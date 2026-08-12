@@ -647,6 +647,27 @@ Remaining polish audit:
   - Broadcast/permission invitation setup.
   - Provider/channel settings.
 
+### Commerce orchestration planning
+
+- [ ] Audit the current Commerce product/provider identity shape before implementing multi-provider orchestration.
+  - Separate canonical Commerce product/variant identity from external provider mappings.
+  - Do not rely on SKU equality as the durable cross-provider identity rule.
+- [ ] Add provider-neutral Commerce capability/role registration that supports multiple concurrent providers.
+  - Allow one provider to satisfy several roles or separate providers to own catalog, checkout/payment, inventory, POS/sales-source, order, or fulfillment-facing responsibilities.
+  - Do not hard-code a single global commerce provider when the concrete client ecosystem needs distinct roles.
+- [ ] Add durable inventory-effect orchestration.
+  - Normalize internal module consumption, external sales webhooks, refunds/returns, and reconciled Commerce purchases into canonical item effects.
+  - Make effects idempotent and safe under webhook/job retries.
+  - Distinguish authority-adjustment-required effects from authority-already-mutated reconciliation so the same sale cannot decrement inventory twice.
+  - Prevent provider feedback loops when an authoritative inventory update produces its own webhook.
+- [ ] Build the Engage Core storefront/presentation layer around Commerce public offers and canonical variants.
+  - Keep payment processing, raw payment data, warehouse/shipping fulfillment, tax/fraud, and deep external store operations with the configured specialized providers.
+  - Use provider-backed checkout/payment primitives rather than building a payment processor.
+- [ ] Implement only the provider packages required by the first concrete client ecosystem after the neutral role contracts are stable.
+  - Treat any Shopify/Square/Stripe/other combination as one implementation example, not a platform default.
+  - Prefer direct provider packages over requiring a separate middleware/integration SaaS account when Engage Core can own the bounded orchestration.
+- [ ] Add Commerce Project State transfer before operational production use of storefront, provider mappings, purchases, or durable inventory orchestration.
+
 ### Vertical module planning
 
 - [ ] Plan the PetServices vertical module.
@@ -659,7 +680,7 @@ Remaining polish audit:
   - Keep pet-specific fields out of Core contacts.
 - [ ] Plan the Music vertical module.
   - Own music-specific fan/customer meaning, release/fan campaign strategy, music product interest categories, and music-specific segmentation rules.
-  - Consume Commerce for Shopify/purchase facts.
+  - Consume Commerce for provider-neutral purchase and inventory facts.
   - Consume Location later for show-radius targeting if needed.
   - Consume Campaigns, Broadcasts, Messaging, and FlowRoutes for fan communication/automation.
   - Contribute vertical-specific route presets/task templates/capability labels through public seams.

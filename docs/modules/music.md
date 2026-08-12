@@ -102,7 +102,7 @@ Initial export is deterministic and on demand. Do not add export-history tables 
 
 ## Commerce boundary
 
-Commerce owns normalized Shopify products, variants, offers, checkout orchestration, orders, and purchase facts.
+Commerce owns canonical provider-neutral products, variants, provider mappings, storefront/offers, checkout orchestration, orders, purchase facts, and inventory-effect orchestration.
 
 Music decides what those facts mean for fan strategy.
 
@@ -116,8 +116,8 @@ Music assigns the music-specific fan/customer interpretation.
 Bad:
 
 ```text
-Core contacts store purchased_shopify_product_ids.
-Music imports the Shopify adapter for generic order sync or checkout.
+Core contacts store provider-specific purchased product IDs.
+Music imports a commerce/payment/inventory provider adapter for generic order sync, inventory sync, or checkout.
 ```
 
 ## Experiences boundary
@@ -130,7 +130,7 @@ Good:
 
 ```text
 Event owns the canonical show.
-Commerce records the Shopify purchase.
+Commerce records the provider-neutral purchase.
 Experiences grants and fulfills the VIP package.
 Music associates the artist/tour context and music-specific presets.
 ```
@@ -157,4 +157,4 @@ Music-owned durable tables must receive an explicit Project State section before
 
 Music Event/show integration and Bandsintown export begin only after the Events foundation, lifecycle/readiness contracts, Project State section, and CRM operations are stable.
 
-Music Experience integration begins only after Shopify-capable Commerce and Experiences have stable public contracts.
+Music Experience integration begins only after provider-capable Commerce and Experiences have stable public contracts for the concrete client ecosystem.

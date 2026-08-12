@@ -2,7 +2,7 @@
 
 Experiences is a planned optional vertical module.
 
-Experiences owns post-purchase and operational fulfillment for special-access packages such as VIP, backstage, meet-and-greet, soundcheck, tour-bus, hospitality, or other managed experiences.
+Experiences owns post-purchase entitlement and operational benefit fulfillment for special-access packages such as VIP, backstage, meet-and-greet, soundcheck, tour-bus, hospitality, or other managed experiences.
 
 Experiences is not Scheduling and is not Commerce.
 
@@ -16,10 +16,10 @@ Commerce
     presents and sells an offer, then records the purchase
 
 Experiences
-    fulfills the purchased package and manages access/participants
+    fulfills the experience benefits and manages access/participants
 ```
 
-Experiences should be built only after Events has a stable public contract and Commerce has a Shopify-capable purchase contract.
+Experiences should be built only after Events has a stable public contract and Commerce has a provider-neutral purchase contract capable of reconciling the concrete provider ecosystem selected for the client.
 
 ## Product barometer
 
@@ -135,7 +135,7 @@ cart
 checkout
 payment processing
 Commerce order state
-Shopify webhooks
+provider-specific commerce webhooks
 generic Event identity or lifecycle
 Event attendance reconciliation
 appointment availability or appointment lifecycle
@@ -146,6 +146,10 @@ Task lifecycle
 ```
 
 Experiences must not become a second checkout, a second Event catalog, or an appointment scheduler.
+
+`fulfillment` in Experiences means fulfilling Experience-owned benefits/access. It does not mean warehouse, shipping, carrier, or ordinary ecommerce order fulfillment. Those external commerce operations remain with the configured provider ecosystem and Commerce's reconciliation layer.
+
+If an Experience package includes inventory-managed merchandise, Experiences owns the package composition meaning while Commerce owns the resulting canonical inventory effect and provider orchestration.
 
 ## Dependency direction
 
@@ -212,11 +216,12 @@ Commerce exclusively owns:
 storefront discovery
 public offer pages
 product presentation
-Shopify product/variant identity
-cart creation
-checkout redirection
+canonical Commerce product/variant identity
+provider-backed cart/checkout orchestration
 purchase and order reconciliation
 purchase-confirmed signal
+inventory-effect orchestration
+provider inventory adjustment/reconciliation
 ```
 
 Experiences owns everything operational after the purchase creates or confirms an entitlement.
@@ -224,13 +229,15 @@ Experiences owns everything operational after the purchase creates or confirms a
 Expected flow:
 
 ```text
-Engage Core Commerce offer page
--> Shopify cart and hosted checkout
--> Shopify webhook/order reconciliation in Commerce
+Engage Core Commerce offer/storefront page
+-> configured provider-backed checkout/payment path
+-> authoritative provider reconciliation in Commerce
 -> Commerce emits purchase-confirmed outcome
 -> Experiences grants the mapped package
+-> Experiences resolves any package-owned inventory component meaning
+-> Experiences submits canonical inventory effects through Commerce when required
 -> purchaser manages participants/access
--> staff scans and fulfills the Experience
+-> staff scans and fulfills the Experience benefits
 ```
 
 The package-to-Commerce mapping belongs to Experiences or an explicit Experiences-owned mapping table because Experiences owns the meaning of the purchased variant.
@@ -243,27 +250,28 @@ participant slots
 benefits
 QR credentials
 check-ins
-fulfillment records
+Experience benefit-fulfillment records
 ```
 
 Experiences must not infer a successful purchase from a browser return URL. It acts only on authoritative Commerce reconciliation or an explicit authorized manual grant.
 
-## Shopify boundary
+## Commerce provider boundary
 
-Experiences does not integrate directly with Shopify.
+Experiences does not integrate directly with commerce, payment, inventory, or point-of-sale provider adapters.
 
 ```text
-Shopify adapter
+provider adapter/package
     belongs behind Commerce contracts
 
 Commerce
-    normalizes and confirms the purchase
+    normalizes and confirms the purchase/inventory facts
 
 Experiences
     consumes Commerce's provider-neutral purchase identity/outcome
+    submits canonical inventory effects through Commerce when package composition requires them
 ```
 
-This keeps Experience fulfillment provider-neutral and prevents Shopify-specific identifiers from becoming the operational entitlement contract.
+This keeps Experience operations provider-neutral and prevents provider-specific identifiers from becoming the operational entitlement contract.
 
 ## Public surface
 
@@ -322,7 +330,7 @@ ExperienceGrant records the purchaser's acquired entitlement.
 Bad:
 
 ```text
-Copy the full Shopify product, variant, price, and order payload into Experience JSON.
+Copy full provider product, variant, price, inventory, or order payloads into Experience JSON.
 Let Commerce own participant and benefit fulfillment.
 ```
 
@@ -401,7 +409,7 @@ Good:
 ```text
 Music associates an artist/show context with an Experience occurrence.
 Experiences manages the purchased VIP package and access.
-Commerce records the Shopify purchase.
+Commerce records the provider-neutral purchase.
 Events owns the canonical show Event.
 ```
 
@@ -456,10 +464,11 @@ Before the Experiences foundation begins, complete:
 ```text
 1. stable Events public contracts and promotion gate
 2. Events Project State support
-3. Commerce product-variant and offer contracts
-4. Shopify cart/checkout and authoritative order reconciliation
+3. Commerce canonical product-variant, provider-mapping, and offer contracts
+4. provider-backed checkout and authoritative purchase reconciliation for the first concrete client ecosystem
 5. Commerce purchase-confirmed provider-neutral signal
-6. Commerce Project State support
+6. Commerce inventory-effect public seam when Experience packages consume inventory-managed items
+7. Commerce Project State support
 ```
 
 Subject-first FlowRoutes and contributor-based Contact filters are prerequisites only for the optional automation/audience integrations that require them; they are not required for the core Experience entitlement and scanning foundation.

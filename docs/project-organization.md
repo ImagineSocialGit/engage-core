@@ -1,4 +1,3 @@
-
 # Engage Core Project Organization
 
 ## Shared config and token contract infrastructure
@@ -201,7 +200,7 @@ Universal modules are reusable capability modules. They may be disabled for many
 | Portal | Loud | External/customer accounts, authentication, invitations, contact-account links, and customer-facing shell. |
 | Forms | Loud | Form definitions/versions plus submission, review, and public/portal form workflows. |
 | Documents | Loud | Document requests, uploads, review events, checklist state, and document lifecycle workflows. |
-| Commerce | Loud | Provider-neutral purchase history plus planned offers and Shopify-backed checkout orchestration. The current repository implements only the customer/product/order history foundation. |
+| Commerce | Loud | Provider-neutral purchase history plus planned custom storefront/offers, checkout orchestration, provider mappings, and inventory-effect orchestration across client-configured provider roles. The current repository implements only the customer/product/order history foundation. |
 | Location | Silent | Reusable normalized location/address facts and optional geographic provider results used through consuming modules; no standalone Location product by default. |
 
 ### Planned universal modules
@@ -230,14 +229,15 @@ Vertical modules should not push domain-specific fields into Core contacts.
 | --- | --- | --- | --- |
 | PetServices | Loud | Pets/dogs, pet profiles, training goals, training programs, behavior notes, and pet-service-specific rules/workflows. | Scheduling, Portal, Forms, Documents, Tasks, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Reporting. |
 | Music | Loud | Artist/show associations, music-specific fan/customer meaning, release/fan strategy, lineup/setlist/tour context, Bandsintown mapping, and music-specific segmentation/presets. | Events, Commerce, Experiences, Messaging, Campaigns, Broadcasts, FlowRoutes, Tasks, Location, Scheduling, Portal, Reporting. |
-| Experiences | Loud | Post-purchase special-access packages, entitlements, participants, benefits, management access, credentials, scanning, check-in, manifests, and fulfillment. | Core, Events, Commerce, plus optional Messaging, Tasks, FlowRoutes, InternalNotifications, Location, and Reporting. |
+| Experiences | Loud | Post-purchase special-access packages, entitlements, participants, benefits, management access, credentials, scanning, check-in, manifests, and Experience benefit fulfillment. | Core, Events, Commerce, plus optional Messaging, Tasks, FlowRoutes, InternalNotifications, Location, and Reporting. |
 
 Approved implementation order:
 
 ```text
 Events foundation and Project State support
--> Shopify-capable Commerce contracts, persistence, reconciliation, and Project State support
--> Experiences entitlement and operational fulfillment
+-> provider-neutral Commerce role contracts, canonical mappings, storefront/checkout/inventory orchestration, reconciliation, and Project State support
+-> first concrete client provider package(s) behind those Commerce seams
+-> Experiences entitlement and operational benefit fulfillment
 -> optional Music/Bandsintown and cross-module automation/audience contributors
 ```
 
@@ -331,7 +331,7 @@ Engage Core
 
 private packages
     engage-integration-arive
-    engage-integration-shopify
+    engage-integration-[commerce-provider]
     future provider packages
 ```
 
@@ -348,7 +348,7 @@ does not own vendor-specific business meaning.
 | Telnyx | Messaging / InboundMessaging |
 | Twilio | Messaging / InboundMessaging |
 | Zoom | Webinars |
-| Shopify Admin/Storefront GraphQL, first Commerce provider integration | Commerce |
+| Commerce catalog/checkout/order/inventory provider packages | Commerce |
 | External calendar providers, later | Scheduling |
 | Geocoding/address providers, later | Location |
 | LOS providers such as Arive, later | Mortgage |
@@ -384,7 +384,7 @@ Examples:
 | Customer login/account | Portal |
 | Intake questionnaire | Forms |
 | Uploaded file/document request | Documents |
-| Shopify purchase sync or hosted-checkout orchestration | Commerce + Shopify adapter |
+| External commerce purchase/inventory sync or provider-backed checkout orchestration | Commerce + the configured provider package(s) |
 | Canonical concert/seminar/open-house occurrence | Events |
 | VIP entitlement, participant, credential, or scan | Experiences |
 | Dog profile/training goals | PetServices |

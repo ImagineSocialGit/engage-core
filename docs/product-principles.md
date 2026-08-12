@@ -170,6 +170,30 @@ Avoid forcing the client to maintain 10 disconnected services.
 Avoid making the client relearn complex SaaS tools for occasional workflows.
 ```
 
+## Best-of-breed provider and middleware principle
+
+Engage Core should not replace specialized external platforms merely because it can technically reproduce part of their behavior.
+
+Prefer this split:
+
+```text
+Engage Core
+    owns the client/customer experience, CRM-aware presentation, cross-module meaning,
+    provider-neutral orchestration, and direct integration glue where custom behavior
+    creates unique value
+
+specialized external provider
+    keeps the capabilities it performs better or more securely, such as payment
+    processing, deep ecommerce/store operations, warehouse/shipping fulfillment,
+    point-of-sale execution, or another provider-owned operational domain
+```
+
+A client may use several providers at once. Provider roles must be explicit and composable rather than assuming one vendor owns the whole business ecosystem.
+
+Avoid introducing a separate middleware/integration SaaS account merely to synchronize providers when Engage Core can perform that bounded orchestration directly through provider-neutral contracts and installed provider packages.
+
+Provider names used in implementation examples are illustrative. They must not become universal module dependencies, canonical schema vocabulary, or assumptions that every client uses the same provider combination.
+
 ## Module capability standard
 
 A module capability is a good fit for Engage Core when it supports one of these outcomes:

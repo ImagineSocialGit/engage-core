@@ -1,4 +1,3 @@
-
 # Client Request Intake Template
 
 Use this prompt when asking a new thread to convert a client request into Engage Core config files.
@@ -83,7 +82,7 @@ Rules:
 - If client copy requires a missing token, list the required message-data/runtime work separately instead of inventing the token.
 - Messaging should block unresolved tokens before provider send.
 - Authoring UI may expose tokens as friendly available fields, but the field must still come from a documented runtime payload/provider/registry.
-- Commerce/Location requests should improve admin/client convenience; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
+- Commerce requests may use Engage Core for custom storefront/presentation and provider-neutral orchestration while external providers retain payment processing, deep store operations, warehouse/shipping fulfillment, or other configured authoritative roles. Do not assume one commerce provider or hard-code an example provider combination. Avoid adding middleware SaaS as an architectural requirement when direct provider packages can connect the client's existing systems. Location remains supporting geographic capability rather than a GIS, routing, or map-provider replacement.
 - If a request needs module behavior beyond config, identify the owning module and list required code/seam work separately.
 
 Canonical contact alias rule:

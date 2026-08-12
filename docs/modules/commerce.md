@@ -1,15 +1,14 @@
-
 # Commerce Module
 
 Commerce is a current universal module with a provider-history foundation already present in the repository.
 
-Current implementation owns normalized customer, product, order, order-item, and order-event records. The approved next direction expands Commerce into the provider-neutral purchasing capability used by Engage Core public offer pages, beginning with Shopify as the first provider integration.
+Current implementation owns normalized customer, product, order, order-item, and order-event records. The approved next direction expands Commerce into the provider-neutral storefront, purchasing, inventory-orchestration, and purchase-history capability used by Engage Core and optional modules.
 
-Commerce must remain provider-neutral even though Shopify is the first implementation target.
+No single commerce, payment, point-of-sale, inventory, or fulfillment provider is an architectural default.
 
 A concise definition:
 
-> Commerce owns the provider-neutral catalog, public-offer, checkout-orchestration, purchase-reconciliation, and purchase-history contracts that optional modules use without owning provider-specific payment or fulfillment internals.
+> Commerce owns the provider-neutral catalog identity, Engage Core storefront/presentation, checkout orchestration, purchase reconciliation, inventory-effect orchestration, purchase history, and cross-provider commerce contracts that optional modules use without owning provider-specific payment, warehouse, shipping, or deep store-operation internals.
 
 ## Current implementation status
 
@@ -37,16 +36,19 @@ Current limitations:
 no Commerce public routes or storefront surface
 no product-variant model
 no Commerce offer model
-no provider contracts or provider manager
-no Shopify adapter
-no Storefront cart/checkout orchestration
-no verified Shopify webhook handlers
-no purchase-confirmed public signal
+no provider contracts or provider manager/role registry
+no normalized multi-provider product/variant mapping
+no inventory-effect/adjustment orchestration
+no configured inventory-authority resolution
+no provider adapters for the planned Commerce seams
+no provider-backed cart/checkout orchestration
+no verified commerce-provider webhook handlers
+no provider-neutral purchase-confirmed public signal
 no Commerce Project State transfer section
 no Commerce CRM operations
 ```
 
-The existing tables are a useful normalized purchase-history base, but they are not sufficient for the approved Shopify-backed storefront and VIP purchasing flow.
+The existing tables are a useful normalized purchase-history base. They are not yet sufficient for the approved provider-neutral storefront, cross-provider inventory coordination, or optional-module purchasing flows.
 
 ## Product barometer
 
@@ -60,39 +62,125 @@ Appropriate client/admin Commerce work:
 
 ```text
 See what a Contact purchased.
-Review recent Shopify orders.
-Create or manage a focused Engage Core public offer.
+Review recent reconciled orders.
+Create or manage a focused Engage Core public offer/storefront presentation.
 Associate an offer with one or more sellable variants.
 Publish an eligible offer.
-Open the provider order when deeper fulfillment work belongs in Shopify.
-Target Contacts from normalized purchase facts through contributed filters later.
+Review inventory availability/projection status.
+Open the authoritative provider record when deeper store or fulfillment work belongs there.
 ```
 
 Operator/developer work:
 
 ```text
-Configure Shopify credentials and webhook delivery.
-Define provider reconciliation policy.
+Configure installed provider packages and credentials.
+Bind provider capabilities/roles for the client ecosystem.
+Define provider reconciliation and idempotency policy.
 Map provider customers to Core Contacts.
+Map provider catalog identities to canonical Commerce products/variants.
 Choose the client-configured public Commerce host.
-Configure product/variant synchronization.
+Configure inventory authority and external sales sources.
 Configure optional Event and Experience relationships through public seams.
 ```
 
-Commerce should not ask clients to maintain a second full ecommerce platform. Engage Core should add focused branded presentation and orchestration where Shopify-native pages are operationally awkward, while Shopify remains authoritative for its commercial records.
+Commerce should not ask clients to maintain a second full operations platform when a mature provider already owns payment processing, shipping, warehouse/fulfillment, tax, fraud, or deep store administration well.
+
+Commerce should also avoid forcing clients to adopt a separate middleware/integration SaaS merely to connect providers that Engage Core can integrate directly through its own provider-neutral seams.
+
+## Architectural north star
+
+Commerce is the experience and orchestration layer, not a replacement for every specialized external commerce system.
+
+Preferred shape:
+
+```text
+Customer / operator
+    -> Engage Core storefront and CRM experience
+    -> Commerce provider-neutral orchestration
+    -> one or more installed provider packages
+    -> external systems performing the specialized work they own
+```
+
+Engage Core should own the parts where its combined CRM/module context creates unique value:
+
+```text
+custom storefront/presentation
+CRM-aware buying flows
+cross-module purchase meaning
+normalized purchase history
+cross-provider product identity
+inventory-effect orchestration
+cross-provider reconciliation
+automation/read-model outcomes
+```
+
+External providers may remain authoritative for one or more of:
+
+```text
+payment processing
+secure payment-data handling
+order creation
+inventory quantity
+warehouse operations
+shipping
+returns
+tax
+fraud
+deep store administration
+point-of-sale execution
+```
+
+The exact authority split is client configuration, not a universal vendor assumption.
+
+## Provider-role model
+
+Commerce must support more than one provider in the same client ecosystem.
+
+A client may use one provider for several roles or different providers for different roles.
+
+Conceptual provider roles/capabilities may include:
+
+```text
+catalog authority/source
+inventory authority
+online checkout/order provider
+payment processor
+order/fulfillment operations provider
+in-person sales/POS source
+external marketplace/sales source
+```
+
+Examples are illustrative only:
+
+```text
+one provider may own catalog + inventory + online checkout + fulfillment
+another provider may produce in-person sales
+a separate payment provider may process online payment
+```
+
+Do not reduce Commerce to one global `selected_provider` when the implemented workflows require multiple concurrent providers.
+
+Provider configuration should bind capabilities/roles, not hard-code vendor names into Commerce controllers or vertical modules.
+
+A single provider package may implement several Commerce contracts.
+
+Several provider packages may be installed and active at once.
 
 ## Responsibility
 
 Commerce should answer:
 
 ```text
-Which sellable product and variant is this?
-Which Engage Core offer presents it publicly?
+Which canonical product and variant is this?
+Which external provider identities represent it?
+Which Engage Core offer/storefront presentation exposes it?
 May that offer be published?
-Which provider cart/checkout was initiated?
+Which provider-backed checkout or transaction was initiated?
 Which authoritative order and order items were reconciled?
 Which Core Contact or provider customer owns the purchase?
-What provider-neutral purchase outcome should consumers receive?
+What inventory effect did the business activity create?
+Does that effect require an authoritative provider mutation or only reconciliation?
+What provider-neutral purchase/inventory outcome should consumers receive?
 ```
 
 Commerce stays vertical-neutral.
@@ -108,40 +196,46 @@ course purchases
 appointment add-ons
 pet-service packages
 music fan products
-general Shopify purchase history
+general external commerce purchase history
 ```
 
-Vertical modules own the meaning and fulfillment of those purchases.
+Vertical modules own the vertical meaning of those purchases.
 
-## Approved storefront shape
+## Storefront and transaction boundary
 
-Commerce supports three distinct surfaces:
+Engage Core may own the public storefront/presentation layer.
+
+That can include:
 
 ```text
-Shopify-native storefront
-    may remain the simplest surface for ordinary merchandise
-
-Engage Core Commerce public offer pages
-    focused branded presentation for custom offers, VIP packages, or workflows
-    that are cumbersome to express in the Shopify theme
-
-Shopify-hosted checkout
-    authoritative cart/checkout/payment execution for both paths
+product/offer discovery
+custom layouts and presentation
+CRM-aware content
+variant selection
+cart presentation when useful
+cross-module context
+custom calls to action
+provider-backed checkout initiation
 ```
 
-The initial VIP purchasing path is:
+Commerce should not require clients to build the customer experience inside a provider theme/template environment when Engage Core can present it better.
+
+The storefront boundary does not make Engage Core the payment processor, warehouse, shipping system, tax engine, or deep store-operations platform.
+
+Payment execution must remain behind an external provider's secure primitives.
+
+Depending on the selected provider role, the handoff may be:
 
 ```text
-Engage Core Commerce offer page
--> Shopify Storefront cart
--> Shopify-hosted checkout
--> Shopify webhooks
--> Commerce order reconciliation
--> provider-neutral purchase-confirmed signal
--> Experiences grants the mapped package
+provider-hosted checkout URL
+provider-backed checkout/session API
+provider-secure embedded payment component
+another provider-supported payment/transaction primitive
 ```
 
-A browser return or success URL is not authoritative proof of payment. Commerce derives purchase state from provider reconciliation and verified webhooks.
+Engage Core must not receive or persist raw card data.
+
+When the external provider also owns authoritative order or fulfillment state, Commerce reconciles that state rather than recreating a competing operations engine.
 
 ## Owns
 
@@ -149,9 +243,10 @@ Commerce owns:
 
 ```text
 commerce customer/provider identity records
-normalized product identity
-normalized product-variant identity
-provider-neutral public offer identity and presentation state
+canonical normalized product identity
+canonical normalized product-variant identity
+provider identity mappings for Commerce products/variants
+provider-neutral public offer/storefront identity and presentation state
 offer-to-variant availability
 public offer publication decisions
 provider-neutral cart/checkout orchestration contracts
@@ -160,6 +255,9 @@ normalized order identity
 normalized order-item purchase snapshots
 compact order lifecycle history
 provider-neutral purchase-confirmed outcomes
+inventory-effect normalization and orchestration
+inventory-authority resolution
+inventory adjustment/reconciliation idempotency
 purchase-history read/query services
 Commerce-owned automation events
 Commerce public and CRM surfaces
@@ -175,15 +273,17 @@ commerce_order_items
 commerce_order_events
 ```
 
-Approved next durable concepts:
+Approved next durable concepts include:
 
 ```text
 commerce_product_variants
 commerce_offers
 commerce_offer_variants
+normalized provider mappings for canonical products/variants
+durable inventory-effect/adjustment state sufficient for idempotent orchestration
 ```
 
-Exact migration columns and indexes must be confirmed in the Commerce implementation audit against the current Shopify API contract and existing model fields.
+Exact mapping/inventory table names, columns, and indexes must be confirmed in the Commerce implementation audit against the current repository and first concrete provider ecosystem. Do not force a vendor-specific schema merely because the first implementation uses one vendor.
 
 ## Does not own
 
@@ -191,20 +291,20 @@ Commerce does not own:
 
 ```text
 Core Contact identity
-Shopify credentials or webhook secrets
-Shopify's authoritative pricing and inventory
-Shopify's cart implementation
-Shopify-hosted checkout UI
-payment processing
-card data
+provider credentials or webhook secrets
+raw card/payment credentials
+provider-specific secure payment internals
 a general payment ledger unless later justified
-warehouse or stock movement
+warehouse management
 shipping-label execution
-full fulfillment operations
+carrier operations
+provider-native tax/fraud systems
+deep provider store administration
 Experience entitlements
 Experience participants
 Experience benefits
 Experience credentials or scanning
+Experience benefit/check-in fulfillment
 Event identity or lifecycle
 artist, tour, fan, or music-specific meaning
 Messaging consent or delivery
@@ -214,102 +314,94 @@ FlowRoute execution
 Task lifecycle
 ```
 
-Commerce may normalize provider status and history without claiming authority over provider-owned execution.
+Commerce may normalize provider status, inventory effects, and history without claiming authority over provider-owned execution.
 
-## Provider authority
+## Authority and source-of-truth rules
 
-For the initial Shopify integration:
+Authority is a configured business contract.
+
+Do not assume the provider that produced a sale is also the inventory authority, order authority, payment processor, or fulfillment system.
+
+Conceptual examples:
 
 ```text
-Engage Core Commerce
-    owns branded public offer pages
-    owns provider-neutral offer publication
-    owns Contact association
-    owns normalized purchase records
-    owns post-purchase provider-neutral signals
+external POS sale
+    source = POS provider
+    inventory authority = another provider
+    -> Commerce may need to request an inventory adjustment from the authority
 
-Shopify
-    owns authoritative products and variants
-    owns authoritative price and inventory availability
-    owns cart and checkout
-    owns payment processing
-    owns authoritative order/payment/fulfillment state
+sale completed by the configured inventory/order authority itself
+    source = authority provider
+    authority already changed inventory
+    -> Commerce reconciles the authoritative result
+    -> Commerce must not apply the same decrement again
+
+internal package consumption
+    source = Engage Core module
+    inventory authority = configured external provider
+    -> Commerce requests the authoritative adjustment
 ```
 
-Engage Core may cache or normalize provider facts required for public presentation and reconciliation, but it must not silently diverge from Shopify's authoritative state.
+This distinction prevents double-decrements.
 
-## Shopify integration boundary
+Commerce may keep normalized local projections/caches required for storefront presentation and business logic, but the configured authority remains authoritative for the facts assigned to that role.
 
-Shopify is the first Commerce provider adapter and should establish the external
-provider-package pattern.
+A future client may configure different authorities for different inventory pools or business scopes. Do not hard-code a single global authority into schema unless the first implementation proves that restriction is intentional.
+
+## Integration/provider-package boundary
+
+New Commerce provider implementations should follow the external provider-package pattern.
 
 Expected implementation location:
 
 ```text
 separate private Composer package/repository
-    e.g. engage-integration-shopify
+    engage-integration-[provider]
 ```
 
-Do not add a new long-lived `app/Integrations/Commerce/Shopify` implementation merely
-because older provider adapters currently live inside Engage Core.
-
-Engage Core's Commerce module owns the provider-neutral Commerce contracts, managers,
-normalized persistence, public offer/checkout orchestration, and purchase outcomes.
-The Shopify package owns Shopify-specific Admin/Storefront GraphQL clients, verification,
-mapping, payload interpretation, and provider implementation. The package should declare
-a compatible Engage Core version and register itself explicitly into Commerce's supported
-provider seams.
-
-Expected provider-facing responsibilities:
+Engage Core's Commerce module owns:
 
 ```text
-Storefront GraphQL client
-    product/variant lookup required by public offers
-    cart creation and updates
-    hosted checkout URL retrieval
-
-Admin GraphQL client
-    product/variant reconciliation
-    customer reconciliation
-    order and order-item reconciliation
-    administrative provider reads required by sync/recovery
-
-Webhook verifier and handlers
-    verify provider signatures
-    use the shared webhook inbox/receipt infrastructure
-    reconcile normalized Commerce state idempotently
+provider-neutral contracts
+provider role/capability registration
+normalized persistence
+public storefront/offer orchestration
+checkout orchestration
+purchase outcomes
+inventory-effect orchestration
+read/query services
 ```
 
-Do not build a new Shopify integration on the legacy REST Admin API.
-
-Provider-specific payload parsing and identifiers remain inside the adapter or normalized Commerce provider DTOs. Consumers such as Experiences must not import Shopify adapter classes.
-
-Expected conceptual adapter collaborators:
+A provider package owns only the vendor-specific implementation it can authoritatively perform, for example:
 
 ```text
-ShopifyStorefrontClient
-ShopifyAdminClient
-ShopifyWebhookVerifier
-ShopifyWebhookHandler
-ShopifyProductMapper
-ShopifyOrderMapper
-ShopifyCustomerMapper
+catalog/product lookup
+checkout/session creation
+order reads/reconciliation
+inventory reads/adjustments
+webhook verification
+webhook payload interpretation
+customer mapping inputs
+provider-specific identifier conversion
 ```
 
-Exact class names should follow the repository conventions confirmed during implementation.
+A provider package must not become the place where Experience, Music, Event, Contact, Campaign, or other cross-module business meaning is hard-coded.
+
+Existing in-repository adapters may remain until deliberately extracted. New Commerce providers should normally establish the private-package pattern instead of adding new long-lived vendor directories merely for symmetry.
 
 ## Provider-neutral contracts
 
-Commerce should expose provider-neutral contracts before public pages or optional modules depend on Shopify internals.
+Commerce should expose provider-neutral contracts before public pages or optional modules depend on provider internals.
 
-Likely contracts and services:
+Likely capability contracts/services include:
 
 ```text
-CommerceProvider
-CommerceProviderManager
+CommerceProviderRegistry
+CommerceProviderRoleResolver
 CommerceCatalogProvider
 CommerceCheckoutProvider
 CommerceOrderProvider
+CommerceInventoryProvider
 CommerceWebhookReconciler
 CommerceProductReadService
 CommerceVariantReadService
@@ -320,9 +412,31 @@ CommerceContactLinker
 CommercePromotionGate
 CommerceCheckoutService
 CommercePurchaseOutcomePublisher
+CommerceInventoryEffectRecorder
+CommerceInventoryOrchestrator
+CommerceInventoryReconciler
 ```
 
-The provider manager should resolve the selected provider from deployment/client configuration without hard-coded Shopify branching in controllers or vertical modules.
+Exact class names should follow repository conventions confirmed during implementation.
+
+Do not require every provider package to implement every contract.
+
+For example:
+
+```text
+POS-only provider
+    may implement webhook/order-sale input
+    may not implement online checkout
+
+payment-only provider
+    may implement checkout/payment capability
+    may not own catalog or inventory
+
+full commerce provider
+    may implement catalog, checkout, orders, inventory, and fulfillment-facing reads
+```
+
+Role resolution should fail loudly when an intended workflow requires a capability that no installed/configured provider implements.
 
 ## Commerce customers and Core Contacts
 
@@ -342,14 +456,14 @@ Good:
 
 ```text
 commerce_customers.contact_id = Contact #123
-commerce_customers.provider = shopify
+commerce_customers.provider = configured provider key
 commerce_customers.external_id = provider customer identity
 ```
 
 Bad:
 
 ```text
-contacts.shopify_customer_id
+contacts.provider_customer_id
 contacts.total_spent_cents
 contacts.last_ordered_at
 contacts.purchased_product_ids
@@ -359,45 +473,188 @@ Commerce-owned purchase facts stay in Commerce tables.
 
 Contact matching must be explicit, deterministic, and repairable. Email or phone similarity may suggest a match but should not silently merge identities when confidence is insufficient.
 
-## Products and variants
+## Products, variants, and provider mappings
 
-A Commerce product represents provider-neutral product identity.
+A Commerce product represents canonical provider-neutral product identity.
 
-A Commerce product variant represents the actual sellable unit required by Shopify cart lines and order reconciliation.
+A Commerce product variant represents the canonical sellable/inventory unit used by offers, purchases, inventory effects, and provider mapping.
 
-The existing `commerce_products` table remains useful for product-level identity and purchase intelligence.
+The existing `commerce_products` table remains useful for product-level identity and purchase intelligence, but its current provider/external identity assumptions must be audited before it is treated as the final cross-provider catalog shape.
 
-The next schema slice should add a normalized `commerce_product_variants` table rather than storing all variants in `commerce_products.meta` or raw provider payloads.
+The next schema slice should add normalized product variants rather than storing all variants in product metadata or raw provider payloads.
 
-Expected variant facts may include:
+Expected canonical variant facts may include:
 
 ```text
 commerce_product_id
-key or provider-neutral identity
+stable key
 sku nullable
 title/name
 status
-currency
-price_cents or synchronized presentation price
-compare-at price when operationally required
-availability state
-provider
-external_id
-external_product_id
-external_url nullable
-published_at nullable
-provider synchronization timestamps
+presentation facts required by Commerce
 ```
 
-Shopify remains authoritative for price and inventory. Engage Core should revalidate provider availability before cart creation.
+Provider-specific facts should not force the canonical row to represent only one provider.
 
-Do not add inventory/warehouse tables merely because Shopify exposes inventory concepts. Add only the normalized fields required by the approved Engage Core workflow.
+A product/variant may need several external mappings:
 
-## Public offers
+```text
+Core variant 42
+    -> provider A catalog/variant identity
+    -> provider B POS/catalog identity
+    -> provider C marketplace identity
+```
+
+Use normalized provider mapping records when cross-provider orchestration requires them.
+
+Do not rely on SKU equality as the only cross-provider identity rule.
+
+SKU may help suggest mappings, but durable reconciliation should use explicit provider identity mappings once confirmed.
+
+Price and availability authority are role/configuration decisions. Commerce should revalidate authoritative provider state before checkout or inventory-sensitive publication when required by the selected provider contract.
+
+## Inventory orchestration
+
+Commerce should own a provider-neutral inventory-effect contract.
+
+The important incoming fact is not merely:
+
+```text
+inventory_reduced
+```
+
+because the authoritative inventory system may not have been changed yet.
+
+The incoming concept is closer to:
+
+```text
+business activity consumed or restored quantity
+```
+
+The producing module/adapter must determine the actual inventory effect from its authoritative business facts. Do not assume every purchase decrements immediately, every refund restocks, or every cancellation restores quantity.
+
+Examples:
+
+```text
+external point-of-sale purchase
+Experience package purchase consuming mapped merchandise
+Commerce storefront purchase
+refund or return
+manual provider reconciliation
+```
+
+A normalized inventory effect should identify compact durable facts such as:
+
+```text
+canonical Commerce variant/item identity
+quantity delta or consumed/restored quantity
+reason
+source type/provider/module
+source reference/idempotency identity
+occurred_at
+inventory scope/location identity when the configured authority requires it
+authority/reconciliation context required to avoid duplicate mutation
+```
+
+Exact persistence shape is deferred to the implementation audit.
+
+### One orchestration path, different authority behavior
+
+Multiple sources may normalize into the same Commerce inventory pipeline:
+
+```text
+internal module
+external provider webhook
+Commerce purchase reconciliation
+    -> canonical inventory effect
+    -> inventory orchestration
+```
+
+But they do not always produce the same outbound provider mutation.
+
+Commerce must decide:
+
+```text
+authoritative system has NOT already applied this effect
+    -> issue one idempotent authoritative mutation through the configured provider path
+
+authoritative system ALREADY applied this effect
+    -> reconcile/refresh local projection only
+    -> do not decrement again
+
+another authoritative operation being created by Core will itself apply the effect
+    -> perform that operation once
+    -> do not also send a separate inventory adjustment
+```
+
+That decision is critical for provider-originated purchases and Commerce storefront purchases whose checkout/order/fulfillment provider may also be the inventory authority.
+
+### Idempotency
+
+Inventory effects must be durable and idempotent.
+
+Webhook retries, queue retries, job retries, browser retries, or duplicate provider notifications must not apply the same inventory change twice.
+
+Use stable source identity and bounded normalized payloads.
+
+Do not rely on an ephemeral event listener alone for a business-critical stock mutation.
+
+### Feedback-loop prevention
+
+Provider reconciliation must not create an endless or duplicate adjustment loop.
+
+Bad:
+
+```text
+provider sale
+-> Core adjusts authority
+-> authority inventory webhook
+-> Core treats webhook as a new sale/effect
+-> Core adjusts authority again
+```
+
+Core must distinguish:
+
+```text
+new business effect requiring propagation
+authoritative state confirmation/reconciliation
+```
+
+### Bundles and package composition
+
+A consuming module may own the business meaning of a package while Commerce owns the canonical inventory effects.
+
+Example:
+
+```text
+Experience package
+    -> 1 canonical shirt variant
+    -> 1 canonical poster variant
+    -> 1 canonical credential/merch variant when inventory-managed
+
+authoritative package purchase
+    -> Experiences resolves package composition
+    -> Experiences submits compact inventory effects through Commerce public seams
+    -> Commerce applies/reconciles them against the configured inventory authority
+```
+
+Commerce should not own Experience package semantics merely because inventory is involved.
+
+### Inventory projections
+
+Commerce may maintain a normalized local inventory projection/cache when needed for storefront availability, reporting, or orchestration.
+
+That projection is not automatically the source of truth.
+
+When provider authority is configured, authoritative reconciliation wins.
+
+Do not build a warehouse-management subsystem merely because providers expose warehouses, bins, transfers, or locations. Add normalized location/pool concepts only when an approved Engage Core workflow requires them.
+
+## Public offers and storefront presentation
 
 A Commerce offer is the Engage Core-authored public presentation and publication identity.
 
-An offer is not a second provider product.
+An offer is not automatically a second provider product.
 
 It may provide:
 
@@ -406,7 +663,7 @@ stable slug
 client-facing title and description
 presentation order
 publication lifecycle
-optional hero/supporting copy according to the shared media/content conventions
+optional hero/supporting copy according to shared media/content conventions
 selected sellable variants
 default variant
 publication window or explicit publication state
@@ -414,9 +671,7 @@ optional Event linkage through a Commerce-owned relationship or subject seam
 optional vertical-owned mapping references
 ```
 
-The exact content/media model must follow repository-wide media and content conventions. Do not introduce an isolated Commerce image-storage pattern without that shared decision.
-
-Expected tables:
+Expected tables remain:
 
 ```text
 commerce_offers
@@ -425,13 +680,24 @@ commerce_offer_variants
 
 `commerce_offer_variants` should normalize the variants available through an offer, their ordering, and any default selection. Do not store a variant-ID list in offer JSON.
 
+The same Commerce product/variant may appear in:
+
+```text
+an Engage Core storefront
+an external provider-native storefront
+an external POS
+another marketplace/channel
+```
+
+Commerce should not assume only one sales surface exists.
+
 ## Public Commerce host
 
 The public Commerce host must be deployment/client configuration and must not be hard-coded.
 
 The exact environment key and host convention should be finalized in the Commerce implementation audit.
 
-Public routes should expose focused offer pages and checkout initiation, not CRM internals or provider credentials.
+Public routes should expose storefront/offer pages and checkout initiation, not CRM internals or provider credentials.
 
 The public surface should remain usable independently of Experiences. An offer may sell merchandise or another provider-backed product without an Experience relationship.
 
@@ -444,9 +710,10 @@ A Commerce offer may require:
 ```text
 offer active/publishable state
 at least one active mapped variant
-provider availability
+required provider-role readiness
+authoritative availability when applicable
 valid public slug/presentation
-provider checkout capability
+checkout capability
 optional upstream Event promotion eligibility
 optional vertical capability readiness
 ```
@@ -470,20 +737,22 @@ Existing valid orders and Experience entitlements remain manageable after an Eve
 Commerce public checkout initiation should:
 
 ```text
-load the current offer and selected variant through Commerce read services
+load the current offer and selected canonical variant through Commerce read services
 run Commerce and optional upstream promotion gates
-revalidate provider availability
-create/update a provider cart through the selected provider contract
-obtain the provider-hosted checkout URL
-redirect the customer to the provider checkout
+resolve the configured checkout provider capability
+revalidate authoritative availability/pricing when required
+create/update the provider-backed checkout/cart/session
+obtain the provider-supported next checkout/payment step
 record only minimal operational correlation required for reconciliation
 ```
 
-Do not store payment data.
+Do not store raw payment data.
 
 Ephemeral carts and checkout sessions should not become durable Project State unless a later recovery requirement proves they must survive a clean rebuild.
 
-A checkout redirect response is not an order.
+A checkout redirect, session creation, or browser success return is not an authoritative paid order.
+
+Authoritative purchase state comes from provider reconciliation and verified provider events/reads.
 
 ## Orders and order items
 
@@ -512,7 +781,7 @@ external_url
 
 `financial_status` is a provider-style status, not a full payment ledger.
 
-`fulfillment_status` is a provider-style status, not an Engage Core fulfillment engine.
+`fulfillment_status` is a provider-style normalized status, not an Engage Core shipping/warehouse engine.
 
 `commerce_order_items` preserves the purchase-time snapshot.
 
@@ -539,7 +808,7 @@ external_url
 
 Order-item snapshots must remain stable when current provider product copy or price changes.
 
-The next implementation should link normalized order items to `commerce_product_variants` where deterministically resolvable while retaining provider identity snapshots required for historical truth.
+The next implementation should link normalized order items to canonical `commerce_product_variants` where deterministically resolvable while retaining provider identity snapshots required for historical truth.
 
 ## Order events and webhook inbox
 
@@ -547,11 +816,13 @@ The next implementation should link normalized order items to `commerce_product_
 
 It must not become a duplicate full raw webhook archive.
 
-The shared `webhook_inbox_receipts` infrastructure should own webhook receipt deduplication, processing status, retry evidence, and idempotent provider delivery handling.
+The shared `webhook_inbox_receipts` infrastructure should own webhook receipt deduplication, processing status, retry evidence, and idempotent provider delivery handling when that infrastructure is used by the provider package.
 
 Commerce order events should store only normalized lifecycle facts and narrowly justified provider context.
 
-Avoid retaining large raw Shopify payloads on every normalized record when the required historical/business facts are already represented in first-class columns.
+Avoid retaining large raw provider payloads on every normalized record when required historical/business facts are already represented in first-class columns.
+
+External sales/inventory provider webhooks should likewise normalize through Commerce rather than becoming public vendor-specific domain events.
 
 ## Purchase-confirmed outcome
 
@@ -564,29 +835,31 @@ commerce_order_id
 commerce_order_item_id or item identities
 contact_id nullable
 commerce_customer_id nullable
-provider
+provider/source identity
 provider order identity
 occurred_at
 ```
 
 Do not copy full order/product/provider payloads into the automation event.
 
-The outcome must be idempotent so repeated Shopify webhooks cannot grant duplicate Experience packages or start duplicate automation.
+The outcome must be idempotent so repeated provider webhooks cannot grant duplicate Experience packages, duplicate inventory effects, or start duplicate automation.
 
 ## Experiences boundary
 
-Commerce exclusively owns everything through purchase:
+Commerce owns everything through provider-neutral purchasing and inventory orchestration:
 
 ```text
-public discovery
+public discovery/storefront
 public offer page
 product/variant selection
-cart and checkout orchestration
+checkout orchestration
 provider order reconciliation
 purchase-confirmed signal
+canonical inventory effects
+provider inventory adjustment/reconciliation
 ```
 
-Experiences owns everything operational after purchase:
+Experiences owns the post-purchase special-access meaning:
 
 ```text
 package mapping meaning
@@ -597,12 +870,16 @@ management access
 credentials
 scanning
 check-in
-fulfillment
+experience-benefit fulfillment
 ```
 
 The mapping from a Commerce variant/order item to an Experience package belongs to Experiences or an explicit Experiences-owned mapping table because Experiences owns the entitlement meaning.
 
+If an Experience package consumes inventory-managed merchandise, Experiences owns the package-to-item composition meaning and submits the resulting canonical inventory effects through Commerce's public inventory seam.
+
 Commerce must not create Experience grants or credentials directly.
+
+Experiences must not become the shipping/warehouse fulfillment system for ordinary Commerce orders merely because it uses the word fulfillment for package benefits.
 
 ## Events boundary
 
@@ -616,7 +893,7 @@ Commerce does not copy Event schedule/location/lifecycle snapshots into generic 
 
 ## Music and other vertical boundaries
 
-Commerce records purchase facts.
+Commerce records provider-neutral purchase and inventory facts.
 
 Vertical modules interpret those facts.
 
@@ -626,15 +903,15 @@ Examples:
 Commerce records that a Contact bought a T-shirt.
 Music decides whether that Contact belongs in a merch-buyer segment.
 
-Commerce records that a Shopify order item maps to a VIP package.
-Experiences grants and fulfills the package.
+Commerce records that an order item maps to a VIP package.
+Experiences grants and fulfills the experience package.
 Music may provide artist/tour-specific meaning.
 
 Commerce records that a Contact bought a dog-training package.
 PetServices decides what that purchase means operationally.
 ```
 
-Vertical modules must not import Shopify adapter classes for generic purchase sync or checkout behavior.
+Vertical modules must not import provider adapter classes for generic purchase sync, inventory sync, or checkout behavior.
 
 ## Segmentation and Contact filters
 
@@ -659,7 +936,7 @@ Do not make Broadcasts or Campaigns query Commerce private tables directly.
 
 Commerce records its own state first and emits neutral automation events through the shared Automation Event outbox.
 
-Likely implemented outcomes may include:
+Likely outcomes may include:
 
 ```text
 commerce.order_reconciled
@@ -667,13 +944,16 @@ commerce.order_paid
 commerce.order_cancelled
 commerce.order_refunded
 commerce.purchase_confirmed
+commerce.inventory_effect_recorded
+commerce.inventory_adjusted
+commerce.inventory_reconciled
 ```
 
 Exact keys should be introduced only with implemented actions and consumers.
 
 Provider-specific webhook topics must not become the public domain-event contract.
 
-Current FlowRoutes runtime is Contact-centered. Contact-linked purchase events can use the existing generic seam when integration is added. Contactless provider/order events that require subject-only orchestration depend on the planned subject-first FlowRoutes generalization.
+Current FlowRoutes runtime is Contact-centered. Contact-linked purchase events can use the existing generic seam when integration is added. Contactless provider/order/inventory events that require subject-only orchestration depend on the planned subject-first FlowRoutes generalization.
 
 ## Messaging boundary
 
@@ -691,11 +971,11 @@ provider submission and attempts
 
 Commerce must use public Messaging actions/contracts and must not create ScheduledMessage rows directly.
 
-Provider checkout/order emails remain Shopify-owned unless the client explicitly configures Engage Core transactional follow-up through Messaging.
+Provider-native checkout/order emails may remain provider-owned when that external platform is authoritative for those operations. Engage Core transactional follow-up is a separate configured Messaging decision.
 
 ## Reporting boundary
 
-Reporting may consume Commerce read/query services for purchase totals, products, variants, offers, orders, and Contact purchase history.
+Reporting may consume Commerce read/query services for purchase totals, products, variants, offers, orders, inventory effects/projections, and Contact purchase history.
 
 Reporting must not mutate Commerce state.
 
@@ -703,7 +983,7 @@ Reporting must not mutate Commerce state.
 
 Commerce remains functional without FlowRoutes.
 
-FlowRoutes may coordinate purchase follow-up through Commerce public actions and neutral automation events.
+FlowRoutes may coordinate purchase or inventory follow-up through Commerce public actions and neutral automation events.
 
 Commerce must not import FlowRoutes models or store FlowRoutes-specific foreign keys merely for provenance symmetry.
 
@@ -713,9 +993,9 @@ Current Commerce tables are explicitly discovered and policy-controlled by Proje
 
 That is acceptable only while Commerce remains an unused foundation whose tables must be empty.
 
-Before Shopify-backed Commerce becomes operational, Project State must transfer all durable Commerce state required to survive a controlled clean rebuild.
+Before provider-backed Commerce becomes operational, Project State must transfer all durable Commerce state required to survive a controlled clean rebuild.
 
-Expected transfer coverage:
+Expected transfer coverage includes at least:
 
 ```text
 commerce_customers
@@ -726,6 +1006,8 @@ commerce_offer_variants
 commerce_orders
 commerce_order_items
 commerce_order_events
+provider product/variant mappings once implemented
+durable inventory orchestration records once implemented
 ```
 
 Transfer:
@@ -737,12 +1019,13 @@ Contact associations
 normalized customers/products/variants/orders/items
 compact operational lifecycle history
 current publication state
+durable inventory effects required for idempotency/reconciliation
 ```
 
 Do not transfer as durable state:
 
 ```text
-Shopify access tokens
+provider access tokens
 webhook secrets
 provider credentials
 ephemeral carts
@@ -751,29 +1034,23 @@ reconstructible caches
 full redundant provider payload archives
 ```
 
-Do not enable production Shopify workflows while Commerce remains under a must-be-empty Project State policy.
+Do not enable production Commerce workflows while Commerce remains under a must-be-empty Project State policy.
 
-The expected Project State sequence, if no intervening format-changing batch lands, is:
-
-```text
-current repository format: version 10
-Events foundation: version 11
-Shopify-capable Commerce foundation: version 12
-```
-
-Recalculate those numbers from the fresh repository snapshot if another Project State batch lands first.
+The expected Project State version must be recalculated from the fresh repository snapshot when the Commerce section lands. Do not preserve a predicted version number as architectural truth.
 
 ## Setup validation
 
 Commerce setup validation should eventually verify:
 
 ```text
-module and provider configuration consistency
-selected provider contract is registered
-required Shopify credentials are present outside test/dev sink modes
+module and provider-role configuration consistency
+required provider contracts are registered for every configured role
+required provider credentials are present outside test/dev sink modes
 public Commerce host is valid and client-configured
-webhook configuration is complete
-configured offer mappings reference valid products/variants
+webhook configuration is complete for enabled inbound provider flows
+configured provider mappings reference valid canonical products/variants
+configured inventory authority is resolvable
+an inventory effect cannot be routed into an impossible/missing authority path
 Event-linked offers can resolve the Events promotion gate when Events is enabled
 Project State no longer classifies operational Commerce tables as must-be-empty
 ```
@@ -783,52 +1060,98 @@ Validation should report actionable findings without making external provider ca
 ## Implementation order
 
 ```text
-1. Commerce architecture audit against current tables and Shopify requirements
-2. provider-neutral contracts and provider manager
-3. normalized product-variant schema/model
-4. Commerce offer and offer-variant schema/model
-5. Project State Commerce section and current-format version bump
-6. external Shopify package: Admin/Storefront GraphQL adapter foundation
-7. verified webhook inbox integration and idempotent reconciliation
-8. provider-neutral purchase-confirmed outcome
-9. Commerce CRM operations
-10. client-configured public offer surface and checkout redirect
-11. optional Event promotion gate integration
-12. Experiences package mapping and grant consumption
-13. optional Contact filters, Messaging, FlowRoutes, and Reporting contributors
+1. Commerce architecture audit against current tables and the first concrete client provider ecosystem
+2. provider-neutral capability/role contracts and provider registration
+3. canonical product-variant schema/model
+4. normalized multi-provider product/variant mapping
+5. Commerce offer/storefront presentation schema/model
+6. durable inventory-effect/orchestration contract with idempotency and loop prevention
+7. Project State Commerce section and current-format version bump
+8. first required external provider package(s) for the concrete client roles
+9. verified webhook inbox integration and idempotent order/inventory reconciliation
+10. provider-neutral purchase-confirmed outcome
+11. Commerce CRM operations
+12. client-configured public storefront/offer surface and provider-backed checkout
+13. optional Event promotion gate integration
+14. Experiences package mapping/grant and inventory-component consumption
+15. optional Contact filters, Messaging, FlowRoutes, and Reporting contributors
 ```
 
-Commerce provider/contracts, persistence, Project State, and reconciliation must precede Experiences purchasing.
+Provider/contracts, canonical mappings, persistence, Project State, and reconciliation must precede production cross-provider orchestration.
+
+## Illustrative provider ecosystem only
+
+The following is the concrete example that motivated this architecture. It is one client/provider combination, not an Engage Core default:
+
+```text
+Engage Core
+    owns custom storefront presentation and orchestration
+
+Shopify
+    owns authoritative inventory
+    owns online order/fulfillment operations
+    owns or coordinates the provider-backed online checkout/payment path
+
+Square
+    owns venue POS/payment execution
+
+Square venue sale
+    -> Square provider event/webhook
+    -> Commerce normalizes canonical item consumption
+    -> Commerce adjusts Shopify because Shopify is the configured inventory authority
+
+Engage Core storefront sale completed through Shopify
+    -> Shopify processes the order and changes its own inventory
+    -> Commerce reconciles the authoritative Shopify order/inventory result
+    -> Commerce does NOT send a second decrement
+
+Experience package purchase
+    -> Experiences resolves package component meaning
+    -> Commerce receives canonical component inventory effects for components not already represented by an authoritative inventory mutation
+    -> Commerce adjusts or reconciles Shopify according to the configured authority path
+```
+
+Another client may use Square for more roles, Stripe for payment, another ecommerce platform for fulfillment/inventory, or entirely different providers.
+
+The architecture must not require Shopify, Square, Stripe, or the specific role split from this example.
 
 ## Deferred work
 
 Defer until a proven workflow requires it:
 
 ```text
-additional commerce providers
 full payment ledger
-refund transaction ledger
-fulfillment/shipment execution
-warehouse/inventory management
-Shopify theme management
+refund transaction ledger beyond normalized provider history
+warehouse/bin management
+shipping-label execution
+carrier management
+deep provider fulfillment administration
 complex promotion/discount engine
-multi-provider cart
+multi-provider payment splitting
 retained checkout-session history
 customer self-service order portal
 advanced purchase segmentation UI
+speculative inventory-location topology
 ```
+
+Additional commerce providers are not conceptually deferred; they should be implemented only when a real client requires them, using the same provider-neutral capability/role seams.
 
 ## Durable defaults
 
 ```text
+Engage Core owns storefront experience and commerce orchestration where that creates unique value.
+Specialized external platforms remain responsible for payment processing, deep store operations, warehouse/shipping fulfillment, or other capabilities they perform better.
+Do not require a separate middleware SaaS when direct provider packages can connect the client's existing systems.
+Do not assume one commerce provider per client.
+Bind provider capabilities/roles explicitly.
+Treat provider names in documentation examples as illustrative, not architectural defaults.
 Use cents-based integer money fields.
-Use normalized provider/external identity columns.
+Use canonical Commerce product/variant identity plus explicit provider mappings.
+Do not rely on SKU equality as cross-provider identity.
+Normalize purchase and inventory facts before consumers use them.
+Treat inventory effects as durable/idempotent business operations, not fire-and-forget listener side effects.
+Distinguish adjustment-required effects from authority-already-mutated reconciliation so inventory is not decremented twice.
 Keep order-item purchase snapshots stable.
-Normalize product variants rather than storing variant lists in JSON.
-Normalize offer-to-variant relationships.
-Treat Shopify as authoritative for price, inventory, checkout, payment, and order state.
-Use the shared webhook inbox for idempotency and retry evidence.
 Keep provider payload retention minimal and justified.
-Keep vertical entitlement/fulfillment meaning outside Commerce.
+Keep vertical entitlement/experience meaning outside Commerce.
 Require Project State support before operational production use.
-```

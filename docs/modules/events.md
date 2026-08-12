@@ -747,7 +747,7 @@ Events must not contain Music-specific columns.
 
 ### Commerce
 
-Commerce owns public offers, product presentation, Shopify cart/checkout orchestration, purchase records, and purchase lifecycle.
+Commerce owns public storefront/offers, product presentation, provider-backed checkout orchestration, purchase records, inventory-effect orchestration, and purchase lifecycle.
 
 An Event-linked Commerce offer inherits the Event promotion gate. Events does not own pricing, checkout, orders, or entitlements.
 

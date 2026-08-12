@@ -1,4 +1,3 @@
-
 # Engage Core Module Boundaries
 
 ## Executable config and token contract ownership
@@ -695,8 +694,8 @@ Composer package/repository installed only for clients that need that provider.
 Examples:
 
 - `engage-integration-arive`
-- `engage-integration-shopify`
-- future calendar, geocoding, payment, webinar, email, or SMS provider packages
+- `engage-integration-[commerce-provider]`
+- future calendar, geocoding, payment, webinar, email, SMS, POS, inventory, or fulfillment-facing provider packages
 
 Existing provider implementations under `app/Integrations/**` may remain in Engage Core
 until there is a concrete reason to extract them. Do not move Resend, Telnyx, Twilio,
@@ -737,7 +736,7 @@ Scheduling = universal appointment/booking capability.
 Portal = universal external/customer account capability.
 Forms = universal configurable form/submission capability.
 Documents = universal document request/upload/review capability.
-Commerce = universal catalog/offer/checkout-orchestration/purchase capability.
+Commerce = universal catalog/storefront/offer/checkout-orchestration/purchase/inventory-effect capability.
 Location = universal normalized location/address facts and optional geographic-provider capability.
 Events = universal concrete-event catalog and reconciliation capability.
 ```
@@ -912,7 +911,7 @@ Bad:
 ```text
 FlowRoutes creates appointment rows directly.
 Documents mutates task internals directly.
-Music imports Shopify adapter directly for purchase history.
+Music imports a Commerce provider adapter directly for purchase history.
 Core imports module models for contact pages.
 ```
 
@@ -1007,7 +1006,7 @@ Accepted dependency direction:
 - Commerce -> Core, when commerce customers/orders are contact-linked
 - Commerce may optionally use Events through the Events public promotion gate for Event-linked offers
 - Commerce may optionally use Messaging, Broadcasts, Campaigns, FlowRoutes, Portal, and Reporting through public services/contracts when those modules are enabled
-- Commerce may use Integrations through provider contracts/managers; Shopify is the first planned provider adapter
+- Commerce may use Integrations through provider contracts/role resolvers and may bind multiple provider packages to different commerce capabilities in the same client ecosystem
 - Location -> Core
 - Events -> Core
 - Events remains independently usable and must not depend on FlowRoutes, Messaging, Campaigns, Broadcasts, Tasks, Music, Experiences, Commerce, Webinars, Reporting, or Location
@@ -2550,7 +2549,7 @@ Global rules from those modules that belong here:
 - Public seams should be added before a consumer directly mutates another module's internals.
 - New durable module tables require Project State transfer or an explicit must-be-empty policy before export can proceed; operational production use requires transfer support.
 - Scheduling may consume silent Location normalization or optionally reference reusable saved Location records while keeping appointment location policy, snapshots, and user experience inside Scheduling.
-- Commerce owns provider-neutral catalog/variant identity, public offers, checkout orchestration, normalized orders, and purchase outcomes; Shopify remains authoritative for provider price, inventory, checkout, payment, and order state.
+- Commerce owns provider-neutral catalog/variant identity, provider mappings, public storefront/offers, checkout orchestration, normalized orders, purchase outcomes, and inventory-effect orchestration; configured external providers remain authoritative for the payment, inventory, order, fulfillment, POS, or other roles assigned to them.
 - Events owns one concrete Event's identity, schedule/location snapshot, lifecycle, announcement/promotion gates, passive references, stakeholders, readiness, and generic attendance outcomes.
 - Location is address/location intelligence first, not GIS, route optimization, or map-provider replacement.
 
@@ -2650,7 +2649,7 @@ Music owns artist/show association, concert meaning, lineup, setlist, tour conte
 
 Music may consume Core, Events, Commerce, Experiences, Messaging, Campaigns, Broadcasts, FlowRoutes, Tasks, Scheduling, Portal, Location, Reporting, and Integrations.
 
-Events owns the universal Event. Music owns the artist/show meaning. Commerce owns Shopify-backed purchase facts. Experiences owns VIP entitlements, participants, credentials, scanning, and fulfillment.
+Events owns the universal Event. Music owns the artist/show meaning. Commerce owns provider-neutral purchase and inventory facts. Experiences owns VIP entitlements, participants, credentials, scanning, and Experience benefit fulfillment.
 
 Music must not push music-specific state into Core Contacts or add artist/tour/lineup/setlist columns to Events.
 
@@ -2664,7 +2663,7 @@ database/migrations/verticals/music
 
 Experiences is a planned optional vertical module documented in `docs/modules/experiences.md`.
 
-Experiences owns post-purchase package entitlements, participants, benefits, management access, credentials, scanning, check-in, manifests, and fulfillment.
+Experiences owns post-purchase package entitlements, participants, benefits, management access, credentials, scanning, check-in, manifests, and Experience benefit fulfillment.
 
 Experiences is not Scheduling and is not Commerce.
 
@@ -2673,17 +2672,18 @@ Scheduling
     appointment availability and lifecycle
 
 Commerce
-    public offer, Shopify cart/checkout orchestration, order reconciliation, purchase outcome
+    public storefront/offer, provider-backed checkout orchestration, order reconciliation,
+    purchase outcome, inventory-effect orchestration
 
 Experiences
-    post-purchase entitlement and operational access fulfillment
+    post-purchase entitlement and operational Experience benefit/access fulfillment
 ```
 
 An Experience occurrence may stand alone or reference at most one Event through an Experiences-owned nullable relationship. Event-linked Experiences inherit the Event promotion gate. Events remains unaware of Experiences.
 
 The public Experiences host is client-configured and operational only. Use separate management and scanning route groups on the same host. Commerce owns public discovery and purchasing; Experiences must not expose a second storefront catalog.
 
-Experiences must consume Shopify purchases only through Commerce's provider-neutral purchase-confirmed contract. It must not import Shopify adapter classes or infer payment from a browser return URL.
+Experiences must consume purchases only through Commerce's provider-neutral purchase-confirmed contract. It must not import commerce/payment/inventory provider adapter classes or infer payment from a browser return URL.
 
 Experiences durable state requires a dedicated Project State section before production use.
 
@@ -2696,7 +2696,7 @@ Examples:
 - Resend powers email
 - Telnyx/Twilio power SMS
 - Zoom powers webinar behavior
-- Shopify Admin/Storefront GraphQL adapters power Commerce catalog, checkout orchestration, and reconciliation
+- commerce provider packages may power catalog, checkout, order, POS, inventory, or reconciliation capabilities according to the client-configured provider roles
 - External calendar adapters may power Scheduling sync later
 - Geocoding/address providers may power Location later
 - Arive may power mortgage LOS behavior later
@@ -2708,6 +2708,16 @@ The owning module is authoritative for business/domain meaning. A vendor adapter
 translates provider-specific input/output into those neutral seams and must not become
 the place where Contact, Workflow, FlowRoute, Task, Campaign, Commerce, Mortgage, or
 other cross-module business behavior is hard-coded.
+
+Commerce is explicitly allowed to compose multiple provider adapters at once. Do not force
+catalog, checkout/payment, inventory, POS, order, and fulfillment roles through one global
+provider selection when the client ecosystem assigns those roles differently. The same
+provider may satisfy several roles when appropriate.
+
+Do not make a third-party middleware/integration SaaS a required architectural layer merely
+to synchronize providers. When Engage Core already owns the relevant orchestration contract,
+prefer direct provider packages so clients can keep the specialized platforms they need
+without adopting another integration product.
 
 ### Package/repository default
 
@@ -2726,14 +2736,17 @@ private provider package
     owns vendor API/webhook/parser/provider implementation
 ```
 
-Examples:
+Illustrative package names:
 
 ```text
 engage-integration-arive
-engage-integration-shopify
-engage-integration-stripe
-engage-integration-square
+engage-integration-[commerce-provider]
+engage-integration-[payment-provider]
+engage-integration-[pos-provider]
 ```
+
+These are examples of the package pattern, not a required provider stack. A client may use
+one provider for several roles or several providers concurrently.
 
 The exact package naming convention may be finalized when the first package is created,
 but vendor code should not be added to Engage Core merely because `app/Integrations/**`
@@ -2764,8 +2777,8 @@ app/Integrations/Webinars/Zoom
 They may be extracted later when there is real maintenance/deployment value. Do not
 perform extraction merely for consistency.
 
-New specialized integrations such as Arive and Shopify should establish the external
-package pattern rather than adding new long-lived vendor directories under
+New specialized integrations such as Arive and future Commerce providers should establish
+the external package pattern rather than adding new long-lived vendor directories under
 `app/Integrations/**`.
 
 ## Contact Show UI

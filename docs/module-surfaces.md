@@ -259,7 +259,7 @@ This registry records the current product direction. Reclassification requires a
 | Portal | universal | loud | Provide a recognizable external user experience plus contextual administration. |
 | Forms | universal | loud | Provide form/submission workflows; complex form construction may remain developer/operator work. |
 | Documents | universal | loud | Provide request, upload, review, and checklist workflows; requirement design may remain developer/operator work. |
-| Commerce | universal | loud | Provide offers, purchase history, and checkout orchestration while provider operations remain external. |
+| Commerce | universal | loud | Provide custom storefront/offers, purchase history, provider-backed checkout orchestration, and cross-provider inventory coordination while specialized payment, shipping/warehouse, POS, and deep store operations remain external. |
 | Location | universal | silent | Provide normalized location facts and supporting contracts through consuming modules; no standalone Location product by default. |
 | Events | universal | loud | Provide concrete Event catalog, readiness, lifecycle, and attendance workflows. |
 | Mortgage | vertical | loud | Provide mortgage-specific records, workflow meaning, and operations. |
