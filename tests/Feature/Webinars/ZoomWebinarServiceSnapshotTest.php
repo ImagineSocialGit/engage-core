@@ -67,6 +67,54 @@ class ZoomWebinarServiceSnapshotTest extends TestCase
         );
     }
 
+    public function test_blank_provider_timezone_falls_back_to_client_timezone(): void
+    {
+        Config::set('client.timezone', 'America/New_York');
+
+        Http::fake([
+            '*' => Http::response([
+                'webinars' => [[
+                    'id' => 'zoom-1001',
+                    'uuid' => 'uuid-1001',
+                    'topic' => 'Home Buyer Game Plan',
+                    'start_time' => '2026-05-01T19:00:00Z',
+                    'duration' => 60,
+                    'timezone' => '',
+                ]],
+                'next_page_token' => '',
+            ]),
+        ]);
+
+        $snapshot = $this->service()->listWebinarsByTitle('Home Buyer Game Plan');
+
+        $this->assertTrue($snapshot->authoritative);
+        $this->assertSame('America/New_York', $snapshot->webinars[0]->timezone);
+    }
+
+    public function test_invalid_provider_and_client_timezones_fall_back_to_utc(): void
+    {
+        Config::set('client.timezone', 'Not/A-Timezone');
+
+        Http::fake([
+            '*' => Http::response([
+                'webinars' => [[
+                    'id' => 'zoom-1001',
+                    'uuid' => 'uuid-1001',
+                    'topic' => 'Home Buyer Game Plan',
+                    'start_time' => '2026-05-01T19:00:00Z',
+                    'duration' => 60,
+                    'timezone' => 'Also/Invalid',
+                ]],
+                'next_page_token' => '',
+            ]),
+        ]);
+
+        $snapshot = $this->service()->listWebinarsByTitle('Home Buyer Game Plan');
+
+        $this->assertTrue($snapshot->authoritative);
+        $this->assertSame('UTC', $snapshot->webinars[0]->timezone);
+    }
+
     public function test_malformed_provider_payload_is_non_authoritative(): void
     {
         Http::fake([

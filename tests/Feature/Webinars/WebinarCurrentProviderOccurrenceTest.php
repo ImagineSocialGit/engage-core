@@ -3,14 +3,19 @@
 namespace Tests\Feature\Webinars;
 
 use App\Models\User;
+use App\Modules\Webinars\Actions\DispatchWebinarWaitlistMessagesAction;
 use App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction;
 use App\Modules\Webinars\Actions\ResolveRegisterableWebinarAction;
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
+use App\Modules\Webinars\Jobs\NotifyWebinarWaitlistJob;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class WebinarCurrentProviderOccurrenceTest extends TestCase
@@ -113,6 +118,65 @@ class WebinarCurrentProviderOccurrenceTest extends TestCase
             app(ResolveRegisterableWebinarAction::class)
                 ->getGlobal()?->is($meeting) ?? false,
         );
+    }
+
+    public function test_waitlist_notification_uses_only_the_series_current_provider_event_type(): void
+    {
+        $series = WebinarSeries::factory()->meeting()->create([
+            'status' => 'active',
+        ]);
+        Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+            'provider_event_type' => WebinarProviderEventType::Webinar->value,
+            'starts_at' => now()->addHour(),
+            'ends_at' => now()->addHours(2),
+        ]);
+        $meeting = Webinar::factory()->meeting()->create([
+            'webinar_series_id' => $series->getKey(),
+            'starts_at' => now()->addHours(3),
+            'ends_at' => now()->addHours(4),
+        ]);
+
+        $dispatcher = $this->mock(
+            DispatchWebinarWaitlistMessagesAction::class,
+            function (MockInterface $mock) use ($meeting): void {
+                $mock->shouldReceive('handle')
+                    ->once()
+                    ->withArgs(
+                        fn (Webinar $webinar): bool => $webinar->is($meeting),
+                    );
+            },
+        );
+
+        (new NotifyWebinarWaitlistJob($series->getKey()))->handle(
+            app(ResolveRegisterableWebinarAction::class),
+            $dispatcher,
+        );
+    }
+
+    public function test_crm_upcoming_survives_legacy_blank_timezone_values(): void
+    {
+        Config::set('client.timezone', 'America/New_York');
+
+        $user = User::factory()->create();
+        $series = WebinarSeries::factory()->meeting()->create();
+        $meeting = Webinar::factory()->meeting()->create([
+            'webinar_series_id' => $series->getKey(),
+            'starts_at' => now()->addDay(),
+            'ends_at' => now()->addDay()->addHour(),
+        ]);
+
+        DB::table('webinars')
+            ->where('id', $meeting->getKey())
+            ->update(['timezone' => '']);
+
+        $meeting->refresh();
+
+        $this->assertSame('America/New_York', $meeting->timezone);
+
+        $this->actingAs($user)
+            ->get(route('crm.webinar-series.index'))
+            ->assertOk();
     }
 
     public function test_crm_upcoming_hides_old_provider_type_but_archived_view_keeps_it_available(): void

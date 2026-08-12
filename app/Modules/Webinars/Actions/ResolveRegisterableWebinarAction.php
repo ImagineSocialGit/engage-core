@@ -47,6 +47,19 @@ class ResolveRegisterableWebinarAction
             ->first();
     }
 
+    public function getFutureForSeries(WebinarSeries $series): ?Webinar
+    {
+        if ($series->status !== 'active') {
+            return null;
+        }
+
+        return Webinar::query()
+            ->forSeriesProviderIdentity($series)
+            ->where('starts_at', '>', now())
+            ->orderBy('starts_at')
+            ->first();
+    }
+
     public function isRegisterable(Webinar $webinar): bool
     {
         return $webinar->webinar_series_id !== null

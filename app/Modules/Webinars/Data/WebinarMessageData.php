@@ -63,7 +63,7 @@ readonly class WebinarMessageData extends MessageData
      */
     public function toArray(): array
     {
-        $timezone = $this->webinar->timezone ?: config('app.timezone', 'America/Chicago');
+        $timezone = $this->webinar->timezone;
         $startsAt = $this->webinar->starts_at;
         $endsAt = $this->webinar->ends_at;
         $webinarSeries = $this->webinar->webinarSeries;
@@ -315,7 +315,7 @@ readonly class WebinarMessageData extends MessageData
     public function formattedStart(string $format = 'M j g:i A'): string
     {
         return $this->webinar->starts_at
-            ? $this->webinar->starts_at->copy()->setTimezone($this->webinar->timezone ?: config('app.timezone'))->format($format)
+            ? $this->webinar->starts_at->copy()->setTimezone($this->webinar->timezone)->format($format)
             : '';
     }
 }

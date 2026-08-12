@@ -4,6 +4,7 @@ namespace App\Modules\Webinars\Models;
 
 use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
+use App\Modules\Webinars\Services\WebinarTimezoneResolver;
 use Database\Factories\WebinarFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -170,6 +171,17 @@ class Webinar extends Model
             $this->provider_event_type
                 ?? config('webinars.provider_event_type'),
         );
+    }
+
+    public function getTimezoneAttribute(mixed $value): string
+    {
+        return app(WebinarTimezoneResolver::class)->resolve($value);
+    }
+
+    public function setTimezoneAttribute(mixed $value): void
+    {
+        $this->attributes['timezone'] = app(WebinarTimezoneResolver::class)
+            ->resolve($value);
     }
 
     private static function configuredProviderKey(): string

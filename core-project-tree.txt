@@ -1005,7 +1005,8 @@
 │   │   │   │   ├── WebinarScheduleProfileChainDefinitionBuilder.php
 │   │   │   │   ├── WebinarScheduleProfileDefinitionResolver.php
 │   │   │   │   ├── WebinarScheduleProfileResolver.php
-│   │   │   │   └── WebinarStateCanonicalizer.php
+│   │   │   │   ├── WebinarStateCanonicalizer.php
+│   │   │   │   └── WebinarTimezoneResolver.php
 │   │   │   ├── Support
 │   │   │   │   ├── WebinarJoinBrowserProof.php
 │   │   │   │   ├── WebinarJoinLinkGenerator.php
@@ -2130,4 +2131,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-541 directories, 1590 files
+541 directories, 1591 files

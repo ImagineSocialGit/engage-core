@@ -3,6 +3,7 @@
 namespace App\Modules\Webinars\Jobs;
 
 use App\Modules\Webinars\Actions\DispatchWebinarWaitlistMessagesAction;
+use App\Modules\Webinars\Actions\ResolveRegisterableWebinarAction;
 use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -18,21 +19,16 @@ class NotifyWebinarWaitlistJob implements ShouldQueue
     }
 
     public function handle(
-        DispatchWebinarWaitlistMessagesAction $dispatchWebinarWaitlistMessagesAction
+        ResolveRegisterableWebinarAction $resolveRegisterableWebinar,
+        DispatchWebinarWaitlistMessagesAction $dispatchWebinarWaitlistMessagesAction,
     ): void {
-        $series = WebinarSeries::query()
-            ->with([
-                'webinars' => fn ($query) => $query
-                    ->where('starts_at', '>', now())
-                    ->orderBy('starts_at'),
-            ])
-            ->find($this->seriesId);
+        $series = WebinarSeries::query()->find($this->seriesId);
 
         if (! $series) {
             return;
         }
 
-        $webinar = $series->webinars->first();
+        $webinar = $resolveRegisterableWebinar->getFutureForSeries($series);
 
         if (! $webinar) {
             return;

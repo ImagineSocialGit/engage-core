@@ -8,6 +8,7 @@ use App\Modules\Webinars\Data\ProviderRecordingData;
 use App\Modules\Webinars\Data\ProviderWebinarData;
 use App\Modules\Webinars\Data\ProviderWebinarSnapshot;
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
+use App\Modules\Webinars\Services\WebinarTimezoneResolver;
 use Carbon\Carbon;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
@@ -15,10 +16,16 @@ use InvalidArgumentException;
 
 class ZoomEventService
 {
+    private readonly WebinarTimezoneResolver $timezoneResolver;
+
     public function __construct(
         private readonly ZoomOAuthService $auth,
         private readonly ZoomAttendanceMapper $attendanceMapper,
-    ) {}
+        ?WebinarTimezoneResolver $timezoneResolver = null,
+    ) {
+        $this->timezoneResolver = $timezoneResolver
+            ?? app(WebinarTimezoneResolver::class);
+    }
 
     public function registerAttendee(
         WebinarProviderEventType $eventType,
@@ -340,7 +347,7 @@ class ZoomEventService
             endsAt: $startsAt && $duration
                 ? $startsAt->copy()->addMinutes($duration)
                 : null,
-            timezone: $event['timezone'] ?? config('app.timezone', 'America/Chicago'),
+            timezone: $this->timezoneResolver->resolve($event['timezone'] ?? null),
             description: $event['agenda'] ?? null,
             meta: [
                 'zoom_uuid' => $event['uuid'] ?? null,
