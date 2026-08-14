@@ -1,16 +1,21 @@
 <?php
 
 use App\Modules\Webinars\Actions\PostEvent\DispatchPostWebinarFollowUpsAction;
+use App\Modules\Webinars\Actions\PostEvent\EnsureWebinarPostEventReviewAction;
 use App\Modules\Webinars\Actions\PostEvent\RecordWebinarProviderAttendanceAction;
 use App\Modules\Webinars\Actions\PostEvent\ResolveWebinarPlaybackAction;
 
 return [
     'events' => [
         'webinar.ended' => [
+            EnsureWebinarPostEventReviewAction::class,
             RecordWebinarProviderAttendanceAction::class,
+            DispatchPostWebinarFollowUpsAction::class,
         ],
 
         'webinar.recording_completed' => [
+            EnsureWebinarPostEventReviewAction::class,
+            RecordWebinarProviderAttendanceAction::class,
             ResolveWebinarPlaybackAction::class,
             DispatchPostWebinarFollowUpsAction::class,
         ],
@@ -24,6 +29,10 @@ return [
 
     'recordings' => [
         'enabled' => true,
+    ],
+
+    'review' => [
+        'required' => false,
     ],
 
     'booking' => [

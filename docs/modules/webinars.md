@@ -860,3 +860,11 @@ Dev testing actions should still use public module seams:
 The dev UI should behave like an operator console. Actions inside testing modals should use AJAX/fetch where practical so the modal, selected registration, loaded message options, and activity log are not lost after each action.
 
 Sim Join should skip already-queued live reminders when the real definition has skip_when_join_clicked enabled. Manual dev sends are forced sends and may still send a selected reminder afterward so the exact payload can be tested.
+
+## Post-event replay review and dispatch safety
+
+Post-event replay delivery has two independent safety layers. Clients may enable `webinars.post_event.review.required` to require an operator decision after an occurrence ends. A pending review is surfaced through the Webinar dashboard panel. The operator may approve the current provider recording, approve a completed occurrence from the same WebinarSeries as the alternate replay source, or suppress replay sending for that occurrence. The effective approved playback URL remains stored on the completed Webinar so existing Webinar message tokens and public playback links keep their current contract.
+
+Replay-dependent scheduled messages are also revalidated at actual Messaging dispatch. Webinars contributes a Messaging recipient gate that recognizes WebinarRegistration context and templates containing `{webinar_playback_url}`. The normal Contact consent/suppression gate runs first; the Webinar gate then verifies that any required operator review is approved and asks the authoritative provider for the selected recording again. A missing/deleted recording skips the replay-dependent message with `webinar_recording_unavailable` rather than sending a stale replay. Provider failures other than an authoritative unavailable result continue through the normal Messaging retry/failure path.
+
+The dashboard review is the canonical operator surface. Internal Notifications may later link to the same review task, but Webinars does not depend on Internal Notifications for this lifecycle.

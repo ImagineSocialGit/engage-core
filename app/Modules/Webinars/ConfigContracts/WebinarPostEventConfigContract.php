@@ -38,6 +38,14 @@ class WebinarPostEventConfigContract implements ConfigContract
             'recordings' => ConfigField::required(ConfigSchema::object([
                 'enabled' => ConfigField::required(ConfigSchema::boolean()),
             ])),
+            'review' => ConfigField::defaulted(ConfigSchema::object([
+                'required' => ConfigField::defaulted(
+                    ConfigSchema::boolean(),
+                    false,
+                ),
+            ]), [
+                'required' => false,
+            ]),
             'booking' => ConfigField::required(ConfigSchema::object([
                 'url' => ConfigField::required(
                     ConfigSchema::string(nullable: true),

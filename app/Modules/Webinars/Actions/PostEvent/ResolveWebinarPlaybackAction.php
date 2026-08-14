@@ -26,7 +26,12 @@ class ResolveWebinarPlaybackAction
 
         $webinar = $webinar->fresh() ?? $webinar;
 
-        if (filled($webinar->playback_url)) {
+        $reviewMode = data_get(
+            $webinar->meta,
+            'normalized.post_event.review.playback_mode',
+        );
+
+        if (in_array($reviewMode, ['alternate', 'none'], true)) {
             $this->emitReplayAvailableIfNeeded($provider, $webinar, $event);
 
             return true;
@@ -35,6 +40,13 @@ class ResolveWebinarPlaybackAction
         $recording = $provider->getRecording($webinar);
 
         if (! $recording || ! $recording->hasPlaybackUrl()) {
+            if (filled($webinar->playback_url)) {
+                $webinar->forceFill([
+                    'playback_url' => null,
+                    'playback_passcode' => null,
+                ])->save();
+            }
+
             return false;
         }
 

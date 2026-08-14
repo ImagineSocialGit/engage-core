@@ -39,19 +39,17 @@ class ScheduledMessageGate
             return 'Message conditions no longer pass.';
         }
 
-        if ($recipient instanceof Contact) {
-            if (! $this->messageEligibilityGate->allows(
+        if ($recipient instanceof Contact
+            && ! $this->messageEligibilityGate->allows(
                 contact: $recipient,
                 channel: $scheduledMessage->channel,
                 purpose: $scheduledMessage->purpose,
                 scope: $scheduledMessage->scope,
                 messageKey: $scheduledMessage->message_type,
                 context: $this->eligibilityContext($scheduledMessage),
-            )) {
-                return 'Message eligibility gate denied send.';
-            }
-
-            return null;
+            )
+        ) {
+            return 'Message eligibility gate denied send.';
         }
 
         return $this->recipientGateRegistry->denialReason(

@@ -37,9 +37,24 @@ class DispatchPostWebinarFollowUpsAction
         string $event,
     ): bool {
         $webinar = $webinar->fresh() ?? $webinar;
+        $reviewStatus = data_get(
+            $webinar->meta,
+            'normalized.post_event.review.status',
+        );
         $followUpsComplete = true;
 
-        if ($this->hasEnabledOutcomeMessages()) {
+        if (config('webinars.post_event.review.required', false)) {
+            if ($reviewStatus === 'suppressed') {
+                $this->markReplayFollowUpsSuppressed($webinar);
+                $webinar = $webinar->fresh() ?? $webinar;
+            } elseif ($reviewStatus !== 'approved') {
+                $this->emitWebinarEndedIfNeeded($provider, $webinar, $event);
+
+                return true;
+            }
+        }
+
+        if ($reviewStatus !== 'suppressed' && $this->hasEnabledOutcomeMessages()) {
             $conditions = config('webinars.post_event.outcome_messages.conditions', []);
             $conditionsPass = ! is_array($conditions)
                 || $this->conditionChecker->passes(
@@ -48,7 +63,7 @@ class DispatchPostWebinarFollowUpsAction
                 );
 
             if (! $conditionsPass) {
-                $followUpsComplete = false;
+                $followUpsComplete = $event === 'webinar.ended';
             } elseif (! data_get($webinar->meta, 'normalized.post_event.follow_ups_dispatched_at')) {
                 $this->dispatchTransactionalFollowUps($webinar);
                 $followUpsComplete = $this->refreshWebinarFollowUpCompletion($webinar);
@@ -56,29 +71,71 @@ class DispatchPostWebinarFollowUpsAction
             }
         }
 
-        if (! data_get($webinar->meta, 'automation_events.webinar_ended_recorded_at')) {
-            $this->emitWebinarAutomationEvent->forWebinar(
-                eventKey: config('webinars.post_event.automation_events.webinar_ended.event_key', 'webinar.ended'),
-                webinar: $webinar,
-                occurredAt: $webinar->ends_at ?? now(),
-                payload: [
-                    'provider' => [
-                        'key' => $provider->key(),
-                    ],
-                    'post_event' => [
-                        'event' => $event,
-                    ],
-                ],
-            );
-
-            $this->markMeta($webinar, [
-                'automation_events' => [
-                    'webinar_ended_recorded_at' => now()->toIso8601String(),
-                ],
-            ]);
-        }
+        $this->emitWebinarEndedIfNeeded($provider, $webinar, $event);
 
         return $followUpsComplete;
+    }
+
+    private function emitWebinarEndedIfNeeded(
+        WebinarProvider $provider,
+        Webinar $webinar,
+        string $event,
+    ): void {
+        $webinar = $webinar->fresh() ?? $webinar;
+
+        if (data_get($webinar->meta, 'automation_events.webinar_ended_recorded_at')) {
+            return;
+        }
+
+        $this->emitWebinarAutomationEvent->forWebinar(
+            eventKey: config('webinars.post_event.automation_events.webinar_ended.event_key', 'webinar.ended'),
+            webinar: $webinar,
+            occurredAt: $webinar->ends_at ?? now(),
+            payload: [
+                'provider' => [
+                    'key' => $provider->key(),
+                ],
+                'post_event' => [
+                    'event' => $event,
+                ],
+            ],
+        );
+
+        $this->markMeta($webinar, [
+            'automation_events' => [
+                'webinar_ended_recorded_at' => now()->toIso8601String(),
+            ],
+        ]);
+    }
+
+    private function markReplayFollowUpsSuppressed(Webinar $webinar): void
+    {
+        if (data_get($webinar->meta, 'normalized.post_event.follow_ups_dispatched_at')) {
+            return;
+        }
+
+        $registrationsCount = WebinarRegistration::query()
+            ->where('webinar_id', $webinar->getKey())
+            ->count();
+
+        $this->markMeta($webinar, [
+            'normalized' => [
+                'post_event' => [
+                    'follow_ups_dispatched_at' => now()->toISOString(),
+                    'follow_up_summary' => [
+                        'complete' => true,
+                        'registrations_total' => $registrationsCount,
+                        'scheduled' => 0,
+                        'not_applicable' => $registrationsCount,
+                        'failed' => 0,
+                        'in_progress' => 0,
+                        'unresolved' => 0,
+                        'reason' => 'webinar_replay_suppressed',
+                        'updated_at' => now()->toISOString(),
+                    ],
+                ],
+            ],
+        ]);
     }
 
     public function executeForRegistration(

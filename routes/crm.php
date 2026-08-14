@@ -22,6 +22,7 @@ use App\Modules\Tasks\Controllers\TaskController;
 use App\Modules\Webinars\Controllers\CRM\WebinarController;
 use App\Modules\Webinars\Controllers\CRM\WebinarDevController;
 use App\Modules\Webinars\Controllers\CRM\WebinarMessageTemplateController;
+use App\Modules\Webinars\Controllers\CRM\WebinarPostEventReviewController;
 use App\Modules\Webinars\Controllers\CRM\WebinarProviderCancellationController;
 use App\Modules\Webinars\Controllers\CRM\WebinarRegistrationFinalizationController;
 use App\Modules\Webinars\Controllers\CRM\WebinarRegistrationFollowUpController;
@@ -53,6 +54,12 @@ Route::middleware('auth')->group(function () {
     Route::middleware('module:webinars')->group(function () {
         Route::get('/webinars', [WebinarController::class, 'index'])
             ->name('crm.webinar-series.index');
+
+        Route::get('/webinars/{webinar}/post-event-review', [WebinarPostEventReviewController::class, 'show'])
+            ->name('crm.webinars.post-event-review.show');
+
+        Route::patch('/webinars/{webinar}/post-event-review', [WebinarPostEventReviewController::class, 'update'])
+            ->name('crm.webinars.post-event-review.update');
 
         Route::middleware('module:messaging')
             ->prefix('webinars/message-templates')

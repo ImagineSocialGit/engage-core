@@ -4,6 +4,7 @@ namespace App\Modules\Webinars\Services\Dashboard;
 
 use App\Models\DashboardAcknowledgement;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Support\Dashboard\Contracts\DashboardPanelProvider;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,15 +23,35 @@ class WebinarActivityDashboardPanelProvider implements DashboardPanelProvider
         return 'webinars';
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function panel(Request $request): array
     {
         $acknowledgedIds = $this->acknowledgedItemKeys(
             $request,
             DashboardAcknowledgement::TYPE_WEBINAR_REGISTRATION,
         );
+
+        $reviewCount = 0;
+        $reviews = collect();
+
+        if (config('webinars.post_event.review.required', false)) {
+            $reviewQuery = Webinar::query()
+                ->with('webinarSeries')
+                ->withCount([
+                    'registrations as attended_registrations_count' => fn (Builder $query) => $query->whereNotNull('attended_at'),
+                    'registrations as missed_registrations_count' => fn (Builder $query) => $query->where('status', 'missed'),
+                ])
+                ->whereNotNull('ends_at')
+                ->where('ends_at', '<=', now())
+                ->where('meta->normalized->post_event->review->status', 'pending');
+
+            $reviewCount = (clone $reviewQuery)->count();
+            $reviews = (clone $reviewQuery)
+                ->latest('ends_at')
+                ->latest('id')
+                ->limit(4)
+                ->get();
+        }
 
         $attentionQuery = WebinarRegistration::query()
             ->with(['contact', 'webinar.webinarSeries'])
@@ -46,11 +67,11 @@ class WebinarActivityDashboardPanelProvider implements DashboardPanelProvider
                     );
             });
 
-        $attentionCount = (clone $attentionQuery)->count();
+        $registrationAttentionCount = (clone $attentionQuery)->count();
         $attentionRegistrations = (clone $attentionQuery)
             ->latest('updated_at')
             ->latest('id')
-            ->limit(8)
+            ->limit(max(0, 8 - $reviews->count()))
             ->get();
 
         $recentQuery = WebinarRegistration::query()
@@ -79,18 +100,27 @@ class WebinarActivityDashboardPanelProvider implements DashboardPanelProvider
             ->when($acknowledgedIds !== [], fn (Builder $query) => $query->whereNotIn('id', $acknowledgedIds));
 
         $recentCount = (clone $recentQuery)->count();
+        $remainingRecentLimit = max(
+            0,
+            8 - $reviews->count() - $attentionRegistrations->count(),
+        );
         $recentRegistrations = (clone $recentQuery)
             ->latest('registered_at')
             ->latest('id')
-            ->limit(max(0, 8 - $attentionRegistrations->count()))
+            ->limit($remainingRecentLimit)
             ->get();
 
-        $items = $attentionRegistrations
-            ->map(fn (WebinarRegistration $registration): array => $this->recoveryItem($registration))
+        $items = $reviews
+            ->map(fn (Webinar $webinar): array => $this->postEventReviewItem($webinar))
+            ->concat($attentionRegistrations->map(
+                fn (WebinarRegistration $registration): array => $this->recoveryItem($registration),
+            ))
             ->concat($recentRegistrations->map(
                 fn (WebinarRegistration $registration): array => $this->webinarRegistrationItem($registration),
             ))
             ->values();
+
+        $attentionCount = $reviewCount + $registrationAttentionCount;
 
         return [
             'key' => $this->key(),
@@ -99,23 +129,33 @@ class WebinarActivityDashboardPanelProvider implements DashboardPanelProvider
             'priority' => $attentionCount > 0 ? 140 : 50,
             'order' => 10,
             'view' => 'webinar_activity',
-            'title' => $attentionCount > 0
-                ? 'Webinar registration recovery'
-                : 'Webinar activity',
-            'description' => $attentionCount > 0
-                ? 'Registration finalization failures require operator review before confirmations can continue.'
-                : 'Supporting context for recent registrations. This is not the main daily triage list.',
+            'title' => $reviewCount > 0
+                ? 'Review webinar follow-ups'
+                : ($registrationAttentionCount > 0
+                    ? 'Webinar registration recovery'
+                    : 'Webinar activity'),
+            'description' => $reviewCount > 0
+                ? 'A completed webinar is waiting for you to confirm its replay and follow-up plan.'
+                : ($registrationAttentionCount > 0
+                    ? 'Registration finalization failures require operator review before confirmations can continue.'
+                    : 'Supporting context for recent registrations. This is not the main daily triage list.'),
             'empty_title' => 'No new webinar activity to review.',
             'empty_description' => 'Recent signups will appear here as context beneath the main work panels.',
-            'summary_label' => $attentionCount > 0
-                ? 'webinar registration failures'
-                : 'webinar updates',
+            'summary_label' => $reviewCount > 0
+                ? 'webinar follow-ups to review'
+                : ($registrationAttentionCount > 0
+                    ? 'webinar registration failures'
+                    : 'webinar updates'),
             'count' => $attentionCount + $recentCount,
             'attention_count' => $attentionCount,
             'hide_when_empty' => true,
             'items' => $items,
             'actions' => module_enabled('webinars') ? array_values(array_filter([
-                $attentionCount > 0 ? [
+                $reviews->isNotEmpty() ? [
+                    'label' => 'Review next webinar',
+                    'href' => route('crm.webinars.post-event-review.show', $reviews->first()),
+                ] : null,
+                $registrationAttentionCount > 0 ? [
                     'label' => 'Resolve registration failures',
                     'href' => route('crm.webinar-series.index', ['attention' => 1]),
                 ] : null,
@@ -127,9 +167,33 @@ class WebinarActivityDashboardPanelProvider implements DashboardPanelProvider
         ];
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
+    private function postEventReviewItem(Webinar $webinar): array
+    {
+        $attended = (int) ($webinar->attended_registrations_count ?? 0);
+        $missed = (int) ($webinar->missed_registrations_count ?? 0);
+
+        return [
+            'key' => 'post-event-review-'.$webinar->getKey(),
+            'type' => 'webinar_post_event_review',
+            'sort_at' => $webinar->ends_at ?? $webinar->updated_at,
+            'label' => 'Follow-up review',
+            'tone' => 'amber',
+            'title' => $webinar->title.' is ready for follow-up review',
+            'subtitle' => trim(implode(' · ', array_filter([
+                $this->dateLabel($webinar->ends_at),
+                $attended.' attended',
+                $missed.' missed',
+            ]))),
+            'description' => filled($webinar->playback_url)
+                ? 'A replay was detected. Confirm it before replay-dependent follow-ups continue.'
+                : 'No replay is currently detected. Choose this webinar, a previous replay, or no replay.',
+            'href' => route('crm.webinars.post-event-review.show', $webinar),
+            'action_label' => 'Review follow-ups',
+        ];
+    }
+
+    /** @return array<string, mixed> */
     private function recoveryItem(WebinarRegistration $registration): array
     {
         $contact = $registration->contact;
@@ -172,9 +236,7 @@ class WebinarActivityDashboardPanelProvider implements DashboardPanelProvider
         ];
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     private function webinarRegistrationItem(WebinarRegistration $registration): array
     {
         $contact = $registration->contact;
@@ -200,9 +262,7 @@ class WebinarActivityDashboardPanelProvider implements DashboardPanelProvider
         ];
     }
 
-    /**
-     * @return array<int, string>
-     */
+    /** @return array<int, string> */
     private function acknowledgedItemKeys(Request $request, string $itemType): array
     {
         $userId = $request->user()?->id;
