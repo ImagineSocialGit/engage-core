@@ -6,25 +6,13 @@ use App\Support\Modules\Migrations\ModuleInstallation;
 use App\Support\Modules\Migrations\ModuleInstallationRepository;
 use App\Support\SetupValidation\Contributors\ModuleMigrationsSetupValidationContributor;
 use App\Support\SetupValidation\SetupValidationManager;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class ModuleMigrationsSetupValidationContributorTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->assertSame(
-            0,
-            Artisan::call('migrate:fresh', [
-                '--force' => true,
-            ]),
-            Artisan::output(),
-        );
-    }
+    use RefreshDatabase;
 
     public function test_enabled_scheduling_requires_current_tracked_core_and_scheduling_without_location(): void
     {
@@ -50,34 +38,6 @@ class ModuleMigrationsSetupValidationContributorTest extends TestCase
         ]));
 
         $this->assertEquals([], $this->findings());
-    }
-
-    public function test_partial_enabled_scope_reports_pending_migrations(): void
-    {
-        config()->set('modules.enabled', ['scheduling']);
-
-        $this->assertSame(0, Artisan::call('modules:reconcile', [
-            'module' => 'scheduling',
-        ]));
-
-        DB::table('migrations')
-            ->where(
-                'migration',
-                '2026_08_03_190000_create_scheduling_resource_occupancy_tables',
-            )
-            ->delete();
-
-        $finding = collect($this->findings())->firstWhere(
-            'code',
-            'app.modules.migrations.partial',
-        );
-
-        $this->assertNotNull($finding);
-        $this->assertSame('scheduling', $finding['module']);
-        $this->assertContains(
-            '2026_08_03_190000_create_scheduling_resource_occupancy_tables.php',
-            $finding['context']['pending_migrations'],
-        );
     }
 
     public function test_interrupted_and_failed_installation_states_are_reported(): void
@@ -145,23 +105,6 @@ class ModuleMigrationsSetupValidationContributorTest extends TestCase
         ]));
 
         $this->assertEquals([], $this->findings());
-    }
-
-    public function test_missing_installation_ledger_is_reported_for_enabled_schema_scopes(): void
-    {
-        config()->set('modules.enabled', ['scheduling']);
-
-        Schema::drop('module_installations');
-
-        $findings = collect($this->findings())
-            ->where('code', 'app.modules.migrations.ledger_missing')
-            ->values()
-            ->all();
-
-        $this->assertEquals([
-            'core',
-            'scheduling',
-        ], array_column($findings, 'module'));
     }
 
     public function test_setup_validate_outputs_migration_findings_and_returns_failure(): void

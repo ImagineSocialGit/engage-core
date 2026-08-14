@@ -9,10 +9,10 @@ use Tests\TestCase;
 
 class ModuleFirstPresetCompositionTest extends TestCase
 {
-    public function test_core_exposes_only_the_three_generic_packages(): void
+    public function test_core_exposes_the_generic_package_surface(): void
     {
         $this->assertSame(
-            ['basic', 'messaging', 'automated_messaging'],
+            ['core', 'basic', 'messaging', 'automated_messaging'],
             array_keys(config('presets.packages', [])),
         );
     }

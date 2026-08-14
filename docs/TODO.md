@@ -2,7 +2,9 @@
 
 ## Config generation lock-in
 
-- [x] Freeze Slam Dunk effective config and representative runtime behavior as golden fixtures.
+- [x] Use Slam Dunk as temporary end-to-end config/runtime proof during
+  contract hardening, then prune the client-specific golden fixtures once
+  shared contracts and generic runtime coverage become authoritative.
 - [x] Add shared closed config-contract primitives and register foundational, Messaging,
   Campaigns, FlowRoutes, and Webinars contracts.
 - [x] Add token source/context contracts based on real columns and explicit computed providers;
@@ -14,8 +16,9 @@
   producer-owned campaign start payloads.
 - [ ] Add strict reference and token closure validation for every exported definition.
 - [ ] Generate field/token tables and contract-derived authoring references in CI.
-- [ ] Build a minimal deterministic exporter and semantic round trip using Slam Dunk as the first
-  full-package fixture.
+- [ ] Build a minimal deterministic exporter and semantic round trip using one
+  representative full-package fixture, validated through the shared contracts,
+  setup-validation path, and representative runtime coverage.
 - [ ] Build preview and authoring UX as consumers of the same registries and strict validator.
 
 Detailed sequencing and open decisions are in

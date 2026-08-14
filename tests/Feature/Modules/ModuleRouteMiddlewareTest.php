@@ -4,10 +4,13 @@ namespace Tests\Feature\Modules;
 
 use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ModuleRouteMiddlewareTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_disabled_webinar_module_returns_404_for_crm_webinar_routes(): void
     {
         config()->set('modules.enabled', [

@@ -366,7 +366,10 @@
 │   │   │   │   └── FormDefinitionConfigContractTargetProvider.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
+│   │   │   │   └── External
+│   │   │   │       └── ExternalFormIntakeController.php
 │   │   │   ├── Data
+│   │   │   │   ├── ExternalFormIntakeClient.php
 │   │   │   │   ├── FormPresetSyncResult.php
 │   │   │   │   ├── FormSubmissionInput.php
 │   │   │   │   ├── FormSubmissionResult.php
@@ -376,6 +379,9 @@
 │   │   │   ├── Exceptions
 │   │   │   │   ├── FormSubmissionReplayConflictException.php
 │   │   │   │   └── FormSubmissionValidationException.php
+│   │   │   ├── Http
+│   │   │   │   └── Middleware
+│   │   │   │       └── AuthenticateExternalFormIntake.php
 │   │   │   ├── Models
 │   │   │   │   ├── FormDefinition.php
 │   │   │   │   ├── FormSubmission.php
@@ -385,6 +391,7 @@
 │   │   │   │   └── FormsModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
+│   │   │   │   ├── ExternalFormIntakeClientResolver.php
 │   │   │   │   ├── FormSchemaNormalizer.php
 │   │   │   │   ├── FormSubmissionContactMapper.php
 │   │   │   │   ├── FormSubmissionValidator.php
@@ -724,6 +731,7 @@
 │   │   │   │   ├── CreatePublicBookingHoldAction.php
 │   │   │   │   ├── FindBookableAvailabilityAction.php
 │   │   │   │   ├── IssueBookableSlotOfferAction.php
+│   │   │   │   ├── IssuePublicBookingSlotOfferAction.php
 │   │   │   │   ├── MarkAppointmentNoShowAction.php
 │   │   │   │   ├── ReleaseBookingHoldAction.php
 │   │   │   │   ├── RescheduleAppointmentAction.php
@@ -774,6 +782,8 @@
 │   │   │   │   ├── CancelAppointmentRequest.php
 │   │   │   │   ├── CompletePublicBookingRequest.php
 │   │   │   │   ├── CreatePublicBookingHoldRequest.php
+│   │   │   │   ├── IssuePublicBookingSlotOfferRequest.php
+│   │   │   │   ├── PreparePublicBookingRequest.php
 │   │   │   │   ├── RescheduleAppointmentRequest.php
 │   │   │   │   └── StoreAppointmentRequest.php
 │   │   │   ├── Services
@@ -883,11 +893,13 @@
 │   │   │   │   ├── ImportWebinarRegistrationAction.php
 │   │   │   │   ├── PostEvent
 │   │   │   │   │   ├── DispatchPostWebinarFollowUpsAction.php
+│   │   │   │   │   ├── EnsureWebinarPostEventReviewAction.php
 │   │   │   │   │   ├── HandleWebinarProviderWebhookEventAction.php
 │   │   │   │   │   ├── RecordWebinarAttendanceAction.php
 │   │   │   │   │   ├── RecordWebinarProviderAttendanceAction.php
 │   │   │   │   │   ├── ResolveWebinarPlaybackAction.php
-│   │   │   │   │   └── ResolveWebinarProviderEventTargetAction.php
+│   │   │   │   │   ├── ResolveWebinarProviderEventTargetAction.php
+│   │   │   │   │   └── ReviewWebinarPostEventAction.php
 │   │   │   │   ├── QueueWebinarProviderCancellationAction.php
 │   │   │   │   ├── QueueWebinarRegistrationFinalizationAction.php
 │   │   │   │   ├── ReplaceWebinarOccurrenceAction.php
@@ -920,6 +932,7 @@
 │   │   │   │   │   ├── WebinarController.php
 │   │   │   │   │   ├── WebinarDevController.php
 │   │   │   │   │   ├── WebinarMessageTemplateController.php
+│   │   │   │   │   ├── WebinarPostEventReviewController.php
 │   │   │   │   │   ├── WebinarProviderCancellationController.php
 │   │   │   │   │   ├── WebinarRegistrationFinalizationController.php
 │   │   │   │   │   ├── WebinarRegistrationFollowUpController.php
@@ -997,6 +1010,8 @@
 │   │   │   │   ├── WebinarMessageChainBindingResolver.php
 │   │   │   │   ├── WebinarMessageChainExecutionContextProvider.php
 │   │   │   │   ├── WebinarMessageReadinessService.php
+│   │   │   │   ├── WebinarPostEventMessageRecipientGate.php
+│   │   │   │   ├── WebinarPostEventReplayPreflight.php
 │   │   │   │   ├── WebinarProviderManager.php
 │   │   │   │   ├── WebinarRegisterPageDefinitionValidator.php
 │   │   │   │   ├── WebinarRegistrationCancellationPolicy.php
@@ -1180,6 +1195,9 @@
 │       │   │   ├── SetupValidationFinding.php
 │       │   │   └── SetupValidationResult.php
 │       │   └── SetupValidationManager.php
+│       ├── Testing
+│       │   ├── ArtisanTestDatabaseLock.php
+│       │   └── ArtisanTestEnvironmentBootstrap.php
 │       ├── TokenContracts
 │       │   ├── Contracts
 │       │   │   ├── ComputedTokenValueProvider.php
@@ -1219,6 +1237,7 @@
 │   ├── events.php
 │   ├── filesystems.php
 │   ├── flow_routes.php
+│   ├── forms.php
 │   ├── generated
 │   ├── horizon.php
 │   ├── location.php
@@ -1714,8 +1733,9 @@
 │       │       ├── index.blade.php
 │       │       ├── message-chains
 │       │       │   └── show.blade.php
-│       │       └── message-templates
-│       │           └── index.blade.php
+│       │       ├── message-templates
+│       │       │   └── index.blade.php
+│       │       └── post-event-review.blade.php
 │       ├── email.blade.php
 │       ├── email-text.blade.php
 │       ├── messaging
@@ -1813,6 +1833,7 @@
 │   │   │   ├── WebinarCampaignLifecycleEndToEndTest.php
 │   │   │   └── WebinarNurtureFirstAvailableVariantTest.php
 │   │   ├── Clients
+│   │   │   ├── ArtisanTestEnvironmentBootstrapTest.php
 │   │   │   ├── ClientConfigFallbackTest.php
 │   │   │   ├── ClientEnvironmentLoaderTest.php
 │   │   │   └── ProjectStateClientEnvironmentContractTest.php
@@ -1828,10 +1849,6 @@
 │   │   │   └── TokenContractRegistryTest.php
 │   │   ├── ConfigGeneration
 │   │   │   ├── CoreWebinarMessagingDefaultsTest.php
-│   │   │   ├── RobTheMortgageCoachClientSelectionTest.php
-│   │   │   ├── SlamDunkConfigGoldenFixtureTest.php
-│   │   │   ├── SlamDunkDeliveryConsolidationConfigTest.php
-│   │   │   ├── SlamDunkRuntimeGoldenFixtureTest.php
 │   │   │   └── WebinarRegistrationConsentContentConfigTest.php
 │   │   ├── Core
 │   │   │   ├── ContactControllerTest.php
@@ -1876,6 +1893,7 @@
 │   │   │   └── SyncFlowRoutePresetsActionTest.php
 │   │   ├── Forms
 │   │   │   ├── CreateFormSubmissionActionTest.php
+│   │   │   ├── ExternalFormIntakeTest.php
 │   │   │   ├── FormConfigContractTest.php
 │   │   │   ├── FormPresetSyncTest.php
 │   │   │   ├── FormsFoundationTest.php
@@ -1948,6 +1966,7 @@
 │   │   │   ├── ResolvedMessageDispatchIntegrationTest.php
 │   │   │   ├── ResolvedMessageDispatchSchemaTest.php
 │   │   │   ├── RouteAuthoringMessageTemplateEligibilityResolverTest.php
+│   │   │   ├── ScheduledMessageContactRecipientGateTest.php
 │   │   │   ├── ScheduledMessageDeliveryLeaseTest.php
 │   │   │   ├── ScheduledMessageEventOutboxTest.php
 │   │   │   ├── ScheduledMessageFlowRoutesBoundaryTest.php
@@ -1969,10 +1988,10 @@
 │   │   │   ├── ContactShowModuleVisibilityTest.php
 │   │   │   ├── ModuleDependencyBoundaryTest.php
 │   │   │   ├── ModuleManagerTest.php
+│   │   │   ├── ModuleMigrationCommandBehaviorTest.php
 │   │   │   ├── ModuleMigrationInstallationTest.php
 │   │   │   ├── ModuleMigrationPlanningAndStatusTest.php
 │   │   │   ├── ModuleMigrationRegistryTest.php
-│   │   │   ├── ModuleMigrationUpgradeAndReconciliationTest.php
 │   │   │   ├── ModuleNavigationTest.php
 │   │   │   ├── ModuleRouteMiddlewareTest.php
 │   │   │   └── PlatformMigrationFoundationTest.php
@@ -2076,10 +2095,11 @@
 │   │   │   │   ├── ProcessPostWebinarEventJobTest.php
 │   │   │   │   ├── ProviderAttendanceReconciliationTest.php
 │   │   │   │   ├── WebinarFollowUpOutcomeAccountingTest.php
-│   │   │   │   └── WebinarProviderEventTargetResolutionTest.php
+│   │   │   │   ├── WebinarPostEventReviewTest.php
+│   │   │   │   ├── WebinarProviderEventTargetResolutionTest.php
+│   │   │   │   └── WebinarReplayDispatchPreflightTest.php
 │   │   │   ├── ProviderCancellationReconciliationTest.php
 │   │   │   ├── ResolveRegisterableWebinarActionTest.php
-│   │   │   ├── SlamDunkWebinarConfigurationContractTest.php
 │   │   │   ├── SyncWebinarScheduleProfilesMessageAreaTest.php
 │   │   │   ├── WebinarAutomationOutboxTest.php
 │   │   │   ├── WebinarCurrentProviderOccurrenceTest.php
@@ -2131,4 +2151,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-541 directories, 1591 files
+545 directories, 1607 files

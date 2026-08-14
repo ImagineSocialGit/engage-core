@@ -60,6 +60,10 @@ return [
         'mode' => 'resettable',
         'reason' => 'Resume rows coordinate only the current target import.',
     ],
+    'module_installations' => [
+        'mode' => 'environment_owned',
+        'reason' => 'Module installation and migration bookkeeping belongs to the target environment.',
+    ],
 
     'mortgage_stages' => [
         'mode' => 'must_be_empty',

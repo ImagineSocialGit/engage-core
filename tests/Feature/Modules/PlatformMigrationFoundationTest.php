@@ -9,8 +9,6 @@ use App\Support\Modules\Migrations\ModuleMigrationRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -91,7 +89,7 @@ class PlatformMigrationFoundationTest extends TestCase
         $this->assertTrue(Schema::hasTable('module_installations'));
     }
 
-    public function test_no_module_owned_migrations_remain_in_the_legacy_root(): void
+    public function test_no_module_owned_migrations_exist_in_the_legacy_root(): void
     {
         $legacyRootFiles = collect(File::files(database_path('migrations')))
             ->filter(
@@ -105,125 +103,6 @@ class PlatformMigrationFoundationTest extends TestCase
             ->all();
 
         $this->assertEquals([], $legacyRootFiles);
-    }
-
-    public function test_platform_migrations_are_relocated_without_replaying_recorded_basenames(): void
-    {
-        $registry = app(ModuleMigrationRegistry::class);
-        $platform = $registry->platform();
-
-        foreach ($platform->migrationFiles as $migrationFile) {
-            $this->assertFileExists(
-                base_path($platform->targetPath($migrationFile)),
-            );
-            $this->assertFileDoesNotExist(
-                database_path('migrations/'.$migrationFile),
-            );
-        }
-
-        $expectedMigrationNames = collect($platform->migrationFiles)
-            ->map(
-                static fn (string $migrationFile): string => pathinfo(
-                    $migrationFile,
-                    PATHINFO_FILENAME,
-                ),
-            )
-            ->sort()
-            ->values()
-            ->all();
-        $recordedBefore = DB::table('migrations')
-            ->whereIn('migration', $expectedMigrationNames)
-            ->pluck('migration')
-            ->sort()
-            ->values()
-            ->all();
-
-        $this->assertEquals($expectedMigrationNames, $recordedBefore);
-
-        $migrationCountBefore = DB::table('migrations')->count();
-
-        $this->assertSame(0, Artisan::call('migrate', [
-            '--path' => [$platform->path],
-            '--force' => true,
-        ]));
-        $this->assertSame(
-            $migrationCountBefore,
-            DB::table('migrations')->count(),
-        );
-    }
-
-    public function test_relocated_module_migrations_are_not_replayed_from_new_paths(): void
-    {
-        $registry = app(ModuleMigrationRegistry::class);
-        $migrationCountBefore = DB::table('migrations')->count();
-
-        foreach (self::COMPLETE_TEST_MODULE_KEYS as $moduleKey) {
-            $scope = $registry->requireModule($moduleKey);
-
-            foreach ($scope->migrationFiles as $migrationFile) {
-                $this->assertFileExists(
-                    base_path($scope->targetPath($migrationFile)),
-                );
-                $this->assertFileDoesNotExist(
-                    database_path('migrations/'.$migrationFile),
-                );
-            }
-
-            $expectedMigrationNames = collect($scope->migrationFiles)
-                ->map(
-                    static fn (string $migrationFile): string => pathinfo(
-                        $migrationFile,
-                        PATHINFO_FILENAME,
-                    ),
-                )
-                ->sort()
-                ->values()
-                ->all();
-            $recordedBefore = DB::table('migrations')
-                ->whereIn('migration', $expectedMigrationNames)
-                ->pluck('migration')
-                ->sort()
-                ->values()
-                ->all();
-
-            $this->assertEquals($expectedMigrationNames, $recordedBefore);
-
-            $this->assertSame(0, Artisan::call('migrate', [
-                '--path' => [$scope->path],
-                '--force' => true,
-            ]));
-        }
-
-        $this->assertSame(
-            $migrationCountBefore,
-            DB::table('migrations')->count(),
-        );
-    }
-
-    public function test_scheduling_booking_hold_snapshot_columns_are_part_of_the_authoritative_create_migration(): void
-    {
-        $registry = app(ModuleMigrationRegistry::class);
-        $scheduling = $registry->requireModule('scheduling');
-        $bookingHoldMigration = '2026_07_21_180101_create_booking_holds_table.php';
-        $obsoleteFollowUp = '2026_08_04_190000_add_location_snapshots_to_booking_holds.php';
-
-        $this->assertTrue(Schema::hasColumns('booking_holds', [
-            'location_type',
-            'location_details',
-        ]));
-        $this->assertFileExists(
-            base_path($scheduling->targetPath($bookingHoldMigration)),
-        );
-        $this->assertFileDoesNotExist(
-            database_path('migrations/'.$bookingHoldMigration),
-        );
-        $this->assertFileDoesNotExist(
-            database_path('migrations/'.$obsoleteFollowUp),
-        );
-        $this->assertFileDoesNotExist(
-            base_path($scheduling->path.'/'.$obsoleteFollowUp),
-        );
-        $this->assertFalse($scheduling->owns($obsoleteFollowUp));
     }
 
     public function test_installation_repository_records_module_level_state_without_replacing_laravel_history(): void

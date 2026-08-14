@@ -4,10 +4,13 @@ namespace Tests\Feature\Modules;
 
 use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ModuleNavigationTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_webinars_nav_item_renders_when_webinars_module_is_enabled(): void
     {
         config()->set('modules.enabled', [

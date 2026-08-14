@@ -97,8 +97,6 @@ filename_timestamp="$(date -u +'%Y%m%dT%H%M%SZ')"
 dump_file="$dump_dir/test-dump-${filename_scope}-${filename_timestamp}-$$.txt"
 
 command=(
-    env
-    APP_ENV=testing
     "$php_binary"
     artisan
     test
@@ -106,6 +104,7 @@ command=(
     "${test_target[@]}"
     "$@"
 )
+
 printf -v command_display '%q ' "${command[@]}"
 command_display="${command_display% }"
 
@@ -175,6 +174,14 @@ fi
     echo "Completed: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
     echo "Dump file: $dump_file"
 } | tee -a "$dump_file"
+
+if (( awk_status != 0 )); then
+    echo "ERROR: Test execution completed, but output normalization failed with exit code $awk_status." >&2
+
+    if (( test_status == 0 )); then
+        exit "$awk_status"
+    fi
+fi
 
 if (( tee_status != 0 )); then
     echo "ERROR: Test execution completed, but writing the dump failed with exit code $tee_status." >&2

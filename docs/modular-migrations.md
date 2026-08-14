@@ -726,7 +726,10 @@ It does not install Location.
 
 The platform path is active in every environment.
 
-Normal runtime and deployment bootstrap registers only the platform path. Optional module and vertical paths are not added to Laravel's global migration-path list merely because their code exists or their runtime provider is enabled.
+Normal runtime and deployment bootstrap registers only the platform path.
+Optional module and vertical paths are not added to Laravel's global
+migration-path list merely because their code exists or their runtime provider
+is enabled.
 
 Module operations use explicit selected paths:
 
@@ -741,45 +744,81 @@ modules:reconcile
     runs no migrations
 ```
 
-The test base class deliberately adds every registry-owned path under `database/migrations/modules/` to Laravel's migrator after application bootstrap. This happens before `RefreshDatabase` and explicit test `migrate:fresh` calls, preserving complete non-vertical schema construction for the suite. Mortgage remains excluded unless a test explicitly selects its vertical path.
+The test base class deliberately adds every registry-owned path under
+`database/migrations/modules/` to Laravel's migrator after application
+bootstrap. This happens before `RefreshDatabase`, preserving complete
+non-vertical schema construction for the suite. Mortgage remains excluded
+unless a test explicitly selects its vertical path.
 
-Outside the testing environment, plain `php artisan migrate` and `php artisan migrate:fresh` remain platform-only. New-client full setup uses `engage:install`; later module schema creation and upgrades continue to use the explicit module commands.
+Run automated tests with the ordinary command:
 
-Planning, status, installation, upgrade, reconciliation, validation, and orchestration tests additionally prove:
+```bash
+php artisan test
+```
+
+Do not require callers to prefix `APP_ENV=testing`. The Artisan test bootstrap
+sets the testing environment before Laravel loads selected-client environment
+values, so the outer Artisan process and the PHPUnit process use the same
+testing boundary.
+
+Every `php artisan test` process also acquires a non-blocking lock keyed to the
+effective PHPUnit test database before Laravel boots. A second suite targeting
+the same destructive test database must fail immediately rather than running
+concurrently. This protects `RefreshDatabase`, installer tests, and other schema
+operations from cross-process table drops/rebuilds. Separate suites may run
+concurrently only when they use different test databases.
+
+`scripts/run-tests-to-dump.sh` uses the same ordinary Artisan test path. It does
+not maintain a separate `APP_ENV=testing` wrapper or a second shell-only
+database lock.
+
+Outside the testing environment, plain `php artisan migrate` and
+`php artisan migrate:fresh` remain platform-only. New-client full setup uses
+`engage:install`; later module schema creation and upgrades continue to use the
+explicit module commands.
+
+Permanent migration tests should prove current architecture and operator
+behavior, not preserve one-time migration-history transitions indefinitely.
+
+Keep durable coverage for:
 
 ```text
-Scheduling plans Core before Scheduling and excludes Location
-transitive dependencies preserve dependency-first order
-schema-free modules contribute no false migration scope
-unknown modules and dependency cycles fail explicitly
-fresh schemas report current migrations separately from untracked ledger state
-manifest gaps report pending migration filenames
-modules:status does not mutate migration history or module_installations
-modules:install adopts current selected scopes without replaying migrations
-repeated installation of a current tracked scope is a timestamp-preserving no-op
-a pending Scheduling migration runs without touching a deliberately pending Location migration
-failed dependency scopes stop the plan and leave later scopes unstarted
-interrupted installing state resumes to installed after verification
-concurrent module migration operations are rejected by the global lock
-modules:migrate rejects untracked dependency closures before schema work
-targeted and bulk upgrades run only installed selected scopes
-contract-only drift refreshes ledger state without replaying current migrations
-targeted reconciliation adopts Core and Scheduling without Location
-partial selected scopes reject reconciliation before any ledger write
-bulk reconciliation adopts current module paths while leaving absent Mortgage schema untracked
-enabled Scheduling validation selects Core and Scheduling without Location
-untracked, partial, interrupted, failed, and drifted enabled scopes produce actionable setup-validation errors
-schema-free enabled modules create no false migration findings
-fully reconciled current enabled scopes produce no migration findings
-setup:validate surfaces migration findings without mutating schema or ledger state
-runtime startup path policy selects only platform migrations
-test bootstrap explicitly registers the complete non-vertical module schema
-engage:install can bootstrap an empty database through platform, selected module, preset, and validation stages
-engage:install defaults to configured enabled schema scopes when --modules is omitted
-explicit installer selection cannot silently omit configured enabled schema scopes
-Scheduling installation through engage:install creates Core and Scheduling schema without Location
-preset-stage failure stops before setup validation and the same install command can be rerun without replaying migrations
+migration registry ownership and safe registered paths
+runtime startup selecting only platform migrations
+test bootstrap registering the complete non-vertical module schema
+dependency planning and schema-free module behavior
+read-only module status and manifest/pending-state inspection
+module installation dependency closure and idempotence
+failure stopping later installation scopes
+interrupted installation recovery
+global module-migration locking
+current-schema reconciliation and absent-vertical handling
+modules:migrate refusing untracked scopes
+contract-drift ledger refresh without replaying current migrations
+setup-validation handling of untracked, installing, failed, and drifted scopes
+schema-free enabled modules producing no false migration findings
+engage:install empty-database orchestration and configured-scope enforcement
+preset/setup-validation failure boundaries during installation
 ```
+
+Do not keep permanent tests whose only purpose is to:
+
+```text
+delete one named historical migration row and replay that migration
+drop tables from one named historical migration to prove an old upgrade
+prove a one-time migration relocation by rerunning moved paths
+preserve a pre-rollout migration consolidation assertion
+manufacture a historical partial state tied to one specific migration filename
+```
+
+Those checks may be useful while a migration reorganization is being developed
+or rolled out, but they should be removed after the transition is established
+unless the scenario represents a durable supported operator contract.
+
+Use `RefreshDatabase` and normal transactional isolation for current-state
+behavior whenever possible. Do not run `migrate:fresh` in every test setup merely
+to manufacture a clean baseline. Explicit destructive schema rebuilding belongs
+only in tests whose permanent contract genuinely requires it.
 
 ## Operational closeout and remaining follow-up
 

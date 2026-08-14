@@ -1,5 +1,19 @@
 <?php
 
+$rootDomain = trim((string) env('ROOT_DOMAIN', 'localhost'));
+$appUrl = trim((string) env('APP_URL', 'http://localhost'));
+$appScheme = parse_url($appUrl, PHP_URL_SCHEME);
+$appPort = parse_url($appUrl, PHP_URL_PORT);
+
+$defaultWebinarUrl = sprintf(
+    '%s://webinar.%s%s',
+    is_string($appScheme) && $appScheme !== ''
+        ? strtolower($appScheme)
+        : 'http',
+    $rootDomain !== '' ? $rootDomain : 'localhost',
+    is_int($appPort) ? ':'.$appPort : '',
+);
+
 return [
 
     /*
@@ -52,9 +66,9 @@ return [
     |
     */
 
-    'root_domain' => env('ROOT_DOMAIN', 'localhost'),
-    'url' => env('APP_URL', 'http://localhost'),
-    'webinar_url' => env('WEBINAR_APP_URL', env('APP_URL')),
+    'root_domain' => $rootDomain,
+    'url' => $appUrl,
+    'webinar_url' => env('WEBINAR_APP_URL', $defaultWebinarUrl),
     'crm_url' => env('CRM_APP_URL'),
     
     /*

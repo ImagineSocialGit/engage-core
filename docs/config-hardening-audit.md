@@ -37,7 +37,8 @@ The audit reconciled these layers:
 10. Webinar schedule, waitlist, registration, and post-event consumers.
 11. Setup-validation contributors and provider registration.
 12. Database models and migrations used as token-source proof.
-13. Focused, golden-fixture, runtime, and full-suite tests.
+13. Focused tests, temporary client-specific lock-in fixtures, representative
+    runtime tests, and full-suite validation.
 
 ## Confirmed loading and composition behavior
 
@@ -54,19 +55,33 @@ These rules are part of the export target. An exporter must preview and validate
 
 ## Phase 1 — Frozen behavior
 
-Slam Dunk was established as the first golden vertical slice.
+Slam Dunk was used as the first temporary end-to-end vertical slice while the
+configuration-contract foundation was being established.
 
-Coverage now proves that:
+At that hardening checkpoint, the client-specific coverage proved that:
 
-- the real client boot produces the expected effective module/package configuration;
-- the selected package syncs into a fresh database;
-- selected statuses, tasks, Messaging templates, schedule profiles, Campaigns, variants, capabilities, and FlowRoutes resolve;
-- Webinar registration and waitlist messages use synced profiles and templates;
-- post-event attended and missed follow-ups resolve real definitions;
-- attended and missed automation events change status and enroll the intended Campaigns;
-- representative Campaign messages are scheduled through the actual runtime path.
+- the real client boot produced the expected effective module/package
+  configuration;
+- the selected package synced into a fresh database;
+- selected statuses, tasks, Messaging templates, schedule profiles, Campaigns,
+  variants, capabilities, and FlowRoutes resolved;
+- Webinar registration and waitlist messages used synced profiles and templates;
+- post-event attended and missed follow-ups resolved real definitions;
+- attended and missed automation events changed status and enrolled the intended
+  Campaigns;
+- representative Campaign messages were scheduled through the actual runtime
+  path.
 
-Golden text or array snapshots are useful drift detectors, but the primary proof is semantic round-trip behavior through the real loader, sync, resolver, and runtime services.
+Those client-specific golden/config fixtures were deliberately temporary. After
+the shared config contracts, setup-validation paths, semantic resolvers, and
+generic runtime tests became authoritative, the permanent Slam Dunk/Rob golden
+test files were pruned rather than preserved as a parallel client-specific
+contract layer.
+
+Golden text or array snapshots may still be useful during a focused transition,
+but they are not the long-term source of truth. The durable proof is semantic
+behavior through the real loader, registered contracts, setup validation,
+sync/resolution seams, representative runtime tests, and the full suite.
 
 ## Semantic identity correction
 

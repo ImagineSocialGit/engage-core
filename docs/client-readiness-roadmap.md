@@ -2,13 +2,19 @@
 
 ## Config generation lock-in checkpoint
 
-The first hardening vertical slice is complete. Slam Dunk is frozen as a semantic golden fixture;
-its effective package syncs into a fresh database and representative registration, waitlist,
-post-event, status-change, campaign-enrollment, and message-resolution paths execute in tests.
-Closed config contracts now cover module definitions, preset packages, contact statuses, tasks,
-email, SMS, permission invitations, Campaign presets, FlowRoute presets, Webinar schedule profiles,
-and Webinar post-event configuration. Token sources and producer contexts are registered from real
-model columns and explicit computed providers.
+The first hardening vertical slice is complete. Slam Dunk was used as temporary
+end-to-end semantic proof while the config-contract foundation was established.
+Those client-specific golden/config fixtures have since been pruned; durable
+assurance now comes from shared closed contracts, setup validation, semantic
+sync/resolution tests, representative runtime coverage, and the full suite. The
+underlying package and runtime behavior proven during that lock-in work remains
+part of the historical audit record.
+
+Closed config contracts now cover module definitions, preset packages, contact
+statuses, tasks, email, SMS, permission invitations, Campaign presets, FlowRoute
+presets, Webinar schedule profiles, and Webinar post-event configuration. Token
+sources and producer contexts are registered from real model columns and
+explicit computed providers.
 
 The broad `test_everything` package has also completed sync with no unavailable capability
 handlers, and `setup:validate` reports no findings. This proves the current checked-in setup is

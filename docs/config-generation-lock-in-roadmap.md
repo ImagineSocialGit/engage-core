@@ -8,7 +8,10 @@ The system should expose only capabilities registered by installed code and refu
 
 ## Completed foundation
 
-- Slam Dunk effective config and runtime golden fixtures.
+- Slam Dunk was used as temporary end-to-end vertical proof while the shared
+  config contracts and runtime seams were hardened; the client-specific golden
+  fixtures were later pruned once shared contract, setup-validation, and runtime
+  coverage became the durable authority.
 - Semantic Campaign variant assignment resolution.
 - Shared config schema/contract registry.
 - Foundational module/package/status/task contracts.
@@ -135,16 +138,21 @@ Build this before the polished UX.
 
 Recommended first vertical slice:
 
-1. Represent Slam Dunk configuration as structured authoring state.
+1. Represent one representative full-package configuration as structured
+   authoring state.
 2. Export deterministic PHP files.
 3. Snapshot exported text for drift review.
 4. Reload through `ClientServiceProvider`.
 5. Normalize through contracts.
 6. Compare semantic effective configuration.
-7. Fresh-sync and setup-validate.
-8. Run the existing Slam Dunk runtime golden fixture.
+7. Fresh-sync and setup-validate in an isolated test database.
+8. Run the shared config-contract and representative runtime tests against the
+   generated output.
 
-Text equality is a useful secondary check. Semantic equality and runtime execution are the primary proof.
+Text equality is a useful secondary check. Semantic equality, shared contract
+validation, setup validation, and representative runtime execution are the
+primary proof. Do not create a permanent client-specific golden suite merely to
+freeze one client's prose, list ordering, or presentation config.
 
 ## Phase 5 — Dev authoring UX
 

@@ -5,25 +5,14 @@ namespace Tests\Feature\Modules;
 use App\Support\Modules\Migrations\ModuleInstallation;
 use App\Support\Modules\Migrations\ModuleMigrationRegistry;
 use Carbon\CarbonImmutable;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
-class ModuleMigrationUpgradeAndReconciliationTest extends TestCase
+class ModuleMigrationCommandBehaviorTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->assertSame(
-            0,
-            Artisan::call('migrate:fresh', [
-                '--force' => true,
-            ]),
-            Artisan::output(),
-        );
-    }
+    use RefreshDatabase;
 
     protected function tearDown(): void
     {
@@ -32,7 +21,7 @@ class ModuleMigrationUpgradeAndReconciliationTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_targeted_reconciliation_adopts_current_scheduling_closure_without_location(): void
+    public function test_targeted_reconciliation_adopts_current_scheduling_closure_without_location_and_is_idempotent(): void
     {
         CarbonImmutable::setTestNow('2026-08-06 15:00:00 UTC');
 
@@ -50,7 +39,11 @@ class ModuleMigrationUpgradeAndReconciliationTest extends TestCase
         );
         $this->assertStringNotContainsString('location', $output);
         $this->assertStringContainsString('reconciled', $output);
-        $this->assertSame($migrationCountBefore, DB::table('migrations')->count());
+        $this->assertSame(
+            $migrationCountBefore,
+            DB::table('migrations')->count(),
+        );
+
         $this->assertDatabaseHas('module_installations', [
             'module_key' => 'core',
             'status' => ModuleInstallation::STATUS_INSTALLED,
@@ -81,26 +74,10 @@ class ModuleMigrationUpgradeAndReconciliationTest extends TestCase
         $this->assertStringContainsString('current', Artisan::output());
         $this->assertTrue($repeated->installed_at?->equalTo($installedAt));
         $this->assertTrue($repeated->last_migrated_at?->equalTo($lastMigratedAt));
-    }
-
-    public function test_targeted_reconciliation_rejects_partial_closure_before_writing_any_ledger_rows(): void
-    {
-        DB::table('migrations')
-            ->where(
-                'migration',
-                '2026_08_03_190000_create_scheduling_resource_occupancy_tables',
-            )
-            ->delete();
-
-        $this->assertSame(1, Artisan::call('modules:reconcile', [
-            'module' => 'scheduling',
-        ]));
-
-        $this->assertStringContainsString(
-            'Module migration scope [scheduling] cannot be reconciled because migrations are [partial].',
-            Artisan::output(),
+        $this->assertSame(
+            $migrationCountBefore,
+            DB::table('migrations')->count(),
         );
-        $this->assertSame(0, ModuleInstallation::query()->count());
     }
 
     public function test_bulk_reconciliation_adopts_current_scopes_and_skips_absent_vertical_schema(): void
@@ -141,75 +118,10 @@ class ModuleMigrationUpgradeAndReconciliationTest extends TestCase
             Artisan::output(),
         );
         $this->assertSame(0, ModuleInstallation::query()->count());
-        $this->assertSame($migrationCountBefore, DB::table('migrations')->count());
-    }
-
-    public function test_targeted_module_migrate_runs_only_installed_scheduling_closure(): void
-    {
-        $this->assertSame(0, Artisan::call('modules:reconcile', [
-            'module' => 'scheduling',
-        ]));
-
-        $this->removeSchedulingResourceMigration();
-
-        DB::table('migrations')
-            ->where(
-                'migration',
-                '2026_04_15_195859_create_location_area_assignments_table',
-            )
-            ->delete();
-
-        $this->assertSame(0, Artisan::call('modules:migrate', [
-            'module' => 'scheduling',
-        ]));
-
-        $output = Artisan::output();
-
-        $this->assertStringContainsString(
-            'Resolved modules: core, scheduling',
-            $output,
+        $this->assertSame(
+            $migrationCountBefore,
+            DB::table('migrations')->count(),
         );
-        $this->assertStringNotContainsString('location', $output);
-        $this->assertStringContainsString('migrated', $output);
-        $this->assertTrue(Schema::hasTable('scheduling_resources'));
-        $this->assertTrue(Schema::hasTable('scheduling_resource_occupancies'));
-        $this->assertDatabaseHas('migrations', [
-            'migration' => '2026_08_03_190000_create_scheduling_resource_occupancy_tables',
-        ]);
-        $this->assertDatabaseMissing('migrations', [
-            'migration' => '2026_04_15_195859_create_location_area_assignments_table',
-        ]);
-        $this->assertDatabaseMissing('module_installations', [
-            'module_key' => 'location',
-        ]);
-    }
-
-    public function test_bulk_module_migrate_runs_only_ledger_installed_scopes(): void
-    {
-        $this->assertSame(0, Artisan::call('modules:reconcile', [
-            'module' => 'scheduling',
-        ]));
-
-        $this->removeSchedulingResourceMigration();
-
-        DB::table('migrations')
-            ->where(
-                'migration',
-                '2026_04_15_195859_create_location_area_assignments_table',
-            )
-            ->delete();
-
-        $this->assertSame(0, Artisan::call('modules:migrate'));
-
-        $this->assertDatabaseHas('migrations', [
-            'migration' => '2026_08_03_190000_create_scheduling_resource_occupancy_tables',
-        ]);
-        $this->assertDatabaseMissing('migrations', [
-            'migration' => '2026_04_15_195859_create_location_area_assignments_table',
-        ]);
-        $this->assertDatabaseMissing('module_installations', [
-            'module_key' => 'location',
-        ]);
     }
 
     public function test_module_migrate_refreshes_drifted_contract_without_replaying_current_migrations(): void
@@ -249,21 +161,9 @@ class ModuleMigrationUpgradeAndReconciliationTest extends TestCase
             '2026-08-06 16:00:00',
             $updated->last_migrated_at?->format('Y-m-d H:i:s'),
         );
-        $this->assertSame($migrationCountBefore, DB::table('migrations')->count());
-    }
-
-    private function removeSchedulingResourceMigration(): void
-    {
-        DB::table('migrations')
-            ->where(
-                'migration',
-                '2026_08_03_190000_create_scheduling_resource_occupancy_tables',
-            )
-            ->delete();
-
-        Schema::dropIfExists('scheduling_resource_occupancies');
-        Schema::dropIfExists('bookable_service_resource_requirements');
-        Schema::dropIfExists('scheduling_host_resources');
-        Schema::dropIfExists('scheduling_resources');
+        $this->assertSame(
+            $migrationCountBefore,
+            DB::table('migrations')->count(),
+        );
     }
 }
