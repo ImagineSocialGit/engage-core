@@ -4,11 +4,13 @@ namespace App\Modules\Scheduling\Actions;
 
 use App\Modules\Scheduling\Data\AvailabilitySearch;
 use App\Modules\Scheduling\Data\BookableSlot;
+use App\Modules\Scheduling\Data\SchedulingLocationSnapshot;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookableSlotOffer;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Services\SchedulingDurationResolver;
+use App\Modules\Scheduling\Services\SchedulingLocationSnapshotResolver;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use DomainException;
@@ -26,12 +28,14 @@ class IssueBookableSlotOfferAction
     public function __construct(
         private readonly FindBookableAvailabilityAction $findAvailability,
         private readonly SchedulingDurationResolver $durations,
+        private readonly SchedulingLocationSnapshotResolver $locations,
     ) {}
 
     public function handle(
         BookableSlot $slot,
         ?CarbonInterface $issuedAt = null,
         ?Appointment $rescheduleAppointment = null,
+        ?SchedulingLocationSnapshot $location = null,
     ): BookableSlotOffer {
         $issuedAt = $issuedAt !== null
             ? CarbonImmutable::instance($issuedAt)->utc()
@@ -41,6 +45,7 @@ class IssueBookableSlotOfferAction
             $slot,
             $issuedAt,
             $rescheduleAppointment,
+            $location,
         ): BookableSlotOffer {
             $service = BookableService::withTrashed()
                 ->whereKey($slot->bookableServiceId)
@@ -61,12 +66,25 @@ class IssueBookableSlotOfferAction
                 service: $service,
                 appointment: $rescheduleAppointment,
             );
+            $locationSnapshot = $location;
+
+            if ($location instanceof SchedulingLocationSnapshot
+                || $service->location_type !== BookableService::LOCATION_TYPE_CUSTOMER_SITE
+                || $rescheduleAppointment instanceof Appointment
+            ) {
+                $locationSnapshot = $this->locations->forCommitment(
+                    service: $service,
+                    requested: $location,
+                    rescheduleSource: $rescheduleAppointment,
+                );
+            }
             $currentSlot = $this->exactCurrentSlot(
                 service: $service,
                 host: $host,
                 slot: $slot,
                 evaluatedAt: $issuedAt,
                 rescheduleAppointment: $rescheduleAppointment,
+                location: $locationSnapshot,
             );
 
             if (! $currentSlot instanceof BookableSlot) {
@@ -89,6 +107,8 @@ class IssueBookableSlotOfferAction
                 'display_timezone' => $currentSlot->displayTimezone,
                 'capacity' => $currentSlot->capacity,
                 'remaining_capacity' => $currentSlot->remainingCapacity,
+                'location_type' => $locationSnapshot?->type,
+                'location_details' => $locationSnapshot?->details,
                 'source_scopes' => $currentSlot->sourceScopes,
                 'source_window_ids' => $currentSlot->sourceWindowIds,
                 'issued_at' => $issuedAt,
@@ -179,6 +199,7 @@ class IssueBookableSlotOfferAction
         BookableSlot $slot,
         CarbonImmutable $evaluatedAt,
         ?Appointment $rescheduleAppointment,
+        ?SchedulingLocationSnapshot $location,
     ): ?BookableSlot {
         $candidateDurationMinutes = $this->durations->durationMinutes(
             service: $service,
@@ -193,6 +214,7 @@ class IssueBookableSlotOfferAction
             displayTimezone: $slot->displayTimezone,
             evaluatedAt: $evaluatedAt,
             rescheduleAppointment: $rescheduleAppointment,
+            location: $location,
             candidateDurationMinutes: $candidateDurationMinutes,
         );
 

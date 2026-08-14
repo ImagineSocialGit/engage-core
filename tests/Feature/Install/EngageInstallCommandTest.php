@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Support\Modules\Migrations\ModuleInstallation;
 use App\Support\SetupValidation\Contributors\ModuleMigrationsSetupValidationContributor;
 use App\Support\SetupValidation\SetupValidationManager;
+use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -200,6 +201,19 @@ class EngageInstallCommandTest extends TestCase
         );
         $this->assertFalse(Schema::hasTable('migrations'));
         $this->assertFalse(Schema::hasTable('users'));
+    }
+
+    protected function tearDown(): void
+    {
+        /*
+        * This test class deliberately destroys and reconstructs the schema
+        * outside RefreshDatabase. Ensure the next RefreshDatabase test does
+        * not mistake whatever schema this test left behind for the complete
+        * migrated test schema.
+        */
+        RefreshDatabaseState::$migrated = false;
+
+        parent::tearDown();
     }
 
     private function useMigrationOnlySetupValidation(): void

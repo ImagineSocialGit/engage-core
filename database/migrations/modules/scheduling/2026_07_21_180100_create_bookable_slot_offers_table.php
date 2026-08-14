@@ -30,6 +30,8 @@ return new class extends Migration
             $table->string('display_timezone', 100);
             $table->unsignedInteger('capacity');
             $table->unsignedInteger('remaining_capacity');
+            $table->string('location_type', 80)->nullable();
+            $table->json('location_details')->nullable();
             $table->json('source_scopes')->nullable();
             $table->json('source_window_ids')->nullable();
             $table->dateTime('issued_at');

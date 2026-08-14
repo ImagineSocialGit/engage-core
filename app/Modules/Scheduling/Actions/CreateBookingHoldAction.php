@@ -103,10 +103,11 @@ class CreateBookingHoldAction
                     offer: $offer,
                     service: $service,
                 );
-                $locationSnapshot = $this->locations->forCommitment(
+                $locationSnapshot = $this->locationSnapshotForOffer(
+                    offer: $offer,
                     service: $service,
+                    rescheduleAppointment: $rescheduleAppointment,
                     requested: $location,
-                    rescheduleSource: $rescheduleAppointment,
                 );
                 $resourceSnapshot = $this->resourceOccupancy->lockRequirementSnapshot(
                     service: $service,
@@ -217,6 +218,55 @@ class CreateBookingHoldAction
 
             return $existing;
         }
+    }
+
+    private function locationSnapshotForOffer(
+        BookableSlotOffer $offer,
+        BookableService $service,
+        ?Appointment $rescheduleAppointment,
+        ?SchedulingLocationSnapshot $requested,
+    ): ?SchedulingLocationSnapshot {
+        $offered = $offer->locationSnapshot();
+
+        if ($service->location_type === BookableService::LOCATION_TYPE_CUSTOMER_SITE) {
+            if ($offered instanceof SchedulingLocationSnapshot
+                && $requested instanceof SchedulingLocationSnapshot
+                && ! $offered->hasSameCommitmentIdentity($requested)
+            ) {
+                throw new LogicException(
+                    'The selected slot offer belongs to another customer-site location.',
+                );
+            }
+
+            return $this->locations->forCommitment(
+                service: $service,
+                requested: $offered ?? $requested,
+                rescheduleSource: $rescheduleAppointment,
+            );
+        }
+
+        if ($requested instanceof SchedulingLocationSnapshot) {
+            return $this->locations->forCommitment(
+                service: $service,
+                requested: $requested,
+                rescheduleSource: $rescheduleAppointment,
+            );
+        }
+
+        $current = $this->locations->forCommitment(
+            service: $service,
+            rescheduleSource: $rescheduleAppointment,
+        );
+
+        if ($offered instanceof SchedulingLocationSnapshot
+            && ! $offered->hasSameCommitmentIdentity($current)
+        ) {
+            throw new DomainException(
+                'The selected slot offer no longer matches the service location.',
+            );
+        }
+
+        return $current;
     }
 
     private function assertRequestedLocationMatches(

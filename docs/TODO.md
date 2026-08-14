@@ -103,7 +103,7 @@ The durable Scheduling architecture is documented in [`modules/scheduling.md`](m
 - [x] Phase 4B.2C: add Scheduling-owned provider-neutral travel-time resolution, deterministic conservative fallback, adjacent Appointment/active-hold checks, reservation/direct-creation revalidation, and admin reschedule slot suggestions that preserve the source booking criteria; optional app-level geographic enrichment may improve travel ranking without making Location a Scheduling dependency.
 - [x] Phase 4B.2D1: add first-class fixed/range service-duration policy, Scheduling schema v2, explicit range interval validation, check-in/check-out boundary availability, full-stay hold/capacity/resource occupancy, direct range creation, and range-preserving reschedule runtime.
 - [x] Phase 4B.2D2: expose closed CRM range-service authoring plus public/internal check-in/check-out input, strict service-timezone wall-time resolution, and range-specific reschedule presentation; fixed-location PetServices stays do not require Location, while PetServices owns pet association, vaccination/compliance, intake, feeding/medication, and other boarding-specific meaning.
-- [ ] Phase 4B.3: restructure public booking around appointment-type-first progressive steps; require customer-site location before authoritative availability and keep all page transitions server authoritative.
+- [x] Phase 4B.3: restructure public booking around appointment-type-first progressive prerequisites; require canonical customer-site location before travel-aware fixed-slot availability, issue a short-lived non-blocking location-bound offer before the real hold, preserve fixed/range server authority, and leave Messaging-backed destination verification to Phase 4B.4.
 - [ ] Phase 4B.4: when Messaging has an eligible deliverable transactional channel, verify one email or SMS destination before creating a capacity-consuming hold; keep verification independent from marketing consent.
 - [ ] Add Scheduling Project State transfer support only after these durable configuration and public-booking contracts are stable.
 
@@ -647,27 +647,6 @@ Remaining polish audit:
   - Broadcast/permission invitation setup.
   - Provider/channel settings.
 
-### Commerce orchestration planning
-
-- [ ] Audit the current Commerce product/provider identity shape before implementing multi-provider orchestration.
-  - Separate canonical Commerce product/variant identity from external provider mappings.
-  - Do not rely on SKU equality as the durable cross-provider identity rule.
-- [ ] Add provider-neutral Commerce capability/role registration that supports multiple concurrent providers.
-  - Allow one provider to satisfy several roles or separate providers to own catalog, checkout/payment, inventory, POS/sales-source, order, or fulfillment-facing responsibilities.
-  - Do not hard-code a single global commerce provider when the concrete client ecosystem needs distinct roles.
-- [ ] Add durable inventory-effect orchestration.
-  - Normalize internal module consumption, external sales webhooks, refunds/returns, and reconciled Commerce purchases into canonical item effects.
-  - Make effects idempotent and safe under webhook/job retries.
-  - Distinguish authority-adjustment-required effects from authority-already-mutated reconciliation so the same sale cannot decrement inventory twice.
-  - Prevent provider feedback loops when an authoritative inventory update produces its own webhook.
-- [ ] Build the Engage Core storefront/presentation layer around Commerce public offers and canonical variants.
-  - Keep payment processing, raw payment data, warehouse/shipping fulfillment, tax/fraud, and deep external store operations with the configured specialized providers.
-  - Use provider-backed checkout/payment primitives rather than building a payment processor.
-- [ ] Implement only the provider packages required by the first concrete client ecosystem after the neutral role contracts are stable.
-  - Treat any Shopify/Square/Stripe/other combination as one implementation example, not a platform default.
-  - Prefer direct provider packages over requiring a separate middleware/integration SaaS account when Engage Core can own the bounded orchestration.
-- [ ] Add Commerce Project State transfer before operational production use of storefront, provider mappings, purchases, or durable inventory orchestration.
-
 ### Vertical module planning
 
 - [ ] Plan the PetServices vertical module.
@@ -680,7 +659,7 @@ Remaining polish audit:
   - Keep pet-specific fields out of Core contacts.
 - [ ] Plan the Music vertical module.
   - Own music-specific fan/customer meaning, release/fan campaign strategy, music product interest categories, and music-specific segmentation rules.
-  - Consume Commerce for provider-neutral purchase and inventory facts.
+  - Consume Commerce for Shopify/purchase facts.
   - Consume Location later for show-radius targeting if needed.
   - Consume Campaigns, Broadcasts, Messaging, and FlowRoutes for fan communication/automation.
   - Contribute vertical-specific route presets/task templates/capability labels through public seams.

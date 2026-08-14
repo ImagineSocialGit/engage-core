@@ -10,6 +10,7 @@ use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingAvailabilityWindow;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Providers\SchedulingModuleServiceProvider;
+use App\Modules\Scheduling\Services\SchedulingLocationSnapshotResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
@@ -27,7 +28,7 @@ class PublicBookingHoldTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_public_time_selection_creates_one_opaque_hold_for_a_deterministic_hidden_host(): void
+    public function test_public_time_selection_issues_a_non_blocking_offer_before_the_real_hold(): void
     {
         CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
         $this->registerPublicSurface('https://schedule.test');
@@ -55,57 +56,72 @@ class PublicBookingHoldTest extends TestCase
             endsAt: '2026-07-23 10:00:00 UTC',
         );
 
-        $this->get('https://schedule.test/services/consultation?date=2026-07-23')
+        $serviceUrl = 'https://schedule.test/services/consultation?date=2026-07-23';
+
+        $this->get($serviceUrl)
             ->assertOk()
             ->assertSee('name="starts_at"', false)
-            ->assertSee('name="idempotency_key"', false)
             ->assertDontSee('Hidden First Host')
-            ->assertDontSee('Hidden Second Host')
             ->assertDontSee('scheduling_host_id')
             ->assertDontSee('remaining_capacity')
-            ->assertDontSee('offer_id');
+            ->assertDontSee('source_window_ids');
 
-        $response = $this->post(
-            'https://schedule.test/services/consultation/reserve',
-            [
-                'starts_at' => '2026-07-23T09:00:00.000000Z',
-                'idempotency_key' => (string) Str::uuid(),
-            ],
+        $offerResponse = $this->post(
+            'https://schedule.test/services/consultation/offers',
+            ['starts_at' => '2026-07-23T09:00:00.000000Z'],
         );
 
-        $response->assertRedirect();
+        $offerResponse->assertRedirect();
+
+        $offer = BookableSlotOffer::query()->sole();
+
+        $this->assertSame($service->id, $offer->bookable_service_id);
+        $this->assertSame($firstHost->id, $offer->scheduling_host_id);
+        $this->assertDatabaseCount('bookable_slot_offers', 1);
+        $this->assertDatabaseCount('booking_holds', 0);
+
+        $offerUrl = 'https://schedule.test/offers/'.$offer->offer_id;
+
+        $this->assertSame($offerUrl, $offerResponse->headers->get('Location'));
+
+        $this->get($offerUrl)
+            ->assertOk()
+            ->assertSee('name="idempotency_key"', false)
+            ->assertSee('action="/offers/'.$offer->offer_id.'/hold"', false)
+            ->assertDontSee('Hidden First Host')
+            ->assertDontSee('scheduling_host_id')
+            ->assertDontSee('remaining_capacity');
+
+        $this->from($offerUrl)
+            ->post($offerUrl.'/hold', [
+                'idempotency_key' => (string) Str::uuid(),
+                'verified' => true,
+            ])
+            ->assertRedirect($offerUrl)
+            ->assertSessionHasErrors('verified');
+
+        $this->assertDatabaseCount('booking_holds', 0);
+
+        $holdResponse = $this->post($offerUrl.'/hold', [
+            'idempotency_key' => (string) Str::uuid(),
+        ]);
+
+        $holdResponse->assertRedirect();
 
         $hold = BookingHold::query()->sole();
 
         $this->assertSame($service->id, $hold->bookable_service_id);
         $this->assertSame($firstHost->id, $hold->scheduling_host_id);
         $this->assertSame(BookingHold::STATUS_ACTIVE, $hold->status);
-        $this->assertDatabaseCount('bookable_slot_offers', 1);
+        $this->assertNotNull($offer->refresh()->consumed_at);
         $this->assertDatabaseCount('booking_holds', 1);
-
-        $location = (string) $response->headers->get('Location');
-
         $this->assertSame(
             'https://schedule.test/book/'.$hold->hold_id,
-            $location,
+            $holdResponse->headers->get('Location'),
         );
-
-        $this->get($location)
-            ->assertOk()
-            ->assertSee('Time reserved')
-            ->assertSee('Consultation')
-            ->assertSee('9:00 AM–10:00 AM')
-            ->assertSee('data-remaining-seconds="600"', false)
-            ->assertDontSee('Hidden First Host')
-            ->assertDontSee('scheduling_host_id')
-            ->assertDontSee('capacity')
-            ->assertDontSee('slot_offer');
-
-        $this->get('https://example.test'.$location)
-            ->assertNotFound();
     }
 
-    public function test_public_reservation_rejects_forged_or_unavailable_booking_state(): void
+    public function test_public_offer_rejects_forged_or_unavailable_booking_state(): void
     {
         CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
         $this->registerPublicSurface('https://booking.test');
@@ -118,19 +134,18 @@ class PublicBookingHoldTest extends TestCase
         );
 
         $serviceUrl = 'https://booking.test/services/strategy-session?date=2026-07-23';
+        $offerUrl = 'https://booking.test/services/strategy-session/offers';
 
         $this->from($serviceUrl)
-            ->post('https://booking.test/services/strategy-session/reserve', [
+            ->post($offerUrl, [
                 'starts_at' => '2026-07-23T11:00:00.000000Z',
-                'idempotency_key' => (string) Str::uuid(),
             ])
             ->assertRedirect($serviceUrl)
             ->assertSessionHasErrors('starts_at');
 
         $this->from($serviceUrl)
-            ->post('https://booking.test/services/strategy-session/reserve', [
+            ->post($offerUrl, [
                 'starts_at' => '2026-07-23T09:00:00.000000Z',
-                'idempotency_key' => (string) Str::uuid(),
                 'scheduling_host_id' => 999,
                 'ends_at' => '2026-07-23T10:00:00.000000Z',
                 'capacity' => 999,
@@ -148,96 +163,123 @@ class PublicBookingHoldTest extends TestCase
         $this->assertDatabaseCount('booking_holds', 0);
     }
 
-
-    public function test_customer_site_public_booking_requires_raw_address_and_commits_normalized_snapshot(): void
+    public function test_customer_site_is_prepared_before_authoritative_availability_and_is_bound_to_the_offer(): void
     {
         CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
+        config()->set('scheduling.travel.conservative_minutes', 45);
         $this->registerPublicSurface('https://schedule.test');
 
         $service = $this->publicService('home-visit', [
+            'slot_interval_minutes' => 60,
             'location_type' => BookableService::LOCATION_TYPE_CUSTOMER_SITE,
             'location_details' => [
                 'label' => 'Customer address',
                 'instructions' => 'Meet the customer at the submitted address.',
             ],
         ]);
+        $host = SchedulingHost::factory()->create([
+            'timezone' => 'UTC',
+            'capacity' => 1,
+        ]);
+
+        BookableServiceHost::factory()->create([
+            'bookable_service_id' => $service->id,
+            'scheduling_host_id' => $host->id,
+        ]);
+
         $this->absoluteAvailability(
             service: $service,
             startsAt: '2026-07-23 09:00:00 UTC',
-            endsAt: '2026-07-23 10:00:00 UTC',
+            endsAt: '2026-07-23 11:00:00 UTC',
         );
 
+        $priorLocation = app(SchedulingLocationSnapshotResolver::class)->normalizeAddress(
+            type: BookableService::LOCATION_TYPE_CUSTOMER_SITE,
+            input: [
+                'address_line_1' => '900 Prior Avenue',
+                'address_line_2' => null,
+                'city' => 'Denver',
+                'region' => 'CO',
+                'postal_code' => '80205',
+                'country' => 'US',
+            ],
+        );
+
+        Appointment::factory()->create([
+            'bookable_service_id' => $service->id,
+            'scheduling_host_id' => $host->id,
+            'starts_at' => CarbonImmutable::parse('2026-07-23 08:00:00 UTC'),
+            'ends_at' => CarbonImmutable::parse('2026-07-23 09:00:00 UTC'),
+            'timezone' => 'UTC',
+            ...$priorLocation->toColumns(),
+        ]);
+
         $serviceUrl = 'https://schedule.test/services/home-visit?date=2026-07-23';
-        $reserveUrl = 'https://schedule.test/services/home-visit/reserve';
+        $prepareUrl = 'https://schedule.test/services/home-visit/prepare';
+        $offerUrl = 'https://schedule.test/services/home-visit/offers';
 
         $this->get($serviceUrl)
             ->assertOk()
-            ->assertSee('Service address')
             ->assertSee('name="address_line_1"', false)
-            ->assertSee('name="country"', false);
-
-        $base = [
-            'starts_at' => '2026-07-23T09:00:00.000000Z',
-            'idempotency_key' => (string) Str::uuid(),
-        ];
+            ->assertDontSee('name="starts_at"', false);
 
         $this->from($serviceUrl)
-            ->post($reserveUrl, $base)
+            ->post($offerUrl, [
+                'starts_at' => '2026-07-23T09:00:00.000000Z',
+            ])
             ->assertRedirect($serviceUrl)
-            ->assertSessionHasErrors([
-                'address_line_1',
-                'city',
-                'region',
-                'postal_code',
-                'country',
-            ]);
+            ->assertSessionHasErrors('address_line_1');
 
         $this->from($serviceUrl)
-            ->post($reserveUrl, [
-                ...$base,
-                'idempotency_key' => (string) Str::uuid(),
-                'address_line_1' => '  123   Main Street ',
-                'city' => ' Denver ',
-                'region' => ' CO ',
-                'postal_code' => ' 80202 ',
-                'country' => 'us',
+            ->post($prepareUrl, [
+                ...$this->customerSiteAddress(),
                 'latitude' => 39.7392,
             ])
             ->assertRedirect($serviceUrl)
             ->assertSessionHasErrors('latitude');
 
-        $response = $this->post($reserveUrl, [
-            ...$base,
-            'idempotency_key' => (string) Str::uuid(),
-            'address_line_1' => '  123   Main Street ',
-            'address_line_2' => '',
-            'city' => ' Denver ',
-            'region' => ' CO ',
-            'postal_code' => ' 80202 ',
-            'country' => 'us',
+        $this->post($prepareUrl, $this->customerSiteAddress())
+            ->assertRedirect('https://schedule.test/services/home-visit');
+
+        $this->get($serviceUrl)
+            ->assertOk()
+            ->assertDontSee('value="2026-07-23T09:00:00.000000Z"', false)
+            ->assertSee('value="2026-07-23T10:00:00.000000Z"', false)
+            ->assertSee('name="starts_at"', false);
+
+        $response = $this->post($offerUrl, [
+            'starts_at' => '2026-07-23T10:00:00.000000Z',
         ])->assertRedirect();
 
-        $hold = BookingHold::query()->sole();
+        $offer = BookableSlotOffer::query()->sole();
 
-        $this->assertSame(BookableService::LOCATION_TYPE_CUSTOMER_SITE, $hold->location_type);
-        $this->assertSame('Customer address', data_get($hold->location_details, 'label'));
+        $this->assertSame(BookableService::LOCATION_TYPE_CUSTOMER_SITE, $offer->location_type);
+        $this->assertSame('Customer address', data_get($offer->location_details, 'label'));
         $this->assertSame(
             'Meet the customer at the submitted address.',
-            data_get($hold->location_details, 'instructions'),
+            data_get($offer->location_details, 'instructions'),
         );
-        $this->assertSame('123 Main Street', data_get($hold->location_details, 'address.address_line_1'));
-        $this->assertSame('US', data_get($hold->location_details, 'address.country'));
         $this->assertSame(
             '123 Main Street, Denver, CO 80202, US',
-            data_get($hold->location_details, 'address.formatted_address'),
+            data_get($offer->location_details, 'address.formatted_address'),
         );
+        $this->assertDatabaseCount('booking_holds', 0);
 
         $this->get((string) $response->headers->get('Location'))
             ->assertOk()
             ->assertSee('123 Main Street, Denver, CO 80202, US');
+
+        $this->post('https://schedule.test/offers/'.$offer->offer_id.'/hold', [
+            'idempotency_key' => (string) Str::uuid(),
+        ])->assertRedirect();
+
+        $hold = BookingHold::query()->sole();
+
+        $this->assertSame($offer->location_type, $hold->location_type);
+        $this->assertEquals($offer->location_details, $hold->location_details);
     }
 
-    public function test_public_range_service_collects_check_in_and_check_out_and_holds_the_complete_stay(): void
+    public function test_public_range_service_issues_an_offer_for_the_complete_stay_before_holding_capacity(): void
     {
         CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
         $this->registerPublicSurface('https://schedule.test');
@@ -277,36 +319,38 @@ class PublicBookingHoldTest extends TestCase
             ->assertOk()
             ->assertSee('name="range_starts_at"', false)
             ->assertSee('name="range_ends_at"', false)
-            ->assertSee('name="idempotency_key"', false)
-            ->assertDontSee('name="starts_at"', false)
-            ->assertDontSee('scheduling_host_id')
-            ->assertDontSee('offer_id');
+            ->assertDontSee('name="starts_at"', false);
 
-        $response = $this->post($serviceUrl.'/reserve', [
+        $offerResponse = $this->post($serviceUrl.'/offers', [
             'range_starts_at' => '2026-07-23T15:00',
             'range_ends_at' => '2026-07-26T10:00',
-            'idempotency_key' => (string) Str::uuid(),
         ]);
 
-        $response
+        $offerResponse
             ->assertRedirect()
             ->assertSessionHasNoErrors();
 
-        $hold = BookingHold::query()->sole();
+        $offer = BookableSlotOffer::query()->sole();
 
-        $this->assertSame($service->id, $hold->bookable_service_id);
-        $this->assertTrue($hold->starts_at->equalTo(
+        $this->assertTrue($offer->starts_at->equalTo(
             CarbonImmutable::parse('2026-07-23 15:00:00 UTC'),
         ));
-        $this->assertTrue($hold->ends_at->equalTo(
+        $this->assertTrue($offer->ends_at->equalTo(
             CarbonImmutable::parse('2026-07-26 10:00:00 UTC'),
         ));
-        $this->assertSame(BookingHold::STATUS_ACTIVE, $hold->status);
-        $this->assertDatabaseCount('bookable_slot_offers', 1);
-        $this->assertDatabaseCount('booking_holds', 1);
+        $this->assertDatabaseCount('booking_holds', 0);
+
+        $this->post('https://schedule.test/offers/'.$offer->offer_id.'/hold', [
+            'idempotency_key' => (string) Str::uuid(),
+        ])->assertRedirect();
+
+        $hold = BookingHold::query()->sole();
+
+        $this->assertTrue($hold->starts_at->equalTo($offer->starts_at));
+        $this->assertTrue($hold->ends_at->equalTo($offer->ends_at));
     }
 
-    public function test_private_services_cannot_create_public_holds(): void
+    public function test_private_services_cannot_issue_public_offers_or_holds(): void
     {
         CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
         $this->registerPublicSurface('https://booking.test');
@@ -317,16 +361,15 @@ class PublicBookingHoldTest extends TestCase
             'timezone' => 'UTC',
         ]);
 
-        $this->post('https://booking.test/services/private-service/reserve', [
+        $this->post('https://booking.test/services/private-service/offers', [
             'starts_at' => '2026-07-23T09:00:00.000000Z',
-            'idempotency_key' => (string) Str::uuid(),
         ])->assertNotFound();
 
         $this->assertDatabaseCount('bookable_slot_offers', 0);
         $this->assertDatabaseCount('booking_holds', 0);
     }
 
-    public function test_reservation_rechecks_capacity_after_availability_was_displayed(): void
+    public function test_real_hold_rechecks_capacity_after_a_non_blocking_offer_was_selected(): void
     {
         CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
         $this->registerPublicSurface('https://schedule.test');
@@ -348,11 +391,11 @@ class PublicBookingHoldTest extends TestCase
             endsAt: '2026-07-23 10:00:00 UTC',
         );
 
-        $serviceUrl = 'https://schedule.test/services/capacity-race?date=2026-07-23';
+        $this->post('https://schedule.test/services/capacity-race/offers', [
+            'starts_at' => '2026-07-23T09:00:00.000000Z',
+        ])->assertRedirect();
 
-        $this->get($serviceUrl)
-            ->assertOk()
-            ->assertSee('9:00 AM–10:00 AM');
+        $offer = BookableSlotOffer::query()->sole();
 
         Appointment::factory()->create([
             'bookable_service_id' => $service->id,
@@ -362,19 +405,20 @@ class PublicBookingHoldTest extends TestCase
             'timezone' => 'UTC',
         ]);
 
-        $this->from($serviceUrl)
-            ->post('https://schedule.test/services/capacity-race/reserve', [
-                'starts_at' => '2026-07-23T09:00:00.000000Z',
+        $offerUrl = 'https://schedule.test/offers/'.$offer->offer_id;
+
+        $this->from($offerUrl)
+            ->post($offerUrl.'/hold', [
                 'idempotency_key' => (string) Str::uuid(),
             ])
-            ->assertRedirect($serviceUrl)
-            ->assertSessionHasErrors('starts_at');
+            ->assertRedirect($offerUrl)
+            ->assertSessionHasErrors('booking');
 
-        $this->assertDatabaseCount('bookable_slot_offers', 0);
         $this->assertDatabaseCount('booking_holds', 0);
+        $this->assertNull($offer->refresh()->consumed_at);
     }
 
-    public function test_public_reservation_retries_are_idempotent_and_conflicting_reuse_is_rejected(): void
+    public function test_public_hold_creation_is_idempotent_for_the_same_offer_and_replay_key(): void
     {
         CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
         $this->registerPublicSurface('https://schedule.test');
@@ -383,39 +427,26 @@ class PublicBookingHoldTest extends TestCase
         $this->absoluteAvailability(
             service: $service,
             startsAt: '2026-07-23 09:00:00 UTC',
-            endsAt: '2026-07-23 11:00:00 UTC',
+            endsAt: '2026-07-23 10:00:00 UTC',
         );
 
-        $key = (string) Str::uuid();
-        $reserveUrl = 'https://schedule.test/services/replay-service/reserve';
-        $serviceUrl = 'https://schedule.test/services/replay-service?date=2026-07-23';
-        $payload = [
+        $this->post('https://schedule.test/services/replay-service/offers', [
             'starts_at' => '2026-07-23T09:00:00.000000Z',
-            'idempotency_key' => $key,
-        ];
+        ])->assertRedirect();
 
-        $first = $this->post($reserveUrl, $payload);
-        $second = $this->post($reserveUrl, $payload);
+        $offer = BookableSlotOffer::query()->sole();
+        $key = (string) Str::uuid();
+        $url = 'https://schedule.test/offers/'.$offer->offer_id.'/hold';
+
+        $first = $this->post($url, ['idempotency_key' => $key]);
+        $second = $this->post($url, ['idempotency_key' => $key]);
 
         $first->assertRedirect();
         $second->assertRedirect($first->headers->get('Location'));
-
-        $this->assertDatabaseCount('bookable_slot_offers', 1);
-        $this->assertDatabaseCount('booking_holds', 1);
-
-        $this->from($serviceUrl)
-            ->post($reserveUrl, [
-                'starts_at' => '2026-07-23T10:00:00.000000Z',
-                'idempotency_key' => $key,
-            ])
-            ->assertRedirect($serviceUrl)
-            ->assertSessionHasErrors('starts_at');
-
-        $this->assertDatabaseCount('bookable_slot_offers', 1);
         $this->assertDatabaseCount('booking_holds', 1);
     }
 
-    public function test_hold_review_uses_absolute_expiration_without_extending_the_hold(): void
+    public function test_offer_and_hold_expiration_are_authoritative_and_do_not_extend_on_review(): void
     {
         CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
         $this->registerPublicSurface('https://schedule.test');
@@ -427,33 +458,33 @@ class PublicBookingHoldTest extends TestCase
             endsAt: '2026-07-23 10:00:00 UTC',
         );
 
-        $this->post('https://schedule.test/services/expiring-service/reserve', [
+        $this->post('https://schedule.test/services/expiring-service/offers', [
             'starts_at' => '2026-07-23T09:00:00.000000Z',
-            'idempotency_key' => (string) Str::uuid(),
         ])->assertRedirect();
 
-        $hold = BookingHold::query()->sole();
-        $originalExpiration = CarbonImmutable::instance($hold->expires_at)->utc();
+        $offer = BookableSlotOffer::query()->sole();
+        $offerExpiration = CarbonImmutable::instance($offer->expires_at)->utc();
 
-        CarbonImmutable::setTestNow($originalExpiration->addSecond());
+        CarbonImmutable::setTestNow($offerExpiration->addSecond());
 
-        $this->get('https://schedule.test/book/'.$hold->hold_id)
+        $offerUrl = 'https://schedule.test/offers/'.$offer->offer_id;
+
+        $this->get($offerUrl)
             ->assertOk()
-            ->assertSee('Reservation expired')
-            ->assertSee('This reservation has expired.')
-            ->assertSee('data-remaining-seconds="0"', false);
+            ->assertDontSee('name="idempotency_key"', false);
 
-        $hold->refresh();
+        $this->from($offerUrl)
+            ->post($offerUrl.'/hold', [
+                'idempotency_key' => (string) Str::uuid(),
+            ])
+            ->assertRedirect($offerUrl)
+            ->assertSessionHasErrors('booking');
 
-        $this->assertSame(BookingHold::STATUS_ACTIVE, $hold->status);
-        $this->assertTrue(
-            CarbonImmutable::instance($hold->expires_at)
-                ->utc()
-                ->equalTo($originalExpiration),
-        );
+        $this->assertDatabaseCount('booking_holds', 0);
+        $this->assertTrue($offer->refresh()->expires_at->equalTo($offerExpiration));
     }
 
-    public function test_public_reservation_route_is_rate_limited(): void
+    public function test_public_offer_route_is_rate_limited(): void
     {
         CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
         $this->registerPublicSurface(
@@ -468,15 +499,27 @@ class PublicBookingHoldTest extends TestCase
             endsAt: '2026-07-23 10:00:00 UTC',
         );
 
-        $payload = [
-            'starts_at' => '2026-07-23T09:00:00.000000Z',
-            'idempotency_key' => (string) Str::uuid(),
-        ];
-        $url = 'https://schedule.test/services/limited-service/reserve';
+        $payload = ['starts_at' => '2026-07-23T09:00:00.000000Z'];
+        $url = 'https://schedule.test/services/limited-service/offers';
 
         $this->post($url, $payload)->assertRedirect();
         $this->post($url, $payload)->assertRedirect();
         $this->post($url, $payload)->assertStatus(429);
+    }
+
+    /**
+     * @return array<string, string|null>
+     */
+    private function customerSiteAddress(): array
+    {
+        return [
+            'address_line_1' => '  123   Main Street ',
+            'address_line_2' => '',
+            'city' => ' Denver ',
+            'region' => ' CO ',
+            'postal_code' => ' 80202 ',
+            'country' => 'us',
+        ];
     }
 
     /**

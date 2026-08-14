@@ -65,7 +65,7 @@ class ModuleMigrationRegistryTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertCount(95, $currentFiles);
+        $this->assertCount(94, $currentFiles);
         $this->assertEquals($currentFiles, $registry->migrationFiles());
 
         foreach ($currentFiles as $migrationFile) {
@@ -89,9 +89,12 @@ class ModuleMigrationRegistryTest extends TestCase
         $scheduling = $registry->requireModule('scheduling');
 
         $this->assertSame(2, $scheduling->schemaVersion);
-        $this->assertCount(11, $scheduling->migrationFiles);
-        $this->assertTrue($scheduling->owns(
+        $this->assertCount(10, $scheduling->migrationFiles);
+        $this->assertFalse($scheduling->owns(
             '2026_08_10_040000_add_range_duration_policy_to_bookable_services.php',
+        ));
+        $this->assertTrue($scheduling->owns(
+            '2026_04_15_195860_create_bookable_services_table.php',
         ));
         $this->assertFalse($scheduling->owns(
             '2026_08_04_190000_add_location_snapshots_to_booking_holds.php',

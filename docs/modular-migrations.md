@@ -632,7 +632,7 @@ Current relocation and path-selection contract tests prove:
 
 ## Current ownership contract
 
-The registry classifies all 95 current migration files exactly once.
+The registry classifies all 94 current migration files exactly once.
 
 Ownership totals:
 
@@ -643,7 +643,7 @@ messaging                     12
 inbound_messaging              2
 internal_notifications         2
 tasks                          3
-scheduling                    11
+scheduling                    10
 portal                         4
 forms                          4
 documents                      4
@@ -658,13 +658,13 @@ webinars                       8
 mortgage                       2
 ```
 
-Scheduling schema version 2 adds the append-only range-duration policy migration:
+Scheduling remains schema version 2, but the module is still pre-rollout. The range-duration policy columns are therefore consolidated into the authoritative clean-install service migration:
 
 ```text
-2026_08_10_040000_add_range_duration_policy_to_bookable_services.php
+2026_04_15_195860_create_bookable_services_table.php
 ```
 
-It adds `duration_mode`, `minimum_duration_minutes`, and `maximum_duration_minutes` without changing Scheduling's dependency closure or Location independence. Existing installed Scheduling scopes upgrade through `php artisan modules:migrate scheduling`.
+That create migration owns `duration_mode`, `minimum_duration_minutes`, and `maximum_duration_minutes`. The former `2026_08_10_040000_add_range_duration_policy_to_bookable_services.php` file is intentionally removed and must not remain in the migration manifest or be recreated merely for history symmetry. Disposable development databases created before this consolidation should use the approved clean-rebuild/install workflow rather than relying on `modules:migrate scheduling` to replay a migration that no longer exists.
 
 Scheduling and Location remain independent optional schema scopes:
 

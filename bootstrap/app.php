@@ -56,6 +56,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
             'sms/telnyx',
             'sms/twilio',
             'email/resend',
+            'forms/*/submissions',
         ]);
 
         $middleware->web(

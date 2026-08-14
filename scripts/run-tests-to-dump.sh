@@ -5,6 +5,7 @@ set -Eeuo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_root="$(cd -- "$script_dir/.." && pwd)"
 php_binary="${PHP_BINARY:-php}"
+test_database="${TEST_DB_DATABASE:-engagecore_test}"
 feature_tests_dir="$project_root/tests/Feature"
 dump_dir="${TEST_DUMP_DIR:-$project_root/file_dumps/error_output}"
 test_target=()
@@ -95,7 +96,16 @@ generated_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 filename_timestamp="$(date -u +'%Y%m%dT%H%M%SZ')"
 dump_file="$dump_dir/test-dump-${filename_scope}-${filename_timestamp}-$$.txt"
 
-command=("$php_binary" artisan test --no-ansi "${test_target[@]}" "$@")
+command=(
+    env
+    APP_ENV=testing
+    "$php_binary"
+    artisan
+    test
+    --no-ansi
+    "${test_target[@]}"
+    "$@"
+)
 printf -v command_display '%q ' "${command[@]}"
 command_display="${command_display% }"
 
@@ -116,6 +126,7 @@ fi
     echo "Git branch: $git_branch"
     echo "Git commit: $git_commit"
     echo "Scope: $scope_label"
+    echo "Test database: $test_database"
     echo "Command: $command_display"
     echo
     echo "TEST OUTPUT"

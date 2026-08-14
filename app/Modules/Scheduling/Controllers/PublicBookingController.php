@@ -6,13 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Modules\Scheduling\Actions\CompletePublicBookingAction;
 use App\Modules\Scheduling\Actions\CreatePublicBookingHoldAction;
 use App\Modules\Scheduling\Actions\FindBookableAvailabilityAction;
+use App\Modules\Scheduling\Actions\IssuePublicBookingSlotOfferAction;
 use App\Modules\Scheduling\Data\AvailabilitySearch;
 use App\Modules\Scheduling\Data\BookableSlot;
+use App\Modules\Scheduling\Data\SchedulingLocationSnapshot;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\BookableService;
+use App\Modules\Scheduling\Models\BookableSlotOffer;
 use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Requests\CompletePublicBookingRequest;
 use App\Modules\Scheduling\Requests\CreatePublicBookingHoldRequest;
+use App\Modules\Scheduling\Requests\IssuePublicBookingSlotOfferRequest;
+use App\Modules\Scheduling\Requests\PreparePublicBookingRequest;
 use App\Modules\Scheduling\Services\SchedulingLocationSnapshotResolver;
 use Carbon\CarbonImmutable;
 use DomainException;
@@ -36,17 +41,36 @@ class PublicBookingController extends Controller
         Request $request,
         string $serviceKey,
         FindBookableAvailabilityAction $findAvailability,
+        SchedulingLocationSnapshotResolver $locationSnapshots,
     ): View {
         $service = $this->publicService($serviceKey);
         $displayTimezone = $this->serviceTimezone($service);
         $today = CarbonImmutable::now($displayTimezone)->startOfDay();
         $maximumDate = $this->maximumPublicDate($service, $today);
+        $location = $this->availabilityLocation(
+            request: $request,
+            service: $service,
+            locationSnapshots: $locationSnapshots,
+        );
+        $requiresCustomerSitePreparation = $service->location_type
+            === BookableService::LOCATION_TYPE_CUSTOMER_SITE
+            && ! $location instanceof SchedulingLocationSnapshot;
+
+        if ($requiresCustomerSitePreparation) {
+            return view('scheduling.public.index', $this->pageData([
+                'selectedService' => $service,
+                'displayTimezone' => $displayTimezone,
+                'maximumDate' => $maximumDate,
+                'requiresCustomerSitePreparation' => true,
+            ]));
+        }
 
         if ($service->usesRangeDuration()) {
             return view('scheduling.public.index', $this->pageData([
                 'selectedService' => $service,
                 'displayTimezone' => $displayTimezone,
                 'maximumDate' => $maximumDate,
+                'preparedLocation' => $this->locationPresentation($location),
             ]));
         }
 
@@ -63,6 +87,7 @@ class PublicBookingController extends Controller
             endsAt: $selectedDate->addDay()->utc(),
             displayTimezone: $displayTimezone,
             evaluatedAt: CarbonImmutable::now('UTC'),
+            location: $location,
         ));
 
         return view('scheduling.public.index', $this->pageData([
@@ -71,27 +96,62 @@ class PublicBookingController extends Controller
             'displayTimezone' => $displayTimezone,
             'availableTimes' => $this->publicTimes($slots, $displayTimezone),
             'maximumDate' => $maximumDate,
+            'preparedLocation' => $this->locationPresentation($location),
         ]));
     }
 
-    public function reserve(
-        CreatePublicBookingHoldRequest $request,
+    public function prepare(
+        PreparePublicBookingRequest $request,
         string $serviceKey,
-        CreatePublicBookingHoldAction $createPublicBookingHold,
         SchedulingLocationSnapshotResolver $locationSnapshots,
     ): RedirectResponse {
         $service = $this->publicService($serviceKey);
 
+        abort_unless(
+            $service->location_type === BookableService::LOCATION_TYPE_CUSTOMER_SITE,
+            404,
+        );
+
         try {
-            $location = $service->location_type === BookableService::LOCATION_TYPE_CUSTOMER_SITE
-                ? $locationSnapshots->normalizeAddress(
-                    type: BookableService::LOCATION_TYPE_CUSTOMER_SITE,
-                    input: $request->customerSiteAddress(),
-                )
-                : null;
+            $location = $locationSnapshots->normalizeAddress(
+                type: BookableService::LOCATION_TYPE_CUSTOMER_SITE,
+                input: $request->customerSiteAddress(),
+            );
         } catch (InvalidArgumentException $exception) {
             throw ValidationException::withMessages([
                 'address_line_1' => $exception->getMessage(),
+            ]);
+        }
+
+        $request->session()->put(
+            $this->customerSiteSessionKey($service),
+            $location->toColumns(),
+        );
+
+        return redirect()->route(
+            'scheduling.public.services.show',
+            ['serviceKey' => $service->key],
+        );
+    }
+
+    public function offer(
+        IssuePublicBookingSlotOfferRequest $request,
+        string $serviceKey,
+        IssuePublicBookingSlotOfferAction $issuePublicOffer,
+        SchedulingLocationSnapshotResolver $locationSnapshots,
+    ): RedirectResponse {
+        $service = $this->publicService($serviceKey);
+        $location = $this->availabilityLocation(
+            request: $request,
+            service: $service,
+            locationSnapshots: $locationSnapshots,
+        );
+
+        if ($service->location_type === BookableService::LOCATION_TYPE_CUSTOMER_SITE
+            && ! $location instanceof SchedulingLocationSnapshot
+        ) {
+            throw ValidationException::withMessages([
+                'address_line_1' => 'Provide the service address before choosing an appointment time.',
             ]);
         }
 
@@ -112,18 +172,59 @@ class PublicBookingController extends Controller
         }
 
         try {
-            $hold = $createPublicBookingHold->handle(
+            $offer = $issuePublicOffer->handle(
                 service: $service,
                 startsAt: $startsAt,
-                idempotencyKey: $request->idempotencyKey(),
-                location: $location,
                 endsAt: $endsAt,
+                location: $location,
             );
-        } catch (DomainException) {
+        } catch (DomainException $exception) {
             throw ValidationException::withMessages([
-                $service->usesRangeDuration() ? 'range_ends_at' : 'starts_at' => $service->usesRangeDuration()
-                    ? 'That check-in/check-out interval is no longer available. Choose another stay interval.'
-                    : 'That appointment time is no longer available. Choose another time.',
+                $service->usesRangeDuration() ? 'range_ends_at' : 'starts_at' => $exception->getMessage(),
+            ]);
+        }
+
+        return redirect()->route(
+            'scheduling.public.offers.show',
+            ['offerId' => $offer->offer_id],
+        );
+    }
+
+    public function reviewOffer(string $offerId): View|RedirectResponse
+    {
+        $offer = $this->publicOffer($offerId);
+
+        if ($offer->bookingHold instanceof BookingHold) {
+            return redirect()->route(
+                'scheduling.public.holds.show',
+                ['holdId' => $offer->bookingHold->hold_id],
+            );
+        }
+
+        $service = $offer->bookableService;
+
+        abort_unless($service instanceof BookableService, 404);
+
+        return view('scheduling.public.index', $this->pageData([
+            'offerSummary' => $this->offerSummary($offer, $service),
+        ]));
+    }
+
+    public function hold(
+        CreatePublicBookingHoldRequest $request,
+        string $offerId,
+        CreatePublicBookingHoldAction $createPublicBookingHold,
+    ): RedirectResponse {
+        $offer = $this->publicOffer($offerId);
+
+        try {
+            $hold = $createPublicBookingHold->handle(
+                offerId: $offer->offer_id,
+                idempotencyKey: $request->idempotencyKey(),
+            );
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages([
+                'booking' => $exception->getMessage(),
             ]);
         }
 
@@ -186,6 +287,9 @@ class PublicBookingController extends Controller
             'displayTimezone' => null,
             'availableTimes' => [],
             'maximumDate' => null,
+            'preparedLocation' => null,
+            'requiresCustomerSitePreparation' => false,
+            'offerSummary' => null,
             'holdSummary' => null,
         ], $overrides);
     }
@@ -223,6 +327,30 @@ class PublicBookingController extends Controller
         return $service;
     }
 
+    private function publicOffer(string $offerId): BookableSlotOffer
+    {
+        $offerId = trim($offerId);
+
+        if ($offerId === '') {
+            abort(404);
+        }
+
+        $offer = BookableSlotOffer::query()
+            ->with(['bookableService', 'bookingHold'])
+            ->where('offer_id', $offerId)
+            ->whereNull('reschedule_appointment_id')
+            ->first();
+
+        abort_unless($offer instanceof BookableSlotOffer, 404);
+        abort_unless(
+            $offer->bookableService instanceof BookableService
+                && $offer->bookableService->is_public,
+            404,
+        );
+
+        return $offer;
+    }
+
     private function publicHold(string $holdId): BookingHold
     {
         $holdId = trim($holdId);
@@ -239,6 +367,93 @@ class PublicBookingController extends Controller
         abort_unless($hold instanceof BookingHold, 404);
 
         return $hold;
+    }
+
+    private function availabilityLocation(
+        Request $request,
+        BookableService $service,
+        SchedulingLocationSnapshotResolver $locationSnapshots,
+    ): ?SchedulingLocationSnapshot {
+        if ($service->location_type === BookableService::LOCATION_TYPE_CUSTOMER_SITE) {
+            return $this->storedCustomerSiteLocation($request, $service);
+        }
+
+        try {
+            return $locationSnapshots->forCommitment($service);
+        } catch (DomainException) {
+            return null;
+        }
+    }
+
+    private function storedCustomerSiteLocation(
+        Request $request,
+        BookableService $service,
+    ): ?SchedulingLocationSnapshot {
+        $key = $this->customerSiteSessionKey($service);
+        $stored = $request->session()->get($key);
+
+        if (! is_array($stored)) {
+            return null;
+        }
+
+        try {
+            $snapshot = SchedulingLocationSnapshot::fromPersisted(
+                type: is_string($stored['location_type'] ?? null)
+                    ? $stored['location_type']
+                    : null,
+                details: $stored['location_details'] ?? null,
+            );
+        } catch (InvalidArgumentException) {
+            $request->session()->forget($key);
+
+            return null;
+        }
+
+        if (! $snapshot instanceof SchedulingLocationSnapshot
+            || ! $snapshot->canonical
+            || ! $snapshot->isCustomerSite()
+        ) {
+            $request->session()->forget($key);
+
+            return null;
+        }
+
+        return $snapshot;
+    }
+
+    private function customerSiteSessionKey(BookableService $service): string
+    {
+        return 'scheduling.public.customer_site_location.'.(int) $service->getKey();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function locationPresentation(?SchedulingLocationSnapshot $location): ?array
+    {
+        if (! $location instanceof SchedulingLocationSnapshot
+            || ! $location->isCustomerSite()
+        ) {
+            return null;
+        }
+
+        $address = data_get($location->details, 'address');
+
+        if (! is_array($address)) {
+            return null;
+        }
+
+        return [
+            'formatted_address' => is_string($address['formatted_address'] ?? null)
+                ? $address['formatted_address']
+                : null,
+            'address_line_1' => $address['address_line_1'] ?? null,
+            'address_line_2' => $address['address_line_2'] ?? null,
+            'city' => $address['city'] ?? null,
+            'region' => $address['region'] ?? null,
+            'postal_code' => $address['postal_code'] ?? null,
+            'country' => $address['country'] ?? 'US',
+        ];
     }
 
     private function serviceTimezone(BookableService $service): string
@@ -314,7 +529,7 @@ class PublicBookingController extends Controller
 
     /**
      * @param array<int, BookableSlot> $slots
-     * @return array<int, array{starts_at: string, label: string, idempotency_key: string}>
+     * @return array<int, array{starts_at: string, label: string}>
      */
     private function publicTimes(array $slots, string $displayTimezone): array
     {
@@ -332,11 +547,47 @@ class PublicBookingController extends Controller
             $times[$key] = [
                 'starts_at' => $slot->startsAt->toISOString(),
                 'label' => $startsAt->format('g:i A').'–'.$endsAt->format('g:i A'),
-                'idempotency_key' => (string) Str::uuid(),
             ];
         }
 
         return array_values($times);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function offerSummary(
+        BookableSlotOffer $offer,
+        BookableService $service,
+    ): array {
+        $now = CarbonImmutable::now('UTC');
+        $timezone = $this->serviceTimezone($service);
+        $startsAt = CarbonImmutable::instance($offer->starts_at)->setTimezone($timezone);
+        $endsAt = CarbonImmutable::instance($offer->ends_at)->setTimezone($timezone);
+        $active = $offer->isActiveAt($now);
+        $locationDetails = is_array($offer->location_details)
+            ? $offer->location_details
+            : [];
+
+        return [
+            'offer_id' => $offer->offer_id,
+            'status' => $active ? 'active' : 'expired',
+            'remaining_seconds' => $offer->remainingSeconds($now),
+            'expires_at' => $offer->expires_at?->toISOString(),
+            'service_key' => $service->key,
+            'service_name' => $service->name,
+            'is_range' => $service->usesRangeDuration(),
+            'date' => $startsAt->format('Y-m-d'),
+            'date_label' => $startsAt->format('l, F j, Y'),
+            'time_label' => $startsAt->format('g:i A').'–'.$endsAt->format('g:i A'),
+            'interval_label' => $startsAt->format('D, M j, Y \a\t g:i A')
+                .' – '
+                .$endsAt->format('D, M j, Y \a\t g:i A'),
+            'timezone' => $timezone,
+            'location_address' => is_string(data_get($locationDetails, 'address.formatted_address'))
+                ? data_get($locationDetails, 'address.formatted_address')
+                : null,
+        ];
     }
 
     /**

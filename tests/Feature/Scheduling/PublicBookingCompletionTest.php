@@ -4,6 +4,7 @@ namespace Tests\Feature\Scheduling;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\Scheduling\Actions\CreatePublicBookingHoldAction;
+use App\Modules\Scheduling\Actions\IssuePublicBookingSlotOfferAction;
 use App\Modules\Scheduling\Actions\ReleaseBookingHoldAction;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\AppointmentAttendee;
@@ -88,7 +89,9 @@ class PublicBookingCompletionTest extends TestCase
 
         $this->get($holdUrl)
             ->assertOk()
-            ->assertSee('Your appointment is booked.')
+            ->assertDontSee('name="name"', false)
+            ->assertDontSee('name="email"', false)
+            ->assertDontSee('name="phone"', false)
             ->assertDontSee('jamie@example.test')
             ->assertDontSee('+15555550123')
             ->assertDontSee('contact_id')
@@ -123,8 +126,9 @@ class PublicBookingCompletionTest extends TestCase
 
         $this->get($holdUrl)
             ->assertOk()
-            ->assertSee('Your appointment request was received.')
-            ->assertSee('This service requires confirmation.')
+            ->assertDontSee('name="name"', false)
+            ->assertDontSee('name="email"', false)
+            ->assertDontSee('name="phone"', false)
             ->assertDontSee('Pending Visitor')
             ->assertDontSee('pending@example.test');
     }
@@ -341,9 +345,13 @@ class PublicBookingCompletionTest extends TestCase
                 'capacity' => 1,
             ]);
 
-        return app(CreatePublicBookingHoldAction::class)->handle(
+        $offer = app(IssuePublicBookingSlotOfferAction::class)->handle(
             service: $service,
             startsAt: $startsAt,
+        );
+
+        return app(CreatePublicBookingHoldAction::class)->handle(
+            offerId: $offer->offer_id,
             idempotencyKey: (string) Str::uuid(),
         );
     }

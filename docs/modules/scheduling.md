@@ -73,14 +73,17 @@ The currently implemented public routes are:
 ```text
 GET  /
 GET  /services/{serviceKey}
-POST /services/{serviceKey}/reserve
+POST /services/{serviceKey}/prepare
+POST /services/{serviceKey}/offers
+GET  /offers/{offerId}
+POST /offers/{offerId}/hold
 GET  /book/{holdId}
 POST /book/{holdId}
 ```
 
-They are registered only on the configured host while the Scheduling module is enabled. The catalog returns active services with `is_public = true`. Service pages accept one bounded local date, calculate live availability through `FindBookableAvailabilityAction`, show times in the service timezone, and omit host identity, capacity, occupancy, availability-window identity, and other trusted booking details. Identical times produced by multiple eligible hosts are presented once.
+They are registered only on the configured host while the Scheduling module is enabled. The catalog returns active services with `is_public = true`. Service pages progressively collect only the prerequisites required by the selected service before the relevant authoritative availability decision. Fixed-duration pages accept one bounded local date, calculate live availability through `FindBookableAvailabilityAction`, show times in the service timezone, and omit host identity, capacity, occupancy, availability-window identity, and other trusted booking details. Identical times produced by multiple eligible hosts are presented once.
 
-A displayed time submits only its UTC `starts_at` value plus a UUID idempotency key. `CreatePublicBookingHoldAction` recalculates availability, selects the first eligible slot in the existing deterministic ordering, issues an opaque offer, and creates the hold inside one outer transaction. The visitor cannot nominate a host, end time, duration, capacity, offer, or rule provenance.
+A displayed fixed-duration time submits only its UTC `starts_at` value. Range-duration services submit local check-in/check-out wall times under the closed duration policy. The server revalidates the selection and issues an opaque, short-lived `BookableSlotOffer` without consuming capacity. A separate offer POST accepts only a UUID hold idempotency key and creates the real `BookingHold` after revalidating the exact service, location, host, travel, capacity, and resource state. The visitor cannot nominate a host, authoritative end time, normalized location, duration, capacity, offer provenance, or rule provenance.
 
 The opaque hold page accepts attendee name, email, and optional phone only while the hold remains effective. `CompletePublicBookingAction` resolves the Contact through the Core-owned `ResolveContactByEmailAction`, supplies immutable attendee snapshots, and converts the hold through `ConvertBookingHoldToAppointmentAction`. An existing Contact is returned unchanged; public input never overwrites established Contact fields or metadata. Reservation, completion, and hold-review routes are rate limited through `config/scheduling.php`.
 
@@ -88,24 +91,22 @@ All public booking, cancellation, and reschedule URLs should resolve from the co
 
 The universal booking surface is separate from CRM, Portal, and Webinars. A webinar-triggered booking journey may add source context, eligibility, and tailored copy through a thin client-specific integration layer, but it must consume generic Scheduling contracts and must not shape Scheduling around Webinars.
 
-### Planned progressive public booking contract
+### Progressive public booking contract
 
-The currently implemented public flow remains service page → availability → capacity-consuming hold → attendee completion. The future mobile-service and abuse-resistant flow must begin with appointment type because the selected service determines which prerequisites are required before authoritative availability can be calculated.
-
-The planned visitor sequence is:
+The implemented flow begins with appointment type because the selected service determines which prerequisites are required before authoritative availability can be calculated. The current visitor sequence is:
 
 ```text
 1. choose appointment type
 2. provide only the details required for that type
 3. view authoritative availability
 4. select one short-lived non-blocking slot offer
-5. verify one reachable email or SMS destination when Messaging can deliver
+5. Phase 4B.4: verify one reachable email or SMS destination when Messaging can deliver
 6. revalidate service, location, slot, and capacity
 7. create the capacity-consuming hold
 8. review and complete the booking
 ```
 
-Blade and Alpine may present these steps as sliding or progressively revealed pages. The animation is presentation only. Each transition that changes trusted state must be server validated, and later pages must not trust hidden browser-authored service, host, duration, location, verification, offer, or capacity fields.
+Blade may present these steps as progressively revealed pages, and Alpine may later add sliding animation. Presentation does not establish authority. Each transition that changes trusted state is server validated, and later pages do not trust hidden browser-authored service, host, duration, normalized location, verification, offer provenance, or capacity fields.
 
 Service location policy determines the details step:
 
@@ -121,6 +122,8 @@ customer-site service
 ```
 
 Customer-site availability must not be presented as authoritative until Scheduling has a normalized server-owned location. Browser-supplied coordinates, travel durations, or a boolean claiming that a destination was verified are never authoritative.
+
+Phase 4B.4 owns the actual Messaging-backed verification behavior. The non-blocking offer review boundary intentionally exists before the real hold so verification can be inserted there without making Messaging a Scheduling dependency.
 
 ## Responsibility
 
@@ -170,8 +173,10 @@ transaction-time slot, occupancy, capacity, and idempotency revalidation
 reschedule-aware offer issuance with one trusted source-Appointment exclusion
 atomic hold-to-reschedule replacement with attendee and vertical-subject preservation
 appointment lifecycle transitions and neutral automation event emission
-configured-host public service discovery and bounded availability presentation
-public slot reservation with deterministic hidden-host selection and authoritative hold review
+configured-host appointment-type-first public service discovery and bounded availability presentation
+service-specific prerequisite collection before authoritative customer-site availability
+non-blocking public slot offers with deterministic hidden-host selection and immutable location commitment snapshots
+separate authoritative public offer-to-hold conversion with full capacity/resource/travel revalidation
 public attendee capture, safe Contact resolution, and replay-safe hold-to-Appointment completion
 ```
 
@@ -723,6 +728,7 @@ The implemented booking-safety layer consists of:
 BookableSlotOffer
 BookingHold
 IssueBookableSlotOfferAction
+IssuePublicBookingSlotOfferAction
 CreateBookingHoldAction
 CreatePublicBookingHoldAction
 CompletePublicBookingAction
@@ -743,6 +749,7 @@ reschedule_appointment_id
 starts_at / ends_at
 display_timezone
 capacity / remaining_capacity
+location_type / location_details
 source_scopes
 source_window_ids
 issued_at
@@ -750,9 +757,9 @@ expires_at
 consumed_at
 ```
 
-The caller receives only the opaque `offer_id`. Public or CRM booking actions must not accept caller-authored service, host, start, end, capacity, timezone, or rule-provenance values as authoritative booking input.
+The caller receives only the opaque `offer_id`. Public or CRM booking actions must not accept caller-authored service, host, start, end, capacity, timezone, normalized location, or rule-provenance values as authoritative booking input.
 
-`IssueBookableSlotOfferAction` revalidates the supplied server-side `BookableSlot` before persisting the offer. An ordinary offer stores no reschedule identity. A reschedule-scoped offer locks one persisted source Appointment, verifies that it belongs to the service, remains in a reschedulable state, and has no existing replacement, then stores that identity in `reschedule_appointment_id`. An offer may be consumed only once and cannot create a hold after `expires_at`.
+`IssueBookableSlotOfferAction` revalidates the supplied server-side `BookableSlot` before persisting the offer. When a canonical commitment location is known, the offer snapshots that location with the exact candidate so later hold creation can revalidate the same commitment instead of accepting browser-authored location state. An ordinary offer stores no reschedule identity. A reschedule-scoped offer locks one persisted source Appointment, verifies that it belongs to the service, remains in a reschedulable state, and has no existing replacement, then stores that identity in `reschedule_appointment_id`. An offer may be consumed only once and cannot create a hold after `expires_at`.
 
 ### booking_holds
 
@@ -791,10 +798,10 @@ expired
 ```text
 offer_id
 idempotency_key
-optional canonical customer_site location snapshot
+optional canonical customer_site location snapshot for trusted internal compatibility paths
 ```
 
-The optional location is accepted only for a `customer_site` service. Phone, virtual, and fixed locations are derived from locked server-owned service configuration. A customer-site reschedule may reuse the source Appointment's immutable customer-site snapshot when the address is unchanged.
+For public booking, the selected offer is the location trust boundary: customer-site offers carry the canonical normalized address snapshot that produced their availability result, while phone, virtual, and fixed commitments are re-derived from locked service configuration and checked against any offer snapshot. The optional action argument remains available only for trusted internal compatibility paths and is accepted only for a `customer_site` service. A customer-site reschedule may reuse the source Appointment's immutable customer-site snapshot when the address is unchanged.
 
 It locks the offer, service, optional host, optional assignment, optional reschedule source Appointment, relevant blocking appointments, and overlapping active holds in a deterministic transaction. It reruns exact-slot availability, applies current buffers and capacity, rejects stale or consumed offers, and prevents separate offers from over-reserving one slot.
 
@@ -802,35 +809,43 @@ The same idempotency key returns the original hold for the same offer and commit
 
 ### Public reservation transaction
 
-The public browser does not receive an offer ID. Fixed-duration services post the server-issued UTC slot start. Range-duration services instead post local check-in/check-out wall times in the service timezone. Both modes post a replay key and—when the service is `customer_site`—raw booking-specific address fields:
+The public booking surface is appointment-type-first and progressive:
 
 ```text
-fixed:
-    starts_at
-
-range:
-    range_starts_at
-    range_ends_at
-
-shared:
-    idempotency_key
-    address_line_1
-    address_line_2
-    city
-    region
-    postal_code
-    country
+1. choose one active public service
+2. provide only prerequisites required by that service
+3. view or choose against authoritative server-evaluated availability
+4. select one short-lived non-blocking BookableSlotOffer
+5. later Phase 4B.4 may verify one reachable transactional destination
+6. revalidate the selected offer and current booking rules
+7. create the real capacity-consuming BookingHold
+8. review and complete the booking
 ```
 
-The address fields are required only for `customer_site` and prohibited for phone, virtual, and fixed services. Caller-authored normalized or enrichment fields such as `location_type`, `location_details`, `formatted_address`, coordinates, timezone, precision, confidence, or provider identity are rejected. `PublicBookingController` normalizes the raw address through the Scheduling-owned resolver before it invokes the hold action.
+Service selection remains route-bound by the stable public service key. Phone and virtual services require no customer location prerequisite. Fixed-location services derive their canonical location entirely from server-owned service configuration. A `customer_site` service first accepts only raw address fields:
 
-Fixed-location availability can now be travel-aware immediately because its authoritative location is already server-owned. The current customer-site date/time list remains a pre-location candidate surface: the visitor's normalized customer-site address is not available until the reservation POST. That POST passes the normalized snapshot into the exact-slot transaction, which performs authoritative travel revalidation before capacity is consumed. Phase 4B.3 will move customer-site address collection ahead of the displayed availability so the visitor sees only travel-aware authoritative times in the first place.
+```text
+address_line_1
+address_line_2
+city
+region
+postal_code
+country
+```
 
-`CreatePublicBookingHoldAction` accepts the already-resolved public `BookableService`, checks for an idempotent existing hold, and recalculates exact current availability. Fixed-duration services derive the end from service policy. Range-duration services require an explicit end time at the action boundary and validate the whole interval against the service minimum/maximum duration policy before issuing an offer or consuming capacity. The public request layer resolves exact `YYYY-MM-DDTHH:MM` check-in/check-out values in the service timezone through `SchedulingLocalDateTimeResolver`; nonexistent spring-forward values and ambiguous repeated-hour values are rejected rather than normalized or guessed. The action selects the first matching `BookableSlot` in the engine's deterministic order, then calls `IssueBookableSlotOfferAction` and `CreateBookingHoldAction` inside one outer database transaction.
+`PublicBookingController` normalizes those fields through the Scheduling-owned resolver and stores the canonical customer-site snapshot in the visitor session under a service-scoped key. That session value is prerequisite state only; it does not reserve capacity. Caller-authored normalized or enrichment fields such as `location_type`, `location_details`, `formatted_address`, coordinates, timezone, precision, confidence, or provider identity are rejected. The browser never receives the normalized snapshot as a trusted hidden field.
 
-This preserves the opaque-offer trust boundary while allowing a simple public form. The server remains authoritative for service identity, eligible host, duration policy, UTC conversion, validated end time, capacity, availability provenance, offer identity, and hold expiration. Fixed services continue to expose only server-issued available start choices. Range services now expose explicit check-in/check-out inputs and commit one full authoritative stay interval. When multiple hosts expose the same visitor-facing interval, the lowest current deterministic slot ordering wins; round-robin and weighted allocation remain deferred. Phase 4B.3 will restructure both booking modes into the appointment-type-first progressive journey and will move customer-site address collection before authoritative availability.
+Customer-site fixed-duration availability is not rendered until that server-owned normalized snapshot exists. The snapshot is then supplied to `FindBookableAvailabilityAction`, so the displayed times already include the same travel-aware location commitment that will be used when an offer and later hold are created. Changing the raw address runs normalization again and replaces the service-scoped prerequisite snapshot before another availability decision.
 
-Public replay keys are UUIDs. Repeating the same service, start time, and replay key returns the original hold without issuing another offer. Reusing the key for another service, time, or reschedule-scoped hold is rejected. A concurrency loser reloads the matching committed hold after its speculative offer transaction rolls back.
+Fixed-duration services post only the selected server-issued UTC `starts_at` value to the offer endpoint. Range-duration services post only local `range_starts_at` / `range_ends_at` wall times in the service timezone. `SchedulingLocalDateTimeResolver` continues to reject nonexistent spring-forward values and ambiguous repeated-hour values rather than normalizing or guessing. The server derives fixed end times, validates range minimum/maximum duration, checks range boundary availability, resolves the deterministic eligible host, and never accepts browser-authored host, end time, capacity, source-window, or offer provenance.
+
+`IssuePublicBookingSlotOfferAction` reruns exact current availability and then issues one opaque `BookableSlotOffer`. For customer-site work, the offer snapshots the canonical location used by travel-aware availability. The offer does **not** create a `BookingHold`, consume host/service capacity, create resource occupancy, or extend its expiration merely because the visitor reviews it. This is the intentional pre-verification selection state required by the progressive flow.
+
+The offer review page is capability-addressed by opaque `offer_id` and exposes only visitor-safe service/time/location presentation plus authoritative expiration. It does not expose host identity, capacity, availability provenance, normalized location payloads, or resource state. Phase 4B.4 will insert Messaging-backed destination verification at this boundary when an eligible transactional delivery channel exists; Scheduling remains usable without Messaging and no verification state is trusted from the browser.
+
+Creating the real hold is a separate POST to the offer capability. `CreatePublicBookingHoldRequest` accepts only a UUID `idempotency_key`. `CreatePublicBookingHoldAction` verifies that the offer is an ordinary public-booking offer, then delegates to `CreateBookingHoldAction`, which re-locks and revalidates the service, host assignment, offered location commitment, travel fit, capacity, resources, and exact interval before consuming the offer and creating occupancy. A race that made the selected interval unavailable after offer issuance therefore fails without creating a hold.
+
+Public hold idempotency is now scoped to the opaque offer plus replay key. Repeating the same offer and key returns the original hold. Reusing a key for another offer is rejected. An expired or already-consumed offer cannot create another hold.
 
 The public hold page is capability-addressed by the opaque `hold_id`, marked `noindex`, and renders only service name, local date/time, timezone, effective status, absolute expiration, authoritative remaining seconds, and the held customer-site formatted address when one exists. It does not expose host, capacity, offer, occupancy, or availability-rule details.
 
@@ -1251,7 +1266,7 @@ Phase 4B.2B2 — COMPLETE: add closed CRM service-location authoring and custome
 Phase 4B.2C — COMPLETE: add Scheduling-owned provider-neutral travel-time resolution, conservative fallback, adjacent Appointment/active-hold checks, transaction-time revalidation, and admin reschedule slot suggestions that preserve the source booking criteria; optional app-level geographic enrichment may improve travel ranking without making Location a dependency
 Phase 4B.2D1 — COMPLETE: add first-class fixed/range service-duration policy, module schema v2, explicit range interval validation, check-in/check-out boundary availability, full-stay hold/capacity/resource occupancy, direct range creation, and range-preserving reschedule runtime
 Phase 4B.2D2 — COMPLETE: expose closed CRM range-service authoring plus public/internal check-in/check-out input, strict service-timezone wall-time resolution, and range-specific reschedule presentation; fixed-location PetServices stays do not require Location, and PetServices continues to own pet/compliance/feeding/medication meaning
-Phase 4B.3 — appointment-type-first progressive public booking
+Phase 4B.3 — COMPLETE: restructure public booking around appointment-type-first progressive prerequisites, require canonical customer-site location before travel-aware fixed-slot availability, issue a short-lived non-blocking location-bound offer before the real hold, and preserve fixed/range server authority without exposing host/capacity/provenance state
 Phase 4B.4 — Messaging-backed email/SMS verification before capacity hold
 SCHEDULING_APP_URL setup validation
 calendar views

@@ -22,8 +22,6 @@
         <env name="DB_HOST" value="127.0.0.1" force="true"/>
         <env name="DB_PORT" value="3306" force="true"/>
         <env name="DB_DATABASE" value="engagecore_test" force="true"/>
-        <env name="DB_USERNAME" value="devUser" force="true"/>
-        <env name="DB_PASSWORD" value="" force="true"/>
 
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>

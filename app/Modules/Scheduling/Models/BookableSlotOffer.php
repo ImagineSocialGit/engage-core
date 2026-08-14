@@ -2,6 +2,7 @@
 
 namespace App\Modules\Scheduling\Models;
 
+use App\Modules\Scheduling\Data\SchedulingLocationSnapshot;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,6 +23,8 @@ class BookableSlotOffer extends Model
         'display_timezone',
         'capacity',
         'remaining_capacity',
+        'location_type',
+        'location_details',
         'source_scopes',
         'source_window_ids',
         'issued_at',
@@ -53,6 +56,7 @@ class BookableSlotOffer extends Model
             'ends_at' => 'immutable_datetime',
             'capacity' => 'integer',
             'remaining_capacity' => 'integer',
+            'location_details' => 'array',
             'source_scopes' => 'array',
             'source_window_ids' => 'array',
             'issued_at' => 'immutable_datetime',
@@ -60,6 +64,15 @@ class BookableSlotOffer extends Model
             'consumed_at' => 'immutable_datetime',
             'meta' => 'array',
         ];
+    }
+
+
+    public function locationSnapshot(): ?SchedulingLocationSnapshot
+    {
+        return SchedulingLocationSnapshot::fromPersisted(
+            type: $this->location_type,
+            details: $this->location_details,
+        );
     }
 
     public function bookableService(): BelongsTo

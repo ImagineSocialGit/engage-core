@@ -5,6 +5,7 @@ namespace Tests\Feature\Scheduling;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Scheduling\Actions\CreateAppointmentAction;
 use App\Modules\Scheduling\Actions\CreatePublicBookingHoldAction;
+use App\Modules\Scheduling\Actions\IssuePublicBookingSlotOfferAction;
 use App\Modules\Scheduling\Actions\FindBookableAvailabilityAction;
 use App\Modules\Scheduling\Actions\ReleaseBookingHoldAction;
 use App\Modules\Scheduling\Actions\RescheduleAppointmentToSlotAction;
@@ -223,10 +224,13 @@ class RangeDurationBookingFoundationTest extends TestCase
             'is_active' => true,
         ]);
 
-        $hold = app(CreatePublicBookingHoldAction::class)->handle(
+        $offer = app(IssuePublicBookingSlotOfferAction::class)->handle(
             service: $service,
             startsAt: CarbonImmutable::parse('2026-08-12 10:00:00', 'UTC'),
             endsAt: CarbonImmutable::parse('2026-08-15 10:00:00', 'UTC'),
+        );
+        $hold = app(CreatePublicBookingHoldAction::class)->handle(
+            offerId: $offer->offer_id,
             idempotencyKey: 'range-public-hold',
         );
 

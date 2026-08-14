@@ -143,6 +143,63 @@ class FormsSetupValidationContributorTest extends TestCase
         $this->assertSame('invalid_rules', $finding['context']['form_key']);
     }
 
+    public function test_invalid_external_intake_client_configuration_is_reported(): void
+    {
+        config()->set('forms.external_intake', [
+            'enabled' => true,
+            'max_body_bytes' => 262144,
+            'max_timestamp_drift_seconds' => 300,
+            'nonce_ttl_seconds' => 600,
+            'unauthenticated_rate_limit_per_minute' => 120,
+            'client_rate_limit_per_minute' => 60,
+            'clients' => [
+                'engage_sites' => [
+                    'secret' => 'too-short',
+                    'source' => 'engage_sites',
+                    'provider' => 'engage_sites',
+                    'allowed_forms' => ['artist_updates'],
+                ],
+            ],
+        ]);
+
+        $finding = collect($this->findings())
+            ->firstWhere('code', 'forms.external_intake.client_config_invalid');
+
+        $this->assertNotNull($finding);
+        $this->assertSame('forms.external_intake.clients', $finding['path']);
+    }
+
+    public function test_external_intake_allowed_form_must_be_current_published_and_public(): void
+    {
+        $this->publishedDefinition('artist_updates');
+        config()->set('forms.external_intake', [
+            'enabled' => true,
+            'max_body_bytes' => 262144,
+            'max_timestamp_drift_seconds' => 300,
+            'nonce_ttl_seconds' => 600,
+            'unauthenticated_rate_limit_per_minute' => 120,
+            'client_rate_limit_per_minute' => 60,
+            'clients' => [
+                'engage_sites' => [
+                    'secret' => 'test-external-forms-secret-with-more-than-32-bytes',
+                    'source' => 'engage_sites',
+                    'provider' => 'engage_sites',
+                    'allowed_forms' => ['artist_updates', 'missing_form'],
+                ],
+            ],
+        ]);
+
+        $finding = collect($this->findings())
+            ->firstWhere('code', 'forms.external_intake.allowed_form_unavailable');
+
+        $this->assertNotNull($finding);
+        $this->assertSame('missing_form', $finding['context']['form_key']);
+        $this->assertSame(
+            'forms.external_intake.clients.engage_sites.allowed_forms',
+            $finding['path'],
+        );
+    }
+
     private function publishedDefinition(string $key): FormDefinition
     {
         $definition = FormDefinition::factory()->active()->create([

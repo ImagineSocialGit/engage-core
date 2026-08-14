@@ -110,7 +110,6 @@ return [
                 '2026_07_21_180100_create_bookable_slot_offers_table.php',
                 '2026_07_21_180101_create_booking_holds_table.php',
                 '2026_08_03_190000_create_scheduling_resource_occupancy_tables.php',
-                '2026_08_10_040000_add_range_duration_policy_to_bookable_services.php',
             ],
         ],
 

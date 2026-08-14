@@ -1,370 +1,99 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="robots" content="{{ $holdSummary ? 'noindex,nofollow' : 'index,follow' }}">
-    <title>Schedule an appointment · {{ config('app.name') }}</title>
+    <meta name="robots" content="{{ $holdSummary || $offerSummary ? 'noindex,nofollow' : 'index,follow' }}">
+    <title>Schedule an appointment</title>
     <style>
         :root {
             color-scheme: light;
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            color: #172033;
-            background: #f4f7f8;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f5f7f8;
+            color: #172026;
         }
-
         * { box-sizing: border-box; }
-
-        body {
-            margin: 0;
-            min-height: 100vh;
-            background:
-                radial-gradient(circle at top left, rgba(13, 148, 136, .12), transparent 32rem),
-                #f4f7f8;
-        }
-
-        a { color: inherit; }
-
-        .shell {
-            width: min(1080px, calc(100% - 2rem));
-            margin: 0 auto;
-            padding: 3rem 0 5rem;
-        }
-
-        .eyebrow {
-            margin: 0 0 .65rem;
-            color: #0f766e;
-            font-size: .78rem;
-            font-weight: 800;
-            letter-spacing: .12em;
-            text-transform: uppercase;
-        }
-
+        body { margin: 0; background: #f5f7f8; }
+        main { width: min(1080px, calc(100% - 2rem)); margin: 0 auto; padding: 3rem 0 5rem; }
         h1, h2, h3, p { margin-top: 0; }
-
-        h1 {
-            max-width: 720px;
-            margin-bottom: .8rem;
-            font-size: clamp(2rem, 6vw, 3.65rem);
-            line-height: 1.02;
-            letter-spacing: -.045em;
-        }
-
-        .intro {
-            max-width: 680px;
-            color: #556174;
-            font-size: 1.05rem;
-            line-height: 1.7;
-        }
-
-        .layout {
-            display: grid;
-            gap: 1.25rem;
-            margin-top: 2.25rem;
-        }
-
-        .card {
-            border: 1px solid #dce5e7;
-            border-radius: 1.15rem;
-            background: rgba(255, 255, 255, .94);
-            box-shadow: 0 18px 45px rgba(23, 32, 51, .07);
-        }
-
+        h1 { font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.02; margin-bottom: .7rem; }
+        h2 { font-size: 1.35rem; margin-bottom: .4rem; }
+        .intro { color: #56646d; max-width: 44rem; margin-bottom: 2rem; }
+        .layout { display: grid; grid-template-columns: minmax(220px, .72fr) minmax(0, 1.45fr); gap: 1rem; align-items: start; }
+        .card { background: white; border: 1px solid #dbe2e6; border-radius: 16px; box-shadow: 0 12px 30px rgba(28, 43, 50, .06); }
         .services { overflow: hidden; }
-
-        .service-link {
-            display: block;
-            padding: 1.2rem 1.25rem;
-            border-bottom: 1px solid #e6edef;
-            text-decoration: none;
-            transition: background .15s ease, transform .15s ease;
-        }
-
+        .service-link { display: block; padding: 1rem 1.1rem; border-bottom: 1px solid #e7ecef; color: inherit; text-decoration: none; }
         .service-link:last-child { border-bottom: 0; }
-        .service-link:hover { background: #f2fbfa; }
-        .service-link[aria-current="page"] { background: #e7f7f5; }
-
-        .service-link strong {
-            display: block;
-            margin-bottom: .35rem;
-            font-size: 1rem;
-        }
-
-        .service-link span,
-        .muted {
-            color: #647184;
-            font-size: .9rem;
-            line-height: 1.55;
-        }
-
-        .availability { padding: 1.35rem; }
-
-        .availability-head {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 1rem;
-            margin-bottom: 1.25rem;
-        }
-
-        .availability h2 {
-            margin-bottom: .35rem;
-            font-size: 1.35rem;
-            letter-spacing: -.02em;
-        }
-
-        .date-form {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: end;
-            gap: .65rem;
-        }
-
-        .date-form label {
-            display: grid;
-            gap: .35rem;
-            color: #455166;
-            font-size: .78rem;
-            font-weight: 750;
-        }
-
-        input[type="date"] {
-            min-height: 2.7rem;
-            border: 1px solid #bdcbd0;
-            border-radius: .7rem;
-            padding: .6rem .75rem;
-            background: #fff;
-            color: #172033;
-            font: inherit;
-        }
-
-        button,
-        .button-link {
-            min-height: 2.7rem;
-            border: 0;
-            border-radius: .7rem;
-            padding: .65rem 1rem;
-            background: #0f766e;
-            color: #fff;
-            font: inherit;
-            font-weight: 750;
-            cursor: pointer;
-            text-decoration: none;
-        }
-
-        button:hover,
-        .button-link:hover { background: #115e59; }
-
-        .error {
-            margin: 0 0 1rem;
-            border: 1px solid #fecaca;
-            border-radius: .8rem;
-            padding: .8rem 1rem;
-            background: #fff1f2;
-            color: #9f1239;
-            font-size: .9rem;
-        }
-
-        .times {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: .7rem;
-        }
-
+        a.service-link:hover, .service-link[aria-current="page"] { background: #eef8f6; }
+        .service-link strong { display: block; margin-bottom: .25rem; }
+        .service-link span { display: block; color: #65737b; font-size: .92rem; line-height: 1.35; }
+        .workspace { padding: 1.35rem; }
+        .step { display: inline-flex; align-items: center; gap: .45rem; color: #39776f; font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: .65rem; }
+        .muted { color: #66747c; }
+        .notice { padding: .9rem 1rem; border-radius: 12px; background: #f1f7f6; margin-bottom: 1rem; }
+        .error { color: #a32121; font-size: .9rem; margin-top: .4rem; }
+        .booking-form, .date-form { display: grid; gap: 1rem; }
+        .booking-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+        .booking-field, .date-form label { display: grid; gap: .35rem; font-weight: 650; font-size: .92rem; }
+        input { width: 100%; border: 1px solid #c8d2d7; border-radius: 10px; padding: .72rem .78rem; font: inherit; background: white; }
+        input:focus { outline: 3px solid rgba(36, 125, 113, .16); border-color: #247d71; }
+        button, .button-link { appearance: none; border: 0; border-radius: 10px; background: #176f65; color: white; padding: .75rem 1rem; font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+        button:hover, .button-link:hover { background: #105d55; }
+        .button-secondary { background: #e8efef; color: #25363b; }
+        .button-secondary:hover { background: #dce6e6; }
+        .actions { display: flex; flex-wrap: wrap; gap: .65rem; align-items: center; }
+        .times { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .65rem; margin-top: 1rem; }
         .time-form { margin: 0; }
-
-        .time {
-            width: 100%;
-            border: 1px solid #b7d9d5;
-            border-radius: .8rem;
-            padding: .85rem .95rem;
-            background: #f3fbfa;
-            color: #134e4a;
-            font-weight: 750;
-            text-align: center;
+        .time { width: 100%; background: #eef7f5; color: #176f65; border: 1px solid #cfe3df; }
+        .time:hover { background: #dff0ec; }
+        .empty { padding: 1rem; border: 1px dashed #cbd5d9; border-radius: 12px; color: #65737b; margin-top: 1rem; }
+        .summary-card { padding: 1.35rem; max-width: 720px; }
+        .status { display: inline-block; margin-bottom: .65rem; padding: .3rem .55rem; border-radius: 999px; background: #e7f4f1; color: #176f65; font-weight: 750; font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; }
+        .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin: 1.25rem 0; }
+        .summary div { padding: .85rem; border-radius: 12px; background: #f7f9fa; }
+        .summary dt { color: #67757c; font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .25rem; }
+        .summary dd { margin: 0; font-weight: 650; }
+        .countdown { color: #4e5d64; font-weight: 650; }
+        details { margin-top: 1rem; border-top: 1px solid #e3e8eb; padding-top: 1rem; }
+        summary { cursor: pointer; font-weight: 700; }
+        .footer-note { margin-top: 1rem; color: #718087; font-size: .88rem; }
+        @media (max-width: 760px) {
+            main { width: min(100% - 1rem, 1080px); padding-top: 1.5rem; }
+            .layout { grid-template-columns: 1fr; }
+            .booking-fields, .summary { grid-template-columns: 1fr; }
+            .times { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
-
-        .time:hover {
-            border-color: #5eaaa2;
-            background: #e4f6f3;
-        }
-
-        .empty {
-            border: 1px dashed #c9d4d8;
-            border-radius: .9rem;
-            padding: 1.2rem;
-            color: #647184;
-            background: #fafcfc;
-            line-height: 1.6;
-        }
-
-        .footer-note {
-            margin-top: 1rem;
-            color: #738093;
-            font-size: .82rem;
-        }
-
-        .hold-card {
-            max-width: 720px;
-            margin-top: 2.25rem;
-            padding: clamp(1.35rem, 5vw, 2.2rem);
-        }
-
-        .hold-status {
-            display: inline-flex;
-            margin-bottom: 1rem;
-            border-radius: 999px;
-            padding: .4rem .7rem;
-            background: #e7f7f5;
-            color: #115e59;
-            font-size: .78rem;
-            font-weight: 800;
-            letter-spacing: .04em;
-            text-transform: uppercase;
-        }
-
-        .hold-details {
-            display: grid;
-            gap: .8rem;
-            margin: 1.4rem 0;
-            border-top: 1px solid #e6edef;
-            border-bottom: 1px solid #e6edef;
-            padding: 1.2rem 0;
-        }
-
-        .hold-details div {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            gap: .5rem 1rem;
-        }
-
-        .hold-details dt {
-            color: #647184;
-            font-size: .85rem;
-        }
-
-        .hold-details dd {
-            margin: 0;
-            font-weight: 750;
-            text-align: right;
-        }
-
-        .countdown {
-            margin-bottom: 1.2rem;
-            color: #0f766e;
-            font-weight: 800;
-        }
-
-        .booking-form {
-            display: grid;
-            gap: 1rem;
-            margin-top: 1.4rem;
-            border-top: 1px solid #e6edef;
-            padding-top: 1.4rem;
-        }
-
-        .booking-fields {
-            display: grid;
-            gap: .9rem;
-        }
-
-        .booking-field {
-            display: grid;
-            gap: .4rem;
-            color: #455166;
-            font-size: .84rem;
-            font-weight: 750;
-        }
-
-        .booking-field input {
-            width: 100%;
-            min-height: 2.9rem;
-            border: 1px solid #bdcbd0;
-            border-radius: .7rem;
-            padding: .65rem .75rem;
-            background: #fff;
-            color: #172033;
-            font: inherit;
-            font-weight: 500;
-        }
-
-        .booking-field input:focus {
-            outline: 3px solid rgba(13, 148, 136, .16);
-            border-color: #0f766e;
-        }
-
-        .booking-form button {
-            justify-self: start;
-        }
-
-        @media (min-width: 620px) {
-            .booking-fields {
-                grid-template-columns: 1fr 1fr;
-            }
-
-            .booking-field:first-child {
-                grid-column: 1 / -1;
-            }
-        }
-
-        @media (min-width: 840px) {
-            .layout {
-                grid-template-columns: minmax(250px, .78fr) minmax(0, 1.55fr);
-                align-items: start;
-            }
+        @media (max-width: 440px) {
+            .times { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
-<main class="shell">
-    <p class="eyebrow">{{ config('app.name') }}</p>
-
+<main>
     @if($holdSummary)
-        @if($holdSummary['status'] === 'converted')
-            <h1>Your booking is complete</h1>
-            <p class="intro">
-                Your reserved time has been converted into an appointment.
-            </p>
-        @else
-            <h1>Review your reserved time</h1>
-            <p class="intro">
-                This time is held temporarily while the booking is completed.
-            </p>
-        @endif
-
-        <section class="card hold-card" aria-live="polite">
+        <section class="card summary-card" aria-live="polite">
             @if($holdSummary['status'] === 'active')
-                <span class="hold-status">Time reserved</span>
-                <h2>{{ $holdSummary['service_name'] }}</h2>
-                <p class="muted">
-                    Enter your details before the reservation expires.
-                </p>
+                <span class="status">Time reserved</span>
+                <h1>{{ $holdSummary['service_name'] }}</h1>
+                <p class="muted">Your appointment time is temporarily reserved while you finish the booking.</p>
             @elseif($holdSummary['status'] === 'expired')
-                <span class="hold-status">Reservation expired</span>
-                <h2>This reservation has expired.</h2>
-                <p class="muted">
-                    Return to the service availability page to choose another time.
-                </p>
+                <span class="status">Reservation expired</span>
+                <h1>{{ $holdSummary['service_name'] }}</h1>
+                <p class="muted">This reservation has expired. Choose another time to continue.</p>
             @elseif($holdSummary['status'] === 'converted' && $holdSummary['confirmation_pending'])
-                <span class="hold-status">Request received</span>
-                <h2>Your appointment request was received.</h2>
-                <p class="muted">
-                    This service requires confirmation. The appointment is reserved in a pending state until it is confirmed.
-                </p>
+                <span class="status">Request received</span>
+                <h1>{{ $holdSummary['service_name'] }}</h1>
+                <p class="muted">This service requires confirmation. Your appointment is pending confirmation.</p>
             @elseif($holdSummary['status'] === 'converted')
-                <span class="hold-status">Appointment booked</span>
-                <h2>Your appointment is booked.</h2>
-                <p class="muted">
-                    The appointment has been added to the schedule.
-                </p>
+                <span class="status">Appointment booked</span>
+                <h1>{{ $holdSummary['service_name'] }}</h1>
+                <p class="muted">Your booking is complete.</p>
             @else
-                <span class="hold-status">Reservation inactive</span>
-                <h2>This reservation is no longer active.</h2>
+                <span class="status">Reservation inactive</span>
+                <h1>{{ $holdSummary['service_name'] }}</h1>
             @endif
 
-            <dl class="hold-details">
+            <dl class="summary">
                 <div>
                     <dt>Service</dt>
                     <dd>{{ $holdSummary['service_name'] }}</dd>
@@ -403,9 +132,9 @@
             @if($holdSummary['status'] === 'active')
                 <p
                     class="countdown"
-                    data-hold-countdown
+                    data-countdown
                     data-expires-at="{{ $holdSummary['expires_at'] }}"
-                    data-remaining-seconds="{{ $holdSummary['remaining_seconds'] }}"
+                    data-expired-message="This reservation has expired. Refresh to choose another time."
                 >
                     Reserved for {{ max(1, (int) ceil($holdSummary['remaining_seconds'] / 60)) }} more minute(s).
                 </p>
@@ -416,85 +145,123 @@
                     action="{{ route('scheduling.public.holds.complete', ['holdId' => $holdSummary['hold_id']], false) }}"
                 >
                     @csrf
-
                     <div class="booking-fields">
                         <label class="booking-field" for="name">
                             Name
-                            <input
-                                id="name"
-                                name="name"
-                                type="text"
-                                value="{{ old('name') }}"
-                                autocomplete="name"
-                                maxlength="255"
-                                required
-                            >
-                            @error('name')
-                                <span class="error">{{ $message }}</span>
-                            @enderror
+                            <input id="name" name="name" type="text" value="{{ old('name') }}" autocomplete="name" maxlength="255" required>
+                            @error('name')<span class="error">{{ $message }}</span>@enderror
                         </label>
-
                         <label class="booking-field" for="email">
                             Email
-                            <input
-                                id="email"
-                                name="email"
-                                type="email"
-                                value="{{ old('email') }}"
-                                autocomplete="email"
-                                maxlength="255"
-                                required
-                            >
-                            @error('email')
-                                <span class="error">{{ $message }}</span>
-                            @enderror
+                            <input id="email" name="email" type="email" value="{{ old('email') }}" autocomplete="email" maxlength="255" required>
+                            @error('email')<span class="error">{{ $message }}</span>@enderror
                         </label>
-
                         <label class="booking-field" for="phone">
                             Phone <span class="muted">(optional)</span>
-                            <input
-                                id="phone"
-                                name="phone"
-                                type="tel"
-                                value="{{ old('phone') }}"
-                                autocomplete="tel"
-                                maxlength="255"
-                            >
-                            @error('phone')
-                                <span class="error">{{ $message }}</span>
-                            @enderror
+                            <input id="phone" name="phone" type="tel" value="{{ old('phone') }}" autocomplete="tel" maxlength="255">
+                            @error('phone')<span class="error">{{ $message }}</span>@enderror
                         </label>
                     </div>
-
-                    <button type="submit">Complete booking</button>
+                    <div class="actions">
+                        <button type="submit">Complete booking</button>
+                    </div>
                 </form>
             @else
-                <p class="countdown" data-remaining-seconds="0">
-                    No reservation time remains.
-                </p>
-
                 <a
                     class="button-link"
                     href="{{ route('scheduling.public.services.show', array_filter([
                         'serviceKey' => $holdSummary['service_key'],
                         'date' => $holdSummary['is_range'] ? null : $holdSummary['date'],
                     ]), false) }}"
+                >Choose another time</a>
+            @endif
+        </section>
+    @elseif($offerSummary)
+        <section class="card summary-card" aria-live="polite">
+            @if($offerSummary['status'] === 'active')
+                <span class="status">Selection ready</span>
+                <h1>{{ $offerSummary['service_name'] }}</h1>
+                <p class="muted">This is a short-lived selection, not a capacity reservation yet. Availability is checked again before a real hold is created.</p>
+            @else
+                <span class="status">Selection expired</span>
+                <h1>{{ $offerSummary['service_name'] }}</h1>
+                <p class="muted">This selection has expired without reserving capacity.</p>
+            @endif
+
+            <dl class="summary">
+                <div>
+                    <dt>Service</dt>
+                    <dd>{{ $offerSummary['service_name'] }}</dd>
+                </div>
+                @if($offerSummary['is_range'])
+                    <div>
+                        <dt>Stay</dt>
+                        <dd>{{ $offerSummary['interval_label'] }}</dd>
+                    </div>
+                @else
+                    <div>
+                        <dt>Date</dt>
+                        <dd>{{ $offerSummary['date_label'] }}</dd>
+                    </div>
+                    <div>
+                        <dt>Time</dt>
+                        <dd>{{ $offerSummary['time_label'] }}</dd>
+                    </div>
+                @endif
+                <div>
+                    <dt>Timezone</dt>
+                    <dd>{{ str_replace('_', ' ', $offerSummary['timezone']) }}</dd>
+                </div>
+                @if($offerSummary['location_address'])
+                    <div>
+                        <dt>Service address</dt>
+                        <dd>{{ $offerSummary['location_address'] }}</dd>
+                    </div>
+                @endif
+            </dl>
+
+            @error('booking')
+                <p class="error">{{ $message }}</p>
+            @enderror
+
+            @if($offerSummary['status'] === 'active')
+                <p
+                    class="countdown"
+                    data-countdown
+                    data-expires-at="{{ $offerSummary['expires_at'] }}"
+                    data-expired-message="This selection has expired. Refresh to choose another time."
                 >
-                    View available times
-                </a>
+                    Selection available for {{ max(1, (int) ceil($offerSummary['remaining_seconds'] / 60)) }} more minute(s).
+                </p>
+
+                <form
+                    method="POST"
+                    action="{{ route('scheduling.public.offers.hold', ['offerId' => $offerSummary['offer_id']], false) }}"
+                >
+                    @csrf
+                    <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', (string) \Illuminate\Support\Str::uuid()) }}">
+                    <button type="submit">Continue with this time</button>
+                </form>
+            @else
+                <a
+                    class="button-link"
+                    href="{{ route('scheduling.public.services.show', array_filter([
+                        'serviceKey' => $offerSummary['service_key'],
+                        'date' => $offerSummary['is_range'] ? null : $offerSummary['date'],
+                    ]), false) }}"
+                >Choose another time</a>
             @endif
         </section>
     @else
         <h1>Schedule an appointment</h1>
-        <p class="intro">
-            Choose a service, review current availability, and find a time that works.
-        </p>
+        <p class="intro">Choose the appointment type first. We’ll ask only for details that affect that service before showing authoritative availability.</p>
 
         <div class="layout">
             <section class="card services" aria-labelledby="services-heading">
                 <div class="service-link">
-                    <strong id="services-heading">Available services</strong>
-                    <span>Select a service to view appointment times.</span>
+                    <span class="step">Step 1</span>
+                    <strong id="services-heading">Choose appointment type</strong>
+                    <span>Select the service that best matches what you need.</span>
                 </div>
 
                 @forelse($services as $service)
@@ -523,126 +290,83 @@
                 @endforelse
             </section>
 
-            <section
-                class="card availability"
-                aria-live="polite"
-                x-data="{
-                    addressLine1: @js(old('address_line_1', '')),
-                    addressLine2: @js(old('address_line_2', '')),
-                    city: @js(old('city', '')),
-                    region: @js(old('region', '')),
-                    postalCode: @js(old('postal_code', '')),
-                    country: @js(old('country', 'US')),
-                }"
-            >
-                @if($selectedService)
-                    <div class="availability-head">
-                        <div>
-                            <h2>{{ $selectedService->name }}</h2>
-                            <p class="muted">
-                                Times shown in {{ str_replace('_', ' ', $displayTimezone) }}.
-                            </p>
+            <section class="card workspace" aria-live="polite">
+                @if(!$selectedService)
+                    <span class="step">Step 1</span>
+                    <h2>Choose an appointment type</h2>
+                    <p class="muted">Availability appears after you select a service.</p>
+                @elseif($requiresCustomerSitePreparation)
+                    <span class="step">Step 2</span>
+                    <h2>Where should we meet?</h2>
+                    <p class="muted">{{ $selectedService->name }} takes place at your location. We use the normalized service address before calculating travel-aware availability.</p>
+
+                    <form
+                        class="booking-form"
+                        method="POST"
+                        action="{{ route('scheduling.public.services.prepare', ['serviceKey' => $selectedService->key], false) }}"
+                    >
+                        @csrf
+                        <div class="booking-fields">
+                            <label class="booking-field" for="address_line_1">
+                                Address line 1
+                                <input id="address_line_1" name="address_line_1" type="text" value="{{ old('address_line_1') }}" autocomplete="address-line1" required>
+                                @error('address_line_1')<span class="error">{{ $message }}</span>@enderror
+                            </label>
+                            <label class="booking-field" for="address_line_2">
+                                Address line 2 <span class="muted">(optional)</span>
+                                <input id="address_line_2" name="address_line_2" type="text" value="{{ old('address_line_2') }}" autocomplete="address-line2">
+                                @error('address_line_2')<span class="error">{{ $message }}</span>@enderror
+                            </label>
+                            <label class="booking-field" for="city">
+                                City
+                                <input id="city" name="city" type="text" value="{{ old('city') }}" autocomplete="address-level2" required>
+                                @error('city')<span class="error">{{ $message }}</span>@enderror
+                            </label>
+                            <label class="booking-field" for="region">
+                                State / region
+                                <input id="region" name="region" type="text" value="{{ old('region') }}" autocomplete="address-level1" required>
+                                @error('region')<span class="error">{{ $message }}</span>@enderror
+                            </label>
+                            <label class="booking-field" for="postal_code">
+                                Postal code
+                                <input id="postal_code" name="postal_code" type="text" value="{{ old('postal_code') }}" autocomplete="postal-code" required>
+                                @error('postal_code')<span class="error">{{ $message }}</span>@enderror
+                            </label>
+                            <label class="booking-field" for="country">
+                                Country code
+                                <input id="country" name="country" type="text" maxlength="2" value="{{ old('country', 'US') }}" autocomplete="country" required>
+                                @error('country')<span class="error">{{ $message }}</span>@enderror
+                            </label>
                         </div>
+                        <div class="actions">
+                            <button type="submit">Show available times</button>
+                        </div>
+                    </form>
+                @else
+                    <span class="step">{{ $preparedLocation ? 'Step 3' : 'Step 2' }}</span>
+                    <h2>{{ $selectedService->name }}</h2>
+                    <p class="muted">Times shown in {{ str_replace('_', ' ', $displayTimezone) }}.</p>
 
-                        @if($selectedService->usesFixedDuration())
-                            <form
-                                class="date-form"
-                                method="GET"
-                                action="{{ route('scheduling.public.services.show', ['serviceKey' => $selectedService->key], false) }}"
-                            >
-                                <label for="date">
-                                    Appointment date
-                                    <input
-                                        id="date"
-                                        name="date"
-                                        type="date"
-                                        value="{{ old('date', $selectedDate?->format('Y-m-d')) }}"
-                                        min="{{ now($displayTimezone)->format('Y-m-d') }}"
-                                        max="{{ $maximumDate?->format('Y-m-d') }}"
-                                        required
-                                    >
-                                </label>
-                                <button type="submit">View times</button>
-                            </form>
-                        @endif
-                    </div>
-
-                    @error('date')
-                        <p class="error">{{ $message }}</p>
-                    @enderror
-
-                    @error('starts_at')
-                        <p class="error">{{ $message }}</p>
-                    @enderror
-
-                    @error('range_starts_at')
-                        <p class="error">{{ $message }}</p>
-                    @enderror
-
-                    @error('range_ends_at')
-                        <p class="error">{{ $message }}</p>
-                    @enderror
-
-                    @error('idempotency_key')
-                        <p class="error">{{ $message }}</p>
-                    @enderror
-
-                    @if($selectedService->location_type === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_CUSTOMER_SITE)
-                        <div class="booking-form" style="margin-bottom: 1rem;">
-                            <div>
-                                <strong>Service address</strong>
-                                <p class="muted">Enter the address where this appointment will take place. It is normalized by Scheduling when you reserve a time.</p>
-                            </div>
-
-                            <div class="booking-fields">
-                                <label class="booking-field" for="address_line_1">
-                                    Address line 1
-                                    <input id="address_line_1" type="text" x-model="addressLine1" autocomplete="address-line1" required>
-                                </label>
-
-                                <label class="booking-field" for="address_line_2">
-                                    Address line 2
-                                    <input id="address_line_2" type="text" x-model="addressLine2" autocomplete="address-line2">
-                                </label>
-
-                                <label class="booking-field" for="city">
-                                    City
-                                    <input id="city" type="text" x-model="city" autocomplete="address-level2" required>
-                                </label>
-
-                                <label class="booking-field" for="region">
-                                    State / region
-                                    <input id="region" type="text" x-model="region" autocomplete="address-level1" required>
-                                </label>
-
-                                <label class="booking-field" for="postal_code">
-                                    Postal code
-                                    <input id="postal_code" type="text" x-model="postalCode" autocomplete="postal-code" required>
-                                </label>
-
-                                <label class="booking-field" for="country">
-                                    Country code
-                                    <input id="country" type="text" maxlength="2" x-model="country" autocomplete="country" required>
-                                </label>
-                            </div>
-
-                            @foreach(['address_line_1', 'address_line_2', 'city', 'region', 'postal_code', 'country'] as $addressField)
-                                @error($addressField)
-                                    <p class="error">{{ $message }}</p>
-                                @enderror
-                            @endforeach
+                    @if($preparedLocation && $preparedLocation['formatted_address'])
+                        <div class="notice">
+                            <strong>Service address</strong><br>
+                            {{ $preparedLocation['formatted_address'] }}
                         </div>
                     @endif
+
+                    @error('date')<p class="error">{{ $message }}</p>@enderror
+                    @error('starts_at')<p class="error">{{ $message }}</p>@enderror
+                    @error('range_starts_at')<p class="error">{{ $message }}</p>@enderror
+                    @error('range_ends_at')<p class="error">{{ $message }}</p>@enderror
+                    @error('address_line_1')<p class="error">{{ $message }}</p>@enderror
 
                     @if($selectedService->usesRangeDuration())
                         <form
                             class="booking-form"
                             method="POST"
-                            action="{{ route('scheduling.public.services.reserve', ['serviceKey' => $selectedService->key], false) }}"
+                            action="{{ route('scheduling.public.services.offers.store', ['serviceKey' => $selectedService->key], false) }}"
                         >
                             @csrf
-                            <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', (string) \Illuminate\Support\Str::uuid()) }}">
-
                             <div class="booking-fields">
                                 <label class="booking-field" for="range_starts_at">
                                     Check-in
@@ -657,7 +381,6 @@
                                         required
                                     >
                                 </label>
-
                                 <label class="booking-field" for="range_ends_at">
                                     Check-out
                                     <input
@@ -671,81 +394,87 @@
                                     >
                                 </label>
                             </div>
-
-                            @if($selectedService->location_type === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_CUSTOMER_SITE)
-                                <input type="hidden" name="address_line_1" x-model="addressLine1">
-                                <input type="hidden" name="address_line_2" x-model="addressLine2">
-                                <input type="hidden" name="city" x-model="city">
-                                <input type="hidden" name="region" x-model="region">
-                                <input type="hidden" name="postal_code" x-model="postalCode">
-                                <input type="hidden" name="country" x-model="country">
-                            @endif
-
-                            <p class="muted">
-                                Times are interpreted in {{ str_replace('_', ' ', $displayTimezone) }}. Allowed duration: {{ $selectedService->minimumDurationMinutes() }}–{{ $selectedService->maximumDurationMinutes() }} minutes. Scheduling revalidates the entire stay before reserving capacity.
-                            </p>
-
-                            <button type="submit">Reserve stay</button>
+                            <p class="muted">Allowed duration: {{ $selectedService->minimumDurationMinutes() }}–{{ $selectedService->maximumDurationMinutes() }} minutes. The full interval is rechecked before a non-blocking selection is issued.</p>
+                            <div class="actions">
+                                <button type="submit">Check this stay</button>
+                            </div>
                         </form>
-                    @elseif($availableTimes !== [])
-                        <div class="times" aria-label="Available appointment times">
-                            @foreach($availableTimes as $time)
-                                <form
-                                    class="time-form"
-                                    method="POST"
-                                    action="{{ route('scheduling.public.services.reserve', ['serviceKey' => $selectedService->key], false) }}"
-                                >
-                                    @csrf
-                                    <input
-                                        type="hidden"
-                                        name="starts_at"
-                                        value="{{ $time['starts_at'] }}"
-                                    >
-                                    <input
-                                        type="hidden"
-                                        name="idempotency_key"
-                                        value="{{ $time['idempotency_key'] }}"
-                                    >
-                                    @if($selectedService->location_type === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_CUSTOMER_SITE)
-                                        <input type="hidden" name="address_line_1" x-model="addressLine1">
-                                        <input type="hidden" name="address_line_2" x-model="addressLine2">
-                                        <input type="hidden" name="city" x-model="city">
-                                        <input type="hidden" name="region" x-model="region">
-                                        <input type="hidden" name="postal_code" x-model="postalCode">
-                                        <input type="hidden" name="country" x-model="country">
-                                    @endif
-                                    <button class="time" type="submit">
-                                        {{ $time['label'] }}
-                                    </button>
-                                </form>
-                            @endforeach
-                        </div>
                     @else
-                        <div class="empty">
-                            No appointment times are currently available for this date. Choose another date to continue.
-                        </div>
+                        <form
+                            class="date-form"
+                            method="GET"
+                            action="{{ route('scheduling.public.services.show', ['serviceKey' => $selectedService->key], false) }}"
+                        >
+                            <label for="date">
+                                Appointment date
+                                <input
+                                    id="date"
+                                    name="date"
+                                    type="date"
+                                    value="{{ old('date', $selectedDate?->format('Y-m-d')) }}"
+                                    min="{{ now($displayTimezone)->format('Y-m-d') }}"
+                                    max="{{ $maximumDate?->format('Y-m-d') }}"
+                                    required
+                                >
+                            </label>
+                            <div class="actions">
+                                <button type="submit" class="button-secondary">View this date</button>
+                            </div>
+                        </form>
+
+                        @if($availableTimes !== [])
+                            <div class="times" aria-label="Available appointment times">
+                                @foreach($availableTimes as $time)
+                                    <form
+                                        class="time-form"
+                                        method="POST"
+                                        action="{{ route('scheduling.public.services.offers.store', ['serviceKey' => $selectedService->key], false) }}"
+                                    >
+                                        @csrf
+                                        <input type="hidden" name="starts_at" value="{{ $time['starts_at'] }}">
+                                        <button class="time" type="submit">{{ $time['label'] }}</button>
+                                    </form>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="empty">No appointment times are currently available for this date. Choose another date to continue.</div>
+                        @endif
                     @endif
 
-                    <p class="footer-note">
-                        {{ $selectedService->usesRangeDuration()
-                            ? 'The complete check-in/check-out interval is recalculated when the stay is reserved.'
-                            : 'Availability is recalculated when a time is selected and may change before a reservation is created.' }}
-                    </p>
-                @else
-                    <h2>Choose a service</h2>
-                    <p class="muted">
-                        Select one of the public services to view its current appointment availability.
-                    </p>
+                    @if($preparedLocation)
+                        <details>
+                            <summary>Change service address</summary>
+                            <form
+                                class="booking-form"
+                                method="POST"
+                                action="{{ route('scheduling.public.services.prepare', ['serviceKey' => $selectedService->key], false) }}"
+                                style="margin-top: 1rem;"
+                            >
+                                @csrf
+                                <div class="booking-fields">
+                                    <label class="booking-field">Address line 1<input name="address_line_1" type="text" value="{{ old('address_line_1', $preparedLocation['address_line_1']) }}" required></label>
+                                    <label class="booking-field">Address line 2<input name="address_line_2" type="text" value="{{ old('address_line_2', $preparedLocation['address_line_2']) }}"></label>
+                                    <label class="booking-field">City<input name="city" type="text" value="{{ old('city', $preparedLocation['city']) }}" required></label>
+                                    <label class="booking-field">State / region<input name="region" type="text" value="{{ old('region', $preparedLocation['region']) }}" required></label>
+                                    <label class="booking-field">Postal code<input name="postal_code" type="text" value="{{ old('postal_code', $preparedLocation['postal_code']) }}" required></label>
+                                    <label class="booking-field">Country code<input name="country" type="text" maxlength="2" value="{{ old('country', $preparedLocation['country']) }}" required></label>
+                                </div>
+                                <button type="submit" class="button-secondary">Update address and recalculate</button>
+                            </form>
+                        </details>
+                    @endif
+
+                    <p class="footer-note">Selecting a time creates only a short-lived opaque offer. Capacity is not consumed until the next server-authoritative step succeeds.</p>
                 @endif
             </section>
         </div>
     @endif
 </main>
 
-@if($holdSummary && $holdSummary['status'] === 'active')
+@if(($holdSummary && $holdSummary['status'] === 'active') || ($offerSummary && $offerSummary['status'] === 'active'))
     <script>
         (() => {
-            const element = document.querySelector('[data-hold-countdown]');
+            const element = document.querySelector('[data-countdown]');
 
             if (! element) {
                 return;
@@ -758,23 +487,16 @@
             }
 
             const render = () => {
-                const remainingSeconds = Math.max(
-                    0,
-                    Math.ceil((expiresAt - Date.now()) / 1000),
-                );
-
-                element.dataset.remainingSeconds = String(remainingSeconds);
+                const remainingSeconds = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
 
                 if (remainingSeconds === 0) {
-                    element.textContent = 'This reservation has expired. Refresh to choose another time.';
-
+                    element.textContent = element.dataset.expiredMessage || 'This selection has expired.';
                     return;
                 }
 
                 const minutes = Math.floor(remainingSeconds / 60);
                 const seconds = remainingSeconds % 60;
-
-                element.textContent = `Reserved for ${minutes}:${String(seconds).padStart(2, '0')} more.`;
+                element.textContent = `${minutes}:${String(seconds).padStart(2, '0')} remaining.`;
                 window.setTimeout(render, 1000);
             };
 

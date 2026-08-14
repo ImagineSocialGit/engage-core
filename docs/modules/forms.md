@@ -401,6 +401,105 @@ The submission runtime stores an internal logical-request fingerprint in `form_s
 
 Engage Sites and other transports should generate one stable external UUID per logical submission attempt and reuse the same UUID after transport uncertainty.
 
+## External server-to-server intake
+
+Forms exposes a signed first-party intake endpoint on the existing webhook host:
+
+```text
+POST https://webhooks.{root_domain}/forms/{form_key}/submissions
+Content-Type: application/json
+```
+
+This is an application-to-application boundary. Engage Sites accepts browser input on its own server and signs the outbound request there. Forms client IDs and shared secrets must never appear in browser JavaScript, HTML, or public configuration.
+
+The JSON request contract is:
+
+```json
+{
+  "external_id": "ad918706-38b4-449c-8675-311c9a85bf09",
+  "values": {
+    "email": "fan@example.com",
+    "interests": ["music", "vip"]
+  },
+  "meta": {
+    "consent": {
+      "disclosure_key": "artist_updates_v1"
+    }
+  },
+  "provenance": {
+    "ip_address": "203.0.113.42",
+    "user_agent": "Artist site visitor browser"
+  }
+}
+```
+
+`external_id` is required and must be one stable UUID per logical submission. `values` must be a JSON object. `meta` is an optional JSON object for durable submission evidence; `_forms` remains reserved for the Forms runtime.
+
+`provenance` is an optional JSON object authored by the authenticated calling application from the original browser request. It may contain only `ip_address` and `user_agent`. The signature covers the complete exact body so Engage Core can detect tampering; HTTPS still provides transport confidentiality. A caller may omit either or both values when its privacy policy does not retain them. When omitted, Forms stores `null`; it never mislabels the authenticated Engage Sites server or proxy as the visitor. The peer address remains available to authentication and rate limiting at the HTTP boundary.
+
+Visitor provenance is evidence, not durable replay identity. A legitimate retry may therefore carry different or absent provenance and still replay the original submission; the first accepted submission retains its original snapshots. Unknown envelope or provenance keys fail validation.
+
+Every request includes:
+
+```text
+X-Engage-Client
+X-Engage-Timestamp
+X-Engage-Nonce
+X-Engage-Signature
+```
+
+`X-Engage-Timestamp` is the current Unix timestamp in seconds. `X-Engage-Nonce` is a fresh UUID for this HTTP request. `X-Engage-Signature` is `v1=` followed by the lowercase hex HMAC-SHA256 of this canonical string:
+
+```text
+v1
+{client_id}
+{unix_timestamp}
+{lowercase_nonce}
+{uppercase_http_method}
+{request_path_without_host_or_query}
+{lowercase_sha256_of_exact_raw_body}
+```
+
+The canonical string uses literal line-feed separators and no trailing line feed. For the current route the method is `POST` and the path is `/forms/{form_key}/submissions`.
+
+Authentication fails closed for unknown clients, stale timestamps, malformed nonces, or invalid signatures. Each client has a server-owned source, provider, and exact form allowlist. Setup validation requires every allowed form to resolve as the exact current active, published, public FormVersion.
+
+Two replay controls have deliberately different lifetimes:
+
+```text
+X-Engage-Nonce
+    Short-lived cache identity for one signed HTTP request.
+    Reusing it returns request_replayed.
+
+provider + external_id
+    Durable FormSubmission identity for one logical submission.
+    An identical retry returns the original submission.
+    A conflicting retry returns external_id_conflict.
+```
+
+After transport uncertainty, the caller reuses the same `external_id` but generates a new timestamp, nonce, and signature. The endpoint then returns HTTP 200 with `data.replayed = true`; a newly created submission returns HTTP 201.
+
+Known error responses use one stable JSON envelope:
+
+```json
+{
+  "error": {
+    "code": "validation_failed",
+    "message": "The external form intake payload failed validation.",
+    "details": {
+      "errors": {}
+    }
+  },
+  "request_id": "..."
+}
+```
+
+Relevant statuses include 400 for malformed JSON, 401 for authentication failure, 403 for a form outside the client allowlist, 404 when external intake is disabled, 409 for replay/conflict, 413 for body size, 415 for content type, 422 for envelope or form-value validation, 429 for rate limiting, and 503 for fail-closed runtime unavailability.
+
+External intake configuration lives under `forms.external_intake`. Client configuration may be supplied through selected-client config for multiple callers, or through the single-client environment variables documented in `.env.example`. Secrets must contain at least 32 bytes. Provider identities must be unique across configured clients because provider is the durable external-idempotency namespace.
+
+The shared provider webhook inbox is not used for this endpoint. A completed `FormSubmission` is the canonical durable intake record, including the exact raw and normalized answers; creating a second durable transport receipt would duplicate ownership without improving replay safety.
+
 ## Contact and tag mapping
 
 Contact mapping is optional. Forms remains useful for anonymous or non-contact intake when no mapping is declared.
@@ -434,7 +533,7 @@ Tag mappings are server-owned value-to-tag allowlists. Submitted values select o
 
 Invalid submission rules or Contact/tag mappings fail closed. `FormsSetupValidationContributor` reports these invalid published contracts before runtime handoff.
 
-The external HTTP endpoint/authentication contract remains later integration work. Messaging consent grants remain an optional bridge and are not performed by this Forms runtime.
+Messaging consent grants remain an optional bridge and are not performed by this Forms runtime.
 
 ## Definitions and versions
 

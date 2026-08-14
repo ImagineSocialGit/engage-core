@@ -7,7 +7,7 @@ $reservationLimit = max(
     1,
     (int) config('scheduling.public.reservation_rate_limit_per_minute', 12),
 );
-$holdReviewLimit = max(
+$reviewLimit = max(
     1,
     (int) config('scheduling.public.hold_review_rate_limit_per_minute', 60),
 );
@@ -19,14 +19,29 @@ Route::get('/services/{serviceKey}', [PublicBookingController::class, 'show'])
     ->where('serviceKey', '[A-Za-z0-9][A-Za-z0-9_-]*')
     ->name('scheduling.public.services.show');
 
-Route::post('/services/{serviceKey}/reserve', [PublicBookingController::class, 'reserve'])
+Route::post('/services/{serviceKey}/prepare', [PublicBookingController::class, 'prepare'])
     ->where('serviceKey', '[A-Za-z0-9][A-Za-z0-9_-]*')
     ->middleware("throttle:{$reservationLimit},1")
-    ->name('scheduling.public.services.reserve');
+    ->name('scheduling.public.services.prepare');
+
+Route::post('/services/{serviceKey}/offers', [PublicBookingController::class, 'offer'])
+    ->where('serviceKey', '[A-Za-z0-9][A-Za-z0-9_-]*')
+    ->middleware("throttle:{$reservationLimit},1")
+    ->name('scheduling.public.services.offers.store');
+
+Route::get('/offers/{offerId}', [PublicBookingController::class, 'reviewOffer'])
+    ->whereUuid('offerId')
+    ->middleware("throttle:{$reviewLimit},1")
+    ->name('scheduling.public.offers.show');
+
+Route::post('/offers/{offerId}/hold', [PublicBookingController::class, 'hold'])
+    ->whereUuid('offerId')
+    ->middleware("throttle:{$reservationLimit},1")
+    ->name('scheduling.public.offers.hold');
 
 Route::get('/book/{holdId}', [PublicBookingController::class, 'review'])
     ->whereUuid('holdId')
-    ->middleware("throttle:{$holdReviewLimit},1")
+    ->middleware("throttle:{$reviewLimit},1")
     ->name('scheduling.public.holds.show');
 
 Route::post('/book/{holdId}', [PublicBookingController::class, 'complete'])
