@@ -526,35 +526,39 @@ These are open code/runtime investigations surfaced by the first production Webi
   - `webinar.ended` handles attendance while recording completion resolves playback and dispatches follow-ups.
   - Attendance snapshot authority and unresolved reasons are now visible in CRM Webinar history. Add explicit replay/recovery controls only after the desired operator authorization and audit contract is defined.
 
-## Reporting foundation documentation and audit
+## Reporting foundation
 
-This is the next focused documentation branch. Do not begin Reporting implementation until the durable module contract and first phased plan are written.
+The Reporting audit and durable module contract are complete in `docs/modules/reporting.md`. Reporting remains optional, Core-only, privacy-first, and separate from operational observability.
 
-- [ ] Audit current first-party observability inputs before proposing schema.
-  - Existing Nginx/access logs and server-side request facts.
-  - Current Webinar landing, registration, waitlist, join, attendance, replay, and message outcomes.
-  - Current module events, public read seams, and any existing Reporting module files/tests.
-- [ ] Use mature FOSS analytics/reporting systems as feature-shape references, not implementation sources.
-- [ ] Expand `docs/modules/reporting.md` into a durable optional-module contract.
-  - Reporting owns collection/normalization/aggregation/read models and report surfaces that are genuinely Reporting-specific.
-  - Producer modules own their domain state and emit public events/read data; Reporting must not mutate producer state or absorb producer business logic.
-  - The module must remain independently enableable and malleable across mortgage, music, pet services, and other clients.
-- [ ] Lock privacy-first identity and retention rules.
-  - No covert personal-data collection or sale.
-  - No cross-domain identity stitching by default.
-  - Prefer anonymous/session-level first-party measurement until a deliberate consented Contact correlation exists.
-  - Define IP/user-agent handling, bot classification, raw-event retention, aggregation retention, deletion, and access boundaries.
-- [ ] Define the initial event and attribution contract.
-  - Page/request observations.
-  - Webinar view, CTA, registration-start, registration-complete, waitlist, join, attendance, replay, and downstream conversion milestones.
-  - Source/referrer/UTM/campaign/content identifiers.
-  - Anonymous session, request, page-view, webinar, registration, Contact, message, and campaign correlation rules.
-  - Human-vs-bot classification and confidence/reason provenance without pretending uncertain traffic is definitively human.
-- [ ] Define the first report and phased implementation plan.
-  - First report: Webinar traffic and conversion funnel, including likely-human views, registration conversion, source attribution, join/attendance/replay outcomes, and explicit denominator rules.
-  - Phase collection and ingestion separately from normalized events, rollups, query/read services, dashboards, and external-site tracking client work.
-  - Include testing, data-volume, dedupe/idempotency, retry, privacy, and persistence-size requirements.
-- [ ] Capture unresolved product/schema decisions explicitly instead of guessing.
+Completed contract work:
+
+- [x] Audit current first-party observability inputs and keep Nginx/Laravel operational logs outside Reporting storage.
+- [x] Use mature FOSS analytics/reporting systems as narrow feature-shape references rather than implementation dependencies.
+- [x] Define the shared no-op recorder/contributor direction so producer modules do not depend on `App\Modules\Reporting`.
+- [x] Lock the initial Reporting-owned table concepts: sessions, observations, daily metrics, and projection checkpoints; defer external measurements to the later comparison slice.
+- [x] Lock privacy/session rules: host-only ephemeral sessions, 30-minute inactivity, four-hour absolute maximum, page-only fallback, no persistent visitor profile, no fingerprinting, no raw IP, and no full user-agent retention.
+- [x] Lock attribution rules: normalized landing path, referrer host, allowlisted bounded UTM/source values, and keyed hashes only for explicitly approved platform click identifiers.
+- [x] Lock versioned event definitions, UUID idempotency/conflict behavior, strict property allowlists, and hard ingestion limits.
+- [x] Lock retention defaults: 45-day raw interactions, 90-day normalized diagnostics, correlation hash removal when no longer needed, and 25-month privacy-safe daily aggregates.
+- [x] Lock the first Webinar traffic/conversion report, explicit denominator rules, traffic-class separation, safe question distributions, and the phased implementation plan.
+
+### Reporting implementation sequence
+
+- [ ] Build the observation foundation.
+  - Add shared Reporting contracts/registry and a no-op recorder when Reporting is disabled.
+  - Add Reporting config, migrations/models, idempotent ingestion, session resolution, attribution normalization, projection checkpoints, setup validation, and explicit Project State policy for every new Reporting table.
+  - Add focused module-boundary, schema, privacy, replay/conflict, session-expiry, attribution, projection, and retention tests.
+- [ ] Add public transport and traffic classification.
+  - Same-origin endpoint, lightweight browser client, allowed host/surface checks, scoped throttling, hard payload limits, transient user-agent parsing, traffic classification, and page-only fallback.
+- [ ] Add the Webinar behavioral funnel after reconciling a fresh Webinar dependency cone and current frontend entry points.
+  - Landing view, CTA click, modal open, form start, submit attempt, normalized validation failures, completion correlation, throttling, bot-protection outcome, and page revision.
+- [ ] Add durable producer projections.
+  - Webinars: local completion, provider finalization, trusted joins, attendance finalization, and safe question distributions.
+  - Messaging: confirmation planning/deduplication/coverage and terminal delivery outcomes through current immutable authority, not copied ScheduledMessage payload/meta.
+- [ ] Build the initial Reporting UI with date, series, occurrence, source/campaign/content, device, page revision, and traffic-class filters plus funnel/drop-off, validation, attribution, questions, provider health, and message health.
+- [ ] Add generic external platform measurement comparison only after first-party Reporting is stable.
+
+Separate producer privacy debt remains separate from Reporting. In particular, do not copy any existing raw Webinar registration/waitlist IP or user-agent provenance into Reporting; audit/removal belongs to the owning producer persistence/privacy work.
 
 ## One-off backlog
 
