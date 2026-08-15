@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('webinar_waitlist_signups', function (Blueprint $table) {
+        Schema::create('webinar_waitlist_signups', function (Blueprint $table): void {
             $table->id();
 
             $table->foreignIdFor(Contact::class)
@@ -22,15 +22,44 @@ return new class extends Migration
                 ->constrained()
                 ->nullOnDelete();
 
-            $table->timestamp('notified_at')->nullable()->index();
+            $table->timestamp('notified_at')
+                ->nullable()
+                ->index();
 
-            $table->string('source_page')->nullable();
+            $table->string('notification_mode', 32)
+                ->default('once');
 
-            $table->json('meta')->nullable();
+            $table->timestamp('expires_at')
+                ->nullable();
+
+            $table->timestamp('ended_at')
+                ->nullable();
+
+            $table->string('source_page')
+                ->nullable();
+
+            $table->json('meta')
+                ->nullable();
+
             $table->timestamps();
 
-            $table->unique(['webinar_series_id', 'contact_id']);
-            $table->index(['webinar_series_id', 'notified_at']);
+            $table->unique([
+                'webinar_series_id',
+                'contact_id',
+            ]);
+
+            $table->index([
+                'webinar_series_id',
+                'notified_at',
+            ]);
+
+            $table->index([
+                'webinar_series_id',
+                'notification_mode',
+                'ended_at',
+                'expires_at',
+            ], 'webinar_waitlist_subscription_eligibility_index');
+
             $table->index('contact_id');
         });
     }

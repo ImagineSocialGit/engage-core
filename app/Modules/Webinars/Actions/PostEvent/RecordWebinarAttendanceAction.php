@@ -11,12 +11,15 @@ use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class RecordWebinarAttendanceAction
 {
     public function __construct(
         private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
         private readonly WebinarStateCanonicalizer $stateCanonicalizer,
+        private readonly EnsureMissedWebinarFutureAvailabilitySubscriptionAction
+            $ensureFutureAvailabilitySubscription,
     ) {}
 
     public function execute(
@@ -148,6 +151,8 @@ class RecordWebinarAttendanceAction
         }
 
         if ($registration->status === 'missed' && data_get($registration->meta, 'attendance.status') === 'missed') {
+            $this->ensureFutureAvailabilitySubscription($registration);
+
             return;
         }
 
@@ -181,6 +186,24 @@ class RecordWebinarAttendanceAction
                 ],
             );
         });
+
+        $this->ensureFutureAvailabilitySubscription($registration);
+    }
+
+    private function ensureFutureAvailabilitySubscription(
+        WebinarRegistration $registration,
+    ): void {
+        try {
+            $this->ensureFutureAvailabilitySubscription->execute(
+                $registration->fresh([
+                    'contact',
+                    'webinar',
+                    'webinar.webinarSeries',
+                ]) ?? $registration,
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     protected function matchesRegistration(

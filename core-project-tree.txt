@@ -893,6 +893,7 @@
 │   │   │   │   ├── ImportWebinarRegistrationAction.php
 │   │   │   │   ├── PostEvent
 │   │   │   │   │   ├── DispatchPostWebinarFollowUpsAction.php
+│   │   │   │   │   ├── EnsureMissedWebinarFutureAvailabilitySubscriptionAction.php
 │   │   │   │   │   ├── EnsureWebinarPostEventReviewAction.php
 │   │   │   │   │   ├── HandleWebinarProviderWebhookEventAction.php
 │   │   │   │   │   ├── RecordWebinarAttendanceAction.php
@@ -2095,10 +2096,12 @@
 │   │   │   │   ├── ProcessPostWebinarEventJobTest.php
 │   │   │   │   ├── ProviderAttendanceReconciliationTest.php
 │   │   │   │   ├── WebinarFollowUpOutcomeAccountingTest.php
+│   │   │   │   ├── WebinarFutureAvailabilitySubscriptionTest.php
 │   │   │   │   ├── WebinarPostEventReviewTest.php
 │   │   │   │   ├── WebinarProviderEventTargetResolutionTest.php
 │   │   │   │   └── WebinarReplayDispatchPreflightTest.php
 │   │   │   ├── ProviderCancellationReconciliationTest.php
+│   │   │   ├── RecurringWebinarWaitlistProviderSyncTest.php
 │   │   │   ├── ResolveRegisterableWebinarActionTest.php
 │   │   │   ├── SyncWebinarScheduleProfilesMessageAreaTest.php
 │   │   │   ├── WebinarAutomationOutboxTest.php
@@ -2151,4 +2154,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-545 directories, 1607 files
+545 directories, 1610 files

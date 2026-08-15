@@ -20,6 +20,9 @@ class WebinarWaitlistSignupFactory extends Factory
             'contact_id' => Contact::factory(),
             'webinar_series_id' => WebinarSeries::factory(),
             'notified_at' => null,
+            'notification_mode' => WebinarWaitlistSignup::NOTIFICATION_MODE_ONCE,
+            'expires_at' => null,
+            'ended_at' => null,
             'source_page' => 'webinar-notify-me',
             'meta' => [
                 'accepted_channels' => [
@@ -49,6 +52,15 @@ class WebinarWaitlistSignupFactory extends Factory
     {
         return $this->state(fn (): array => [
             'notified_at' => now(),
+        ]);
+    }
+
+    public function recurring(int $durationDays = 365): self
+    {
+        return $this->state(fn (): array => [
+            'notification_mode' => WebinarWaitlistSignup::NOTIFICATION_MODE_RECURRING,
+            'expires_at' => now()->addDays(max(1, $durationDays)),
+            'ended_at' => null,
         ]);
     }
 }

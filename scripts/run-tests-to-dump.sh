@@ -30,6 +30,7 @@ if [[ "$dump_dir" != /* ]]; then
     dump_dir="$project_root/$dump_dir"
 fi
 
+original_umask="$(umask)"
 umask 077
 mkdir -p "$dump_dir"
 
@@ -131,6 +132,8 @@ fi
     echo "TEST OUTPUT"
     echo "==========="
 } | tee "$dump_file"
+
+umask "$original_umask"
 
 cd "$project_root"
 

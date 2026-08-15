@@ -35,6 +35,12 @@ return [
         'required' => false,
     ],
 
+    'future_availability_subscription' => [
+        'enabled' => false,
+        'duration_days' => 365,
+        'channels' => [],
+    ],
+
     'booking' => [
         'url' => null,
     ],

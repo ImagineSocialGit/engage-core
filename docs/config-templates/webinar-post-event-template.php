@@ -68,6 +68,21 @@ return [
         'enabled' => true,
     ],
 
+    /*
+    | Missed-attendee future availability subscriptions are optional and
+    | Webinar-owned. Enabling this does not grant Messaging consent. Only
+    | channels with current marketing consent in the Webinar consent domain
+    | are retained on the recurring subscription.
+    */
+    'future_availability_subscription' => [
+        'enabled' => false,
+        'duration_days' => 365,
+        'channels' => [
+            'email',
+            'sms',
+        ],
+    ],
+
     'outcome_messages' => [
         'enabled' => true,
         'dispatch_key' => 'webinar_ended',

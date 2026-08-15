@@ -38,6 +38,7 @@ class SyncWebinarSeriesFromProviderAction
 
         $created = 0;
         $updated = 0;
+        $createdWebinarIds = [];
         $missing = [];
 
         $fetchedExternalIds = $fetchedWebinars
@@ -46,7 +47,14 @@ class SyncWebinarSeriesFromProviderAction
             ->values()
             ->all();
 
-        $fetchedWebinars->each(function (ProviderWebinarData $fetchedWebinar) use ($series, $provider, $providerEventType, &$created, &$updated): void {
+        $fetchedWebinars->each(function (ProviderWebinarData $fetchedWebinar) use (
+            $series,
+            $provider,
+            $providerEventType,
+            &$created,
+            &$updated,
+            &$createdWebinarIds,
+        ): void {
             $webinar = Webinar::query()->firstOrNew([
                 'platform' => $provider,
                 'provider_event_type' => $providerEventType,
@@ -87,6 +95,7 @@ class SyncWebinarSeriesFromProviderAction
 
             if ($webinar->wasRecentlyCreated) {
                 $created++;
+                $createdWebinarIds[] = (int) $webinar->getKey();
 
                 return;
             }
@@ -129,6 +138,16 @@ class SyncWebinarSeriesFromProviderAction
             )
         ) {
             NotifyWebinarWaitlistJob::dispatch($series->id);
+        }
+
+        if ($this->hasActiveRecurringWaitlistSubscriptions($series)) {
+            foreach ($createdWebinarIds as $webinarId) {
+                NotifyWebinarWaitlistJob::dispatch(
+                    (int) $series->getKey(),
+                    $webinarId,
+                    WebinarWaitlistSignup::NOTIFICATION_MODE_RECURRING,
+                );
+            }
         }
 
         return [
@@ -186,7 +205,16 @@ class SyncWebinarSeriesFromProviderAction
     {
         return WebinarWaitlistSignup::query()
             ->where('webinar_series_id', $series->getKey())
-            ->whereNull('notified_at')
+            ->eligibleForNotification(WebinarWaitlistSignup::NOTIFICATION_MODE_ONCE)
+            ->exists();
+    }
+
+    private function hasActiveRecurringWaitlistSubscriptions(
+        WebinarSeries $series,
+    ): bool {
+        return WebinarWaitlistSignup::query()
+            ->where('webinar_series_id', $series->getKey())
+            ->eligibleForNotification(WebinarWaitlistSignup::NOTIFICATION_MODE_RECURRING)
             ->exists();
     }
 

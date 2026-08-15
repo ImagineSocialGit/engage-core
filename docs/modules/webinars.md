@@ -539,6 +539,33 @@ Webinars should not materialize the entire reminder cadence as ScheduledMessages
 
 Normal progression should create only the next actionable chain wave.
 
+### Recurring future-availability subscriptions
+
+A missed-attendee future-Webinar subscription reuses `webinar_waitlist_signups`; it does not introduce a second subscription or notification-history table.
+
+The durable lifecycle fields are:
+
+```text
+notification_mode = once | recurring
+expires_at
+ended_at
+```
+
+`notified_at` remains the first successfully planned availability notification. For a one-shot signup it also removes the row from future eligibility. For a recurring signup it is historical context only; the subscription remains eligible until `expires_at` or `ended_at` closes it.
+
+Automatic missed-attendee subscription creation does not grant Messaging consent. Webinars may retain only configured channels that are available on the `webinar_waitlists` surface and already have active marketing consent in the resolved Webinar consent domain. Revocation, suppression, provider availability, and send-time gates remain Messaging-owned.
+
+Recurring availability delivery reuses the existing waitlist MessageChain. Stable per-occurrence dedupe remains:
+
+```text
+waitlist signup + Webinar occurrence + waitlist message area
+    -> one MessageChainEnrollment identity
+```
+
+The existing MessageChainEnrollment/ScheduledMessage history is authoritative evidence for an occurrence. Do not add a parallel per-occurrence notification-history table or use `send_at` as occurrence identity.
+
+Provider sync may dispatch a recurring-only waitlist notification for each newly created registerable occurrence. The historical one-shot path remains series-based and continues to stop after its first planned notification.
+
 ### Attendance outcomes
 
 Attended and missed follow-up chains are separate business-trigger bindings.

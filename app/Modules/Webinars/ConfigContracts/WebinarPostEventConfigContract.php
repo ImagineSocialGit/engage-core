@@ -46,6 +46,29 @@ class WebinarPostEventConfigContract implements ConfigContract
             ]), [
                 'required' => false,
             ]),
+            'future_availability_subscription' => ConfigField::defaulted(
+                ConfigSchema::object([
+                    'enabled' => ConfigField::defaulted(
+                        ConfigSchema::boolean(),
+                        false,
+                    ),
+                    'duration_days' => ConfigField::defaulted(
+                        ConfigSchema::integer(),
+                        365,
+                    ),
+                    'channels' => ConfigField::defaulted(
+                        ConfigSchema::listOf(ConfigSchema::string(
+                            allowedValues: ['email', 'sms'],
+                        )),
+                        [],
+                    ),
+                ]),
+                [
+                    'enabled' => false,
+                    'duration_days' => 365,
+                    'channels' => [],
+                ],
+            ),
             'booking' => ConfigField::required(ConfigSchema::object([
                 'url' => ConfigField::required(
                     ConfigSchema::string(nullable: true),

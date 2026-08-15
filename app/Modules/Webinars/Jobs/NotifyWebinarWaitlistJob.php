@@ -14,6 +14,8 @@ class NotifyWebinarWaitlistJob implements ShouldQueue
 
     public function __construct(
         public int $seriesId,
+        public ?int $webinarId = null,
+        public ?string $notificationMode = null,
     ) {
         $this->onQueue(config('webinars.queues.notifications'));
     }
@@ -28,12 +30,17 @@ class NotifyWebinarWaitlistJob implements ShouldQueue
             return;
         }
 
-        $webinar = $resolveRegisterableWebinar->getFutureForSeries($series);
+        $webinar = $this->webinarId !== null
+            ? $resolveRegisterableWebinar->findForSeries($series, $this->webinarId)
+            : $resolveRegisterableWebinar->getFutureForSeries($series);
 
         if (! $webinar) {
             return;
         }
 
-        $dispatchWebinarWaitlistMessagesAction->handle($webinar);
+        $dispatchWebinarWaitlistMessagesAction->handle(
+            webinar: $webinar,
+            notificationMode: $this->notificationMode,
+        );
     }
 }

@@ -20,8 +20,10 @@ class DispatchWebinarWaitlistMessagesAction
         private readonly WebinarMessageAreaRegistry $messageAreaRegistry,
     ) {}
 
-    public function handle(Webinar $webinar): void
-    {
+    public function handle(
+        Webinar $webinar,
+        ?string $notificationMode = null,
+    ): void {
         if (! $this->messageAreaRegistry->isEnabled('waitlist')) {
             return;
         }
@@ -31,7 +33,7 @@ class DispatchWebinarWaitlistMessagesAction
         $signups = WebinarWaitlistSignup::query()
             ->with(['contact', 'webinarSeries'])
             ->where('webinar_series_id', $webinar->webinar_series_id)
-            ->whereNull('notified_at')
+            ->eligibleForNotification($notificationMode)
             ->get();
 
         foreach ($signups as $signup) {
@@ -39,9 +41,11 @@ class DispatchWebinarWaitlistMessagesAction
                 continue;
             }
 
-            $signup->forceFill([
-                'notified_at' => now(),
-            ])->save();
+            if ($signup->notified_at === null) {
+                $signup->forceFill([
+                    'notified_at' => now(),
+                ])->save();
+            }
         }
     }
 
