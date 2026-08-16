@@ -22,6 +22,7 @@ use App\Support\Presets\PresetContributionRegistry;
 use App\Support\Presets\PresetPackageResolver;
 use App\Support\Reporting\Contracts\ReportingObservationRecorder;
 use App\Support\Reporting\ReportingEventDefinitionRegistry;
+use App\Support\Reporting\ReportingProjectionFactRegistry;
 use App\Support\Reporting\Services\NoopReportingObservationRecorder;
 use App\Support\SetupValidation\Contributors\ConfigContractsSetupValidationContributor;
 use App\Support\SetupValidation\Contributors\ModuleDependenciesSetupValidationContributor;
@@ -67,6 +68,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ReportingEventDefinitionRegistry::class, function ($app): ReportingEventDefinitionRegistry {
             return new ReportingEventDefinitionRegistry(
                 contributors: $app->tagged('reporting.event_definition_contributors'),
+            );
+        });
+
+        $this->app->singleton(ReportingProjectionFactRegistry::class, function ($app): ReportingProjectionFactRegistry {
+            return new ReportingProjectionFactRegistry(
+                contributors: $app->tagged('reporting.projection_fact_contributors'),
             );
         });
 

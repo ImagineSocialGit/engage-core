@@ -711,7 +711,11 @@
 │   │   │   └── Support
 │   │   ├── Reporting
 │   │   │   ├── Actions
+│   │   │   │   ├── ProjectReportingDailyMetricsAction.php
 │   │   │   │   └── RecordReportingObservationAction.php
+│   │   │   ├── Console
+│   │   │   │   └── Commands
+│   │   │   │       └── ProjectReportingMetricsCommand.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   │   └── Public
@@ -1011,6 +1015,8 @@
 │   │   │   │   └── WebinarsPresetContributor.php
 │   │   │   ├── Providers
 │   │   │   │   └── WebinarsModuleServiceProvider.php
+│   │   │   ├── ReadModels
+│   │   │   │   └── WebinarFunnelFactContributor.php
 │   │   │   ├── Requests
 │   │   │   │   ├── ReplaceWebinarOccurrenceRequest.php
 │   │   │   │   ├── ResolveWebinarRegistrationReconciliationRequest.php
@@ -1206,12 +1212,16 @@
 │       ├── Reporting
 │       │   ├── Contracts
 │       │   │   ├── ReportingEventDefinitionContributor.php
-│       │   │   └── ReportingObservationRecorder.php
+│       │   │   ├── ReportingObservationRecorder.php
+│       │   │   └── ReportingProjectionFactContributor.php
 │       │   ├── Data
 │       │   │   ├── ReportingEventDefinition.php
 │       │   │   ├── ReportingObservationData.php
-│       │   │   └── ReportingObservationResult.php
+│       │   │   ├── ReportingObservationResult.php
+│       │   │   ├── ReportingProjectionFact.php
+│       │   │   └── ReportingProjectionWindow.php
 │       │   ├── ReportingEventDefinitionRegistry.php
+│       │   ├── ReportingProjectionFactRegistry.php
 │       │   └── Services
 │       │       └── NoopReportingObservationRecorder.php
 │       ├── SetupValidation
@@ -2059,8 +2069,10 @@
 │   │   │   └── WorkflowProjectStateRoundTripTest.php
 │   │   ├── Reporting
 │   │   │   ├── ReportingBrowserClientContractTest.php
+│   │   │   ├── ReportingDailyProjectionTest.php
 │   │   │   ├── ReportingFoundationTest.php
 │   │   │   ├── ReportingObservationFoundationTest.php
+│   │   │   ├── ReportingProjectionFactRegistryTest.php
 │   │   │   └── ReportingPublicTransportTest.php
 │   │   ├── Scheduling
 │   │   │   ├── AppointmentLifecycleActionTest.php
@@ -2148,6 +2160,7 @@
 │   │   │   ├── WebinarAutomationOutboxTest.php
 │   │   │   ├── WebinarCurrentProviderOccurrenceTest.php
 │   │   │   ├── WebinarDevControllerEnvironmentGuardTest.php
+│   │   │   ├── WebinarFunnelFactContributorTest.php
 │   │   │   ├── WebinarJoinBrowserProofTest.php
 │   │   │   ├── WebinarMessageAreaRegistryTest.php
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
@@ -2196,4 +2209,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-557 directories, 1640 files
+560 directories, 1650 files

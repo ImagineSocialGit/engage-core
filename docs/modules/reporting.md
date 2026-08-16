@@ -37,7 +37,7 @@ How do first-party outcomes compare with externally reported campaign measuremen
 
 The first committed report is the Webinar traffic and conversion funnel.
 
-Reporting should favor a small number of trustworthy, explainable measures over a large dashboard of ambiguous counters.
+Reporting should favor a small number of trustworthy, explainable measures over a large dashboard of ambiguous counters. Its primary product job is conversion and public-experience diagnosis: identify where likely-human traffic enters, where it drops, where validation or completion fails, and whether downstream registration/booking outcomes actually completed. Bot/crawler separation supports denominator trust. Malicious-traffic indicators may remain lightweight diagnostics, but Reporting is not a SIEM or attack-monitoring product.
 
 ## Responsibility
 
@@ -186,7 +186,9 @@ ScheduledMessage sent/skipped/failed outcomes
 Campaign enrollment or conversion outcomes introduced later
 ```
 
-Those facts are projected through producer-owned Reporting contributors or public read seams.
+Those facts are projected through neutral `App\Support\Reporting` fact contracts implemented in producer-owned read areas such as `ReadModels/` or through equivalent public read seams. Do not create `Reporting/` subdirectories inside Webinars, Messaging, Scheduling, Forms, Commerce, or another producer merely to feed Reporting.
+
+The first implementation uses `app/Modules/Webinars/ReadModels/WebinarFunnelFactContributor.php`. Because Webinars already depends on Messaging and owns the registration-message meaning, that read model may consume Messaging's durable `ScheduledMessage` terminal authority without copying delivery payload/meta or modifying Messaging. Messaging does not gain a Reporting-specific contributor or directory.
 
 This keeps the report tied to authoritative domain state rather than copied historical payloads.
 
@@ -722,13 +724,13 @@ The Webinar contributor owns the definition of eligible and authoritative finali
 
 ```text
 denominator
-    eligible completed local registrations
+    eligible completed local registrations whose provider stage, when required, is ready for registration messaging
 
 numerator
-    registrations for which the authoritative Messaging/Webinar planning path produced the intended terminal planning outcome
+    registrations for which the authoritative Messaging/Webinar planning path produced at least one intended confirmation delivery
 ```
 
-The exact mapping of scheduled, deliberately deduplicated/consolidated, skipped, or failed planning outcomes must be resolved from the current Messaging authority during the producer-projection slice. Reporting must not infer it from copied ScheduledMessage metadata.
+The Webinar-owned read model resolves this from current Messaging authority, including durable terminal outbox/delivery-attempt state and relational confirmation intent where present. A provider-stage failure does not also become a confirmation-planning failure; downstream metrics begin only after the upstream provider stage is ready. Reporting does not infer message outcomes from copied ScheduledMessage payload/meta.
 
 ### Join rate
 
@@ -945,23 +947,27 @@ Tests should use generic fixtures. Do not make Slam Dunk, Rob, or another client
 
 ## Project State
 
-The four current Reporting foundation tables are explicitly classified `resettable` in Project State. They are not exported/imported as durable client configuration today:
+Reporting session, raw-observation, aggregate, and projector tables currently remain outside the Project State transfer artifact.
 
 ```text
 reporting_sessions
-    ephemeral correlation resets
+    ephemeral correlation intentionally resets
 
 reporting_observations
-    privacy-limited raw observations reset during the foundation phase
+    privacy-limited raw observations intentionally reset
 
 reporting_daily_metrics
-    aggregate transfer remains deferred until retained projections are populated
+    now retained/authoritative aggregate history; Project State transfer is required before retained history is relied on across controlled rebuilds
 
 reporting_projection_checkpoints
-    derived-work coordination resets
+    derived-work coordination intentionally resets and can be rebuilt
 ```
 
-A later retained-history requirement may deliberately revise the aggregate transfer contract, but it must do so explicitly rather than silently treating all Reporting data as Project State.
+Phase 5A makes `reporting_daily_metrics` authoritative retained history, so its current `resettable` Project State policy is now a known pre-production transfer gap rather than the desired final contract.
+
+Do not solve that gap by unconditionally adding a required `reporting` Project State section. Reporting is optional, while the current Project State section contract requires every configured section table to exist. A global required section would therefore make Project State unsafe for clients that intentionally do not install Reporting.
+
+Phase 5B must add retained Reporting aggregate transfer in an optional-module-safe way after reconciling the current Project State infrastructure. Until that lands, a controlled Project State rebuild may discard Reporting history that is older than the raw-observation rebuild window.
 
 ## Existing producer privacy debt
 
@@ -1071,29 +1077,39 @@ Webinars contributes versioned event definitions through `App\Support\Reporting`
 
 The submit-attempt UUID is producer-owned bounded request provenance. The browser uses the same UUID as the `webinar.form.submit_attempt` observation identity, while a newly created Webinar registration stores only that UUID for later authoritative completion correlation. The Reporting session token is never copied into Webinar state.
 
-Browser events remain non-authoritative for completed registration state. Phase 5 must still project the durable local completion from Webinar-owned authority.
+Browser events remain non-authoritative for completed registration state. Phase 5 therefore projects durable local completion from Webinar-owned authority rather than treating browser success as conversion authority.
 
-### Phase 5 — Durable producer projections
+### Phase 5A — Durable producer projections
 
-Add producer contributors for the authoritative facts required by the report.
+Implemented. The neutral projection-fact registry lives under `App\Support\Reporting`; the Webinar-owned read contributor lives under `app/Modules/Webinars/ReadModels/`. No Reporting-specific directory or implementation was added to Messaging or another producer module.
 
-Initial producers:
+Authoritative sources used by the first projection:
 
 ```text
 Webinars
-Messaging
+    local registration + finalization state
+    provider-sync state
+    trusted signed-POST join evidence
+    authoritative attendance finalization
+    snapshotted question_key / answer_key / definition_version
+
+Messaging (read by the Webinar-owned contributor through Webinars' existing dependency)
+    confirmation ScheduledMessage planning
+    relational confirmation intent when present
+    durable terminal outbox/delivery-attempt authority
 ```
 
-Initial facts:
+The producer fact includes only bounded finalization reason codes, never exception text or provider payloads, so the report can distinguish stages such as provider reconciliation from registration-message planning failure without turning operational internals into analytics data. Provider-stage failures are not cascaded into downstream confirmation-planning failures.
 
-```text
-local completed registration
-provider finalization
-confirmation planning/deduplication/outcomes
-trusted join evidence
-attendance finalization
-safe configured answer distributions
-```
+The `public_funnel` projector rebuilds privacy-safe client-local daily aggregates idempotently. It correlates the public submit-attempt UUID to authoritative local registrations and writes funnel, traffic-quality, validation, provider, confirmation, join, attendance, and safe question-distribution metrics. It deliberately does not project Contact identity, raw IP/user agent, provider message IDs, free-text question answers, message payloads, exception text, or arbitrary producer metadata.
+
+A short rolling rebuild runs every ten minutes for late-changing provider/delivery state, with a daily rebuild across the raw-observation retention horizon for reconciliation.
+
+### Phase 5B — Retained aggregate Project State transfer
+
+Before the initial CRM UI is treated as durable across controlled database rebuilds, add optional-module-safe Project State transfer for `reporting_daily_metrics`.
+
+Do not transfer ephemeral sessions, raw observations, or projection checkpoints merely to preserve aggregate history.
 
 ### Phase 6 — Initial Reporting UI
 
@@ -1105,7 +1121,7 @@ Add provider-neutral external measurement import/adapter support only after the 
 
 ## Current status
 
-Current repository state through Phase 4:
+Current repository state through Phase 5A:
 
 ```text
 Reporting depends only on Core
@@ -1120,12 +1136,18 @@ request classification is server-owned and persists only coarse bounded results
 Webinars contributes namespaced browser funnel definitions through App\Support\Reporting only
 the Webinar registration page records page/CTA/modal/form/validation/throttle/bot diagnostics with bounded properties
 submit-attempt UUID correlation is available without copying the Reporting session token into Webinar state
-no producer-fact projections exist yet
+neutral projection-fact contracts/registry are app-level shared infrastructure
+Webinar durable facts are exposed from Webinars/ReadModels rather than a producer Reporting subdirectory
+Messaging receives no Reporting-specific source changes; Webinar reads its durable terminal authority through the existing dependency
+public_funnel daily projection combines likely-human browser behavior with authoritative registration/provider/message/join/attendance outcomes
+safe Webinar question distributions persist keys/version only and exclude answer_text/labels
+projection is deterministic/idempotent and maintains a versioned checkpoint
+short rolling and daily retention-horizon reconciliation rebuilds are scheduler-owned
 no Reporting CRM UI exists yet
-current Reporting and Webinar dependency cones have no detected module-boundary violations
+current Reporting, Webinar, and Messaging dependency cones have no detected module-boundary violations
 ```
 
-Phase 5 adds the first authoritative producer read/projection seam. That phase must reconcile the then-current Webinar and Messaging authority before defining normalized durable fact DTOs.
+Phase 5B is the required durability closeout before Phase 6 builds the first Reporting CRM workspace over these aggregates.
 
 ## Deferred possibilities
 
@@ -1154,10 +1176,9 @@ Add one only when a concrete client workflow proves the value and the privacy/ow
 The following remain intentionally open until their concrete phases provide authoritative producer/runtime sources:
 
 ```text
-exact producer-fact contributor DTO/registry shape
-exact Messaging state mapping for confirmation planning success/coverage
-projection/rebuild/pruning operational controls beyond the checkpoint foundation
+aggregate-before-prune operational controls for raw observation retention
 exact external measurement dimensions/provider adapter contract
+producer fact mappings for Forms, Scheduling, Commerce, and other future public funnels
 ```
 
 Do not resolve these by inventing compatibility fields or generic metadata. Resolve each against the concrete implementation source and tests when its phase begins.

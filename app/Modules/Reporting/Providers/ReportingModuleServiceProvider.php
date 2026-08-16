@@ -3,11 +3,13 @@
 namespace App\Modules\Reporting\Providers;
 
 use App\Modules\Reporting\Actions\RecordReportingObservationAction;
+use App\Modules\Reporting\Console\Commands\ProjectReportingMetricsCommand;
 use App\Modules\Reporting\Controllers\Public\ReportingObservationController;
 use App\Modules\Reporting\EventDefinitions\ConfigReportingEventDefinitionContributor;
 use App\Modules\Reporting\Validation\ReportingSetupValidationContributor;
 use App\Support\Reporting\Contracts\ReportingObservationRecorder;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
@@ -36,6 +38,35 @@ class ReportingModuleServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerPublicRateLimiter();
+
+        $this->callAfterResolving(
+            Schedule::class,
+            function (Schedule $schedule): void {
+                $schedule
+                    ->command('reporting:project --days=2')
+                    ->everyTenMinutes()
+                    ->withoutOverlapping(30);
+
+                $rebuildDays = max(
+                    1,
+                    (int) config(
+                        'reporting.retention.raw_observations_days',
+                        45,
+                    ),
+                );
+
+                $schedule
+                    ->command("reporting:project --days={$rebuildDays}")
+                    ->dailyAt('02:17')
+                    ->withoutOverlapping(180);
+            },
+        );
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                ProjectReportingMetricsCommand::class,
+            ]);
+        }
 
         if (! $this->app->routesAreCached()) {
             Route::post('/_reporting/observations', ReportingObservationController::class)

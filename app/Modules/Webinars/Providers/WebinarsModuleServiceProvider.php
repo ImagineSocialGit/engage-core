@@ -10,6 +10,7 @@ use App\Modules\Webinars\ConfigContracts\WebinarsConfigContractTargetProvider;
 use App\Modules\Webinars\Console\Commands\ImportWebinarRegistrationsCommand;
 use App\Modules\Webinars\Console\Commands\SyncWebinarScheduleProfilesCommand;
 use App\Modules\Webinars\Jobs\RecoverWebinarRegistrationFinalizationsJob;
+use App\Modules\Webinars\ReadModels\WebinarFunnelFactContributor;
 use App\Modules\Webinars\EventDefinitions\WebinarBehaviorEventDefinitionContributor;
 use App\Modules\Webinars\Services\ContactPanels\WebinarContactPanelProvider;
 use App\Modules\Webinars\Services\Dashboard\WebinarActivityDashboardPanelProvider;
@@ -72,6 +73,11 @@ class WebinarsModuleServiceProvider extends ServiceProvider
         $this->app->tag(
             WebinarBehaviorEventDefinitionContributor::class,
             'reporting.event_definition_contributors',
+        );
+
+        $this->app->tag(
+            WebinarFunnelFactContributor::class,
+            'reporting.projection_fact_contributors',
         );
     }
 

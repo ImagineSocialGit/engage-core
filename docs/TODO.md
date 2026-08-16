@@ -552,9 +552,17 @@ Completed contract work:
   - Webinar-owned namespaced definitions now cover landing/page view, CTA click, modal open, form start, submit attempt, normalized validation failures, throttling, bot-protection outcome, and page revision/presentation.
   - A bounded public submission-attempt UUID is shared between the browser submit observation and newly created Webinar registration provenance for later authoritative completion correlation; no Reporting session token is copied into Webinar state.
   - Webinars imports only neutral `App\Support\Reporting` contracts; Reporting remains Core-only and does not import Webinar internals.
-- [ ] Add durable producer projections.
-  - Webinars: local completion, provider finalization, trusted joins, attendance finalization, and safe question distributions.
-  - Messaging: confirmation planning/deduplication/coverage and terminal delivery outcomes through current immutable authority, not copied ScheduledMessage payload/meta.
+- [x] Add durable producer projections (Phase 5A).
+  - Neutral projection-fact contracts/registry are app-level shared infrastructure; the Webinar contributor lives under `Webinars/ReadModels`, not a producer `Reporting/` directory.
+  - Webinars contributes local completion/finalization, provider-sync state, trusted joins, authoritative attendance state, and safe `question_key` / `answer_key` / definition-version facts.
+  - Webinar's read model consumes Messaging confirmation planning, relational confirmation intent, and durable terminal outbox/attempt authority through Webinars' existing Messaging dependency; Messaging has no Reporting-specific contributor or source changes.
+  - Provider-stage failures do not cascade into confirmation-planning failures; bounded finalization reason codes preserve the actual failure stage without projecting exception text or provider payloads.
+  - The idempotent `public_funnel` daily projector correlates submission-attempt UUIDs, writes traffic/funnel/validation/provider/message/join/attendance/question aggregates, checkpoints projection state, preserves metric-version coexistence, and runs rolling plus retention-horizon reconciliation rebuilds.
+- [ ] Add optional-module-safe Project State transfer for retained `reporting_daily_metrics` (Phase 5B).
+  - Phase 5A makes daily aggregates authoritative retained history; leaving them resettable can lose history older than the 45-day raw-observation rebuild window during a controlled Project State rebuild.
+  - Do not unconditionally add a required Reporting section to the current Project State contract: Reporting is optional and required configured tables must exist.
+  - Keep `reporting_sessions`, `reporting_observations`, and `reporting_projection_checkpoints` resettable; transfer only the retained aggregate history.
+  - Reconcile a fresh Project State dependency cone before changing the shared transfer contract.
 - [ ] Build the initial Reporting UI with date, series, occurrence, source/campaign/content, device, page revision, and traffic-class filters plus funnel/drop-off, validation, attribution, questions, provider health, and message health.
 - [ ] Add generic external platform measurement comparison only after first-party Reporting is stable.
 
