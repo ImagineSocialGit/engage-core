@@ -792,7 +792,7 @@ generation time and adapter/template version in filename or artifact metadata
 
 ## Project State
 
-Events durable state must be supported by Project State in the same implementation workstream as the Events foundation. The fresh repository snapshot is Project State version 10, so the Events section is expected to produce version 11 if no other format-changing batch lands first.
+Events durable state must be supported by Project State in the same implementation workstream as the Events foundation. The fresh repository snapshot is Project State version 11, so an Events transfer section is expected to produce version 12 if no other format-changing batch lands first.
 
 Expected dependency-safe section order:
 

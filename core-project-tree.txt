@@ -1329,6 +1329,7 @@
 │   │   ├── inbound_messaging.php
 │   │   ├── internal_notifications.php
 │   │   ├── messaging.php
+│   │   ├── reporting.php
 │   │   ├── table_policies.php
 │   │   ├── tasks.php
 │   │   ├── webinars.php
@@ -2064,6 +2065,7 @@
 │   │   │   ├── ProjectStateImporterExtractionTest.php
 │   │   │   ├── ProjectStateInfrastructureExtractionTest.php
 │   │   │   ├── ProjectStateValidationInfrastructureExtractionTest.php
+│   │   │   ├── ReportingProjectStateRoundTripTest.php
 │   │   │   ├── TasksProjectStateRoundTripTest.php
 │   │   │   ├── WebinarProjectStateRoundTripTest.php
 │   │   │   └── WorkflowProjectStateRoundTripTest.php
@@ -2209,4 +2211,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-560 directories, 1650 files
+560 directories, 1652 files

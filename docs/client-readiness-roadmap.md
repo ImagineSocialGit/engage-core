@@ -300,7 +300,7 @@ Completed runway pieces:
 - FlowRoutes event-wait/task-completed resume behavior on top of route plan/progress item correlation.
 - `task.completed` resume through the generic `AutomationEventRecorded` seam without broad contact-only fallback.
 
-The Project State data-safety path is now complete for the current v10 scope:
+The Project State data-safety path is now complete for the current v11 scope:
 
 1. The current post-15B schema is classified as transferred, explicitly policy-controlled, or narrowly ignored.
 2. Export uses one consistent snapshot and fails closed on schema, policy, and reference drift.
@@ -1164,7 +1164,7 @@ This is durable schema/architecture work completed before production rollout, no
 
 ## Recommended next documentation and implementation targets
 
-The Project State v10 export/validate/import/resume system and its documentation are complete for the current supported schema. Its durable references are:
+The Project State v11 export/validate/import/resume system and its documentation are complete for the current supported schema. Its durable references are:
 
 - [`project-state-extension-guide.md`](project-state-extension-guide.md)
 - [`operations/project-state-transfer-runbook.md`](operations/project-state-transfer-runbook.md)

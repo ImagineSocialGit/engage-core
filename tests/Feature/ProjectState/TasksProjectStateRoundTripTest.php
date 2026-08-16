@@ -26,7 +26,7 @@ class TasksProjectStateRoundTripTest extends TestCase
 
         $this->assertIsArray($sections);
         $this->assertEquals(
-            ['core', 'internal_notifications', 'inbound_messaging', 'messaging', 'webinars', 'tasks', 'campaigns', 'broadcasts', 'workflow', 'automation_opportunities', 'automation_events', 'flow_routes'],
+            ['core', 'internal_notifications', 'inbound_messaging', 'messaging', 'webinars', 'tasks', 'campaigns', 'broadcasts', 'workflow', 'automation_opportunities', 'automation_events', 'flow_routes', 'reporting'],
             array_keys($sections),
         );
 
@@ -45,7 +45,7 @@ class TasksProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(10, $document['version']);
+        $this->assertSame(11, $document['version']);
         $this->assertCount(
             1,
             $document['sections']['tasks']['tables']['task_templates'],

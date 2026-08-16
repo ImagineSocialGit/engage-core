@@ -33,7 +33,7 @@ class ProjectStateExporterExtractionTest extends TestCase
             $managerDocument = app(ProjectStateManager::class)->export();
 
             $this->assertEquals($exporterDocument, $managerDocument);
-            $this->assertSame(10, $managerDocument['version']);
+            $this->assertSame(11, $managerDocument['version']);
             $this->assertSame(
                 $managerDocument['checksum'],
                 app(ProjectStateDocumentCodec::class)->checksum($managerDocument),

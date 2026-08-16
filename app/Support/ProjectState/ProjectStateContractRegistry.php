@@ -12,6 +12,24 @@ class ProjectStateContractRegistry
      */
     public function sections(): array
     {
+        $active = [];
+
+        foreach ($this->configuredSections() as $sectionKey => $section) {
+            if (! $this->sectionIsActive($sectionKey, $section)) {
+                continue;
+            }
+
+            $active[$sectionKey] = $section;
+        }
+
+        return $active;
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    public function configuredSections(): array
+    {
         $sections = config('project_state.sections', []);
 
         if (! is_array($sections) || $sections === []) {
@@ -27,8 +45,41 @@ class ProjectStateContractRegistry
                 || ! is_array($section)
                 || ! is_int($section['version'] ?? null)
                 || ! is_array($section['tables'] ?? null)
+                || (array_key_exists('optional', $section) && ! is_bool($section['optional']))
             ) {
                 throw new RuntimeException('Project-state section configuration is invalid.');
+            }
+
+            $optional = $section['optional'] ?? false;
+            $activationTables = array_key_exists('activation_tables', $section)
+                ? $section['activation_tables']
+                : array_keys($section['tables']);
+
+            if ($optional
+                && ! $this->isStringList($activationTables, allowEmpty: false)
+            ) {
+                throw new RuntimeException(
+                    "Optional project-state section [{$sectionKey}] activation table configuration is invalid."
+                );
+            }
+
+            if ($optional) {
+                $activationTables = array_values(array_map(
+                    static fn (string $table): string => trim($table),
+                    $activationTables,
+                ));
+
+                if (count(array_unique($activationTables)) !== count($activationTables)) {
+                    throw new RuntimeException(
+                        "Optional project-state section [{$sectionKey}] activation table configuration is invalid."
+                    );
+                }
+            }
+
+            if (! $optional && array_key_exists('activation_tables', $section)) {
+                throw new RuntimeException(
+                    "Required project-state section [{$sectionKey}] cannot declare activation tables."
+                );
             }
 
             $tables = [];
@@ -53,11 +104,48 @@ class ProjectStateContractRegistry
 
             $normalized[$sectionKey] = [
                 'version' => $section['version'],
+                'optional' => $optional,
+                'activation_tables' => $optional
+                    ? array_values($activationTables)
+                    : [],
                 'tables' => $tables,
             ];
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $section
+     */
+    private function sectionIsActive(string $sectionKey, array $section): bool
+    {
+        if (! $section['optional']) {
+            return true;
+        }
+
+        $activationTables = $section['activation_tables'];
+        $present = array_values(array_filter(
+            $activationTables,
+            fn (string $table): bool => Schema::hasTable($table),
+        ));
+
+        if ($present === []) {
+            return false;
+        }
+
+        if (count($present) !== count($activationTables)) {
+            $missing = array_values(array_diff($activationTables, $present));
+            sort($missing, SORT_STRING);
+
+            throw new RuntimeException(sprintf(
+                'Optional project-state section [%s] has a partially installed activation schema. Missing table(s): %s.',
+                $sectionKey,
+                implode(', ', $missing),
+            ));
+        }
+
+        return true;
     }
 
     /**

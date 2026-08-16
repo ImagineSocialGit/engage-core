@@ -18,10 +18,10 @@ Developer contract changes belong in [`../project-state-extension-guide.md`](../
 
 ```text
 format: engage-core-project-state
-version: 10
+version: 11
 ```
 
-The current implementation transfers 60 tables in 12 dependency-ordered sections and explicitly classifies 55 excluded tables.
+The current implementation has 13 dependency-ordered section contracts and transfers 61 tables when the optional Reporting schema is installed; otherwise the Reporting section is omitted. A current-version export produced without Reporting may be imported into a Reporting-enabled target with that optional section absent; the target applies no Reporting rows. An export that does contain retained Reporting history is rejected if the target Reporting schema is absent. It explicitly classifies 54 excluded tables.
 
 The CRM surface is owner-only:
 
@@ -58,6 +58,7 @@ Project State does not transfer:
 - users, passwords, password-reset tokens, or sessions;
 - Redis queue contents, Horizon metadata, cache, or locks;
 - failed-job history;
+- Reporting sessions, raw observations, and projection checkpoints; retained Reporting daily metrics transfer only when the Reporting schema is installed;
 - unsupported Mortgage, Scheduling, Location, Portal, Forms, Documents, or Commerce durable state;
 - active booking holds or slot offers;
 - external provider state.
@@ -236,7 +237,7 @@ Under **Download current state**:
 The filename follows:
 
 ```text
-{client-key}-project-state-v10-YYYYMMDD-HHMMSS.json
+{client-key}-project-state-v11-YYYYMMDD-HHMMSS.json
 ```
 
 The response is streamed directly. The application does not intentionally leave a public server-side copy.
@@ -261,7 +262,7 @@ Confirm:
 
 ```text
 format = engage-core-project-state
-version = 10
+version = 11
 client_key = expected selected client
 source.environment = expected source environment
 source.database = expected source database

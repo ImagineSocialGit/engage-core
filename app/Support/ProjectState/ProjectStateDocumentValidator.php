@@ -39,6 +39,7 @@ class ProjectStateDocumentValidator
         }
 
         $configuredSections = $this->contractRegistry->sections();
+        $allConfiguredSections = $this->contractRegistry->configuredSections();
         $documentSections = $document['sections'] ?? null;
 
         if (! is_array($documentSections)) {
@@ -50,6 +51,10 @@ class ProjectStateDocumentValidator
             $documentSection = $documentSections[$sectionKey] ?? null;
 
             if (! is_array($documentSection)) {
+                if ($section['optional']) {
+                    continue;
+                }
+
                 $errors[] = "Required project-state section [{$sectionKey}] is missing.";
                 continue;
             }
@@ -133,9 +138,18 @@ class ProjectStateDocumentValidator
         }
 
         foreach (array_keys($documentSections) as $sectionKey) {
-            if (! array_key_exists($sectionKey, $configuredSections)) {
-                $warnings[] = "Unknown section [{$sectionKey}] will not be imported.";
+            if (array_key_exists($sectionKey, $configuredSections)) {
+                continue;
             }
+
+            if (array_key_exists($sectionKey, $allConfiguredSections)
+                && ($allConfiguredSections[$sectionKey]['optional'] ?? false)
+            ) {
+                $errors[] = "Optional project-state section [{$sectionKey}] is present in the document but its activation schema is not installed on the target.";
+                continue;
+            }
+
+            $warnings[] = "Unknown section [{$sectionKey}] will not be imported.";
         }
 
         return [

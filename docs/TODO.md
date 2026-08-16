@@ -61,7 +61,7 @@ Do not create one-to-one payload or metadata tables that preserve the same bytes
 
 ## DB snapshot / export / import safety
 
-Current Project State implementation is complete for the supported v10 scope.
+Current Project State implementation is complete for the supported v11 scope.
 
 - [x] Define the `engage-core-project-state` versioned envelope, checksum, client-key guard, and exact current-format validation.
 - [x] Split the transfer contract into dependency-ordered module/shared sections with complete closed column contracts.
@@ -558,11 +558,12 @@ Completed contract work:
   - Webinar's read model consumes Messaging confirmation planning, relational confirmation intent, and durable terminal outbox/attempt authority through Webinars' existing Messaging dependency; Messaging has no Reporting-specific contributor or source changes.
   - Provider-stage failures do not cascade into confirmation-planning failures; bounded finalization reason codes preserve the actual failure stage without projecting exception text or provider payloads.
   - The idempotent `public_funnel` daily projector correlates submission-attempt UUIDs, writes traffic/funnel/validation/provider/message/join/attendance/question aggregates, checkpoints projection state, preserves metric-version coexistence, and runs rolling plus retention-horizon reconciliation rebuilds.
-- [ ] Add optional-module-safe Project State transfer for retained `reporting_daily_metrics` (Phase 5B).
-  - Phase 5A makes daily aggregates authoritative retained history; leaving them resettable can lose history older than the 45-day raw-observation rebuild window during a controlled Project State rebuild.
-  - Do not unconditionally add a required Reporting section to the current Project State contract: Reporting is optional and required configured tables must exist.
-  - Keep `reporting_sessions`, `reporting_observations`, and `reporting_projection_checkpoints` resettable; transfer only the retained aggregate history.
-  - Reconcile a fresh Project State dependency cone before changing the shared transfer contract.
+- [x] Add optional-module-safe Project State transfer for retained `reporting_daily_metrics` (Phase 5B).
+  - Project State v11 adds schema-activated optional sections: absent activation schema omits the section, complete schema activates it, and partial schema fails closed.
+  - Reporting transfers only retained `reporting_daily_metrics`; `reporting_sessions`, `reporting_observations`, and `reporting_projection_checkpoints` remain resettable.
+  - A current-version source document may omit the optional Reporting section when Reporting was not installed there; a Reporting-enabled target imports the rest of the document and applies no Reporting rows.
+  - A document containing an optional Reporting section cannot validate against a target where the Reporting activation schema is absent, preventing silent history loss.
+  - The shared optional-section capability is reusable for future genuinely optional module transfer contracts without making those modules mandatory.
 - [ ] Build the initial Reporting UI with date, series, occurrence, source/campaign/content, device, page revision, and traffic-class filters plus funnel/drop-off, validation, attribution, questions, provider health, and message health.
 - [ ] Add generic external platform measurement comparison only after first-party Reporting is stable.
 

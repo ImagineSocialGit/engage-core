@@ -144,4 +144,110 @@ class ProjectStateFinalArchitectureTest extends TestCase
             $report['errors'],
         );
     }
+
+    public function test_contract_registry_skips_optional_sections_when_activation_schema_is_absent(): void
+    {
+        $sections = config('project_state.sections');
+        $sections['future_optional'] = [
+            'version' => 1,
+            'optional' => true,
+            'activation_tables' => [
+                'future_optional_metrics',
+            ],
+            'tables' => [
+                'future_optional_metrics' => $sections['reporting']['tables']['reporting_daily_metrics'],
+            ],
+        ];
+        config()->set('project_state.sections', $sections);
+
+        $registry = app(ProjectStateContractRegistry::class);
+
+        $this->assertArrayHasKey(
+            'future_optional',
+            $registry->configuredSections(),
+        );
+        $this->assertArrayNotHasKey(
+            'future_optional',
+            $registry->sections(),
+        );
+    }
+
+    public function test_contract_registry_rejects_partially_installed_optional_section_schema(): void
+    {
+        $sections = config('project_state.sections');
+        $sections['future_optional'] = [
+            'version' => 1,
+            'optional' => true,
+            'activation_tables' => [
+                'contacts',
+                'future_optional_metrics',
+            ],
+            'tables' => [
+                'future_optional_metrics' => $sections['reporting']['tables']['reporting_daily_metrics'],
+            ],
+        ];
+        config()->set('project_state.sections', $sections);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            'Optional project-state section [future_optional] has a partially installed activation schema. Missing table(s): future_optional_metrics.'
+        );
+
+        app(ProjectStateContractRegistry::class)->sections();
+    }
+
+    public function test_validator_rejects_known_optional_section_when_target_activation_schema_is_absent(): void
+    {
+        $sections = config('project_state.sections');
+        $sections['future_optional'] = [
+            'version' => 1,
+            'optional' => true,
+            'activation_tables' => [
+                'future_optional_metrics',
+            ],
+            'tables' => [
+                'future_optional_metrics' => $sections['reporting']['tables']['reporting_daily_metrics'],
+            ],
+        ];
+        config()->set('project_state.sections', $sections);
+
+        $manager = app(ProjectStateManager::class);
+        $document = $manager->export();
+        $document['sections']['future_optional'] = [
+            'version' => 1,
+            'tables' => [
+                'future_optional_metrics' => [],
+            ],
+        ];
+        $document['checksum'] = app(ProjectStateDocumentCodec::class)->checksum($document);
+
+        $report = $manager->validate($document);
+
+        $this->assertFalse($report['valid']);
+        $this->assertContains(
+            'Optional project-state section [future_optional] is present in the document but its activation schema is not installed on the target.',
+            $report['errors'],
+        );
+    }
+
+    public function test_contract_registry_rejects_malformed_optional_section_configuration(): void
+    {
+        $sections = config('project_state.sections');
+        $sections['future_optional'] = [
+            'version' => 1,
+            'optional' => null,
+            'tables' => [
+                'future_optional_metrics' => $sections['reporting']['tables']['reporting_daily_metrics'],
+            ],
+        ];
+        config()->set('project_state.sections', $sections);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            'Project-state section configuration is invalid.'
+        );
+
+        app(ProjectStateContractRegistry::class)->configuredSections();
+    }
+
 }

@@ -44,7 +44,19 @@ class ProjectStateImporter
                 $sections = $this->contractRegistry->sections();
 
                 foreach ($sections as $sectionKey => $section) {
-                    $tables = $document['sections'][$sectionKey]['tables'];
+                    $documentSection = $document['sections'][$sectionKey] ?? null;
+
+                    if (! is_array($documentSection)) {
+                        if ($section['optional']) {
+                            continue;
+                        }
+
+                        throw new RuntimeException(
+                            "Required project-state section [{$sectionKey}] is missing during import."
+                        );
+                    }
+
+                    $tables = $documentSection['tables'];
 
                     foreach ($section['tables'] as $table => $definition) {
                         $rows = $tables[$table];

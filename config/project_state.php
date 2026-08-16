@@ -2,7 +2,7 @@
 
 return [
     'format' => 'engage-core-project-state',
-    'version' => 10,
+    'version' => 11,
 
     /*
     |--------------------------------------------------------------------------
@@ -49,5 +49,6 @@ return [
         'automation_opportunities' => require __DIR__.'/project_state/automation_opportunities.php',
         'automation_events' => require __DIR__.'/project_state/automation_events.php',
         'flow_routes' => require __DIR__.'/project_state/flow_routes.php',
+        'reporting' => require __DIR__.'/project_state/reporting.php',
     ],
 ];

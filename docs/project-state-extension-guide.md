@@ -12,7 +12,7 @@ This guide is for developers extending the Project State contract. Operators sho
 
 ```text
 format: engage-core-project-state
-version: 10
+version: 11
 ```
 
 The application accepts only the current root format version and the current version of every configured section. It does not contain in-application translators for older exports.
@@ -20,12 +20,12 @@ The application accepts only the current root format version and the current ver
 Current scope:
 
 ```text
-12 configured sections
-60 transferred tables
-55 explicitly policy-controlled tables
+13 configured section contracts
+61 transferred tables when the optional Reporting schema is installed
+54 explicitly policy-controlled tables
 ```
 
-Mortgage and Scheduling durable data remain outside the transfer contract. Their durable tables are currently guarded by `must_be_empty` policies. Ephemeral Scheduling slot offers and booking holds are also guarded and must be empty before export.
+Reporting is the first schema-activated optional section. Its retained `reporting_daily_metrics` table transfers only when the complete Reporting activation schema is installed; Reporting sessions, raw observations, and projection checkpoints remain resettable. Mortgage and Scheduling durable data remain outside the transfer contract. Their durable tables are currently guarded by `must_be_empty` policies. Ephemeral Scheduling slot offers and booking holds are also guarded and must be empty before export.
 
 ## Authority
 
@@ -101,6 +101,39 @@ Every application table must be exactly one of:
 A table must never be both transferred and policy-controlled. A transferred table must never appear in more than one section.
 
 The coverage contract blocks export when a new migration creates an unclassified table.
+
+### Optional schema-activated sections
+
+A section may be marked `optional` only when its transfer contract belongs to schema that may intentionally be absent from an installation.
+
+Optional sections use explicit activation tables:
+
+```php
+'optional' => true,
+'activation_tables' => [
+    'module_table_a',
+    'module_table_b',
+],
+```
+
+Runtime behavior is closed:
+
+```text
+none of the activation tables exist
+    the section is inactive and omitted from the export/import contract
+
+all activation tables exist
+    the section is active and behaves exactly like a required section
+
+only some activation tables exist
+    Project State fails closed because the optional module schema is partial
+```
+
+An optional section may be absent from a current-version document when the source installation did not have that activation schema. If the target does have the schema, validation and import skip that absent optional section rather than manufacturing state.
+
+The inverse is strict: an export containing a known optional section cannot be imported into a target where that section is inactive; validation fails instead of silently discarding transferred state.
+
+Do not use optional sections to make ordinary required state best-effort. They exist for genuinely optional installed schema such as Reporting. A transferred table from an optional section must still not appear in `table_policies`; non-transferred tables from that module still need explicit policies.
 
 ### Transfer the table when
 

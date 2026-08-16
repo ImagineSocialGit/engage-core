@@ -31,7 +31,7 @@ class InboundMessagingProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(10, $document['version']);
+        $this->assertSame(11, $document['version']);
         $this->assertCount(
             1,
             $document['sections']['inbound_messaging']['tables']['inbound_messages'],

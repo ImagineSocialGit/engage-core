@@ -947,7 +947,7 @@ Tests should use generic fixtures. Do not make Slam Dunk, Rob, or another client
 
 ## Project State
 
-Reporting session, raw-observation, aggregate, and projector tables currently remain outside the Project State transfer artifact.
+Project State v11 transfers retained Reporting aggregate history through a schema-activated optional `reporting` section.
 
 ```text
 reporting_sessions
@@ -957,17 +957,15 @@ reporting_observations
     privacy-limited raw observations intentionally reset
 
 reporting_daily_metrics
-    now retained/authoritative aggregate history; Project State transfer is required before retained history is relied on across controlled rebuilds
+    retained/authoritative aggregate history transfers
 
 reporting_projection_checkpoints
     derived-work coordination intentionally resets and can be rebuilt
 ```
 
-Phase 5A makes `reporting_daily_metrics` authoritative retained history, so its current `resettable` Project State policy is now a known pre-production transfer gap rather than the desired final contract.
+The optional section activates only when the complete Reporting foundation schema is installed. If none of its activation tables exist, Project State omits the Reporting section; if only part of the activation schema exists, Project State fails closed. A current-version source document may omit the Reporting section when Reporting was not installed there, and a Reporting-enabled target simply applies no Reporting rows from that document. A document that does contain the Reporting section cannot validate against a target where that optional schema is absent, so retained history is never silently discarded.
 
-Do not solve that gap by unconditionally adding a required `reporting` Project State section. Reporting is optional, while the current Project State section contract requires every configured section table to exist. A global required section would therefore make Project State unsafe for clients that intentionally do not install Reporting.
-
-Phase 5B must add retained Reporting aggregate transfer in an optional-module-safe way after reconciling the current Project State infrastructure. Until that lands, a controlled Project State rebuild may discard Reporting history that is older than the raw-observation rebuild window.
+This preserves Reporting's Core-only optional-module architecture while allowing its 25-month aggregate history to survive controlled clean rebuilds. Raw interaction evidence and projector coordination remain intentionally rebuildable/resettable.
 
 ## Existing producer privacy debt
 
@@ -1107,9 +1105,11 @@ A short rolling rebuild runs every ten minutes for late-changing provider/delive
 
 ### Phase 5B — Retained aggregate Project State transfer
 
-Before the initial CRM UI is treated as durable across controlled database rebuilds, add optional-module-safe Project State transfer for `reporting_daily_metrics`.
+Implemented through Project State v11.
 
-Do not transfer ephemeral sessions, raw observations, or projection checkpoints merely to preserve aggregate history.
+The shared Project State contract now supports schema-activated optional sections. Reporting uses that capability to transfer only `reporting_daily_metrics` when the complete Reporting foundation schema is installed. An absent source Reporting schema omits the section and remains importable into a Reporting-enabled target without manufacturing Reporting rows; a partial target schema fails closed; and a document containing Reporting history cannot validate against a target where the Reporting schema is absent.
+
+Ephemeral sessions, raw observations, and projection checkpoints remain resettable and are not transferred merely to preserve aggregate history.
 
 ### Phase 6 — Initial Reporting UI
 
@@ -1121,7 +1121,7 @@ Add provider-neutral external measurement import/adapter support only after the 
 
 ## Current status
 
-Current repository state through Phase 5A:
+Current repository state through Phase 5B:
 
 ```text
 Reporting depends only on Core
@@ -1143,11 +1143,13 @@ public_funnel daily projection combines likely-human browser behavior with autho
 safe Webinar question distributions persist keys/version only and exclude answer_text/labels
 projection is deterministic/idempotent and maintains a versioned checkpoint
 short rolling and daily retention-horizon reconciliation rebuilds are scheduler-owned
+Project State v11 transfers retained reporting_daily_metrics through a schema-activated optional Reporting section
+reporting_sessions, reporting_observations, and reporting_projection_checkpoints remain resettable
 no Reporting CRM UI exists yet
 current Reporting, Webinar, and Messaging dependency cones have no detected module-boundary violations
 ```
 
-Phase 5B is the required durability closeout before Phase 6 builds the first Reporting CRM workspace over these aggregates.
+The backend Reporting foundation is now durable enough for Phase 6 to build the first Reporting CRM workspace over these aggregates.
 
 ## Deferred possibilities
 

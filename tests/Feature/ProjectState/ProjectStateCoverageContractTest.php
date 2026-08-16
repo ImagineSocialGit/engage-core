@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\ProjectState;
 
+use App\Support\ProjectState\ProjectStateContractRegistry;
 use App\Support\ProjectState\ProjectStateManager;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Schema\Builder as SchemaBuilder;
@@ -19,7 +20,7 @@ class ProjectStateCoverageContractTest extends TestCase
 
     public function test_every_application_table_is_exported_or_has_an_explicit_policy(): void
     {
-        $exportedTables = collect(config('project_state.sections'))
+        $exportedTables = collect(app(ProjectStateContractRegistry::class)->sections())
             ->flatMap(fn (array $section): array => array_keys($section['tables']))
             ->values()
             ->all();
@@ -201,7 +202,7 @@ class ProjectStateCoverageContractTest extends TestCase
 
         $document = app(ProjectStateManager::class)->export();
 
-        $this->assertSame(10, $document['version']);
+        $this->assertSame(11, $document['version']);
         $this->assertArrayNotHasKey(
             'inbound_message_receipts',
             $document['sections']['core']['tables'],

@@ -71,11 +71,7 @@ return [
     ],
     'reporting_observations' => [
         'mode' => 'resettable',
-        'reason' => 'Privacy-limited raw Reporting observations intentionally reset during Project State rebuilds in the foundation phase.',
-    ],
-    'reporting_daily_metrics' => [
-        'mode' => 'resettable',
-        'reason' => 'Reporting aggregate transfer support is deferred until projections populate retained historical metrics; foundation rows intentionally reset.',
+        'reason' => 'Privacy-limited raw Reporting observations intentionally reset; retained daily aggregates transfer separately.',
     ],
     'reporting_projection_checkpoints' => [
         'mode' => 'resettable',

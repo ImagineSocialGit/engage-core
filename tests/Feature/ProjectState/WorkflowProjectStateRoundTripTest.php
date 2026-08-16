@@ -41,7 +41,7 @@ class WorkflowProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(10, $document['version']);
+        $this->assertSame(11, $document['version']);
         $this->assertCount(
             1,
             $document['sections']['workflow']['tables']['contact_workflow_profiles'],

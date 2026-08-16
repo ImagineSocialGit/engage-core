@@ -36,13 +36,13 @@ class ProjectStateInfrastructureExtractionTest extends TestCase
         $this->assertSame($document['checksum'], $codec->checksum($document));
     }
 
-    public function test_contract_registry_exposes_the_normalized_version_ten_contract(): void
+    public function test_contract_registry_exposes_the_normalized_version_eleven_contract(): void
     {
         $registry = app(ProjectStateContractRegistry::class);
         $sections = $registry->sections();
 
         $this->assertSame('engage-core-project-state', $registry->format());
-        $this->assertSame(10, $registry->version());
+        $this->assertSame(11, $registry->version());
         $this->assertEquals([
             'core',
             'internal_notifications',
@@ -56,6 +56,7 @@ class ProjectStateInfrastructureExtractionTest extends TestCase
             'automation_opportunities',
             'automation_events',
             'flow_routes',
+            'reporting',
         ], array_keys($sections));
         $this->assertEquals(
             ['migrations', 'sqlite_sequence'],

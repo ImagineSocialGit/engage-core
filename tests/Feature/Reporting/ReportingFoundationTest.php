@@ -214,14 +214,27 @@ class ReportingFoundationTest extends TestCase
         $this->assertEquals(['source' => 'test'], $checkpoint->meta);
     }
 
-    public function test_reporting_foundation_tables_have_explicit_project_state_reset_policies(): void
+    public function test_reporting_project_state_contract_transfers_only_retained_daily_metrics(): void
     {
         $policies = config('project_state.table_policies');
+        $section = config('project_state.sections.reporting');
+
+        $this->assertTrue($section['optional'] ?? false);
+        $this->assertEquals([
+            'reporting_sessions',
+            'reporting_observations',
+            'reporting_daily_metrics',
+            'reporting_projection_checkpoints',
+        ], $section['activation_tables'] ?? []);
+        $this->assertArrayHasKey(
+            'reporting_daily_metrics',
+            $section['tables'] ?? [],
+        );
+        $this->assertArrayNotHasKey('reporting_daily_metrics', $policies);
 
         foreach ([
             'reporting_sessions',
             'reporting_observations',
-            'reporting_daily_metrics',
             'reporting_projection_checkpoints',
         ] as $table) {
             $this->assertSame('resettable', $policies[$table]['mode'] ?? null);
