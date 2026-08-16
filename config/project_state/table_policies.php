@@ -65,6 +65,23 @@ return [
         'reason' => 'Module installation and migration bookkeeping belongs to the target environment.',
     ],
 
+    'reporting_sessions' => [
+        'mode' => 'resettable',
+        'reason' => 'Ephemeral first-party Reporting session correlation intentionally resets during Project State rebuilds.',
+    ],
+    'reporting_observations' => [
+        'mode' => 'resettable',
+        'reason' => 'Privacy-limited raw Reporting observations intentionally reset during Project State rebuilds in the foundation phase.',
+    ],
+    'reporting_daily_metrics' => [
+        'mode' => 'resettable',
+        'reason' => 'Reporting aggregate transfer support is deferred until projections populate retained historical metrics; foundation rows intentionally reset.',
+    ],
+    'reporting_projection_checkpoints' => [
+        'mode' => 'resettable',
+        'reason' => 'Reporting projection checkpoints are local derived-work coordination and intentionally reset during Project State rebuilds.',
+    ],
+
     'mortgage_stages' => [
         'mode' => 'must_be_empty',
         'reason' => 'Mortgage transfer support has not been added yet.',

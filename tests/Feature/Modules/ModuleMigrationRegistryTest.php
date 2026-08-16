@@ -39,12 +39,20 @@ class ModuleMigrationRegistryTest extends TestCase
             'campaigns',
             'broadcasts',
             'webinars',
+            'reporting',
             'mortgage',
         ], array_keys($registry->modules()));
 
         $this->assertFalse($registry->hasModule('dashboard'));
         $this->assertFalse($registry->hasModule('integrations'));
-        $this->assertFalse($registry->hasModule('reporting'));
+        $this->assertTrue($registry->hasModule('reporting'));
+        $this->assertSame(
+            'database/migrations/modules/reporting',
+            $registry->requireModule('reporting')->path,
+        );
+        $this->assertEquals([
+            '2026_08_15_063500_create_reporting_foundation_tables.php',
+        ], $registry->requireModule('reporting')->migrationFiles);
         $this->assertSame(
             'database/migrations/verticals/mortgage',
             $registry->requireModule('mortgage')->path,
@@ -65,7 +73,7 @@ class ModuleMigrationRegistryTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertCount(94, $currentFiles);
+        $this->assertCount(95, $currentFiles);
         $this->assertEquals($currentFiles, $registry->migrationFiles());
 
         foreach ($currentFiles as $migrationFile) {

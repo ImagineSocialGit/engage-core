@@ -55,7 +55,18 @@ class ModuleMigrationPlanningAndStatusTest extends TestCase
             'core',
             'reporting',
         ], $reporting->dependencyOrderedModuleKeys);
-        $this->assertEquals(['core'], $reporting->migrationModuleKeys());
+        $this->assertEquals([
+            'core',
+            'reporting',
+        ], $reporting->migrationModuleKeys());
+
+        $integrations = app(ModuleMigrationPlanner::class)->forModule('integrations');
+
+        $this->assertEquals([
+            'core',
+            'integrations',
+        ], $integrations->dependencyOrderedModuleKeys);
+        $this->assertEquals(['core'], $integrations->migrationModuleKeys());
     }
 
     public function test_planner_rejects_unknown_modules_and_dependency_cycles(): void

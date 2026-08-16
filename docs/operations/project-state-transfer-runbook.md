@@ -21,7 +21,7 @@ format: engage-core-project-state
 version: 10
 ```
 
-The current implementation transfers 60 tables in 12 dependency-ordered sections and explicitly classifies 44 excluded tables.
+The current implementation transfers 60 tables in 12 dependency-ordered sections and explicitly classifies 55 excluded tables.
 
 The CRM surface is owner-only:
 

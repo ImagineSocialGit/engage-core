@@ -96,12 +96,29 @@ class ModuleMigrationsSetupValidationContributorTest extends TestCase
         );
     }
 
-    public function test_schema_free_enabled_modules_do_not_create_false_migration_errors(): void
+    public function test_reporting_now_requires_its_owned_schema_to_be_tracked(): void
     {
         config()->set('modules.enabled', ['reporting']);
 
+        $findings = $this->findings();
+        $modules = array_column($findings, 'module');
+
+        $this->assertContains('core', $modules);
+        $this->assertContains('reporting', $modules);
+
         $this->assertSame(0, Artisan::call('modules:reconcile', [
             'module' => 'reporting',
+        ]));
+
+        $this->assertEquals([], $this->findings());
+    }
+
+    public function test_schema_free_enabled_modules_do_not_create_false_migration_errors(): void
+    {
+        config()->set('modules.enabled', ['integrations']);
+
+        $this->assertSame(0, Artisan::call('modules:reconcile', [
+            'module' => 'integrations',
         ]));
 
         $this->assertEquals([], $this->findings());

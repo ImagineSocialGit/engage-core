@@ -159,7 +159,6 @@ Current schema-free module definitions are:
 ```text
 dashboard
 integrations
-reporting
 ```
 
 ## Directory layout
@@ -300,7 +299,7 @@ dependency cycles
 empty migration-plan requests
 ```
 
-Schema-free modules remain valid planning targets. For example, Reporting owns no migration scope but depends on Core, so its migration plan contains Core's scope while retaining Reporting in the resolved module closure.
+Schema-free modules remain valid planning targets. For example, Integrations owns no migration scope but depends on Core, so its migration plan contains Core's scope while retaining Integrations in the resolved module closure. Reporting now owns its dedicated `database/migrations/modules/reporting` scope and resolves to Core + Reporting.
 
 Scheduling resolves exactly to:
 

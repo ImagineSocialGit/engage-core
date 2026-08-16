@@ -715,6 +715,10 @@
 │   │   │   ├── Controllers
 │   │   │   ├── Data
 │   │   │   ├── Models
+│   │   │   │   ├── ReportingDailyMetric.php
+│   │   │   │   ├── ReportingObservation.php
+│   │   │   │   ├── ReportingProjectionCheckpoint.php
+│   │   │   │   └── ReportingSession.php
 │   │   │   ├── Providers
 │   │   │   │   └── ReportingModuleServiceProvider.php
 │   │   │   ├── Requests
@@ -1465,6 +1469,8 @@
 │   │   │   │   ├── 2026_04_15_195871_create_portal_contact_links_table.php
 │   │   │   │   ├── 2026_04_15_195872_create_portal_invitations_table.php
 │   │   │   │   └── 2026_04_15_195873_create_portal_access_grants_table.php
+│   │   │   ├── reporting
+│   │   │   │   └── 2026_08_15_063500_create_reporting_foundation_tables.php
 │   │   │   ├── scheduling
 │   │   │   │   ├── 2026_04_15_195859_create_scheduling_hosts_table.php
 │   │   │   │   ├── 2026_04_15_195860_create_bookable_services_table.php
@@ -2021,6 +2027,8 @@
 │   │   │   ├── TasksProjectStateRoundTripTest.php
 │   │   │   ├── WebinarProjectStateRoundTripTest.php
 │   │   │   └── WorkflowProjectStateRoundTripTest.php
+│   │   ├── Reporting
+│   │   │   └── ReportingFoundationTest.php
 │   │   ├── Scheduling
 │   │   │   ├── AppointmentLifecycleActionTest.php
 │   │   │   ├── BookableSlotOfferAndBookingHoldActionTest.php
@@ -2154,4 +2162,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-545 directories, 1610 files
+547 directories, 1616 files

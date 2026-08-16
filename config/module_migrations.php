@@ -236,6 +236,14 @@ return [
             ],
         ],
 
+        'reporting' => [
+            'path' => 'database/migrations/modules/reporting',
+            'schema_version' => 1,
+            'migrations' => [
+                '2026_08_15_063500_create_reporting_foundation_tables.php',
+            ],
+        ],
+
         'mortgage' => [
             'path' => 'database/migrations/verticals/mortgage',
             'schema_version' => 1,

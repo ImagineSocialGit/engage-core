@@ -22,7 +22,7 @@ Current scope:
 ```text
 12 configured sections
 60 transferred tables
-44 explicitly policy-controlled tables
+55 explicitly policy-controlled tables
 ```
 
 Mortgage and Scheduling durable data remain outside the transfer contract. Their durable tables are currently guarded by `must_be_empty` policies. Ephemeral Scheduling slot offers and booking holds are also guarded and must be empty before export.
