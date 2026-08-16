@@ -20,6 +20,9 @@ use App\Support\Presets\Contracts\PresetContributor;
 use App\Support\Presets\PresetCompositionResolver;
 use App\Support\Presets\PresetContributionRegistry;
 use App\Support\Presets\PresetPackageResolver;
+use App\Support\Reporting\Contracts\ReportingObservationRecorder;
+use App\Support\Reporting\ReportingEventDefinitionRegistry;
+use App\Support\Reporting\Services\NoopReportingObservationRecorder;
 use App\Support\SetupValidation\Contributors\ConfigContractsSetupValidationContributor;
 use App\Support\SetupValidation\Contributors\ModuleDependenciesSetupValidationContributor;
 use App\Support\SetupValidation\Contributors\ModuleMigrationsSetupValidationContributor;
@@ -53,6 +56,17 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(AutomationActionRegistry::class, function ($app): AutomationActionRegistry {
             return new AutomationActionRegistry(
                 handlers: $app->tagged('automation.action_handlers'),
+            );
+        });
+
+        $this->app->singleton(
+            ReportingObservationRecorder::class,
+            NoopReportingObservationRecorder::class,
+        );
+
+        $this->app->singleton(ReportingEventDefinitionRegistry::class, function ($app): ReportingEventDefinitionRegistry {
+            return new ReportingEventDefinitionRegistry(
+                contributors: $app->tagged('reporting.event_definition_contributors'),
             );
         });
 

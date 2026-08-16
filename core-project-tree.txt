@@ -711,9 +711,16 @@
 │   │   │   └── Support
 │   │   ├── Reporting
 │   │   │   ├── Actions
+│   │   │   │   └── RecordReportingObservationAction.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
+│   │   │   │   └── Public
+│   │   │   │       └── ReportingObservationController.php
 │   │   │   ├── Data
+│   │   │   │   ├── NormalizedReportingAttribution.php
+│   │   │   │   └── ReportingRequestClassification.php
+│   │   │   ├── EventDefinitions
+│   │   │   │   └── ConfigReportingEventDefinitionContributor.php
 │   │   │   ├── Models
 │   │   │   │   ├── ReportingDailyMetric.php
 │   │   │   │   ├── ReportingObservation.php
@@ -722,7 +729,14 @@
 │   │   │   ├── Providers
 │   │   │   │   └── ReportingModuleServiceProvider.php
 │   │   │   ├── Requests
-│   │   │   └── Support
+│   │   │   ├── Services
+│   │   │   │   ├── ReportingAttributionNormalizer.php
+│   │   │   │   ├── ReportingBrowserRequestClassifier.php
+│   │   │   │   ├── ReportingPublicCollectionPolicy.php
+│   │   │   │   └── ReportingSessionResolver.php
+│   │   │   ├── Support
+│   │   │   └── Validation
+│   │   │       └── ReportingSetupValidationContributor.php
 │   │   ├── Scheduling
 │   │   │   ├── Actions
 │   │   │   │   ├── CancelAppointmentAction.php
@@ -1187,6 +1201,17 @@
 │       │   └── ProjectStateSchemaGuard.php
 │       ├── Queues
 │       │   └── QueueContract.php
+│       ├── Reporting
+│       │   ├── Contracts
+│       │   │   ├── ReportingEventDefinitionContributor.php
+│       │   │   └── ReportingObservationRecorder.php
+│       │   ├── Data
+│       │   │   ├── ReportingEventDefinition.php
+│       │   │   ├── ReportingObservationData.php
+│       │   │   └── ReportingObservationResult.php
+│       │   ├── ReportingEventDefinitionRegistry.php
+│       │   └── Services
+│       │       └── NoopReportingObservationRecorder.php
 │       ├── SetupValidation
 │       │   ├── Contracts
 │       │   │   └── SetupValidationContributor.php
@@ -1302,6 +1327,7 @@
 │   │   ├── keys.php
 │   │   └── tokens.php
 │   ├── reminders.php
+│   ├── reporting.php
 │   ├── scheduling.php
 │   ├── security.php
 │   ├── services.php
@@ -1638,9 +1664,11 @@
 │   │           └── register
 │   ├── js
 │   │   ├── app.js
-│   │   └── pages
-│   │       ├── flow-route-editor.js
-│   │       └── webinar-registration.js
+│   │   ├── pages
+│   │   │   ├── flow-route-editor.js
+│   │   │   └── webinar-registration.js
+│   │   └── reporting
+│   │       └── client.js
 │   └── views
 │       ├── auth
 │       │   └── login.blade.php
@@ -2028,7 +2056,10 @@
 │   │   │   ├── WebinarProjectStateRoundTripTest.php
 │   │   │   └── WorkflowProjectStateRoundTripTest.php
 │   │   ├── Reporting
-│   │   │   └── ReportingFoundationTest.php
+│   │   │   ├── ReportingBrowserClientContractTest.php
+│   │   │   ├── ReportingFoundationTest.php
+│   │   │   ├── ReportingObservationFoundationTest.php
+│   │   │   └── ReportingPublicTransportTest.php
 │   │   ├── Scheduling
 │   │   │   ├── AppointmentLifecycleActionTest.php
 │   │   │   ├── BookableSlotOfferAndBookingHoldActionTest.php
@@ -2162,4 +2193,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-547 directories, 1616 files
+556 directories, 1638 files

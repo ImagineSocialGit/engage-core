@@ -129,7 +129,7 @@ Reporting
     -> provider-specific Zoom tables/payloads
 ```
 
-The exact shared contract/class names are implementation details for the foundation batch, but the dependency direction is locked here.
+The neutral shared observation seam is implemented under `app/Support/Reporting` through `ReportingObservationRecorder`, `ReportingEventDefinitionContributor`, `ReportingEventDefinition`, `ReportingObservationData`, and `ReportingEventDefinitionRegistry`. The app-level default recorder is a no-op; enabling Reporting replaces only that implementation. Producer modules therefore never need to import `App\Modules\Reporting`.
 
 ## Two input paths
 
@@ -155,6 +155,18 @@ bot-protection outcome
 Browser observations are untrusted input.
 
 The browser may propose only fields permitted by the selected event definition. The server owns trusted values such as effective host/surface, received time, normalized path, classification, definition version, and any server-known Webinar/page context.
+
+Current transport:
+
+```text
+POST /_reporting/observations
+```
+
+The route is Reporting-owned, stateless, and registered only while Reporting is enabled. It does not use Laravel's browser session or a persistent analytics cookie. The request must carry an exact same-origin `Origin`; when `Sec-Fetch-Site` is present it must also be `same-origin`. Public eligibility is defined by the selected versioned event definition: both the normalized surface and exact `browser_hosts` entry must match the request. A definition with no `browser_hosts` cannot be collected through the browser endpoint.
+
+The generic browser client lives at `resources/js/reporting/client.js`. It performs no automatic page tracking. Producer/public-surface code must deliberately call it with an approved event definition. It stores only one opaque random token in `sessionStorage`; if storage or secure browser randomness is unavailable, collection falls back to an uncorrelated page-only observation.
+
+Throttling may use the request IP transiently. Rate-limit cache keys use only a one-way hash scoped to the request host, and that value is never persisted into Reporting. Public responses expose only bounded status/error codes and never Reporting row IDs or submitted values.
 
 ### 2. Producer-owned durable fact contributors
 
@@ -196,7 +208,7 @@ Operational logging has a separate short-retention privacy boundary. Reporting m
 
 ## Initial durable Reporting concepts
 
-The first implementation is expected to introduce these Reporting-owned tables:
+Reporting currently owns these durable tables:
 
 ```text
 reporting_sessions
@@ -211,7 +223,7 @@ A later external-comparison slice may add:
 reporting_external_measurements
 ```
 
-Exact migration columns and indexes are finalized in the observation-foundation implementation batch. The semantic ownership below is already fixed.
+Their bounded privacy-first columns and indexes are implemented in the Reporting module migration. The semantic ownership below remains the durable contract.
 
 ### `reporting_sessions`
 
@@ -299,6 +311,7 @@ Each definition owns:
 stable event key
 definition version
 allowed public surfaces/contexts
+exact browser host allowlist for public collection
 allowed property keys
 property types/enums/bounds
 trusted server-derived fields
@@ -328,7 +341,7 @@ same event UUID replayed with conflicting normalized content
     reject as a conflict
 ```
 
-Exact numeric payload/property limits belong in executable Reporting configuration in the observation-foundation batch. Do not invent large permissive defaults merely to make ingestion convenient.
+Executable Reporting configuration now owns hard payload/property ceilings. Runtime code clamps those values to the documented privacy/security maximums even if client config is broadened incorrectly.
 
 Browser-supplied timestamps may be retained only as bounded event timing context. Server receipt time remains authoritative for ingestion and abuse controls.
 
@@ -503,6 +516,8 @@ confidence/bucket when the classifier supplies one
 The exact classifier implementation may use narrow FOSS-derived device/bot parsing patterns, but no external analytics platform is required.
 
 Browser code cannot assert `likely_human` itself.
+
+The current classifier is the bounded server-owned `request_signals_v1` implementation. It parses the full request user agent transiently, retains only coarse device/browser/OS families, and discards the full string. Recognized browser-family syntax plus same-origin Fetch Metadata may classify as `likely_human`; explicit automation/headless/crawler request signatures classify as `likely_automated`; missing or ambiguous signals remain `unknown`. The classifier is deliberately conservative and versioned so a later parser can replace it without changing historical meaning.
 
 Imported, page-only/uncorrelated, unknown, and likely-automated traffic remain visible in Reporting. They do not silently enter the primary likely-human conversion denominator.
 
@@ -839,38 +854,42 @@ Do not let Reporting ingestion become a generic arbitrary JSON endpoint.
 
 Failures should not echo sensitive submitted values back into logs or Reporting rows.
 
-## Planned Reporting configuration contract
+## Reporting configuration contract
 
-The executable config is added with the observation foundation. The durable categories are fixed here so config does not grow ad hoc.
+The executable contract now lives in `config/reporting.php`. Keep these concerns bounded rather than growing an ad hoc analytics configuration surface.
 
-Expected top-level concerns:
+Current top-level concerns:
 
 ```text
 reporting.collection
-    public browser collection enablement
-    allowed hosts/surfaces
+    browser_enabled
 
-reporting.sessions
-    inactivity minutes = 30
-    absolute max minutes = 240
-
-reporting.attribution
-    allowed attribution keys
-    approved click-ID hash definitions/secrets by reference
-
-reporting.classification
-    parser/classifier selection and bounded retained fields
-
-reporting.retention
-    raw observation days = 45
-    diagnostic days = 90
-    aggregate months = 25
+reporting.session
+    inactivity_minutes = 30
+    absolute_minutes = 240
+    bounded ephemeral token length
 
 reporting.ingestion
-    request/event/property size and rate limits
+    request/event/property limits
+    occurred_at tolerance
+    allowed sources
+    per-IP and per-session public rate limits
 
-reporting.projections
-    batch/rebuild/pruning controls
+reporting.attribution
+    canonical UTM allowlist
+    bounded path/host/value lengths
+    explicitly approved click-ID keys and dedicated hash key
+
+reporting.classification
+    browser_classifier = request_signals_v1
+
+reporting.retention
+    raw_observations_days = 45
+    diagnostics_days = 90
+    daily_aggregate_months = 25
+
+reporting.events
+    versioned event definitions including surfaces, exact browser_hosts, session mode, property schema, and funnel eligibility
 ```
 
 Runtime module availability remains owned by `client/[CLIENT_KEY]/config/modules.php`.
@@ -926,23 +945,23 @@ Tests should use generic fixtures. Do not make Slam Dunk, Rob, or another client
 
 ## Project State
 
-Reporting currently has no durable tables, so there is no Reporting Project State section today.
-
-When Reporting persistence is introduced, the same schema batch must explicitly classify every new Reporting table for Project State before production data depends on it.
-
-Do not assume all Reporting data should automatically transfer.
-
-The classification must distinguish:
+The four current Reporting foundation tables are explicitly classified `resettable` in Project State. They are not exported/imported as durable client configuration today:
 
 ```text
-raw browser observations that cannot be reconstructed
-short-lived session correlation state
-derived daily metrics that may be rebuildable
-projection checkpoints that may be rebuildable/resettable
-external imported measurements that may or may not be reproducible
+reporting_sessions
+    ephemeral correlation resets
+
+reporting_observations
+    privacy-limited raw observations reset during the foundation phase
+
+reporting_daily_metrics
+    aggregate transfer remains deferred until retained projections are populated
+
+reporting_projection_checkpoints
+    derived-work coordination resets
 ```
 
-If the chosen policy permits losing a category during a controlled clean rebuild, that loss must be explicit in the Project State contract and operations documentation.
+A later retained-history requirement may deliberately revise the aggregate transfer contract, but it must do so explicitly rather than silently treating all Reporting data as Project State.
 
 ## Existing producer privacy debt
 
@@ -998,7 +1017,7 @@ implementation phases
 
 ### Phase 2 — Observation foundation
 
-Implement:
+Complete. Implemented:
 
 ```text
 shared Reporting contracts/registry + no-op recorder
@@ -1013,20 +1032,22 @@ Project State policy for new tables
 focused boundary/privacy/schema tests
 ```
 
-Do not yet instrument every Webinar interaction.
+No Webinar interaction instrumentation is part of this phase.
 
 ### Phase 3 — Public transport and traffic classification
 
-Implement:
+Complete. Implemented:
 
 ```text
 same-origin public observation endpoint
 lightweight browser client
-host/surface allowlisting
-throttling and payload limits
+per-event exact browser-host and surface allowlisting
+stateless same-origin Origin enforcement
+scoped per-IP/per-session throttling and payload limits
 transient user-agent parsing
-traffic classification
-page-only fallback
+coarse server-owned request-signals-v1 traffic classification
+sessionStorage-only anonymous token with page-only fallback
+safe non-authoritative failure responses
 ```
 
 ### Phase 4 — Webinar behavioral funnel
@@ -1080,21 +1101,25 @@ Add provider-neutral external measurement import/adapter support only after the 
 
 ## Current status
 
-Current repository state at contract lock:
+Current repository state through Phase 3:
 
 ```text
-ReportingModuleServiceProvider exists
 Reporting depends only on Core
-no Reporting migrations
-no Reporting models
-no Reporting routes/controllers/views
-no Reporting ingestion
-no Reporting projections
-no Reporting tests specific to Reporting runtime
-no detected Reporting module-boundary violations in the supplied dependency cone
+four Reporting foundation tables/models are owned and registered
+shared observation/event-definition seams are app-level and no-op when Reporting is disabled
+idempotent normalized observation recording is implemented
+host-scoped ephemeral sessions and attribution normalization are implemented
+POST /_reporting/observations is the generic stateless public transport
+resources/js/reporting/client.js is the generic fail-open browser client
+public collection requires an event-definition surface plus exact browser_hosts match
+request classification is server-owned and persists only coarse bounded results
+no Webinar-specific Reporting instrumentation exists yet
+no producer-fact projections exist yet
+no Reporting CRM UI exists yet
+current Reporting dependency cone has no detected module-boundary violations
 ```
 
-The observability prerequisite is already separate and complete enough to proceed. Reporting implementation should now begin with Phase 2 rather than reopening operational Nginx/Laravel logging as Reporting storage.
+Phase 4 is the first producer-specific use case: Webinars will contribute definitions/instrumentation through neutral Reporting seams without becoming a Reporting dependency and without Reporting importing Webinar internals.
 
 ## Deferred possibilities
 
@@ -1120,18 +1145,12 @@ Add one only when a concrete client workflow proves the value and the privacy/ow
 
 ## Open implementation decisions
 
-The following are intentionally left to the implementation batches because the current sources do not justify choosing them yet:
+The following remain intentionally open until their concrete phases provide authoritative producer/runtime sources:
 
 ```text
-exact PHP class/interface names for shared Reporting recorder/contributor seams
-exact migration columns/indexes within the locked table concepts
-browser transport mechanism details
-exact numeric ingestion/property size limits
-exact coarse browser/OS taxonomy
-exact classifier/confidence storage representation
-exact configured UTM/source allowlist
+exact producer-fact contributor DTO/registry shape
 exact Messaging state mapping for confirmation planning success/coverage
-Project State transfer policy per Reporting table
+projection/rebuild/pruning operational controls beyond the checkpoint foundation
 exact external measurement dimensions/provider adapter contract
 ```
 

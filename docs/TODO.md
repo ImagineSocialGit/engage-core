@@ -1,3 +1,4 @@
+
 # Engage Core TODO
 
 ## Config generation lock-in
@@ -544,12 +545,10 @@ Completed contract work:
 
 ### Reporting implementation sequence
 
-- [ ] Build the observation foundation.
-  - Add shared Reporting contracts/registry and a no-op recorder when Reporting is disabled.
-  - Add Reporting config, migrations/models, idempotent ingestion, session resolution, attribution normalization, projection checkpoints, setup validation, and explicit Project State policy for every new Reporting table.
-  - Add focused module-boundary, schema, privacy, replay/conflict, session-expiry, attribution, projection, and retention tests.
-- [ ] Add public transport and traffic classification.
-  - Same-origin endpoint, lightweight browser client, allowed host/surface checks, scoped throttling, hard payload limits, transient user-agent parsing, traffic classification, and page-only fallback.
+- [x] Build the observation foundation.
+  - Shared no-op/real recorder binding, versioned event definitions, four Reporting foundation tables/models, idempotent ingestion, host-scoped sessions, attribution normalization, setup validation, and explicit Project State reset policies are implemented and green.
+- [x] Add public transport and traffic classification.
+  - Generic stateless `POST /_reporting/observations`, fail-open browser client, per-event exact browser-host/surface allowlisting, same-origin enforcement, scoped throttling, hard payload limits, transient user-agent parsing, conservative server-owned traffic classification, and page-only fallback are implemented without Webinar-module coupling.
 - [ ] Add the Webinar behavioral funnel after reconciling a fresh Webinar dependency cone and current frontend entry points.
   - Landing view, CTA click, modal open, form start, submit attempt, normalized validation failures, completion correlation, throttling, bot-protection outcome, and page revision.
 - [ ] Add durable producer projections.
