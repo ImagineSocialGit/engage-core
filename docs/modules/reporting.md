@@ -1052,22 +1052,26 @@ safe non-authoritative failure responses
 
 ### Phase 4 — Webinar behavioral funnel
 
-After reconciling the fresh Webinar/frontend source:
+Complete. Implemented through the Webinar-owned producer integration:
 
 ```text
-landing view
-CTA click
-modal open
+landing/page view
+CTA click with bounded location
+modal open with bounded reason
 form start
 submission attempt
 normalized validation failures
-local completion correlation
+bounded submit-attempt UUID correlation
 throttling outcome
 bot-protection outcome
-page revision/context
+page revision and registration presentation
 ```
 
-Do not make browser events authoritative for completed registration state.
+Webinars contributes versioned event definitions through `App\Support\Reporting` only. It does not import `App\Modules\Reporting`, and Reporting does not import Webinar internals.
+
+The submit-attempt UUID is producer-owned bounded request provenance. The browser uses the same UUID as the `webinar.form.submit_attempt` observation identity, while a newly created Webinar registration stores only that UUID for later authoritative completion correlation. The Reporting session token is never copied into Webinar state.
+
+Browser events remain non-authoritative for completed registration state. Phase 5 must still project the durable local completion from Webinar-owned authority.
 
 ### Phase 5 — Durable producer projections
 
@@ -1101,7 +1105,7 @@ Add provider-neutral external measurement import/adapter support only after the 
 
 ## Current status
 
-Current repository state through Phase 3:
+Current repository state through Phase 4:
 
 ```text
 Reporting depends only on Core
@@ -1113,13 +1117,15 @@ POST /_reporting/observations is the generic stateless public transport
 resources/js/reporting/client.js is the generic fail-open browser client
 public collection requires an event-definition surface plus exact browser_hosts match
 request classification is server-owned and persists only coarse bounded results
-no Webinar-specific Reporting instrumentation exists yet
+Webinars contributes namespaced browser funnel definitions through App\Support\Reporting only
+the Webinar registration page records page/CTA/modal/form/validation/throttle/bot diagnostics with bounded properties
+submit-attempt UUID correlation is available without copying the Reporting session token into Webinar state
 no producer-fact projections exist yet
 no Reporting CRM UI exists yet
-current Reporting dependency cone has no detected module-boundary violations
+current Reporting and Webinar dependency cones have no detected module-boundary violations
 ```
 
-Phase 4 is the first producer-specific use case: Webinars will contribute definitions/instrumentation through neutral Reporting seams without becoming a Reporting dependency and without Reporting importing Webinar internals.
+Phase 5 adds the first authoritative producer read/projection seam. That phase must reconcile the then-current Webinar and Messaging authority before defining normalized durable fact DTOs.
 
 ## Deferred possibilities
 

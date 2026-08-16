@@ -53,6 +53,64 @@
             && ($story['is_enabled'] ?? true) !== false
         )
         ->values();
+    $reportingPresentation = data_get($registrationPage, 'presentation', 'modal');
+    $reportingPresentation = in_array($reportingPresentation, ['modal', 'inline'], true)
+        ? $reportingPresentation
+        : 'modal';
+
+    $reportingPageRevision = data_get(
+        $registrationPage,
+        'page_revision',
+        'webinar-register-v1',
+    );
+    $reportingPageRevision = is_string($reportingPageRevision)
+        && trim($reportingPageRevision) !== ''
+            ? mb_substr(trim($reportingPageRevision), 0, 80)
+            : 'webinar-register-v1';
+
+    $reportingThrottleReason = session('webinar_registration_throttle_reason');
+    $reportingThrottleReason = is_string($reportingThrottleReason)
+        && in_array($reportingThrottleReason, [
+            'ip_minute',
+            'ip_hour',
+            'email_hour',
+            'phone_hour',
+        ], true)
+            ? $reportingThrottleReason
+            : null;
+
+    $reportingBotProtectionOutcome = $errors->has('registration_form')
+        ? 'server_rejected'
+        : null;
+
+    $reportingValidationFields = collect($errors->keys())
+        ->reject(fn (string $field): bool =>
+            $field === 'registration_form'
+            || $reportingThrottleReason !== null
+        )
+        ->map(function (string $field): string {
+            if (str_starts_with($field, 'registration_questions.')) {
+                return 'registration_question';
+            }
+
+            return match ($field) {
+                'first_name' => 'first_name',
+                'last_name' => 'last_name',
+                'email' => 'email',
+                'phone' => 'phone',
+                'webinar_id' => 'webinar',
+                'transactional_consent',
+                'transactional_email_consent',
+                'transactional_sms_consent' => 'transactional_consent',
+                'marketing_consent',
+                'marketing_email_consent',
+                'marketing_sms_consent' => 'marketing_consent',
+                'public_submission_attempt_id' => 'submission_attempt',
+                default => 'other',
+            };
+        })
+        ->unique()
+        ->values();
 @endphp
 
 <x-layouts.public
@@ -107,6 +165,14 @@
             'formOpen' => $errors->any(),
             'transactionalSmsConsent' => (bool) old('transactional_sms_consent'),
             'marketingSmsConsent' => (bool) old('marketing_sms_consent'),
+            'reporting' => [
+                'enabled' => module_enabled('reporting'),
+                'pageRevision' => $reportingPageRevision,
+                'presentation' => $reportingPresentation,
+                'validationFields' => $reportingValidationFields->all(),
+                'throttleReason' => $reportingThrottleReason,
+                'botProtectionOutcome' => $reportingBotProtectionOutcome,
+            ],
         ]))"
         class="{{ $style['section'] ?? 'bg-white' }}"
         >
@@ -279,7 +345,7 @@
                         <div class="mt-6 flex flex-col items-center gap-4">
                             <x-ui.button
                                 type="button"
-                                @click="formOpen = true"
+                                @click="openRegistrationForm('secondary')"
                                 class="{{ $tokens['secondary_button'] ?? 'w-full' }}"
                                 
                             >
@@ -497,7 +563,7 @@
                         <div class="{{ $style['final_close']['cta_wrapper'] ?? 'mt-10 flex flex-col items-center gap-4' }}">
                             <x-ui.button
                                 type="button"
-                                @click="formOpen = true"
+                                @click="openRegistrationForm('final_close')"
                                 class="{{ $tokens['secondary_button'] ?? 'w-full' }}"
                             >
                                 {{ $page['final_close']['label'] ?? 'Lock In My Spot Now' }}
@@ -542,7 +608,7 @@
 
                 <x-ui.button
                     type="button"
-                    @click="formOpen = true"
+                    @click="openRegistrationForm('mobile_primary')"
                     class="{{ $tokens['primary_button'] ?? 'w-full' }}"
                 >
                     {{ $page['primary_cta']['label'] ?? 'Save My Seat' }}

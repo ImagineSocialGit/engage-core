@@ -1,4 +1,3 @@
-
 # Engage Core TODO
 
 ## Config generation lock-in
@@ -549,8 +548,10 @@ Completed contract work:
   - Shared no-op/real recorder binding, versioned event definitions, four Reporting foundation tables/models, idempotent ingestion, host-scoped sessions, attribution normalization, setup validation, and explicit Project State reset policies are implemented and green.
 - [x] Add public transport and traffic classification.
   - Generic stateless `POST /_reporting/observations`, fail-open browser client, per-event exact browser-host/surface allowlisting, same-origin enforcement, scoped throttling, hard payload limits, transient user-agent parsing, conservative server-owned traffic classification, and page-only fallback are implemented without Webinar-module coupling.
-- [ ] Add the Webinar behavioral funnel after reconciling a fresh Webinar dependency cone and current frontend entry points.
-  - Landing view, CTA click, modal open, form start, submit attempt, normalized validation failures, completion correlation, throttling, bot-protection outcome, and page revision.
+- [x] Add the Webinar behavioral funnel after reconciling a fresh Webinar dependency cone and current frontend entry points.
+  - Webinar-owned namespaced definitions now cover landing/page view, CTA click, modal open, form start, submit attempt, normalized validation failures, throttling, bot-protection outcome, and page revision/presentation.
+  - A bounded public submission-attempt UUID is shared between the browser submit observation and newly created Webinar registration provenance for later authoritative completion correlation; no Reporting session token is copied into Webinar state.
+  - Webinars imports only neutral `App\Support\Reporting` contracts; Reporting remains Core-only and does not import Webinar internals.
 - [ ] Add durable producer projections.
   - Webinars: local completion, provider finalization, trusted joins, attendance finalization, and safe question distributions.
   - Messaging: confirmation planning/deduplication/coverage and terminal delivery outcomes through current immutable authority, not copied ScheduledMessage payload/meta.

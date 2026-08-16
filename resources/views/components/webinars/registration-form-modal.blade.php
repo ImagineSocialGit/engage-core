@@ -381,6 +381,7 @@
                     hasExplicitRequiredTransactionalChannels: @js($hasExplicitRequiredTransactionalChannels),
                     registrationFormReady: '',
                     registrationFormInteracted: '',
+                    submissionAttemptId: '',
                     transactionalConsentError: false,
                     submitting: false,
                     hasRequiredTransactionalConsent() {
@@ -398,10 +399,30 @@
 
                         return true
                     },
+                    markRegistrationFormInteracted() {
+                        this.registrationFormInteracted = @js($botInteractionValue)
+                        this.recordRegistrationFormStart()
+                    },
                     submitRegistration(event) {
+                        const attemptId = this.prepareRegistrationSubmitAttempt(
+                            Boolean(this.registrationFormReady),
+                            Boolean(this.registrationFormInteracted),
+                        )
+
+                        this.submissionAttemptId = attemptId ?? ''
+
+                        const attemptInput = event.currentTarget?.elements?.namedItem(
+                            'public_submission_attempt_id',
+                        )
+
+                        if (attemptInput instanceof HTMLInputElement) {
+                            attemptInput.value = this.submissionAttemptId
+                        }
+
                         if (! this.hasRequiredTransactionalConsent()) {
                             event.preventDefault()
                             this.transactionalConsentError = true
+                            this.recordRegistrationValidationFailure(['transactional_consent'])
                             this.$nextTick(() => this.$refs.transactionalConsentGroup?.focus())
 
                             return
@@ -409,19 +430,21 @@
 
                         if (! this.registrationFormReady || ! this.registrationFormInteracted) {
                             event.preventDefault()
+                            this.recordBotProtectionResult('client_rejected')
 
                             return
                         }
 
+                        this.recordBotProtectionResult('client_passed')
                         this.submitting = true
                     },
                 }"
                 x-init="window.setTimeout(() => registrationFormReady = @js($botReadyValue), 750)"
-                @focusin="registrationFormInteracted = @js($botInteractionValue)"
-                @input="registrationFormInteracted = @js($botInteractionValue)"
-                @change="registrationFormInteracted = @js($botInteractionValue); transactionalConsentError = false"
-                @keydown="registrationFormInteracted = @js($botInteractionValue)"
-                @pointerdown="registrationFormInteracted = @js($botInteractionValue)"
+                @focusin="markRegistrationFormInteracted()"
+                @input="markRegistrationFormInteracted()"
+                @change="markRegistrationFormInteracted(); transactionalConsentError = false"
+                @keydown="markRegistrationFormInteracted()"
+                @pointerdown="markRegistrationFormInteracted()"
                 @submit="submitRegistration($event)"
             >
                 @csrf
@@ -436,6 +459,12 @@
                     type="hidden"
                     name="registration_form_interacted"
                     x-model="registrationFormInteracted"
+                >
+
+                <input
+                    type="hidden"
+                    name="public_submission_attempt_id"
+                    x-model="submissionAttemptId"
                 >
 
                 <div

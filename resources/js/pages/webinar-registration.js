@@ -1,4 +1,29 @@
+const REPORTING_SURFACE = 'webinar_registration'
+const REPORTING_EVENT_VERSION = 1
+
+function normalizedString(value, fallback = null) {
+    return typeof value === 'string' && value.trim() !== ''
+        ? value.trim()
+        : fallback
+}
+
+function normalizedStringList(values) {
+    if (!Array.isArray(values)) {
+        return []
+    }
+
+    return Array.from(new Set(
+        values
+            .filter((value) => typeof value === 'string' && value.trim() !== '')
+            .map((value) => value.trim()),
+    ))
+}
+
 export default function webinarRegistrationPage(config = {}) {
+    const reporting = typeof config.reporting === 'object' && config.reporting !== null
+        ? config.reporting
+        : {}
+
     return {
         formOpen: Boolean(config.formOpen),
         showStickyCta: false,
@@ -13,19 +38,168 @@ export default function webinarRegistrationPage(config = {}) {
         registrationModalPreviouslyFocusedElement: null,
         registrationModalPreviousBodyOverflow: null,
 
+        reportingEnabled: reporting.enabled !== false,
+        reportingPageRevision: normalizedString(reporting.pageRevision, 'webinar-register-v1'),
+        reportingPresentation: normalizedString(reporting.presentation, 'modal'),
+        reportingValidationFields: normalizedStringList(reporting.validationFields),
+        reportingThrottleReason: normalizedString(reporting.throttleReason),
+        reportingBotProtectionOutcome: normalizedString(reporting.botProtectionOutcome),
+        reportingFormStarted: false,
+        reportingLastCtaLocation: null,
+
         init() {
             this.initializeCountdown()
             this.initializeStickyCta()
+            this.recordReportingEvent('webinar.page.view')
+
+            if (this.reportingValidationFields.length > 0) {
+                this.recordRegistrationValidationFailure(this.reportingValidationFields)
+            }
+
+            if (this.reportingThrottleReason) {
+                this.recordReportingEvent('webinar.request.throttled', {
+                    reason: this.reportingThrottleReason,
+                })
+            }
+
+            if (this.reportingBotProtectionOutcome) {
+                this.recordBotProtectionResult(this.reportingBotProtectionOutcome)
+            }
 
             this.$watch('formOpen', (isOpen) => {
                 this.handleRegistrationModalState(isOpen)
+
+                if (isOpen) {
+                    this.recordRegistrationModalOpen(
+                        this.reportingLastCtaLocation ?? 'unknown',
+                    )
+                }
             })
 
             if (this.formOpen) {
                 this.$nextTick(() => {
                     this.handleRegistrationModalState(true)
+                    this.recordRegistrationModalOpen('validation_return')
                 })
             }
+        },
+
+        reportingProperties(properties = {}) {
+            return {
+                page_revision: this.reportingPageRevision,
+                presentation: this.reportingPresentation,
+                ...properties,
+            }
+        },
+
+        recordReportingEvent(eventKey, properties = {}, options = {}) {
+            const client = window.EngageReporting
+
+            if (!this.reportingEnabled || !client || typeof client.record !== 'function') {
+                return Promise.resolve({
+                    status: 'disabled',
+                    eventId: options.eventId ?? null,
+                })
+            }
+
+            return client.record({
+                enabled: true,
+                eventId: options.eventId ?? null,
+                eventKey,
+                eventVersion: REPORTING_EVENT_VERSION,
+                surface: REPORTING_SURFACE,
+                properties: this.reportingProperties(properties),
+                keepalive: Boolean(options.keepalive),
+            })
+        },
+
+        createReportingEventId() {
+            if (!this.reportingEnabled) {
+                return null
+            }
+
+            const client = window.EngageReporting
+
+            return client && typeof client.createEventId === 'function'
+                ? client.createEventId()
+                : null
+        },
+
+        openRegistrationForm(location) {
+            this.reportingLastCtaLocation = normalizedString(location, 'unknown')
+
+            this.recordReportingEvent('webinar.cta.click', {
+                cta_location: this.reportingLastCtaLocation,
+            })
+
+            this.formOpen = true
+        },
+
+        recordRegistrationModalOpen(openReason) {
+            if (this.reportingPresentation !== 'modal') {
+                return
+            }
+
+            this.recordReportingEvent('webinar.modal.open', {
+                open_reason: normalizedString(openReason, 'unknown'),
+            })
+        },
+
+        recordRegistrationFormStart() {
+            if (this.reportingFormStarted) {
+                return
+            }
+
+            this.reportingFormStarted = true
+            this.recordReportingEvent('webinar.form.start')
+        },
+
+        prepareRegistrationSubmitAttempt(botReady, botInteracted) {
+            const eventId = this.createReportingEventId()
+
+            this.recordReportingEvent(
+                'webinar.form.submit_attempt',
+                {
+                    bot_ready: Boolean(botReady),
+                    bot_interacted: Boolean(botInteracted),
+                },
+                {
+                    eventId,
+                    keepalive: true,
+                },
+            )
+
+            return eventId
+        },
+
+        recordRegistrationValidationFailure(fields) {
+            const fieldKeys = normalizedStringList(fields)
+
+            if (fieldKeys.length === 0) {
+                return
+            }
+
+            this.recordReportingEvent('webinar.form.validation_failed', {
+                field_keys: fieldKeys,
+            })
+        },
+
+        recordBotProtectionResult(outcome) {
+            const normalizedOutcome = normalizedString(outcome)
+
+            if (!normalizedOutcome) {
+                return
+            }
+
+            this.recordReportingEvent(
+                'webinar.bot_protection.result',
+                {
+                    outcome: normalizedOutcome,
+                },
+                {
+                    keepalive: true,
+                },
+            )
         },
 
         initializeCountdown() {

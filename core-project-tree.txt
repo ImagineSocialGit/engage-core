@@ -986,6 +986,8 @@
 │   │   │   ├── Enums
 │   │   │   │   ├── WebinarProviderEventType.php
 │   │   │   │   └── WebinarTag.php
+│   │   │   ├── EventDefinitions
+│   │   │   │   └── WebinarBehaviorEventDefinitionContributor.php
 │   │   │   ├── Jobs
 │   │   │   │   ├── CancelWebinarRegistrationWithProviderJob.php
 │   │   │   │   ├── NotifyWebinarWaitlistJob.php
@@ -2171,6 +2173,7 @@
 │   │   │   ├── WebinarRegistrationThankYouTest.php
 │   │   │   ├── WebinarRegistrationTrustVariantTest.php
 │   │   │   ├── WebinarReplacementPublicLifecycleTest.php
+│   │   │   ├── WebinarReportingFunnelContractTest.php
 │   │   │   ├── WebinarResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── WebinarScheduleProfileDefinitionResolverMessageAreaTest.php
 │   │   │   ├── WebinarScheduleProfileMessageChainSyncTest.php
@@ -2193,4 +2196,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-556 directories, 1638 files
+557 directories, 1640 files

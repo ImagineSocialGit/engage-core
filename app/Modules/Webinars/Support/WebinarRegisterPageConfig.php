@@ -12,6 +12,8 @@ class WebinarRegisterPageConfig
      * @var array<int, string>
      */
     public const REGISTRATION_CONTENT_KEYS = [
+        'presentation',
+        'page_revision',
         'form_card',
         'consents',
         'consent_header',

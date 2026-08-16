@@ -10,6 +10,7 @@ use App\Modules\Webinars\ConfigContracts\WebinarsConfigContractTargetProvider;
 use App\Modules\Webinars\Console\Commands\ImportWebinarRegistrationsCommand;
 use App\Modules\Webinars\Console\Commands\SyncWebinarScheduleProfilesCommand;
 use App\Modules\Webinars\Jobs\RecoverWebinarRegistrationFinalizationsJob;
+use App\Modules\Webinars\EventDefinitions\WebinarBehaviorEventDefinitionContributor;
 use App\Modules\Webinars\Services\ContactPanels\WebinarContactPanelProvider;
 use App\Modules\Webinars\Services\Dashboard\WebinarActivityDashboardPanelProvider;
 use App\Modules\Webinars\Services\WebinarMessageChainExecutionContextProvider;
@@ -32,6 +33,7 @@ class WebinarsModuleServiceProvider extends ServiceProvider
         'company_website',
         'registration_form_ready',
         'registration_form_interacted',
+        'public_submission_attempt_id',
     ];
 
     public function register(): void
@@ -66,6 +68,11 @@ class WebinarsModuleServiceProvider extends ServiceProvider
             WebinarMessageChainSetupValidationContributor::class,
             WebinarsSetupValidationContributor::class,
         ], 'setup.validation_contributors');
+
+        $this->app->tag(
+            WebinarBehaviorEventDefinitionContributor::class,
+            'reporting.event_definition_contributors',
+        );
     }
 
     public function boot(): void
@@ -129,12 +136,14 @@ class WebinarsModuleServiceProvider extends ServiceProvider
                 Limit::perMinute($perIpPerMinute)
                     ->by('webinar-public:ip-minute:'.$ipIdentity)
                     ->response($this->webinarRegistrationThrottleResponse(
+                        'ip_minute',
                         'email',
                         'Too many attempts. Please wait a moment and try again.',
                     )),
                 Limit::perHour($perIpPerHour)
                     ->by('webinar-public:ip-hour:'.$ipIdentity)
                     ->response($this->webinarRegistrationThrottleResponse(
+                        'ip_hour',
                         'email',
                         'Too many attempts from this connection. Please try again later.',
                     )),
@@ -151,6 +160,7 @@ class WebinarsModuleServiceProvider extends ServiceProvider
                         $email,
                     )))
                     ->response($this->webinarRegistrationThrottleResponse(
+                        'email_hour',
                         'email',
                         'Too many attempts for this email. Please wait and try again.',
                     ));
@@ -167,6 +177,7 @@ class WebinarsModuleServiceProvider extends ServiceProvider
                         $phone,
                     )))
                     ->response($this->webinarRegistrationThrottleResponse(
+                        'phone_hour',
                         'phone',
                         'Too many attempts for this phone number. Please wait and try again.',
                     ));
@@ -196,12 +207,16 @@ class WebinarsModuleServiceProvider extends ServiceProvider
         return hash_hmac('sha256', $material, $key);
     }
 
-    private function webinarRegistrationThrottleResponse(string $field, string $message): callable
-    {
-        return function (Request $request, array $headers) use ($field, $message) {
+    private function webinarRegistrationThrottleResponse(
+        string $reasonCode,
+        string $field,
+        string $message,
+    ): callable {
+        return function (Request $request, array $headers) use ($reasonCode, $field, $message) {
             return redirect()
                 ->back()
                 ->withInput($request->except(self::SENSITIVE_PUBLIC_FORM_FIELDS))
+                ->with('webinar_registration_throttle_reason', $reasonCode)
                 ->withErrors([
                     $field => $message,
                 ])

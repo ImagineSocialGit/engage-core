@@ -44,8 +44,21 @@ class WebinarRegistrationFrontendContractTest extends TestCase
             'submitRegistration(event)',
             'transactionalConsentError',
             'x-bind:disabled="submitting || ! registrationFormReady"',
+            'name="public_submission_attempt_id"',
+            'prepareRegistrationSubmitAttempt(',
+            'markRegistrationFormInteracted()',
         ] as $contract) {
             $this->assertStringContainsString($contract, $formView);
+        }
+
+        foreach ([
+            'openRegistrationForm(',
+            'recordRegistrationFormStart(',
+            'prepareRegistrationSubmitAttempt(',
+            'recordRegistrationValidationFailure(',
+            'recordBotProtectionResult(',
+        ] as $reportingContract) {
+            $this->assertStringContainsString($reportingContract, $script);
         }
 
         $combined = strtolower($pageView.$formView);

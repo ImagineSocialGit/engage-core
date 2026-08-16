@@ -155,6 +155,13 @@ return [
     ],
 
     'registration' => [
+        /*
+         * Presentation and revision are stable, bounded Reporting dimensions.
+         * They are producer-owned page metadata, not Reporting module config.
+         */
+        'presentation' => 'modal',
+        'page_revision' => 'webinar-register-v1',
+
         'disclosures' => [
             'items' => [
                 'sms_terms' => [

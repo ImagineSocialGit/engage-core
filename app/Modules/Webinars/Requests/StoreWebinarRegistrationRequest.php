@@ -128,6 +128,7 @@ class StoreWebinarRegistrationRequest extends FormRequest
             self::HONEYPOT_FIELD => ['nullable', 'string', 'max:255'],
             self::READY_FIELD => ['nullable', 'string', 'max:20'],
             self::INTERACTION_FIELD => ['nullable', 'string', 'max:20'],
+            'public_submission_attempt_id' => ['nullable', 'uuid'],
         ];
 
         return array_replace(

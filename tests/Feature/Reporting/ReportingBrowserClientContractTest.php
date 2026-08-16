@@ -22,6 +22,8 @@ class ReportingBrowserClientContractTest extends TestCase
         $this->assertStringContainsString('new URL(document.referrer).hostname', $client);
         $this->assertStringContainsString("credentials: 'same-origin'", $client);
         $this->assertStringContainsString("status: 'unavailable'", $client);
+        $this->assertStringContainsString('createEventId()', $client);
+        $this->assertStringContainsString("status: 'disabled'", $client);
         $this->assertStringContainsString("status: response.ok ? 'accepted' : 'rejected'", $client);
         $this->assertStringNotContainsString('traffic_class', $client);
         $this->assertStringNotContainsString('browser_family', $client);

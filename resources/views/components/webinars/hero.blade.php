@@ -304,7 +304,7 @@
 
                     <x-ui.button
                         type="button"
-                        @click="formOpen = true"
+                        @click="openRegistrationForm('hero')"
                         class="{{ $tokens['primary_button'] ?? 'w-full' }}"
                     >
                         {{ $primaryCta['label'] ?? 'Save My Seat' }}

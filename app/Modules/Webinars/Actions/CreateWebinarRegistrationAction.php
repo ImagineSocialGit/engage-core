@@ -164,6 +164,11 @@ class CreateWebinarRegistrationAction
                 // as anonymous visitor identity.
                 'request_ip' => $request->ip(),
                 'user_agent' => $request->userAgent(),
+                'public_submission_attempt_id' => is_string(
+                    $validated['public_submission_attempt_id'] ?? null,
+                )
+                    ? strtolower(trim($validated['public_submission_attempt_id']))
+                    : null,
                 'accepted_channels' => [
                     'transactional' => $this->acceptedChannels(
                         validated: $validated,

@@ -32,7 +32,7 @@
 
         <button
             type="button"
-            @click="formOpen = true"
+            @click="openRegistrationForm('sticky_desktop')"
             class="{{ $card['cta'] ?? '' }}"
         >
             {{ $content['sticky_desktop']['label'] ?? 'Save My Seat' }}

@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -573,7 +574,48 @@ class WebinarRegistrationControllerTest extends TestCase
 
         $response->assertRedirect(route('webinar.show', $series->slug));
         $response->assertSessionHasErrors('email');
+        $response->assertSessionHas(
+            'webinar_registration_throttle_reason',
+            'ip_minute',
+        );
         $this->assertDatabaseCount('webinar_registrations', 1);
+    }
+
+    public function test_new_registration_persists_only_the_bounded_public_submission_attempt_id_for_reporting_correlation(): void
+    {
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'reporting-correlation',
+        ]);
+
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->id,
+            'starts_at' => now()->addDay(),
+            'external_id' => null,
+        ]);
+
+        $attemptId = (string) Str::uuid();
+
+        $response = $this->from(route('webinar.show', $series->slug))
+            ->post(
+                $this->registrationUrl($series, $webinar),
+                $this->registrationPayload([
+                    'public_submission_attempt_id' => $attemptId,
+                ]),
+            );
+
+        $this->assertRegistrationThankYouRedirect($response, $series);
+
+        $registration = WebinarRegistration::query()->firstOrFail();
+
+        $this->assertSame(
+            $attemptId,
+            data_get($registration->meta, 'public_submission_attempt_id'),
+        );
+        $this->assertArrayNotHasKey(
+            'reporting_session_token',
+            is_array($registration->meta) ? $registration->meta : [],
+        );
     }
 
     public function test_show_resolves_public_layout_image_client_key_from_client_config(): void

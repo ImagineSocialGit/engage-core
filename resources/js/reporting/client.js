@@ -93,7 +93,18 @@ export function createReportingClient(options = {}) {
         : DEFAULT_QUERY_KEYS
 
     return {
+        createEventId() {
+            return browserUuid()
+        },
+
         async record(event = {}) {
+            if (event.enabled === false) {
+                return {
+                    status: 'disabled',
+                    eventId: event.eventId ?? null,
+                }
+            }
+
             const eventId = event.eventId ?? browserUuid()
 
             if (!eventId || !event.eventKey || !event.eventVersion || !event.surface) {
