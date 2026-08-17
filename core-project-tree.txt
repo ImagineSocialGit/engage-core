@@ -367,9 +367,11 @@
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   │   └── External
-│   │   │   │       └── ExternalFormIntakeController.php
+│   │   │   │       ├── ExternalFormIntakeController.php
+│   │   │   │       └── ExternalPublishedFormController.php
 │   │   │   ├── Data
 │   │   │   │   ├── ExternalFormIntakeClient.php
+│   │   │   │   ├── ExternalPublishedForm.php
 │   │   │   │   ├── FormPresetSyncResult.php
 │   │   │   │   ├── FormSubmissionInput.php
 │   │   │   │   ├── FormSubmissionResult.php
@@ -1927,6 +1929,7 @@
 │   │   │   ├── ArtisanTestEnvironmentBootstrapTest.php
 │   │   │   ├── ClientConfigFallbackTest.php
 │   │   │   ├── ClientEnvironmentLoaderTest.php
+│   │   │   ├── ExternalFormsClientEnvironmentContractTest.php
 │   │   │   └── ProjectStateClientEnvironmentContractTest.php
 │   │   ├── Commerce
 │   │   │   └── CommerceFoundationTest.php
@@ -1985,6 +1988,7 @@
 │   │   ├── Forms
 │   │   │   ├── CreateFormSubmissionActionTest.php
 │   │   │   ├── ExternalFormIntakeTest.php
+│   │   │   ├── ExternalPublishedFormTest.php
 │   │   │   ├── FormConfigContractTest.php
 │   │   │   ├── FormPresetSyncTest.php
 │   │   │   ├── FormsFoundationTest.php
@@ -2257,4 +2261,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-585 directories, 1673 files
+585 directories, 1677 files

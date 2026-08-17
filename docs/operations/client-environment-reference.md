@@ -157,6 +157,40 @@ webinar.[ROOT_DOMAIN]
 webhooks.[ROOT_DOMAIN]
 ```
 
+## External Forms server-to-server access
+
+When Engage Sites or another approved first-party server is allowed to read and submit a Core-backed form, the selected client `.env` owns the calling identity and credential values:
+
+```env
+FORMS_EXTERNAL_INTAKE_ENABLED=true
+FORMS_EXTERNAL_INTAKE_CLIENT_ID=engage_sites
+FORMS_EXTERNAL_INTAKE_CLIENT_SECRET=
+FORMS_EXTERNAL_INTAKE_SOURCE=engage_sites
+FORMS_EXTERNAL_INTAKE_PROVIDER=engage_sites
+FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS=artist_updates
+```
+
+These values configure the signed application-to-application boundary used by both:
+
+```text
+GET  https://webhooks.[ROOT_DOMAIN]/forms/{form_key}
+POST https://webhooks.[ROOT_DOMAIN]/forms/{form_key}/submissions
+```
+
+`FORMS_EXTERNAL_INTAKE_CLIENT_SECRET` is server-only and must not be rendered into browser HTML or JavaScript. The client ID identifies the authenticated caller. `SOURCE` and `PROVIDER` are server-owned attribution/idempotency values, and `ALLOWED_FORMS` is an exact comma-separated allowlist of form keys.
+
+The root/process environment continues to own the shared signed-request and abuse controls documented in `.env.example`:
+
+```text
+FORMS_EXTERNAL_INTAKE_MAX_BODY_BYTES
+FORMS_EXTERNAL_INTAKE_MAX_TIMESTAMP_DRIFT_SECONDS
+FORMS_EXTERNAL_INTAKE_NONCE_TTL_SECONDS
+FORMS_EXTERNAL_INTAKE_UNAUTHENTICATED_RATE_LIMIT_PER_MINUTE
+FORMS_EXTERNAL_INTAKE_CLIENT_RATE_LIMIT_PER_MINUTE
+```
+
+Do not put those process-wide controls into every selected-client `.env` merely for symmetry.
+
 ---
 
 # 4. Application locale and timezone
@@ -855,6 +889,7 @@ Before deleting an existing live environment variable, search the full repositor
 [ ] Webinars/Zoom provider and credentials correct when enabled
 [ ] setup user values handled securely
 [ ] PROJECT_STATE_ADMIN_EMAIL is blank or matches the deliberately authorized CRM owner
+[ ] External Forms client identity/secret/allowlist are populated only when external Forms access is enabled
 [ ] staging credentials only used where intended
 [ ] php artisan optimize:clear run after client/env changes
 [ ] php artisan setup:validate passes

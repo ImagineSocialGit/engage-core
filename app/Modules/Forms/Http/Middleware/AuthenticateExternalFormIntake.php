@@ -69,7 +69,16 @@ final class AuthenticateExternalFormIntake
             );
         }
 
-        if (! $request->isJson()) {
+        if ($request->isMethod('GET') && $request->getContent() !== '') {
+            return $this->error(
+                request: $request,
+                status: 400,
+                code: 'unexpected_request_body',
+                message: 'External published-form reads must not contain a request body.',
+            );
+        }
+
+        if (! $request->isMethod('GET') && ! $request->isJson()) {
             return $this->error(
                 request: $request,
                 status: 415,
@@ -137,7 +146,7 @@ final class AuthenticateExternalFormIntake
                 request: $request,
                 status: 403,
                 code: 'form_not_allowed',
-                message: 'This external intake client is not allowed to submit the requested form.',
+                message: 'This external Forms client is not allowed to access the requested form.',
             );
         }
 

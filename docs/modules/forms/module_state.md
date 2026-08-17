@@ -401,18 +401,53 @@ The submission runtime stores an internal logical-request fingerprint in `form_s
 
 Engage Sites and other transports should generate one stable external UUID per logical submission attempt and reuse the same UUID after transport uncertainty.
 
-## External server-to-server intake
+## External server-to-server Forms access
 
-Forms exposes a signed first-party intake endpoint on the existing webhook host:
+Forms exposes signed first-party read and submission endpoints on the existing webhook host:
 
 ```text
+GET  https://webhooks.{root_domain}/forms/{form_key}
 POST https://webhooks.{root_domain}/forms/{form_key}/submissions
-Content-Type: application/json
 ```
 
-This is an application-to-application boundary. Engage Sites accepts browser input on its own server and signs the outbound request there. Forms client IDs and shared secrets must never appear in browser JavaScript, HTML, or public configuration.
+This is an application-to-application boundary. Engage Sites accepts browser input on its own server and signs Core requests there. Forms client IDs and shared secrets must never appear in browser JavaScript, HTML, or public configuration.
 
-The JSON request contract is:
+### Published-form read
+
+The GET endpoint resolves the exact current active, public, non-archived published FormVersion through `PublishedFormResolver`. It has an empty request body and does not require a `Content-Type` header. It never falls back to an older historical version.
+
+The successful response contains the presentation-safe contract:
+
+```json
+{
+  "data": {
+    "definition_id": 10,
+    "version_id": 24,
+    "version_number": 3,
+    "key": "artist_updates",
+    "name": "Artist Updates",
+    "description": "Choose the updates you want to receive.",
+    "category": "intake",
+    "is_public": true,
+    "schema": {},
+    "rules": {},
+    "layout": {},
+    "settings": {},
+    "fields": []
+  },
+  "request_id": "..."
+}
+```
+
+The HTTP response maps the internal transport-neutral `PublishedForm` into `ExternalPublishedForm`; it does not serialize an Eloquent model. `schema`, `rules`, `layout`, and normalized `fields` come from the frozen published version.
+
+Only `FormVersion.settings.public` is exposed as response `data.settings`. Server-owned siblings such as `settings.submission.contact`, `settings.submission.tags`, future execution mappings, or any other internal settings remain private. A Core-backed presentation or disclosure setting must be deliberately authored beneath `settings.public` before an external renderer may receive it.
+
+Published-form responses use `Cache-Control: private, no-store`. A trusted server-side caller may maintain its own bounded application cache after authenticating and validating the response.
+
+### Completed submission
+
+The POST endpoint requires `Content-Type: application/json`. Its request contract is:
 
 ```json
 {
@@ -439,7 +474,9 @@ The JSON request contract is:
 
 Visitor provenance is evidence, not durable replay identity. A legitimate retry may therefore carry different or absent provenance and still replay the original submission; the first accepted submission retains its original snapshots. Unknown envelope or provenance keys fail validation.
 
-Every request includes:
+### Shared authentication contract
+
+Every GET or POST request includes:
 
 ```text
 X-Engage-Client
@@ -460,9 +497,9 @@ v1
 {lowercase_sha256_of_exact_raw_body}
 ```
 
-The canonical string uses literal line-feed separators and no trailing line feed. For the current route the method is `POST` and the path is `/forms/{form_key}/submissions`.
+The canonical string uses literal line-feed separators and no trailing line feed. GET signs an empty body and path `/forms/{form_key}`. POST signs the exact JSON bytes sent to `/forms/{form_key}/submissions`.
 
-Authentication fails closed for unknown clients, stale timestamps, malformed nonces, or invalid signatures. Each client has a server-owned source, provider, and exact form allowlist. Setup validation requires every allowed form to resolve as the exact current active, published, public FormVersion.
+Authentication fails closed for unknown clients, stale timestamps, malformed nonces, invalid signatures, or replayed request nonces. Each client has a server-owned source, provider, and exact form allowlist. Setup validation requires every allowed form to resolve as the exact current active, published, public FormVersion.
 
 Two replay controls have deliberately different lifetimes:
 
@@ -477,7 +514,7 @@ provider + external_id
     A conflicting retry returns external_id_conflict.
 ```
 
-After transport uncertainty, the caller reuses the same `external_id` but generates a new timestamp, nonce, and signature. The endpoint then returns HTTP 200 with `data.replayed = true`; a newly created submission returns HTTP 201.
+After POST transport uncertainty, the caller reuses the same `external_id` but generates a new timestamp, nonce, and signature. The endpoint then returns HTTP 200 with `data.replayed = true`; a newly created submission returns HTTP 201.
 
 Known error responses use one stable JSON envelope:
 
@@ -494,11 +531,11 @@ Known error responses use one stable JSON envelope:
 }
 ```
 
-Relevant statuses include 400 for malformed JSON, 401 for authentication failure, 403 for a form outside the client allowlist, 404 when external intake is disabled, 409 for replay/conflict, 413 for body size, 415 for content type, 422 for envelope or form-value validation, 429 for rate limiting, and 503 for fail-closed runtime unavailability.
+Relevant statuses include 400 for malformed JSON or an invalid GET body, 401 for authentication failure, 403 for a form outside the client allowlist, 404 when external access is disabled, 409 for replay/conflict, 413 for body size, 415 for POST content type, 422 for envelope or form-value validation, 429 for rate limiting, and 503 for fail-closed runtime/form unavailability.
 
-External intake configuration lives under `forms.external_intake`. Client configuration may be supplied through selected-client config for multiple callers, or through the single-client environment variables documented in `.env.example`. Secrets must contain at least 32 bytes. Provider identities must be unique across configured clients because provider is the durable external-idempotency namespace.
+External access configuration lives under `forms.external_intake`. Client configuration may be supplied through selected-client config for multiple callers, or through the single-client environment variables documented in `.env.example`. Secrets must contain at least 32 bytes. Provider identities must be unique across configured clients because provider is the durable external-idempotency namespace.
 
-The shared provider webhook inbox is not used for this endpoint. A completed `FormSubmission` is the canonical durable intake record, including the exact raw and normalized answers; creating a second durable transport receipt would duplicate ownership without improving replay safety.
+The shared provider webhook inbox is not used for these endpoints. A completed `FormSubmission` is the canonical durable intake record, including the exact raw and normalized answers; creating a second durable transport receipt would duplicate ownership without improving replay safety.
 
 ## Contact and tag mapping
 
