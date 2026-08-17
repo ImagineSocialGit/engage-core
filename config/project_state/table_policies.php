@@ -67,7 +67,7 @@ return [
 
     'reporting_external_measurements' => [
         'mode' => 'resettable',
-        'reason' => 'External platform aggregate measurements are re-importable in the Phase 7A foundation and are not retained through Project State until import/adapters become authoritative.',
+        'reason' => 'External platform aggregate measurements now have an authoritative manual CSV import path but remain re-importable/resettable until the retained-history lifecycle is promoted in the follow-up Project State batch.',
     ],
 
     'reporting_sessions' => [

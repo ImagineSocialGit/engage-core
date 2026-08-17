@@ -110,7 +110,8 @@ class ReportingFoundationTest extends TestCase
         ]);
 
         $this->assertTableHasColumns('reporting_external_measurements', [
-            'measurement_date',
+            'period_start',
+            'period_end',
             'platform',
             'account_id',
             'account_timezone',
@@ -121,6 +122,7 @@ class ReportingFoundationTest extends TestCase
             'group_name',
             'creative_name',
             'placement',
+            'identity_quality',
             'currency',
             'impressions',
             'reach',
@@ -131,6 +133,8 @@ class ReportingFoundationTest extends TestCase
             'result_type',
             'results',
             'source',
+            'source_file_hash',
+            'meta',
             'identity_hash',
             'imported_at',
         ]);

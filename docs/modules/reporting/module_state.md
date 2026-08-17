@@ -294,11 +294,11 @@ Projection code must be safe to rerun without double-counting.
 
 Provider-neutral aggregate measurements from configured external platforms, not external visitor identities or raw platform event feeds.
 
-Phase 7A stores stable platform/account/campaign/group/creative identity, display names, placement, account timezone, currency, and a bounded common measurement set (impressions, reach, link/outbound clicks, landing-page views, spend, result type/count). Derived rates such as CTR, CPC, CPM, frequency, and cost per result should be computed from base measurements rather than imported as competing sources of truth.
+The external measurement contract stores stable platform/account/campaign/group/creative identity, display names, placement, account timezone, currency, and a bounded common measurement set (impressions, reach, link/outbound clicks, landing-page views, spend, result type/count). Derived rates such as CTR, CPC, CPM, frequency, and cost per result should be computed from base measurements rather than imported as competing sources of truth.
 
 The schema remains provider-neutral. Meta, Google, TikTok, or another platform are adapters; no vendor defines the Reporting domain model. Names may change and are display metadata. Stable platform IDs define the reconciliation identity.
 
-In Phase 7A these rows are re-importable/resettable rather than retained Project State history. That policy should be revisited only after a concrete import/adapter is authoritative.
+Through Phase 7B these rows remain re-importable/resettable rather than retained Project State history. Phase 7B now provides the first authoritative manual CSV import path; Phase 7C will make the separate lifecycle decision to retain imported external history through Project State.
 
 ## Event-definition contract
 
@@ -1116,7 +1116,7 @@ The UI deliberately does not pretend arbitrary cross-filter combinations exist w
 
 ### Phase 7 — Campaign attribution and external platform comparison
 
-Phase 7A establishes a provider-neutral stable attribution identity alongside human-readable UTMs. Browser landing attribution may carry only the canonical transport keys:
+Reporting uses a provider-neutral stable attribution identity alongside human-readable UTMs. Browser landing attribution may carry only the canonical transport keys:
 
 ```text
 engage_platform
@@ -1128,19 +1128,25 @@ engage_placement
 
 These values are normalized into separate external-attribution columns; they do not replace or overload `utm_campaign`, `utm_term`, or `utm_content`. Platform campaign/group/creative IDs are aggregate campaign identity, not visitor identity, and may be stored raw within the configured bounds. Raw click IDs remain a separate explicitly approved + HMAC-only contract.
 
-The `reporting_external_measurements` table is the provider-neutral aggregate landing zone for platform-reported daily campaign/ad measurements such as impressions, reach, link/outbound clicks, landing-page views, spend, and reported result counts. Adapter/import code must normalize provider exports into this schema rather than extending Reporting with Meta/Google/TikTok-specific columns. Names are display metadata; the stable platform IDs define reconciliation identity.
+The `reporting_external_measurements` table is the provider-neutral aggregate landing zone for platform-reported campaign/ad measurements such as impressions, reach, link/outbound clicks, landing-page views, spend, and reported result counts. Phase 7B corrected the original daily-only assumption after reviewing real Meta exports: external measurements use `period_start` + `period_end`, so a CSV can represent an arbitrary reporting window while a daily API row is simply a one-day period.
 
-In 7A the external-measurement table is re-importable/resettable and intentionally not yet retained through Project State. Promote it to retained state only once the import/adapter path is authoritative and production history depends on it.
+Stable platform IDs remain the preferred reconciliation identity, but they are no longer mandatory for historical imports. Rows whose most-specific represented object has a stable ID are labeled `stable_ids`; name-only rows with campaign/ad-set/ad names but no stable IDs are accepted as `name_fallback`. Name-fallback rows are retained and visible, but the CRM does not claim exact automatic ad-to-Engage reconciliation from mutable names alone.
 
-A later 7B slice should add the first concrete adapter/import workflow (Meta CSV is the initial candidate), followed by comparison reads in the CRM workspace.
+Phase 7B adds the first concrete adapter/import workflow for Meta Ads CSV. The parser recognizes Meta's exported headers directly, including dynamic `Results` + `Result indicator` semantics. For example, `actions:link_click` populates link clicks when no explicit link-click column is present, while `actions:omni_landing_page_view` populates landing-page views. Currency may be inferred from headers such as `Amount spent (USD)`. The preview is non-mutating and reports stable-ID versus name-fallback coverage before import.
+
+Preview CSVs are stored only on the local disk long enough to support the review/confirm workflow and are pruned after six hours; the original export is not retained as Reporting history.
+
+The CRM Reporting workspace now shows imported ad-platform periods separately from Engage first-party measurements. Independent source files remain separate comparison groups so separately exported reporting snapshots are not silently combined into one platform total. Exact comparison is produced only for stable-ID rows that match retained campaign slices, including likely-human landing sessions, authoritative correlated registrations, and cost per Engage registration. Platform landing-page views and Engage sessions remain visibly distinct measurements.
+
+The external-measurement table remains re-importable/resettable through 7B. The authoritative manual import path now exists, so the next lifecycle slice should decide whether imported external history moves into retained Project State transfer.
 
 ## Current status
 
-Current repository state through Phase 7A:
+Current repository state through Phase 7B:
 
 ```text
 Reporting depends only on Core
-five Reporting-owned durable tables/models are defined, including the provider-neutral external measurement foundation
+five Reporting-owned durable tables/models are defined, including provider-neutral period-based external measurements
 shared observation/event-definition seams are app-level and no-op when Reporting is disabled
 idempotent normalized observation recording is implemented
 host-scoped ephemeral sessions and attribution normalization are implemented, including separate stable external campaign/group/creative identity alongside readable UTMs
@@ -1159,12 +1165,12 @@ safe Webinar question distributions persist keys/version only and exclude answer
 projection is deterministic/idempotent and maintains a versioned checkpoint
 short rolling and daily retention-horizon reconciliation rebuilds are scheduler-owned
 Project State v11 transfers retained reporting_daily_metrics through a schema-activated optional Reporting section
-reporting_sessions, reporting_observations, reporting_projection_checkpoints, and the still-re-importable reporting_external_measurements foundation remain resettable
+reporting_sessions, reporting_observations, reporting_projection_checkpoints, and re-importable reporting_external_measurements remain resettable
 Reporting now owns a CRM Webinar Registration workspace over retained daily aggregates
 current Reporting, Webinar, and Messaging dependency cones have no detected module-boundary violations
 ```
 
-The first Reporting CRM workspace is implemented over the durable aggregate foundation. Phase 7A now locks stable provider-neutral campaign identity and the external aggregate landing schema. The next Reporting slice is the first concrete import adapter/workflow (Meta CSV first), followed by platform-vs-Engage comparison reads.
+The first Reporting CRM workspace is implemented over the durable aggregate foundation. Phase 7B adds the concrete Meta CSV import/preview flow, period-based external measurement semantics, name-only fallback support, and stable-ID platform-vs-Engage comparison reads. The next Reporting lifecycle slice is retained Project State treatment for authoritative imported external history.
 
 ## Deferred possibilities
 
@@ -1194,7 +1200,6 @@ The following remain intentionally open until their concrete phases provide auth
 
 ```text
 aggregate-before-prune operational controls for raw observation retention
-exact external measurement dimensions/provider adapter contract
 producer fact mappings for Forms, Scheduling, Commerce, and other future public funnels
 ```
 

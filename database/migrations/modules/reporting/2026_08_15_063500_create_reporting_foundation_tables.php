@@ -111,17 +111,19 @@ return new class extends Migration
 
         Schema::create('reporting_external_measurements', function (Blueprint $table): void {
             $table->id();
-            $table->date('measurement_date');
+            $table->date('period_start');
+            $table->date('period_end');
             $table->string('platform', 32);
             $table->string('account_id', 120)->nullable();
             $table->string('account_timezone', 64)->nullable();
-            $table->string('campaign_id', 120);
+            $table->string('campaign_id', 120)->nullable();
             $table->string('group_id', 120)->nullable();
             $table->string('creative_id', 120)->nullable();
             $table->string('campaign_name', 255)->nullable();
             $table->string('group_name', 255)->nullable();
             $table->string('creative_name', 255)->nullable();
             $table->string('placement', 120)->nullable();
+            $table->string('identity_quality', 24);
             $table->char('currency', 3)->nullable();
             $table->unsignedBigInteger('impressions')->nullable();
             $table->unsignedBigInteger('reach')->nullable();
@@ -132,6 +134,8 @@ return new class extends Migration
             $table->string('result_type', 80)->nullable();
             $table->decimal('results', 20, 6)->nullable();
             $table->string('source', 32);
+            $table->char('source_file_hash', 64)->nullable();
+            $table->json('meta')->nullable();
             $table->char('identity_hash', 64);
             $table->timestamp('imported_at', 6);
             $table->timestamps(6);
@@ -141,12 +145,16 @@ return new class extends Migration
                 'reporting_external_measurements_identity_unique',
             );
             $table->index(
-                ['platform', 'measurement_date'],
-                'reporting_external_measurements_platform_date_idx',
+                ['platform', 'period_start', 'period_end'],
+                'reporting_external_measurements_platform_period_idx',
             );
             $table->index(
-                ['platform', 'campaign_id', 'measurement_date'],
-                'reporting_external_measurements_campaign_date_idx',
+                ['platform', 'campaign_id', 'period_start'],
+                'reporting_external_measurements_campaign_period_idx',
+            );
+            $table->index(
+                ['identity_quality', 'period_start'],
+                'reporting_external_measurements_quality_period_idx',
             );
         });
 

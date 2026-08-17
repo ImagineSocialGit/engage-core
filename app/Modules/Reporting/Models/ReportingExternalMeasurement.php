@@ -6,8 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class ReportingExternalMeasurement extends Model
 {
+    public const IDENTITY_STABLE_IDS = 'stable_ids';
+    public const IDENTITY_NAME_FALLBACK = 'name_fallback';
+
     protected $fillable = [
-        'measurement_date',
+        'period_start',
+        'period_end',
         'platform',
         'account_id',
         'account_timezone',
@@ -18,6 +22,7 @@ class ReportingExternalMeasurement extends Model
         'group_name',
         'creative_name',
         'placement',
+        'identity_quality',
         'currency',
         'impressions',
         'reach',
@@ -28,6 +33,8 @@ class ReportingExternalMeasurement extends Model
         'result_type',
         'results',
         'source',
+        'source_file_hash',
+        'meta',
         'identity_hash',
         'imported_at',
     ];
@@ -35,7 +42,8 @@ class ReportingExternalMeasurement extends Model
     protected function casts(): array
     {
         return [
-            'measurement_date' => 'immutable_date',
+            'period_start' => 'immutable_date',
+            'period_end' => 'immutable_date',
             'impressions' => 'integer',
             'reach' => 'integer',
             'link_clicks' => 'integer',
@@ -43,6 +51,7 @@ class ReportingExternalMeasurement extends Model
             'landing_page_views' => 'integer',
             'spend' => 'decimal:4',
             'results' => 'decimal:6',
+            'meta' => 'array',
             'imported_at' => 'immutable_datetime',
         ];
     }

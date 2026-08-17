@@ -4,6 +4,7 @@ namespace Tests\Feature\Reporting;
 
 use App\Models\User;
 use App\Modules\Reporting\Models\ReportingDailyMetric;
+use App\Modules\Reporting\Models\ReportingExternalMeasurement;
 use App\Support\Modules\ModuleManager;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,6 +20,7 @@ class ReportingWorkspaceTest extends TestCase
         config(['client.timezone' => 'America/Chicago']);
 
         $this->seedReportMetrics();
+        $this->seedExternalMeasurement();
 
         $navigation = collect(app(ModuleManager::class)->navigationItems())
             ->firstWhere('route', 'crm.reporting.index');
@@ -38,6 +40,10 @@ class ReportingWorkspaceTest extends TestCase
             ->assertSee('See where visitors stop before they register')
             ->assertSee('Registration funnel')
             ->assertSee('Traffic quality')
+            ->assertSee('Ad platform reports')
+            ->assertSee('Exact stable-ID comparison available')
+            ->assertSee('USD 100.00')
+            ->assertSee('USD 20.00')
             ->assertSee('Campaign / source traffic')
             ->assertSee('cmp-100')
             ->assertSee('grp-200')
@@ -82,6 +88,33 @@ class ReportingWorkspaceTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/reporting')
             ->assertNotFound();
+    }
+
+    private function seedExternalMeasurement(): void
+    {
+        ReportingExternalMeasurement::query()->create([
+            'period_start' => '2026-08-16',
+            'period_end' => '2026-08-16',
+            'platform' => 'meta',
+            'campaign_id' => 'cmp-100',
+            'group_id' => 'grp-200',
+            'creative_id' => 'ad-300',
+            'campaign_name' => 'August Homebuyer',
+            'group_name' => 'First Time Buyers',
+            'creative_name' => 'Creative A',
+            'placement' => 'facebook_feed',
+            'identity_quality' => ReportingExternalMeasurement::IDENTITY_STABLE_IDS,
+            'currency' => 'USD',
+            'impressions' => 1000,
+            'link_clicks' => 30,
+            'landing_page_views' => 25,
+            'spend' => '100.0000',
+            'result_type' => 'landing_page_view',
+            'results' => '25.000000',
+            'source' => 'meta_ads_csv',
+            'identity_hash' => hash('sha256', 'workspace-external'),
+            'imported_at' => now(),
+        ]);
     }
 
     private function seedReportMetrics(): void

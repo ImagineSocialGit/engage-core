@@ -713,7 +713,9 @@
 │   │   │   └── Support
 │   │   ├── Reporting
 │   │   │   ├── Actions
+│   │   │   │   ├── ImportReportingExternalMeasurementsCsvAction.php
 │   │   │   │   ├── ProjectReportingDailyMetricsAction.php
+│   │   │   │   ├── PruneReportingImportFilesAction.php
 │   │   │   │   ├── RecordReportingObservationAction.php
 │   │   │   │   └── UpsertReportingExternalMeasurementAction.php
 │   │   │   ├── Console
@@ -722,7 +724,8 @@
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
-│   │   │   │   │   └── ReportingController.php
+│   │   │   │   │   ├── ReportingController.php
+│   │   │   │   │   └── ReportingExternalMeasurementImportController.php
 │   │   │   │   └── Public
 │   │   │   │       └── ReportingObservationController.php
 │   │   │   ├── Data
@@ -741,6 +744,8 @@
 │   │   │   │   └── ReportingModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
+│   │   │   │   ├── ExternalMeasurements
+│   │   │   │   │   └── MetaAdsCsvParser.php
 │   │   │   │   ├── ReportingAttributionNormalizer.php
 │   │   │   │   ├── ReportingBrowserRequestClassifier.php
 │   │   │   │   ├── ReportingPublicCollectionPolicy.php
@@ -1810,6 +1815,9 @@
 │       │   ├── project-state
 │       │   │   └── index.blade.php
 │       │   ├── reporting
+│       │   │   ├── imports
+│       │   │   │   ├── create.blade.php
+│       │   │   │   └── preview.blade.php
 │       │   │   └── index.blade.php
 │       │   ├── scheduling
 │       │   │   ├── availability.blade.php
@@ -2120,6 +2128,7 @@
 │   │   │   ├── ReportingBrowserClientContractTest.php
 │   │   │   ├── ReportingDailyProjectionTest.php
 │   │   │   ├── ReportingExternalMeasurementFoundationTest.php
+│   │   │   ├── ReportingExternalMeasurementImportTest.php
 │   │   │   ├── ReportingFoundationTest.php
 │   │   │   ├── ReportingObservationFoundationTest.php
 │   │   │   ├── ReportingProjectionFactRegistryTest.php
@@ -2261,4 +2270,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-585 directories, 1677 files
+587 directories, 1684 files

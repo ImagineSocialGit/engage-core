@@ -14,6 +14,7 @@ use App\Modules\FlowRoutes\Controllers\CRM\FlowRouteEditorController;
 use App\Modules\Messaging\Controllers\ContactImportBatchPermissionInvitationController;
 use App\Modules\Messaging\Controllers\CRM\MessageTemplatePresetController;
 use App\Modules\Reporting\Controllers\CRM\ReportingController;
+use App\Modules\Reporting\Controllers\CRM\ReportingExternalMeasurementImportController;
 use App\Modules\Scheduling\Controllers\CRM\AppointmentController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingAvailabilityController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingConfigurationController;
@@ -203,6 +204,17 @@ Route::middleware('auth')->group(function () {
         ->group(function () {
             Route::get('/', [ReportingController::class, 'index'])
                 ->name('index');
+
+            Route::get('/imports/create', [ReportingExternalMeasurementImportController::class, 'create'])
+                ->name('imports.create');
+
+            Route::post('/imports/preview', [ReportingExternalMeasurementImportController::class, 'preview'])
+                ->middleware('throttle:10,1')
+                ->name('imports.preview');
+
+            Route::post('/imports', [ReportingExternalMeasurementImportController::class, 'store'])
+                ->middleware('throttle:10,1')
+                ->name('imports.store');
         });
 
     Route::middleware('module:flow_routes')

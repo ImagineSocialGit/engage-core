@@ -46,6 +46,12 @@
                                 </a>
                             @endforeach
                         </div>
+                        <a
+                            href="{{ route('crm.reporting.imports.create') }}"
+                            class="mt-3 inline-flex text-sm font-semibold text-slate-700 hover:text-slate-950 hover:underline"
+                        >
+                            Import ad platform report
+                        </a>
                     </div>
                 </div>
 
@@ -61,6 +67,107 @@
                 </div>
             </div>
         </section>
+
+        @if($report['ad_platform_comparisons'] !== [])
+            <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
+                <div class="border-b border-slate-100 p-6 sm:p-8">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <h2 class="text-xl font-semibold tracking-tight text-slate-950">Ad platform reports</h2>
+                            <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
+                                Imported platform measurements stay separate from Engage first-party measurements. Reports that overlap the selected range are shown using their full exported period. Exact comparison is shown only when stable platform IDs match tracked landing traffic.
+                            </p>
+                        </div>
+                        <a href="{{ route('crm.reporting.imports.create') }}" class="text-sm font-semibold text-slate-700 hover:underline">Import another report</a>
+                    </div>
+                </div>
+
+                <div class="space-y-5 p-6 sm:p-8">
+                    @foreach($report['ad_platform_comparisons'] as $comparison)
+                        <article class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                    <div class="font-semibold text-slate-950">{{ \Illuminate\Support\Str::headline($comparison['platform']) }} Ads</div>
+                                    <div class="mt-1 text-sm text-slate-600">
+                                        {{ $comparison['period_start']->format('M j, Y') }} – {{ $comparison['period_end']->format('M j, Y') }}
+                                        @if(filled($comparison['account_id']))
+                                            · Account {{ $comparison['account_id'] }}
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="text-xs font-semibold text-slate-500">
+                                    {{ number_format((int) $comparison['row_count']) }} imported row(s)
+                                </div>
+                            </div>
+
+                            <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                <div class="rounded-xl bg-white p-4 ring-1 ring-slate-200">
+                                    <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Platform spend</div>
+                                    <div class="mt-1 text-xl font-bold text-slate-950">
+                                        @if($comparison['external']['spend'] !== null)
+                                            {{ $comparison['currency'] ? $comparison['currency'].' ' : '' }}{{ number_format((float) $comparison['external']['spend'], 2) }}
+                                        @else
+                                            —
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="rounded-xl bg-white p-4 ring-1 ring-slate-200">
+                                    <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Impressions</div>
+                                    <div class="mt-1 text-xl font-bold text-slate-950">{{ $comparison['external']['impressions'] !== null ? number_format((int) $comparison['external']['impressions']) : '—' }}</div>
+                                </div>
+                                <div class="rounded-xl bg-white p-4 ring-1 ring-slate-200">
+                                    <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Link clicks</div>
+                                    <div class="mt-1 text-xl font-bold text-slate-950">{{ $comparison['external']['link_clicks'] !== null ? number_format((int) $comparison['external']['link_clicks']) : '—' }}</div>
+                                </div>
+                                <div class="rounded-xl bg-white p-4 ring-1 ring-slate-200">
+                                    <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Landing-page views</div>
+                                    <div class="mt-1 text-xl font-bold text-slate-950">{{ $comparison['external']['landing_page_views'] !== null ? number_format((int) $comparison['external']['landing_page_views']) : '—' }}</div>
+                                </div>
+                            </div>
+
+                            @if($comparison['exact_comparison']['available'])
+                                <div class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                                    <div class="font-semibold text-emerald-950">Exact stable-ID comparison available</div>
+                                    <div class="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+                                        <div><span class="font-semibold">Likely-human Engage sessions:</span> {{ number_format((int) $comparison['exact_comparison']['engage_likely_human_sessions']) }}</div>
+                                        <div><span class="font-semibold">Engage registrations:</span> {{ number_format((int) $comparison['exact_comparison']['engage_registrations']) }}</div>
+                                        <div>
+                                            <span class="font-semibold">Cost / Engage registration:</span>
+                                            @if($comparison['exact_comparison']['cost_per_registration'] !== null)
+                                                {{ $comparison['currency'] ? $comparison['currency'].' ' : '' }}{{ number_format((float) $comparison['exact_comparison']['cost_per_registration'], 2) }}
+                                            @else
+                                                —
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <p class="mt-3 text-xs leading-5 text-emerald-900">
+                                        Exact comparison covers {{ number_format((int) $comparison['matched_stable_rows']) }} of {{ number_format((int) $comparison['row_count']) }} imported row(s). Platform landing-page views and Engage likely-human sessions are intentionally shown as different measurements.
+                                    </p>
+                                </div>
+                            @elseif($comparison['name_fallback_rows'] > 0)
+                                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+                                    This historical export did not include stable campaign/ad IDs. The platform totals are retained, but Reporting will not claim an exact ad-to-Engage match from names alone. Future ads using the Engage tracking parameters can reconcile automatically.
+                                </div>
+                            @else
+                                <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700">
+                                    Stable IDs are present, but no matching tracked Engage landing traffic was projected for this reporting period.
+                                </div>
+                            @endif
+
+                            @if($comparison['external']['results_by_type'] !== [])
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    @foreach($comparison['external']['results_by_type'] as $resultType => $resultCount)
+                                        <span class="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                                            {{ \Illuminate\Support\Str::headline($resultType) }}: {{ number_format((float) $resultCount, fmod((float) $resultCount, 1.0) === 0.0 ? 0 : 2) }}
+                                        </span>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </article>
+                    @endforeach
+                </div>
+            </section>
+        @endif
 
         @unless($report['has_data'])
             <section class="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">

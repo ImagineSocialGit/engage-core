@@ -4,6 +4,7 @@ namespace App\Modules\Reporting\Services;
 
 use App\Modules\Reporting\Actions\ProjectReportingDailyMetricsAction;
 use App\Modules\Reporting\Models\ReportingDailyMetric;
+use App\Modules\Reporting\Models\ReportingExternalMeasurement;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
@@ -51,6 +52,7 @@ final class ReportingWorkspaceReadService
             'webinar.provider_completion',
             ['slice' => 'all'],
         );
+        $adPlatformComparisons = $this->adPlatformComparisons($from, $through);
 
         return [
             'has_data' => $rows->isNotEmpty(),
@@ -87,6 +89,7 @@ final class ReportingWorkspaceReadService
                 'field_key',
             ),
             'traffic' => $traffic,
+            'ad_platform_comparisons' => $adPlatformComparisons,
             'campaigns' => $this->browserBreakdown(
                 rows: $rows,
                 slice: 'campaign',
@@ -713,6 +716,192 @@ final class ReportingWorkspaceReadService
                 return true;
             })
             ->values();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function adPlatformComparisons(
+        CarbonImmutable $from,
+        CarbonImmutable $through,
+    ): array {
+        $externalRows = ReportingExternalMeasurement::query()
+            ->whereDate('period_start', '<=', $through->toDateString())
+            ->whereDate('period_end', '>=', $from->toDateString())
+            ->orderByDesc('period_end')
+            ->orderBy('platform')
+            ->get();
+
+        if ($externalRows->isEmpty()) {
+            return [];
+        }
+
+        $groups = $externalRows->groupBy(function (ReportingExternalMeasurement $row): string {
+            return implode('|', [
+                $row->platform,
+                $row->account_id ?? '',
+                $row->period_start?->toDateString() ?? '',
+                $row->period_end?->toDateString() ?? '',
+                $row->currency ?? '',
+                $row->source_file_hash ?? 'direct',
+            ]);
+        });
+
+        $comparisons = [];
+
+        foreach ($groups as $group) {
+            /** @var ReportingExternalMeasurement $first */
+            $first = $group->first();
+            $periodStart = CarbonImmutable::instance($first->period_start)->startOfDay();
+            $periodEnd = CarbonImmutable::instance($first->period_end)->startOfDay();
+            $periodRows = ReportingDailyMetric::query()
+                ->where('metric_version', ProjectReportingDailyMetricsAction::METRIC_VERSION)
+                ->whereBetween('metric_date', [
+                    $periodStart->toDateString(),
+                    $periodEnd->toDateString(),
+                ])
+                ->where('metric_key', 'like', 'webinar.%')
+                ->get();
+
+            $stableRows = $group
+                ->where('identity_quality', ReportingExternalMeasurement::IDENTITY_STABLE_IDS)
+                ->values();
+            $matchedRows = 0;
+            $engageLandingSessions = 0;
+            $engageRegistrations = 0;
+            $matchedSpend = 0.0;
+            $matchedSpendAvailable = false;
+            $matchedLandingViews = 0;
+            $matchedLandingViewsAvailable = false;
+
+            foreach ($stableRows as $measurement) {
+                $matching = $this->matchingCampaignRows($periodRows, $measurement);
+
+                if ($matching->isEmpty()) {
+                    continue;
+                }
+
+                $matchedRows++;
+                $engageLandingSessions += $this->countMetric(
+                    $matching,
+                    'webinar.landing_sessions',
+                    ['traffic_class' => 'likely_human'],
+                );
+                $conversion = $this->ratio(
+                    $matching,
+                    'webinar.registration_conversion',
+                    ['traffic_class' => 'likely_human'],
+                );
+                $engageRegistrations += (int) $conversion['numerator'];
+
+                if ($measurement->spend !== null) {
+                    $matchedSpend += (float) $measurement->spend;
+                    $matchedSpendAvailable = true;
+                }
+
+                if ($measurement->landing_page_views !== null) {
+                    $matchedLandingViews += (int) $measurement->landing_page_views;
+                    $matchedLandingViewsAvailable = true;
+                }
+            }
+
+            $resultsByType = [];
+
+            foreach ($group as $measurement) {
+                if ($measurement->result_type === null || $measurement->results === null) {
+                    continue;
+                }
+
+                $resultsByType[$measurement->result_type] = ($resultsByType[$measurement->result_type] ?? 0.0)
+                    + (float) $measurement->results;
+            }
+
+            ksort($resultsByType);
+
+            $comparisons[] = [
+                'platform' => $first->platform,
+                'account_id' => $first->account_id,
+                'account_timezone' => $first->account_timezone,
+                'period_start' => $periodStart,
+                'period_end' => $periodEnd,
+                'currency' => $first->currency,
+                'row_count' => $group->count(),
+                'stable_id_rows' => $stableRows->count(),
+                'name_fallback_rows' => $group->where(
+                    'identity_quality',
+                    ReportingExternalMeasurement::IDENTITY_NAME_FALLBACK,
+                )->count(),
+                'matched_stable_rows' => $matchedRows,
+                'external' => [
+                    'spend' => $this->nullableNumericSum($group, 'spend'),
+                    'impressions' => $this->nullableIntegerSum($group, 'impressions'),
+                    'link_clicks' => $this->nullableIntegerSum($group, 'link_clicks'),
+                    'outbound_clicks' => $this->nullableIntegerSum($group, 'outbound_clicks'),
+                    'landing_page_views' => $this->nullableIntegerSum($group, 'landing_page_views'),
+                    'results_by_type' => $resultsByType,
+                ],
+                'exact_comparison' => [
+                    'available' => $matchedRows > 0,
+                    'engage_likely_human_sessions' => $engageLandingSessions,
+                    'engage_registrations' => $engageRegistrations,
+                    'matched_spend' => $matchedSpendAvailable ? round($matchedSpend, 4) : null,
+                    'matched_landing_page_views' => $matchedLandingViewsAvailable ? $matchedLandingViews : null,
+                    'cost_per_registration' => $matchedSpendAvailable && $engageRegistrations > 0
+                        ? round($matchedSpend / $engageRegistrations, 2)
+                        : null,
+                ],
+            ];
+        }
+
+        return $comparisons;
+    }
+
+    private function matchingCampaignRows(
+        Collection $rows,
+        ReportingExternalMeasurement $measurement,
+    ): Collection {
+        return $rows
+            ->filter(function (ReportingDailyMetric $row) use ($measurement): bool {
+                $dimensions = is_array($row->dimensions) ? $row->dimensions : [];
+
+                if (($dimensions['slice'] ?? null) !== 'campaign'
+                    || ($dimensions['external_platform'] ?? null) !== $measurement->platform
+                ) {
+                    return false;
+                }
+
+                foreach ([
+                    'external_campaign_id' => $measurement->campaign_id,
+                    'external_group_id' => $measurement->group_id,
+                    'external_creative_id' => $measurement->creative_id,
+                    'external_placement' => $measurement->placement,
+                ] as $key => $value) {
+                    if ($value !== null && ($dimensions[$key] ?? null) !== $value) {
+                        return false;
+                    }
+                }
+
+                return true;
+            })
+            ->values();
+    }
+
+    private function nullableIntegerSum(Collection $rows, string $column): ?int
+    {
+        $available = $rows->filter(fn (ReportingExternalMeasurement $row): bool => $row->{$column} !== null);
+
+        return $available->isEmpty()
+            ? null
+            : (int) $available->sum($column);
+    }
+
+    private function nullableNumericSum(Collection $rows, string $column): ?float
+    {
+        $available = $rows->filter(fn (ReportingExternalMeasurement $row): bool => $row->{$column} !== null);
+
+        return $available->isEmpty()
+            ? null
+            : round((float) $available->sum(fn (ReportingExternalMeasurement $row): float => (float) $row->{$column}), 4);
     }
 
     private function latestProjectionTime(Collection $rows): mixed

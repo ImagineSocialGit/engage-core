@@ -2,6 +2,7 @@
 
 namespace App\Modules\Reporting\Providers;
 
+use App\Modules\Reporting\Actions\PruneReportingImportFilesAction;
 use App\Modules\Reporting\Actions\RecordReportingObservationAction;
 use App\Modules\Reporting\Console\Commands\ProjectReportingMetricsCommand;
 use App\Modules\Reporting\Controllers\Public\ReportingObservationController;
@@ -59,6 +60,12 @@ class ReportingModuleServiceProvider extends ServiceProvider
                     ->command("reporting:project --days={$rebuildDays}")
                     ->dailyAt('02:17')
                     ->withoutOverlapping(180);
+
+                $schedule
+                    ->call(fn (): int => app(PruneReportingImportFilesAction::class)->handle())
+                    ->name('reporting-prune-import-files')
+                    ->hourly()
+                    ->withoutOverlapping(30);
             },
         );
 
