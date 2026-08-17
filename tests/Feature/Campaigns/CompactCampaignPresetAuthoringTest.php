@@ -61,6 +61,25 @@ class CompactCampaignPresetAuthoringTest extends TestCase
         $this->assertSame('first_available', $secondStep->variantStrategy);
     }
 
+    public function test_compact_definition_accepts_a_configured_scope_without_a_core_scope_registry(): void
+    {
+        $data = $this->compactDefinition();
+        $data['scope'] = 'Client-Specific-Nurture';
+
+        $definition = CampaignPresetDefinition::fromArray(
+            data: $data,
+            definitionKey: 'client_specific_campaign',
+        );
+
+        $this->assertSame('client_specific_nurture', $definition->scope);
+
+        foreach ($definition->steps as $step) {
+            foreach ($step->variants as $variant) {
+                $this->assertSame('client_specific_nurture', $variant->scope);
+            }
+        }
+    }
+
     public function test_compact_definition_syncs_derived_values_to_explicit_runtime_rows(): void
     {
         Config::set('presets.packages.test_client.groups.campaigns', ['default']);

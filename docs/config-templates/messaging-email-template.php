@@ -42,7 +42,7 @@ return [
     | config/messaging/permission_invitations.php
     | config/messaging/email/definitions/marketing/webinar_nurture.php
     | config/messaging/email/definitions/marketing/broadcast.php
-    | config/messaging/email/definitions/marketing/mortgage_homebuyer_nurture.php
+    | client/[CLIENT_KEY]/config/messaging/email/definitions/marketing/{client_scope}.php
     | config/messaging/email/definitions/marketing/webinar_waitlist.php
     |
     | Non-campaign top-level keys describe message definition groups. For

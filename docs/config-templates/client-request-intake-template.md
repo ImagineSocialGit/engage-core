@@ -48,7 +48,7 @@ Rules:
 - Core Webinar Messaging should remain deliberately small and generic. Rich client cadences and branded copy belong in client config.
 - Client associative config merges over defaults; list/numeric arrays replace the default list when present. A client reminder list therefore replaces the Core reminder list rather than appending duplicate reminder slots.
 - Core preset packages remain small and generic. Rich vertical/client packages belong in `client/{client-key}/config/presets.php`, and any selected client preset key must exist after effective config merge.
-- Vertical-specific copy belongs in vertical-specific scopes such as marketing:mortgage_homebuyer_nurture.
+- Client- or vertical-specific scopes are configuration-owned. Define them only in the client/module config that needs them; Core must not maintain a hardcoded allowlist of client scope names.
 - Email first. SMS may mirror after email passes, but SMS visibility in UI should be config-toggleable per client/surface.
 - Normal Broadcasts require normal Messaging consent.
 - Imported-contact opt-in invitations are a distinct one-time email flow, not a normal Broadcast bypass.
@@ -59,7 +59,7 @@ Rules:
   - transactional:permission_invitation for imported-contact one-time opt-in invitation emails.
   - marketing:webinar_nurture for attended/missed webinar nurture campaigns.
   - marketing:webinar_waitlist for waitlist notices.
-  - marketing:mortgage_homebuyer_nurture for mortgage-specific long-term homebuyer nurture.
+  - marketing:{client_scope} for a client-defined marketing scope when a module-owned scope does not describe the lifecycle.
 - Use dispatch keys:
   - registration_created for webinar registration confirmation/reminders.
   - consent_granted for Messaging-owned consent acknowledgements.

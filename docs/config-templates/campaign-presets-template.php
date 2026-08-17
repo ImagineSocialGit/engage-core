@@ -49,18 +49,20 @@ return [
     | identity is Campaign key + derived step number + variant key + channel +
     | inherited purpose/scope. Messaging-owned template rows may retain their
     | own physical source path only as diagnostics/provenance.
+    |
+    | Scope ownership:
+    | - module-owned lifecycles may define stable module scopes when the module's
+    |   runtime semantics require one
+    | - client- or vertical-specific scope names belong only in the client/module
+    |   configuration that actually uses them
+    | - Core does not maintain an allowlist or registry of client-specific scope names
+    | - effective Campaign and Messaging definitions must agree on the configured scope
     */
 
     'groups' => [
         'webinar_default' => [
             'webinar_attended_nurture',
             'webinar_missed_nurture',
-        ],
-
-        'mortgage_default' => [
-            'webinar_attended_nurture',
-            'webinar_missed_nurture',
-            'mortgage_homebuyer_nurture',
         ],
     ],
 
@@ -122,41 +124,6 @@ return [
                         'email' => [
                             'name' => 'Email follow-up',
                             'channel' => 'email',
-                        ],
-                    ],
-                ],
-            ],
-        ],
-
-        'mortgage_homebuyer_nurture' => [
-            'name' => 'Mortgage Homebuyer Nurture',
-            'description' => 'Mortgage-specific long-term homebuyer nurture sequence.',
-            'purpose' => 'marketing',
-            'scope' => 'mortgage_homebuyer_nurture',
-            'status' => 'inactive',
-            'variant_strategy' => 'send_all_eligible',
-            'source_version' => 1,
-            'meta' => [
-                'domain' => 'mortgage',
-            ],
-            'steps' => [
-                [
-                    'name' => 'Preparation basics',
-                    'criteria' => [
-                        'timing' => [
-                            'type' => 'delay',
-                            'days' => 14,
-                        ],
-                    ],
-                    'variants' => [
-                        'email' => [
-                            'name' => 'Email follow-up',
-                            'channel' => 'email',
-                        ],
-                        'sms' => [
-                            'name' => 'SMS follow-up',
-                            'channel' => 'sms',
-                            'is_active' => false,
                         ],
                     ],
                 ],

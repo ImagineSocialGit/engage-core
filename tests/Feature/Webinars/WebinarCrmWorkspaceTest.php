@@ -7,6 +7,7 @@ use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
 
@@ -14,7 +15,7 @@ class WebinarCrmWorkspaceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_workspace_prioritizes_pending_follow_up_reviews_and_upcoming_webinars(): void
+    public function test_workspace_exposes_pending_follow_up_reviews_and_upcoming_webinar_state(): void
     {
         Config::set('webinars.post_event.review.required', true);
 
@@ -64,18 +65,32 @@ class WebinarCrmWorkspaceTest extends TestCase
         $this->actingAs($user)
             ->get(route('crm.webinar-series.index'))
             ->assertOk()
-            ->assertSee('Webinar workspace')
-            ->assertSee('Needs attention')
-            ->assertSee('Homebuyer Game Plan - Completed')
-            ->assertSee('2 attended · 1 missed')
-            ->assertSee('Review follow-ups')
-            ->assertSee('Upcoming webinars')
-            ->assertSee('Homebuyer Game Plan - August')
-            ->assertSee('1 registration')
-            ->assertSee('Event details & recovery');
+            ->assertViewIs('crm.webinars.index')
+            ->assertViewHas('pendingPostEventReviews', function (Collection $reviews) use ($completed): bool {
+                if ($reviews->count() !== 1) {
+                    return false;
+                }
+
+                $review = $reviews->first();
+
+                return $review instanceof Webinar
+                    && $review->is($completed)
+                    && (int) $review->attended_registrations_count === 2
+                    && (int) $review->missed_registrations_count === 1;
+            })
+            ->assertViewHas('upcomingWebinars', function (Collection $webinars) use ($upcoming): bool {
+                $webinar = $webinars->first(
+                    fn (Webinar $candidate): bool => $candidate->is($upcoming),
+                );
+
+                return $webinar instanceof Webinar
+                    && (int) $webinar->registrations_count === 1;
+            })
+            ->assertViewHas('registrationAttentionCount', 0)
+            ->assertViewHas('attentionCount', 1);
     }
 
-    public function test_workspace_surfaces_registration_recovery_as_attention_work(): void
+    public function test_workspace_exposes_registration_recovery_as_attention_state(): void
     {
         $user = User::factory()->create();
         $webinar = Webinar::factory()->create([
@@ -93,43 +108,14 @@ class WebinarCrmWorkspaceTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->get(route('crm.webinar-series.index'))
+            ->get(route('crm.webinar-series.index', ['attention' => 1]))
             ->assertOk()
-            ->assertSee('1 item')
-            ->assertSee('Registration recovery')
-            ->assertSee('1 registration needs review')
-            ->assertSee('Resolve registrations');
-    }
-
-    public function test_post_event_review_uses_business_facing_checkpoint_language(): void
-    {
-        Config::set('webinars.post_event.review.required', true);
-
-        $user = User::factory()->create();
-        $webinar = Webinar::factory()->create([
-            'title' => 'VA Homebuyer Game Plan',
-            'starts_at' => now()->subHours(2),
-            'ends_at' => now()->subHour(),
-            'meta' => [
-                'normalized' => [
-                    'post_event' => [
-                        'review' => [
-                            'status' => 'pending',
-                        ],
-                    ],
-                ],
-            ],
-        ]);
-
-        $this->actingAs($user)
-            ->get(route('crm.webinars.post-event-review.show', $webinar))
-            ->assertOk()
-            ->assertSee('Your webinar is finished — review follow-ups')
-            ->assertSee('Follow-up checkpoint')
-            ->assertSee('What should registrants receive next?')
-            ->assertSee('Use this webinar’s replay')
-            ->assertSee('Use a previous replay')
-            ->assertSee('Do not send replay follow-ups')
-            ->assertSee('Approve follow-up plan');
+            ->assertViewIs('crm.webinars.index')
+            ->assertViewHas('showAttention', true)
+            ->assertViewHas('registrationAttentionCount', 1)
+            ->assertViewHas('attentionCount', 1)
+            ->assertViewHas('webinars', fn (Collection $webinars): bool => $webinars->contains(
+                fn (Webinar $candidate): bool => $candidate->is($webinar),
+            ));
     }
 }

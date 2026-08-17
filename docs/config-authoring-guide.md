@@ -158,9 +158,6 @@ marketing:webinar_nurture
     Generic missed webinar nurture campaigns
     Generic post-webinar nurture
 
-marketing:mortgage_homebuyer_nurture
-    Mortgage-specific long-term homebuyer nurture
-
 marketing:webinar_waitlist
     Waitlist availability messages
 
@@ -173,10 +170,12 @@ internal:tasks
 
 Default webinar messaging should stay vertical-neutral.
 
-Mortgage-specific language belongs in mortgage-specific scopes such as:
+Client- and vertical-specific Messaging scopes are configuration-owned identifiers, not Core-known scope names. Define such a scope only in the client or module configuration that actually needs it, and use that same scope consistently across the Campaign and Messaging definitions that participate in the journey. Core must not maintain a hardcoded allowlist or registry of client-specific scope names.
+
+A client-owned marketing scope follows the ordinary identity shape:
 
 ```text
-marketing:mortgage_homebuyer_nurture
+marketing:{client_scope}
 ```
 
 Client overrides may be vertical-specific when the client itself is vertical-specific.
@@ -579,7 +578,7 @@ Examples:
 config/messaging/email/definitions/transactional/webinar.php
 client/[CLIENT_KEY]/config/messaging/email/definitions/transactional/webinar/investor-strategy.php
 config/messaging/email/definitions/marketing/webinar_nurture.php
-config/messaging/email/definitions/marketing/mortgage_homebuyer_nurture.php
+client/[CLIENT_KEY]/config/messaging/email/definitions/marketing/{client_scope}.php
 config/messaging/permission_invitations.php
 client/[CLIENT_KEY]/config/messaging/email/definitions/marketing/webinar_nurture.php
 ```
