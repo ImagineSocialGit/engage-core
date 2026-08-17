@@ -151,11 +151,20 @@ final class ReportingPublicCollectionPolicy
     private function allowedQueryKeys(): array
     {
         $utm = config('reporting.attribution.utm_keys', []);
+        $external = config('reporting.attribution.external_keys', []);
         $clickIds = config('reporting.attribution.click_id_keys', []);
         $keys = [];
 
         if (is_array($utm)) {
             foreach ($utm as $queryKey) {
+                if (is_string($queryKey) && trim($queryKey) !== '') {
+                    $keys[] = trim($queryKey);
+                }
+            }
+        }
+
+        if (is_array($external)) {
+            foreach ($external as $queryKey) {
                 if (is_string($queryKey) && trim($queryKey) !== '') {
                     $keys[] = trim($queryKey);
                 }

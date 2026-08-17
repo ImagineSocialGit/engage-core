@@ -1309,3 +1309,11 @@ Routes
     Use Route Management / Routes in client-facing navigation.
     Use contextual hints to explain automatic actions in plain language.
 ```
+
+
+### Reporting — external campaign reconciliation foundation
+
+- Stable campaign reconciliation uses the provider-neutral `engage_platform`, `engage_campaign_id`, `engage_group_id`, `engage_creative_id`, and `engage_placement` landing parameters alongside readable UTMs.
+- `reporting_external_measurements` is the normalized aggregate foundation for ad-platform exports/API adapters; Meta CSV is the first planned concrete import.
+- External measurements remain re-importable/resettable until the import path is authoritative; do not treat them as retained Project State history yet.
+- The client-facing campaign tracking checklist should be rewritten after the first concrete import contract is green so instructions exactly match executable code.

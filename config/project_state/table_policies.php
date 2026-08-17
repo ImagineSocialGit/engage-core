@@ -65,6 +65,11 @@ return [
         'reason' => 'Module installation and migration bookkeeping belongs to the target environment.',
     ],
 
+    'reporting_external_measurements' => [
+        'mode' => 'resettable',
+        'reason' => 'External platform aggregate measurements are re-importable in the Phase 7A foundation and are not retained through Project State until import/adapters become authoritative.',
+    ],
+
     'reporting_sessions' => [
         'mode' => 'resettable',
         'reason' => 'Ephemeral first-party Reporting session correlation intentionally resets during Project State rebuilds.',

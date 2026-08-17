@@ -218,7 +218,7 @@
                 <div class="border-b border-slate-100 p-6 sm:p-8">
                     <h2 class="text-xl font-semibold tracking-tight text-slate-950">Campaign / source traffic</h2>
                     <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
-                        Compare attributed traffic without assuming every campaign value represents paid media. UTM values are shown as they were safely captured.
+                        Compare attributed traffic without assuming every campaign value represents paid media. Names come from safe UTM values; stable platform IDs are retained separately for reconciliation.
                     </p>
                 </div>
 
@@ -231,7 +231,9 @@
                                 <tr>
                                     <th class="px-5 py-3">Source / medium</th>
                                     <th class="px-5 py-3">Campaign</th>
-                                    <th class="px-5 py-3">Content</th>
+                                    <th class="px-5 py-3">Group</th>
+                                    <th class="px-5 py-3">Creative</th>
+                                    <th class="px-5 py-3">Platform / placement</th>
                                     <th class="px-5 py-3 text-right">Landing</th>
                                     <th class="px-5 py-3 text-right">Likely human</th>
                                     <th class="px-5 py-3 text-right">Form starts</th>
@@ -248,8 +250,30 @@
                                             <span class="text-slate-400">/</span>
                                             {{ $row['dimensions']['utm_medium'] ?? '—' }}
                                         </td>
-                                        <td class="px-5 py-4 text-slate-700">{{ $row['dimensions']['utm_campaign'] ?? '—' }}</td>
-                                        <td class="px-5 py-4 text-slate-700">{{ $row['dimensions']['utm_content'] ?? '—' }}</td>
+                                        <td class="px-5 py-4 text-slate-700">
+                                            <div>{{ $row['dimensions']['utm_campaign'] ?? '—' }}</div>
+                                            @if(filled($row['dimensions']['external_campaign_id'] ?? null))
+                                                <div class="mt-1 text-xs text-slate-400">ID {{ $row['dimensions']['external_campaign_id'] }}</div>
+                                            @endif
+                                        </td>
+                                        <td class="px-5 py-4 text-slate-700">
+                                            <div>{{ $row['dimensions']['utm_term'] ?? '—' }}</div>
+                                            @if(filled($row['dimensions']['external_group_id'] ?? null))
+                                                <div class="mt-1 text-xs text-slate-400">ID {{ $row['dimensions']['external_group_id'] }}</div>
+                                            @endif
+                                        </td>
+                                        <td class="px-5 py-4 text-slate-700">
+                                            <div>{{ $row['dimensions']['utm_content'] ?? '—' }}</div>
+                                            @if(filled($row['dimensions']['external_creative_id'] ?? null))
+                                                <div class="mt-1 text-xs text-slate-400">ID {{ $row['dimensions']['external_creative_id'] }}</div>
+                                            @endif
+                                        </td>
+                                        <td class="px-5 py-4 text-slate-700">
+                                            <div>{{ isset($row['dimensions']['external_platform']) ? \Illuminate\Support\Str::headline((string) $row['dimensions']['external_platform']) : '—' }}</div>
+                                            @if(filled($row['dimensions']['external_placement'] ?? null))
+                                                <div class="mt-1 text-xs text-slate-500">{{ \Illuminate\Support\Str::headline((string) $row['dimensions']['external_placement']) }}</div>
+                                            @endif
+                                        </td>
                                         <td class="px-5 py-4 text-right text-slate-700">{{ number_format((int) $row['landing_sessions']) }}</td>
                                         <td class="px-5 py-4 text-right text-slate-700">{{ $percent($row['human_share']) }}</td>
                                         <td class="px-5 py-4 text-right text-slate-700">{{ number_format((int) $row['form_starts']) }}</td>

@@ -39,6 +39,10 @@ class ReportingWorkspaceTest extends TestCase
             ->assertSee('Registration funnel')
             ->assertSee('Traffic quality')
             ->assertSee('Campaign / source traffic')
+            ->assertSee('cmp-100')
+            ->assertSee('grp-200')
+            ->assertSee('ad-300')
+            ->assertSee('Facebook Feed')
             ->assertSee('Compare public-facing experience')
             ->assertSee('After registration')
             ->assertSee('Where validation failed')
@@ -115,13 +119,13 @@ class ReportingWorkspaceTest extends TestCase
             ['webinar.throttled_requests', ['slice' => 'all', 'reason' => 'rate_limited'], 2, null],
             ['webinar.bot_protection_results', ['slice' => 'all', 'outcome' => 'passed'], 90, null],
 
-            ['webinar.landing_sessions', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'traffic_class' => 'likely_human'], 20, null],
-            ['webinar.landing_sessions', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'traffic_class' => 'likely_automated'], 5, null],
-            ['webinar.traffic_share', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'traffic_class' => 'likely_human'], 20, 25],
-            ['webinar.funnel_sessions', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'traffic_class' => 'likely_human', 'step' => 'form_start'], 12, null],
-            ['webinar.funnel_sessions', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'traffic_class' => 'likely_human', 'step' => 'submit_attempt'], 10, null],
-            ['webinar.registration_conversion', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'traffic_class' => 'likely_human'], 5, 20],
-            ['webinar.validation_failure_rate', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'traffic_class' => 'likely_human'], 2, 10],
+            ['webinar.landing_sessions', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'utm_term' => 'first_time_buyers', 'external_platform' => 'meta', 'external_campaign_id' => 'cmp-100', 'external_group_id' => 'grp-200', 'external_creative_id' => 'ad-300', 'external_placement' => 'facebook_feed', 'traffic_class' => 'likely_human'], 20, null],
+            ['webinar.landing_sessions', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'utm_term' => 'first_time_buyers', 'external_platform' => 'meta', 'external_campaign_id' => 'cmp-100', 'external_group_id' => 'grp-200', 'external_creative_id' => 'ad-300', 'external_placement' => 'facebook_feed', 'traffic_class' => 'likely_automated'], 5, null],
+            ['webinar.traffic_share', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'utm_term' => 'first_time_buyers', 'external_platform' => 'meta', 'external_campaign_id' => 'cmp-100', 'external_group_id' => 'grp-200', 'external_creative_id' => 'ad-300', 'external_placement' => 'facebook_feed', 'traffic_class' => 'likely_human'], 20, 25],
+            ['webinar.funnel_sessions', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'utm_term' => 'first_time_buyers', 'external_platform' => 'meta', 'external_campaign_id' => 'cmp-100', 'external_group_id' => 'grp-200', 'external_creative_id' => 'ad-300', 'external_placement' => 'facebook_feed', 'traffic_class' => 'likely_human', 'step' => 'form_start'], 12, null],
+            ['webinar.funnel_sessions', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'utm_term' => 'first_time_buyers', 'external_platform' => 'meta', 'external_campaign_id' => 'cmp-100', 'external_group_id' => 'grp-200', 'external_creative_id' => 'ad-300', 'external_placement' => 'facebook_feed', 'traffic_class' => 'likely_human', 'step' => 'submit_attempt'], 10, null],
+            ['webinar.registration_conversion', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'utm_term' => 'first_time_buyers', 'external_platform' => 'meta', 'external_campaign_id' => 'cmp-100', 'external_group_id' => 'grp-200', 'external_creative_id' => 'ad-300', 'external_placement' => 'facebook_feed', 'traffic_class' => 'likely_human'], 5, 20],
+            ['webinar.validation_failure_rate', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'utm_term' => 'first_time_buyers', 'external_platform' => 'meta', 'external_campaign_id' => 'cmp-100', 'external_group_id' => 'grp-200', 'external_creative_id' => 'ad-300', 'external_placement' => 'facebook_feed', 'traffic_class' => 'likely_human'], 2, 10],
 
             ['webinar.landing_sessions', ['slice' => 'path', 'path' => '/homebuyer-class', 'traffic_class' => 'likely_human'], 80, null],
             ['webinar.traffic_share', ['slice' => 'path', 'path' => '/homebuyer-class', 'traffic_class' => 'likely_human'], 80, 100],

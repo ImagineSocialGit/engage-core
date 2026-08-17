@@ -23,6 +23,11 @@ class ReportingBrowserClientContractTest extends TestCase
         $this->assertStringContainsString("credentials: 'same-origin'", $client);
         $this->assertStringContainsString("status: 'unavailable'", $client);
         $this->assertStringContainsString('createEventId()', $client);
+        $this->assertStringContainsString("'engage_platform'", $client);
+        $this->assertStringContainsString("'engage_campaign_id'", $client);
+        $this->assertStringContainsString("'engage_group_id'", $client);
+        $this->assertStringContainsString("'engage_creative_id'", $client);
+        $this->assertStringContainsString("'engage_placement'", $client);
         $this->assertStringContainsString("status: 'disabled'", $client);
         $this->assertStringContainsString("status: response.ok ? 'accepted' : 'rejected'", $client);
         $this->assertStringNotContainsString('traffic_class', $client);

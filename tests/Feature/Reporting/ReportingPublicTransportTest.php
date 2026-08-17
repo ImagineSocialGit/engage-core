@@ -27,6 +27,11 @@ class ReportingPublicTransportTest extends TestCase
             query: [
                 'utm_source' => 'newsletter',
                 'utm_campaign' => 'august_webinar',
+                'engage_platform' => 'meta',
+                'engage_campaign_id' => 'cmp-100',
+                'engage_group_id' => 'grp-200',
+                'engage_creative_id' => 'ad-300',
+                'engage_placement' => 'facebook_feed',
             ],
         );
 
@@ -49,6 +54,11 @@ class ReportingPublicTransportTest extends TestCase
         $this->assertSame('external.example', $observation->referrer_host);
         $this->assertSame('newsletter', $observation->utm_source);
         $this->assertSame('august_webinar', $observation->utm_campaign);
+        $this->assertSame('meta', $observation->external_platform);
+        $this->assertSame('cmp-100', $observation->external_campaign_id);
+        $this->assertSame('grp-200', $observation->external_group_id);
+        $this->assertSame('ad-300', $observation->external_creative_id);
+        $this->assertSame('facebook_feed', $observation->external_placement);
         $this->assertSame('likely_human', $observation->traffic_class);
         $this->assertSame('browser_request_signals', $observation->classifier_key);
         $this->assertSame(1, $observation->classifier_version);

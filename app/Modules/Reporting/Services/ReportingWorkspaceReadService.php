@@ -90,7 +90,18 @@ final class ReportingWorkspaceReadService
             'campaigns' => $this->browserBreakdown(
                 rows: $rows,
                 slice: 'campaign',
-                identityKeys: ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content'],
+                identityKeys: [
+                    'utm_source',
+                    'utm_medium',
+                    'utm_campaign',
+                    'utm_content',
+                    'utm_term',
+                    'external_platform',
+                    'external_campaign_id',
+                    'external_group_id',
+                    'external_creative_id',
+                    'external_placement',
+                ],
             ),
             'paths' => $this->browserBreakdown(
                 rows: $rows,

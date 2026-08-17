@@ -573,6 +573,12 @@ Completed contract work:
 
 Separate producer privacy debt remains separate from Reporting. In particular, do not copy any existing raw Webinar registration/waitlist IP or user-agent provenance into Reporting; audit/removal belongs to the owning producer persistence/privacy work.
 
+- [x] Phase 7A: add provider-neutral stable external campaign/group/creative attribution (`engage_*`) without overloading UTM names.
+- [x] Phase 7A: add `reporting_external_measurements` provider-neutral aggregate foundation and normalized upsert action.
+- [ ] Phase 7B: add the first concrete external-platform import adapter/workflow (Meta CSV first), then compare platform-reported aggregate traffic/spend to Engage likely-human funnel outcomes.
+- [ ] After 7B is authoritative, decide when `reporting_external_measurements` should move from resettable/re-importable to retained Project State transfer.
+- [ ] Rewrite the client ad-tracking checklist against the implemented platform-neutral `engage_*` contract, with Meta-specific copy/paste parameters and export instructions plus future platform appendices.
+
 ## One-off backlog
 
 ### Messaging opt-in management and email format support

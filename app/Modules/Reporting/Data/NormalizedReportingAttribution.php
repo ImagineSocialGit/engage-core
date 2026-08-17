@@ -15,6 +15,11 @@ final readonly class NormalizedReportingAttribution
         public ?string $utmCampaign = null,
         public ?string $utmContent = null,
         public ?string $utmTerm = null,
+        public ?string $externalPlatform = null,
+        public ?string $externalCampaignId = null,
+        public ?string $externalGroupId = null,
+        public ?string $externalCreativeId = null,
+        public ?string $externalPlacement = null,
         public array $clickIdHashes = [],
     ) {}
 
@@ -31,6 +36,11 @@ final readonly class NormalizedReportingAttribution
             'utm_campaign' => $this->utmCampaign,
             'utm_content' => $this->utmContent,
             'utm_term' => $this->utmTerm,
+            'external_platform' => $this->externalPlatform,
+            'external_campaign_id' => $this->externalCampaignId,
+            'external_group_id' => $this->externalGroupId,
+            'external_creative_id' => $this->externalCreativeId,
+            'external_placement' => $this->externalPlacement,
             'click_id_hashes' => $this->clickIdHashes,
         ];
     }

@@ -68,6 +68,11 @@ final class ReportingSessionResolver
             'utm_campaign' => $attribution->utmCampaign,
             'utm_content' => $attribution->utmContent,
             'utm_term' => $attribution->utmTerm,
+            'external_platform' => $attribution->externalPlatform,
+            'external_campaign_id' => $attribution->externalCampaignId,
+            'external_group_id' => $attribution->externalGroupId,
+            'external_creative_id' => $attribution->externalCreativeId,
+            'external_placement' => $attribution->externalPlacement,
             'click_id_hashes' => $attribution->clickIdHashes !== []
                 ? $attribution->clickIdHashes
                 : null,

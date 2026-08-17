@@ -19,6 +19,7 @@ final class ReportingAttributionNormalizer
         $normalizedPath = $this->normalizePath($path);
         $referrerHost = $this->normalizeReferrerHost($referrer);
         $utm = $this->normalizeUtm($query);
+        $external = $this->normalizeExternalAttribution($query);
         $clickIdHashes = $this->normalizeClickIds($query);
 
         return new NormalizedReportingAttribution(
@@ -29,6 +30,11 @@ final class ReportingAttributionNormalizer
             utmCampaign: $utm['utm_campaign'] ?? null,
             utmContent: $utm['utm_content'] ?? null,
             utmTerm: $utm['utm_term'] ?? null,
+            externalPlatform: $external['platform'] ?? null,
+            externalCampaignId: $external['campaign_id'] ?? null,
+            externalGroupId: $external['group_id'] ?? null,
+            externalCreativeId: $external['creative_id'] ?? null,
+            externalPlacement: $external['placement'] ?? null,
             clickIdHashes: $clickIdHashes,
         );
     }
@@ -139,6 +145,65 @@ final class ReportingAttributionNormalizer
             if ($value !== null) {
                 $normalized[$dimension] = $value;
             }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $query
+     * @return array<string, string>
+     */
+    private function normalizeExternalAttribution(array $query): array
+    {
+        $keys = config('reporting.attribution.external_keys', []);
+
+        if (! is_array($keys)) {
+            return [];
+        }
+
+        $canonical = [
+            'platform',
+            'campaign_id',
+            'group_id',
+            'creative_id',
+            'placement',
+        ];
+        $normalized = [];
+
+        foreach ($canonical as $dimension) {
+            $queryKey = $keys[$dimension] ?? null;
+
+            if (! is_string($queryKey) || trim($queryKey) === '') {
+                continue;
+            }
+
+            $value = $this->boundedScalar($query[$queryKey] ?? null);
+
+            if ($value === null) {
+                continue;
+            }
+
+            if ($dimension === 'platform') {
+                $value = str_replace('-', '_', strtolower($value));
+
+                if (preg_match('/^[a-z0-9][a-z0-9._]*$/', $value) !== 1) {
+                    throw new InvalidArgumentException('Reporting external attribution platform is invalid.');
+                }
+            }
+
+            $normalized[$dimension] = $value;
+        }
+
+        $hasExternalIdentity = array_intersect_key(
+            $normalized,
+            array_flip(['campaign_id', 'group_id', 'creative_id', 'placement']),
+        ) !== [];
+
+        if ($hasExternalIdentity && ! isset($normalized['platform'])) {
+            throw new InvalidArgumentException(
+                'Reporting external attribution requires platform when an external campaign, group, creative, or placement value is present.',
+            );
         }
 
         return $normalized;

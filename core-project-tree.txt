@@ -712,7 +712,8 @@
 │   │   ├── Reporting
 │   │   │   ├── Actions
 │   │   │   │   ├── ProjectReportingDailyMetricsAction.php
-│   │   │   │   └── RecordReportingObservationAction.php
+│   │   │   │   ├── RecordReportingObservationAction.php
+│   │   │   │   └── UpsertReportingExternalMeasurementAction.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
 │   │   │   │       └── ProjectReportingMetricsCommand.php
@@ -724,11 +725,13 @@
 │   │   │   │       └── ReportingObservationController.php
 │   │   │   ├── Data
 │   │   │   │   ├── NormalizedReportingAttribution.php
+│   │   │   │   ├── ReportingExternalMeasurementData.php
 │   │   │   │   └── ReportingRequestClassification.php
 │   │   │   ├── EventDefinitions
 │   │   │   │   └── ConfigReportingEventDefinitionContributor.php
 │   │   │   ├── Models
 │   │   │   │   ├── ReportingDailyMetric.php
+│   │   │   │   ├── ReportingExternalMeasurement.php
 │   │   │   │   ├── ReportingObservation.php
 │   │   │   │   ├── ReportingProjectionCheckpoint.php
 │   │   │   │   └── ReportingSession.php
@@ -2077,6 +2080,7 @@
 │   │   ├── Reporting
 │   │   │   ├── ReportingBrowserClientContractTest.php
 │   │   │   ├── ReportingDailyProjectionTest.php
+│   │   │   ├── ReportingExternalMeasurementFoundationTest.php
 │   │   │   ├── ReportingFoundationTest.php
 │   │   │   ├── ReportingObservationFoundationTest.php
 │   │   │   ├── ReportingProjectionFactRegistryTest.php
@@ -2217,4 +2221,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-562 directories, 1656 files
+562 directories, 1660 files

@@ -97,11 +97,18 @@ class ReportingObservationFoundationTest extends TestCase
         $this->assertSame('search.example.test', $observation->referrer_host);
         $this->assertSame('search', $observation->utm_source);
         $this->assertSame('campaign-1', $observation->utm_campaign);
+        $this->assertSame('meta', $observation->external_platform);
+        $this->assertSame('12001', $observation->external_campaign_id);
+        $this->assertSame('12002', $observation->external_group_id);
+        $this->assertSame('12003', $observation->external_creative_id);
+        $this->assertSame('instagram_reels', $observation->external_placement);
         $this->assertEquals(['page_revision' => 'revision-1'], $observation->properties);
         $this->assertSame(hash('sha256', $token), $session->token_hash);
         $this->assertNotSame($token, $session->token_hash);
         $this->assertSame('/homebuyer-basics', $session->landing_path);
         $this->assertSame('search.example.test', $session->referrer_host);
+        $this->assertSame('meta', $session->external_platform);
+        $this->assertSame('12001', $session->external_campaign_id);
 
         $serializedObservation = json_encode($observation->getAttributes());
         $serializedSession = json_encode($session->getAttributes());
@@ -265,6 +272,18 @@ class ReportingObservationFoundationTest extends TestCase
             'reporting.session.inactivity_invalid',
             array_map(fn ($finding): string => $finding->code, $findings),
         );
+
+        config()->set('reporting.session.inactivity_minutes', 30);
+        config()->set('reporting.attribution.external_keys.platform', 'meta_platform');
+
+        $externalFindings = iterator_to_array(
+            (new ReportingSetupValidationContributor($this->definitionRegistry()))->findings(),
+        );
+
+        $this->assertContains(
+            'reporting.attribution.external_keys_invalid',
+            array_map(fn ($finding): string => $finding->code, $externalFindings),
+        );
     }
 
     private function configurePageViewEvent(): void
@@ -324,6 +343,11 @@ class ReportingObservationFoundationTest extends TestCase
             query: [
                 'utm_source' => 'search',
                 'utm_campaign' => 'campaign-1',
+                'engage_platform' => 'meta',
+                'engage_campaign_id' => '12001',
+                'engage_group_id' => '12002',
+                'engage_creative_id' => '12003',
+                'engage_placement' => 'instagram_reels',
                 'email' => 'private@example.test',
                 'arbitrary' => 'must-not-be-stored',
             ],

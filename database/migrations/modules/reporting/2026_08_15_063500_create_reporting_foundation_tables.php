@@ -23,6 +23,11 @@ return new class extends Migration
             $table->string('utm_campaign', 120)->nullable();
             $table->string('utm_content', 120)->nullable();
             $table->string('utm_term', 120)->nullable();
+            $table->string('external_platform', 32)->nullable();
+            $table->string('external_campaign_id', 120)->nullable();
+            $table->string('external_group_id', 120)->nullable();
+            $table->string('external_creative_id', 120)->nullable();
+            $table->string('external_placement', 120)->nullable();
             $table->json('click_id_hashes')->nullable();
             $table->string('traffic_class', 32)->default('unknown');
             $table->string('classifier_key', 80)->nullable();
@@ -69,6 +74,11 @@ return new class extends Migration
             $table->string('utm_campaign', 120)->nullable();
             $table->string('utm_content', 120)->nullable();
             $table->string('utm_term', 120)->nullable();
+            $table->string('external_platform', 32)->nullable();
+            $table->string('external_campaign_id', 120)->nullable();
+            $table->string('external_group_id', 120)->nullable();
+            $table->string('external_creative_id', 120)->nullable();
+            $table->string('external_placement', 120)->nullable();
             $table->json('click_id_hashes')->nullable();
             $table->string('traffic_class', 32)->default('unknown');
             $table->string('classifier_key', 80)->nullable();
@@ -96,6 +106,47 @@ return new class extends Migration
             $table->index(
                 ['reporting_session_id', 'occurred_at'],
                 'reporting_observations_session_time_idx',
+            );
+        });
+
+        Schema::create('reporting_external_measurements', function (Blueprint $table): void {
+            $table->id();
+            $table->date('measurement_date');
+            $table->string('platform', 32);
+            $table->string('account_id', 120)->nullable();
+            $table->string('account_timezone', 64)->nullable();
+            $table->string('campaign_id', 120);
+            $table->string('group_id', 120)->nullable();
+            $table->string('creative_id', 120)->nullable();
+            $table->string('campaign_name', 255)->nullable();
+            $table->string('group_name', 255)->nullable();
+            $table->string('creative_name', 255)->nullable();
+            $table->string('placement', 120)->nullable();
+            $table->char('currency', 3)->nullable();
+            $table->unsignedBigInteger('impressions')->nullable();
+            $table->unsignedBigInteger('reach')->nullable();
+            $table->unsignedBigInteger('link_clicks')->nullable();
+            $table->unsignedBigInteger('outbound_clicks')->nullable();
+            $table->unsignedBigInteger('landing_page_views')->nullable();
+            $table->decimal('spend', 16, 4)->nullable();
+            $table->string('result_type', 80)->nullable();
+            $table->decimal('results', 20, 6)->nullable();
+            $table->string('source', 32);
+            $table->char('identity_hash', 64);
+            $table->timestamp('imported_at', 6);
+            $table->timestamps(6);
+
+            $table->unique(
+                'identity_hash',
+                'reporting_external_measurements_identity_unique',
+            );
+            $table->index(
+                ['platform', 'measurement_date'],
+                'reporting_external_measurements_platform_date_idx',
+            );
+            $table->index(
+                ['platform', 'campaign_id', 'measurement_date'],
+                'reporting_external_measurements_campaign_date_idx',
             );
         });
 
@@ -143,6 +194,7 @@ return new class extends Migration
     {
         Schema::dropIfExists('reporting_projection_checkpoints');
         Schema::dropIfExists('reporting_daily_metrics');
+        Schema::dropIfExists('reporting_external_measurements');
         Schema::dropIfExists('reporting_observations');
         Schema::dropIfExists('reporting_sessions');
     }

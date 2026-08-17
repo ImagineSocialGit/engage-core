@@ -60,6 +60,11 @@ class ReportingFoundationTest extends TestCase
             'utm_campaign',
             'utm_content',
             'utm_term',
+            'external_platform',
+            'external_campaign_id',
+            'external_group_id',
+            'external_creative_id',
+            'external_placement',
             'click_id_hashes',
             'traffic_class',
             'classifier_key',
@@ -88,6 +93,11 @@ class ReportingFoundationTest extends TestCase
             'utm_campaign',
             'utm_content',
             'utm_term',
+            'external_platform',
+            'external_campaign_id',
+            'external_group_id',
+            'external_creative_id',
+            'external_placement',
             'click_id_hashes',
             'traffic_class',
             'classifier_key',
@@ -97,6 +107,32 @@ class ReportingFoundationTest extends TestCase
             'browser_family',
             'os_family',
             'properties',
+        ]);
+
+        $this->assertTableHasColumns('reporting_external_measurements', [
+            'measurement_date',
+            'platform',
+            'account_id',
+            'account_timezone',
+            'campaign_id',
+            'group_id',
+            'creative_id',
+            'campaign_name',
+            'group_name',
+            'creative_name',
+            'placement',
+            'currency',
+            'impressions',
+            'reach',
+            'link_clicks',
+            'outbound_clicks',
+            'landing_page_views',
+            'spend',
+            'result_type',
+            'results',
+            'source',
+            'identity_hash',
+            'imported_at',
         ]);
 
         $this->assertTableHasColumns('reporting_daily_metrics', [
@@ -231,6 +267,12 @@ class ReportingFoundationTest extends TestCase
             $section['tables'] ?? [],
         );
         $this->assertArrayNotHasKey('reporting_daily_metrics', $policies);
+
+
+        $this->assertSame(
+            'resettable',
+            $policies['reporting_external_measurements']['mode'] ?? null,
+        );
 
         foreach ([
             'reporting_sessions',

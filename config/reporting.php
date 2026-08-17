@@ -79,7 +79,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | Query parameters are collected only when explicitly allowlisted; the public
-    | browser transport rejects submitted unknown keys. Raw external click IDs are
+    | browser transport rejects submitted unknown keys. Stable external campaign
+    | identity uses the canonical engage_* keys below. Raw external click IDs are
     | never persisted. Leave click_id_keys empty until a concrete approved
     | reconciliation use exists and a dedicated secret hash key is configured.
     |
@@ -96,6 +97,14 @@ return [
             'utm_campaign' => 'utm_campaign',
             'utm_content' => 'utm_content',
             'utm_term' => 'utm_term',
+        ],
+
+        'external_keys' => [
+            'platform' => 'engage_platform',
+            'campaign_id' => 'engage_campaign_id',
+            'group_id' => 'engage_group_id',
+            'creative_id' => 'engage_creative_id',
+            'placement' => 'engage_placement',
         ],
 
         'click_id_keys' => [],

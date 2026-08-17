@@ -759,6 +759,12 @@ final class ProjectReportingDailyMetricsAction
                 'utm_medium' => $session->utm_medium,
                 'utm_campaign' => $session->utm_campaign,
                 'utm_content' => $session->utm_content,
+                'utm_term' => $session->utm_term,
+                'external_platform' => $session->external_platform,
+                'external_campaign_id' => $session->external_campaign_id,
+                'external_group_id' => $session->external_group_id,
+                'external_creative_id' => $session->external_creative_id,
+                'external_placement' => $session->external_placement,
                 'page_revision' => $properties['page_revision'] ?? null,
                 'presentation' => $properties['presentation'] ?? null,
                 'device_class' => $session->device_class,
@@ -789,6 +795,12 @@ final class ProjectReportingDailyMetricsAction
             || filled($profile['utm_medium'] ?? null)
             || filled($profile['utm_campaign'] ?? null)
             || filled($profile['utm_content'] ?? null)
+            || filled($profile['utm_term'] ?? null)
+            || filled($profile['external_platform'] ?? null)
+            || filled($profile['external_campaign_id'] ?? null)
+            || filled($profile['external_group_id'] ?? null)
+            || filled($profile['external_creative_id'] ?? null)
+            || filled($profile['external_placement'] ?? null)
         ) {
             $slices[] = [
                 'slice' => 'campaign',
@@ -796,6 +808,12 @@ final class ProjectReportingDailyMetricsAction
                 'utm_medium' => $profile['utm_medium'] ?? null,
                 'utm_campaign' => $profile['utm_campaign'] ?? null,
                 'utm_content' => $profile['utm_content'] ?? null,
+                'utm_term' => $profile['utm_term'] ?? null,
+                'external_platform' => $profile['external_platform'] ?? null,
+                'external_campaign_id' => $profile['external_campaign_id'] ?? null,
+                'external_group_id' => $profile['external_group_id'] ?? null,
+                'external_creative_id' => $profile['external_creative_id'] ?? null,
+                'external_placement' => $profile['external_placement'] ?? null,
             ];
         }
 
@@ -892,7 +910,13 @@ final class ProjectReportingDailyMetricsAction
                 ($profile['utm_source'] ?? null) === ($slice['utm_source'] ?? null)
                 && ($profile['utm_medium'] ?? null) === ($slice['utm_medium'] ?? null)
                 && ($profile['utm_campaign'] ?? null) === ($slice['utm_campaign'] ?? null)
-                && ($profile['utm_content'] ?? null) === ($slice['utm_content'] ?? null),
+                && ($profile['utm_content'] ?? null) === ($slice['utm_content'] ?? null)
+                && ($profile['utm_term'] ?? null) === ($slice['utm_term'] ?? null)
+                && ($profile['external_platform'] ?? null) === ($slice['external_platform'] ?? null)
+                && ($profile['external_campaign_id'] ?? null) === ($slice['external_campaign_id'] ?? null)
+                && ($profile['external_group_id'] ?? null) === ($slice['external_group_id'] ?? null)
+                && ($profile['external_creative_id'] ?? null) === ($slice['external_creative_id'] ?? null)
+                && ($profile['external_placement'] ?? null) === ($slice['external_placement'] ?? null),
             'presentation' =>
                 ($profile['page_revision'] ?? null) === ($slice['page_revision'] ?? null)
                 && ($profile['presentation'] ?? null) === ($slice['presentation'] ?? null),

@@ -215,14 +215,9 @@ Reporting currently owns these durable tables:
 ```text
 reporting_sessions
 reporting_observations
+reporting_external_measurements
 reporting_daily_metrics
 reporting_projection_checkpoints
-```
-
-A later external-comparison slice may add:
-
-```text
-reporting_external_measurements
 ```
 
 Their bounded privacy-first columns and indexes are implemented in the Reporting module migration. The semantic ownership below remains the durable contract.
@@ -297,11 +292,13 @@ Projection code must be safe to rerun without double-counting.
 
 ### `reporting_external_measurements`
 
-Deferred until the external-platform comparison slice.
+Provider-neutral aggregate measurements from configured external platforms, not external visitor identities or raw platform event feeds.
 
-This table will store normalized aggregate measurements from configured external platforms, not external visitor identities or raw platform event feeds.
+Phase 7A stores stable platform/account/campaign/group/creative identity, display names, placement, account timezone, currency, and a bounded common measurement set (impressions, reach, link/outbound clicks, landing-page views, spend, result type/count). Derived rates such as CTR, CPC, CPM, frequency, and cost per result should be computed from base measurements rather than imported as competing sources of truth.
 
-The schema must remain provider-neutral. Meta, Google, TikTok, or another platform may be adapters; no vendor should define the Reporting domain model.
+The schema remains provider-neutral. Meta, Google, TikTok, or another platform are adapters; no vendor defines the Reporting domain model. Names may change and are display metadata. Stable platform IDs define the reconciliation identity.
+
+In Phase 7A these rows are re-importable/resettable rather than retained Project State history. That policy should be revisited only after a concrete import/adapter is authoritative.
 
 ## Event-definition contract
 
@@ -1117,20 +1114,36 @@ The first CRM Reporting workspace is implemented as a Reporting-owned, read-only
 
 The UI deliberately does not pretend arbitrary cross-filter combinations exist when the retained daily metrics were projected as separate slices. It also does not expose raw `question_key` / `answer_key` identifiers as client-facing labels. Safe question distributions remain retained for a later presentation slice once a provider-neutral client-safe label contract exists. Technical throttling/bot-protection signals are secondary and collapsed rather than becoming a security-monitoring workspace.
 
-### Phase 7 — External platform comparison
+### Phase 7 — Campaign attribution and external platform comparison
 
-Add provider-neutral external measurement import/adapter support only after the first-party report is stable.
+Phase 7A establishes a provider-neutral stable attribution identity alongside human-readable UTMs. Browser landing attribution may carry only the canonical transport keys:
+
+```text
+engage_platform
+engage_campaign_id
+engage_group_id
+engage_creative_id
+engage_placement
+```
+
+These values are normalized into separate external-attribution columns; they do not replace or overload `utm_campaign`, `utm_term`, or `utm_content`. Platform campaign/group/creative IDs are aggregate campaign identity, not visitor identity, and may be stored raw within the configured bounds. Raw click IDs remain a separate explicitly approved + HMAC-only contract.
+
+The `reporting_external_measurements` table is the provider-neutral aggregate landing zone for platform-reported daily campaign/ad measurements such as impressions, reach, link/outbound clicks, landing-page views, spend, and reported result counts. Adapter/import code must normalize provider exports into this schema rather than extending Reporting with Meta/Google/TikTok-specific columns. Names are display metadata; the stable platform IDs define reconciliation identity.
+
+In 7A the external-measurement table is re-importable/resettable and intentionally not yet retained through Project State. Promote it to retained state only once the import/adapter path is authoritative and production history depends on it.
+
+A later 7B slice should add the first concrete adapter/import workflow (Meta CSV is the initial candidate), followed by comparison reads in the CRM workspace.
 
 ## Current status
 
-Current repository state through Phase 6:
+Current repository state through Phase 7A:
 
 ```text
 Reporting depends only on Core
-four Reporting foundation tables/models are owned and registered
+five Reporting-owned durable tables/models are defined, including the provider-neutral external measurement foundation
 shared observation/event-definition seams are app-level and no-op when Reporting is disabled
 idempotent normalized observation recording is implemented
-host-scoped ephemeral sessions and attribution normalization are implemented
+host-scoped ephemeral sessions and attribution normalization are implemented, including separate stable external campaign/group/creative identity alongside readable UTMs
 POST /_reporting/observations is the generic stateless public transport
 resources/js/reporting/client.js is the generic fail-open browser client
 public collection requires an event-definition surface plus exact browser_hosts match
@@ -1146,12 +1159,12 @@ safe Webinar question distributions persist keys/version only and exclude answer
 projection is deterministic/idempotent and maintains a versioned checkpoint
 short rolling and daily retention-horizon reconciliation rebuilds are scheduler-owned
 Project State v11 transfers retained reporting_daily_metrics through a schema-activated optional Reporting section
-reporting_sessions, reporting_observations, and reporting_projection_checkpoints remain resettable
+reporting_sessions, reporting_observations, reporting_projection_checkpoints, and the still-re-importable reporting_external_measurements foundation remain resettable
 Reporting now owns a CRM Webinar Registration workspace over retained daily aggregates
 current Reporting, Webinar, and Messaging dependency cones have no detected module-boundary violations
 ```
 
-The first Reporting CRM workspace is now implemented over the durable aggregate foundation. The next planned Reporting slice is provider-neutral external aggregate comparison after first-party Reporting behavior is proven in use.
+The first Reporting CRM workspace is implemented over the durable aggregate foundation. Phase 7A now locks stable provider-neutral campaign identity and the external aggregate landing schema. The next Reporting slice is the first concrete import adapter/workflow (Meta CSV first), followed by platform-vs-Engage comparison reads.
 
 ## Deferred possibilities
 

@@ -22,6 +22,14 @@ final class ReportingSetupValidationContributor implements SetupValidationContri
         'utm_term',
     ];
 
+    private const EXTERNAL_ATTRIBUTION_KEYS = [
+        'platform' => 'engage_platform',
+        'campaign_id' => 'engage_campaign_id',
+        'group_id' => 'engage_group_id',
+        'creative_id' => 'engage_creative_id',
+        'placement' => 'engage_placement',
+    ];
+
     public function __construct(
         private readonly ReportingEventDefinitionRegistry $definitions,
     ) {}
@@ -220,6 +228,24 @@ final class ReportingSetupValidationContributor implements SetupValidationContri
                     );
                 }
             }
+        }
+
+        $externalKeys = config('reporting.attribution.external_keys');
+        $expectedExternalKeys = self::EXTERNAL_ATTRIBUTION_KEYS;
+
+        if (is_array($externalKeys)) {
+            ksort($externalKeys);
+            ksort($expectedExternalKeys);
+        }
+
+        if (! is_array($externalKeys)
+            || $externalKeys !== $expectedExternalKeys
+        ) {
+            yield $this->error(
+                'reporting.attribution.external_keys_invalid',
+                'Reporting external attribution must use the canonical engage_* transport keys.',
+                'reporting.attribution.external_keys',
+            );
         }
 
         $clickIds = config('reporting.attribution.click_id_keys');

@@ -40,6 +40,12 @@ class ReportingDailyProjectionTest extends TestCase
             'utm_medium' => 'paid_social',
             'utm_campaign' => 'august_homebuyer',
             'utm_content' => 'creative_a',
+            'utm_term' => 'first_time_buyers',
+            'external_platform' => 'meta',
+            'external_campaign_id' => 'cmp-100',
+            'external_group_id' => 'grp-200',
+            'external_creative_id' => 'ad-300',
+            'external_placement' => 'facebook_feed',
             'traffic_class' => 'likely_human',
             'classifier_key' => 'browser_request_signals',
             'classifier_version' => 1,
@@ -164,6 +170,25 @@ class ReportingDailyProjectionTest extends TestCase
         $this->assertMetric(
             'webinar.traffic_share',
             ['slice' => 'all', 'traffic_class' => 'likely_human'],
+            1,
+            1,
+        );
+        $this->assertMetric(
+            'webinar.registration_conversion',
+            [
+                'slice' => 'campaign',
+                'utm_source' => 'meta',
+                'utm_medium' => 'paid_social',
+                'utm_campaign' => 'august_homebuyer',
+                'utm_content' => 'creative_a',
+                'utm_term' => 'first_time_buyers',
+                'external_platform' => 'meta',
+                'external_campaign_id' => 'cmp-100',
+                'external_group_id' => 'grp-200',
+                'external_creative_id' => 'ad-300',
+                'external_placement' => 'facebook_feed',
+                'traffic_class' => 'likely_human',
+            ],
             1,
             1,
         );
