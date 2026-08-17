@@ -1113,7 +1113,9 @@ Ephemeral sessions, raw observations, and projection checkpoints remain resettab
 
 ### Phase 6 — Initial Reporting UI
 
-Build the Webinar traffic/conversion report with the committed filters, denominator labels, funnel/drop-off, validation, attribution, questions, provider health, and message health.
+The first CRM Reporting workspace is implemented as a Reporting-owned, read-only Webinar Registration report. It uses 7/30/90-day date ranges plus aggregate-aligned breakdowns for campaign/source/content, landing path, page revision/presentation, device, series, and occurrence. The primary screen emphasizes likely-human traffic quality, measurable funnel drop-off, validation friction, authoritative local registration correlation, provider completion, confirmation planning/delivery, join, and attendance health.
+
+The UI deliberately does not pretend arbitrary cross-filter combinations exist when the retained daily metrics were projected as separate slices. It also does not expose raw `question_key` / `answer_key` identifiers as client-facing labels. Safe question distributions remain retained for a later presentation slice once a provider-neutral client-safe label contract exists. Technical throttling/bot-protection signals are secondary and collapsed rather than becoming a security-monitoring workspace.
 
 ### Phase 7 — External platform comparison
 
@@ -1121,7 +1123,7 @@ Add provider-neutral external measurement import/adapter support only after the 
 
 ## Current status
 
-Current repository state through Phase 5B:
+Current repository state through Phase 6:
 
 ```text
 Reporting depends only on Core
@@ -1145,11 +1147,11 @@ projection is deterministic/idempotent and maintains a versioned checkpoint
 short rolling and daily retention-horizon reconciliation rebuilds are scheduler-owned
 Project State v11 transfers retained reporting_daily_metrics through a schema-activated optional Reporting section
 reporting_sessions, reporting_observations, and reporting_projection_checkpoints remain resettable
-no Reporting CRM UI exists yet
+Reporting now owns a CRM Webinar Registration workspace over retained daily aggregates
 current Reporting, Webinar, and Messaging dependency cones have no detected module-boundary violations
 ```
 
-The backend Reporting foundation is now durable enough for Phase 6 to build the first Reporting CRM workspace over these aggregates.
+The first Reporting CRM workspace is now implemented over the durable aggregate foundation. The next planned Reporting slice is provider-neutral external aggregate comparison after first-party Reporting behavior is proven in use.
 
 ## Deferred possibilities
 

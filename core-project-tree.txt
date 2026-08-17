@@ -718,6 +718,8 @@
 │   │   │   │       └── ProjectReportingMetricsCommand.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
+│   │   │   │   ├── CRM
+│   │   │   │   │   └── ReportingController.php
 │   │   │   │   └── Public
 │   │   │   │       └── ReportingObservationController.php
 │   │   │   ├── Data
@@ -737,7 +739,8 @@
 │   │   │   │   ├── ReportingAttributionNormalizer.php
 │   │   │   │   ├── ReportingBrowserRequestClassifier.php
 │   │   │   │   ├── ReportingPublicCollectionPolicy.php
-│   │   │   │   └── ReportingSessionResolver.php
+│   │   │   │   ├── ReportingSessionResolver.php
+│   │   │   │   └── ReportingWorkspaceReadService.php
 │   │   │   ├── Support
 │   │   │   └── Validation
 │   │   │       └── ReportingSetupValidationContributor.php
@@ -1766,6 +1769,8 @@
 │       │   │       └── index.blade.php
 │       │   ├── project-state
 │       │   │   └── index.blade.php
+│       │   ├── reporting
+│       │   │   └── index.blade.php
 │       │   ├── scheduling
 │       │   │   ├── availability.blade.php
 │       │   │   ├── configuration.blade.php
@@ -2075,7 +2080,8 @@
 │   │   │   ├── ReportingFoundationTest.php
 │   │   │   ├── ReportingObservationFoundationTest.php
 │   │   │   ├── ReportingProjectionFactRegistryTest.php
-│   │   │   └── ReportingPublicTransportTest.php
+│   │   │   ├── ReportingPublicTransportTest.php
+│   │   │   └── ReportingWorkspaceTest.php
 │   │   ├── Scheduling
 │   │   │   ├── AppointmentLifecycleActionTest.php
 │   │   │   ├── BookableSlotOfferAndBookingHoldActionTest.php
@@ -2211,4 +2217,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-560 directories, 1652 files
+562 directories, 1656 files

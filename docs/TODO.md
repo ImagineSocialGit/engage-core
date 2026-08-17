@@ -564,7 +564,11 @@ Completed contract work:
   - A current-version source document may omit the optional Reporting section when Reporting was not installed there; a Reporting-enabled target imports the rest of the document and applies no Reporting rows.
   - A document containing an optional Reporting section cannot validate against a target where the Reporting activation schema is absent, preventing silent history loss.
   - The shared optional-section capability is reusable for future genuinely optional module transfer contracts without making those modules mandatory.
-- [ ] Build the initial Reporting UI with date, series, occurrence, source/campaign/content, device, page revision, and traffic-class filters plus funnel/drop-off, validation, attribution, questions, provider health, and message health.
+- [x] Build the initial Reporting UI (Phase 6).
+  - Reporting now owns a CRM Webinar Registration workspace with 7/30/90-day ranges, likely-human funnel/drop-off diagnosis, traffic-quality separation, validation friction, campaign/source/content, landing-page, presentation/revision, device, series/occurrence, provider, confirmation, join, and attendance breakdowns.
+  - The UI uses aggregate-aligned breakdowns rather than pretending arbitrary cross-filter combinations are available from independently projected slices.
+  - Raw question/answer keys are not exposed as client-facing labels; safe question aggregates remain available for a later provider-neutral label/presentation contract.
+  - Throttling and bot-protection outcomes remain secondary collapsed diagnostics rather than becoming a security-monitoring product.
 - [ ] Add generic external platform measurement comparison only after first-party Reporting is stable.
 
 Separate producer privacy debt remains separate from Reporting. In particular, do not copy any existing raw Webinar registration/waitlist IP or user-agent provenance into Reporting; audit/removal belongs to the owning producer persistence/privacy work.

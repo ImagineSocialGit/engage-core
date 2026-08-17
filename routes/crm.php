@@ -13,6 +13,7 @@ use App\Modules\FlowRoutes\Controllers\CRM\FlowRouteController;
 use App\Modules\FlowRoutes\Controllers\CRM\FlowRouteEditorController;
 use App\Modules\Messaging\Controllers\ContactImportBatchPermissionInvitationController;
 use App\Modules\Messaging\Controllers\CRM\MessageTemplatePresetController;
+use App\Modules\Reporting\Controllers\CRM\ReportingController;
 use App\Modules\Scheduling\Controllers\CRM\AppointmentController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingAvailabilityController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingConfigurationController;
@@ -194,6 +195,14 @@ Route::middleware('auth')->group(function () {
 
             Route::patch('/{messageTemplatePreset}', [MessageTemplatePresetController::class, 'update'])
                 ->name('update');
+        });
+
+    Route::middleware('module:reporting')
+        ->prefix('reporting')
+        ->name('crm.reporting.')
+        ->group(function () {
+            Route::get('/', [ReportingController::class, 'index'])
+                ->name('index');
         });
 
     Route::middleware('module:flow_routes')

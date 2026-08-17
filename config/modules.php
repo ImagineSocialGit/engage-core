@@ -634,6 +634,11 @@ return [
             'ui' => [
                 'tone' => 'slate',
             ],
+            'nav' => [
+                'label' => 'Reporting',
+                'route' => 'crm.reporting.index',
+                'priority' => 75,
+            ],
             'depends_on' => ['core'],
             'providers' => [
                 ReportingModuleServiceProvider::class,
