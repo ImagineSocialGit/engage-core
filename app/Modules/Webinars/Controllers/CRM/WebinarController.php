@@ -11,6 +11,7 @@ use App\Modules\Webinars\Actions\SyncWebinarSeriesFromProviderAction;
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
+use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Modules\Webinars\Requests\ReplaceWebinarOccurrenceRequest;
 use App\Modules\Webinars\Requests\StoreWebinarSeriesRequest;
@@ -50,6 +51,48 @@ class WebinarController extends Controller
             ->orderByDesc('is_default')
             ->orderBy('name')
             ->get();
+
+        $upcomingWebinars = Webinar::query()
+            ->with('webinarSeries')
+            ->withCount('registrations')
+            ->where('ends_at', '>', now())
+            ->matchingCurrentSeriesProvider()
+            ->orderBy('starts_at')
+            ->orderBy('id')
+            ->limit(6)
+            ->get();
+
+        $pendingPostEventReviews = collect();
+
+        if (config('webinars.post_event.review.required', false)) {
+            $pendingPostEventReviews = Webinar::query()
+                ->with('webinarSeries')
+                ->withCount([
+                    'registrations as attended_registrations_count' => fn ($query) => $query->whereNotNull('attended_at'),
+                    'registrations as missed_registrations_count' => fn ($query) => $query->where('status', 'missed'),
+                ])
+                ->whereNotNull('ends_at')
+                ->where('ends_at', '<=', now())
+                ->where('meta->normalized->post_event->review->status', 'pending')
+                ->orderByDesc('ends_at')
+                ->orderByDesc('id')
+                ->limit(4)
+                ->get();
+        }
+
+        $registrationAttentionCount = WebinarRegistration::query()
+            ->where(function ($query): void {
+                $query
+                    ->whereIn('meta->registration_finalization->status', [
+                        'failed',
+                        'reconciliation_required',
+                    ])
+                    ->orWhere(
+                        'meta->provider_sync->status',
+                        'reconciliation_required',
+                    );
+            })
+            ->count();
 
         $showArchived = $request->boolean('archived');
         $showAttention = $request->boolean('attention');
@@ -108,6 +151,10 @@ class WebinarController extends Controller
             'webinars' => $webinars,
             'series' => $series,
             'scheduleProfiles' => $scheduleProfiles,
+            'upcomingWebinars' => $upcomingWebinars,
+            'pendingPostEventReviews' => $pendingPostEventReviews,
+            'registrationAttentionCount' => $registrationAttentionCount,
+            'attentionCount' => $pendingPostEventReviews->count() + $registrationAttentionCount,
             'showArchived' => $showArchived,
             'showAttention' => $showAttention,
             'providerEventTypeOptions' => $this->providerEventTypeOptions(),

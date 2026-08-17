@@ -32,7 +32,7 @@ class WebinarPostEventReviewController extends Controller
 
         return view('crm.webinars.post-event-review', [
             'title' => 'Review Webinar Follow-ups',
-            'heading' => 'Review Webinar Follow-ups',
+            'heading' => 'Your webinar is finished — review follow-ups',
             'webinar' => $webinar,
             'review' => $this->reviewState($webinar),
             'alternateWebinars' => $alternateWebinars,

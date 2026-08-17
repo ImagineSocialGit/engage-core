@@ -1,4 +1,3 @@
-
 <x-layouts.crm :title="$title" :heading="$heading">
     <div
         class="space-y-6"
@@ -119,37 +118,195 @@
             </div>
         @endif
 
-        @if(function_exists('module_enabled') && module_enabled('messaging') && \Illuminate\Support\Facades\Route::has('crm.webinars.message-templates.index'))
-            <div class="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <p class="font-semibold text-slate-950">Webinar messages</p>
-                        <p class="mt-1 text-slate-600">Review the templates used for confirmations, reminders, waitlist alerts, and replay follow-ups before sharing registration links.</p>
-                    </div>
+        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                <div class="max-w-3xl">
+                    <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
+                        Webinar workspace
+                    </p>
+                    <h2 class="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                        Run the next webinar. Review what needs you. Leave the machinery in the background.
+                    </h2>
+                    <p class="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
+                        Upcoming sessions, follow-up reviews, and registration recovery are surfaced first. Provider setup, series maintenance, and testing tools are available below when you actually need them.
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    @if(function_exists('module_enabled') && module_enabled('messaging') && \Illuminate\Support\Facades\Route::has('crm.webinars.message-templates.index'))
+                        <a
+                            href="{{ route('crm.webinars.message-templates.index') }}"
+                            class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-extrabold text-white transition hover:bg-slate-800"
+                        >
+                            Registration & follow-up messages
+                        </a>
+                    @endif
+
                     <a
-                        href="{{ route('crm.webinars.message-templates.index') }}"
-                        class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-xs font-extrabold text-slate-700 transition hover:bg-slate-50"
+                        href="#advanced-webinar-setup"
+                        class="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50"
                     >
-                        Choose templates
+                        Advanced setup
                     </a>
                 </div>
             </div>
-        @endif
+        </section>
 
-        @if($webinarDevEnabled ?? $webinarSmokeEnabled ?? false)
-            <div class="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
-                <p class="font-semibold">Webinar Event Testing Tools Enabled</p>
-                <p class="mt-1 text-indigo-800">
-                    Use the Testing button on any event to open dev/staging-only controls for confirmations, reminders, join simulation, FlowRoute events, replay URLs, and post-webinar follow-ups.
-                </p>
+        <section class="rounded-3xl border {{ ($attentionCount ?? 0) > 0 ? 'border-amber-200 bg-amber-50/70' : 'border-emerald-200 bg-emerald-50/60' }} p-6 shadow-sm">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-xl font-black tracking-tight text-slate-950">Needs attention</h2>
+                        <span class="rounded-full {{ ($attentionCount ?? 0) > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' }} px-2.5 py-1 text-xs font-extrabold">
+                            {{ $attentionCount ?? 0 }} {{ ($attentionCount ?? 0) === 1 ? 'item' : 'items' }}
+                        </span>
+                    </div>
+                    <p class="mt-1 text-sm leading-6 text-slate-600">
+                        Decisions and recovery work that can block confirmations or post-webinar follow-up.
+                    </p>
+                </div>
+
+                @if(($registrationAttentionCount ?? 0) > 0)
+                    <a
+                        href="{{ route('crm.webinar-series.index', ['attention' => 1]) }}"
+                        class="text-sm font-extrabold text-amber-800 underline decoration-amber-300 underline-offset-4 hover:text-amber-950"
+                    >
+                        Open registration recovery
+                    </a>
+                @endif
             </div>
-        @endif
 
-        <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-            <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            @if(($attentionCount ?? 0) === 0)
+                <div class="mt-5 rounded-2xl border border-emerald-200 bg-white/80 px-4 py-4 text-sm text-emerald-900">
+                    <p class="font-bold">Nothing is waiting on you right now.</p>
+                    <p class="mt-1 text-emerald-800">Upcoming webinar delivery can continue on its configured schedule.</p>
+                </div>
+            @else
+                <div class="mt-5 grid gap-3 lg:grid-cols-2">
+                    @foreach(($pendingPostEventReviews ?? collect()) as $reviewWebinar)
+                        <article class="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm">
+                            <div class="flex items-start justify-between gap-4">
+                                <div>
+                                    <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-700">Follow-up review</p>
+                                    <h3 class="mt-1 text-base font-black text-slate-950">{{ $reviewWebinar->title }}</h3>
+                                    <p class="mt-1 text-sm text-slate-600">
+                                        {{ (int) ($reviewWebinar->attended_registrations_count ?? 0) }} attended · {{ (int) ($reviewWebinar->missed_registrations_count ?? 0) }} missed
+                                    </p>
+                                    <p class="mt-2 text-sm leading-6 text-slate-600">
+                                        Confirm the replay plan before replay-dependent follow-ups continue.
+                                    </p>
+                                </div>
+
+                                <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-800">Waiting</span>
+                            </div>
+
+                            <a
+                                href="{{ route('crm.webinars.post-event-review.show', $reviewWebinar) }}"
+                                class="mt-4 inline-flex min-h-10 items-center justify-center rounded-full bg-amber-700 px-4 text-sm font-extrabold text-white transition hover:bg-amber-600"
+                            >
+                                Review follow-ups
+                            </a>
+                        </article>
+                    @endforeach
+
+                    @if(($registrationAttentionCount ?? 0) > 0)
+                        <article class="rounded-2xl border border-red-200 bg-white p-5 shadow-sm">
+                            <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-red-700">Registration recovery</p>
+                            <h3 class="mt-1 text-base font-black text-slate-950">
+                                {{ $registrationAttentionCount }} {{ $registrationAttentionCount === 1 ? 'registration needs' : 'registrations need' }} review
+                            </h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-600">
+                                These registrations have a failed or ambiguous provider finalization and need an operator decision before normal confirmation can continue.
+                            </p>
+                            <a
+                                href="{{ route('crm.webinar-series.index', ['attention' => 1]) }}"
+                                class="mt-4 inline-flex min-h-10 items-center justify-center rounded-full bg-red-700 px-4 text-sm font-extrabold text-white transition hover:bg-red-600"
+                            >
+                                Resolve registrations
+                            </a>
+                        </article>
+                    @endif
+                </div>
+            @endif
+        </section>
+
+        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h2 class="text-xl font-black tracking-tight text-slate-950">Upcoming webinars</h2>
+                    <p class="mt-1 text-sm leading-6 text-slate-600">The next sessions currently eligible to run for their series.</p>
+                </div>
+                <a
+                    href="#event-operations"
+                    class="text-sm font-extrabold text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
+                >
+                    View event details & recovery
+                </a>
+            </div>
+
+            <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                @forelse(($upcomingWebinars ?? collect()) as $upcomingWebinar)
+                    @php
+                        $upcomingRegistrationUrl = filled($upcomingWebinar->webinarSeries?->slug)
+                            ? route('webinar.show', ['seriesSlug' => $upcomingWebinar->webinarSeries->slug])
+                            : null;
+                        $isLive = $upcomingWebinar->starts_at?->lte(now()) && $upcomingWebinar->ends_at?->gt(now());
+                        $registrationCount = (int) ($upcomingWebinar->registrations_count ?? 0);
+                    @endphp
+
+                    <article class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-xs font-extrabold uppercase tracking-[0.14em] {{ $isLive ? 'text-emerald-700' : 'text-slate-500' }}">
+                                    {{ $isLive ? 'Live now' : 'Upcoming' }}
+                                </p>
+                                <h3 class="mt-1 text-base font-black text-slate-950">{{ $upcomingWebinar->title }}</h3>
+                                <p class="mt-1 text-sm text-slate-500">{{ $upcomingWebinar->webinarSeries?->title ?? 'Webinar series' }}</p>
+                            </div>
+                            <span class="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-slate-700 ring-1 ring-slate-200">
+                                {{ $registrationCount }} {{ $registrationCount === 1 ? 'registration' : 'registrations' }}
+                            </span>
+                        </div>
+
+                        <p class="mt-4 text-sm font-bold text-slate-900">
+                            {{ $upcomingWebinar->starts_at?->copy()->setTimezone($upcomingWebinar->timezone)->format('M j, Y · g:i A') ?? 'Start time pending' }}
+                        </p>
+                        <p class="mt-1 text-xs text-slate-500">{{ $upcomingWebinar->timezone }}</p>
+
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            <a
+                                href="#webinar-{{ $upcomingWebinar->getKey() }}"
+                                class="inline-flex min-h-9 items-center justify-center rounded-full border border-slate-300 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
+                            >
+                                Event details
+                            </a>
+
+                            @if($upcomingRegistrationUrl)
+                                <a
+                                    href="{{ $upcomingRegistrationUrl }}"
+                                    target="_blank"
+                                    rel="noopener"
+                                    class="inline-flex min-h-9 items-center justify-center rounded-full bg-slate-950 px-3 text-xs font-extrabold text-white hover:bg-slate-800"
+                                >
+                                    Registration page
+                                </a>
+                            @endif
+                        </div>
+                    </article>
+                @empty
+                    <div class="md:col-span-2 xl:col-span-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
+                        <p class="font-bold text-slate-900">No upcoming webinars are scheduled.</p>
+                        <p class="mt-1 text-sm text-slate-600">Use Advanced setup when you are ready to add or sync the next occurrence.</p>
+                    </div>
+                @endforelse
+            </div>
+        </section>
+
+        <div id="event-operations" class="space-y-6">
+            <div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="flex flex-col gap-3 px-12 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <h2 class="text-sm font-semibold text-slate-900">
-                        {{ $showAttention ? 'Registration Recovery' : ($showArchived ? 'All Events' : 'Upcoming Events') }}
+                        {{ $showAttention ? 'Registration recovery' : ($showArchived ? 'Webinar history' : 'Event details & recovery') }}
                     </h2>
 
                     <div class="flex flex-wrap items-center gap-3 text-sm font-medium">
@@ -294,7 +451,7 @@
                                 $modalName = 'webinar-dev-testing-'.$webinar->id;
                             @endphp
 
-                            <tr class="hover:bg-slate-50">
+                            <tr id="webinar-{{ $webinar->getKey() }}" class="scroll-mt-24 hover:bg-slate-50">
                                 <td class="px-6 py-4 font-medium text-slate-900">
                                     {{ $webinar->title }}
 
@@ -1062,11 +1219,30 @@
                 </table>
             </div>
 
-            <div class="space-y-6">
-                <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 class="text-base font-semibold text-slate-900">
-                        Add Series
-                    </h2>
+            <details id="advanced-webinar-setup" class="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+                <summary class="cursor-pointer list-none">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">Operator setup</p>
+                            <h2 class="mt-1 text-lg font-black text-slate-950">Advanced setup & provider tools</h2>
+                            <p class="mt-1 text-sm text-slate-600">Create or sync series, change provider type or schedule profiles, and access dev/staging testing controls.</p>
+                        </div>
+                        <span class="text-sm font-extrabold text-slate-700">Open setup</span>
+                    </div>
+                </summary>
+
+                @if($webinarDevEnabled ?? $webinarSmokeEnabled ?? false)
+                    <div class="mt-5 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+                        <p class="font-semibold">Dev/staging webinar testing is enabled.</p>
+                        <p class="mt-1 text-indigo-800">Testing buttons on event rows expose forced sends, join simulation, attendance outcomes, replay URLs, and post-event follow-up controls.</p>
+                    </div>
+                @endif
+
+                <div class="mt-5 grid gap-6 xl:grid-cols-3">
+                    <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h2 class="text-base font-semibold text-slate-900">
+                            Add Series
+                        </h2>
 
                     <form method="POST" action="{{ route('crm.webinar-series.store') }}" class="mt-4 space-y-4">
                         @csrf
@@ -1314,7 +1490,8 @@
                         </div>
                     </div>
                 @endif
-            </div>
+                </div>
+            </details>
         </div>
     </div>
 </x-layouts.crm>
