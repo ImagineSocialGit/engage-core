@@ -1,62 +1,50 @@
 # Engage Core Module Docs
 
-Detailed module-specific responsibility, dependency, schema, current-commitment, and deferred-work notes live here.
+Module-owned documentation lives under one directory per module:
 
-Use `../module-boundaries.md` for global ownership, dependency direction, schema ownership, migration organization, and boundary guardrails.
+```text
+docs/modules/<module>/module_state.md
+docs/modules/<module>/TODO.md            # only while actionable backlog exists
+```
 
-Use `../module-surfaces.md` for loud/silent product-surface rules, the current classification registry, navigation expectations, and the module-definition template.
+`module_state.md` is the durable module reference. It owns responsibility, dependency, schema, current committed behavior, public seams, Project State status, and durable deferred direction.
 
-Use `../project-organization.md` for a quick architecture and surface map.
+`TODO.md` is disposable module-owned backlog. Delete completed items instead of turning it into release history. Do not create an empty TODO merely for symmetry.
 
-Use `../TODO.md` for actionable backlog.
+Use `../module-boundaries.md` for platform-wide ownership/dependency rules, `../module-surfaces.md` for loud/silent product-surface rules, and `../TODO.md` only for backlog that genuinely has no single module owner.
 
-## Platform foundation
+## Module index
 
-| Capability | Surface | Doc |
+| Module | Status / surface | State |
 | --- | --- | --- |
-| Core | Platform exception; Contacts/CRM shell are loud | `core.md` |
-
-## Current universal modules
-
-| Module | Surface | Doc |
-| --- | --- | --- |
-| Messaging | Silent | `messaging.md` |
-| InboundMessaging | Silent | `inbound-messaging.md` |
-| InternalNotifications | Silent | `internal-notifications.md` |
-| Tasks | Loud | `tasks.md` |
-| Workflow | Silent | `workflow.md` |
-| FlowRoutes | Loud; presented as Routes | `flow-routes.md` |
-| Campaigns | Loud | `campaigns.md` |
-| Broadcasts | Loud | `broadcasts.md` |
-| Webinars | Loud | `webinars.md` |
-| Reporting | Loud | `reporting.md` |
-| Scheduling | Loud | `scheduling.md` |
-| Portal | Loud | `portal.md` |
-| Forms | Loud | `forms.md` |
-| Documents | Loud | `documents.md` |
-| Commerce | Loud | `commerce.md` |
-| Location | Silent | `location.md` |
-
-## Planned universal modules
-
-| Module | Surface | Doc |
-| --- | --- | --- |
-| Events | Loud | `events.md` |
-
-## Current and planned vertical modules
-
-| Module | Status | Surface | Doc |
-| --- | --- | --- | --- |
-| Mortgage | Current | Loud | `mortgage.md` |
-| PetServices | Planned | Loud | `pet-services.md` |
-| Music | Planned | Loud | `music.md` |
-| Experiences | Planned | Loud | `experiences.md` |
+| Core | Required; platform exception | `core/module_state.md` |
+| Messaging | Universal; silent | `messaging/module_state.md` |
+| InboundMessaging | Universal; silent | `inbound-messaging/module_state.md` |
+| InternalNotifications | Universal; silent | `internal-notifications/module_state.md` |
+| Tasks | Universal; loud | `tasks/module_state.md` |
+| Workflow | Universal; silent | `workflow/module_state.md` |
+| FlowRoutes | Universal; loud; presented as Routes | `flow-routes/module_state.md` |
+| Campaigns | Universal; loud | `campaigns/module_state.md` |
+| Broadcasts | Universal; loud | `broadcasts/module_state.md` |
+| Webinars | Universal; loud | `webinars/module_state.md` |
+| Reporting | Universal; loud | `reporting/module_state.md` |
+| Scheduling | Universal; loud | `scheduling/module_state.md` |
+| Portal | Universal; loud | `portal/module_state.md` |
+| Forms | Universal; loud | `forms/module_state.md` |
+| Documents | Universal; loud | `documents/module_state.md` |
+| Commerce | Universal; loud | `commerce/module_state.md` |
+| Location | Universal; silent | `location/module_state.md` |
+| Events | Planned universal; loud | `events/module_state.md` |
+| Mortgage | Current vertical; loud | `mortgage/module_state.md` |
+| PetServices | Planned vertical; loud | `pet-services/module_state.md` |
+| Music | Planned vertical; loud | `music/module_state.md` |
+| Experiences | Planned vertical; loud | `experiences/module_state.md` |
 
 Integrations/adapters are not modules and do not receive independent product surfaces by default.
 
 ## Module reference standard
 
-When a module doc is materially revised, state:
+When a module state doc is materially revised, keep these concerns explicit where relevant:
 
 ```text
 architecture tier
@@ -66,32 +54,16 @@ primary users and surfaces
 owns / does not own
 consumes / consumed by
 current committed workflows
-deferred possibilities
+public seams required by those workflows
+schema/table notes
 Project State status
+durable deferred possibilities
 ```
 
-Do not churn every file merely for symmetry. Apply the standard when a module is actively designed or implemented.
-
-## FOSS and competitive references
-
-Sections that describe FOSS, competitive, or provider feature shapes are possibility inventories only.
-
-They do not become module requirements until a concrete Engage Core workflow needs them, ownership is clear, the smallest durable contract is defined, and the capability passes the product barometer.
+FOSS, competitive, or provider feature inventories are possibility inventories only. They are not requirements until an approved Engage Core workflow adopts them.
 
 ## Split rule
 
-`module-boundaries.md` should stay architectural and global. Module docs should own detailed module-specific notes such as:
+Global docs should contain only platform-wide rules. Once a concern is primarily owned by one module, put its durable contract in that module's `module_state.md` (or a focused companion doc in the same directory) and its actionable work in that module's `TODO.md`.
 
-```text
-- module identity and product surface
-- module responsibility
-- owns / does not own
-- consumes / consumed by
-- current committed workflows
-- public seams required by those workflows
-- table notes
-- Project State status
-- deferred possibilities
-```
-
-When a module-specific section grows large inside `module-boundaries.md`, move the detail into the matching file here and leave only a short pointer or global rule behind.
+Cross-module docs should remain global only when no one module can own the contract without distorting dependency direction.

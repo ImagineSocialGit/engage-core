@@ -2,7 +2,7 @@
 
 This document defines how Engage Core modules appear—or intentionally do not appear—as product surfaces.
 
-Use `module-boundaries.md` for ownership, dependency direction, schema, and public seams. Use `project-organization.md` for the quick module map. Use `modules/*.md` for each module's detailed responsibilities and current commitments.
+Use `module-boundaries.md` for ownership, dependency direction, schema, and public seams. Use `project-organization.md` for the quick module map. Use `modules/<module>/module_state.md` for each module's detailed responsibilities and current commitments.
 
 ## Two independent classifications
 

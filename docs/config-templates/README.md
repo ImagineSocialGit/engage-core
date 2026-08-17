@@ -2,7 +2,7 @@
 
 This directory contains safe starting templates for Engage Core default configs and client-specific overrides.
 
-Use this file as the template index. Use `docs/config-authoring-guide.md` for the full authoring rules, token rules, module-boundary rules, and review checklist.
+Use this file as the template index. Use `docs/configuration/config-authoring-guide.md` for the full authoring rules, token rules, module-boundary rules, and review checklist.
 
 ## Primary references
 
@@ -12,16 +12,16 @@ not allowed to invent fields or tokens that runtime ignores.
 
 Permanent implementation references:
 
-- [`../config-contracts.md`](../config-contracts.md)
-- [`../config-hardening-audit.md`](../config-hardening-audit.md)
-- [`../config-generation-lock-in-roadmap.md`](../config-generation-lock-in-roadmap.md)
+- [`../configuration/config-contracts.md`](../configuration/config-contracts.md)
+- [`../configuration/config-hardening-audit.md`](../configuration/config-hardening-audit.md)
+- [`../configuration/roadmap.md`](../configuration/roadmap.md)
 
 Read these before authoring or reviewing configs:
 
 ```text
-docs/config-authoring-guide.md
+docs/configuration/config-authoring-guide.md
 docs/module-boundaries.md
-docs/modules/*.md
+docs/modules/<module>/module_state.md
 docs/config-templates/TOKEN_REFERENCE.md
 config/reference/keys.php
 ```
@@ -372,7 +372,7 @@ We are generating Engage Core configs.
 
 Read these first:
 - config/reference/keys.php
-- docs/config-authoring-guide.md
+- docs/configuration/config-authoring-guide.md
 - docs/config-templates/README.md
 - docs/config-templates/TOKEN_REFERENCE.md
 

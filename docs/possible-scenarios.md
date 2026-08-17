@@ -335,5 +335,3 @@ Additional module-specific validation only when new executable contracts/capabil
 ```
 
 The current contributor-based setup validation should keep using scenarios like these as regression cases so new presets fail clearly when they reference unavailable modules, missing templates, missing campaign keys, unsupported point types, invalid tokens/fields, unavailable capabilities, or unsafe Route/event-wait correlation. New module-owned Point types should contribute their own schema and semantic/domain-reference validation through the shared automation Point-definition registry.
-
-

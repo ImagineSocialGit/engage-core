@@ -1,4 +1,3 @@
-
 <?php
 
 use App\Modules\Broadcasts\Providers\BroadcastsModuleServiceProvider;

@@ -2,7 +2,7 @@
 
 This guide turns Engage Core's product principles into practical interface rules.
 
-Use this document when designing, reviewing, or refactoring CRM/admin/client-facing screens. Use `product-principles.md` for the product posture, `module-boundaries.md` for ownership and dependency rules, `config-authoring-guide.md` for config/template rules, and `TODO.md` for disposable backlog.
+Use this document when designing, reviewing, or refactoring CRM/admin/client-facing screens. Use `product-principles.md` for the product posture, `module-boundaries.md` for ownership and dependency rules, `configuration/config-authoring-guide.md` for config/template rules, and the owning module/configuration `TODO.md` for disposable backlog; use root `TODO.md` only for truly platform-wide work.
 
 ## Core UX standard
 
@@ -1372,7 +1372,7 @@ Action failed.
 
 ## Known UX issue catalog
 
-Use this section to capture UX problems discovered during review. Move items to `TODO.md` only when they become actionable implementation backlog.
+Use this section to capture UX problems discovered during review. Move actionable items to the owning module/configuration `TODO.md`; use root `TODO.md` only when no single owner exists.
 
 ### Platform cockpit screens
 
@@ -1736,5 +1736,3 @@ customer_first_name
 when those names make the authoring experience clearer for the current client. The UI should resolve those aliases to one canonical internal Contact field such as `contact.first_name`.
 
 The product should optimize for the user's vocabulary without duplicating runtime concepts, token sources, schema, or validation logic.
-
-

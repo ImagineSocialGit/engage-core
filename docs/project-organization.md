@@ -1,5 +1,31 @@
 # Engage Core Project Organization
 
+## Documentation ownership
+
+Keep the `docs/` root for platform-wide architecture/product rules only. Organize scoped documentation by owner:
+
+```text
+docs/modules/<module>/module_state.md
+    durable module-owned state, boundaries, schema, public seams, and committed direction
+
+docs/modules/<module>/TODO.md
+    optional disposable module backlog; create only when active work exists
+
+docs/configuration/
+    shared configuration contracts, authoring, roadmap, and checklist
+
+docs/operations/
+    deployment, environment, third-party-service, maintenance, and runbook material
+
+docs/config-templates/
+    executable-shape reference templates
+```
+
+Root `docs/TODO.md` is only for actionable work with no single module/configuration owner. Do not maintain a competing global client-readiness roadmap; implementation sequencing belongs with the owning module/subsystem.
+
+When a module thread changes durable architecture or backlog, it should normally edit only its module subtree. Cross-module/global docs change only when the platform-wide rule itself changes.
+
+
 ## Shared config and token contract infrastructure
 
 Executable authoring contracts live under `app/Support/ConfigContracts` and
@@ -14,7 +40,7 @@ searching and future schema-driven authoring clearer.
 Shared code owns the registry and neutral schema primitives. A module owns the meaning of its
 fields, token sources, producer contexts, computed values, and semantic validation. No UI or
 documentation layer should maintain a parallel list. See
-[`config-contracts.md`](config-contracts.md).
+[`configuration/config-contracts.md`](configuration/config-contracts.md).
 
 
 For Messaging copy, `MessageTemplateTokenValidator` is the shared context-aware consumer of
@@ -40,7 +66,7 @@ A new module-owned Route action should not require central FlowRoutes imports or
 
 This document is a quick orientation map for Engage Core. It classifies the project into Core, universal modules, vertical modules, and integrations/adapters.
 
-Use `module-boundaries.md` for detailed ownership and dependency rules. Use `TODO.md` for actionable implementation backlog. Use `model-persistence-bloat-audit.md` for the current system-wide audit of model creation, JSON payload shape, duplicated snapshots, and database-write boundaries. Use `project-state-extension-guide.md` for the shared database-transfer contract.
+Use `module-boundaries.md` for detailed ownership and dependency rules. Module-specific backlog lives in `modules/<module>/TODO.md`; configuration backlog lives in `configuration/TODO.md`; root `TODO.md` is only for work with no single owner. Use `modules/messaging/persistence-architecture.md` for the Messaging-centered cross-module persistence audit and `project-state-extension-guide.md` for the shared database-transfer contract.
 
 ## Shared Project State transfer infrastructure
 

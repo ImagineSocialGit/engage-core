@@ -6,8 +6,8 @@ This is the concise command-level authority for installing and upgrading Engage 
 
 Use it alongside:
 
-- `../client-staging-production-setup-checklist.md` for full server/client rollout steps;
-- `../deployment-safety-and-troubleshooting.md` for worker, Redis, reset, and incident safety;
+- `client-staging-production-setup-checklist.md` for full server/client rollout steps;
+- `deployment-safety-and-troubleshooting.md` for worker, Redis, reset, and incident safety;
 - `project-state-transfer-runbook.md` for an approved Project State clean rebuild.
 
 Normal application startup never runs migrations. Normal runtime bootstrap registers only the platform migration path. Optional module schema is selected explicitly by the module migration commands.

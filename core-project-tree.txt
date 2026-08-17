@@ -1564,14 +1564,6 @@
 │       └── WebinarSeeder.php
 ├── docs
 │   ├── automation-opportunities.md
-│   ├── client-environment-reference.md
-│   ├── client-readiness-roadmap.md
-│   ├── client-staging-production-setup-checklist.md
-│   ├── client-third-party-services-checklist.md
-│   ├── config-authoring-guide.md
-│   ├── config-contracts.md
-│   ├── config-generation-lock-in-roadmap.md
-│   ├── config-hardening-audit.md
 │   ├── config-templates
 │   │   ├── campaign-presets-template.php
 │   │   ├── client-request-intake-template.md
@@ -1587,42 +1579,85 @@
 │   │   ├── TOKEN_REFERENCE.md
 │   │   ├── webinar-post-event-template.php
 │   │   └── webinar-schedule-profiles-template.php
-│   ├── deployment-safety-and-troubleshooting.md
-│   ├── model-persistence-bloat-audit.md
+│   ├── configuration
+│   │   ├── checklist.md
+│   │   ├── config-authoring-guide.md
+│   │   ├── config-contracts.md
+│   │   ├── config-hardening-audit.md
+│   │   ├── roadmap.md
+│   │   └── TODO.md
+│   ├── development-checklist.md
 │   ├── modular-migrations.md
 │   ├── module-boundaries.md
 │   ├── modules
-│   │   ├── broadcasts.md
-│   │   ├── campaigns.md
-│   │   ├── commerce.md
-│   │   ├── core.md
-│   │   ├── documents.md
-│   │   ├── events.md
-│   │   ├── experiences.md
-│   │   ├── flow-routes.md
-│   │   ├── forms.md
-│   │   ├── inbound-messaging.md
-│   │   ├── internal-notifications.md
-│   │   ├── location.md
-│   │   ├── messaging.md
-│   │   ├── mortgage.md
-│   │   ├── music.md
-│   │   ├── pet-services.md
-│   │   ├── portal.md
+│   │   ├── broadcasts
+│   │   │   ├── module_state.md
+│   │   │   └── TODO.md
+│   │   ├── campaigns
+│   │   │   ├── module_state.md
+│   │   │   └── TODO.md
+│   │   ├── commerce
+│   │   │   └── module_state.md
+│   │   ├── core
+│   │   │   ├── module_state.md
+│   │   │   └── TODO.md
+│   │   ├── documents
+│   │   │   └── module_state.md
+│   │   ├── events
+│   │   │   └── module_state.md
+│   │   ├── experiences
+│   │   │   └── module_state.md
+│   │   ├── flow-routes
+│   │   │   ├── module_state.md
+│   │   │   └── TODO.md
+│   │   ├── forms
+│   │   │   └── module_state.md
+│   │   ├── inbound-messaging
+│   │   │   ├── module_state.md
+│   │   │   └── TODO.md
+│   │   ├── internal-notifications
+│   │   │   └── module_state.md
+│   │   ├── location
+│   │   │   └── module_state.md
+│   │   ├── messaging
+│   │   │   ├── checklist.md
+│   │   │   ├── module_state.md
+│   │   │   ├── permission-invitations.md
+│   │   │   ├── persistence-architecture.md
+│   │   │   └── TODO.md
+│   │   ├── mortgage
+│   │   │   └── module_state.md
+│   │   ├── music
+│   │   │   └── module_state.md
+│   │   ├── pet-services
+│   │   │   └── module_state.md
+│   │   ├── portal
+│   │   │   └── module_state.md
 │   │   ├── README.md
-│   │   ├── reporting.md
-│   │   ├── scheduling.md
-│   │   ├── tasks.md
-│   │   ├── webinars.md
-│   │   └── workflow.md
+│   │   ├── reporting
+│   │   │   ├── module_state.md
+│   │   │   └── TODO.md
+│   │   ├── scheduling
+│   │   │   ├── module_state.md
+│   │   │   └── TODO.md
+│   │   ├── tasks
+│   │   │   └── module_state.md
+│   │   ├── webinars
+│   │   │   ├── module_state.md
+│   │   │   └── TODO.md
+│   │   └── workflow
+│   │       └── module_state.md
 │   ├── module-surfaces.md
 │   ├── operations
+│   │   ├── client-environment-reference.md
+│   │   ├── client-staging-production-setup-checklist.md
+│   │   ├── client-third-party-services-checklist.md
 │   │   ├── crm-user-administration.md
 │   │   ├── deployment-command-workflow.md
+│   │   ├── deployment-safety-and-troubleshooting.md
 │   │   ├── observability
 │   │   │   └── README.md
 │   │   └── project-state-transfer-runbook.md
-│   ├── permission-invitations.md
 │   ├── possible-scenarios.md
 │   ├── product-principles.md
 │   ├── project-organization.md
@@ -2222,4 +2257,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-562 directories, 1661 files
+585 directories, 1673 files

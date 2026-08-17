@@ -4,7 +4,7 @@ This document defines Engage Core's durable architecture and product direction f
 
 Use this document for cross-module ownership, persistence, producer integration, fingerprinting, aggregation, eligibility, and suggestion behavior.
 
-Use `docs/modules/*.md` for module-specific producer rules. Use `docs/ui-ux-guide.md` for how suggestions should appear. Use `docs/module-boundaries.md` for global dependency rules.
+Use `docs/modules/<module>/module_state.md` for module-specific producer rules. Use `docs/ui-ux-guide.md` for how suggestions should appear. Use `docs/module-boundaries.md` for global dependency rules.
 
 ## Product goal
 
@@ -798,5 +798,3 @@ Removing an event from the allowlist should stop future evidence capture; it doe
 The architecture should allow future retention rules such as pruning old, uninteresting occurrences after a defined period while preserving occurrences tied to suggested or converted opportunities.
 
 Add retention/pruning only when real volume or operational needs justify it. Avoid long-term auditing/history storage with little product payoff.
-
-
