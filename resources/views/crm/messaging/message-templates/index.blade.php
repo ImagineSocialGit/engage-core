@@ -1,4 +1,3 @@
-
 <x-layouts.crm
     title="Message Templates"
     heading="Message Templates"
@@ -11,7 +10,7 @@
             </div>
         @endif
 
-        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
@@ -59,7 +58,7 @@
         </section>
 
         @if($presets->isEmpty())
-            <section class="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <section class="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
                 <h2 class="text-xl font-extrabold tracking-tight text-slate-950">
                     No message templates are available yet.
                 </h2>
@@ -70,7 +69,7 @@
         @else
             <div class="grid gap-6 xl:grid-cols-[minmax(18rem,0.82fr)_minmax(0,1.18fr)]">
                 <section class="rounded-3xl border border-slate-200 bg-white shadow-sm">
-                    <div class="border-b border-slate-200 px-5 py-4">
+                    <div class="border-b border-slate-200 px-4 py-4 sm:px-5">
                         <h2 class="text-base font-extrabold tracking-tight text-slate-950">
                             Template library
                         </h2>
@@ -79,7 +78,7 @@
                         </p>
                     </div>
 
-                    <form method="GET" action="{{ route('crm.messaging.message-templates.index') }}" class="border-b border-slate-200 bg-slate-50 p-5">
+                    <form method="GET" action="{{ route('crm.messaging.message-templates.index') }}" class="border-b border-slate-200 bg-slate-50 p-4 sm:p-5">
                         <div class="grid gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
                             <div>
                                 <label for="channel" class="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-500">
@@ -136,17 +135,17 @@
                             </div>
                         </div>
 
-                        <div class="mt-4 flex flex-wrap items-center gap-3">
+                        <div class="mt-4 grid gap-3 sm:flex sm:flex-wrap sm:items-center">
                             <button
                                 type="submit"
-                                class="inline-flex min-h-10 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-extrabold text-white transition hover:bg-slate-800"
+                                class="inline-flex min-h-10 w-full items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-extrabold text-white transition hover:bg-slate-800 sm:w-auto"
                             >
                                 Filter templates
                             </button>
                             @if($filters['channel'] || $filters['purpose'] || $filters['module'])
                                 <a
                                     href="{{ route('crm.messaging.message-templates.index') }}"
-                                    class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50"
+                                    class="inline-flex min-h-10 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
                                 >
                                     Clear filters
                                 </a>
@@ -171,9 +170,9 @@
 
                             <a
                                 href="{{ $groupUrl }}"
-                                class="block px-5 py-4 transition hover:bg-slate-50 {{ $selected ? 'bg-indigo-50/70' : '' }}"
+                                class="block px-4 py-4 transition hover:bg-slate-50 sm:px-5 {{ $selected ? 'bg-indigo-50/70' : '' }}"
                             >
-                                <div class="flex items-start justify-between gap-4">
+                                <div class="flex min-w-0 items-start justify-between gap-3 sm:gap-4">
                                     <div>
                                         <div class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
                                             {{ $group['module_label'] }} · {{ str_replace('_', ' ', $group['purpose']) }} · {{ strtoupper($group['channel']) }}
@@ -212,7 +211,7 @@
                             ], static fn ($value) => $value !== null && $value !== '');
                         @endphp
 
-                        <div class="border-b border-slate-200 px-6 py-5">
+                        <div class="border-b border-slate-200 px-4 py-5 sm:px-6">
                             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                 <div>
                                     <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
@@ -240,11 +239,11 @@
                             </div>
                         </div>
 
-                        <div class="border-b border-slate-200 bg-slate-50 px-6 py-4">
+                        <div class="border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-6">
                             <h3 class="text-sm font-extrabold text-slate-950">
                                 Messages in this group
                             </h3>
-                            <div class="mt-3 flex gap-2 overflow-x-auto pb-4">
+                            <div class="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-3">
                                 @foreach($selectedGroupEntries as $entry)
                                     @php
                                         $entryPreset = $entry->messageTemplatePreset;
@@ -266,7 +265,7 @@
                             </div>
                         </div>
 
-                        <div class="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+                        <div class="grid gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
                             <form
                                 method="POST"
                                 action="{{ route('crm.messaging.message-templates.update', $selectedPreset) }}"
@@ -448,13 +447,13 @@
                                     </div>
                                 @endif
 
-                                <div class="flex items-center justify-between gap-4 border-t border-slate-200 pt-5">
+                                <div class="flex flex-col items-stretch gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                                     <p class="text-sm text-slate-500">
                                         Saving marks this template as customized so normal sync will not overwrite it.
                                     </p>
                                     <button
                                         type="submit"
-                                        class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-extrabold text-white transition hover:bg-slate-800"
+                                        class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-extrabold text-white transition hover:bg-slate-800 sm:w-auto"
                                     >
                                         Save template
                                     </button>
@@ -582,5 +581,3 @@
         @endif
     </div>
 </x-layouts.crm>
-
-

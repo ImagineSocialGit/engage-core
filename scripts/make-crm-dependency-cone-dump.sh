@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 # Place in scripts/ under the Engage Core repository root.
 # Produces: file_dumps/CRM_dependency_cone_dump.txt
+# Revision: 2 - tightened test/integration discovery to avoid generic CRM/route noise.
 #
 # CRM is a cross-module application surface, not an app/Modules module.
 #
@@ -14,7 +15,8 @@ set -Eeuo pipefail
 #   - views directly referenced by admitted CRM controllers
 #   - routing/bootstrap/frontend baseline
 #   - CRM/auth/route-related tests
-#   - repository-wide explicit CRM integration references
+#   - dynamic CRM UI contributor seams (dashboard/contact panels)
+#   - explicit CRM/auth documentation baseline
 #
 # It intentionally does NOT recursively traverse every controller into models,
 # services, actions, migrations, and transitive module dependencies. Doing that
@@ -56,7 +58,8 @@ ROUTE_IMPORT_FILES="$TMP_DIR/route-import-files.txt"
 CONTROLLER_VIEW_FILES="$TMP_DIR/controller-view-files.txt"
 BLADE_DEPENDENCY_FILES="$TMP_DIR/blade-dependency-files.txt"
 TEST_FILES="$TMP_DIR/test-files.txt"
-INTEGRATION_FILES="$TMP_DIR/integration-files.txt"
+CRM_SUPPORT_FILES="$TMP_DIR/crm-support-files.txt"
+DOC_FILES="$TMP_DIR/doc-files.txt"
 BASELINE_FILES="$TMP_DIR/baseline-files.txt"
 CONFIG_FILES="$TMP_DIR/config-files.txt"
 FINAL_FILES="$TMP_DIR/final-files.txt"
@@ -72,7 +75,8 @@ for file in \
     "$CONTROLLER_VIEW_FILES" \
     "$BLADE_DEPENDENCY_FILES" \
     "$TEST_FILES" \
-    "$INTEGRATION_FILES" \
+    "$CRM_SUPPORT_FILES" \
+    "$DOC_FILES" \
     "$BASELINE_FILES" \
     "$CONFIG_FILES" \
     "$FINAL_FILES" \
@@ -338,9 +342,7 @@ BASELINE_PATHS=(
     "bootstrap/app.php"
     "bootstrap/providers.php"
     "composer.json"
-    "composer.lock"
     "package.json"
-    "package-lock.json"
     "vite.config.js"
     "vite.config.ts"
     "phpunit.xml"
@@ -361,6 +363,19 @@ BASELINE_PATHS=(
 
 for relative_path in "${BASELINE_PATHS[@]}"; do
     add_file "$ROOT_DIR/$relative_path" "$BASELINE_FILES"
+done
+
+DOC_PATHS=(
+    "docs/ui-ux-guide.md"
+    "docs/module-surfaces.md"
+    "docs/project-organization.md"
+    "docs/operations/crm-user-administration.md"
+    "docs/project-state-extension-guide.md"
+    "docs/operations/project-state-transfer-runbook.md"
+)
+
+for relative_path in "${DOC_PATHS[@]}"; do
+    add_file "$ROOT_DIR/$relative_path" "$DOC_FILES"
 done
 
 # ---------------------------------------------------------------------------
@@ -482,7 +497,46 @@ while [[ -s "$BLADE_QUEUE" ]]; do
 done
 
 # ---------------------------------------------------------------------------
-# 5. CRM/auth/route-focused tests
+# 5. Dynamic CRM UI contributors and auth ownership
+# ---------------------------------------------------------------------------
+
+# These are the cross-module seams that can materially change what appears on
+# CRM dashboard/contact pages without being imported directly by the owning
+# controller. Search app/ only so documentation/tests do not inflate the cone.
+CRM_SUPPORT_PATTERNS=(
+    "DashboardPanelProvider"
+    "DashboardPanelRegistry"
+    "ContactPanelProvider"
+    "ContactPanelRegistry"
+    "ContactShowDataProvider"
+    "ContactShowDataRegistry"
+)
+
+if [[ -d "$ROOT_DIR/app" ]]; then
+    while IFS= read -r app_file; do
+        is_forbidden_file "$app_file" && continue
+
+        matched=false
+
+        for pattern in "${CRM_SUPPORT_PATTERNS[@]}"; do
+            if grep -IFlq -- "$pattern" "$app_file" 2>/dev/null; then
+                matched=true
+                break
+            fi
+        done
+
+        if [[ "$matched" == true ]]; then
+            add_file "$app_file" "$CRM_SUPPORT_FILES"
+        fi
+    done < <(find "$ROOT_DIR/app" -type f -print)
+fi
+
+# Login is an application-level controller rather than a CRM-namespaced
+# controller, but it owns the CRM login view and redirect boundary.
+add_file "$ROOT_DIR/app/Http/Controllers/Auth/LoginController.php" "$CRM_SUPPORT_FILES"
+
+# ---------------------------------------------------------------------------
+# 6. CRM/auth/route-focused tests
 # ---------------------------------------------------------------------------
 
 if [[ -d "$ROOT_DIR/tests" ]]; then
@@ -490,27 +544,47 @@ if [[ -d "$ROOT_DIR/tests" ]]; then
         is_forbidden_file "$test_file" && continue
 
         relative="${test_file#$ROOT_DIR/}"
+        relative_lower="${relative,,}"
+        base_lower="$(basename "${test_file,,}")"
         include=false
 
-        case "${relative,,}" in
-            *crm*|*auth*|*route*)
+        # Strong path/name signals only. Do NOT match generic "route" because
+        # that accidentally admits nearly the entire FlowRoutes test suite.
+        case "$relative_lower" in
+            tests/feature/crm/*|tests/feature/auth/*)
                 include=true
                 ;;
         esac
 
         if [[ "$include" == false ]]; then
+            case "$base_lower" in
+                *crm*test.php|*login*test.php)
+                    include=true
+                    ;;
+            esac
+        fi
+
+        if [[ "$include" == false ]]; then
             TEST_PATTERNS=(
-                "crm."
-                "/crm"
-                "crm/"
-                "crm."
                 "route('crm."
                 'route("crm.'
-                "route('login'"
-                'route("login"'
+                "to_route('crm."
+                'to_route("crm.'
+                "assertRouteIs('crm."
+                'assertRouteIs("crm.'
+                "assertRedirectToRoute('crm."
+                'assertRedirectToRoute("crm.'
+                "assertViewIs('crm."
+                'assertViewIs("crm.'
+                "view('crm."
+                'view("crm.'
+                "<x-layouts.crm"
                 "auth.login"
-                "assertRedirectToRoute('login'"
-                'assertRedirectToRoute("login"'
+                "get('/login'"
+                'get("/login"'
+                "post('/login'"
+                'post("/login"'
+                "https://crm."
             )
 
             for pattern in "${TEST_PATTERNS[@]}"; do
@@ -528,70 +602,6 @@ if [[ -d "$ROOT_DIR/tests" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 6. Repository-wide explicit CRM integration perimeter
-# ---------------------------------------------------------------------------
-
-SEARCH_ROOTS=(
-    "app"
-    "bootstrap"
-    "config"
-    "docs"
-    "resources"
-    "routes"
-    "tests"
-)
-
-MATCH_PATTERNS=(
-    "resources/views/crm"
-    "views/crm"
-    "Controllers\\CRM"
-    "Controllers/CRM"
-    "<x-layouts.crm"
-    "route('crm."
-    "route(\"crm."
-    "to_route('crm."
-    "to_route(\"crm."
-    "redirect()->route('crm."
-    "redirect()->route(\"crm."
-    "crm."
-    "CRM"
-)
-
-for relative_root in "${SEARCH_ROOTS[@]}"; do
-    absolute_root="$ROOT_DIR/$relative_root"
-    [[ -d "$absolute_root" ]] || continue
-
-    while IFS= read -r file; do
-        is_forbidden_file "$file" && continue
-
-        relative_file="${file#$ROOT_DIR/}"
-        matched=false
-
-        # Strong path-based signals first.
-        case "$relative_file" in
-            resources/views/crm/*|app/Http/Controllers/CRM/*|app/Modules/*/Controllers/CRM/*|routes/crm.php|routes/crm/*)
-                matched=true
-                ;;
-        esac
-
-        if [[ "$matched" == false ]]; then
-            for pattern in "${MATCH_PATTERNS[@]}"; do
-                if [[ "$relative_file" == *"$pattern"* ]] \
-                    || grep -IFlq -- "$pattern" "$file" 2>/dev/null
-                then
-                    matched=true
-                    break
-                fi
-            done
-        fi
-
-        if [[ "$matched" == true ]]; then
-            add_file "$file" "$INTEGRATION_FILES"
-        fi
-    done < <(find "$absolute_root" -type f -print)
-done
-
-# ---------------------------------------------------------------------------
 # 7. Final assembly
 # ---------------------------------------------------------------------------
 
@@ -603,7 +613,8 @@ cat \
     "$CONTROLLER_VIEW_FILES" \
     "$BLADE_DEPENDENCY_FILES" \
     "$TEST_FILES" \
-    "$INTEGRATION_FILES" \
+    "$CRM_SUPPORT_FILES" \
+    "$DOC_FILES" \
     "$BASELINE_FILES" \
     "$CONFIG_FILES" \
     | sort -u \
@@ -622,7 +633,8 @@ ROUTE_IMPORT_COUNT="$(sort -u "$ROUTE_IMPORT_FILES" | wc -l | tr -d ' ')"
 CONTROLLER_VIEW_COUNT="$(sort -u "$CONTROLLER_VIEW_FILES" | wc -l | tr -d ' ')"
 BLADE_DEPENDENCY_COUNT="$(sort -u "$BLADE_DEPENDENCY_FILES" | wc -l | tr -d ' ')"
 TEST_COUNT="$(sort -u "$TEST_FILES" | wc -l | tr -d ' ')"
-INTEGRATION_COUNT="$(sort -u "$INTEGRATION_FILES" | wc -l | tr -d ' ')"
+CRM_SUPPORT_COUNT="$(sort -u "$CRM_SUPPORT_FILES" | wc -l | tr -d ' ')"
+DOC_COUNT="$(sort -u "$DOC_FILES" | wc -l | tr -d ' ')"
 BASELINE_COUNT="$(sort -u "$BASELINE_FILES" | wc -l | tr -d ' ')"
 CONFIG_COUNT="$(sort -u "$CONFIG_FILES" | wc -l | tr -d ' ')"
 GENERATED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
@@ -643,7 +655,8 @@ GENERATED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     echo "Views directly referenced by admitted controllers: $CONTROLLER_VIEW_COUNT"
     echo "Recursively resolved Blade dependencies: $BLADE_DEPENDENCY_COUNT"
     echo "CRM/auth/route-focused tests: $TEST_COUNT"
-    echo "Explicit CRM integration-perimeter files: $INTEGRATION_COUNT"
+    echo "Dynamic CRM UI/auth support files: $CRM_SUPPORT_COUNT"
+    echo "Explicit CRM documentation files: $DOC_COUNT"
     echo "Baseline files included: $BASELINE_COUNT"
     echo "Config dependencies included: $CONFIG_COUNT"
     echo
@@ -658,14 +671,18 @@ GENERATED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     echo "  - views directly referenced by CRM controllers/direct CRM-route runtime owners"
     echo "  - recursive static Blade @include/@extends/@component/view references"
     echo "  - recursive anonymous Blade <x-...> component references"
-    echo "  - CRM/auth/route-related test discovery by path and content"
-    echo "  - repository-wide explicit CRM references retained as integration evidence"
+    echo "  - CRM/auth/route-related test discovery by precise path/name/content signals"
+    echo "  - dynamic dashboard/contact-page contributor seams discovered across app/"
+    echo "  - application-level LoginController retained as the CRM auth owner"
+    echo "  - explicit CRM UI/routing documentation baseline retained"
     echo "  - bootstrap/provider/frontend build baseline retained"
     echo "  - config(...) roots resolved from CRM routes/controllers"
     echo "  - all environment files excluded except .env.example"
     echo
     echo "Intentional boundary:"
     echo "  - controller imports are not recursively expanded into every model/service/action"
+    echo "  - arbitrary backend files that merely link to a crm.* route are not included"
+    echo "  - generic CRM text matches are not used"
     echo "  - model table and migration ownership are not resolved for this cross-module surface"
     echo "  - use module dependency cones for deep module-owned runtime/schema dependencies"
     echo
@@ -735,6 +752,18 @@ GENERATED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     fi
 
     echo
+    echo "DYNAMIC CRM UI/AUTH SUPPORT"
+    echo "==========================="
+
+    if [[ "$CRM_SUPPORT_COUNT" -eq 0 ]]; then
+        echo "None detected."
+    else
+        while IFS= read -r file; do
+            echo "${file#$ROOT_DIR/}"
+        done < <(sort -u "$CRM_SUPPORT_FILES")
+    fi
+
+    echo
     echo "FILE INDEX"
     echo "=========="
 
@@ -772,6 +801,7 @@ echo "Direct CRM route imports: $ROUTE_IMPORT_COUNT"
 echo "Controller-referenced views: $CONTROLLER_VIEW_COUNT"
 echo "Recursive Blade dependencies: $BLADE_DEPENDENCY_COUNT"
 echo "CRM/auth/route-focused tests: $TEST_COUNT"
-echo "CRM integration-perimeter files: $INTEGRATION_COUNT"
+echo "Dynamic CRM UI/auth support files: $CRM_SUPPORT_COUNT"
+echo "Explicit CRM documentation files: $DOC_COUNT"
 echo "Baseline files: $BASELINE_COUNT"
 echo "Config dependencies: $CONFIG_COUNT"

@@ -16,7 +16,7 @@
             </div>
         @endif
 
-        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
@@ -32,7 +32,7 @@
 
                 <a
                     href="{{ route('crm.messaging.message-templates.index', ['module' => 'campaigns']) }}"
-                    class="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 px-5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50"
+                    class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 px-5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
                 >
                     Edit message copy
                 </a>
@@ -40,7 +40,7 @@
         </section>
 
         @if($campaigns->isEmpty())
-            <section class="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <section class="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
                 <h2 class="text-xl font-extrabold tracking-tight text-slate-950">
                     No campaigns are available yet.
                 </h2>
@@ -51,7 +51,7 @@
         @else
             <div class="grid gap-6 xl:grid-cols-[minmax(16rem,0.45fr)_minmax(0,1fr)]">
                 <section class="rounded-3xl border border-slate-200 bg-white shadow-sm">
-                    <div class="border-b border-slate-200 px-5 py-4">
+                    <div class="border-b border-slate-200 px-4 py-4 sm:px-5">
                         <h2 class="text-base font-extrabold tracking-tight text-slate-950">
                             Campaigns
                         </h2>
@@ -67,7 +67,7 @@
                             @endphp
                             <a
                                 href="{{ route('crm.campaigns.message-templates.index', ['campaign' => $campaign->getKey()]) }}"
-                                class="block px-5 py-4 transition hover:bg-slate-50 {{ $selectedCampaign && $selectedCampaign->is($campaign) ? 'bg-indigo-50/70' : '' }}"
+                                class="block px-4 py-4 transition hover:bg-slate-50 sm:px-5 {{ $selectedCampaign && $selectedCampaign->is($campaign) ? 'bg-indigo-50/70' : '' }}"
                             >
                                 <div class="font-extrabold text-slate-950">
                                     {{ $campaign->name }}
@@ -93,7 +93,7 @@
 
                 <section class="rounded-3xl border border-slate-200 bg-white shadow-sm">
                     @if($selectedCampaign)
-                        <div class="border-b border-slate-200 px-6 py-5">
+                        <div class="border-b border-slate-200 px-4 py-5 sm:px-6">
                             <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                                 <div>
                                     <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
@@ -178,7 +178,7 @@
                         </div>
                         <div class="divide-y divide-slate-100">
                             @foreach($selectedCampaign->steps as $step)
-                                <div id="step-{{ $step->id }}" class="p-6 {{ $selectedStep && $selectedStep->is($step) ? 'bg-indigo-50/40' : '' }}">
+                                <div id="step-{{ $step->id }}" class="p-4 sm:p-6 {{ $selectedStep && $selectedStep->is($step) ? 'bg-indigo-50/40' : '' }}">
                                     <div class="space-y-5">
                                         <div class="grid gap-5 lg:grid-cols-[minmax(0,0.7fr)_minmax(20rem,1fr)] lg:items-start">
                                             <div>
@@ -274,7 +274,7 @@
                                                     @if($selectedPreset)
                                                         <a
                                                             href="{{ route('crm.messaging.message-templates.index', ['channel' => $selectedPreset->channel, 'purpose' => $selectedPreset->purpose, 'module' => $selectedCatalogEntry?->module_key, 'preset' => $selectedPreset->getKey()]) }}"
-                                                            class="inline-flex min-h-9 items-center justify-center rounded-full border border-slate-300 px-4 text-xs font-extrabold text-slate-700 transition hover:bg-slate-50"
+                                                            class="inline-flex min-h-9 w-full items-center justify-center rounded-full border border-slate-300 px-4 text-xs font-extrabold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
                                                         >
                                                             Edit copy
                                                         </a>
@@ -321,13 +321,13 @@
                                                             <p class="text-sm font-semibold text-red-600">{{ $message }}</p>
                                                         @enderror
 
-                                                        <div class="flex items-center justify-between gap-4 pt-1">
+                                                        <div class="flex flex-col items-stretch gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                                                             <p class="text-xs leading-5 text-slate-500">
                                                                 This changes the selected template only. It does not edit campaign timing or reusable message copy.
                                                             </p>
                                                             <button
                                                                 type="submit"
-                                                                class="inline-flex min-h-10 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-extrabold text-white transition hover:bg-slate-800"
+                                                                class="inline-flex min-h-10 w-full items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-extrabold text-white transition hover:bg-slate-800 sm:w-auto"
                                                             >
                                                                 Save selection
                                                             </button>

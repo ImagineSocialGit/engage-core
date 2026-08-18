@@ -63,7 +63,7 @@
             this.selectedContacts = this.selectedContacts.filter((contact) => Number(contact.id) !== Number(contactId));
         },
     }"
-    class="space-y-3"
+    class="min-w-0 space-y-3"
 >
     <template x-for="contact in selectedContacts" :key="`hidden-${contact.id}`">
         <input type="hidden" name="{{ $inputName }}" :value="contact.id">
@@ -71,12 +71,12 @@
 
     <div class="flex flex-wrap gap-2">
         <template x-for="contact in selectedContacts" :key="contact.id">
-            <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm text-slate-700">
-                <span x-text="contact.label"></span>
+            <span class="inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm text-slate-700">
+                <span class="min-w-0 truncate" x-text="contact.label" :title="contact.label"></span>
 
                 <button
                     type="button"
-                    class="text-slate-400 hover:text-red-600"
+                    class="shrink-0 text-slate-400 hover:text-red-600"
                     @click="removeContact(contact.id)"
                     aria-label="Remove contact"
                 >
@@ -95,7 +95,7 @@
     <div class="relative">
         <button
             type="button"
-            class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            class="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto"
             @click="open = ! open; if (open) { $nextTick(() => $refs.search.focus()) }"
         >
             Add Individual Contacts
@@ -105,7 +105,7 @@
             x-cloak
             x-show="open"
             @click.outside="open = false"
-            class="absolute z-20 mt-2 w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl"
+            class="absolute left-0 z-20 mt-2 w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-3 shadow-xl sm:p-4"
         >
             <label class="block text-sm font-medium text-slate-700" for="broadcast-contact-picker-search">
                 Search contacts
@@ -144,7 +144,7 @@
                     <template x-for="contact in results" :key="contact.id">
                         <button
                             type="button"
-                            class="block w-full px-2 py-3 text-left hover:bg-slate-50"
+                            class="block w-full break-words px-2 py-3 text-left hover:bg-slate-50"
                             @click="addContact(contact)"
                         >
                             <span

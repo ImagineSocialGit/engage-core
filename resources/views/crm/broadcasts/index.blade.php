@@ -225,7 +225,7 @@
                             </select>
 
                             <p class="mt-2 text-xs text-slate-500">
-                                Hold Ctrl/Cmd to select multiple broadcasts.
+                                Select one or more broadcasts. On desktop, hold Ctrl/Cmd to choose multiple.
                             </p>
 
                             <x-ui.form.error name="exclude_broadcast_ids" />
@@ -283,8 +283,9 @@
                         <x-ui.form.error name="send_at" />
                     </div>
 
-                    <div class="flex flex-wrap gap-3">
+                    <div class="grid gap-3 sm:flex sm:flex-wrap">
                         <x-ui.button
+                            class="w-full justify-center sm:w-auto"
                             type="submit"
                             name="intent"
                             value="draft"
@@ -297,6 +298,7 @@
                             type="submit"
                             name="intent"
                             value="schedule"
+                            class="w-full justify-center sm:w-auto"
                         >
                             Schedule Broadcast
                         </x-ui.button>
@@ -431,7 +433,7 @@
                         </select>
 
                         <p class="mt-2 text-xs text-slate-600">
-                            Leave this unselected when targeting all imported contacts. Hold Ctrl/Cmd to select multiple batches.
+                            Leave this unselected when targeting all imported contacts. On desktop, hold Ctrl/Cmd to choose multiple batches.
                         </p>
 
                         <x-ui.form.error name="import_batch_ids" />
@@ -506,12 +508,13 @@
                         <x-ui.form.error name="send_at" />
                     </div>
 
-                    <div class="flex flex-wrap gap-3">
+                    <div class="grid gap-3 sm:flex sm:flex-wrap">
                         <x-ui.button
                             type="submit"
                             name="intent"
                             value="draft"
                             variant="secondary"
+                            class="w-full justify-center sm:w-auto"
                         >
                             Save Invitation Draft
                         </x-ui.button>
@@ -521,6 +524,7 @@
                             name="intent"
                             value="schedule"
                             :disabled="($permissionInvitationPreview['eligible_contacts_count'] ?? 0) < 1"
+                            class="w-full justify-center sm:w-auto"
                         >
                             Schedule Opt-In Invitation
                         </x-ui.button>
@@ -531,7 +535,7 @@
 
         <div class="grid gap-6 xl:grid-cols-2">
             <x-ui.card class="overflow-hidden p-0">
-                <div class="border-b border-slate-200 px-6 py-4">
+                <div class="border-b border-slate-200 px-4 py-4 sm:px-6">
                     <h2 class="text-lg font-semibold tracking-tight">
                         Recent Broadcasts
                     </h2>
@@ -541,7 +545,50 @@
                     </p>
                 </div>
 
-                <div class="overflow-x-auto">
+                <div class="divide-y divide-slate-200 md:hidden">
+                    @forelse($regularBroadcasts as $broadcast)
+                        <a
+                            href="{{ route('crm.broadcasts.show', $broadcast) }}"
+                            class="block p-4 transition hover:bg-slate-50"
+                        >
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <div class="break-words font-semibold text-slate-950">
+                                        {{ $broadcast->name }}
+                                    </div>
+                                    <div class="mt-1 break-words text-xs text-slate-500">
+                                        @if($broadcast->channel === 'sms')
+                                            {{ str($broadcast->payload['message'] ?? 'No message')->limit(80) }}
+                                        @else
+                                            {{ $broadcast->payload['subject'] ?? 'No subject' }}
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <span class="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                                    {{ str_replace('_', ' ', $broadcast->status) }}
+                                </span>
+                            </div>
+
+                            <dl class="mt-3 grid grid-cols-2 gap-3 text-xs">
+                                <div>
+                                    <dt class="font-semibold uppercase tracking-wide text-slate-400">Recipients</dt>
+                                    <dd class="mt-1 text-sm font-semibold text-slate-700">{{ $broadcast->recipient_count }}</dd>
+                                </div>
+                                <div>
+                                    <dt class="font-semibold uppercase tracking-wide text-slate-400">Send time</dt>
+                                    <dd class="mt-1 text-sm text-slate-700">{{ $broadcast->send_at?->format('M j, Y g:i A') ?? 'Not scheduled' }}</dd>
+                                </div>
+                            </dl>
+                        </a>
+                    @empty
+                        <div class="p-4 text-sm text-slate-600">
+                            No regular broadcasts yet.
+                        </div>
+                    @endforelse
+                </div>
+
+                <div class="hidden overflow-x-auto md:block">
                     <table class="min-w-full text-sm">
                         <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <tr>
@@ -599,7 +646,7 @@
             </x-ui.card>
 
             <x-ui.card class="overflow-hidden p-0">
-                <div class="border-b border-amber-200 bg-amber-50 px-6 py-4">
+                <div class="border-b border-amber-200 bg-amber-50 px-4 py-4 sm:px-6">
                     <h2 class="text-lg font-semibold tracking-tight">
                         Opt-In Invitations
                     </h2>
@@ -609,7 +656,46 @@
                     </p>
                 </div>
 
-                <div class="overflow-x-auto">
+                <div class="divide-y divide-amber-100 md:hidden">
+                    @forelse($permissionInvitationBroadcasts as $broadcast)
+                        <a
+                            href="{{ route('crm.broadcasts.show', $broadcast) }}"
+                            class="block p-4 transition hover:bg-amber-50/50"
+                        >
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <div class="break-words font-semibold text-slate-950">
+                                        {{ $broadcast->name }}
+                                    </div>
+                                    <div class="mt-1 break-words text-xs text-slate-500">
+                                        {{ $broadcast->payload['subject'] ?? 'No subject' }}
+                                    </div>
+                                </div>
+
+                                <span class="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
+                                    {{ str_replace('_', ' ', $broadcast->status) }}
+                                </span>
+                            </div>
+
+                            <dl class="mt-3 grid grid-cols-2 gap-3 text-xs">
+                                <div>
+                                    <dt class="font-semibold uppercase tracking-wide text-slate-400">Recipients</dt>
+                                    <dd class="mt-1 text-sm font-semibold text-slate-700">{{ $broadcast->recipient_count }}</dd>
+                                </div>
+                                <div>
+                                    <dt class="font-semibold uppercase tracking-wide text-slate-400">Send time</dt>
+                                    <dd class="mt-1 text-sm text-slate-700">{{ $broadcast->send_at?->format('M j, Y g:i A') ?? 'Not scheduled' }}</dd>
+                                </div>
+                            </dl>
+                        </a>
+                    @empty
+                        <div class="p-4 text-sm text-slate-600">
+                            No opt-in invitations yet.
+                        </div>
+                    @endforelse
+                </div>
+
+                <div class="hidden overflow-x-auto md:block">
                     <table class="min-w-full text-sm">
                         <thead class="bg-amber-50/60 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <tr>

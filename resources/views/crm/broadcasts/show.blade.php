@@ -16,7 +16,7 @@
             </x-ui.feedback.alert>
         @endif
 
-        <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between">
             <a
                 href="{{ route('crm.broadcasts.index') }}"
                 class="text-sm font-semibold text-slate-600 underline hover:text-slate-900"
@@ -24,25 +24,27 @@
                 Back to Broadcasts
             </a>
 
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="grid w-full gap-3 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
                 @if($broadcast->status === \App\Modules\Broadcasts\Models\Broadcast::STATUS_DRAFT)
                     <x-ui.button
                         href="{{ route('crm.broadcasts.edit', $broadcast) }}"
                         variant="secondary"
+                        class="w-full justify-center sm:w-auto"
                     >
                         Edit Draft
                     </x-ui.button>
 
-                    <form method="POST" action="{{ route('crm.broadcasts.schedule', $broadcast) }}" class="flex flex-wrap items-center gap-2">
+                    <form method="POST" action="{{ route('crm.broadcasts.schedule', $broadcast) }}" class="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
                         @csrf
                         @method('PATCH')
 
                         <x-ui.form.input
                             name="send_at"
                             type="datetime-local"
+                            class="sm:w-56"
                         />
 
-                        <x-ui.button type="submit">
+                        <x-ui.button type="submit" class="w-full justify-center sm:w-auto">
                             {{ $broadcast->isPermissionInvitation() ? 'Schedule Invitation' : 'Schedule Broadcast' }}
                         </x-ui.button>
                     </form>
@@ -52,11 +54,11 @@
                     \App\Modules\Broadcasts\Models\Broadcast::STATUS_COMPLETED,
                     \App\Modules\Broadcasts\Models\Broadcast::STATUS_CANCELLED,
                 ], true))
-                    <form method="POST" action="{{ route('crm.broadcasts.cancel', $broadcast) }}">
+                    <form method="POST" action="{{ route('crm.broadcasts.cancel', $broadcast) }}" class="w-full sm:w-auto">
                         @csrf
                         @method('PATCH')
 
-                        <x-ui.button type="submit" variant="danger">
+                        <x-ui.button type="submit" variant="danger" class="w-full justify-center sm:w-auto">
                             Cancel
                         </x-ui.button>
                     </form>
@@ -75,7 +77,7 @@
                 </p>
 
                 @if($permissionInvitationPreview)
-                    <dl class="mt-4 grid gap-3 sm:grid-cols-3">
+                    <dl class="mt-4 grid gap-3 md:grid-cols-3">
                         <div class="rounded-lg bg-white/70 p-3">
                             <dt class="text-xs font-semibold uppercase tracking-wide text-amber-800">
                                 Imported contacts found
@@ -116,7 +118,7 @@
         <div class="grid gap-6 xl:grid-cols-[1fr_380px]">
             <div class="space-y-6">
                 <x-ui.card class="space-y-5">
-                    <div class="flex items-start justify-between gap-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                         <div>
                             <h2 class="text-lg font-semibold tracking-tight">
                                 Message
@@ -138,7 +140,7 @@
                                 SMS Message
                             </div>
 
-                            <div class="mt-2 whitespace-pre-line rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                            <div class="mt-2 whitespace-pre-line break-words rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                                 {{ $broadcast->payload['message'] ?? '' }}
                             </div>
                         </div>
@@ -158,7 +160,7 @@
                                 Body
                             </div>
 
-                            <div class="mt-2 whitespace-pre-line rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                            <div class="mt-2 whitespace-pre-line break-words rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                                 {{ $broadcast->payload['body'] ?? '' }}
                             </div>
                         </div>
@@ -166,7 +168,7 @@
                 </x-ui.card>
 
                 <x-ui.card class="overflow-hidden p-0">
-                    <div class="border-b border-slate-200 px-6 py-4">
+                    <div class="border-b border-slate-200 px-4 py-4 sm:px-6">
                         <h2 class="text-lg font-semibold tracking-tight">
                             Recipients
                         </h2>
@@ -176,7 +178,56 @@
                         </p>
                     </div>
 
-                    <div class="overflow-x-auto">
+                    <div class="divide-y divide-slate-200 md:hidden">
+                        @forelse($recipients as $recipient)
+                            <div class="p-4">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        @if($recipient->contact)
+                                            <a
+                                                href="{{ route('crm.contacts.show', $recipient->contact) }}"
+                                                class="break-words font-semibold text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900"
+                                            >
+                                                {{ $recipient->contact->name ?: trim($recipient->contact->first_name.' '.$recipient->contact->last_name) ?: $recipient->contact->email }}
+                                            </a>
+                                        @else
+                                            <span class="text-slate-500">Contact missing</span>
+                                        @endif
+
+                                        <div class="mt-1 break-all text-xs text-slate-500">
+                                            {{ $broadcast->channel === 'sms'
+                                                ? ($recipient->contact?->phone ?? '—')
+                                                : ($recipient->contact?->email ?? '—') }}
+                                        </div>
+                                    </div>
+
+                                    <span class="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                                        {{ str_replace('_', ' ', $recipient->status) }}
+                                    </span>
+                                </div>
+
+                                <dl class="mt-3 grid grid-cols-2 gap-3 text-xs">
+                                    <div>
+                                        <dt class="font-semibold uppercase tracking-wide text-slate-400">Sent</dt>
+                                        <dd class="mt-1 text-sm text-slate-700">{{ $recipient->sent_at?->format('M j, Y g:i A') ?? '—' }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="font-semibold uppercase tracking-wide text-slate-400">Reason</dt>
+                                        <dd class="mt-1 break-words text-sm text-slate-700">
+                                            @php($reason = $recipient->terminal_reason)
+                                            {{ $reason ? str_replace('_', ' ', $reason) : '—' }}
+                                        </dd>
+                                    </div>
+                                </dl>
+                            </div>
+                        @empty
+                            <div class="p-4 text-sm text-slate-600">
+                                No recipients yet.
+                            </div>
+                        @endforelse
+                    </div>
+
+                    <div class="hidden overflow-x-auto md:block">
                         <table class="min-w-full text-sm">
                             <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <tr>
@@ -246,61 +297,61 @@
                     </h2>
 
                     <dl class="mt-4 space-y-3 text-sm">
-                        <div class="flex justify-between gap-4">
+                        <div class="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
                             <dt class="text-slate-500">Type</dt>
-                            <dd class="font-medium text-slate-900">
+                            <dd class="break-words font-medium text-slate-900 sm:text-right">
                                 {{ $broadcast->typeLabel() }}
                             </dd>
                         </div>
 
-                        <div class="flex justify-between gap-4">
+                        <div class="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
                             <dt class="text-slate-500">Status</dt>
-                            <dd class="font-medium text-slate-900">{{ str_replace('_', ' ', $broadcast->status) }}</dd>
+                            <dd class="break-words font-medium text-slate-900 sm:text-right">{{ str_replace('_', ' ', $broadcast->status) }}</dd>
                         </div>
 
-                        <div class="flex justify-between gap-4">
+                        <div class="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
                             <dt class="text-slate-500">Channel</dt>
-                            <dd class="font-medium text-slate-900">{{ strtoupper($broadcast->channel) }}</dd>
+                            <dd class="break-words font-medium text-slate-900 sm:text-right">{{ strtoupper($broadcast->channel) }}</dd>
                         </div>
 
-                        <div class="flex justify-between gap-4">
+                        <div class="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
                             <dt class="text-slate-500">Purpose / Scope</dt>
-                            <dd class="font-medium text-slate-900">{{ $broadcast->purpose }} / {{ $broadcast->scope }}</dd>
+                            <dd class="break-words font-medium text-slate-900 sm:text-right">{{ $broadcast->purpose }} / {{ $broadcast->scope }}</dd>
                         </div>
 
-                        <div class="flex justify-between gap-4">
+                        <div class="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
                             <dt class="text-slate-500">Send At</dt>
-                            <dd class="font-medium text-slate-900">{{ $broadcast->send_at?->format('M j, Y g:i A') ?? 'Not scheduled' }}</dd>
+                            <dd class="break-words font-medium text-slate-900 sm:text-right">{{ $broadcast->send_at?->format('M j, Y g:i A') ?? 'Not scheduled' }}</dd>
                         </div>
 
-                        <div class="flex justify-between gap-4">
+                        <div class="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
                             <dt class="text-slate-500">Recipients</dt>
-                            <dd class="font-medium text-slate-900">{{ $broadcast->recipient_count }}</dd>
+                            <dd class="break-words font-medium text-slate-900 sm:text-right">{{ $broadcast->recipient_count }}</dd>
                         </div>
 
-                        <div class="flex justify-between gap-4">
+                        <div class="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
                             <dt class="text-slate-500">Scheduled</dt>
-                            <dd class="font-medium text-slate-900">{{ $broadcast->scheduled_count }}</dd>
+                            <dd class="break-words font-medium text-slate-900 sm:text-right">{{ $broadcast->scheduled_count }}</dd>
                         </div>
 
-                        <div class="flex justify-between gap-4">
+                        <div class="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
                             <dt class="text-slate-500">Sent</dt>
-                            <dd class="font-medium text-slate-900">{{ $broadcast->sent_recipients_count ?? 0 }}</dd>
+                            <dd class="break-words font-medium text-slate-900 sm:text-right">{{ $broadcast->sent_recipients_count ?? 0 }}</dd>
                         </div>
 
-                        <div class="flex justify-between gap-4">
+                        <div class="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
                             <dt class="text-slate-500">Skipped</dt>
-                            <dd class="font-medium text-slate-900">{{ $broadcast->skipped_recipients_count ?? 0 }}</dd>
+                            <dd class="break-words font-medium text-slate-900 sm:text-right">{{ $broadcast->skipped_recipients_count ?? 0 }}</dd>
                         </div>
 
-                        <div class="flex justify-between gap-4">
+                        <div class="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
                             <dt class="text-slate-500">Failed</dt>
-                            <dd class="font-medium text-slate-900">{{ $broadcast->failed_recipients_count ?? 0 }}</dd>
+                            <dd class="break-words font-medium text-slate-900 sm:text-right">{{ $broadcast->failed_recipients_count ?? 0 }}</dd>
                         </div>
 
-                        <div class="flex justify-between gap-4">
+                        <div class="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
                             <dt class="text-slate-500">Completed</dt>
-                            <dd class="font-medium text-slate-900">{{ $broadcast->completed_at?->format('M j, Y g:i A') ?? '—' }}</dd>
+                            <dd class="break-words font-medium text-slate-900 sm:text-right">{{ $broadcast->completed_at?->format('M j, Y g:i A') ?? '—' }}</dd>
                         </div>
                     </dl>
                 </x-ui.card>
@@ -400,7 +451,7 @@
                     <div class="mt-4 space-y-3">
                         @forelse($scheduledMessages as $scheduledMessage)
                             <div class="rounded-xl border border-slate-200 p-3 text-sm">
-                                <div class="flex justify-between gap-3">
+                                <div class="flex flex-wrap justify-between gap-3">
                                     <span class="font-medium text-slate-900">
                                         #{{ $scheduledMessage->id }}
                                     </span>

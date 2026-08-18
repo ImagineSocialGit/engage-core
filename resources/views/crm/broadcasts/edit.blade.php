@@ -36,7 +36,7 @@
             </x-ui.feedback.alert>
         @endif
 
-        <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <a
                 href="{{ route('crm.broadcasts.show', $broadcast) }}"
                 class="text-sm font-semibold text-slate-600 underline hover:text-slate-900"
@@ -264,7 +264,7 @@
                         </select>
 
                         <p class="mt-2 text-xs text-slate-600">
-                            Hold Ctrl/Cmd to select multiple batches.
+                            Select one or more batches. On desktop, hold Ctrl/Cmd to choose multiple.
                         </p>
 
                         <x-ui.form.error name="import_batch_ids" />
@@ -353,7 +353,7 @@
                         </select>
 
                         <p class="mt-2 text-xs text-slate-500">
-                            Hold Ctrl/Cmd to select multiple broadcasts.
+                            Select one or more broadcasts. On desktop, hold Ctrl/Cmd to choose multiple.
                         </p>
 
                         <x-ui.form.error name="exclude_broadcast_ids" />
@@ -411,14 +411,15 @@
                     <x-ui.form.error name="send_at" />
                 </div>
 
-                <div class="flex flex-wrap gap-3">
-                    <x-ui.button type="submit">
+                <div class="grid gap-3 sm:flex sm:flex-wrap">
+                    <x-ui.button type="submit" class="w-full justify-center sm:w-auto">
                         Save Changes
                     </x-ui.button>
 
                     <x-ui.button
                         href="{{ route('crm.broadcasts.show', $broadcast) }}"
                         variant="secondary"
+                        class="w-full justify-center sm:w-auto"
                     >
                         Cancel
                     </x-ui.button>
