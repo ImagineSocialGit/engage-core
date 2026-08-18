@@ -14,11 +14,36 @@
             </h2>
 
             <p class="mt-3 max-w-4xl text-sm leading-6 text-amber-950">
-                Export before rebuilding the database. Import only after the new code is deployed and
-                <code class="rounded bg-white/80 px-1.5 py-0.5 font-mono text-xs">migrate:fresh</code>,
-                <code class="rounded bg-white/80 px-1.5 py-0.5 font-mono text-xs">presets:sync</code>, and
-                <code class="rounded bg-white/80 px-1.5 py-0.5 font-mono text-xs">setup:validate</code>
-                have completed successfully.
+                Export before rebuilding the database. For the approved controlled clean rebuild, use the
+                current modular installation sequence before validating or applying the Project State file.
+            </p>
+
+            <ol class="mt-5 max-w-4xl space-y-3 text-sm leading-6 text-amber-950">
+                <li class="rounded-2xl border border-amber-200 bg-white/80 p-4">
+                    <span class="font-bold">1. Rebuild the platform foundation:</span>
+                    <code class="mt-1 block overflow-x-auto rounded bg-slate-950 px-3 py-2 font-mono text-xs text-white">php artisan migrate:fresh --force</code>
+                </li>
+                <li class="rounded-2xl border border-amber-200 bg-white/80 p-4">
+                    <span class="font-bold">2. Install configured module schema and definitions:</span>
+                    <code class="mt-1 block overflow-x-auto rounded bg-slate-950 px-3 py-2 font-mono text-xs text-white">php artisan engage:install --force --no-create-user</code>
+                </li>
+                <li class="rounded-2xl border border-amber-200 bg-white/80 p-4">
+                    <span class="font-bold">3. Verify module installation state:</span>
+                    <code class="mt-1 block overflow-x-auto rounded bg-slate-950 px-3 py-2 font-mono text-xs text-white">php artisan modules:status</code>
+                </li>
+                <li class="rounded-2xl border border-amber-200 bg-white/80 p-4">
+                    <span class="font-bold">4. Recreate the environment-owned CRM user:</span>
+                    <code class="mt-1 block overflow-x-auto rounded bg-slate-950 px-3 py-2 font-mono text-xs text-white">php artisan engage:user:add</code>
+                </li>
+                <li class="rounded-2xl border border-amber-200 bg-white/80 p-4">
+                    <span class="font-bold">5. Return here and run Validate Only before Apply Import.</span>
+                    Resolve every validation error before typing <code class="rounded bg-white px-1.5 py-0.5 font-mono text-xs">IMPORT</code>.
+                </li>
+            </ol>
+
+            <p class="mt-4 max-w-4xl text-xs leading-5 text-amber-900">
+                Follow <code class="rounded bg-white/80 px-1.5 py-0.5 font-mono">docs/operations/project-state-transfer-runbook.md</code>
+                for the full maintenance, Horizon, Scheduler, Redis, verification, and resume procedure.
             </p>
 
             <dl class="mt-5 grid gap-3 text-sm sm:grid-cols-2">
@@ -81,8 +106,8 @@
                 @endif
 
                 @if(!empty($report['counts']))
-                    <div class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <div class="mt-6 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+                        <table class="min-w-[32rem] divide-y divide-slate-200 text-sm">
                             <thead class="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
                                 <tr>
                                     <th class="px-4 py-3">Table</th>

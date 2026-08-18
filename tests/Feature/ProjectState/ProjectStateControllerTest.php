@@ -45,7 +45,12 @@ class ProjectStateControllerTest extends TestCase
             ->assertOk()
             ->assertSee('Download current state')
             ->assertSee('one consistent database snapshot')
-            ->assertSee('Validate or apply current-format state');
+            ->assertSee('Validate or apply current-format state')
+            ->assertSee('php artisan migrate:fresh --force')
+            ->assertSee('php artisan engage:install --force --no-create-user')
+            ->assertSee('php artisan modules:status')
+            ->assertSee('php artisan engage:user:add')
+            ->assertSee('docs/operations/project-state-transfer-runbook.md');
     }
 
     public function test_resume_surface_is_owner_only_password_confirmed_and_dependency_guarded(): void

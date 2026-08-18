@@ -29,7 +29,7 @@
 <body class="min-h-screen bg-white text-slate-900 antialiased">
     @auth
         @if(session('success'))
-            <div class="fixed top-4 right-4 z-50 max-w-sm w-full">
+            <div class="fixed inset-x-4 top-4 z-50 sm:left-auto sm:right-4 sm:w-full sm:max-w-sm" role="status" aria-live="polite">
                 <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow">
                     {{ session('success') }}
                 </div>

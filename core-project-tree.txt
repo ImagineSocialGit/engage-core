@@ -1868,6 +1868,16 @@
 │       │   └── thank-you.blade.php
 │       └── welcome.blade.php
 ├── routes
+│   ├── crm
+│   │   ├── broadcasts.php
+│   │   ├── campaigns.php
+│   │   ├── core.php
+│   │   ├── flow-routes.php
+│   │   ├── messaging.php
+│   │   ├── reporting.php
+│   │   ├── scheduling.php
+│   │   ├── tasks.php
+│   │   └── webinars.php
 │   ├── crm.php
 │   ├── scheduling.php
 │   ├── staging.php
@@ -1885,6 +1895,7 @@
 │   ├── dump-integration-files.sh
 │   ├── dump-migrations.sh
 │   ├── make-automation-dependency-cone-dump.sh
+│   ├── make-crm-dependency-cone-dump.sh
 │   ├── make-module-dependency-cone-dump.sh
 │   ├── make-project-state-dependency-cone-dump.sh
 │   ├── make-system-deployment-context-dump.sh
@@ -2272,4 +2283,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-587 directories, 1686 files
+588 directories, 1696 files
