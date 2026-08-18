@@ -107,6 +107,7 @@
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   │   └── CRM
+│   │   │   │       ├── CampaignController.php
 │   │   │   │       └── CampaignMessageTemplateController.php
 │   │   │   ├── Data
 │   │   │   │   ├── Automation
@@ -131,6 +132,7 @@
 │   │   │   │   └── UpdateCampaignStepMessageTemplateRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── CampaignMessageDefinitionResolver.php
+│   │   │   │   ├── CampaignWorkspacePresenter.php
 │   │   │   │   └── ContactShow
 │   │   │   │       └── ContactCampaignsVisibilityDataProvider.php
 │   │   │   ├── Support
@@ -1734,6 +1736,8 @@
 │   └── views
 │       ├── auth
 │       ├── components
+│       │   ├── campaigns
+│       │   │   └── builder-shell.blade.php
 │       │   ├── crm
 │       │   │   ├── contact-picker.blade.php
 │       │   │   ├── contact-visibility.blade.php
@@ -1789,8 +1793,11 @@
 │       │   │   ├── index.blade.php
 │       │   │   └── show.blade.php
 │       │   ├── campaigns
-│       │   │   └── message-templates
-│       │   │       └── index.blade.php
+│       │   │   ├── edit.blade.php
+│       │   │   ├── index.blade.php
+│       │   │   ├── message-templates
+│       │   │   │   └── index.blade.php
+│       │   │   └── show.blade.php
 │       │   ├── contacts
 │       │   │   ├── import-batches
 │       │   │   │   ├── index.blade.php
@@ -1936,6 +1943,7 @@
 │   │   │   ├── CampaignVariantDependencyAwareTest.php
 │   │   │   ├── CampaignVariantPresetSyncSpecificityTest.php
 │   │   │   ├── CampaignVariantSchedulingDurabilityTest.php
+│   │   │   ├── CampaignWorkspaceControllerTest.php
 │   │   │   ├── CompactCampaignPresetAuthoringTest.php
 │   │   │   ├── DeactivateCampaignActionTest.php
 │   │   │   ├── DeactivateCampaignCommandTest.php
@@ -2284,4 +2292,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-590 directories, 1695 files
+591 directories, 1702 files

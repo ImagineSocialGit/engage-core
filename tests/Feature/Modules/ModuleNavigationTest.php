@@ -2,170 +2,93 @@
 
 namespace Tests\Feature\Modules;
 
-use App\Http\Middleware\ForceStagingAccess;
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Support\Modules\ModuleManager;
 use Tests\TestCase;
 
 class ModuleNavigationTest extends TestCase
 {
-    use RefreshDatabase;
-
-    public function test_webinars_nav_item_renders_when_webinars_module_is_enabled(): void
+    public function test_enabled_modules_expose_their_registered_navigation_routes(): void
     {
         config()->set('modules.enabled', [
             'messaging',
-            'inbound_messaging',
-            'internal_notifications',
-            'tasks',
             'campaigns',
             'webinars',
-        ]);
-
-        $user = User::factory()->create();
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/')
-            ->assertOk()
-            ->assertSee('Webinars');
-    }
-
-    public function test_webinars_nav_item_does_not_render_when_webinars_module_is_disabled(): void
-    {
-        config()->set('modules.enabled', [
-            'messaging',
-            'inbound_messaging',
-            'internal_notifications',
-            'tasks',
-            'campaigns',
-        ]);
-
-        $user = User::factory()->create();
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/')
-            ->assertOk()
-            ->assertDontSee('Webinars');
-    }
-
-    public function test_message_templates_nav_item_renders_when_messaging_module_is_enabled(): void
-    {
-        config()->set('modules.enabled', [
-            'messaging',
-        ]);
-
-        $user = User::factory()->create();
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/')
-            ->assertOk()
-            ->assertSee('Message Templates');
-    }
-
-    public function test_message_templates_nav_item_does_not_render_when_messaging_module_is_disabled(): void
-    {
-        config()->set('modules.enabled', []);
-
-        $user = User::factory()->create();
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/')
-            ->assertOk()
-            ->assertDontSee('Message Templates');
-    }
-
-    public function test_campaign_messages_nav_item_renders_when_campaigns_and_messaging_are_enabled(): void
-    {
-        config()->set('modules.enabled', [
-            'campaigns',
-            'messaging',
-        ]);
-
-        $user = User::factory()->create();
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/')
-            ->assertOk()
-            ->assertSee('Campaign Messages')
-            ->assertSee(route('crm.campaigns.message-templates.index'));
-    }
-
-    public function test_campaign_messages_nav_item_does_not_render_when_messaging_module_is_disabled(): void
-    {
-        config()->set('modules.enabled', [
-            'campaigns',
-        ]);
-
-        $user = User::factory()->create();
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/')
-            ->assertOk()
-            ->assertDontSee('Campaign Messages');
-    }
-
-    public function test_routes_nav_item_renders_when_flow_routes_module_is_enabled(): void
-    {
-        config()->set('modules.enabled', [
             'workflow',
             'flow_routes',
+            'broadcasts',
         ]);
 
-        $user = User::factory()->create();
+        $routes = collect(app(ModuleManager::class)->navigationItems())
+            ->pluck('route')
+            ->all();
 
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/')
-            ->assertOk()
-            ->assertSee('Routes');
+        $this->assertContains('crm.campaigns.index', $routes);
+        $this->assertContains('crm.messaging.message-templates.index', $routes);
+        $this->assertContains('crm.webinar-series.index', $routes);
+        $this->assertContains('crm.flow-routes.index', $routes);
+        $this->assertContains('crm.broadcasts.index', $routes);
     }
 
-    public function test_routes_nav_item_does_not_render_when_flow_routes_module_is_disabled(): void
+    public function test_disabled_modules_do_not_expose_their_navigation_routes(): void
     {
         config()->set('modules.enabled', [
-            'workflow',
+            'messaging',
         ]);
 
-        $user = User::factory()->create();
+        $routes = collect(app(ModuleManager::class)->navigationItems())
+            ->pluck('route')
+            ->all();
 
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/')
-            ->assertOk()
-            ->assertDontSee('Routes');
+        $this->assertContains('crm.messaging.message-templates.index', $routes);
+        $this->assertNotContains('crm.campaigns.index', $routes);
+        $this->assertNotContains('crm.webinar-series.index', $routes);
+        $this->assertNotContains('crm.flow-routes.index', $routes);
+        $this->assertNotContains('crm.broadcasts.index', $routes);
     }
 
-    public function test_routes_nav_item_points_to_route_management_when_flow_routes_is_enabled(): void
+    public function test_campaign_navigation_does_not_require_messaging_to_be_explicitly_visible(): void
     {
         config()->set('modules.enabled', [
-            'workflow',
-            'flow_routes',
+            'campaigns',
         ]);
 
-        $user = User::factory()->create();
+        $routes = collect(app(ModuleManager::class)->navigationItems())
+            ->pluck('route')
+            ->all();
 
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/')
-            ->assertOk()
-            ->assertSee('Routes')
-            ->assertSee(route('crm.flow-routes.index'), false)
-            ->assertDontSee('Automatic Follow-ups');
+        $this->assertContains('crm.campaigns.index', $routes);
+        $this->assertNotContains('crm.messaging.message-templates.index', $routes);
     }
 
+    public function test_campaign_navigation_uses_the_primary_campaign_workspace_route(): void
+    {
+        config()->set('modules.enabled', [
+            'campaigns',
+            'messaging',
+        ]);
+
+        $campaignNavigation = collect(app(ModuleManager::class)->navigationItems())
+            ->firstWhere('module', 'campaigns');
+
+        $this->assertIsArray($campaignNavigation);
+        $this->assertSame('crm.campaigns.index', $campaignNavigation['route']);
+        $this->assertSame(route('crm.campaigns.index'), $campaignNavigation['href']);
+    }
+
+    public function test_navigation_ignores_configured_routes_that_are_not_registered(): void
+    {
+        config()->set('modules.enabled', [
+            'campaigns',
+            'messaging',
+        ]);
+
+        $campaignDefinition = config('modules.modules.campaigns');
+        $campaignDefinition['nav']['route'] = 'crm.campaigns.missing';
+        config()->set('modules.modules.campaigns', $campaignDefinition);
+
+        $campaignNavigation = collect(app(ModuleManager::class)->navigationItems())
+            ->firstWhere('module', 'campaigns');
+
+        $this->assertNull($campaignNavigation);
+    }
 }

@@ -566,6 +566,11 @@ return [
             'ui' => [
                 'tone' => 'rose',
             ],
+            'nav' => [
+                'label' => 'Campaigns',
+                'route' => 'crm.campaigns.index',
+                'priority' => 42,
+            ],
             'depends_on' => ['core', 'messaging'],
             'providers' => [
                 CampaignsModuleServiceProvider::class,
