@@ -17,7 +17,7 @@
             </div>
         @endif
 
-        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-8">
             <div class="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                 <div class="max-w-3xl">
                     <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-amber-700">
@@ -33,7 +33,7 @@
 
                 <a
                     href="{{ route('crm.webinar-series.index') }}"
-                    class="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 px-5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50"
+                    class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 px-5 text-center text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
                 >
                     Back to webinars
                 </a>
@@ -71,7 +71,7 @@
         <form
             method="POST"
             action="{{ route('crm.webinars.post-event-review.update', $webinar) }}"
-            class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
+            class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-8"
             x-data="{ mode: @js($initialMode) }"
         >
             @csrf
@@ -132,7 +132,7 @@
                         </span>
                     </span>
 
-                    <div class="mt-4 pl-7" x-show="mode === 'alternate'" x-cloak>
+                    <div class="mt-4 pl-0 sm:pl-7" x-show="mode === 'alternate'" x-cloak>
                         <select
                             name="alternate_webinar_id"
                             class="block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-0"
@@ -168,10 +168,10 @@
                 </label>
             </div>
 
-            <div class="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-6">
+            <div class="mt-6 flex flex-col items-stretch gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:flex-wrap sm:items-center">
                 <button
                     type="submit"
-                    class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-extrabold text-white transition hover:bg-slate-800"
+                    class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-6 text-center text-sm font-extrabold text-white transition hover:bg-slate-800 sm:w-auto"
                 >
                     Approve follow-up plan
                 </button>

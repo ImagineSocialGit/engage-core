@@ -25,7 +25,7 @@
         @include('crm.flow-routes.partials.navigation')
 
         <section class="rounded-3xl border border-orange-200 bg-white/90 shadow-sm">
-            <div class="p-6 sm:p-8">
+            <div class="p-5 sm:p-8">
                 <p class="text-sm font-semibold uppercase tracking-[0.16em] text-orange-800">
                     Manage Routes
                 </p>
@@ -61,7 +61,7 @@
                 },
             }"
         >
-            <div class="border-b border-orange-100 p-6 sm:p-8">
+            <div class="border-b border-orange-100 p-5 sm:p-8">
                 <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <h2 class="text-xl font-semibold tracking-tight text-slate-950">
@@ -127,7 +127,7 @@
                     @endphp
 
                     <article
-                        class="p-6 sm:p-8"
+                        class="p-5 sm:p-8"
                         data-search="{{ $searchText }}"
                         data-assignment="{{ $route['assignment_count'] > 0 ? 'assigned' : 'unassigned' }}"
                         x-show="matchesRoute($el)"
@@ -156,7 +156,7 @@
 
                                 @if(count($route['presented_points']) > 0)
                                     <details class="group mt-5">
-                                        <summary class="inline-flex cursor-pointer list-none items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-950 transition hover:bg-orange-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400">
+                                        <summary class="flex w-full cursor-pointer list-none flex-wrap items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2.5 text-sm font-semibold text-orange-950 transition hover:bg-orange-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 sm:inline-flex sm:w-auto sm:py-2">
                                             <span>{{ $route['point_count'] }} {{ \Illuminate\Support\Str::plural('Point', $route['point_count']) }}</span>
                                             <span class="text-orange-700 group-open:hidden">· Show route flow</span>
                                             <span class="hidden text-orange-700 group-open:inline">· Hide route flow</span>
@@ -203,18 +203,18 @@
                                 @endif
                             </div>
 
-                            <div class="flex shrink-0 flex-wrap gap-2 xl:justify-end">
+                            <div class="grid w-full shrink-0 gap-2 sm:grid-cols-2 xl:flex xl:w-auto xl:flex-wrap xl:justify-end">
                                 <button
                                     type="button"
                                     @click="openRoute({{ $route['id'] }})"
-                                    class="inline-flex items-center justify-center rounded-xl border border-orange-300 bg-white px-4 py-2.5 text-sm font-semibold text-orange-900 shadow-sm transition hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
+                                    class="inline-flex w-full items-center justify-center rounded-xl border border-orange-300 bg-white px-4 py-2.5 text-sm font-semibold text-orange-900 shadow-sm transition hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 xl:w-auto"
                                 >
                                     Edit Route
                                 </button>
 
                                 <a
                                     href="{{ $assignmentUrl }}"
-                                    class="inline-flex items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
+                                    class="inline-flex w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 xl:w-auto"
                                 >
                                     {{ $route['assignment_count'] > 0 ? 'Review Assignment' : 'Assign Route' }}
                                 </a>
@@ -235,7 +235,7 @@
 
         @if($automaticActions->isNotEmpty())
             <section id="automatic-actions" class="rounded-3xl border border-orange-200 bg-white/90 shadow-sm">
-                <div class="border-b border-orange-100 p-6 sm:p-8">
+                <div class="border-b border-orange-100 p-5 sm:p-8">
                     <h2 class="text-xl font-semibold tracking-tight text-slate-950">
                         Automatic Behavior
                     </h2>
@@ -248,10 +248,10 @@
                 <div class="divide-y divide-orange-100">
                     @foreach($automaticActions as $group)
                         <details class="group">
-                            <summary class="flex cursor-pointer list-none items-center justify-between gap-4 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-300 sm:px-8">
+                            <summary class="flex cursor-pointer list-none flex-col items-start gap-2 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-300 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-8">
                                 <div>
                                     <span class="font-semibold text-slate-950">{{ $group['label'] }}</span>
-                                    <span class="ml-2 text-sm text-slate-700">
+                                    <span class="mt-1 block text-sm text-slate-700 sm:ml-2 sm:mt-0 sm:inline">
                                         {{ $group['assigned_count'] }} currently running
                                         @if($group['action_count'] > $group['assigned_count'])
                                             · {{ $group['action_count'] - $group['assigned_count'] }} available
@@ -342,7 +342,7 @@
 
                                                 <a
                                                     href="{{ $assignmentUrl }}"
-                                                    class="inline-flex shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
+                                                    class="inline-flex w-full shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 sm:w-auto sm:py-2"
                                                 >
                                                     Review Assignment
                                                 </a>

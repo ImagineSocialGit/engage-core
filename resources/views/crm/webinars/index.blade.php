@@ -50,9 +50,9 @@
                 x-data="{ open: true }"
                 x-show="open"
                 x-cloak
-                class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+                class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 px-3 py-4 sm:px-4"
             >
-                <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                <div class="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-4 shadow-xl sm:p-6">
                     <h2 class="text-lg font-bold text-gray-950">
                         Zoom Sync Failed
                     </h2>
@@ -61,11 +61,11 @@
                         {{ session('zoom_sync_error') }}
                     </p>
 
-                    <div class="mt-6 flex justify-end">
+                    <div class="mt-6 flex justify-stretch sm:justify-end">
                         <button
                             type="button"
                             x-on:click="open = false"
-                            class="rounded-lg bg-gray-950 px-4 py-2 text-sm font-semibold text-white"
+                            class="w-full rounded-lg bg-gray-950 px-4 py-2 text-sm font-semibold text-white sm:w-auto"
                         >
                             Close
                         </button>
@@ -80,7 +80,7 @@
 
                 <ul class="mt-2 space-y-1 text-sm">
                     @foreach(session('sync_conflicts') as $conflict)
-                        <li class="flex items-center justify-between gap-4">
+                        <li class="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                             <span>
                                 {{ $conflict['series'] }} — active: {{ $conflict['active'] }}, expected: {{ $conflict['expected'] }}
                             </span>
@@ -132,11 +132,11 @@
                     </p>
                 </div>
 
-                <div class="flex flex-wrap gap-2">
+                <div class="grid gap-2 sm:flex sm:flex-wrap">
                     @if(function_exists('module_enabled') && module_enabled('messaging') && \Illuminate\Support\Facades\Route::has('crm.webinars.message-templates.index'))
                         <a
                             href="{{ route('crm.webinars.message-templates.index') }}"
-                            class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-extrabold text-white transition hover:bg-slate-800"
+                            class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-5 text-center text-sm font-extrabold text-white transition hover:bg-slate-800 sm:w-auto"
                         >
                             Registration & follow-up messages
                         </a>
@@ -144,7 +144,7 @@
 
                     <a
                         href="#advanced-webinar-setup"
-                        class="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50"
+                        class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-center text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
                     >
                         Advanced setup
                     </a>
@@ -185,7 +185,7 @@
                 <div class="mt-5 grid gap-3 lg:grid-cols-2">
                     @foreach(($pendingPostEventReviews ?? collect()) as $reviewWebinar)
                         <article class="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm">
-                            <div class="flex items-start justify-between gap-4">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                                 <div>
                                     <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-700">Follow-up review</p>
                                     <h3 class="mt-1 text-base font-black text-slate-950">{{ $reviewWebinar->title }}</h3>
@@ -202,7 +202,7 @@
 
                             <a
                                 href="{{ route('crm.webinars.post-event-review.show', $reviewWebinar) }}"
-                                class="mt-4 inline-flex min-h-10 items-center justify-center rounded-full bg-amber-700 px-4 text-sm font-extrabold text-white transition hover:bg-amber-600"
+                                class="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-full bg-amber-700 px-4 text-center text-sm font-extrabold text-white transition hover:bg-amber-600 sm:w-auto"
                             >
                                 Review follow-ups
                             </a>
@@ -220,7 +220,7 @@
                             </p>
                             <a
                                 href="{{ route('crm.webinar-series.index', ['attention' => 1]) }}"
-                                class="mt-4 inline-flex min-h-10 items-center justify-center rounded-full bg-red-700 px-4 text-sm font-extrabold text-white transition hover:bg-red-600"
+                                class="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-full bg-red-700 px-4 text-center text-sm font-extrabold text-white transition hover:bg-red-600 sm:w-auto"
                             >
                                 Resolve registrations
                             </a>
@@ -255,7 +255,7 @@
                     @endphp
 
                     <article class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                        <div class="flex items-start justify-between gap-3">
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                             <div>
                                 <p class="text-xs font-extrabold uppercase tracking-[0.14em] {{ $isLive ? 'text-emerald-700' : 'text-slate-500' }}">
                                     {{ $isLive ? 'Live now' : 'Upcoming' }}
@@ -304,7 +304,7 @@
 
         <div id="event-operations" class="space-y-6">
             <div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div class="flex flex-col gap-3 px-12 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <h2 class="text-sm font-semibold text-slate-900">
                         {{ $showAttention ? 'Registration recovery' : ($showArchived ? 'Webinar history' : 'Event details & recovery') }}
                     </h2>
@@ -333,7 +333,7 @@
                     </div>
                 </div>
 
-                <table class="min-w-full text-sm">
+                <table class="min-w-[64rem] text-sm">
                     <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                         <tr>
                             <th class="px-6 py-3">Title</th>
@@ -1219,7 +1219,7 @@
                 </table>
             </div>
 
-            <details id="advanced-webinar-setup" class="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+            <details id="advanced-webinar-setup" class="rounded-3xl border border-slate-200 bg-slate-50 p-4 shadow-sm sm:p-5">
                 <summary class="cursor-pointer list-none">
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div>
@@ -1239,7 +1239,7 @@
                 @endif
 
                 <div class="mt-5 grid gap-6 xl:grid-cols-3">
-                    <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
                         <h2 class="text-base font-semibold text-slate-900">
                             Add Series
                         </h2>
@@ -1301,14 +1301,14 @@
 
                         <button
                             type="submit"
-                            class="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+                            class="inline-flex w-full items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 sm:w-auto"
                         >
                             Add Series
                         </button>
                     </form>
                 </div>
 
-                <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
                     <h2 class="text-base font-semibold text-slate-900">
                         Sync Series
                     </h2>
@@ -1349,7 +1349,7 @@
 
                         <button
                             type="submit"
-                            class="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+                            class="inline-flex w-full items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 sm:w-auto"
                         >
                             Sync from Zoom
                         </button>
@@ -1357,7 +1357,7 @@
                 </div>
 
                 @if($series->isNotEmpty())
-                    <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
                         <h2 class="text-base font-semibold text-slate-900">
                             Series
                         </h2>
@@ -1365,7 +1365,7 @@
                         <div class="mt-4 space-y-2">
                             @foreach($series as $seriesItem)
                                 <div class="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-700">
-                                    <div class="flex items-start justify-between gap-3">
+                                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                                         <div>
                                             <p class="font-semibold text-slate-900">{{ $seriesItem->title }}</p>
                                             <div class="mt-1 flex flex-wrap items-center gap-2 text-xs">
@@ -1401,7 +1401,7 @@
                                             ->isNotEmpty();
                                     @endphp
 
-                                    <div class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                                    <div class="mt-3 flex flex-col items-start gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                                         <span class="text-xs font-semibold {{ $hasCustomMessageChains ? 'text-indigo-700' : 'text-slate-600' }}">
                                             {{ $hasCustomMessageChains ? 'Custom message chain' : 'Uses profile message chain' }}
                                         </span>
@@ -1422,10 +1422,10 @@
                                         @csrf
                                         @method('PATCH')
 
-                                        <div class="flex gap-2">
+                                        <div class="flex flex-col gap-2 sm:flex-row">
                                             <select
                                                 name="provider_event_type"
-                                                class="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-0"
+                                                class="w-full min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-0"
                                                 aria-label="Zoom event type for {{ $seriesItem->title }}"
                                                 required
                                             >
@@ -1441,7 +1441,7 @@
 
                                             <button
                                                 type="submit"
-                                                class="rounded-lg border border-indigo-300 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                                                class="w-full rounded-lg border border-indigo-300 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 sm:w-auto"
                                             >
                                                 Save type
                                             </button>
@@ -1456,14 +1456,14 @@
                                         <form
                                             method="POST"
                                             action="{{ route('crm.webinar-series.schedule-profile.update', $seriesItem) }}"
-                                            class="mt-3 flex gap-2"
+                                            class="mt-3 flex flex-col gap-2 sm:flex-row"
                                         >
                                             @csrf
                                             @method('PATCH')
 
                                             <select
                                                 name="webinar_schedule_profile_id"
-                                                class="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-0"
+                                                class="w-full min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-0"
                                                 aria-label="Webinar schedule profile for {{ $seriesItem->title }}"
                                             >
                                                 <option value="">Use default profile</option>
@@ -1479,7 +1479,7 @@
 
                                             <button
                                                 type="submit"
-                                                class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto"
                                             >
                                                 Save
                                             </button>

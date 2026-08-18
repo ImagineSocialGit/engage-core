@@ -76,11 +76,11 @@
                 </p>
             </div>
 
-            <div class="mt-6 flex flex-wrap gap-2 rounded-2xl bg-orange-50 p-1 text-sm font-semibold ring-1 ring-orange-200">
+            <div class="mt-6 grid grid-cols-2 gap-2 rounded-2xl bg-orange-50 p-1 text-sm font-semibold ring-1 ring-orange-200 sm:flex sm:flex-wrap">
                 <button
                     type="button"
                     x-on:click="tab = 'status'"
-                    class="rounded-xl px-4 py-2 transition"
+                    class="shrink-0 rounded-xl px-3 py-2.5 text-center transition sm:px-4 sm:py-2"
                     x-bind:class="tab === 'status' ? 'bg-white text-orange-950 shadow-sm ring-1 ring-orange-200' : 'text-slate-700 hover:text-slate-900'"
                 >
                     By Status
@@ -89,7 +89,7 @@
                 <button
                     type="button"
                     x-on:click="tab = 'activity'"
-                    class="rounded-xl px-4 py-2 transition"
+                    class="shrink-0 rounded-xl px-3 py-2.5 text-center transition sm:px-4 sm:py-2"
                     x-bind:class="tab === 'activity' ? 'bg-white text-orange-950 shadow-sm ring-1 ring-orange-200' : 'text-slate-700 hover:text-slate-900'"
                 >
                     By Activity
@@ -99,7 +99,7 @@
 
         <section x-show="tab === 'status'" class="space-y-4">
             <div class="rounded-3xl border border-orange-200 bg-white/90 shadow-sm">
-                <div class="border-b border-orange-100 p-6">
+                <div class="border-b border-orange-100 p-5 sm:p-6">
                     <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end">
                         <div>
                             <h2 class="text-lg font-semibold tracking-tight text-slate-950">
@@ -131,7 +131,7 @@
                     </div>
                 </div>
 
-                <div class="p-6">
+                <div class="p-5 sm:p-6">
                     @forelse($contactStatusBindings as $row)
                         @php
                             $status = $row['status'];
@@ -146,7 +146,7 @@
                             method="POST"
                             action="{{ route('crm.flow-routes.bindings.update') }}"
                             x-show="selectedStatus === @js($status->key)"
-                            class="rounded-2xl p-5 ring-1 transition duration-300 {{ module_tone('workflow', 'item') }}"
+                            class="rounded-2xl p-4 ring-1 transition duration-300 sm:p-5 {{ module_tone('workflow', 'item') }}"
                             x-bind:class="focusedTarget === @js($targetId) ? 'scale-[1.01] !bg-orange-100 ring-2 ring-orange-500 shadow-md' : ''"
                         >
                             @csrf
@@ -251,7 +251,7 @@
 
         <section x-show="tab === 'activity'" class="space-y-4">
             <div class="rounded-3xl border border-orange-200 bg-white/90 shadow-sm">
-                <div class="border-b border-orange-100 p-6">
+                <div class="border-b border-orange-100 p-5 sm:p-6">
                     <h2 class="text-lg font-semibold tracking-tight text-slate-950">
                         Activity assignments
                     </h2>
@@ -261,12 +261,12 @@
                     </p>
 
                     @if($automationEventGroups->isNotEmpty())
-                        <div class="mt-5 flex flex-wrap gap-2 rounded-2xl bg-slate-100 p-1 text-sm font-semibold">
+                        <div class="mt-5 flex gap-2 overflow-x-auto rounded-2xl bg-slate-100 p-1 text-sm font-semibold sm:flex-wrap sm:overflow-visible">
                             @foreach($automationEventGroups as $group)
                                 <button
                                     type="button"
                                     x-on:click="selectedActivityModule = @js($group['key'])"
-                                    class="rounded-xl px-4 py-2 transition"
+                                    class="shrink-0 rounded-xl px-3 py-2.5 text-center transition sm:px-4 sm:py-2"
                                     x-bind:class="selectedActivityModule === @js($group['key'])
                                         ? @js(module_tone($group['key'], 'badge').' shadow-sm')
                                         : 'text-slate-700 hover:text-slate-900'"
@@ -278,7 +278,7 @@
                     @endif
                 </div>
 
-                <div class="p-6">
+                <div class="p-5 sm:p-6">
                     @forelse($automationEventGroups as $group)
                         <div x-show="selectedActivityModule === @js($group['key'])" class="space-y-4">
                             @foreach($group['events'] as $row)
@@ -293,7 +293,7 @@
                                     id="{{ $targetId }}"
                                     method="POST"
                                     action="{{ route('crm.flow-routes.bindings.update') }}"
-                                    class="rounded-2xl p-4 ring-1 transition duration-300 {{ module_tone($group['key'], 'item') }}"
+                                    class="rounded-2xl p-4 ring-1 transition duration-300 sm:p-5 {{ module_tone($group['key'], 'item') }}"
                                     x-bind:class="focusedTarget === @js((string) $targetId) ? 'scale-[1.01] !bg-orange-100 ring-2 ring-orange-500 shadow-md' : ''"
                                 >
                                     @csrf
@@ -356,7 +356,7 @@
                                         <div class="flex justify-start xl:justify-end">
                                             <button
                                                 type="submit"
-                                                class="inline-flex items-center justify-center rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                                class="inline-flex w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto sm:py-2"
                                                 @disabled($availableRoutes->isEmpty())
                                             >
                                                 Save

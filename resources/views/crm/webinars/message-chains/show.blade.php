@@ -23,7 +23,7 @@
             </div>
         @endif
 
-        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div class="max-w-3xl">
                     <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
@@ -56,7 +56,7 @@
 
                 <a
                     href="{{ route('crm.webinar-series.index') }}"
-                    class="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 px-5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50"
+                    class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 px-5 text-center text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
                 >
                     Back to webinars
                 </a>
@@ -64,7 +64,7 @@
         </section>
 
         @if ($bindings->isEmpty())
-            <section class="rounded-3xl border border-indigo-200 bg-indigo-50/50 p-6 shadow-sm">
+            <section class="rounded-3xl border border-indigo-200 bg-indigo-50/50 p-4 shadow-sm sm:p-6">
                 <div class="max-w-3xl">
                     <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-indigo-700">
                         Create a custom chain
@@ -107,7 +107,7 @@
 
                     <button
                         type="submit"
-                        class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-extrabold text-white transition hover:bg-slate-800"
+                        class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-5 text-center text-sm font-extrabold text-white transition hover:bg-slate-800 sm:w-auto"
                     >
                         Create custom message chain
                     </button>
@@ -124,7 +124,7 @@
             <div class="space-y-6">
                 @foreach ($chains as $chain)
                     <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                        <header class="border-b border-slate-200 bg-slate-50 px-6 py-5">
+                        <header class="border-b border-slate-200 bg-slate-50 px-4 py-5 sm:px-6">
                             <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                 <div>
                                     <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
@@ -148,7 +148,7 @@
 
                         <div class="divide-y divide-slate-200">
                             @foreach ($chain['steps'] as $step)
-                                <div class="px-6 py-6">
+                                <div class="px-4 py-5 sm:px-6 sm:py-6">
                                     <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                         <div>
                                             <h3 class="text-base font-black text-slate-950">
@@ -169,12 +169,12 @@
                                             <form
                                                 method="POST"
                                                 action="{{ route('crm.webinar-series.message-chains.variants.update', [$series, $variant['id']]) }}"
-                                                class="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+                                                class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5"
                                             >
                                                 @csrf
                                                 @method('PATCH')
 
-                                                <div class="flex items-start justify-between gap-3">
+                                                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                                                     <div>
                                                         <p class="font-black text-slate-950">
                                                             {{ $variant['template_name'] }}
@@ -283,7 +283,7 @@
 
                                                 <button
                                                     type="submit"
-                                                    class="mt-5 inline-flex min-h-10 items-center justify-center rounded-full bg-slate-950 px-4 text-sm font-extrabold text-white transition hover:bg-slate-800"
+                                                    class="mt-5 inline-flex min-h-10 w-full items-center justify-center rounded-full bg-slate-950 px-4 text-center text-sm font-extrabold text-white transition hover:bg-slate-800 sm:w-auto"
                                                 >
                                                     Publish updated copy
                                                 </button>

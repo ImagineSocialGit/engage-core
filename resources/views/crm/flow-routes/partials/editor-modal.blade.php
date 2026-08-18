@@ -36,9 +36,9 @@
         )"
         @keydown.escape.window="if (pointModal) closePoint(); else if (addPointModal) closeAddPoint(); else if (openRouteEditor === {{ $flowRoute->getKey() }}) closeRoute()"
         @click.outside="if (! pointModal && ! addPointModal) closeRoute()"
-        class="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/10"
+        class="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/10 sm:max-h-[94vh]"
     >
-        <header class="flex items-start justify-between gap-4 border-b border-orange-100 px-5 py-5 sm:px-7">
+        <header class="flex items-start justify-between gap-3 border-b border-orange-100 px-4 py-4 sm:gap-4 sm:px-7 sm:py-5">
             <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
                     <p class="text-sm font-semibold uppercase tracking-[0.16em] text-orange-800">Route editor</p>
@@ -71,7 +71,7 @@
             </button>
         </header>
 
-        <div class="overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
+        <div class="overflow-y-auto px-4 py-5 sm:px-7 sm:py-6">
             @if(session('status') && (int) request()->integer('edit_route') === (int) $flowRoute->getKey())
                 <div class="mb-5">
                     <x-ui.feedback.alert type="success">
@@ -101,7 +101,7 @@
                         </p>
                     </div>
 
-                    <form method="POST" action="{{ route('crm.flow-routes.points.order', $flowRoute) }}" x-show="orderChanged" x-transition>
+                    <form method="POST" action="{{ route('crm.flow-routes.points.order', $flowRoute) }}" x-show="orderChanged" x-transition class="w-full sm:w-auto">
                         @csrf
                         @method('PATCH')
 
@@ -111,7 +111,7 @@
 
                         <button
                             type="submit"
-                            class="inline-flex items-center justify-center rounded-xl bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
+                            class="inline-flex w-full items-center justify-center rounded-xl bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 sm:w-auto"
                         >
                             Save order
                         </button>
@@ -187,11 +187,11 @@
                                     </div>
                                 </div>
 
-                                <div class="flex shrink-0 flex-wrap items-center gap-2">
+                                <div class="grid w-full shrink-0 grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
                                     <button
                                         type="button"
                                         @click="openPoint({{ $point->getKey() }})"
-                                        class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
+                                        class="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 sm:w-auto sm:py-2"
                                     >
                                         Edit
                                     </button>
@@ -200,18 +200,19 @@
                                         method="POST"
                                         action="{{ route('crm.flow-routes.points.destroy', [$flowRoute, $point]) }}"
                                         @submit="handleRemove($event, {{ $point->getKey() }})"
+                                        class="w-full sm:w-auto"
                                     >
                                         @csrf
                                         @method('DELETE')
 
                                         <span
-                                            class="inline-flex"
+                                            class="inline-flex w-full sm:w-auto"
                                             :title="removalError({{ $point->getKey() }}) ?? ''"
                                         >
                                             <button
                                                 type="submit"
                                                 :disabled="!canRemove({{ $point->getKey() }})"
-                                                class="inline-flex items-center justify-center rounded-xl border px-3 py-2 text-sm font-semibold shadow-sm transition focus-visible:outline-none focus-visible:ring-2"
+                                                class="inline-flex w-full items-center justify-center rounded-xl border px-3 py-2.5 text-sm font-semibold shadow-sm transition focus-visible:outline-none focus-visible:ring-2 sm:w-auto sm:py-2"
                                                 :class="canRemove({{ $point->getKey() }})
                                                     ? 'border-red-300 bg-white text-red-700 hover:bg-red-50 focus-visible:ring-red-300'
                                                     : 'cursor-not-allowed border-slate-300 bg-slate-200 text-slate-500 shadow-none'"
@@ -221,14 +222,14 @@
                                         </span>
                                     </form>
 
-                                    <div class="flex items-center gap-1" aria-label="Move Point without dragging">
+                                    <div class="col-span-2 flex items-center justify-end gap-2 sm:col-auto sm:justify-start" aria-label="Move Point without dragging">
                                         <form method="POST" action="{{ route('crm.flow-routes.points.move-up', [$flowRoute, $point]) }}">
                                             @csrf
                                             @method('PATCH')
 
                                             <button
                                                 type="submit"
-                                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+                                                class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
                                                 aria-label="Move Point up"
                                                 :disabled="!canMove({{ $point->getKey() }}, -1)"
                                                 @disabled($loop->first)
@@ -243,7 +244,7 @@
 
                                             <button
                                                 type="submit"
-                                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+                                                class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
                                                 aria-label="Move Point down"
                                                 :disabled="!canMove({{ $point->getKey() }}, 1)"
                                                 @disabled($loop->last)
@@ -263,7 +264,7 @@
                             x-transition.opacity
                             class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-3 sm:p-6"
                         >
-                            <div @click.outside="closePoint()" class="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl ring-1 ring-black/10 sm:p-7">
+                            <div @click.outside="closePoint()" class="max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl ring-1 ring-black/10 sm:max-h-[92vh] sm:p-7">
                                 <div class="flex items-start justify-between gap-4">
                                     <div>
                                         <p class="text-sm font-semibold uppercase tracking-[0.14em] text-orange-800">Edit Point</p>
@@ -295,9 +296,9 @@
                                         'fieldSuffix' => 'edit-'.$point->id,
                                     ])
 
-                                    <div class="flex justify-end gap-3 pt-2">
-                                        <button type="button" @click="closePoint()" class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800">Cancel</button>
-                                        <button type="submit" class="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">Save Point</button>
+                                    <div class="grid gap-2 pt-2 sm:flex sm:justify-end sm:gap-3">
+                                        <button type="button" @click="closePoint()" class="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 sm:w-auto">Cancel</button>
+                                        <button type="submit" class="w-full rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 sm:w-auto">Save Point</button>
                                     </div>
                                 </form>
                             </div>
@@ -325,7 +326,7 @@
                             @click="openAddPoint({{ $capability['id'] }})"
                             class="rounded-2xl p-4 text-left ring-1 transition hover:-translate-y-0.5 hover:shadow-md {{ module_tone($capability['module_key'], 'item') }}"
                         >
-                            <div class="flex items-center justify-between gap-3">
+                            <div class="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                                 <span class="font-semibold text-slate-950">{{ $capability['name'] }}</span>
                                 <span class="rounded-full px-2.5 py-1 text-xs font-semibold ring-1 {{ module_tone($capability['module_key'], 'badge') }}">
                                     {{ config('modules.modules.'.$capability['module_key'].'.name', \Illuminate\Support\Str::headline($capability['module_key'])) }}
@@ -341,7 +342,7 @@
                             x-transition.opacity
                             class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-3 sm:p-6"
                         >
-                            <div @click.outside="closeAddPoint()" class="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl ring-1 ring-black/10 sm:p-7">
+                            <div @click.outside="closeAddPoint()" class="max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl ring-1 ring-black/10 sm:max-h-[92vh] sm:p-7">
                                 <div class="flex items-start justify-between gap-4">
                                     <div>
                                         <p class="text-sm font-semibold uppercase tracking-[0.14em] text-orange-800">Add Point</p>
@@ -392,9 +393,9 @@
                                         'fieldSuffix' => 'create-'.$flowRoute->id.'-'.$capability['id'],
                                     ])
 
-                                    <div class="flex justify-end gap-3 pt-2">
-                                        <button type="button" @click="closeAddPoint()" class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800">Cancel</button>
-                                        <button type="submit" class="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">Add Point</button>
+                                    <div class="grid gap-2 pt-2 sm:flex sm:justify-end sm:gap-3">
+                                        <button type="button" @click="closeAddPoint()" class="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 sm:w-auto">Cancel</button>
+                                        <button type="submit" class="w-full rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 sm:w-auto">Add Point</button>
                                     </div>
                                 </form>
                             </div>

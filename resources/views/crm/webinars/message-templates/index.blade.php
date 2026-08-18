@@ -10,7 +10,7 @@
             </div>
         @endif
 
-        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
@@ -24,17 +24,17 @@
                     </p>
                 </div>
 
-                <div class="flex flex-wrap gap-2">
+                <div class="grid gap-2 sm:flex sm:flex-wrap">
                     <a
                         href="{{ route('crm.messaging.message-templates.index', ['module' => 'webinars']) }}"
-                        class="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 px-5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50"
+                        class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 px-5 text-center text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
                     >
                         Edit message copy
                     </a>
 
                     <a
                         href="{{ route('crm.webinar-series.index') }}"
-                        class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-extrabold text-white transition hover:bg-slate-800"
+                        class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-5 text-center text-sm font-extrabold text-white transition hover:bg-slate-800 sm:w-auto"
                     >
                         View webinars
                     </a>
@@ -46,7 +46,7 @@
             $readinessIsReady = ($readiness['status'] ?? null) === 'ready';
         @endphp
 
-        <section class="rounded-3xl border {{ $readinessIsReady ? 'border-emerald-200 bg-emerald-50/60' : 'border-amber-200 bg-amber-50/60' }} p-6 shadow-sm">
+        <section class="rounded-3xl border {{ $readinessIsReady ? 'border-emerald-200 bg-emerald-50/60' : 'border-amber-200 bg-amber-50/60' }} p-4 shadow-sm sm:p-6">
             <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div class="max-w-3xl">
                     <div class="flex flex-wrap items-center gap-2">
@@ -73,15 +73,15 @@
                 </div>
 
                 <dl class="grid grid-cols-3 gap-2 text-center">
-                    <div class="min-w-20 rounded-2xl border border-white/80 bg-white/80 px-3 py-3">
+                    <div class="min-w-0 rounded-2xl border border-white/80 bg-white/80 px-2 py-3 sm:px-3">
                         <dt class="text-xs font-bold uppercase tracking-wide text-slate-500">Ready</dt>
                         <dd class="mt-1 text-xl font-extrabold text-slate-950">{{ $readiness['counts']['ready'] }}</dd>
                     </div>
-                    <div class="min-w-20 rounded-2xl border border-white/80 bg-white/80 px-3 py-3">
+                    <div class="min-w-0 rounded-2xl border border-white/80 bg-white/80 px-2 py-3 sm:px-3">
                         <dt class="text-xs font-bold uppercase tracking-wide text-slate-500">Review</dt>
                         <dd class="mt-1 text-xl font-extrabold text-slate-950">{{ $readiness['counts']['needs_attention'] }}</dd>
                     </div>
-                    <div class="min-w-20 rounded-2xl border border-white/80 bg-white/80 px-3 py-3">
+                    <div class="min-w-0 rounded-2xl border border-white/80 bg-white/80 px-2 py-3 sm:px-3">
                         <dt class="text-xs font-bold uppercase tracking-wide text-slate-500">Optional</dt>
                         <dd class="mt-1 text-xl font-extrabold text-slate-950">{{ $readiness['counts']['optional'] }}</dd>
                     </div>
@@ -176,7 +176,7 @@
                     @endphp
 
                     @if($selectedSection)
-                        <div class="border-b border-slate-200 px-6 py-5">
+                        <div class="border-b border-slate-200 px-4 py-5 sm:px-6">
                             <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
                                 Selected area
                             </p>
@@ -204,7 +204,7 @@
                         </div>
 
                         @if($selectedSection['entries']->isEmpty())
-                            <div class="p-6">
+                            <div class="p-4 sm:p-6">
                                 @if($selectedSection['managed_by_messaging'] ?? false)
                                     <div class="rounded-2xl border border-sky-200 bg-sky-50/70 p-5 text-sm leading-6 text-slate-700">
                                         <p class="font-extrabold text-slate-950">
@@ -259,7 +259,7 @@
                                         $options = $entryState['options'];
                                     @endphp
 
-                                    <div id="message-{{ $entry->id }}" class="p-6">
+                                    <div id="message-{{ $entry->id }}" class="p-4 sm:p-6">
                                         <div class="grid gap-5 lg:grid-cols-[minmax(0,0.72fr)_minmax(20rem,1fr)] lg:items-start">
                                             <div>
                                                 <div class="flex flex-wrap items-center gap-2">
@@ -315,7 +315,7 @@
                                                     @if($selectedPreset)
                                                         <a
                                                             href="{{ route('crm.messaging.message-templates.index', ['channel' => $selectedPreset->channel, 'purpose' => $selectedPreset->purpose, 'module' => $selectedCatalogEntry?->module_key, 'group' => $selectedCatalogEntry?->group_key, 'preset' => $selectedPreset->getKey()]) }}"
-                                                            class="inline-flex min-h-9 items-center justify-center rounded-full border border-slate-300 px-4 text-xs font-extrabold text-slate-700 transition hover:bg-slate-50"
+                                                            class="inline-flex min-h-9 w-full items-center justify-center rounded-full border border-slate-300 px-4 text-xs font-extrabold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
                                                         >
                                                             Edit copy
                                                         </a>
@@ -368,13 +368,13 @@
                                                             <p class="text-sm font-semibold text-red-600">{{ $message }}</p>
                                                         @enderror
 
-                                                        <div class="flex items-center justify-between gap-4 pt-1">
+                                                        <div class="flex flex-col items-stretch gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                                                             <p class="text-xs leading-5 text-slate-500">
                                                                 This changes future webinar message selection only. It does not edit copy or reschedule messages already created.
                                                             </p>
                                                             <button
                                                                 type="submit"
-                                                                class="inline-flex min-h-10 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-extrabold text-white transition hover:bg-slate-800"
+                                                                class="inline-flex min-h-10 w-full items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-extrabold text-white transition hover:bg-slate-800 sm:w-auto"
                                                             >
                                                                 Save selection
                                                             </button>
