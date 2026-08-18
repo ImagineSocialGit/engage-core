@@ -220,6 +220,16 @@ Example:
 
 Verify the intended deployment user, web user, PHP version, PHP-FPM socket, Composer, Node/npm, MySQL client access, Redis access, Nginx, Supervisor, and required PHP extensions.
 
+Also verify the host has enough memory and disk headroom for the deployment toolchain:
+
+```bash
+free -h
+swapon --show
+df -h /
+```
+
+Composer, npm, and Vite builds can create short-lived memory spikes. Swap is not an Engage Core application requirement, but a small production host with limited RAM and no swap should be corrected before relying on in-place server builds. Choose swap size from the actual host capacity and workload; do not copy one client's value blindly.
+
 ## 7. Inspect SSH keys and host aliases before cloning
 
 Useful checks:
@@ -269,14 +279,35 @@ Use the project's actual supported deployment commands if they differ.
 
 ## 10. Set permissions
 
-Verify the web server and queue worker user can write where required:
+Verify every process identity that must create or update runtime files can write where required:
 
 ```text
 storage/
 bootstrap/cache/
 ```
 
-Do not blindly copy `chown`/`chmod` commands between servers. Confirm the actual deployment and web users first.
+Typical deployments may use different identities for:
+
+```text
+deployment / Scheduler user
+PHP-FPM user
+Supervisor/Horizon user
+```
+
+A directory showing `775` is not sufficient proof when those identities have different primary groups. A newly created file can still be writable only by its creator and creator group.
+
+Before handoff, perform a real cross-user write check in a disposable file:
+
+```text
+deploy user creates -> web/worker user updates
+web/worker user creates -> deploy user updates
+```
+
+Both directions must succeed when both identities are expected to write that tree.
+
+Use the server's deliberate shared-write policy—such as shared groups with inherited group ownership or POSIX default ACLs—rather than repeatedly applying broad `chmod`/`chown` after deploys. When POSIX ACLs are used, apply access to existing files/directories and default ACLs to directories so future files inherit the same writable identities.
+
+Do not blindly copy ownership/ACL commands between servers. Confirm the actual deployment, web, Scheduler, and worker users first.
 
 ## 11. Create the staging root and client environments
 
@@ -912,6 +943,8 @@ npm run build
 php artisan optimize:clear
 ```
 
+Production `composer install --no-dev` intentionally omits development-only test tooling. Do not make `php artisan test` a production deployment gate. Run automated tests in local/staging/CI before production; production uses current-code configuration validation, `modules:status`, `setup:validate`, process checks, provider-safe smoke checks, and observability verification.
+
 Apply any project-approved config/route/view caching only after the final environment is complete.
 
 ## 36. Apply production schema
@@ -970,7 +1003,27 @@ cd <APP_PATH>
 
 The production deployment is not ready when Horizon is healthy but the once-per-minute Scheduler entry is absent.
 
-## 39. Verify production routes and hosts
+## 39. Install and verify production observability
+
+When the deployment uses the Engage Core production observability path, complete `docs/operations/observability/README.md` before launch.
+
+At minimum verify:
+
+```text
+root LOG_CHANNEL/LOG_STACK/LOG_LEVEL/LOG_DAILY_DAYS resolve to the intended production values
+Nginx access log uses engage_core_json
+X-Request-ID is returned and forwarded to Laravel
+Laravel writes structured daily JSON
+PHP-FPM slow logging validates
+Horizon and slow-log rotation rules are installed
+the public observability verifier passes
+```
+
+Run the server verifier with `sudo`; it executes `nginx -t`, which may require root access to read certificate files even when Nginx itself is already healthy.
+
+Do not run an environment-diff helper on a secret-bearing production `.env` unless its output is known to redact unrelated values.
+
+## 40. Verify production routes and hosts
 
 ```bash
 php artisan route:list
@@ -984,7 +1037,7 @@ Check every required hostname.
 
 Run production-safe tests before real client traffic or a live event.
 
-## 40. Infrastructure smoke test
+## 41. Infrastructure smoke test
 
 ```text
 [ ] Root/public URL works
@@ -1002,7 +1055,7 @@ Run production-safe tests before real client traffic or a live event.
 [ ] setup:validate passes
 ```
 
-## 41. Messaging smoke test
+## 42. Messaging smoke test
 
 When enabled:
 
@@ -1018,7 +1071,7 @@ When enabled:
 
 Use production-safe recipients only.
 
-## 42. Webinar smoke test
+## 43. Webinar smoke test
 
 Before relying on a live client Webinar or Meeting:
 
@@ -1056,13 +1109,13 @@ old cancellation link cancels one canonical provider registrant
 
 Inspect actual database state; do not rely only on UI success messages.
 
-## 43. Check for duplicate-registration conflicts
+## 44. Check for duplicate-registration conflicts
 
 Before a live event or legacy import, confirm that one person does not have conflicting duplicate registrations for the same webinar.
 
 Do not globally merge contacts solely by phone number without a broader identity-resolution design.
 
-## 44. Verify no stale jobs survived previous disposable-data resets
+## 45. Verify no stale jobs survived previous disposable-data resets
 
 Inspect the actual prefixed queue keys when there has been a destructive reset or app migration.
 
@@ -1090,14 +1143,15 @@ Required sequence:
 5. Clear only the exact stale Redis queue/runtime namespace before IDs are reused.
 6. Deploy the intended target code/client configuration.
 7. Run `php artisan migrate:fresh --force` only inside the approved controlled rebuild; after the path-selection cutover this rebuilds the platform foundation only.
-8. Run `php artisan engage:install --force` to install the configured module schema, synchronize presets, and validate setup.
-9. Recreate environment-owned CRM users.
-10. Upload the file with Validate Only and resolve every error.
-11. Apply with the current password and exact IMPORT confirmation.
-12. Verify counts and inert runtime state.
-13. Restore workers/providers/Scheduler.
-14. Resume imported work category by category until pending counts are zero.
-15. Verify providers, queues, relationships, and external side effects before reopening traffic.
+8. Run `php artisan engage:install --force --no-create-user` to install the configured module schema, synchronize presets, and validate setup while keeping environment-owned CRM user recreation explicit.
+9. Recreate environment-owned CRM users with `php artisan engage:user:add`.
+10. Ensure the authorized operator can reach the Project State CRM surface while Horizon and Scheduler remain stopped. If maintenance mode blocks CRM access, use the environment's approved maintenance-window access method; do not accidentally reopen public/provider writes merely to reach the owner screen.
+11. Upload the file with Validate Only and resolve every error.
+12. Apply with the current password and exact IMPORT confirmation.
+13. Verify counts and inert runtime state.
+14. Restore workers/providers/Scheduler only after the import is verified.
+15. Resume imported work category by category only when pending resume items actually exist and the operator intends to release them. A deliberately runtime-stripped file may correctly have no resume work.
+16. Verify providers, queues, relationships, and external side effects before reopening normal traffic.
 ```
 
 Project State does not transfer users, sessions, Redis jobs, cache/locks, provider state, or currently unsupported module data. Mortgage and Scheduling durable rows must remain empty until explicit transfer support exists.
@@ -1152,6 +1206,10 @@ Import rules:
 [ ] Horizon process path verified
 [ ] Every required queue consumed
 [ ] Laravel Scheduler cron installed and `schedule:list` verified
+[ ] Runtime writable directories work across every process identity that needs them
+[ ] Host memory/disk/swap posture is adequate for the deployment/build strategy
+[ ] Production logging resolves to the intended root logging stack
+[ ] Production observability verification passes when the Engage Core observability path is installed
 [ ] No stale jobs from a previous disposable DB state
 [ ] DNS correct
 [ ] Nginx correct for every hostname
@@ -1195,8 +1253,10 @@ For normal post-launch deployments:
 11. Restart Horizon through Supervisor after any queued-job runtime code change; use the exact `<CLIENT_HORIZON_PROGRAM>` discovered from Supervisor.
 12. Verify actual Horizon process path and queue list.
 13. Run focused production-safe smoke checks for touched providers/modules.
+14. When observability configuration or Nginx/PHP-FPM logging changed, rerun the production observability verifier.
 ```
 
+Do not make the production test suite part of this procedure; production dependencies are installed with `--no-dev`, and automated tests belong in local/staging/CI.
 Do not clear Redis indiscriminately during ordinary deployments.
 Do not regenerate `APP_KEY`.
 Do not destructively reset a production database containing real data.

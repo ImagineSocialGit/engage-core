@@ -1,3 +1,4 @@
+
 # Engage Core — Deployment Command Workflow
 
 ## Purpose
@@ -143,10 +144,14 @@ At the schema-rebuild point, the command boundary is:
 
 ```bash
 php artisan migrate:fresh --force
-php artisan engage:install --force
+php artisan engage:install --force --no-create-user
+php artisan modules:status
+php artisan engage:user:add
 ```
 
-After the path-selection cutover, `migrate:fresh` reconstructs the platform foundation only. `engage:install` then installs the configured module schema, materializes presets, and runs setup validation before the Project State file is validated/applied.
+After the path-selection cutover, `migrate:fresh` reconstructs the platform foundation only. `engage:install` then installs the configured module schema, materializes presets, and runs setup validation before the Project State file is validated/applied. `--no-create-user` keeps the environment-owned CRM user outside the imported application state; recreate the intended owner explicitly with `engage:user:add`.
+
+Keep Horizon and the Laravel Scheduler stopped through validation and apply. Resume imported work only when the import actually creates pending resume items and the operator deliberately releases them.
 
 Never use this destructive sequence as a routine production deployment.
 

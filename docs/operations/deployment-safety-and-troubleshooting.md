@@ -219,6 +219,14 @@ redis-cli ZCARD <REDIS_PREFIX>queues:default:reserved
 
 Never inspect an unprefixed key, see zero, and conclude the app queue is empty without first checking effective config.
 
+When the root environment contains:
+
+```env
+REDIS_PASSWORD=null
+```
+
+the literal value `null` represents no Redis password. Do not export `REDISCLI_AUTH=null`; that makes `redis-cli` attempt authentication against a server that may have no password configured.
+
 ---
 
 # 4. Delayed-job diagnostics: database `send_at` is not enough
@@ -286,6 +294,75 @@ php artisan tinker --execute="dump(config('horizon.environments.'.app()->environ
 ```
 
 Do not leave queue behavior dependent on one hand-maintained historical `.env` forever. Reconcile queue registry/config, Horizon defaults, and deployed environment values whenever executable queue paths change.
+
+---
+
+# 5A. Shared runtime directories look writable but cross-user writes fail
+
+## Failure mode
+
+A deployment can show:
+
+```text
+storage/            775
+bootstrap/cache/    775
+```
+
+and still fail when the deployment/Scheduler user and PHP-FPM/Horizon user have different primary groups.
+
+Typical symptom:
+
+```text
+deploy user creates file
+-> www-data cannot update it
+
+www-data creates file
+-> deploy user cannot update it
+```
+
+Directory mode alone is not proof that future files inherit a usable shared-write policy.
+
+## Required protection
+
+Identify every process identity that writes runtime files:
+
+```text
+deployment / Scheduler user
+PHP-FPM user
+Supervisor/Horizon user
+```
+
+Test both create/update directions with disposable files in the actual runtime tree.
+
+When multiple identities must write the same tree, use a deliberate inheritance mechanism such as:
+
+```text
+shared group + setgid/inherited group ownership
+POSIX access + default ACLs
+another explicitly administered equivalent
+```
+
+When POSIX ACLs are used, grant access to existing files/directories and set default ACLs on directories so new files inherit the same writable identities.
+
+Do not solve this with recurring broad `chmod 777`, blanket ownership changes, or assumptions based only on the parent directory mode.
+
+---
+
+# 5B. Server build memory pressure
+
+Composer, npm, and Vite can create short-lived memory spikes even when normal PHP request/worker memory is healthy.
+
+Before an in-place server build on a small host, inspect:
+
+```bash
+free -h
+swapon --show
+df -h /
+```
+
+Swap is not an Engage Core runtime requirement, but a host with limited RAM and no swap may be unnecessarily vulnerable to OOM kills or stalled deployment builds. Add an appropriately sized persistent swapfile when the actual server capacity/workload warrants it.
+
+Do not copy a fixed swap size from another client without checking the host.
 
 ---
 
@@ -695,8 +772,13 @@ Before launch or a live Webinar event:
 [ ] Correct checkout consumed by Horizon
 [ ] Actual Horizon process path verified
 [ ] Explicit queue list covers executable queues
+[ ] Laravel Scheduler cron exists exactly once for this client and `schedule:list` is understood
+[ ] Runtime writable directories pass cross-user create/update checks for the actual process identities
+[ ] Build host has adequate memory/disk/swap posture for the chosen deployment strategy
 [ ] Redis prefixes understood
 [ ] No stale jobs after disposable-data resets or a controlled Project State rebuild
+[ ] Root production logging resolves to the intended logging stack
+[ ] Production observability verifier passes when the Engage Core observability path is installed
 [ ] Project State export/import/resume record preserved when a controlled rebuild was performed
 [ ] No pending Project State resume items remain unless deliberately reconciled
 [ ] No placeholder domains

@@ -288,18 +288,45 @@ Remove or rotate bootstrap secrets after use according to operational policy. Ke
 
 # 7. Logging
 
-Curated current-stack variables:
+Logging is a root/process environment concern.
+
+Canonical current-stack variables:
 
 ```env
-LOG_CHANNEL=errorlog
-LOG_STACK=errorlog
+LOG_CHANNEL=stack
+LOG_STACK=daily_json
 LOG_DEPRECATIONS_CHANNEL=null
 LOG_DEPRECATIONS_TRACE=false
-LOG_LEVEL=debug
+LOG_LEVEL=info
 LOG_DAILY_DAYS=14
 ```
 
-For production, use an intentional log level such as `info` or stricter when appropriate.
+`config/logging.php` defaults to the `stack` channel, but the stack's default child is `single` when `LOG_STACK` is absent. Production deployments that use the Engage Core observability path must therefore set `LOG_STACK=daily_json` explicitly rather than assuming `LOG_CHANNEL=stack` alone enables structured daily JSON logging.
+
+Keep these values in the root `.env`, not `client/[CLIENT_KEY]/.env`.
+
+Verify the effective production logging contract after the current code and environment are in place:
+
+```bash
+php artisan tinker --execute="dump([
+    'default' => config('logging.default'),
+    'stack_channels' => config('logging.channels.stack.channels'),
+    'daily_json_level' => config('logging.channels.daily_json.level'),
+    'daily_json_days' => config('logging.channels.daily_json.days'),
+    'daily_json_path' => config('logging.channels.daily_json.path'),
+]);"
+```
+
+Expected production shape:
+
+```text
+default = stack
+stack channels = [daily_json]
+daily_json level = info
+daily_json days = 14
+```
+
+Use `docs/operations/observability/README.md` for the Nginx request-ID/JSON access log, PHP-FPM slow-log, Horizon rotation, verification, and rollback procedure.
 
 The Core logging config also supports Slack, Papertrail, stderr, syslog, and other optional handlers. Those variables are omitted from the canonical current-stack `.env.example` until a client deployment actually uses them.
 
@@ -479,6 +506,8 @@ REDIS_DB=0
 REDIS_CACHE_DB=1
 REDIS_PREFIX=CHANGE_ME_
 ```
+
+`REDIS_PASSWORD=null` means no Redis password is configured. Do not pass the literal string `null` to `redis-cli` through `REDISCLI_AUTH`; omit authentication when the server itself has no Redis password configured.
 
 Optional supported variables include:
 
@@ -882,6 +911,8 @@ Before deleting an existing live environment variable, search the full repositor
 [ ] Cache prefix unique
 [ ] Horizon prefix unique
 [ ] Horizon queue list covers executable queues
+[ ] Root logging resolves to the intended production channel/stack/level/retention
+[ ] Production observability is installed/verified when this deployment uses the Engage Core observability path
 [ ] Mail sender fallbacks resolve to non-empty addresses
 [ ] Resend secret/API key set when enabled
 [ ] SMS_ENABLED deliberate

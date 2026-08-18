@@ -87,49 +87,72 @@ Use that exact path as `--app-path`.
 
 ## Deployment order
 
-### 1. Apply and test repository files
+### 1. Validate repository files before production
+
+Run the focused observability tests in local/staging/CI before deploying production:
 
 ```bash
-composer dump-autoload && \
-php artisan optimize:clear && \
 php artisan test \
   tests/Feature/Observability/RequestCorrelationTest.php \
   tests/Feature/Observability/ObservabilityConfigurationContractTest.php
 ```
 
-The Laravel code is safe before Nginx changes: it generates its own request IDs until Nginx begins supplying them.
+Do not make `php artisan test` a production step. The production install path uses `composer install --no-dev`, so development-only test tooling may not exist on the live host.
 
-### 2. Configure each client’s runtime logging
-
-Dry run:
+After pulling the approved current code on production, use runtime-safe commands only:
 
 ```bash
-scripts/operations/configure-client-logging.sh \
-  --env-file client/<client-key>/.env \
-  --app-path /REAL/APP/PATH
+composer dump-autoload
+php artisan optimize:clear
 ```
 
-Apply after reviewing the diff:
+The Laravel request-correlation middleware is safe before Nginx changes: it generates its own request IDs until Nginx begins supplying them.
 
-```bash
-scripts/operations/configure-client-logging.sh \
-  --env-file client/<client-key>/.env \
-  --app-path /REAL/APP/PATH \
-  --level info \
-  --days 14 \
-  --apply
-```
+### 2. Configure the deployment’s root runtime logging
 
-This script only manages:
+Logging is process-owned. Configure these values in the root application `.env`, not `client/<client-key>/.env`:
 
-```text
+```env
 LOG_CHANNEL=stack
 LOG_STACK=daily_json
 LOG_LEVEL=info
 LOG_DAILY_DAYS=14
 ```
 
-It creates a timestamped `.env` backup and clears Laravel caches. It never touches provider credentials or unrelated settings.
+Then clear cached configuration:
+
+```bash
+php artisan optimize:clear
+```
+
+Verify effective config without printing the rest of the environment:
+
+```bash
+php artisan tinker --execute="dump([
+    'default' => config('logging.default'),
+    'stack_channels' => config('logging.channels.stack.channels'),
+    'daily_json_level' => config('logging.channels.daily_json.level'),
+    'daily_json_days' => config('logging.channels.daily_json.days'),
+    'daily_json_path' => config('logging.channels.daily_json.path'),
+]);"
+```
+
+Expected production shape:
+
+```text
+default = stack
+stack channels = [daily_json]
+daily_json level = info
+daily_json days = 14
+```
+
+Current operational warning:
+
+```text
+scripts/operations/configure-client-logging.sh
+```
+
+may display unrelated environment values in its proposed diff. Do not run that helper against a secret-bearing production environment until its output is hardened to redact unrelated values. The safe production procedure is to edit only the four root logging keys above and verify only their effective Laravel config.
 
 ### 3. Dry-run the server installer
 
@@ -183,7 +206,9 @@ Save the printed backup directory. It is required for one-command rollback.
 
 ### 5. Verify
 
-Use a safe public page without a tokenized URL:
+Use a safe public page without a tokenized URL.
+
+Run the verifier with `sudo`. It validates Nginx with `nginx -t`, and a non-root shell may be unable to read the active certificate files even when the running Nginx service itself is healthy.
 
 ```bash
 sudo scripts/operations/verify-observability.sh \
@@ -211,7 +236,7 @@ The global Nginx format and PHP-FPM slow log are server-wide and idempotent. Rep
 - FastCGI request-ID forwarding;
 - client-specific Horizon log rotation.
 
-Repeat the client logging environment script for each client deployment.
+Configure the four root logging values for each client deployment. Do not use the current logging helper against a secret-bearing production environment until its diff output is hardened.
 
 ## Existing Nginx rotation
 
@@ -270,11 +295,13 @@ sudo scripts/operations/rollback-observability.sh \
 
 The rollback restores replaced files, removes files that were newly created, validates Nginx/PHP-FPM, and reloads both services.
 
-To roll back the per-client environment, restore the timestamped `.env.*.bak` created by `configure-client-logging.sh`, then run:
+To roll back the root logging environment, restore the prior root `.env` values or the operator-created root `.env` backup, then run:
 
 ```bash
 php artisan optimize:clear
 ```
+
+If a future hardened logging helper creates its own root `.env` backup, that backup may be used instead.
 
 ## Retention defaults
 

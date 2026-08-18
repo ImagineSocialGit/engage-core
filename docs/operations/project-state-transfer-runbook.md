@@ -347,7 +347,21 @@ Its email must match `PROJECT_STATE_ADMIN_EMAIL`.
 
 Do not reuse password hashes or sessions from the source transfer file; they are not present.
 
-### 5. Confirm target tables are clean
+### 5. Preserve maintenance-window access to Project State
+
+The owner-only Project State surface is a web CRM surface. Plan how the authorized operator will reach it while background runtime remains inert.
+
+Keep:
+
+```text
+Horizon stopped
+Laravel Scheduler stopped
+provider-side write delivery paused when operationally available
+```
+
+If the application is still in maintenance mode and that blocks the owner CRM session, use the environment's approved maintenance-window access method. Do not casually reopen public/provider write traffic merely to reach the import screen.
+
+### 6. Confirm target tables are clean
 
 `insert_empty` tables must be empty. Validation will reject any non-empty target table in that mode.
 
@@ -510,7 +524,9 @@ php artisan schedule:list
 
 ## Phase 9 — Resume imported activity
 
-The UI exposes only categories that have pending items and no incomplete dependencies.
+If the import created no pending resume items, do not run `RESUME` merely because this phase exists. A deliberately runtime-stripped or otherwise non-runnable transfer may correctly proceed directly to final verification after runtime services are restored.
+
+When resume items do exist, the UI exposes only categories that have pending items and no incomplete dependencies.
 
 Each submission processes at most:
 

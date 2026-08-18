@@ -37,6 +37,10 @@ The Routes-specific suggestion experience belongs in `modules/flow-routes/TODO.m
 - [ ] Separate controlled beta/operator-assisted readiness from true client self-serve readiness.
 - [ ] Audit which admin surfaces must exist before clients can operate without developer help, then assign each resulting item to its owning module/configuration area.
 
+## Operations tooling
+
+- [ ] Harden `scripts/operations/configure-client-logging.sh` so dry-run/apply output never prints unrelated environment values or secrets, and align the helper with root `.env` logging ownership before it is used against a secret-bearing production environment again.
+
 ## Documentation maintenance
 
 - [ ] Keep top-level docs platform-wide; move module-owned state/backlog into `docs/modules/<module>/`.
