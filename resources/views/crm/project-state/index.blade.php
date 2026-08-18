@@ -4,7 +4,7 @@
     subheading="Download the currently supported project state or validate and apply a current-format JSON file after a clean rebuild."
 >
     <div class="space-y-6">
-        <section class="rounded-3xl border border-amber-300 bg-amber-50 p-6 shadow-sm sm:p-8">
+        <section class="rounded-3xl border border-amber-300 bg-amber-50 p-4 shadow-sm sm:p-6 lg:p-8">
             <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-amber-800">
                 Owner-only maintenance
             </p>
@@ -59,7 +59,7 @@
         </section>
 
         @if($errors->any())
-            <section class="rounded-3xl border border-red-300 bg-red-50 p-6 shadow-sm">
+            <section class="rounded-3xl border border-red-300 bg-red-50 p-4 shadow-sm sm:p-6">
                 <h2 class="text-lg font-bold text-red-950">The request could not be completed</h2>
                 <ul class="mt-3 space-y-1 text-sm text-red-900">
                     @foreach($errors->all() as $error)
@@ -70,7 +70,7 @@
         @endif
 
         @if(is_array($report))
-            <section class="rounded-3xl border {{ $report['valid'] ? 'border-emerald-300 bg-emerald-50' : 'border-red-300 bg-red-50' }} p-6 shadow-sm sm:p-8">
+            <section class="rounded-3xl border {{ $report['valid'] ? 'border-emerald-300 bg-emerald-50' : 'border-red-300 bg-red-50' }} p-4 shadow-sm sm:p-6 lg:p-8">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <p class="text-xs font-extrabold uppercase tracking-[0.18em] {{ $report['valid'] ? 'text-emerald-800' : 'text-red-800' }}">
@@ -137,7 +137,7 @@
         @endif
 
         @if(is_array($resumeReport))
-            <section class="rounded-3xl border border-emerald-300 bg-emerald-50 p-6 shadow-sm sm:p-8">
+            <section class="rounded-3xl border border-emerald-300 bg-emerald-50 p-4 shadow-sm sm:p-6 lg:p-8">
                 <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-800">
                     Resume completed
                 </p>
@@ -163,7 +163,7 @@
         @endif
 
         <div class="grid gap-6 xl:grid-cols-2">
-            <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:p-8">
                 <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">Export</p>
                 <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-slate-950">Download current state</h2>
                 <p class="mt-3 text-sm leading-6 text-slate-600">
@@ -185,13 +185,13 @@
                         >
                     </div>
 
-                    <button type="submit" class="inline-flex items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
+                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 sm:w-auto">
                         Download Project State
                     </button>
                 </form>
             </section>
 
-            <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:p-8">
                 <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">Import</p>
                 <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-slate-950">Validate or apply current-format state</h2>
                 <p class="mt-3 text-sm leading-6 text-slate-600">
@@ -235,12 +235,12 @@
                         >
                     </div>
 
-                    <div class="flex flex-wrap gap-3">
-                        <button name="operation" value="validate" type="submit" class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50">
+                    <div class="grid gap-3 sm:flex sm:flex-wrap">
+                        <button name="operation" value="validate" type="submit" class="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 sm:w-auto">
                             Validate Only
                         </button>
 
-                        <button name="operation" value="apply" type="submit" class="inline-flex items-center justify-center rounded-xl bg-red-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-800">
+                        <button name="operation" value="apply" type="submit" class="inline-flex w-full items-center justify-center rounded-xl bg-red-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-800 sm:w-auto">
                             Apply Import
                         </button>
                     </div>
@@ -248,7 +248,7 @@
             </section>
         </div>
 
-        <section class="rounded-3xl border border-orange-300 bg-orange-50 p-6 shadow-sm sm:p-8">
+        <section class="rounded-3xl border border-orange-300 bg-orange-50 p-4 shadow-sm sm:p-6 lg:p-8">
             <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-orange-800">
                 Explicit post-import resume
             </p>
@@ -265,7 +265,7 @@
             <div class="mt-6 grid gap-4 lg:grid-cols-2">
                 @foreach($resumeSummary as $category)
                     <article class="rounded-2xl border {{ $category['pending_count'] > 0 ? 'border-orange-300 bg-white' : 'border-slate-200 bg-white/70' }} p-5">
-                        <div class="flex items-start justify-between gap-4">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h3 class="font-bold text-slate-950">{{ $category['label'] }}</h3>
                                 <p class="mt-1 text-sm leading-5 text-slate-600">{{ $category['description'] }}</p>
@@ -300,7 +300,7 @@
             @endphp
 
             @if($resumableCategories->isNotEmpty())
-                <form method="POST" action="{{ route('crm.project-state.resume') }}" class="mt-6 grid gap-4 rounded-2xl border border-orange-300 bg-white p-5 lg:grid-cols-3">
+                <form method="POST" action="{{ route('crm.project-state.resume') }}" class="mt-6 grid gap-4 rounded-2xl border border-orange-300 bg-white p-4 sm:p-5 lg:grid-cols-3">
                     @csrf
 
                     <div>
@@ -344,7 +344,7 @@
                     </div>
 
                     <div class="lg:col-span-3">
-                        <button type="submit" class="inline-flex items-center justify-center rounded-xl bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-800">
+                        <button type="submit" class="inline-flex w-full items-center justify-center rounded-xl bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-800 sm:w-auto">
                             Resume Selected Activity
                         </button>
                     </div>

@@ -29,7 +29,7 @@
             </x-ui.feedback.alert>
         @endif
 
-        <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <a
                 href="{{ route('crm.tasks.index') }}"
                 class="text-sm font-semibold text-slate-600 underline underline-offset-4 hover:text-slate-900"
@@ -37,51 +37,51 @@
                 Back to Tasks
             </a>
 
-            <div class="flex flex-wrap gap-2">
+            <div class="grid w-full gap-2 sm:w-auto sm:flex sm:flex-wrap">
                 @if($task->archived_at)
-                    <form method="POST" action="{{ route('crm.tasks.restore', $task) }}">
+                    <form method="POST" action="{{ route('crm.tasks.restore', $task) }}" class="w-full sm:w-auto">
                         @csrf
                         @method('PATCH')
 
-                        <x-ui.button type="submit" variant="secondary">
+                        <x-ui.button type="submit" variant="secondary" class="w-full sm:w-auto">
                             Restore
                         </x-ui.button>
                     </form>
                 @elseif($task->status === \App\Modules\Tasks\Models\Task::STATUS_OPEN)
-                    <form method="POST" action="{{ route('crm.tasks.complete', $task) }}">
+                    <form method="POST" action="{{ route('crm.tasks.complete', $task) }}" class="w-full sm:w-auto">
                         @csrf
                         @method('PATCH')
 
-                        <x-ui.button type="submit">
+                        <x-ui.button type="submit" class="w-full sm:w-auto">
                             Mark Complete
                         </x-ui.button>
                     </form>
 
-                    <form method="POST" action="{{ route('crm.tasks.cancel', $task) }}">
+                    <form method="POST" action="{{ route('crm.tasks.cancel', $task) }}" class="w-full sm:w-auto">
                         @csrf
                         @method('PATCH')
 
                         <input type="hidden" name="canceled_reason" value="Manually canceled">
 
-                        <x-ui.button type="submit" variant="outline">
+                        <x-ui.button type="submit" variant="outline" class="w-full sm:w-auto">
                             Cancel
                         </x-ui.button>
                     </form>
                 @else
-                    <form method="POST" action="{{ route('crm.tasks.reopen', $task) }}">
+                    <form method="POST" action="{{ route('crm.tasks.reopen', $task) }}" class="w-full sm:w-auto">
                         @csrf
                         @method('PATCH')
 
-                        <x-ui.button type="submit" variant="secondary">
+                        <x-ui.button type="submit" variant="secondary" class="w-full sm:w-auto">
                             Reopen
                         </x-ui.button>
                     </form>
 
-                    <form method="POST" action="{{ route('crm.tasks.archive', $task) }}">
+                    <form method="POST" action="{{ route('crm.tasks.archive', $task) }}" class="w-full sm:w-auto">
                         @csrf
                         @method('PATCH')
 
-                        <x-ui.button type="submit" variant="outline">
+                        <x-ui.button type="submit" variant="outline" class="w-full sm:w-auto">
                             Archive
                         </x-ui.button>
                     </form>
@@ -89,7 +89,7 @@
             </div>
         </div>
 
-        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:p-8">
             <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
@@ -108,7 +108,7 @@
                         @endif
                     </div>
 
-                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
+                    <h2 class="mt-2 break-words text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
                         {{ $task->title }}
                     </h2>
 
@@ -119,7 +119,7 @@
                     @endif
                 </div>
 
-                <div class="rounded-2xl bg-slate-50 p-4 text-sm ring-1 ring-slate-200 lg:min-w-72">
+                <div class="w-full rounded-2xl bg-slate-50 p-4 text-sm ring-1 ring-slate-200 lg:w-auto lg:min-w-72">
                     <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Current status
                     </div>
@@ -234,9 +234,9 @@
                                 @if($link['details'])
                                     <dl class="mt-3 space-y-2 border-t border-slate-100 pt-3 text-xs">
                                         @foreach($link['details'] as $label => $value)
-                                            <div class="flex justify-between gap-4">
+                                            <div class="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
                                                 <dt class="text-slate-500">{{ $label }}</dt>
-                                                <dd class="text-right font-medium text-slate-800">{{ $value }}</dd>
+                                                <dd class="break-words font-medium text-slate-800 sm:text-right">{{ $value }}</dd>
                                             </div>
                                         @endforeach
                                     </dl>
@@ -274,11 +274,11 @@
                         Restore this task to put it back into the active workspace.
                     </p>
 
-                    <form method="POST" action="{{ route('crm.tasks.restore', $task) }}">
+                    <form method="POST" action="{{ route('crm.tasks.restore', $task) }}" class="w-full sm:w-auto">
                         @csrf
                         @method('PATCH')
 
-                        <x-ui.button type="submit">
+                        <x-ui.button type="submit" class="w-full sm:w-auto">
                             Restore Task
                         </x-ui.button>
                     </form>
@@ -287,23 +287,23 @@
                         Do the work described above, then mark the task complete. Cancel it only when the work is no longer needed.
                     </p>
 
-                    <div class="flex flex-wrap gap-2">
-                        <form method="POST" action="{{ route('crm.tasks.complete', $task) }}">
+                    <div class="grid gap-2 sm:flex sm:flex-wrap">
+                        <form method="POST" action="{{ route('crm.tasks.complete', $task) }}" class="w-full sm:w-auto">
                             @csrf
                             @method('PATCH')
 
-                            <x-ui.button type="submit">
+                            <x-ui.button type="submit" class="w-full sm:w-auto">
                                 Mark Complete
                             </x-ui.button>
                         </form>
 
-                        <form method="POST" action="{{ route('crm.tasks.cancel', $task) }}">
+                        <form method="POST" action="{{ route('crm.tasks.cancel', $task) }}" class="w-full sm:w-auto">
                             @csrf
                             @method('PATCH')
 
                             <input type="hidden" name="canceled_reason" value="Manually canceled">
 
-                            <x-ui.button type="submit" variant="outline">
+                            <x-ui.button type="submit" variant="outline" class="w-full sm:w-auto">
                                 Cancel Task
                             </x-ui.button>
                         </form>
@@ -313,21 +313,21 @@
                         Reopen the task when more work is required. Archive it when you want it out of the active workspace without deleting its history.
                     </p>
 
-                    <div class="flex flex-wrap gap-2">
-                        <form method="POST" action="{{ route('crm.tasks.reopen', $task) }}">
+                    <div class="grid gap-2 sm:flex sm:flex-wrap">
+                        <form method="POST" action="{{ route('crm.tasks.reopen', $task) }}" class="w-full sm:w-auto">
                             @csrf
                             @method('PATCH')
 
-                            <x-ui.button type="submit">
+                            <x-ui.button type="submit" class="w-full sm:w-auto">
                                 Reopen Task
                             </x-ui.button>
                         </form>
 
-                        <form method="POST" action="{{ route('crm.tasks.archive', $task) }}">
+                        <form method="POST" action="{{ route('crm.tasks.archive', $task) }}" class="w-full sm:w-auto">
                             @csrf
                             @method('PATCH')
 
-                            <x-ui.button type="submit" variant="outline">
+                            <x-ui.button type="submit" variant="outline" class="w-full sm:w-auto">
                                 Archive Task
                             </x-ui.button>
                         </form>

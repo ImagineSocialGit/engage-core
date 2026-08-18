@@ -37,10 +37,11 @@
                 </p>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
                 <x-ui.button
                     type="button"
                     variant="secondary"
+                    class="w-full sm:w-auto"
                     x-on:click="addLeadOpen = ! addLeadOpen"
                 >
                     Add {{ str($leadSingular)->title() }}
@@ -49,6 +50,7 @@
                 <x-ui.button
                     href="{{ route('crm.contacts.import') }}"
                     variant="secondary"
+                    class="w-full sm:w-auto"
                 >
                     Import {{ str($leadPlural)->title() }}
                 </x-ui.button>
@@ -56,6 +58,7 @@
                 <x-ui.button
                     href="{{ route('crm.contacts.import-batches.index') }}"
                     variant="outline"
+                    class="w-full sm:w-auto"
                 >
                     View Imports
                 </x-ui.button>
@@ -165,8 +168,8 @@
                     </div>
                 @endif
 
-                <div class="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4">
-                    <x-ui.button type="submit">
+                <div class="grid gap-3 border-t border-slate-200 pt-4 sm:flex sm:flex-wrap sm:items-center">
+                    <x-ui.button type="submit" class="w-full sm:w-auto">
                         Create {{ str($leadSingular)->title() }}
                     </x-ui.button>
 
@@ -182,7 +185,7 @@
         </x-ui.card>
 
         <x-ui.card padding="none" class="overflow-hidden">
-            <div class="border-b border-slate-200 px-6 py-4">
+            <div class="border-b border-slate-200 px-4 py-4 sm:px-6">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h3 class="text-lg font-semibold tracking-tight text-slate-950 capitalize">
@@ -209,7 +212,7 @@
 
                     <a
                         href="{{ route('crm.contacts.show', $contact) }}"
-                        class="block px-6 py-4 transition hover:bg-slate-50"
+                        class="block px-4 py-4 transition hover:bg-slate-50 sm:px-6"
                     >
                         <div class="grid gap-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(8rem,auto)] md:items-center">
                             <div>
@@ -217,7 +220,7 @@
                                     {{ $displayName }}
                                 </p>
 
-                                <p class="mt-1 text-sm text-slate-500">
+                                <p class="mt-1 break-words text-sm text-slate-500">
                                     {{ collect([$contact->email, $contact->phone])->filter()->join(' · ') ?: 'No contact method saved' }}
                                 </p>
                             </div>
@@ -240,7 +243,7 @@
                         </div>
                     </a>
                 @empty
-                    <div class="px-6 py-10 text-center">
+                    <div class="px-4 py-10 text-center sm:px-6">
                         <p class="text-sm font-medium text-slate-900 capitalize">
                             No {{ $leadPlural }} yet.
                         </p>

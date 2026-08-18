@@ -13,6 +13,13 @@ class LoginThrottlingTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_login_form_uses_the_crm_auth_view(): void
+    {
+        $this->get('/login')
+            ->assertOk()
+            ->assertViewIs('crm.auth.login');
+    }
+
     public function test_failed_login_attempts_are_rate_limited(): void
     {
         config([

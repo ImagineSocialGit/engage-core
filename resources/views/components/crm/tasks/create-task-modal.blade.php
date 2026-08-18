@@ -43,23 +43,26 @@
     x-cloak
     x-show="taskModalOpen"
     x-on:keydown.escape.window="taskModalOpen = false"
-    class="fixed inset-0 z-50 flex items-center justify-center px-4"
+    class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-3 py-4 sm:items-center sm:px-4 sm:py-6"
 >
     <div
         x-show="taskModalOpen"
         x-transition.opacity
-        class="absolute inset-0 bg-slate-900/50"
+        class="fixed inset-0 bg-slate-900/50"
         x-on:click="taskModalOpen = false"
     ></div>
 
     <div
         x-show="taskModalOpen"
         x-transition
-        class="relative z-10 w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="task-modal-title"
+        class="relative z-10 my-auto max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-4 shadow-xl sm:max-h-[calc(100dvh-3rem)] sm:p-6"
     >
-        <div class="mb-6 flex items-center justify-between gap-4">
+        <div class="mb-5 flex items-start justify-between gap-4 sm:mb-6">
             <div>
-                <h3 class="text-lg font-semibold tracking-tight">
+                <h3 id="task-modal-title" class="text-lg font-semibold tracking-tight">
                     Add Task
                 </h3>
 
@@ -71,7 +74,7 @@
             <button
                 type="button"
                 x-on:click="taskModalOpen = false"
-                class="text-slate-400 hover:text-slate-600"
+                class="-mr-2 -mt-2 rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                 aria-label="Close task form"
             >
                 ✕
@@ -263,16 +266,17 @@
                 </label>
             @endif
 
-            <div class="flex justify-end gap-3 border-t border-slate-200 pt-4">
+            <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
                 <x-ui.button
                     type="button"
                     variant="outline"
+                    class="w-full sm:w-auto"
                     x-on:click="taskModalOpen = false"
                 >
                     Cancel
                 </x-ui.button>
 
-                <x-ui.button type="submit">
+                <x-ui.button type="submit" class="w-full sm:w-auto">
                     Create Task
                 </x-ui.button>
             </div>

@@ -32,13 +32,13 @@
     class="{{ $itemBaseClass }} {{ module_tone($module, 'item') }}"
     :class="focusedPanel === @js($targetRef) ? @js($itemFocusClass) : @js($itemRestClass)"
 >
-    <div class="flex items-start justify-between gap-4">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div class="min-w-0">
             <span class="rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $badgeClasses[$item['tone'] ?? 'slate'] ?? ($tone['badge'] ?? $badgeClasses['slate']) }}">
                 {{ $item['label'] ?? 'Item' }}
             </span>
 
-            <h3 class="mt-3 font-semibold text-slate-950">
+            <h3 class="mt-3 break-words font-semibold text-slate-950">
                 {{ $item['title'] ?? 'Untitled item' }}
             </h3>
 
@@ -55,7 +55,7 @@
             @endif
         </div>
 
-        <div class="flex shrink-0 flex-col items-end gap-2">
+        <div class="flex shrink-0 flex-row flex-wrap items-center gap-3 sm:flex-col sm:items-end sm:gap-2">
             @if(filled($href))
                 <a href="{{ $href }}" class="text-xs font-bold text-slate-700 underline underline-offset-4 hover:text-slate-950">
                     {{ $item['action_label'] ?? 'Open' }}

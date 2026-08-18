@@ -27,7 +27,7 @@
     ];
 @endphp
 
-<div class="flex items-center justify-between gap-4">
+<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
     <div class="flex rounded-xl bg-slate-100 p-1 text-sm font-semibold">
         <a
             href="{{ request()->fullUrlWithQuery(['task_view' => 'active', 'activity_tab' => 'tasks']) }}"
@@ -52,11 +52,11 @@
 <div class="space-y-3 border-t border-slate-200 pt-4">
     @forelse ($visibleTasks as $task)
         <div class="rounded-xl border p-4 {{ module_tone('tasks', 'item') }}">
-            <div class="flex items-start justify-between gap-4">
-                <div>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0">
                     <a
                         href="{{ route('crm.tasks.show', $task) }}"
-                        class="font-semibold text-slate-900 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900"
+                        class="break-words font-semibold text-slate-900 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900"
                     >
                         {{ $task->title }}
                     </a>
@@ -96,58 +96,59 @@
                 </span>
             </p>
 
-            <div class="mt-4 flex flex-wrap gap-2">
+            <div class="mt-4 grid gap-2 sm:flex sm:flex-wrap">
                 <x-ui.button
                     href="{{ route('crm.tasks.show', $task) }}"
                     variant="outline"
+                    class="w-full sm:w-auto"
                 >
                     Open Task
                 </x-ui.button>
 
                 @if ($task->archived_at)
-                    <form method="POST" action="{{ route('crm.tasks.restore', $task) }}">
+                    <form method="POST" action="{{ route('crm.tasks.restore', $task) }}" class="w-full sm:w-auto">
                         @csrf
                         @method('PATCH')
 
-                        <x-ui.button type="submit" variant="secondary">
+                        <x-ui.button type="submit" variant="secondary" class="w-full sm:w-auto">
                             Restore
                         </x-ui.button>
                     </form>
                 @elseif ($task->status === 'open')
-                    <form method="POST" action="{{ route('crm.tasks.complete', $task) }}">
+                    <form method="POST" action="{{ route('crm.tasks.complete', $task) }}" class="w-full sm:w-auto">
                         @csrf
                         @method('PATCH')
 
-                        <x-ui.button type="submit" variant="secondary">
+                        <x-ui.button type="submit" variant="secondary" class="w-full sm:w-auto">
                             Mark Complete
                         </x-ui.button>
                     </form>
 
-                    <form method="POST" action="{{ route('crm.tasks.cancel', $task) }}">
+                    <form method="POST" action="{{ route('crm.tasks.cancel', $task) }}" class="w-full sm:w-auto">
                         @csrf
                         @method('PATCH')
 
                         <input type="hidden" name="canceled_reason" value="Manually canceled">
 
-                        <x-ui.button type="submit" variant="outline">
+                        <x-ui.button type="submit" variant="outline" class="w-full sm:w-auto">
                             Cancel
                         </x-ui.button>
                     </form>
                 @else
-                    <form method="POST" action="{{ route('crm.tasks.reopen', $task) }}">
+                    <form method="POST" action="{{ route('crm.tasks.reopen', $task) }}" class="w-full sm:w-auto">
                         @csrf
                         @method('PATCH')
 
-                        <x-ui.button type="submit" variant="outline">
+                        <x-ui.button type="submit" variant="outline" class="w-full sm:w-auto">
                             Reopen
                         </x-ui.button>
                     </form>
 
-                    <form method="POST" action="{{ route('crm.tasks.archive', $task) }}">
+                    <form method="POST" action="{{ route('crm.tasks.archive', $task) }}" class="w-full sm:w-auto">
                         @csrf
                         @method('PATCH')
 
-                        <x-ui.button type="submit" variant="outline">
+                        <x-ui.button type="submit" variant="outline" class="w-full sm:w-auto">
                             Archive
                         </x-ui.button>
                     </form>

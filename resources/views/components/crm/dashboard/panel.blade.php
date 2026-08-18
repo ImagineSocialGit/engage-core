@@ -7,7 +7,7 @@
     $module = $panel['module'] ?? 'core';
     $tone = module_tone($module);
     $targetRef = (string) ($panel['target_ref'] ?? str_replace(['.', '-'], '_', (string) ($panel['key'] ?? 'dashboard_panel')).'Panel');
-    $panelBaseClass = 'transition duration-700 ease-out rounded-3xl border p-6 shadow-sm lg:p-7';
+    $panelBaseClass = 'transition duration-700 ease-out rounded-3xl border p-4 shadow-sm sm:p-6 lg:p-7';
     $panelFocusClass = 'scale-[1.01] '.module_tone($module, 'panel_focus');
     $panelRestClass = 'ring-1 ring-transparent';
     $itemsGridClass = $layout === 'context' ? 'mt-5 grid gap-3 lg:grid-cols-2' : 'mt-5 space-y-3';
@@ -20,7 +20,7 @@
     class="{{ $panelBaseClass }} {{ module_tone($module, 'panel') }}"
     :class="focusedPanel === @js($targetRef) ? @js($panelFocusClass) : @js($panelRestClass)"
 >
-    <div class="flex flex-wrap items-start justify-between gap-4">
+    <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
         <div>
             <h2 class="text-lg font-semibold tracking-tight text-slate-950">
                 {{ $panel['title'] ?? 'Dashboard panel' }}
@@ -33,7 +33,7 @@
             @endif
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             @if(($panel['key'] ?? null) === 'tasks.today' && (int) ($panel['overdue_count'] ?? 0) > 0)
                 <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200">
                     {{ (int) ($panel['overdue_count'] ?? 0) }} overdue
@@ -44,7 +44,7 @@
                 <a
                     href="{{ route('crm.tasks.today.print') }}"
                     target="_blank"
-                    class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                    class="inline-flex min-h-9 items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
                 >
                     Print
                 </a>
@@ -52,7 +52,7 @@
                 @if($panel['can_broadcast'] ?? false)
                     <form method="POST" action="{{ route('crm.tasks.today.broadcast') }}">
                         @csrf
-                        <button type="submit" class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50">
+                        <button type="submit" class="inline-flex min-h-9 items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50">
                             Broadcast
                         </button>
                     </form>
@@ -65,7 +65,7 @@
 
             @foreach(($panel['actions'] ?? []) as $action)
                 @if(filled($action['href'] ?? null))
-                    <a href="{{ $action['href'] }}" class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50">
+                    <a href="{{ $action['href'] }}" class="inline-flex min-h-9 items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50">
                         {{ $action['label'] ?? 'Open' }}
                     </a>
                 @endif
@@ -83,7 +83,7 @@
 
     @if(($panel['key'] ?? null) === 'tasks.today' && filled($panel['upcoming_summary'] ?? null))
         <div class="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
-            <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                 <div>
                     <p class="text-sm font-semibold text-slate-950">
                         Upcoming this week

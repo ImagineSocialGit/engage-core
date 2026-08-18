@@ -39,13 +39,13 @@
         @endif
 
         <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-            <div class="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:p-8">
+            <div class="grid gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:p-8">
                 <div>
                     <div class="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">
                         Today
                     </div>
 
-                    <h2 class="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-slate-950">
+                    <h2 class="mt-3 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
                         You have a clear place to start.
                     </h2>
 
@@ -53,11 +53,11 @@
                         The dashboard adapts to the modules enabled for this client, keeping the most actionable work first and context underneath.
                     </p>
 
-                    <div class="mt-6 flex flex-wrap items-center gap-3">
+                    <div class="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                         @if(filled($primaryAction['href'] ?? null))
                             <a
                                 href="{{ $primaryAction['href'] }}"
-                                class="inline-flex items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800"
+                                class="inline-flex w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 sm:w-auto"
                             >
                                 {{ $primaryAction['label'] ?? 'Start here' }}
                             </a>
@@ -76,7 +76,7 @@
                         Right now
                     </p>
 
-                    <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
+                    <div class="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                         @forelse($rightNowCards as $card)
                             @php
                                 $cardTone = module_tone($card['module'] ?? 'core');
@@ -92,7 +92,7 @@
                                 <div class="mt-1 text-xs font-medium text-slate-500">{{ $card['label'] }}</div>
                             </button>
                         @empty
-                            <div class="col-span-2 rounded-xl bg-white p-3 ring-1 ring-slate-200">
+                            <div class="rounded-xl bg-white p-3 ring-1 ring-slate-200 sm:col-span-2">
                                 <div class="text-2xl font-semibold text-slate-950">0</div>
                                 <div class="mt-1 text-xs font-medium text-slate-500">need attention</div>
                             </div>
@@ -115,5 +115,3 @@
         @endforeach
     </div>
 </x-layouts.crm>
-
-

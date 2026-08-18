@@ -33,7 +33,7 @@
         @endif
 
         <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-            <div class="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:p-8">
+            <div class="grid gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:p-8">
                 <div>
                     <p class="text-sm font-semibold uppercase tracking-[0.16em] {{ $taskTone['text'] ?? 'text-slate-700' }}">
                         Task workspace
@@ -50,6 +50,7 @@
 
                 <x-ui.button
                     type="button"
+                    class="w-full sm:w-auto"
                     x-on:click="taskModalOpen = true"
                 >
                     Add Task
@@ -83,7 +84,7 @@
         </section>
 
         <section class="rounded-3xl border border-slate-200 bg-white shadow-sm">
-            <div class="border-b border-slate-200 p-6">
+            <div class="border-b border-slate-200 p-4 sm:p-6">
                 <div class="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
                     <div>
                         <h2 class="text-xl font-semibold tracking-tight text-slate-950">
@@ -98,7 +99,7 @@
                     <form
                         method="GET"
                         action="{{ route('crm.tasks.index') }}"
-                        class="grid gap-3 sm:grid-cols-[minmax(16rem,1fr)_12rem_auto]"
+                        class="grid gap-3 md:grid-cols-[minmax(16rem,1fr)_12rem_auto]"
                     >
                         <input type="hidden" name="task_view" value="{{ $taskView }}">
 
@@ -136,24 +137,24 @@
                         </div>
 
                         <div class="flex items-end">
-                            <x-ui.button type="submit" variant="secondary">
+                            <x-ui.button type="submit" variant="secondary" class="w-full md:w-auto">
                                 Filter
                             </x-ui.button>
                         </div>
                     </form>
                 </div>
 
-                <div class="mt-4 flex gap-2 text-sm font-semibold">
+                <div class="mt-4 grid grid-cols-2 gap-2 text-sm font-semibold sm:flex">
                     <a
                         href="{{ route('crm.tasks.index', ['task_view' => 'active']) }}"
-                        class="rounded-lg px-3 py-2 {{ $taskView === 'active' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}"
+                        class="inline-flex items-center justify-center rounded-lg px-3 py-2 {{ $taskView === 'active' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}"
                     >
                         Active
                     </a>
 
                     <a
                         href="{{ route('crm.tasks.index', ['task_view' => 'archived']) }}"
-                        class="rounded-lg px-3 py-2 {{ $taskView === 'archived' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}"
+                        class="inline-flex items-center justify-center rounded-lg px-3 py-2 {{ $taskView === 'archived' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}"
                     >
                         Archived
                     </a>
@@ -168,13 +169,13 @@
                         $dueAt = $task->due_at?->timezone(config('client.timezone', config('app.timezone', 'UTC')));
                     @endphp
 
-                    <article class="p-6">
+                    <article class="p-4 sm:p-6">
                         <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <a
                                         href="{{ route('crm.tasks.show', $task) }}"
-                                        class="text-lg font-semibold tracking-tight text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900"
+                                        class="break-words text-lg font-semibold tracking-tight text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900"
                                     >
                                         {{ $task->title }}
                                     </a>
@@ -227,10 +228,11 @@
                                 </div>
                             </div>
 
-                            <div class="shrink-0">
+                            <div class="w-full shrink-0 xl:w-auto">
                                 <x-ui.button
                                     href="{{ route('crm.tasks.show', $task) }}"
                                     variant="secondary"
+                                    class="w-full xl:w-auto"
                                 >
                                     Open Task
                                 </x-ui.button>
@@ -251,13 +253,13 @@
             </div>
 
             @if($tasks->hasPages())
-                <div class="border-t border-slate-200 p-6">
+                <div class="border-t border-slate-200 p-4 sm:p-6">
                     {{ $tasks->links() }}
                 </div>
             @endif
         </section>
 
-        <x-tasks.create-task-modal
+        <x-crm.tasks.create-task-modal
             :assignee-options="$taskAssigneeOptions"
             :current-assignee-key="$currentTaskAssigneeKey"
             :default-due-at="$defaultTaskDueAt"

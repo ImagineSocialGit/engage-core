@@ -20,7 +20,7 @@
     <div class="space-y-3">
         @forelse($registrations as $registration)
             <div class="rounded-xl border p-3 {{ module_tone('webinars', 'item') }}">
-                <div class="flex items-start justify-between gap-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <p class="font-medium text-slate-900">
                             {{ $registration->webinar?->title ?? $registration->webinar_slug ?? 'Webinar' }}

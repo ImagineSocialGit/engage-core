@@ -36,6 +36,7 @@
         <x-ui.button
             href="{{ route('crm.scheduling.index', ['contact_id' => $contact->id]) }}"
             variant="secondary"
+            class="w-full sm:w-auto"
             data-scheduling-panel-action="schedule"
         >
             Schedule Appointment

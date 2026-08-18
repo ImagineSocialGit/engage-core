@@ -49,13 +49,13 @@
 
         <div class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
             <x-ui.card class="{{ $contactPanelClass }}" data-module-panel="core">
-                <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                     <div>
                         <p class="text-sm font-medium capitalize text-slate-500">
                             {{ $leadSingular }}
                         </p>
 
-                        <h2 class="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
+                        <h2 class="mt-1 break-words text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
                             {{ $leadName }}
                         </h2>
                     </div>
@@ -67,7 +67,7 @@
 
                 <div class="rounded-2xl border p-4 {{ $nextStepTone }}" data-module-panel="{{ module_enabled('tasks') ? 'tasks' : 'core' }}">
                     @if($nextTask)
-                        <div class="flex flex-wrap items-start justify-between gap-4">
+                        <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                             <div>
                                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     Next step
@@ -100,12 +100,12 @@
                                 </div>
                             </div>
 
-                            <div class="flex flex-wrap gap-2">
+                            <div class="grid gap-2 sm:flex sm:flex-wrap">
                                 <form method="POST" action="{{ route('crm.tasks.complete', $nextTask) }}">
                                     @csrf
                                     @method('PATCH')
 
-                                    <x-ui.button type="submit" variant="secondary">
+                                    <x-ui.button type="submit" variant="secondary" class="w-full sm:w-auto">
                                         Mark Complete
                                     </x-ui.button>
                                 </form>
@@ -113,6 +113,7 @@
                                 <x-ui.button
                                     type="button"
                                     variant="outline"
+                                    class="w-full sm:w-auto"
                                     x-on:click="activityTab = 'notes'; $nextTick(() => document.getElementById('lead-activity')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))"
                                 >
                                     Add Note
@@ -160,7 +161,7 @@
                             </div>
                         @endif
                     @else
-                        <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                             <div>
                                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     Next step
@@ -179,6 +180,7 @@
                                 <x-ui.button
                                     type="button"
                                     variant="secondary"
+                                    class="w-full sm:w-auto"
                                     x-on:click="taskModalOpen = true"
                                 >
                                     Add Task
@@ -191,7 +193,7 @@
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
                         <p class="text-sm text-slate-500">Email</p>
-                        <p class="font-medium text-slate-900">{{ $contact->email ?: '—' }}</p>
+                        <p class="break-words font-medium text-slate-900">{{ $contact->email ?: '—' }}</p>
                     </div>
 
                     <div>
@@ -235,7 +237,7 @@
                                 @endif
                             </div>
 
-                            <x-ui.button type="submit">
+                            <x-ui.button type="submit" class="w-full sm:w-auto">
                                 Update Status
                             </x-ui.button>
                         </div>
@@ -275,7 +277,7 @@
 
         <div id="lead-activity" class="grid gap-6">
             <x-ui.card class="{{ $activityPanelClass }}" data-module-panel="{{ module_enabled('tasks') ? 'tasks' : 'core' }}">
-                <div class="flex items-center justify-between gap-4">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h3 class="text-lg font-semibold tracking-tight">
                             Activity
@@ -286,12 +288,12 @@
                         </p>
                     </div>
 
-                    <div class="flex rounded-xl bg-slate-100 p-1 text-sm font-semibold">
+                    <div class="flex w-full rounded-xl bg-slate-100 p-1 text-sm font-semibold sm:w-auto">
                         @if(module_enabled('tasks'))
                             <button
                                 type="button"
                                 x-on:click="activityTab = 'tasks'"
-                                class="rounded-lg px-3 py-1.5"
+                                class="flex-1 rounded-lg px-3 py-1.5 sm:flex-none"
                                 x-bind:class="activityTab === 'tasks' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
                             >
                                 Tasks
@@ -301,7 +303,7 @@
                         <button
                             type="button"
                             x-on:click="activityTab = 'notes'"
-                            class="rounded-lg px-3 py-1.5"
+                            class="flex-1 rounded-lg px-3 py-1.5 sm:flex-none"
                             x-bind:class="activityTab === 'notes' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
                         >
                             Notes
@@ -311,20 +313,21 @@
 
                 @if(module_enabled('tasks'))
                     <div x-show="activityTab === 'tasks'" class="space-y-4">
-                        <div class="flex items-center justify-between gap-4">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <h4 class="font-semibold tracking-tight">
                                 Tasks
                             </h4>
 
                             <x-ui.button
                                 type="button"
+                                class="w-full sm:w-auto"
                                 x-on:click="taskModalOpen = true"
                             >
                                 Add Task
                             </x-ui.button>
                         </div>
 
-                        <x-tasks.task-list
+                        <x-crm.tasks.task-list
                             :tasks="$tasks"
                             :archived-tasks="$archivedTasks"
                             :task-view="$taskView"
@@ -369,7 +372,7 @@
                                 x-data="{ editing: false }"
                                 class="rounded-xl border border-slate-200 p-3"
                             >
-                                <div x-show="! editing" class="flex justify-between items-center gap-4">
+                                <div x-show="! editing" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                     <div class="space-y-2">
                                         <p class="text-slate-800">
                                             {{ $note->body }}
@@ -380,7 +383,7 @@
                                         </p>
                                     </div>
 
-                                    <div class="flex space-x-2">
+                                    <div class="flex flex-wrap gap-3">
                                         <button
                                             type="button"
                                             x-on:click="editing = true"
@@ -445,7 +448,7 @@
             </x-ui.card>
 
             @if(module_enabled('tasks'))
-                <x-tasks.create-task-modal
+                <x-crm.tasks.create-task-modal
                     :subject="$contact"
                     subject-label="{{ $leadSingular }}"
                     :assignee-options="$taskAssigneeOptions"
@@ -468,7 +471,7 @@
                 </div>
 
                 <div class="border-b border-slate-200">
-                    <nav class="-mb-px flex gap-6" aria-label="Tabs">
+                    <nav class="-mb-px flex gap-4 overflow-x-auto" aria-label="Tabs">
                         <button
                             type="button"
                             x-on:click="messageTab = 'messages'"
@@ -502,7 +505,7 @@
                         @endphp
 
                         <div class="rounded-xl border border-slate-200 p-4">
-                            <div class="flex items-start justify-between gap-4">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                     <p class="font-medium text-slate-900">
                                         {{ $scope }} {{ $messageType }} {{ $channel }}
@@ -557,7 +560,7 @@
                             @endphp
 
                             <div class="rounded-xl border border-slate-200 p-4">
-                                <div class="flex items-start justify-between gap-4">
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                     <div>
                                         <p class="font-medium text-slate-900">
                                             Can receive {{ strtolower($scope) }} {{ strtolower($purpose) }} by {{ strtolower($channel) }}
@@ -595,7 +598,7 @@
                         <div class="mt-3 space-y-3">
                             @forelse ($consentRevocations as $revocation)
                                 <div class="rounded-xl border border-slate-200 p-4">
-                                    <div class="flex items-start justify-between gap-4">
+                                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                         <div>
                                             <p class="font-medium text-slate-900">
                                                 {{ str($revocation->channel->value)->replace('_', ' ')->title() }} {{ str($revocation->purpose->value)->replace('_', ' ')->title() }} revoked

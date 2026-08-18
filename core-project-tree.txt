@@ -1733,7 +1733,6 @@
 │   │       └── client.js
 │   └── views
 │       ├── auth
-│       │   └── login.blade.php
 │       ├── components
 │       │   ├── crm
 │       │   │   ├── contact-picker.blade.php
@@ -1742,7 +1741,10 @@
 │       │   │   │   ├── panel.blade.php
 │       │   │   │   ├── panel-empty.blade.php
 │       │   │   │   └── panel-item.blade.php
-│       │   │   └── dev-testing-modal.blade.php
+│       │   │   ├── dev-testing-modal.blade.php
+│       │   │   └── tasks
+│       │   │       ├── create-task-modal.blade.php
+│       │   │       └── task-list.blade.php
 │       │   ├── head.blade.php
 │       │   ├── hero.blade.php
 │       │   ├── layouts
@@ -1752,8 +1754,6 @@
 │       │   │   └── public.blade.php
 │       │   ├── section.blade.php
 │       │   ├── tasks
-│       │   │   ├── create-task-modal.blade.php
-│       │   │   └── task-list.blade.php
 │       │   ├── ui
 │       │   │   ├── button.blade.php
 │       │   │   ├── card.blade.php
@@ -1782,6 +1782,8 @@
 │       │       ├── hero.blade.php
 │       │       └── registration-form-modal.blade.php
 │       ├── crm
+│       │   ├── auth
+│       │   │   └── login.blade.php
 │       │   ├── broadcasts
 │       │   │   ├── edit.blade.php
 │       │   │   ├── index.blade.php
@@ -2283,4 +2285,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-588 directories, 1696 files
+590 directories, 1696 files
