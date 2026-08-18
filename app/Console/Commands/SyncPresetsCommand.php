@@ -390,7 +390,7 @@ class SyncPresetsCommand extends Command
     {
         $this->line('');
         $this->info('Campaigns');
-        $this->line('Force mode: not supported. Customized Campaigns, Steps, and Variants are preserved.');
+        $this->line('Force mode: not supported. Customized Campaigns and MessageChains are preserved.');
 
         $this->table(
             ['Item', 'Count'],
@@ -404,6 +404,12 @@ class SyncPresetsCommand extends Command
                 ['Variants created', $result->variantsCreated],
                 ['Variants updated', $result->variantsUpdated],
                 ['Variants skipped', $result->variantsSkipped],
+                ['MessageChains created', $result->messageChainsCreated],
+                ['MessageChains updated', $result->messageChainsUpdated],
+                ['MessageChains skipped', $result->messageChainsSkipped],
+                ['Chain versions published', $result->messageChainVersionsPublished],
+                ['Chain versions reused', $result->messageChainVersionsReused],
+                ['Chain publication deferred', $result->messageChainsDeferred],
             ],
         );
     }

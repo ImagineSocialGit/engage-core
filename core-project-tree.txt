@@ -134,6 +134,8 @@
 │   │   │   ├── Requests
 │   │   │   │   └── UpdateCampaignStepMessageTemplateRequest.php
 │   │   │   ├── Services
+│   │   │   │   ├── CampaignMessageChainDefinitionBuilder.php
+│   │   │   │   ├── CampaignMessageChainExecutionContextProvider.php
 │   │   │   │   ├── CampaignMessageDefinitionResolver.php
 │   │   │   │   ├── CampaignWorkspacePresenter.php
 │   │   │   │   └── ContactShow
@@ -1944,6 +1946,7 @@
 │   │   │   └── ScheduleBroadcastActionTest.php
 │   │   ├── Campaigns
 │   │   │   ├── CampaignMessageChainBridgeTest.php
+│   │   │   ├── CampaignMessageChainPresetSyncTest.php
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
 │   │   │   ├── CampaignScheduledMessageTerminalReconciliationTest.php
 │   │   │   ├── CampaignsSetupValidationContributorTest.php
@@ -2303,4 +2306,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-592 directories, 1712 files
+592 directories, 1715 files

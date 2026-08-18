@@ -8,6 +8,7 @@ use App\Modules\Campaigns\Exceptions\CampaignUnavailableForEnrollmentException;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Support\AutomationCapabilities\Contracts\AutomationActionHandler;
 use App\Support\AutomationCapabilities\Data\AutomationActionContext;
 use App\Support\AutomationCapabilities\Data\AutomationActionResult;
@@ -69,14 +70,10 @@ class EnrollCampaignAutomationActionHandler implements AutomationActionHandler
             );
         }
 
-        $existingEnrollment = CampaignEnrollment::query()
-            ->where('contact_id', $contact->getKey())
-            ->where('campaign_key', $definition->campaignKey)
-            ->whereIn('status', [
-                CampaignEnrollment::STATUS_ACTIVE,
-                CampaignEnrollment::STATUS_PAUSED,
-            ])
-            ->first();
+        $existingEnrollment = $this->existingOpenEnrollment(
+            contact: $contact,
+            campaign: $campaign,
+        );
 
         if ($existingEnrollment instanceof CampaignEnrollment) {
             return $this->alreadyEnrolledResult($existingEnrollment, $definition);
@@ -137,12 +134,33 @@ class EnrollCampaignAutomationActionHandler implements AutomationActionHandler
             correlation: [
                 'campaign_enrollment_id' => $enrollment->getKey(),
                 'campaign_key' => $enrollment->campaign_key,
+                'message_chain_enrollment_id' => $enrollment->message_chain_enrollment_id,
             ],
             output: [
                 'campaign_enrollment' => $this->enrollmentMeta($enrollment),
                 'enroll_campaign_definition' => $definition->toMetaPayload(),
             ],
         );
+    }
+
+    private function existingOpenEnrollment(
+        Contact $contact,
+        Campaign $campaign,
+    ): ?CampaignEnrollment {
+        return CampaignEnrollment::query()
+            ->with('messageChainEnrollment')
+            ->where('contact_id', $contact->getKey())
+            ->where('campaign_id', $campaign->getKey())
+            ->whereNotNull('message_chain_enrollment_id')
+            ->whereHas(
+                'messageChainEnrollment',
+                fn ($query) => $query->whereIn('status', [
+                    MessageChainEnrollment::STATUS_ACTIVE,
+                    MessageChainEnrollment::STATUS_PAUSED,
+                ]),
+            )
+            ->orderByDesc('id')
+            ->first();
     }
 
     private function alreadyEnrolledResult(
@@ -190,18 +208,28 @@ class EnrollCampaignAutomationActionHandler implements AutomationActionHandler
     /** @return array<string, mixed> */
     private function enrollmentMeta(CampaignEnrollment $enrollment): array
     {
+        $enrollment->loadMissing('messageChainEnrollment');
+        $chainEnrollment = $enrollment->messageChainEnrollment;
+
         return [
             'id' => $enrollment->getKey(),
             'contact_id' => $enrollment->contact_id,
             'campaign_id' => $enrollment->campaign_id,
             'campaign_key' => $enrollment->campaign_key,
-            'status' => $enrollment->status,
+            'status' => $chainEnrollment?->status ?? $enrollment->status,
+            'message_chain_enrollment_id' => $chainEnrollment?->getKey(),
+            'message_chain_status' => $chainEnrollment?->status,
+            'message_chain_version_id' => $chainEnrollment?->message_chain_version_id,
+            'current_message_chain_step_id' => $chainEnrollment?->current_message_chain_step_id,
+            'next_action_at' => $chainEnrollment?->next_action_at?->toISOString(),
+            // Transitional compatibility keys. These are not progression authority.
             'current_step' => $enrollment->current_step,
             'current_campaign_step_id' => $enrollment->current_campaign_step_id,
             'last_scheduled_message_id' => $enrollment->last_scheduled_message_id,
-            'started_at' => $enrollment->started_at?->toISOString(),
-            'exited_at' => $enrollment->exited_at?->toISOString(),
-            'exit_reason' => $enrollment->exit_reason,
+            'started_at' => $chainEnrollment?->started_at?->toISOString()
+                ?? $enrollment->started_at?->toISOString(),
+            'exited_at' => $chainEnrollment?->exited_at?->toISOString(),
+            'exit_reason' => $chainEnrollment?->exit_reason_code,
         ];
     }
 }

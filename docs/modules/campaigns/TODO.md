@@ -1,20 +1,21 @@
+
 # Campaigns TODO
 
 Work these in order. Keep Campaigns independent from FlowRoutes, Webinars, Forms, Scheduling, InboundMessaging, and other producer modules; use shared/public automation seams instead of direct module dependencies.
 
 ## 1. Runtime cutover first
 
-- [x] Add the nullable Campaign -> MessageChain and CampaignEnrollment -> MessageChainEnrollment schema/model bridge while preserving the legacy runtime during cutover.
 - [ ] Migrate Campaigns fully to Messaging MessageChains while preserving Campaign identity, activation, audience/enrollment intent, source context, and reporting.
-- [ ] Add/select the Campaign -> MessageChain relationship and make new Campaign enrollments create a thin CampaignEnrollment wrapper around a version-pinned MessageChainEnrollment.
-- [ ] Move current Campaign step/variant timing, channel strategy, dependencies, and generic progression into Messaging-owned MessageChain definitions/runtime.
-- [ ] Update Campaign cancellation/deactivation to use Messaging public chain-enrollment cancellation/skip actions.
+- [x] Make new Campaign enrollments create a thin CampaignEnrollment wrapper around a version-pinned MessageChainEnrollment. New starts now use Messaging runtime; legacy progression columns remain compatibility-only until readers/schema are removed.
+- [x] Publish current Campaign preset timing, channel strategy, variants, and dependencies into immutable Messaging-owned MessageChain definitions during transitional preset sync.
+- [ ] Update Campaign cancellation/deactivation to use Messaging public chain-enrollment cancellation/skip actions. This is the next runtime cutover batch; do not launch active client Campaigns before it is complete.
 - [ ] Replace Campaign-owned step/variant progression fields only after every runtime reader and Project State path uses the MessageChain relationship.
-- [ ] Preserve current operational lifecycle semantics: Off cancels open work and skips pending messages; turning back on permits future enrollments only and never resurrects cancelled journeys.
-- [ ] Before bulk Campaign enrollment is switched to MessageChain runtime, use the shared Messaging/system bulk-dispatch backpressure path so a large audience does not synchronously create thousands of chain/send jobs from one request or one giant database transaction.
+- [ ] Preserve current operational lifecycle semantics: Off cancels open work and skips pending messages; turning back on permits future enrollments only and never resurrects cancelled journeys. Activation/deactivation must keep the selected MessageChain lifecycle aligned with Campaign.status.
+- [ ] After runtime cutover, add a dev-only Campaign simulator that can enroll a test contact, set/fake the clock, advance through scheduled moments, run MessageChain progression, and inspect scheduled/sent/skipped outcomes without provider delivery. It must be unavailable in production.
 
 ## 2. Campaign lifecycle and launch safety
 
+- [ ] Add bounded bulk Campaign audience enrollment orchestration for operator/import-driven starts so large recipient sets reuse the generic bulk policy instead of creating an unbounded burst of enrollment/progression jobs.
 - [ ] Define a generic Campaign entry/start contract so activation never implies audience selection; enrollment must come from an explicit operator action or shared automation/public action seam.
 - [ ] Define the shared trigger-authoring/binding seam needed by the Campaign Builder's `What starts this campaign?` stage without introducing Campaigns -> FlowRoutes or FlowRoutes -> Campaigns private coupling.
 - [ ] Support business exits such as conversion, qualifying status changes, application started, appointment booked, or other configured outcomes by invoking Campaign-owned cancellation through neutral events/public automation seams.

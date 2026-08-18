@@ -9,6 +9,13 @@ use App\Modules\Campaigns\Data\CampaignStepVariantPresetDefinition;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Campaigns\Models\CampaignStepVariant;
+use App\Modules\Campaigns\Services\CampaignMessageChainDefinitionBuilder;
+use App\Modules\Messaging\Actions\PublishMessageChainVersionAction;
+use App\Modules\Messaging\Models\MessageChain;
+use App\Modules\Messaging\Models\MessageChainVersion;
+use App\Modules\Messaging\Models\MessageTemplate;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
 use InvalidArgumentException;
 use Throwable;
 use App\Support\Presets\Data\ResolvedPresetDomain;
@@ -16,6 +23,13 @@ use App\Support\Presets\Enums\PresetDomain;
 
 class SyncCampaignPresetsAction
 {
+    private const MESSAGE_CHAIN_SOURCE = 'campaign_preset_bridge';
+
+    public function __construct(
+        private readonly CampaignMessageChainDefinitionBuilder $messageChainDefinitionBuilder,
+        private readonly PublishMessageChainVersionAction $publishMessageChainVersion,
+    ) {}
+
     /**
      * Campaign preset sync intentionally has no force mode.
      *
@@ -53,13 +67,20 @@ class SyncCampaignPresetsAction
                 );
             }
 
-            $campaign = $this->syncCampaign($definition, $result);
+            DB::transaction(function () use ($definition, $result): void {
+                $campaign = $this->syncCampaign($definition, $result);
 
-            $this->syncSteps(
-                campaign: $campaign,
-                definition: $definition,
-                result: $result,
-            );
+                $this->syncSteps(
+                    campaign: $campaign,
+                    definition: $definition,
+                    result: $result,
+                );
+
+                $this->syncMessageChain(
+                    campaign: $campaign->refresh(),
+                    result: $result,
+                );
+            }, 3);
         }
 
         return $result;
@@ -321,6 +342,123 @@ class SyncCampaignPresetsAction
             'source_version' => $definition->sourceVersion,
             'meta' => $definition->meta,
         ];
+    }
+
+    private function syncMessageChain(
+        Campaign $campaign,
+        CampaignPresetSyncResult $result,
+    ): void {
+        if ($campaign->is_customized) {
+            $result->recordMessageChainSkipped();
+
+            return;
+        }
+
+        if (MessageTemplate::query()->doesntExist()) {
+            $result->recordMessageChainDeferred();
+
+            return;
+        }
+
+        $key = $this->messageChainKey($campaign);
+        $chain = MessageChain::query()
+            ->where('key', $key)
+            ->lockForUpdate()
+            ->first();
+        $attributes = [
+            'key' => $key,
+            'name' => $campaign->name,
+            'description' => $campaign->description,
+            'status' => $this->messageChainStatus($campaign),
+            'source' => self::MESSAGE_CHAIN_SOURCE,
+            'source_version' => $campaign->source_version !== null
+                ? (string) $campaign->source_version
+                : null,
+        ];
+
+        if (! $chain instanceof MessageChain) {
+            $chain = MessageChain::query()->create([
+                ...$attributes,
+                'is_customized' => false,
+                'customized_at' => null,
+            ]);
+            $result->recordMessageChainCreated();
+        } elseif ($chain->is_customized) {
+            if (! $chain->current_version_id) {
+                throw new RuntimeException(
+                    "Customized Campaign MessageChain [{$chain->key}] has no current version.",
+                );
+            }
+
+            $result->recordMessageChainSkipped();
+            $this->bindCampaignToMessageChain($campaign, $chain);
+
+            return;
+        } else {
+            $chain->forceFill([
+                ...$attributes,
+                'is_customized' => false,
+                'customized_at' => null,
+            ])->save();
+            $result->recordMessageChainUpdated();
+        }
+
+        $steps = $this->messageChainDefinitionBuilder->build($campaign);
+        $versionCountBefore = MessageChainVersion::query()
+            ->where('message_chain_id', $chain->getKey())
+            ->count();
+
+        $this->publishMessageChainVersion->handle(
+            messageChain: $chain,
+            steps: $steps,
+            exitConditions: [],
+        );
+
+        $versionCountAfter = MessageChainVersion::query()
+            ->where('message_chain_id', $chain->getKey())
+            ->count();
+
+        if ($versionCountAfter > $versionCountBefore) {
+            $result->recordMessageChainVersionPublished();
+        } else {
+            $result->recordMessageChainVersionReused();
+        }
+
+        $this->bindCampaignToMessageChain($campaign, $chain);
+    }
+
+    private function bindCampaignToMessageChain(
+        Campaign $campaign,
+        MessageChain $chain,
+    ): void {
+        if ((int) $campaign->message_chain_id === (int) $chain->getKey()) {
+            return;
+        }
+
+        $campaign->forceFill([
+            'message_chain_id' => $chain->getKey(),
+        ])->save();
+        $campaign->setRelation('messageChain', $chain);
+    }
+
+    private function messageChainKey(Campaign $campaign): string
+    {
+        $key = 'campaign.'.$this->normalizeSegment($campaign->key);
+
+        if (mb_strlen($key) <= 191) {
+            return $key;
+        }
+
+        return mb_substr($key, 0, 126).'.'.hash('sha256', $key);
+    }
+
+    private function messageChainStatus(Campaign $campaign): string
+    {
+        return match ($campaign->status) {
+            Campaign::STATUS_ACTIVE => MessageChain::STATUS_ACTIVE,
+            Campaign::STATUS_ARCHIVED => MessageChain::STATUS_ARCHIVED,
+            default => MessageChain::STATUS_INACTIVE,
+        };
     }
 
     /**

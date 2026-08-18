@@ -12,6 +12,7 @@ use App\Modules\Campaigns\ConfigContracts\CampaignPresetDefinitionConfigContract
 use App\Modules\Campaigns\Console\Commands\DeactivateCampaignCommand;
 use App\Modules\Campaigns\Console\Commands\SyncCampaignPresetsCommand;
 use App\Modules\Campaigns\Listeners\ScheduleNextCampaignStepAfterScheduledMessageSent;
+use App\Modules\Campaigns\Services\CampaignMessageChainExecutionContextProvider;
 use App\Modules\Campaigns\Services\ContactShow\ContactCampaignsVisibilityDataProvider;
 use App\Modules\Campaigns\TokenContracts\CampaignTokenContextProvider;
 use App\Modules\Campaigns\TokenContracts\CampaignTokenSourceProvider;
@@ -30,6 +31,11 @@ class CampaignsModuleServiceProvider extends ServiceProvider
         $this->app->tag(CampaignPresetConfigContractTargetProvider::class, 'config.contract_target_providers');
         $this->app->tag(CampaignTokenSourceProvider::class, 'token.source_providers');
         $this->app->tag(CampaignTokenContextProvider::class, 'token.context_providers');
+
+        $this->app->tag(
+            CampaignMessageChainExecutionContextProvider::class,
+            'messaging.message_chain_execution_context_providers',
+        );
 
         $this->app->tag([
             CampaignsAutomationCapabilityContributor::class,

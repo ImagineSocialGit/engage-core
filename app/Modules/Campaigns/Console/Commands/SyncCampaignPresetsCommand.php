@@ -13,7 +13,7 @@ class SyncCampaignPresetsCommand extends Command
 {
     protected $signature = 'campaigns:sync-presets {preset? : Optional preset package key}';
 
-    protected $description = 'Sync campaign preset definitions into database-owned Campaign, CampaignStep, and CampaignStepVariant records. Customized records are preserved; no force mode is supported.';
+    protected $description = 'Sync Campaign presets and publish their Messaging MessageChains. Customized records are preserved; no force mode is supported.';
 
     public function handle(
         SyncCampaignPresetsAction $syncCampaignPresets,
@@ -42,7 +42,7 @@ class SyncCampaignPresetsCommand extends Command
         }
 
         $this->info('Campaign presets synced.');
-        $this->line('Force mode: not supported. Customized Campaigns, Steps, and Variants are preserved.');
+        $this->line('Force mode: not supported. Customized Campaigns and MessageChains are preserved.');
 
         $this->table(
             ['Item', 'Count'],
@@ -56,6 +56,12 @@ class SyncCampaignPresetsCommand extends Command
                 ['Variants created', $result->variantsCreated],
                 ['Variants updated', $result->variantsUpdated],
                 ['Variants skipped', $result->variantsSkipped],
+                ['MessageChains created', $result->messageChainsCreated],
+                ['MessageChains updated', $result->messageChainsUpdated],
+                ['MessageChains skipped', $result->messageChainsSkipped],
+                ['Chain versions published', $result->messageChainVersionsPublished],
+                ['Chain versions reused', $result->messageChainVersionsReused],
+                ['Chain publication deferred', $result->messageChainsDeferred],
             ],
         );
 

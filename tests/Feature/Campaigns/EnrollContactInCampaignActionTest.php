@@ -6,457 +6,360 @@ use App\Modules\Campaigns\Actions\EnrollContactInCampaignAction;
 use App\Modules\Campaigns\Exceptions\CampaignUnavailableForEnrollmentException;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
-use App\Modules\Campaigns\Models\CampaignStep;
-use App\Modules\Campaigns\Models\CampaignStepVariant;
 use App\Modules\Core\Models\Contact;
-use App\Modules\Messaging\Models\MessageConsent;
-use App\Modules\Messaging\Models\ScheduledMessage;
-use App\Modules\Messaging\Payloads\EmailPayload;
-use App\Modules\Messaging\Payloads\SmsPayload;
-use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Messaging\Actions\PublishMessageChainVersionAction;
+use App\Modules\Messaging\Models\MessageChain;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
+use App\Modules\Messaging\Models\MessageChainStep;
+use App\Modules\Messaging\Models\MessageTemplate;
+use App\Modules\Messaging\Models\MessageTemplateVersion;
+use App\Modules\Messaging\Services\MessageChainExecutionContextResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\Schema;
+use RuntimeException;
 use Tests\TestCase;
 
 class EnrollContactInCampaignActionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_campaign_status_is_the_single_lifecycle_authority(): void
+    public function test_it_starts_the_selected_message_chain_and_preserves_campaign_attribution(): void
     {
-        $active = Campaign::factory()->create([
-            'status' => Campaign::STATUS_ACTIVE,
-        ]);
+        Queue::fake();
+        Carbon::setTestNow(Carbon::parse('2026-08-18 12:00:00', 'America/Chicago'));
 
-        $inactive = Campaign::factory()->create([
-            'status' => Campaign::STATUS_INACTIVE,
-        ]);
+        [$campaign, $chain, $version] = $this->campaignWithChain('cold_lead_nurture');
+        $contact = Contact::factory()->create(['email' => 'lead@example.com']);
+        $source = Contact::factory()->create(['email' => 'source@example.com']);
 
-        $archived = Campaign::factory()->create([
-            'status' => Campaign::STATUS_ARCHIVED,
-        ]);
-
-        $this->assertFalse(Schema::hasColumn('campaigns', 'is_active'));
-        $this->assertTrue($active->isActive());
-        $this->assertFalse($inactive->isActive());
-        $this->assertFalse($archived->isActive());
-        $this->assertEquals(
-            [$active->getKey()],
-            Campaign::query()->active()->pluck('id')->all(),
+        $enrollment = app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $campaign->key,
+            source: $source,
+            payload: [
+                'offer_code' => 'VA-2026',
+                'runtime_context' => ['event_key' => 'lead.imported'],
+            ],
+            meta: ['source' => 'test'],
+            startContext: [
+                'market' => 'tampa',
+                'payload' => ['existing' => 'kept'],
+            ],
+            exitConditions: [['field' => 'contact.status', 'operator' => 'equals', 'value' => 'engaged']],
         );
+
+        $chainEnrollment = $enrollment->messageChainEnrollment;
+
+        $this->assertInstanceOf(MessageChainEnrollment::class, $chainEnrollment);
+        $this->assertSame((int) $chainEnrollment->getKey(), (int) $enrollment->message_chain_enrollment_id);
+        $this->assertSame((int) $version->getKey(), (int) $chainEnrollment->message_chain_version_id);
+        $this->assertSame(MessageChainEnrollment::STATUS_ACTIVE, $chainEnrollment->status);
+        $this->assertSame($contact->getMorphClass(), $chainEnrollment->recipient_type);
+        $this->assertSame((int) $contact->getKey(), (int) $chainEnrollment->recipient_id);
+        $this->assertSame($enrollment->getMorphClass(), $chainEnrollment->context_type);
+        $this->assertSame((int) $enrollment->getKey(), (int) $chainEnrollment->context_id);
+        $this->assertSame($campaign->getMorphClass(), $chainEnrollment->origin_type);
+        $this->assertSame((int) $campaign->getKey(), (int) $chainEnrollment->origin_id);
+        $this->assertSame(EnrollContactInCampaignAction::SURFACE, $chainEnrollment->surface);
+        $this->assertSame(
+            "campaign:{$campaign->getKey()}:enrollment:{$enrollment->getKey()}",
+            $enrollment->dedupe_key,
+        );
+        $this->assertSame($enrollment->dedupe_key, $chainEnrollment->dedupe_key);
+        $this->assertSame($source->getMorphClass(), $enrollment->source_type);
+        $this->assertSame((int) $source->getKey(), (int) $enrollment->source_id);
+        $this->assertNull($enrollment->current_campaign_step_id);
+        $this->assertNull($enrollment->last_scheduled_message_id);
+        $this->assertDatabaseCount('scheduled_messages', 0);
+
+        $expectedNextActionAt = $chainEnrollment->started_at?->copy()->addHours(2);
+
+        $this->assertNotNull($expectedNextActionAt);
+        $this->assertTrue(
+            $chainEnrollment->next_action_at?->equalTo($expectedNextActionAt) ?? false,
+        );
+
+        $context = app(MessageChainExecutionContextResolver::class)->resolve(
+            $chainEnrollment->fresh(),
+        );
+
+        $this->assertSame('tampa', data_get($context, 'market'));
+        $this->assertSame('kept', data_get($context, 'payload.existing'));
+        $this->assertSame('kept', data_get($context, 'existing'));
+        $this->assertSame('VA-2026', data_get($context, 'offer_code'));
+        $this->assertSame('lead.imported', data_get($context, 'runtime_context.event_key'));
+        $this->assertSame($campaign->key, data_get($context, 'campaign.key'));
+        $this->assertSame($enrollment->getKey(), data_get($context, 'campaign_enrollment.id'));
+        $this->assertSame($contact->getKey(), data_get($context, 'contact.id'));
+        $this->assertSame($chain->getKey(), $campaign->message_chain_id);
     }
 
-    public function test_it_rejects_inactive_campaign_with_explicit_reason(): void
+    public function test_it_returns_existing_open_message_chain_enrollment_without_duplicate_start(): void
     {
-        $campaign = Campaign::factory()->create([
-            'key' => 'inactive_campaign',
-            'status' => Campaign::STATUS_INACTIVE,
-        ]);
+        Queue::fake();
+
+        [$campaign] = $this->campaignWithChain('existing_open');
+        $contact = Contact::factory()->create();
+
+        $first = app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $campaign->key,
+        );
+
+        $first->messageChainEnrollment->forceFill([
+            'status' => MessageChainEnrollment::STATUS_PAUSED,
+            'paused_at' => now(),
+        ])->save();
+
+        $second = app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $campaign->key,
+        );
+
+        $this->assertTrue($first->is($second));
+        $this->assertDatabaseCount('campaign_enrollments', 1);
+        $this->assertDatabaseCount('message_chain_enrollments', 1);
+    }
+
+    public function test_terminal_message_chain_enrollment_allows_a_new_campaign_enrollment(): void
+    {
+        Queue::fake();
+
+        [$campaign] = $this->campaignWithChain('reenrollment');
+        $contact = Contact::factory()->create();
+
+        $first = app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $campaign->key,
+        );
+
+        $first->messageChainEnrollment->forceFill([
+            'status' => MessageChainEnrollment::STATUS_COMPLETED,
+            'current_message_chain_step_id' => null,
+            'next_action_at' => null,
+            'completed_at' => now(),
+        ])->save();
+
+        $second = app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $campaign->key,
+        );
+
+        $this->assertFalse($first->is($second));
+        $this->assertNotSame($first->dedupe_key, $second->dedupe_key);
+        $this->assertDatabaseCount('campaign_enrollments', 2);
+        $this->assertDatabaseCount('message_chain_enrollments', 2);
+    }
+
+    public function test_inactive_campaign_is_rejected_before_chain_start(): void
+    {
+        Queue::fake();
+
+        [$campaign] = $this->campaignWithChain(
+            key: 'inactive_campaign',
+            campaignStatus: Campaign::STATUS_INACTIVE,
+        );
 
         try {
             app(EnrollContactInCampaignAction::class)->handle(
                 contact: Contact::factory()->create(),
                 campaignKey: $campaign->key,
             );
+            $this->fail('Expected inactive Campaign enrollment to be rejected.');
         } catch (CampaignUnavailableForEnrollmentException $exception) {
             $this->assertSame(
                 CampaignUnavailableForEnrollmentException::REASON_INACTIVE,
                 $exception->reason,
             );
-            $this->assertSame($campaign->key, $exception->campaignKey);
-            $this->assertSame(Campaign::STATUS_INACTIVE, $exception->campaignStatus);
-            $this->assertDatabaseCount('campaign_enrollments', 0);
-
-            return;
         }
 
-        $this->fail('Expected inactive Campaign enrollment to be rejected.');
+        $this->assertDatabaseCount('campaign_enrollments', 0);
+        $this->assertDatabaseCount('message_chain_enrollments', 0);
     }
 
-    public function test_it_enrolls_contact_and_schedules_first_campaign_step_variant(): void
+    public function test_active_campaign_with_inactive_selected_chain_rolls_back_wrapper_creation(): void
     {
         Queue::fake();
-        Carbon::setTestNow('2026-06-12 12:00:00');
 
-        $this->configureEmailCampaignAvailability();
-        $campaign = $this->createCampaignWithStepAndVariant('webinar_attended', 1);
-        $contact = $this->contactWithMarketingEmailConsent();
-        $registration = WebinarRegistration::factory()->create(['contact_id' => $contact->id]);
+        [$campaign] = $this->campaignWithChain(
+            key: 'inactive_selected_chain',
+            chainStatus: MessageChain::STATUS_INACTIVE,
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('is not active');
+
+        try {
+            app(EnrollContactInCampaignAction::class)->handle(
+                contact: Contact::factory()->create(),
+                campaignKey: $campaign->key,
+            );
+        } finally {
+            $this->assertDatabaseCount('campaign_enrollments', 0);
+            $this->assertDatabaseCount('message_chain_enrollments', 0);
+        }
+    }
+
+    public function test_active_campaign_without_selected_chain_rolls_back_wrapper_creation(): void
+    {
+        Queue::fake();
+
+        $campaign = Campaign::query()->create([
+            'key' => 'unbound_campaign',
+            'name' => 'Unbound Campaign',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'campaign_test',
+            'status' => Campaign::STATUS_ACTIVE,
+            'meta' => [],
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('has no selected MessageChain');
+
+        try {
+            app(EnrollContactInCampaignAction::class)->handle(
+                contact: Contact::factory()->create(),
+                campaignKey: $campaign->key,
+            );
+        } finally {
+            $this->assertDatabaseCount('campaign_enrollments', 0);
+            $this->assertDatabaseCount('message_chain_enrollments', 0);
+        }
+    }
+
+    public function test_chain_with_no_active_step_completes_initial_compatibility_projection(): void
+    {
+        Queue::fake();
+
+        [$campaign] = $this->campaignWithChain(
+            key: 'no_active_steps',
+            stepActive: false,
+        );
 
         $enrollment = app(EnrollContactInCampaignAction::class)->handle(
-            contact: $contact,
-            campaignKey: 'webinar_attended',
-            source: $registration,
+            contact: Contact::factory()->create(),
+            campaignKey: $campaign->key,
         );
 
-        $step = $campaign->steps()->where('step_number', 1)->firstOrFail();
-        $variant = $step->variants()->where('key', 'email')->firstOrFail();
-
-        $this->assertSame($contact->id, $enrollment->contact_id);
-        $this->assertSame($campaign->id, $enrollment->campaign_id);
-        $this->assertSame($registration->getMorphClass(), $enrollment->source_type);
-        $this->assertSame($registration->id, $enrollment->source_id);
-        $this->assertSame('webinar_attended', $enrollment->campaign_key);
-        $this->assertSame(CampaignEnrollment::STATUS_ACTIVE, $enrollment->status);
-        $this->assertSame(1, $enrollment->current_step);
-        $this->assertSame($step->id, $enrollment->current_campaign_step_id);
-
-        $scheduledMessage = ScheduledMessage::first();
-
-        $this->assertNotNull($scheduledMessage);
-        $this->assertSame(Contact::class, $scheduledMessage->recipient_type);
-        $this->assertSame($contact->id, $scheduledMessage->recipient_id);
-        $this->assertSame($scheduledMessage->id, $enrollment->last_scheduled_message_id);
-        $this->assertSame('webinar_attended_step_1', $scheduledMessage->message_type);
-        $this->assertSame('email', $scheduledMessage->channel);
-        $this->assertSame('marketing', $scheduledMessage->purpose);
-        $this->assertSame('webinar', $scheduledMessage->scope);
-        $this->assertSame('marketing', $scheduledMessage->queue);
-        $this->assertEquals(['campaign_step_due'], $scheduledMessage->dispatch_keys);
-        $this->assertSame('messaging.email.definitions.marketing.webinar.campaigns.webinar_attended.steps.1.variants.email', $scheduledMessage->definition_config_path);
-        $this->assertSame($campaign->id, $scheduledMessage->meta['campaign_id']);
-        $this->assertSame('webinar_attended', $scheduledMessage->meta['campaign_key']);
-        $this->assertSame(1, $scheduledMessage->meta['campaign_step']);
-        $this->assertSame($step->id, $scheduledMessage->meta['campaign_step_id']);
-        $this->assertSame($variant->id, $scheduledMessage->meta['campaign_step_variant_id']);
-        $this->assertSame('email', $scheduledMessage->meta['campaign_step_variant_key']);
-        $this->assertArrayNotHasKey(
-            'definition_config_path',
-            $scheduledMessage->meta,
-        );
-        $this->assertTrue($scheduledMessage->send_at->equalTo(Carbon::now()->addMinutes(720)));
+        $this->assertSame(MessageChainEnrollment::STATUS_COMPLETED, $enrollment->messageChainEnrollment->status);
+        $this->assertSame(CampaignEnrollment::STATUS_COMPLETED, $enrollment->status);
+        $this->assertNotNull($enrollment->completed_at);
+        $this->assertSame(CampaignEnrollment::EXIT_REASON_NO_NEXT_STEP, $enrollment->exit_reason);
     }
 
-    public function test_it_returns_existing_active_enrollment_without_scheduling_duplicate_message(): void
+    public function test_unlinked_open_legacy_enrollment_fails_loudly_instead_of_dual_running(): void
     {
         Queue::fake();
 
-        $campaign = $this->createCampaignWithStepAndVariant('webinar_attended', 1);
-        $contact = $this->contactWithMarketingEmailConsent();
-        $step = $campaign->steps()->where('step_number', 1)->firstOrFail();
+        [$campaign] = $this->campaignWithChain('legacy_guard');
+        $contact = Contact::factory()->create();
 
-        $existingEnrollment = CampaignEnrollment::create([
-            'contact_id' => $contact->id,
-            'campaign_id' => $campaign->id,
-            'campaign_key' => 'webinar_attended',
+        CampaignEnrollment::query()->create([
+            'contact_id' => $contact->getKey(),
+            'campaign_id' => $campaign->getKey(),
+            'campaign_key' => $campaign->key,
             'status' => CampaignEnrollment::STATUS_ACTIVE,
-            'current_step' => 1,
-            'current_campaign_step_id' => $step->id,
             'started_at' => now(),
         ]);
 
-        $enrollment = app(EnrollContactInCampaignAction::class)->handle(
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('open legacy CampaignEnrollment');
+
+        app(EnrollContactInCampaignAction::class)->handle(
             contact: $contact,
-            campaignKey: 'webinar_attended',
+            campaignKey: $campaign->key,
         );
-
-        $this->assertTrue($existingEnrollment->is($enrollment));
-        $this->assertDatabaseCount('campaign_enrollments', 1);
-        $this->assertDatabaseCount('scheduled_messages', 0);
     }
 
-    public function test_it_returns_existing_paused_enrollment_without_restarting_campaign(): void
-    {
-        Queue::fake();
+    /**
+     * @return array{0: Campaign, 1: MessageChain, 2: \App\Modules\Messaging\Models\MessageChainVersion}
+     */
+    private function campaignWithChain(
+        string $key,
+        string $campaignStatus = Campaign::STATUS_ACTIVE,
+        string $chainStatus = MessageChain::STATUS_ACTIVE,
+        bool $stepActive = true,
+    ): array {
+        $templateVersion = $this->templateVersion("fixture.{$key}.email");
 
-        $campaign = $this->createCampaignWithStepAndVariant('webinar_attended', 1);
-        $contact = $this->contactWithMarketingEmailConsent();
-        $step = $campaign->steps()->where('step_number', 1)->firstOrFail();
-
-        $existingEnrollment = CampaignEnrollment::create([
-            'contact_id' => $contact->id,
-            'campaign_id' => $campaign->id,
-            'campaign_key' => 'webinar_attended',
-            'status' => CampaignEnrollment::STATUS_PAUSED,
-            'current_step' => 1,
-            'current_campaign_step_id' => $step->id,
-            'started_at' => now(),
-            'paused_at' => now(),
-        ]);
-
-        $enrollment = app(EnrollContactInCampaignAction::class)->handle(
-            contact: $contact,
-            campaignKey: 'webinar_attended',
-        );
-
-        $this->assertTrue($existingEnrollment->is($enrollment));
-        $this->assertDatabaseCount('campaign_enrollments', 1);
-        $this->assertDatabaseCount('scheduled_messages', 0);
-    }
-
-    public function test_it_completes_enrollment_when_first_step_does_not_exist(): void
-    {
-        Queue::fake();
-        Carbon::setTestNow('2026-06-12 12:00:00');
-
-        Campaign::create([
-            'key' => 'webinar_attended',
-            'name' => 'Webinar Attended',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
-            'status' => Campaign::STATUS_ACTIVE,
-            'meta' => [],
-        ]);
-
-        $contact = $this->contactWithMarketingEmailConsent();
-
-        $enrollment = app(EnrollContactInCampaignAction::class)->handle(
-            contact: $contact,
-            campaignKey: 'webinar_attended',
-        );
-
-        $this->assertSame(CampaignEnrollment::STATUS_COMPLETED, $enrollment->status);
-        $this->assertSame(0, $enrollment->current_step);
-        $this->assertNull($enrollment->current_campaign_step_id);
-        $this->assertDatabaseCount('scheduled_messages', 0);
-    }
-
-    public function test_it_completes_enrollment_when_first_step_has_no_active_variants(): void
-    {
-        Queue::fake();
-
-        $campaign = Campaign::create([
-            'key' => 'webinar_attended',
-            'name' => 'Webinar Attended',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
-            'status' => Campaign::STATUS_ACTIVE,
-            'meta' => [],
-        ]);
-
-        CampaignStep::create([
-            'campaign_id' => $campaign->id,
-            'step_number' => 1,
-            'name' => 'Step 1',
-            'dispatch_key' => 'campaign_step_due',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
-            'is_active' => true,
-            'criteria' => ['timing' => ['type' => 'delay', 'minutes' => 15]],
-            'meta' => ['type' => 'message'],
-        ]);
-
-        $enrollment = app(EnrollContactInCampaignAction::class)->handle(
-            contact: $this->contactWithMarketingEmailConsent(),
-            campaignKey: 'webinar_attended',
-        );
-
-        $this->assertSame(CampaignEnrollment::STATUS_COMPLETED, $enrollment->status);
-        $this->assertDatabaseCount('scheduled_messages', 0);
-        $this->assertSame('campaign_step_has_no_active_variants', data_get($enrollment->meta, 'last_message_schedule_attempt.reason'));
-    }
-
-    public function test_it_skips_sms_campaign_step_variant_when_sms_is_not_available_for_campaigns(): void
-    {
-        Queue::fake();
-
-        config()->set('messaging.channel_availability.sms.runtime_supported', true);
-        config()->set('messaging.channel_availability.sms.provider_enabled', true);
-        config()->set('messaging.channel_availability.sms.surfaces.campaigns', false);
-        config()->set('messaging.channel_availability.sms.purpose_scopes', ['marketing:webinar' => true]);
-
-        config()->set('messaging.sms.definitions.marketing.webinar.campaigns.webinar_sms.steps.1.variants.sms', [
-            'dispatch_key' => 'campaign_step_due',
-            'payload_class' => SmsPayload::class,
-            'queue' => 'marketing',
-            'payload' => ['message' => 'SMS step'],
-        ]);
-
-        $campaign = Campaign::create([
-            'key' => 'webinar_sms',
-            'name' => 'Webinar SMS',
-            'channel' => 'sms',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
-            'status' => Campaign::STATUS_ACTIVE,
-            'meta' => [],
-        ]);
-
-        $step = CampaignStep::create([
-            'campaign_id' => $campaign->id,
-            'step_number' => 1,
-            'name' => 'SMS Step 1',
-            'dispatch_key' => 'campaign_step_due',
-            'channel' => 'sms',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
-            'is_active' => true,
-            'criteria' => ['timing' => ['type' => 'delay', 'minutes' => 15]],
-            'meta' => ['type' => 'message'],
-        ]);
-
-        CampaignStepVariant::create([
-            'campaign_step_id' => $step->id,
-            'key' => 'sms',
-            'name' => 'SMS follow-up',
-            'sort_order' => 0,
-            'dispatch_key' => 'campaign_step_due',
-            'channel' => 'sms',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
-            'is_active' => true,
-            'criteria' => [],
-            'dependency_rules' => [],
-            'meta' => [],
-        ]);
-
-        $contact = Contact::factory()->create(['phone' => '+15555550123']);
-
-        MessageConsent::query()->create([
-            'contact_id' => $contact->id,
-            'channel' => 'sms',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
-            'consented_at' => now()->subMinute(),
+        $chain = MessageChain::query()->create([
+            'key' => "campaign.{$key}",
+            'name' => "{$key} chain",
+            'status' => $chainStatus,
             'source' => 'test',
+            'is_customized' => false,
         ]);
 
-        $enrollment = app(EnrollContactInCampaignAction::class)->handle(
-            contact: $contact,
-            campaignKey: 'webinar_sms',
+        $version = app(PublishMessageChainVersionAction::class)->handle(
+            messageChain: $chain,
+            steps: [[
+                'key' => 'step_1',
+                'name' => 'Step 1',
+                'sort_order' => 10,
+                'timing_type' => MessageChainStep::TIMING_DELAY,
+                'offset_seconds' => 7200,
+                'variant_strategy' => MessageChainStep::VARIANT_STRATEGY_FIRST_AVAILABLE,
+                'advance_policy' => MessageChainStep::ADVANCE_ALL_TERMINAL,
+                'conditions' => [],
+                'is_active' => $stepActive,
+                'variants' => [[
+                    'key' => 'email',
+                    'sort_order' => 10,
+                    'message_template_version_id' => $templateVersion->getKey(),
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'campaign_test',
+                    'message_type' => "{$key}_step_1",
+                    'queue' => 'marketing',
+                    'dependency_policy' => [],
+                    'conditions' => [],
+                    'is_active' => true,
+                ]],
+            ]],
         );
 
-        $this->assertSame(CampaignEnrollment::STATUS_COMPLETED, $enrollment->status);
-        $this->assertSame(1, $enrollment->current_step);
-        $this->assertNull($enrollment->last_scheduled_message_id);
-        $this->assertDatabaseCount('scheduled_messages', 0);
-        $this->assertSame('campaign_channel_unavailable', data_get($enrollment->meta, 'last_message_schedule_attempt.reason'));
-    }
-
-    public function test_it_preserves_opaque_metadata_on_enrollment_and_first_message(): void
-    {
-        Queue::fake();
-        Carbon::setTestNow('2026-06-12 12:00:00');
-
-        $this->configureEmailCampaignAvailability();
-        $this->createCampaignWithStepAndVariant('webinar_attended', 1);
-
-        $contact = $this->contactWithMarketingEmailConsent();
-        $meta = [
-            'automation' => [
-                'surface' => 'integration_test',
-                'execution_key' => 'execution-123',
-            ],
-        ];
-
-        $enrollment = app(EnrollContactInCampaignAction::class)->handle(
-            contact: $contact,
-            campaignKey: 'webinar_attended',
-            meta: $meta,
-        );
-
-        $scheduledMessage = ScheduledMessage::query()->firstOrFail();
-
-        $this->assertSame(
-            'integration_test',
-            data_get($enrollment->meta, 'automation.surface'),
-        );
-        $this->assertSame(
-            'execution-123',
-            data_get($enrollment->meta, 'automation.execution_key'),
-        );
-        $this->assertSame(
-            'integration_test',
-            data_get($scheduledMessage->meta, 'automation.surface'),
-        );
-        $this->assertSame(
-            'execution-123',
-            data_get($scheduledMessage->meta, 'automation.execution_key'),
-        );
-    }
-
-    private function createCampaignWithStepAndVariant(string $campaignKey, int $stepNumber): Campaign
-    {
-        $this->defineCampaignStepVariantMessageTemplate($campaignKey, $stepNumber);
-
-        $campaign = Campaign::create([
-            'key' => $campaignKey,
-            'name' => 'Webinar Attended',
+        $campaign = Campaign::query()->create([
+            'key' => $key,
+            'name' => "{$key} campaign",
+            'message_chain_id' => $chain->getKey(),
             'channel' => 'email',
             'purpose' => 'marketing',
-            'scope' => 'webinar',
-            'status' => Campaign::STATUS_ACTIVE,
+            'scope' => 'campaign_test',
+            'status' => $campaignStatus,
             'meta' => [],
         ]);
 
-        $step = CampaignStep::create([
-            'campaign_id' => $campaign->id,
-            'step_number' => $stepNumber,
-            'name' => 'Step '.$stepNumber,
-            'dispatch_key' => 'campaign_step_due',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
-            'variant_strategy' => 'first_available',
-            'is_active' => true,
-            'criteria' => ['timing' => ['type' => 'delay', 'minutes' => 720]],
-            'meta' => ['type' => 'message'],
-        ]);
-
-        CampaignStepVariant::create([
-            'campaign_step_id' => $step->id,
-            'key' => 'email',
-            'name' => 'Email follow-up',
-            'sort_order' => 0,
-            'dispatch_key' => 'campaign_step_due',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
-            'is_active' => true,
-            'criteria' => [],
-            'dependency_rules' => [],
-            'source_config_path' => "messaging.email.definitions.marketing.webinar.campaigns.{$campaignKey}.steps.{$stepNumber}.variants.email",
-            'meta' => [],
-        ]);
-
-        return $campaign->refresh();
+        return [$campaign, $chain->refresh(), $version];
     }
 
-    private function defineCampaignStepVariantMessageTemplate(string $campaignKey, int $stepNumber): void
+    private function templateVersion(string $key): MessageTemplateVersion
     {
-        config()->set("messaging.email.definitions.marketing.webinar.campaigns.{$campaignKey}.steps.{$stepNumber}.variants.email", [
-            'dispatch_key' => 'campaign_step_due',
-            'payload_class' => EmailPayload::class,
-            'queue' => 'marketing',
-            'payload' => [
-                'to' => '{email}',
-                'subject' => 'Step '.$stepNumber,
-                'body' => 'Message '.$stepNumber,
-            ],
-        ]);
-    }
-
-    private function configureEmailCampaignAvailability(): void
-    {
-        Config::set('messaging.channel_availability.email', [
-            'runtime_supported' => true,
-            'provider_enabled' => true,
-            'requires_explicit_opt_in' => false,
-            'surfaces' => ['campaigns' => true],
-            'purpose_scopes' => ['marketing:webinar' => true],
-        ]);
-    }
-
-    private function contactWithMarketingEmailConsent(): Contact
-    {
-        $contact = Contact::factory()->create(['email' => 'person@example.com']);
-
-        MessageConsent::query()->create([
-            'contact_id' => $contact->id,
+        $template = MessageTemplate::query()->create([
+            'key' => $key,
+            'name' => $key,
             'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
-            'consented_at' => now()->subMinute(),
+            'status' => MessageTemplate::STATUS_ACTIVE,
             'source' => 'test',
+            'is_customized' => false,
         ]);
 
-        return $contact;
+        $version = MessageTemplateVersion::query()->create([
+            'message_template_id' => $template->getKey(),
+            'version' => 1,
+            'subject' => 'Fixture subject',
+            'content' => ['body' => 'Fixture body'],
+            'renderer_key' => 'fixture',
+            'renderer_version' => '1',
+            'content_hash' => hash('sha256', $key),
+        ]);
+
+        $template->forceFill([
+            'current_version_id' => $version->getKey(),
+        ])->save();
+
+        return $version;
     }
 
     protected function tearDown(): void
