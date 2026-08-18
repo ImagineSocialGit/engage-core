@@ -46,12 +46,25 @@
                                 </a>
                             @endforeach
                         </div>
-                        <a
-                            href="{{ route('crm.reporting.imports.create') }}"
-                            class="mt-3 inline-flex text-sm font-semibold text-slate-700 hover:text-slate-950 hover:underline"
-                        >
-                            Import ad platform report
-                        </a>
+                        <div class="mt-3 flex flex-wrap items-center gap-4">
+                            <a
+                                href="{{ route('crm.reporting.imports.create') }}"
+                                class="inline-flex text-sm font-semibold text-slate-700 hover:text-slate-950 hover:underline"
+                            >
+                                Import ad platform report
+                            </a>
+
+                            <form method="POST" action="{{ route('crm.reporting.refresh') }}">
+                                @csrf
+                                <input type="hidden" name="days" value="{{ $report['range']['days'] }}">
+                                <button
+                                    type="submit"
+                                    class="inline-flex text-sm font-semibold text-slate-700 hover:text-slate-950 hover:underline"
+                                >
+                                    Refresh recent data
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
 
@@ -67,6 +80,128 @@
                 </div>
             </div>
         </section>
+
+        @if($report['has_data'])
+            @php
+                $decisionSummary = $report['decision_summary'];
+                $primaryDecision = $decisionSummary['primary'];
+            @endphp
+            <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
+                <div class="border-b border-slate-100 p-6 sm:p-8">
+                    <h2 class="text-xl font-semibold tracking-tight text-slate-950">What to look at first</h2>
+                    <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
+                        Reporting prioritizes the strongest observed signal, shows the population behind the numbers, and keeps attribution limits visible. These are investigation priorities, not claims about causation.
+                    </p>
+                </div>
+
+                <div class="grid gap-4 p-6 sm:p-8 lg:grid-cols-3">
+                    <article class="rounded-2xl border p-5 lg:col-span-2 {{ $toneClasses[$primaryDecision['tone']] ?? $toneClasses['neutral'] }}">
+                        <div class="text-xs font-bold uppercase tracking-wide opacity-70">{{ $primaryDecision['label'] }}</div>
+                        <h3 class="mt-2 text-lg font-semibold">{{ $primaryDecision['title'] }}</h3>
+                        <p class="mt-2 text-sm leading-6">{{ $primaryDecision['body'] }}</p>
+                        <div class="mt-4 rounded-xl bg-white/70 p-4 text-sm leading-6 ring-1 ring-black/5">
+                            <span class="font-semibold">Next step:</span>
+                            {{ $primaryDecision['next_step'] }}
+                        </div>
+                    </article>
+
+                    <div class="space-y-4">
+                        @foreach(['measurement', 'acquisition'] as $decisionKey)
+                            @php
+                                $decision = $decisionSummary[$decisionKey];
+                            @endphp
+                            <article class="rounded-2xl border p-5 {{ $toneClasses[$decision['tone']] ?? $toneClasses['neutral'] }}">
+                                <div class="text-xs font-bold uppercase tracking-wide opacity-70">{{ $decision['label'] }}</div>
+                                <h3 class="mt-2 font-semibold">{{ $decision['title'] }}</h3>
+                                <p class="mt-2 text-sm leading-6">{{ $decision['body'] }}</p>
+                                <p class="mt-3 text-xs leading-5 opacity-80">
+                                    <span class="font-semibold">Use it this way:</span>
+                                    {{ $decision['next_step'] }}
+                                </p>
+                            </article>
+                        @endforeach
+                    </div>
+                </div>
+
+                @if($report['supporting_signals'] !== [])
+                    <div class="border-t border-slate-100 p-6 sm:p-8">
+                        <h3 class="font-semibold text-slate-950">Supporting signals</h3>
+                        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                            @foreach($report['supporting_signals'] as $insight)
+                                <article class="rounded-2xl border p-4 {{ $toneClasses[$insight['tone']] ?? $toneClasses['neutral'] }}">
+                                    <h4 class="font-semibold">{{ $insight['title'] }}</h4>
+                                    <p class="mt-1 text-sm leading-6">{{ $insight['body'] }}</p>
+                                </article>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+            </section>
+
+        @endif
+
+        @if($report['has_data'])
+            @php
+                $comparisons = $report['performance_comparisons'];
+            @endphp
+            <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
+                <div class="border-b border-slate-100 p-6 sm:p-8">
+                    <h2 class="text-xl font-semibold tracking-tight text-slate-950">What performs differently</h2>
+                    <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
+                        These are directional first-party comparisons, not causal conclusions or statistical-significance claims. A variant must have at least {{ number_format((int) $comparisons['minimum_likely_human_sessions']) }} likely-human landing sessions before Reporting will rank its registration conversion.
+                    </p>
+                </div>
+
+                @if($comparisons['highlights'] === [])
+                    <div class="p-6 sm:p-8">
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                            <h3 class="font-semibold text-slate-950">More comparable traffic is needed</h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-700">
+                                No retained comparison dimension currently has at least two variants that meet the sample guardrail. Keep collecting classified traffic rather than ranking tiny samples.
+                            </p>
+                        </div>
+                    </div>
+                @else
+                    <div class="grid gap-4 p-6 sm:p-8 lg:grid-cols-2">
+                        @foreach($comparisons['highlights'] as $comparison)
+                            <article class="rounded-2xl border p-5 {{ $comparison['status'] === 'directional' ? $toneClasses['attention'] : $toneClasses['neutral'] }}">
+                                <div class="text-xs font-bold uppercase tracking-wide opacity-70">{{ $comparison['label'] }}</div>
+                                <h3 class="mt-2 font-semibold">{{ $comparison['title'] }}</h3>
+                                <p class="mt-2 text-sm leading-6">{{ $comparison['body'] }}</p>
+                                <p class="mt-3 text-xs leading-5 opacity-80">
+                                    @if($comparison['status'] === 'directional')
+                                        Investigate the experience, audience, and acquisition context behind this gap before changing spend or declaring the dimension itself causal.
+                                    @else
+                                        Current eligible variants are within {{ number_format((float) $comparisons['minimum_gap_percentage_points'], 1) }} percentage points; treat them as broadly similar for now.
+                                    @endif
+                                </p>
+                            </article>
+                        @endforeach
+                    </div>
+                @endif
+
+                <details class="group border-t border-slate-100">
+                    <summary class="flex cursor-pointer list-none items-center justify-between gap-4 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-300 sm:px-8">
+                        <div>
+                            <span class="font-semibold text-slate-950">Comparison coverage</span>
+                            <span class="ml-2 text-sm text-slate-500">See which dimensions have enough traffic</span>
+                        </div>
+                        <span class="text-sm font-semibold text-slate-600 group-open:hidden">Show</span>
+                        <span class="hidden text-sm font-semibold text-slate-600 group-open:inline">Hide</span>
+                    </summary>
+                    <div class="grid gap-3 border-t border-slate-100 p-6 sm:grid-cols-2 sm:p-8 lg:grid-cols-4">
+                        @foreach($comparisons['groups'] as $comparison)
+                            <div class="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                                <div class="font-semibold text-slate-950">{{ $comparison['label'] }}</div>
+                                <div class="mt-1 text-xs leading-5 text-slate-600">
+                                    {{ number_format((int) $comparison['eligible_count']) }} of {{ number_format((int) $comparison['observed_count']) }} variants eligible
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </details>
+            </section>
+        @endif
 
         @if($report['ad_platform_comparisons'] !== [])
             <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
@@ -177,24 +312,6 @@
                 </p>
             </section>
         @else
-            <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
-                <div class="border-b border-slate-100 p-6 sm:p-8">
-                    <h2 class="text-xl font-semibold tracking-tight text-slate-950">What stands out</h2>
-                    <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
-                        These callouts describe what the data shows. They do not assume a universal conversion benchmark.
-                    </p>
-                </div>
-
-                <div class="grid gap-4 p-6 sm:p-8 lg:grid-cols-2">
-                    @foreach($report['insights'] as $insight)
-                        <article class="rounded-2xl border p-5 {{ $toneClasses[$insight['tone']] ?? $toneClasses['neutral'] }}">
-                            <h3 class="font-semibold">{{ $insight['title'] }}</h3>
-                            <p class="mt-2 text-sm leading-6">{{ $insight['body'] }}</p>
-                        </article>
-                    @endforeach
-                </div>
-            </section>
-
             <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
                 <div class="border-b border-slate-100 p-6 sm:p-8">
                     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -341,8 +458,8 @@
                                     <th class="px-5 py-3">Group</th>
                                     <th class="px-5 py-3">Creative</th>
                                     <th class="px-5 py-3">Platform / placement</th>
-                                    <th class="px-5 py-3 text-right">Landing</th>
-                                    <th class="px-5 py-3 text-right">Likely human</th>
+                                    <th class="px-5 py-3 text-right">Observed landing</th>
+                                    <th class="px-5 py-3 text-right">Likely-human landing</th>
                                     <th class="px-5 py-3 text-right">Form starts</th>
                                     <th class="px-5 py-3 text-right">Reached submit</th>
                                     <th class="px-5 py-3 text-right">Registration</th>
@@ -382,7 +499,10 @@
                                             @endif
                                         </td>
                                         <td class="px-5 py-4 text-right text-slate-700">{{ number_format((int) $row['landing_sessions']) }}</td>
-                                        <td class="px-5 py-4 text-right text-slate-700">{{ $percent($row['human_share']) }}</td>
+                                        <td class="px-5 py-4 text-right text-slate-700">
+                                            <div>{{ number_format((int) $row['likely_human_sessions']) }}</div>
+                                            <div class="mt-1 text-xs text-slate-500">{{ $percent($row['human_share']) }} of observed</div>
+                                        </td>
                                         <td class="px-5 py-4 text-right text-slate-700">{{ number_format((int) $row['form_starts']) }}</td>
                                         <td class="px-5 py-4 text-right text-slate-700">{{ number_format((int) $row['submit_sessions']) }}</td>
                                         <td class="px-5 py-4 text-right font-semibold text-slate-950">{{ $percent($row['registration_conversion']) }}</td>
@@ -427,8 +547,8 @@
                                         <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                             <tr>
                                                 <th class="px-5 py-3">{{ $breakdown['label'] }}</th>
-                                                <th class="px-5 py-3 text-right">Landing</th>
-                                                <th class="px-5 py-3 text-right">Likely human</th>
+                                                <th class="px-5 py-3 text-right">Observed landing</th>
+                                                <th class="px-5 py-3 text-right">Likely-human landing</th>
                                                 <th class="px-5 py-3 text-right">Form starts</th>
                                                 <th class="px-5 py-3 text-right">Reached submit</th>
                                                 <th class="px-5 py-3 text-right">Registration</th>
@@ -451,7 +571,10 @@
                                                 <tr>
                                                     <td class="px-5 py-4 font-medium text-slate-900">{{ $identity }}</td>
                                                     <td class="px-5 py-4 text-right text-slate-700">{{ number_format((int) $row['landing_sessions']) }}</td>
-                                                    <td class="px-5 py-4 text-right text-slate-700">{{ $percent($row['human_share']) }}</td>
+                                                    <td class="px-5 py-4 text-right text-slate-700">
+                                                        <div>{{ number_format((int) $row['likely_human_sessions']) }}</div>
+                                                        <div class="mt-1 text-xs text-slate-500">{{ $percent($row['human_share']) }} of observed</div>
+                                                    </td>
                                                     <td class="px-5 py-4 text-right text-slate-700">{{ number_format((int) $row['form_starts']) }}</td>
                                                     <td class="px-5 py-4 text-right text-slate-700">{{ number_format((int) $row['submit_sessions']) }}</td>
                                                     <td class="px-5 py-4 text-right font-semibold text-slate-950">{{ $percent($row['registration_conversion']) }}</td>
@@ -635,11 +758,12 @@
             <section class="rounded-3xl border border-slate-200 bg-slate-50/80 p-6 text-sm text-slate-700 shadow-sm sm:p-8">
                 <h2 class="font-semibold text-slate-950">How to read this report</h2>
                 <ul class="mt-3 list-disc space-y-2 pl-5 leading-6">
-                    <li>Primary registration conversion uses likely-human browser-observed landing sessions as its denominator.</li>
+                    <li>Primary registration conversion uses likely-human browser-observed landing sessions as its denominator; “Observed landing” totals in breakdowns can also include automated and unknown traffic.</li>
                     <li>Validation failure rate uses submit attempts, not landing sessions.</li>
                     <li>Imported or uncorrelated registrations are visible in authoritative totals but do not inflate browser conversion.</li>
                     <li>Provider, confirmation, join, and attendance percentages use their own eligible authoritative populations.</li>
                     <li>Campaign, page, presentation, device, series, and occurrence sections are separate retained breakdowns—not an arbitrary combined analytics cube.</li>
+                    <li>Performance comparisons require at least 20 likely-human landing sessions per variant and describe observed conversion differences only; they do not claim statistical significance or causation.</li>
                 </ul>
             </section>
         @endunless

@@ -205,6 +205,10 @@ Route::middleware('auth')->group(function () {
             Route::get('/', [ReportingController::class, 'index'])
                 ->name('index');
 
+            Route::post('/refresh', [ReportingController::class, 'refresh'])
+                ->middleware('throttle:6,1')
+                ->name('refresh');
+
             Route::get('/imports/create', [ReportingExternalMeasurementImportController::class, 'create'])
                 ->name('imports.create');
 

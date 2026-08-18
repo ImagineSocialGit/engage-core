@@ -1143,9 +1143,46 @@ The CRM Reporting workspace now shows imported ad-platform periods separately fr
 
 Phase 7C promotes `reporting_external_measurements` into retained Project State history now that the authoritative manual import path exists. The Reporting section advances to version 2, uses `identity_hash` as the upsert identity for external measurements, and retains the normalized measurement period, platform/account identity, campaign/group/creative identity and names, base metrics, result semantics, source snapshot hash, metadata, and import timestamp. Reporting sessions, raw observations, and projection checkpoints remain resettable.
 
+### Phase 8A — Actionable decision summary and denominator clarity
+
+The CRM Reporting workspace now puts a bounded decision layer ahead of the detailed evidence. It does not generate causal explanations or compare performance to an invented universal benchmark. Instead it deterministically identifies the largest observed session loss in the likely-human registration funnel, explains which population each headline metric uses, and surfaces the current ad-attribution coverage before the operator reaches the detailed tables.
+
+The first-investigation guidance is stage-specific:
+
+```text
+landing -> form start
+    compare device/presentation evidence and registration visibility before changing ad spend
+
+form start -> submit
+    inspect form requirements, consent choices, field usability, and validation evidence
+
+submit -> registered
+    inspect validation, bot-protection, and registration-finalization evidence
+```
+
+When there is no observed pre-registration loss, the workspace says so rather than manufacturing a recommendation. If the public funnel completes but provider-required registration sync is incomplete, the next investigation moves to provider completion instead of blaming the landing page.
+
+The decision layer also keeps measurement and acquisition limits visible. It states how many observed landing sessions are actually in the likely-human denominator, preserves unknown traffic as excluded context, reports browser-to-registration correlation coverage, and distinguishes exact stable-ID ad reconciliation from aggregate-only name-fallback imports. Cost per Engage registration is surfaced only when imported spend is attached to stable-ID rows that actually match retained Engage campaign traffic.
+
+Comparison tables now label all-class landing totals as `Observed landing` and show the separate `Likely-human landing` count plus share. This prevents broader observed traffic from being mistaken for the primary conversion denominator.
+
+An authenticated CRM `Refresh recent data` action synchronously rebuilds today and yesterday through the existing Reporting projector. It is an explicit mutating POST and complements, rather than replaces, the scheduled ten-minute rolling projection and nightly retention-horizon reconciliation. It exists so an operator can immediately refresh recent observations while reviewing a report without requiring Horizon or a manually running scheduler.
+
+### Phase 8B — Guarded comparative performance
+
+The CRM workspace now derives direct registration-conversion comparisons from the retained daily slices without creating a new analytics cube. Comparisons cover source/medium, campaign, ad set/ad group, creative/ad, placement, landing page, page revision/registration presentation, and device class when those dimensions are actually present in the projected metrics.
+
+A comparison candidate must have at least 20 likely-human landing sessions in the selected period before Reporting will rank its registration conversion. At least two eligible variants are required for a comparison. The 20-session threshold is a product guardrail against tiny-sample ranking; it is not a conversion benchmark, statistical-significance test, or claim that the result is representative.
+
+When two or more variants are eligible, Reporting compares the highest and lowest observed registration conversion. A gap of at least 5.0 percentage points is surfaced as a directional difference; smaller gaps are described as currently close. The UI always shows the underlying registrations / likely-human landing denominator and explicitly instructs the operator to investigate experience, audience, and acquisition context before changing spend or declaring the compared dimension causal.
+
+Stable external campaign/group/creative IDs are preferred as grouping identity when available so renamed readable UTMs do not split the same tracked marketing object. Where stable IDs are absent, the retained readable UTM dimensions provide a fallback behavioral comparison only. This fallback is not promoted to exact external-platform spend reconciliation.
+
+The comparison layer reads existing retained `webinar.registration_conversion` slices only. It does not change projection schema, raw observation collection, Project State, producer contracts, or module boundaries.
+
 ## Current status
 
-Current repository state through Phase 7D:
+Current repository state through Phase 8B:
 
 ```text
 Reporting depends only on Core
@@ -1173,7 +1210,7 @@ Reporting now owns a CRM Webinar Registration workspace over retained daily aggr
 current Reporting, Webinar, and Messaging dependency cones have no detected module-boundary violations
 ```
 
-The first Reporting CRM workspace is implemented over the durable aggregate foundation. Phase 7B adds the concrete Meta CSV import/preview flow, period-based external measurement semantics, name-only fallback support, and stable-ID platform-vs-Engage comparison reads. Phase 7C retains authoritative imported external measurement history through the optional Reporting Project State section. Phase 7D calibrates browser request classification so a recognized browser is not excluded from the primary likely-human denominator merely because the optional `Sec-Fetch-Site` header is absent; classifier provenance advances to version 2 and historical version 1 rows retain their original meaning. The next product slice is decision-oriented reporting that turns these retained inputs into prioritized client actions.
+The first Reporting CRM workspace is implemented over the durable aggregate foundation. Phase 7B adds the concrete Meta CSV import/preview flow, period-based external measurement semantics, name-only fallback support, and stable-ID platform-vs-Engage comparison reads. Phase 7C retains authoritative imported external measurement history through the optional Reporting Project State section. Phase 7D calibrates browser request classification so a recognized browser is not excluded from the primary likely-human denominator merely because the optional `Sec-Fetch-Site` header is absent; classifier provenance advances to version 2 and historical version 1 rows retain their original meaning. Phase 8A adds a deterministic first-investigation layer, denominator clarity, bounded ad-attribution guidance, and explicit recent-data refresh while retaining the detailed evidence underneath. Phase 8B adds guarded directional comparison across source, campaign, group, creative, placement, landing page, presentation, and device dimensions using only retained likely-human conversion slices and explicit minimum-sample rules.
 
 ## Deferred possibilities
 

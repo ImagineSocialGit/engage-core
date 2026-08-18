@@ -3,7 +3,10 @@
 namespace App\Modules\Reporting\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Reporting\Actions\ProjectReportingDailyMetricsAction;
 use App\Modules\Reporting\Services\ReportingWorkspaceReadService;
+use Carbon\CarbonImmutable;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -15,11 +18,7 @@ final class ReportingController extends Controller
         Request $request,
         ReportingWorkspaceReadService $workspace,
     ): View {
-        $days = $request->integer('days', 30);
-
-        if (! in_array($days, self::RANGE_OPTIONS, true)) {
-            $days = 30;
-        }
+        $days = $this->normalizedDays($request);
 
         return view('crm.reporting.index', [
             'title' => 'Reporting',
@@ -28,5 +27,44 @@ final class ReportingController extends Controller
             'report' => $workspace->webinarRegistration($days),
             'rangeOptions' => self::RANGE_OPTIONS,
         ]);
+    }
+
+    public function refresh(
+        Request $request,
+        ProjectReportingDailyMetricsAction $project,
+    ): RedirectResponse {
+        $days = $this->normalizedDays($request);
+        $timezone = $this->reportingTimezone();
+        $through = CarbonImmutable::now($timezone)->startOfDay();
+
+        $project->handle(
+            fromDate: $through->subDay(),
+            throughDate: $through,
+        );
+
+        return redirect()
+            ->route('crm.reporting.index', ['days' => $days])
+            ->with('success', 'Recent Reporting data refreshed.');
+    }
+
+    private function normalizedDays(Request $request): int
+    {
+        $days = $request->integer('days', 30);
+
+        return in_array($days, self::RANGE_OPTIONS, true)
+            ? $days
+            : 30;
+    }
+
+    private function reportingTimezone(): string
+    {
+        $timezone = config(
+            'client.timezone',
+            config('app.timezone', 'UTC'),
+        );
+
+        return is_string($timezone) && trim($timezone) !== ''
+            ? trim($timezone)
+            : 'UTC';
     }
 }
