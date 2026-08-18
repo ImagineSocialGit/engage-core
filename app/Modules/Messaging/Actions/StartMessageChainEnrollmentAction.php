@@ -230,7 +230,9 @@ class StartMessageChainEnrollmentAction
     {
         ProcessMessageChainEnrollmentJob::dispatch(
             enrollmentId: (int) $enrollment->getKey(),
-        )->delay($enrollment->next_action_at);
+        )
+            ->delay($enrollment->next_action_at)
+            ->afterCommit();
     }
 
     private function nullableSegment(

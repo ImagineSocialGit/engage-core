@@ -109,15 +109,30 @@ class ProcessMessageChainEnrollmentAction
 
             $step = $enrollment->currentMessageChainStep;
 
-            if (! $step instanceof MessageChainStep
-                || ! $this->waveSatisfied($enrollment, $step)
-            ) {
+            if (! $step instanceof MessageChainStep) {
+                return ['enrollment' => $enrollment, 'dispatch' => false];
+            }
+
+            $context = $this->contextResolver->resolve($enrollment);
+            $wave = $this->waveMessages($enrollment, $step);
+
+            if ($step->variant_strategy === MessageChainStep::VARIANT_STRATEGY_DEPENDENCY_AWARE) {
+                $wave = $this->materializeDependencyAwareVariants(
+                    enrollment: $enrollment,
+                    step: $step,
+                    context: $context,
+                    messages: $wave,
+                    sendAt: $this->waveSendAt($wave),
+                );
+            }
+
+            if (! $this->waveSatisfied($enrollment, $step, $wave)) {
                 return ['enrollment' => $enrollment, 'dispatch' => false];
             }
 
             return $this->advance(
                 enrollment: $enrollment,
-                context: $this->contextResolver->resolve($enrollment),
+                context: $context,
                 baseAt: now(),
             );
         }, 3);
@@ -224,6 +239,18 @@ class ProcessMessageChainEnrollmentAction
                 messages: $existingWave,
                 components: $components,
             );
+
+            if ($step->variant_strategy === MessageChainStep::VARIANT_STRATEGY_DEPENDENCY_AWARE) {
+                $existingWave = $this->materializeDependencyAwareVariants(
+                    enrollment: $enrollment,
+                    step: $step,
+                    context: $context,
+                    messages: $existingWave,
+                    sendAt: $this->waveSendAt($existingWave),
+                    components: $components,
+                );
+            }
+
             $enrollment->forceFill(['next_action_at' => null])->save();
 
             if ($this->waveSatisfied($enrollment, $step, $existingWave)) {
@@ -233,6 +260,33 @@ class ProcessMessageChainEnrollmentAction
                     baseAt: now(),
                 );
             }
+
+            return ['enrollment' => $enrollment, 'dispatch' => false];
+        }
+
+        $sendAt = $enrollment->next_action_at->copy();
+
+        if ($step->variant_strategy === MessageChainStep::VARIANT_STRATEGY_DEPENDENCY_AWARE) {
+            $wave = $this->materializeDependencyAwareVariants(
+                enrollment: $enrollment,
+                step: $step,
+                context: $context,
+                messages: collect(),
+                sendAt: $sendAt,
+                components: $components,
+            );
+
+            if ($wave->isEmpty()) {
+                return $this->advance(
+                    enrollment: $enrollment,
+                    context: $context,
+                    baseAt: now(),
+                );
+            }
+
+            $enrollment->forceFill([
+                'next_action_at' => null,
+            ])->save();
 
             return ['enrollment' => $enrollment, 'dispatch' => false];
         }
@@ -250,8 +304,6 @@ class ProcessMessageChainEnrollmentAction
                 baseAt: now(),
             );
         }
-
-        $sendAt = $enrollment->next_action_at->copy();
 
         foreach ($variants as $variant) {
             $message = $this->materialize(
@@ -298,85 +350,16 @@ class ProcessMessageChainEnrollmentAction
         MessageChainStep $step,
         array $context,
     ): Collection {
-        $recipient = $enrollment->recipient;
-
-        if (! $recipient instanceof Model) {
-            throw new RuntimeException(
-                "MessageChainEnrollment [{$enrollment->getKey()}] has no recipient.",
-            );
-        }
-
-        $contextModel = $enrollment->context instanceof Model
-            ? $enrollment->context
-            : null;
-
         $eligible = $step->variants
             ->filter(
                 fn (MessageChainStepVariant $variant): bool =>
-                    (bool) $variant->is_active,
+                    (bool) $variant->is_active
+                    && $this->variantIsEligible(
+                        enrollment: $enrollment,
+                        variant: $variant,
+                        context: $context,
+                    ),
             )
-            ->filter(function (
-                MessageChainStepVariant $variant,
-            ) use ($enrollment, $recipient, $contextModel, $context): bool {
-                if (
-                    is_string($enrollment->surface)
-                    && $enrollment->surface !== ''
-                    && ! $this->messageChannelAvailability->isVisibleForSurface(
-                        channel: $variant->channel,
-                        surface: $enrollment->surface,
-                        purpose: $variant->purpose,
-                        scope: $variant->scope,
-                    )
-                ) {
-                    return false;
-                }
-
-                $conditions = is_array($variant->conditions)
-                    ? $variant->conditions
-                    : [];
-
-                if (
-                    $conditions !== []
-                    && ! $this->conditionChecker->passes($conditions, $context)
-                ) {
-                    return false;
-                }
-
-                $templateVersion = $variant->messageTemplateVersion;
-
-                if (! $templateVersion instanceof MessageTemplateVersion) {
-                    throw new RuntimeException(
-                        "MessageChainStepVariant [{$variant->getKey()}] has no resolvable MessageTemplateVersion.",
-                    );
-                }
-
-                $payload = $this->recipientPayloadResolver->resolve(
-                    recipient: $recipient,
-                    channel: $variant->channel,
-                    purpose: $variant->purpose,
-                    scope: $variant->scope,
-                    messageType: $variant->message_type,
-                    definitionPayload: $templateVersion->payload(),
-                );
-
-                if (! is_array($payload)) {
-                    return false;
-                }
-
-                return $this->planningGate->allows(
-                    recipient: $recipient,
-                    channel: $variant->channel,
-                    purpose: $variant->purpose,
-                    scope: $variant->scope,
-                    definition: [
-                        'enabled' => true,
-                        'message_type' => $variant->message_type,
-                        'conditions' => [],
-                    ],
-                    payload: $payload,
-                    context: $contextModel,
-                );
-            })
             ->values();
 
         return match ($step->variant_strategy) {
@@ -386,12 +369,317 @@ class ProcessMessageChainEnrollmentAction
                 $eligible,
             MessageChainStep::VARIANT_STRATEGY_DEPENDENCY_AWARE =>
                 throw new LogicException(
-                    'Dependency-aware message-chain variant selection is not implemented.',
+                    'Dependency-aware variants must be materialized through sibling-state evaluation.',
                 ),
             default => throw new LogicException(
                 "MessageChainStep [{$step->getKey()}] has unsupported variant strategy [{$step->variant_strategy}].",
             ),
         };
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function variantIsEligible(
+        MessageChainEnrollment $enrollment,
+        MessageChainStepVariant $variant,
+        array $context,
+    ): bool {
+        $recipient = $enrollment->recipient;
+
+        if (! $recipient instanceof Model) {
+            throw new RuntimeException(
+                "MessageChainEnrollment [{$enrollment->getKey()}] has no recipient.",
+            );
+        }
+
+        if (
+            is_string($enrollment->surface)
+            && $enrollment->surface !== ''
+            && ! $this->messageChannelAvailability->isVisibleForSurface(
+                channel: $variant->channel,
+                surface: $enrollment->surface,
+                purpose: $variant->purpose,
+                scope: $variant->scope,
+            )
+        ) {
+            return false;
+        }
+
+        $conditions = is_array($variant->conditions)
+            ? $variant->conditions
+            : [];
+
+        if (
+            $conditions !== []
+            && ! $this->conditionChecker->passes($conditions, $context)
+        ) {
+            return false;
+        }
+
+        $templateVersion = $variant->messageTemplateVersion;
+
+        if (! $templateVersion instanceof MessageTemplateVersion) {
+            throw new RuntimeException(
+                "MessageChainStepVariant [{$variant->getKey()}] has no resolvable MessageTemplateVersion.",
+            );
+        }
+
+        $payload = $this->recipientPayloadResolver->resolve(
+            recipient: $recipient,
+            channel: $variant->channel,
+            purpose: $variant->purpose,
+            scope: $variant->scope,
+            messageType: $variant->message_type,
+            definitionPayload: $templateVersion->payload(),
+        );
+
+        if (! is_array($payload)) {
+            return false;
+        }
+
+        return $this->planningGate->allows(
+            recipient: $recipient,
+            channel: $variant->channel,
+            purpose: $variant->purpose,
+            scope: $variant->scope,
+            definition: [
+                'enabled' => true,
+                'message_type' => $variant->message_type,
+                'conditions' => [],
+            ],
+            payload: $payload,
+            context: $enrollment->context instanceof Model
+                ? $enrollment->context
+                : null,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     * @param Collection<int, ScheduledMessage> $messages
+     * @param array<int, MessageDeliveryComponent> $components
+     * @return Collection<int, ScheduledMessage>
+     */
+    private function materializeDependencyAwareVariants(
+        MessageChainEnrollment $enrollment,
+        MessageChainStep $step,
+        array $context,
+        Collection $messages,
+        Carbon $sendAt,
+        array $components = [],
+    ): Collection {
+        $messages = $messages
+            ->keyBy(
+                fn (ScheduledMessage $message): int =>
+                    (int) $message->message_chain_step_variant_id,
+            );
+
+        do {
+            $materialized = false;
+
+            foreach ($step->variants as $variant) {
+                $variantId = (int) $variant->getKey();
+
+                if (! $variant->is_active
+                    || $messages->has($variantId)
+                    || ! $this->variantIsEligible(
+                        enrollment: $enrollment,
+                        variant: $variant,
+                        context: $context,
+                    )
+                    || ! $this->dependencyPolicySatisfied(
+                        enrollment: $enrollment,
+                        step: $step,
+                        variant: $variant,
+                        messages: $messages->values(),
+                    )
+                ) {
+                    continue;
+                }
+
+                $message = $this->materialize(
+                    enrollment: $enrollment,
+                    variant: $variant,
+                    sendAt: $sendAt->copy(),
+                );
+
+                $this->attachComponents->handle(
+                    scheduledMessage: $message,
+                    components: $components,
+                );
+
+                $messages->put($variantId, $message);
+                $materialized = true;
+            }
+        } while ($materialized);
+
+        return $messages
+            ->sortBy(fn (ScheduledMessage $message): int => (int) $message->getKey())
+            ->values();
+    }
+
+    /**
+     * @param Collection<int, ScheduledMessage> $messages
+     */
+    private function dependencyPolicySatisfied(
+        MessageChainEnrollment $enrollment,
+        MessageChainStep $step,
+        MessageChainStepVariant $variant,
+        Collection $messages,
+    ): bool {
+        $policy = is_array($variant->dependency_policy)
+            ? $variant->dependency_policy
+            : [];
+        $requirements = $policy['requires_variant_states'] ?? [];
+
+        if (! is_array($requirements) || $requirements === []) {
+            return true;
+        }
+
+        foreach ($requirements as $requiredVariantKey => $states) {
+            if (! is_string($requiredVariantKey)
+                || trim($requiredVariantKey) === ''
+            ) {
+                return false;
+            }
+
+            $requiredVariant = $step->variants->first(
+                fn (MessageChainStepVariant $candidate): bool =>
+                    $candidate->is_active
+                    && $this->variantKey($candidate)
+                        === $this->normalizeSegment($requiredVariantKey),
+            );
+
+            if (! $requiredVariant instanceof MessageChainStepVariant) {
+                return false;
+            }
+
+            $allowedStates = $this->dependencyStates($states);
+
+            if (in_array('unavailable', $allowedStates, true)
+                && $this->requiredVariantChannelIsUnavailable(
+                    enrollment: $enrollment,
+                    variant: $requiredVariant,
+                )
+            ) {
+                continue;
+            }
+
+            $message = $messages->first(
+                fn (ScheduledMessage $candidate): bool =>
+                    (int) $candidate->message_chain_step_variant_id
+                        === (int) $requiredVariant->getKey(),
+            );
+
+            if (! $message instanceof ScheduledMessage
+                || ! $this->messageMatchesAnyDependencyState(
+                    message: $message,
+                    allowedStates: $allowedStates,
+                )
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function requiredVariantChannelIsUnavailable(
+        MessageChainEnrollment $enrollment,
+        MessageChainStepVariant $variant,
+    ): bool {
+        if (! is_string($enrollment->surface)
+            || trim($enrollment->surface) === ''
+        ) {
+            return false;
+        }
+
+        return ! $this->messageChannelAvailability->isVisibleForSurface(
+            channel: $variant->channel,
+            surface: $enrollment->surface,
+            purpose: $variant->purpose,
+            scope: $variant->scope,
+        );
+    }
+
+    /**
+     * @param array<int, string> $allowedStates
+     */
+    private function messageMatchesAnyDependencyState(
+        ScheduledMessage $message,
+        array $allowedStates,
+    ): bool {
+        foreach ($allowedStates as $state) {
+            if ($this->messageMatchesDependencyState($message, $state)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function messageMatchesDependencyState(
+        ScheduledMessage $message,
+        string $state,
+    ): bool {
+        return match ($state) {
+            'scheduled' => true,
+            'pending' => $message->status === ScheduledMessage::STATUS_PENDING,
+            'sent' => $message->status === ScheduledMessage::STATUS_SENT,
+            'skipped' => $message->status === ScheduledMessage::STATUS_SKIPPED,
+            'failed' => $message->status === ScheduledMessage::STATUS_FAILED,
+            'terminal' => in_array($message->status, [
+                ScheduledMessage::STATUS_SENT,
+                ScheduledMessage::STATUS_SKIPPED,
+                ScheduledMessage::STATUS_FAILED,
+            ], true),
+            default => false,
+        };
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function dependencyStates(mixed $states): array
+    {
+        if (is_string($states)) {
+            $states = [$states];
+        }
+
+        if (! is_array($states)) {
+            return ['scheduled'];
+        }
+
+        $states = array_values(array_unique(array_filter(array_map(
+            fn (mixed $state): ?string =>
+                is_string($state) && trim($state) !== ''
+                    ? $this->normalizeSegment($state)
+                    : null,
+            $states,
+        ))));
+
+        $states = array_values(array_intersect($states, [
+            'scheduled',
+            'pending',
+            'sent',
+            'skipped',
+            'failed',
+            'terminal',
+            'unavailable',
+        ]));
+
+        return $states !== [] ? $states : ['scheduled'];
+    }
+
+    private function variantKey(MessageChainStepVariant $variant): string
+    {
+        return $this->normalizeSegment((string) $variant->key);
+    }
+
+    private function normalizeSegment(string $value): string
+    {
+        return str_replace('-', '_', strtolower(trim($value)));
     }
 
     private function materialize(
@@ -647,6 +935,20 @@ class ProcessMessageChainEnrollmentAction
             ->get();
     }
 
+    /**
+     * @param Collection<int, ScheduledMessage> $messages
+     */
+    private function waveSendAt(Collection $messages): Carbon
+    {
+        $sendAt = $messages
+            ->first(fn (ScheduledMessage $message): bool => $message->send_at !== null)
+            ?->send_at;
+
+        return $sendAt !== null
+            ? Carbon::parse($sendAt)
+            : now();
+    }
+
     private function payloadClass(string $channel): string
     {
         return match (strtolower(trim($channel))) {
@@ -674,6 +976,8 @@ class ProcessMessageChainEnrollmentAction
     {
         ProcessMessageChainEnrollmentJob::dispatch(
             enrollmentId: (int) $enrollment->getKey(),
-        )->delay($enrollment->next_action_at);
+        )
+            ->delay($enrollment->next_action_at)
+            ->afterCommit();
     }
 }

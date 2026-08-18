@@ -5,6 +5,7 @@ namespace App\Modules\Messaging\Actions;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use App\Modules\Messaging\Services\ScheduledMessageEventOutbox;
@@ -17,6 +18,17 @@ class SkipScheduledMessagesAction
     public function __construct(
         private readonly ScheduledMessageEventOutbox $eventOutbox,
     ) {}
+
+    public function forMessageChainEnrollment(
+        MessageChainEnrollment $enrollment,
+        ?string $reason = null,
+    ): int {
+        return $this->skip(
+            query: ScheduledMessage::query()
+                ->where('message_chain_enrollment_id', $enrollment->getKey()),
+            reason: $reason,
+        );
+    }
 
     public function forContext(Model $context, ?string $reason = null): int
     {
