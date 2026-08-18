@@ -92,6 +92,32 @@ ScheduledMessageDeliveryAttempt
 
 A message chain is not a general trigger engine.
 
+### MessageChainEnrollment lifecycle
+
+Messaging owns the generic enrollment lifecycle for every MessageChain consumer.
+
+Public lifecycle actions include:
+
+```text
+StartMessageChainEnrollmentAction
+PauseMessageChainEnrollmentAction
+ResumeMessageChainEnrollmentAction
+CancelMessageChainEnrollmentAction
+```
+
+Pause is a delivery-safety operation, not only a status label:
+
+```text
+active -> paused
+pending ScheduledMessages for that enrollment -> skipped
+sending/sent/failed/already-skipped deliveries -> unchanged
+future progression -> dormant while paused
+```
+
+Resume preserves the remaining delay for a future, unmaterialized step by shifting `next_action_at` by the actual pause duration. If the enrollment was already waiting on a materialized wave whose pending messages were skipped during pause, resume makes the enrollment immediately due so the normal chain processor can account for that terminal wave and continue. Resume dispatch is after-commit and idempotent for already-active enrollments.
+
+A delivery already claimed as `sending` cannot be recalled by pause. Consumers that require stronger provider-side recall semantics need a separate provider capability; they must not pretend a sent/claimed delivery was unsent.
+
 Webinars, Campaigns, Scheduling, Documents, Portal, FlowRoutes, and future modules remain authoritative for their domain events and bindings.
 
 ## Config and token contracts

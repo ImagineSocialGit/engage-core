@@ -90,6 +90,8 @@
 │   │   │   │   ├── CancelCampaignEnrollmentAction.php
 │   │   │   │   ├── DeactivateCampaignAction.php
 │   │   │   │   ├── EnrollContactInCampaignAction.php
+│   │   │   │   ├── PauseCampaignEnrollmentAction.php
+│   │   │   │   ├── ResumeCampaignEnrollmentAction.php
 │   │   │   │   ├── ScheduleCampaignStepMessagesAction.php
 │   │   │   │   ├── ScheduleNextCampaignStepAction.php
 │   │   │   │   └── SyncCampaignPresetsAction.php
@@ -524,11 +526,13 @@
 │   │   │   │   ├── GrantMessageConsentAction.php
 │   │   │   │   ├── GrantMessageConsentsAction.php
 │   │   │   │   ├── ImportMessageConsentAction.php
+│   │   │   │   ├── PauseMessageChainEnrollmentAction.php
 │   │   │   │   ├── ProcessMessageChainEnrollmentAction.php
 │   │   │   │   ├── PublishMessageChainVersionAction.php
 │   │   │   │   ├── PublishMessageTemplateVersionAction.php
 │   │   │   │   ├── RecordMessageConsentAction.php
 │   │   │   │   ├── RecoverStaleScheduledMessageClaimsAction.php
+│   │   │   │   ├── ResumeMessageChainEnrollmentAction.php
 │   │   │   │   ├── RevokeMessageConsentAction.php
 │   │   │   │   ├── ScheduleMessageAction.php
 │   │   │   │   ├── SkipScheduledMessagesAction.php
@@ -1945,6 +1949,7 @@
 │   │   │   ├── MarkBroadcastRecipientTerminalStatusTest.php
 │   │   │   └── ScheduleBroadcastActionTest.php
 │   │   ├── Campaigns
+│   │   │   ├── CampaignEnrollmentLifecycleBridgeTest.php
 │   │   │   ├── CampaignMessageChainBridgeTest.php
 │   │   │   ├── CampaignMessageChainPresetSyncTest.php
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
@@ -2075,6 +2080,7 @@
 │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest.php
 │   │   │   ├── MarkClaimedPermissionInvitationSentAfterScheduledMessageSentTest.php
 │   │   │   ├── MessageChainDuplicationTest.php
+│   │   │   ├── MessageChainEnrollmentPauseResumeTest.php
 │   │   │   ├── MessageChainEnrollmentRunnerTest.php
 │   │   │   ├── MessageChainRuntimeParityTest.php
 │   │   │   ├── MessageChainVersionPersistenceTest.php
@@ -2306,4 +2312,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-592 directories, 1715 files
+592 directories, 1721 files

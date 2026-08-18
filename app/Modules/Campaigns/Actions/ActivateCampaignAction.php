@@ -3,6 +3,7 @@
 namespace App\Modules\Campaigns\Actions;
 
 use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Messaging\Models\MessageChain;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +40,8 @@ class ActivateCampaignAction
                 );
             }
 
+            $this->activateSelectedMessageChain($lockedCampaign);
+
             $previousStatus = (string) $lockedCampaign->status;
             $statusChanged = ! $lockedCampaign->isActive();
 
@@ -73,6 +76,45 @@ class ActivateCampaignAction
                 'current_status' => (string) $lockedCampaign->status,
                 'status_changed' => $statusChanged,
             ];
-        });
+        }, 3);
+    }
+
+    private function activateSelectedMessageChain(Campaign $campaign): void
+    {
+        // Unbound legacy/draft Campaign records may still exist until F7/Builder
+        // validation completes. They may be activated as records, but F5 enrollment
+        // remains fail-closed until a valid selected MessageChain exists.
+        if (! is_numeric($campaign->message_chain_id) || (int) $campaign->message_chain_id < 1) {
+            return;
+        }
+
+        $chain = MessageChain::query()
+            ->whereKey((int) $campaign->message_chain_id)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $chain instanceof MessageChain) {
+            throw new InvalidArgumentException(sprintf(
+                'Campaign [%s] references missing MessageChain [%d].',
+                (string) $campaign->key,
+                (int) $campaign->message_chain_id,
+            ));
+        }
+
+        if ($chain->status === MessageChain::STATUS_ARCHIVED) {
+            throw new InvalidArgumentException(sprintf(
+                'Campaign [%s] cannot activate archived MessageChain [%s].',
+                (string) $campaign->key,
+                (string) $chain->key,
+            ));
+        }
+
+        $chain->requireCurrentVersion();
+
+        if ($chain->status !== MessageChain::STATUS_ACTIVE) {
+            $chain->forceFill([
+                'status' => MessageChain::STATUS_ACTIVE,
+            ])->save();
+        }
     }
 }

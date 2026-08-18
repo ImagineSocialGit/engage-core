@@ -12,9 +12,9 @@ Messaging owns reusable MessageChains and MessageChainEnrollments.
 Campaigns references a MessageChain rather than duplicating a second chain engine.
 ```
 
-The MessageChain cutover is now underway. Campaign persistence includes the Campaign -> MessageChain and CampaignEnrollment -> MessageChainEnrollment bridge columns. Messaging owns dependency-aware MessageChain execution, cancellation, pending-message skipping, bounded bulk delivery, and provider submission pacing.
+The MessageChain cutover is now underway. Campaign persistence includes the Campaign -> MessageChain and CampaignEnrollment -> MessageChainEnrollment bridge columns. Messaging owns dependency-aware MessageChain execution, cancellation, pause/resume, pending-message skipping, bounded bulk delivery, and provider submission pacing.
 
-Campaign preset sync now converts the current compact Campaign step/variant definition into a Messaging-owned MessageChain and immutable published MessageChainVersion, then stores the selected chain on `campaigns.message_chain_id`. New Campaign enrollment runtime has also cut over: `EnrollContactInCampaignAction` creates the CampaignEnrollment wrapper, starts the selected immutable MessageChainVersion through Messaging, and stores `campaign_enrollments.message_chain_enrollment_id`. The legacy CampaignStep/CampaignStepVariant rows and CampaignEnrollment progression columns remain only as temporary compatibility authoring/read fields until lifecycle, workspace, validation, and Project State readers have completed the cutover.
+Campaign preset sync now converts the current compact Campaign step/variant definition into a Messaging-owned MessageChain and immutable published MessageChainVersion, then stores the selected chain on `campaigns.message_chain_id`. New Campaign enrollment runtime has also cut over: `EnrollContactInCampaignAction` creates the CampaignEnrollment wrapper, starts the selected immutable MessageChainVersion through Messaging, and stores `campaign_enrollments.message_chain_enrollment_id`. Campaign lifecycle has now cut over as well: explicit cancellation delegates to Messaging's MessageChainEnrollment cancellation seam, Campaign deactivation cancels linked active/paused chain enrollments, and Campaign pause/resume delegates to Messaging-owned pause/resume actions. The legacy CampaignStep/CampaignStepVariant rows and CampaignEnrollment progression columns remain only as temporary compatibility authoring/read fields until workspace, validation, reporting, and Project State readers have completed the cutover.
 
 ## Responsibility
 
@@ -111,7 +111,23 @@ preserve Campaign and delivery history
 
 Reactivation permits future enrollments only.
 
-It does not resume cancelled chain enrollments or requeue skipped deliveries.
+It does not resume cancelled chain enrollments or requeue skipped deliveries. When the selected Campaign-generated MessageChain was inactivated with the Campaign, activation restores that chain to active before future enrollment. A reusable/shared MessageChain is not forcibly deactivated merely because one Campaign is turned off.
+
+Enrollment pause/resume is separate from Campaign deactivation:
+
+```text
+pause enrollment
+    MessageChainEnrollment -> paused
+    pending ScheduledMessages for that enrollment -> skipped
+    sending/sent/failed/already-skipped messages remain unchanged
+
+resume enrollment
+    MessageChainEnrollment -> active
+    future unmaterialized timing preserves the remaining delay across the pause
+    a previously materialized/skipped current wave is re-evaluated immediately so progression can continue
+```
+
+A message already claimed as `sending` cannot be recalled by pause; pause prevents pending work and future progression.
 
 Archived Campaigns require an explicit recovery decision.
 
@@ -591,8 +607,7 @@ The shared immutable template/chain, delivery-attempt, and terminal-outbox found
 
 The remaining Campaign-specific cutover should:
 
-- preserve the completed Campaign-to-MessageChain relationship and new-enrollment MessageChain start path;
-- update cancellation/deactivation/activation to use Messaging public chain lifecycle actions;
+- preserve the completed Campaign-to-MessageChain relationship, new-enrollment MessageChain start path, and MessageChain-backed cancellation/pause/resume/deactivation lifecycle;
 - move Campaign workspace/reporting/automation reads to linked MessageChainEnrollment state;
 - remove the legacy Campaign step scheduler/listeners and duplicate Campaign-owned progression fields after all runtime readers move;
 - finish the dev-only fake-clock Campaign simulator against the real MessageChain runtime before client launch.
