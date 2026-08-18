@@ -13,6 +13,7 @@ use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Models\ScheduledMessageDeliveryAttempt;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use App\Modules\Messaging\Services\Email\EmailMessagingService;
+use App\Modules\Messaging\Services\ProviderSubmissionLimiter;
 use App\Modules\Messaging\Services\ScheduledMessageDeliveryLeaseManager;
 use App\Modules\Messaging\Services\ScheduledMessageGate;
 use App\Modules\Messaging\Services\ScheduledMessagePayloadResolver;
@@ -60,6 +61,7 @@ class SendScheduledMessageJob implements ShouldQueue
         EmailMessagingService $emailMessagingService,
         SmsMessagingService $smsMessagingService,
         ContactPermissionInvitationService $permissionInvitationService,
+        ProviderSubmissionLimiter $providerSubmissionLimiter,
     ): void {
         $deliveryLeaseManager = app(ScheduledMessageDeliveryLeaseManager::class);
 
@@ -132,6 +134,11 @@ class SendScheduledMessageJob implements ShouldQueue
 
                 return;
             }
+
+            $providerSubmissionLimiter->acquire(
+                channel: $scheduledMessage->channel,
+                provider: $this->providerKey($scheduledMessage),
+            );
 
             if (! $deliveryLeaseManager->beginProviderSubmission(
                 claimedAttempt: $deliveryAttempt,
@@ -337,6 +344,16 @@ class SendScheduledMessageJob implements ShouldQueue
             && trim($value['label']) !== ''
             && is_string($value['url'] ?? null)
             && trim($value['url']) !== '';
+    }
+
+
+    private function providerKey(ScheduledMessage $scheduledMessage): string
+    {
+        return match ($scheduledMessage->channel) {
+            MessageChannel::Email->value => trim((string) config('messaging.email.provider', '')),
+            MessageChannel::Sms->value => trim((string) config('sms.provider', '')),
+            default => '',
+        };
     }
 
     private function sendEmail(

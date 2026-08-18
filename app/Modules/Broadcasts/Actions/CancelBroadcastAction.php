@@ -16,6 +16,9 @@ class CancelBroadcastAction
     public function handle(Broadcast $broadcast, ?string $reason = null): Broadcast
     {
         return DB::transaction(function () use ($broadcast, $reason): Broadcast {
+            $broadcast = Broadcast::query()
+                ->lockForUpdate()
+                ->findOrFail($broadcast->getKey());
             $reason = $this->normalizeReason($reason);
 
             $skippedMessageCount = $this->skipScheduledMessagesAction->forContext(

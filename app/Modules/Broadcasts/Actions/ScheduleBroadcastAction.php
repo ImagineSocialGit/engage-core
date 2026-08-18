@@ -2,13 +2,11 @@
 
 namespace App\Modules\Broadcasts\Actions;
 
+use App\Modules\Broadcasts\Jobs\ScheduleBroadcastChunkJob;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Broadcasts\Services\BroadcastRecipientResolver;
-use App\Modules\Messaging\Actions\DispatchMessageAction;
-use App\Modules\Messaging\Models\ContactPermissionInvitation;
-use App\Modules\Messaging\Models\ScheduledMessage;
-use App\Modules\Messaging\Services\MessageChannelAvailability;
+use App\Modules\Messaging\Services\BulkMessageDeliveryPolicy;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -18,168 +16,102 @@ class ScheduleBroadcastAction
 
     public function __construct(
         private readonly BroadcastRecipientResolver $recipientResolver,
-        private readonly DispatchMessageAction $dispatchMessageAction,
-        private readonly MessageChannelAvailability $messageChannelAvailability,
+        private readonly ScheduleBroadcastRecipientChunkAction $scheduleRecipientChunk,
+        private readonly BulkMessageDeliveryPolicy $bulkDeliveryPolicy,
     ) {}
 
     public function handle(Broadcast $broadcast): Broadcast
     {
         return DB::transaction(function () use ($broadcast): Broadcast {
+            $broadcast = Broadcast::query()
+                ->lockForUpdate()
+                ->findOrFail($broadcast->getKey());
+
             $sendAt = $this->resolveSendAt($broadcast);
-            $contacts = $this->recipientResolver->resolve($broadcast);
-            $scheduledRecipientCount = 0;
-            $skippedRecipientCount = 0;
-            $consentPolicy = $this->consentPolicy($broadcast);
+            $eligibleRecipientCount = $this->recipientResolver->count($broadcast);
+            $evaluatedAt = now();
 
-            foreach ($contacts as $contact) {
-                $recipient = BroadcastRecipient::query()->firstOrCreate(
-                    [
-                        'broadcast_id' => $broadcast->getKey(),
-                        'contact_id' => $contact->getKey(),
-                    ],
-                    [
-                        'status' => BroadcastRecipient::STATUS_PENDING,
-                        'scheduled_message_ids' => null,
-                        'terminal_reason' => null,
-                        'meta' => [],
-                    ],
-                );
-
-                if (! $this->messageChannelAvailability->isVisibleForSurface(
-                    channel: $broadcast->channel,
-                    surface: 'broadcasts',
-                    purpose: $broadcast->purpose,
-                    scope: $broadcast->scope,
-                )) {
-                    $recipient->forceFill([
-                        'status' => BroadcastRecipient::STATUS_SKIPPED,
-                        'scheduled_message_ids' => null,
-                        'sent_at' => null,
-                        'terminal_reason' => 'broadcast_channel_unavailable',
-                        'meta' => array_replace_recursive($recipient->meta ?? [], [
-                            'broadcast' => [
-                                'attempted_at' => now()->toISOString(),
-                                'channel' => $broadcast->channel,
-                                'purpose' => $broadcast->purpose,
-                                'scope' => $broadcast->scope,
-                                'surface' => 'broadcasts',
-                            ],
-                        ]),
-                    ])->save();
-
-                    $skippedRecipientCount++;
-
-                    continue;
-                }
-
-                $scheduledMessages = $this->dispatchMessageAction->handle(
-                    recipient: $contact,
-                    channel: $broadcast->channel,
-                    purpose: $broadcast->purpose,
-                    scope: $broadcast->scope,
-                    dispatchKeys: $broadcast->dispatch_key,
-                    payload: $broadcast->payload ?? [],
-                    context: $broadcast,
-                    triggeredAt: now(),
-                    sendAt: $sendAt,
-                    behaviorOwner: $broadcast,
-                    occurrenceKey: 'broadcast:'.$broadcast->getKey(),
-                    meta: [
-                        'queue' => $broadcast->queue,
-                        'dispatch_keys' => [$broadcast->dispatch_key],
-                        'broadcast_id' => $broadcast->getKey(),
-                        'broadcast_recipient_id' => $recipient->getKey(),
-                        'send_buffer_minutes' => self::SEND_BUFFER_MINUTES,
-                        'consent_policy' => $consentPolicy,
-                    ],
-                    definitions: [
-                        [
-                            'dispatch_key' => $broadcast->dispatch_key,
-                            'message_type' => $broadcast->message_type,
-                            'channel' => $broadcast->channel,
-                            'purpose' => $broadcast->purpose,
-                            'scope' => $broadcast->scope,
-                            'payload_class' => $broadcast->payload_class,
-                            'queue' => $broadcast->queue,
-                            'payload' => $broadcast->payload ?? [],
-                            'consent_policy' => $consentPolicy,
-                            'meta' => [
-                                'source' => 'broadcast',
-                                'broadcast_id' => $broadcast->getKey(),
-                                'consent_policy' => $consentPolicy,
-                            ],
-                        ],
-                    ],
-                );
-
-                $scheduledMessageIds = $this->scheduledMessageIds($scheduledMessages);
-
-                if ($scheduledMessageIds === []) {
-                    $recipient->forceFill([
-                        'status' => BroadcastRecipient::STATUS_SKIPPED,
-                        'scheduled_message_ids' => null,
-                        'sent_at' => null,
-                        'terminal_reason' => 'not_scheduled_by_messaging',
-                        'meta' => array_replace_recursive($recipient->meta ?? [], [
-                            'broadcast' => [
-                                'attempted_at' => now()->toISOString(),
-                            ],
-                        ]),
-                    ])->save();
-
-                    $skippedRecipientCount++;
-
-                    continue;
-                }
-
-                $recipient->forceFill([
-                    'status' => BroadcastRecipient::STATUS_SCHEDULED,
-                    'scheduled_message_ids' => $scheduledMessageIds,
-                    'sent_at' => null,
-                    'terminal_reason' => null,
-                    'meta' => array_replace_recursive($recipient->meta ?? [], [
-                        'broadcast' => [
-                            'scheduled_at' => now()->toISOString(),
+            if ($eligibleRecipientCount === 0) {
+                $broadcast->forceFill([
+                    'status' => Broadcast::STATUS_COMPLETED,
+                    'send_at' => $sendAt,
+                    'recipient_count' => 0,
+                    'scheduled_count' => 0,
+                    'completed_at' => $evaluatedAt,
+                    'meta' => array_replace_recursive($broadcast->meta ?? [], [
+                        'scheduling' => [
+                            'state' => 'complete',
+                            'evaluated_at' => $evaluatedAt->toISOString(),
+                            'outcome' => 'no_eligible_recipients',
+                            'eligible_recipient_count' => 0,
+                            'scheduled_recipient_count' => 0,
+                            'skipped_recipient_count' => 0,
                         ],
                     ]),
                 ])->save();
 
-                $scheduledRecipientCount++;
+                return $broadcast->refresh();
             }
 
-            $evaluatedAt = now();
-            $eligibleRecipientCount = $contacts->count();
-            $completedWithoutScheduledMessages = $scheduledRecipientCount === 0;
+            $this->recipientResolver->snapshot($broadcast);
 
-            $outcome = match (true) {
-                $eligibleRecipientCount === 0 => 'no_eligible_recipients',
-                $completedWithoutScheduledMessages => 'no_messages_scheduled',
-                default => 'messages_scheduled',
-            };
+            $snapshottedRecipientCount = BroadcastRecipient::query()
+                ->where('broadcast_id', $broadcast->getKey())
+                ->count();
+            $bulk = $this->bulkDeliveryPolicy->shouldChunk(
+                $snapshottedRecipientCount,
+            );
+            $bulkSettings = $bulk
+                ? $this->bulkDeliveryPolicy->snapshot()
+                : null;
+
+            $schedulingMeta = [
+                'state' => $bulk ? 'queued' : 'processing',
+                'queued_at' => $evaluatedAt->toISOString(),
+                'eligible_recipient_count' => $snapshottedRecipientCount,
+                'scheduled_recipient_count' => 0,
+                'skipped_recipient_count' => 0,
+            ];
+
+            if ($bulkSettings !== null) {
+                $schedulingMeta['bulk'] = [
+                    'enabled' => true,
+                    'queue' => $bulkSettings['queue'],
+                    'chunk_size' => $bulkSettings['chunk_size'],
+                    'release_interval_seconds' => $bulkSettings['release_interval_seconds'],
+                    'first_release_at' => $sendAt->toISOString(),
+                ];
+            }
 
             $broadcast->forceFill([
-                'status' => $completedWithoutScheduledMessages
-                    ? Broadcast::STATUS_COMPLETED
-                    : Broadcast::STATUS_SCHEDULED,
+                'status' => Broadcast::STATUS_SCHEDULED,
                 'send_at' => $sendAt,
-                'recipient_count' => $eligibleRecipientCount,
-                'scheduled_count' => $scheduledRecipientCount,
-                'completed_at' => $completedWithoutScheduledMessages
-                    ? $evaluatedAt
-                    : null,
+                'recipient_count' => $snapshottedRecipientCount,
+                'scheduled_count' => 0,
+                'completed_at' => null,
                 'meta' => array_replace_recursive($broadcast->meta ?? [], [
-                    'scheduling' => [
-                        'evaluated_at' => $evaluatedAt->toISOString(),
-                        'outcome' => $outcome,
-                        'eligible_recipient_count' => $eligibleRecipientCount,
-                        'scheduled_recipient_count' => $scheduledRecipientCount,
-                        'skipped_recipient_count' => $skippedRecipientCount,
-                    ],
+                    'scheduling' => $schedulingMeta,
                 ]),
             ])->save();
 
+            if ($bulk) {
+                ScheduleBroadcastChunkJob::dispatch(
+                    (int) $broadcast->getKey(),
+                )
+                    ->delay($sendAt)
+                    ->afterCommit()
+                    ->onQueue($bulkSettings['queue']);
+
+                return $broadcast->refresh();
+            }
+
+            $this->scheduleRecipientChunk->handle(
+                broadcastId: (int) $broadcast->getKey(),
+                bulk: false,
+            );
+
             return $broadcast->refresh();
-        });
+        }, 3);
     }
 
     private function resolveSendAt(Broadcast $broadcast): Carbon
@@ -193,40 +125,5 @@ class ScheduleBroadcastAction
         $sendAt = Carbon::parse($broadcast->send_at);
 
         return $sendAt->gt($minimumSendAt) ? $sendAt : $minimumSendAt;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function consentPolicy(Broadcast $broadcast): array
-    {
-        if ($broadcast->message_type !== Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION) {
-            return [];
-        }
-
-        if ($broadcast->channel !== ContactPermissionInvitation::CHANNEL_EMAIL) {
-            return [];
-        }
-
-        return [
-            'permission_invitation' => [
-                'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
-                'one_time' => true,
-            ],
-        ];
-    }
-
-    /**
-     * @param array<int, ScheduledMessage> $scheduledMessages
-     * @return array<int, int>
-     */
-    private function scheduledMessageIds(array $scheduledMessages): array
-    {
-        return array_values(array_filter(array_map(
-            fn (ScheduledMessage $scheduledMessage): ?int => $scheduledMessage->getKey()
-                ? (int) $scheduledMessage->getKey()
-                : null,
-            $scheduledMessages,
-        )));
     }
 }

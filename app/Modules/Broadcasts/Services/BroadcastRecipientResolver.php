@@ -7,8 +7,9 @@ use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Services\Contacts\ContactFilterResolver;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
-use App\Modules\Messaging\Models\MessageConsent;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 class BroadcastRecipientResolver
 {
@@ -17,27 +18,69 @@ class BroadcastRecipientResolver
     ) {}
 
     /**
+     * @return Builder<Contact>
+     */
+    public function query(Broadcast $broadcast): Builder
+    {
+        $query = $this->contactFilterResolver->query(
+            $broadcast->recipient_filter ?? [],
+        );
+
+        $this->applyPriorBroadcastExclusions($broadcast, $query);
+
+        if ($this->shouldExcludePermissionInvitationIneligibleContacts($broadcast)) {
+            $this->applyPermissionInvitationEligibility($query);
+        }
+
+        return $query;
+    }
+
+    /**
      * @return Collection<int, Contact>
      */
     public function resolve(Broadcast $broadcast): Collection
     {
-        $contacts = $this->contactFilterResolver->resolve($broadcast->recipient_filter ?? []);
+        return $this->query($broadcast)->get();
+    }
 
-        if ($contacts->isEmpty()) {
-            return $contacts;
-        }
+    public function count(Broadcast $broadcast): int
+    {
+        return (int) $this->query($broadcast)
+            ->reorder()
+            ->count('contacts.id');
+    }
 
-        $contacts = $this->excludePriorBroadcastRecipients($broadcast, $contacts);
+    /**
+     * Persist the current eligible recipient set without materializing the
+     * whole Contact collection in PHP. Existing rows make retries idempotent.
+     */
+    public function snapshot(Broadcast $broadcast): int
+    {
+        $now = now();
+        $source = $this->query($broadcast)
+            ->reorder()
+            ->orderBy('contacts.id')
+            ->selectRaw('? as broadcast_id', [$broadcast->getKey()])
+            ->addSelect('contacts.id as contact_id')
+            ->selectRaw('? as status', [BroadcastRecipient::STATUS_PENDING])
+            ->selectRaw('NULL as scheduled_message_ids')
+            ->selectRaw('NULL as sent_at')
+            ->selectRaw('NULL as terminal_reason')
+            ->selectRaw('NULL as meta')
+            ->selectRaw('? as created_at', [$now])
+            ->selectRaw('? as updated_at', [$now]);
 
-        if ($contacts->isEmpty()) {
-            return $contacts;
-        }
-
-        if ($this->shouldExcludePermissionInvitationIneligibleContacts($broadcast)) {
-            $contacts = $this->excludePermissionInvitationIneligibleContacts($contacts);
-        }
-
-        return $contacts->values();
+        return DB::table('broadcast_recipients')->insertOrIgnoreUsing([
+            'broadcast_id',
+            'contact_id',
+            'status',
+            'scheduled_message_ids',
+            'sent_at',
+            'terminal_reason',
+            'meta',
+            'created_at',
+            'updated_at',
+        ], $source->toBase());
     }
 
     /**
@@ -52,9 +95,14 @@ class BroadcastRecipientResolver
      */
     public function permissionInvitationPreview(Broadcast $broadcast): array
     {
-        $candidateContacts = $this->contactFilterResolver->resolve($broadcast->recipient_filter ?? []);
+        $candidateQuery = $this->contactFilterResolver->query(
+            $broadcast->recipient_filter ?? [],
+        );
+        $candidateCount = (int) (clone $candidateQuery)
+            ->reorder()
+            ->count('contacts.id');
 
-        if ($candidateContacts->isEmpty()) {
+        if ($candidateCount === 0) {
             return [
                 'imported_contacts_count' => 0,
                 'already_consented_count' => 0,
@@ -65,114 +113,103 @@ class BroadcastRecipientResolver
             ];
         }
 
-        $afterPriorBroadcastExclusions = $this->excludePriorBroadcastRecipients($broadcast, $candidateContacts);
+        $afterPriorExclusions = clone $candidateQuery;
+        $this->applyPriorBroadcastExclusions(
+            $broadcast,
+            $afterPriorExclusions,
+        );
 
-        $contactIdsWithConsent = $this->contactIdsWithMessageConsent($afterPriorBroadcastExclusions);
-        $contactIdsWithExistingInvitation = $this->contactIdsWithImportedContactEmailInvitation($afterPriorBroadcastExclusions);
-        $ineligibleContactIds = $this->uniqueIds(array_merge(
-            $contactIdsWithConsent,
-            $contactIdsWithExistingInvitation,
-        ));
+        $afterPriorCount = (int) (clone $afterPriorExclusions)
+            ->reorder()
+            ->count('contacts.id');
+
+        $alreadyConsentedCount = (int) (clone $afterPriorExclusions)
+            ->whereExists(function ($query): void {
+                $query
+                    ->selectRaw('1')
+                    ->from('message_consents')
+                    ->whereColumn('message_consents.contact_id', 'contacts.id');
+            })
+            ->reorder()
+            ->count('contacts.id');
+
+        $alreadyInvitedCount = (int) (clone $afterPriorExclusions)
+            ->whereExists(function ($query): void {
+                $query
+                    ->selectRaw('1')
+                    ->from('contact_permission_invitations')
+                    ->whereColumn('contact_permission_invitations.contact_id', 'contacts.id')
+                    ->where('contact_permission_invitations.channel', ContactPermissionInvitation::CHANNEL_EMAIL)
+                    ->where('contact_permission_invitations.source', ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT);
+            })
+            ->reorder()
+            ->count('contacts.id');
+
+        $eligibleQuery = clone $afterPriorExclusions;
+        $this->applyPermissionInvitationEligibility($eligibleQuery);
+        $eligibleCount = (int) $eligibleQuery
+            ->reorder()
+            ->count('contacts.id');
 
         return [
-            'imported_contacts_count' => $candidateContacts->count(),
-            'already_consented_count' => count($contactIdsWithConsent),
-            'already_invited_count' => count($contactIdsWithExistingInvitation),
-            'ineligible_contacts_count' => count($ineligibleContactIds),
-            'eligible_contacts_count' => max(0, $afterPriorBroadcastExclusions->count() - count($ineligibleContactIds)),
-            'excluded_by_prior_broadcast_count' => max(0, $candidateContacts->count() - $afterPriorBroadcastExclusions->count()),
+            'imported_contacts_count' => $candidateCount,
+            'already_consented_count' => $alreadyConsentedCount,
+            'already_invited_count' => $alreadyInvitedCount,
+            'ineligible_contacts_count' => max(0, $afterPriorCount - $eligibleCount),
+            'eligible_contacts_count' => $eligibleCount,
+            'excluded_by_prior_broadcast_count' => max(0, $candidateCount - $afterPriorCount),
         ];
     }
 
     /**
-     * @param Collection<int, Contact> $contacts
-     * @return Collection<int, Contact>
+     * @param Builder<Contact> $query
      */
-    private function excludePriorBroadcastRecipients(Broadcast $broadcast, Collection $contacts): Collection
-    {
+    private function applyPriorBroadcastExclusions(
+        Broadcast $broadcast,
+        Builder $query,
+    ): void {
         $recipientFilter = $broadcast->recipient_filter ?? [];
-        $exclude = is_array($recipientFilter['exclude'] ?? null) ? $recipientFilter['exclude'] : [];
+        $exclude = is_array($recipientFilter['exclude'] ?? null)
+            ? $recipientFilter['exclude']
+            : [];
 
         $broadcastIds = $this->integerValues($exclude['broadcast_ids'] ?? []);
         $statuses = $this->broadcastRecipientStatuses($exclude['statuses'] ?? []);
 
         if ($broadcastIds === [] || $statuses === []) {
-            return $contacts;
+            return;
         }
 
-        $excludedContactIds = BroadcastRecipient::query()
-            ->whereIn('broadcast_id', $broadcastIds)
-            ->whereIn('status', $statuses)
-            ->whereIn('contact_id', $contacts->modelKeys())
-            ->pluck('contact_id')
-            ->map(fn (mixed $contactId): int => (int) $contactId)
-            ->all();
-
-        if ($excludedContactIds === []) {
-            return $contacts;
-        }
-
-        return $contacts->reject(
-            fn (Contact $contact): bool => in_array($contact->getKey(), $excludedContactIds, true)
-        );
+        $query->whereNotExists(function ($subquery) use ($broadcastIds, $statuses): void {
+            $subquery
+                ->selectRaw('1')
+                ->from('broadcast_recipients as excluded_broadcast_recipients')
+                ->whereColumn('excluded_broadcast_recipients.contact_id', 'contacts.id')
+                ->whereIn('excluded_broadcast_recipients.broadcast_id', $broadcastIds)
+                ->whereIn('excluded_broadcast_recipients.status', $statuses);
+        });
     }
 
     /**
-     * @param Collection<int, Contact> $contacts
-     * @return Collection<int, Contact>
+     * @param Builder<Contact> $query
      */
-    private function excludePermissionInvitationIneligibleContacts(Collection $contacts): Collection
+    private function applyPermissionInvitationEligibility(Builder $query): void
     {
-        $ineligibleContactIds = $this->uniqueIds(array_merge(
-            $this->contactIdsWithMessageConsent($contacts),
-            $this->contactIdsWithImportedContactEmailInvitation($contacts),
-        ));
-
-        if ($ineligibleContactIds === []) {
-            return $contacts;
-        }
-
-        return $contacts->reject(
-            fn (Contact $contact): bool => in_array($contact->getKey(), $ineligibleContactIds, true)
-        );
-    }
-
-    /**
-     * @param Collection<int, Contact> $contacts
-     * @return array<int, int>
-     */
-    private function contactIdsWithMessageConsent(Collection $contacts): array
-    {
-        if ($contacts->isEmpty()) {
-            return [];
-        }
-
-        return MessageConsent::query()
-            ->whereIn('contact_id', $contacts->modelKeys())
-            ->distinct()
-            ->pluck('contact_id')
-            ->map(fn (mixed $contactId): int => (int) $contactId)
-            ->all();
-    }
-
-    /**
-     * @param Collection<int, Contact> $contacts
-     * @return array<int, int>
-     */
-    private function contactIdsWithImportedContactEmailInvitation(Collection $contacts): array
-    {
-        if ($contacts->isEmpty()) {
-            return [];
-        }
-
-        return ContactPermissionInvitation::query()
-            ->whereIn('contact_id', $contacts->modelKeys())
-            ->where('channel', ContactPermissionInvitation::CHANNEL_EMAIL)
-            ->where('source', ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT)
-            ->distinct()
-            ->pluck('contact_id')
-            ->map(fn (mixed $contactId): int => (int) $contactId)
-            ->all();
+        $query
+            ->whereNotExists(function ($subquery): void {
+                $subquery
+                    ->selectRaw('1')
+                    ->from('message_consents')
+                    ->whereColumn('message_consents.contact_id', 'contacts.id');
+            })
+            ->whereNotExists(function ($subquery): void {
+                $subquery
+                    ->selectRaw('1')
+                    ->from('contact_permission_invitations')
+                    ->whereColumn('contact_permission_invitations.contact_id', 'contacts.id')
+                    ->where('contact_permission_invitations.channel', ContactPermissionInvitation::CHANNEL_EMAIL)
+                    ->where('contact_permission_invitations.source', ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT);
+            });
     }
 
     private function shouldExcludePermissionInvitationIneligibleContacts(Broadcast $broadcast): bool
@@ -181,19 +218,11 @@ class BroadcastRecipientResolver
             && $broadcast->channel === 'email'
             && $broadcast->purpose === 'transactional'
             && $broadcast->scope === 'permission_invitation'
-            && in_array(data_get($broadcast->recipient_filter, 'type'), ['imported', 'import_batch'], true);
-    }
-
-    /**
-     * @param array<int, int> $ids
-     * @return array<int, int>
-     */
-    private function uniqueIds(array $ids): array
-    {
-        return array_values(array_unique(array_filter(
-            $ids,
-            fn (mixed $id): bool => is_int($id) && $id > 0,
-        )));
+            && in_array(
+                data_get($broadcast->recipient_filter, 'type'),
+                ['imported', 'import_batch'],
+                true,
+            );
     }
 
     /**
@@ -226,9 +255,10 @@ class BroadcastRecipientResolver
         ];
 
         return array_values(array_unique(array_filter(array_map(
-            fn (mixed $value): ?string => is_string($value) && in_array($value, $allowed, true)
-                ? $value
-                : null,
+            fn (mixed $value): ?string => is_string($value)
+                && in_array($value, $allowed, true)
+                    ? $value
+                    : null,
             $values,
         ))));
     }

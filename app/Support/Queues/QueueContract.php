@@ -6,6 +6,8 @@ use InvalidArgumentException;
 
 final class QueueContract
 {
+    public const BULK_MESSAGES = 'bulk_messages';
+
     public const QUEUES = [
         'default',
         'notifications',
@@ -14,6 +16,7 @@ final class QueueContract
         'reminders',
         'post_event',
         'marketing',
+        self::BULK_MESSAGES,
         'emails',
         'sms',
         'webinars',

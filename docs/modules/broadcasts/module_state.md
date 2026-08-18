@@ -233,9 +233,19 @@ Because a normal Broadcast is single-channel, the eventual relationship should r
 operator schedules Broadcast
     lock/validate draft
     pin MessageTemplateVersion
-    resolve Contacts from recipient_filter
-    create BroadcastRecipients
-    call Messaging public scheduling action per recipient
+    resolve the recipient query from recipient_filter
+    snapshot eligible Contacts into BroadcastRecipients
+
+small recipient set
+    schedule the snapshotted recipients immediately
+
+large recipient set
+    queue one bulk chunk job for the requested send time
+    process at most the snapshotted chunk size
+    release the next chunk only after the snapshotted interval
+
+for each processed recipient
+    call Messaging public scheduling action
     create compact ScheduledMessage with:
         recipient = Contact
         context = Broadcast
@@ -243,9 +253,15 @@ operator schedules Broadcast
         message_template_version_id = pinned Broadcast version
 ```
 
-BroadcastRecipient stores the returned ScheduledMessage FK.
+Recipient snapshotting is query-based and must not materialize the entire Contact collection in PHP. The snapshot is durable before chunk delivery begins, so later tag/filter changes do not silently alter an already scheduled Broadcast. Existing `(broadcast_id, contact_id)` uniqueness makes snapshot retry idempotent.
 
-Messaging owns consent, destination, suppression, gates, rendering, claims, retries, provider delivery, and terminal events.
+Large-send chunk size and release interval are Messaging-owned operational policy. The values are snapshotted into Broadcast scheduling metadata when scheduling begins so an in-flight Broadcast does not change behavior if process configuration is tuned later. Only one continuation chunk is queued at a time. Those producer-level chunk details remain on the Broadcast and are not duplicated onto every recipient ScheduledMessage.
+
+Bulk Broadcast deliveries use the Messaging-owned `bulk_messages` queue. Horizon isolates that queue on a dedicated supervisor while retaining the configured environment max-process value as the total worker budget across the primary and bulk supervisors. Messaging separately enforces shared provider submission limits at the send boundary, so Broadcast chunk pacing does not pretend to be the provider rate limiter.
+
+BroadcastRecipient stores the returned ScheduledMessage relationship using the current transitional ID array until the planned single-FK persistence cleanup.
+
+Messaging owns consent, destination, suppression, gates, rendering, claims, retries, provider delivery, bulk-delivery queue policy, and terminal events.
 
 Broadcasts does not create ScheduledMessages directly.
 

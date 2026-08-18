@@ -118,6 +118,11 @@ return [
         'dedupe_enabled' => true,
     ],
 
+    'bulk_delivery' => [
+        'chunk_size' => env('MESSAGING_BULK_CHUNK_SIZE', 100),
+        'release_interval_seconds' => env('MESSAGING_BULK_RELEASE_INTERVAL_SECONDS', 15),
+    ],
+
     'delivery' => [
         'claim_lease_seconds' => env('MESSAGING_DELIVERY_CLAIM_LEASE_SECONDS', 900),
         'stale_recovery_batch_size' => env('MESSAGING_DELIVERY_RECOVERY_BATCH_SIZE', 100),
@@ -126,6 +131,22 @@ return [
             300,
         ),
         'retry_backoff_seconds' => [60, 300],
+
+        'provider_rate_limits' => [
+            'cache_store' => env(
+                'MESSAGING_PROVIDER_RATE_LIMIT_CACHE_STORE',
+                env('CACHE_STORE', 'redis'),
+            ),
+            'email' => [
+                'resend' => [
+                    'enabled' => env('MESSAGING_RESEND_RATE_LIMIT_ENABLED', true),
+                    'max_requests' => env('MESSAGING_RESEND_MAX_REQUESTS_PER_SECOND', 10),
+                    'decay_seconds' => 1,
+                    'scope' => env('MESSAGING_RESEND_RATE_LIMIT_SCOPE', 'team'),
+                ],
+            ],
+            'sms' => [],
+        ],
 
         'provider_idempotency' => [
             'email' => [

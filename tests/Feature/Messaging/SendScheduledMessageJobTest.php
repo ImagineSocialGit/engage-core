@@ -22,6 +22,7 @@ use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use App\Modules\Messaging\Services\Email\EmailMessagingService;
+use App\Modules\Messaging\Services\ProviderSubmissionLimiter;
 use App\Modules\Messaging\Services\ScheduledMessageGate;
 use App\Modules\Messaging\Services\Sms\SmsMessagingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -1592,6 +1593,7 @@ Thanks.",
             emailMessagingService: app(EmailMessagingService::class),
             smsMessagingService: app(SmsMessagingService::class),
             permissionInvitationService: app(ContactPermissionInvitationService::class),
+            providerSubmissionLimiter: app(ProviderSubmissionLimiter::class),
         );
     }
 }

@@ -15,6 +15,43 @@ $supervisorQueues = is_string($configuredSupervisorQueues)
     ), static fn (string $queue): bool => $queue !== '')))
     : QueueContract::QUEUES;
 
+$primarySupervisorQueues = array_values(array_filter(
+    $supervisorQueues,
+    static fn (string $queue): bool => $queue !== QueueContract::BULK_MESSAGES,
+));
+
+$splitProcessBudget = static function (
+    mixed $totalValue,
+    mixed $bulkValue,
+    int $defaultTotal,
+    int $defaultBulk,
+): array {
+    $total = max(2, is_numeric($totalValue) ? (int) $totalValue : $defaultTotal);
+    $bulk = is_numeric($bulkValue) ? (int) $bulkValue : $defaultBulk;
+    $bulk = min($total - 1, max(1, $bulk));
+
+    return [$total - $bulk, $bulk];
+};
+
+[$productionPrimaryProcesses, $productionBulkProcesses] = $splitProcessBudget(
+    env('HORIZON_PRODUCTION_MAX_PROCESSES', 10),
+    env('HORIZON_PRODUCTION_BULK_MAX_PROCESSES', 2),
+    10,
+    2,
+);
+[$stagingPrimaryProcesses, $stagingBulkProcesses] = $splitProcessBudget(
+    env('HORIZON_STAGING_MAX_PROCESSES', 3),
+    env('HORIZON_STAGING_BULK_MAX_PROCESSES', 1),
+    3,
+    1,
+);
+[$localPrimaryProcesses, $localBulkProcesses] = $splitProcessBudget(
+    env('HORIZON_LOCAL_MAX_PROCESSES', 3),
+    env('HORIZON_LOCAL_BULK_MAX_PROCESSES', 1),
+    3,
+    1,
+);
+
 return [
 
     /*
@@ -203,19 +240,33 @@ return [
     | Queue Worker Configuration
     |--------------------------------------------------------------------------
     |
-    | QueueContract::QUEUES is the executable inventory. Environment overrides
-    | may tune the active list, but setup validation rejects drift from the
-    | registered queues before deployment.
+    | QueueContract::QUEUES is the executable inventory. Bulk message work is
+    | isolated on supervisor-bulk while supervisor-1 retains the normal queue
+    | set. The environment max-process values remain total worker budgets and
+    | are split between these supervisors. Setup validation rejects queue drift.
     |
     */
 
     'defaults' => [
         'supervisor-1' => [
             'connection' => 'redis',
-            'queue' => QueueContract::QUEUES,
+            'queue' => $primarySupervisorQueues,
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
             'maxProcesses' => env('HORIZON_MAX_PROCESSES', 1),
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => env('HORIZON_MEMORY', 128),
+            'tries' => env('HORIZON_TRIES', 1),
+            'timeout' => env('HORIZON_TIMEOUT', 60),
+            'nice' => 0,
+        ],
+        'supervisor-bulk' => [
+            'connection' => 'redis',
+            'queue' => [QueueContract::BULK_MESSAGES],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
             'maxTime' => 0,
             'maxJobs' => 0,
             'memory' => env('HORIZON_MEMORY', 128),
@@ -228,24 +279,38 @@ return [
     'environments' => [
         'production' => [
             'supervisor-1' => [
-                'maxProcesses' => env('HORIZON_PRODUCTION_MAX_PROCESSES', 10),
+                'maxProcesses' => $productionPrimaryProcesses,
                 'balanceMaxShift' => env('HORIZON_BALANCE_MAX_SHIFT', 1),
                 'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 3),
-                'queue' => $supervisorQueues,
+                'queue' => $primarySupervisorQueues,
+            ],
+            'supervisor-bulk' => [
+                'maxProcesses' => $productionBulkProcesses,
+                'balanceMaxShift' => env('HORIZON_BALANCE_MAX_SHIFT', 1),
+                'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 3),
+                'queue' => [QueueContract::BULK_MESSAGES],
             ],
         ],
 
         'staging' => [
             'supervisor-1' => [
-                'maxProcesses' => env('HORIZON_STAGING_MAX_PROCESSES', 3),
-                'queue' => $supervisorQueues,
+                'maxProcesses' => $stagingPrimaryProcesses,
+                'queue' => $primarySupervisorQueues,
+            ],
+            'supervisor-bulk' => [
+                'maxProcesses' => $stagingBulkProcesses,
+                'queue' => [QueueContract::BULK_MESSAGES],
             ],
         ],
 
         'local' => [
             'supervisor-1' => [
-                'maxProcesses' => env('HORIZON_LOCAL_MAX_PROCESSES', 3),
-                'queue' => $supervisorQueues,
+                'maxProcesses' => $localPrimaryProcesses,
+                'queue' => $primarySupervisorQueues,
+            ],
+            'supervisor-bulk' => [
+                'maxProcesses' => $localBulkProcesses,
+                'queue' => [QueueContract::BULK_MESSAGES],
             ],
         ],
     ],

@@ -60,11 +60,14 @@
 │   │   ├── Broadcasts
 │   │   │   ├── Actions
 │   │   │   │   ├── CancelBroadcastAction.php
-│   │   │   │   └── ScheduleBroadcastAction.php
+│   │   │   │   ├── ScheduleBroadcastAction.php
+│   │   │   │   └── ScheduleBroadcastRecipientChunkAction.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   │   └── BroadcastController.php
 │   │   │   ├── Data
+│   │   │   ├── Jobs
+│   │   │   │   └── ScheduleBroadcastChunkJob.php
 │   │   │   ├── Listeners
 │   │   │   │   ├── MarkBroadcastRecipientFailed.php
 │   │   │   │   ├── MarkBroadcastRecipientSent.php
@@ -629,6 +632,7 @@
 │   │   │   │   ├── ConsentRevocationRules.php
 │   │   │   │   └── MessageConsentRules.php
 │   │   │   ├── Services
+│   │   │   │   ├── BulkMessageDeliveryPolicy.php
 │   │   │   │   ├── ConditionChecker.php
 │   │   │   │   ├── Consent
 │   │   │   │   │   └── MessageConsentStateResolver.php
@@ -667,6 +671,7 @@
 │   │   │   │   ├── MessageTemplateTokenValidator.php
 │   │   │   │   ├── MessageTemplateUsageResolver.php
 │   │   │   │   ├── PhoneNumberNormalizer.php
+│   │   │   │   ├── ProviderSubmissionLimiter.php
 │   │   │   │   ├── ResolvedMessageDispatchBuilder.php
 │   │   │   │   ├── RouteAuthoringMessageTemplateEligibilityResolver.php
 │   │   │   │   ├── ScheduledMessageComponentComposer.php
@@ -1929,6 +1934,7 @@
 │   │   │   ├── RecordAutomationBehaviorOccurrenceActionTest.php
 │   │   │   └── RecordAutomationEventCorrelationEvidenceActionTest.php
 │   │   ├── Broadcasts
+│   │   │   ├── BroadcastBulkSchedulingTest.php
 │   │   │   ├── BroadcastControllerTest.php
 │   │   │   ├── BroadcastModelTest.php
 │   │   │   ├── BroadcastResolvedMessageDispatchOwnershipTest.php
@@ -2042,6 +2048,7 @@
 │   │   │   ├── LocationFoundationTest.php
 │   │   │   └── LocationNormalizationCapabilityTest.php
 │   │   ├── Messaging
+│   │   │   ├── BulkMessageDeliveryPolicyTest.php
 │   │   │   ├── CampaignVariantTemplateAssignmentResolutionTest.php
 │   │   │   ├── CanonicalMessageTemplateRuntimeCutoverTest.php
 │   │   │   ├── ConditionCheckerTest.php
@@ -2089,6 +2096,7 @@
 │   │   │   ├── MessageTemplateUsageResolverTest.php
 │   │   │   ├── MessageTemplateVersionPersistenceTest.php
 │   │   │   ├── MessagingSetupValidationContributorTest.php
+│   │   │   ├── ProviderSubmissionLimiterTest.php
 │   │   │   ├── QueueContractTest.php
 │   │   │   ├── ResolvedMessageDispatchBuilderTest.php
 │   │   │   ├── ResolvedMessageDispatchIntegrationTest.php
@@ -2295,4 +2303,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-591 directories, 1705 files
+592 directories, 1712 files

@@ -417,6 +417,42 @@ Do not create every future reminder/follow-up delivery merely because the chain 
 
 Concurrent variants may be materialized together only when the chain strategy intentionally requires them.
 
+## Bounded bulk delivery
+
+Messaging owns the operational policy for large simultaneous recipient work. Bulk producers must not translate an arbitrarily large recipient set into an arbitrarily large set of ready or delayed delivery jobs in one request/transaction.
+
+Current policy:
+
+```text
+small recipient set
+    normal scheduling path
+
+large recipient set
+    durable owner-module recipient snapshot
+    one bulk producer job at the requested send time
+    at most bulk_delivery.chunk_size recipients per chunk
+    one continuation producer released after bulk_delivery.release_interval_seconds
+    resulting ScheduledMessages use bulk_messages
+```
+
+`messaging.bulk_delivery.chunk_size` and `messaging.bulk_delivery.release_interval_seconds` are root/process configuration, not client campaign content. A producing module may snapshot those values into its durable execution record so an in-flight operation is stable across later configuration changes.
+
+`bulk_messages` is an executable Messaging queue isolated from the primary Horizon queue set. Horizon's environment max-process setting remains the total worker budget: the bulk reservation is carved out of that budget rather than added on top of it. This prevents bulk marketing work from consuming every worker needed for transactional, reminder, webhook, or notification traffic.
+
+Broadcasts is the first producer using this seam. Campaign enrollment/runtime cutover should reuse the same bulk policy rather than introducing Campaign-specific chunk constants.
+
+Bulk producer pacing is not the provider rate limit. Before a real provider submission begins, `SendScheduledMessageJob` acquires a slot from `ProviderSubmissionLimiter`. Configured provider limits are shared by all workers that use the same cache store/scope. Deployed environments should keep that limiter Redis-backed so parallel Horizon workers coordinate one provider-wide allowance instead of each assuming its own capacity.
+
+The initial Resend configuration uses the provider's normal per-team requests-per-second limit as a configurable default. The environment value must be updated if the Resend team has a different account limit. Other providers are inert until they receive an explicit Messaging-owned limit definition.
+
+This coordination is only global across workers/processes that share the configured limiter cache namespace. If multiple separate deployments share one Resend team but do not share that Redis-backed limiter namespace, they must divide the team allowance between deployments or move them behind a shared limiter rather than each claiming the full team limit.
+
+The limiter waits inside the claimed job before `provider_submission_started_at` is recorded. It does not release the queue job and therefore does not consume `SendScheduledMessageJob`'s provider retry attempt budget.
+
+Bulk timing/chunk settings belong on the durable producer execution record (for Broadcasts, `Broadcast.meta.scheduling.bulk`). They must not be copied onto every recipient ScheduledMessage merely for diagnostics; ScheduledMessage metadata stays limited to delivery-relevant identity/differences.
+
+This layer preserves the existing delivery-attempt and provider-idempotency semantics.
+
 ## Scheduled-message persistence contract
 
 ### `scheduled_messages`
