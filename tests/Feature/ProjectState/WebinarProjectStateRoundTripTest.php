@@ -31,7 +31,7 @@ class WebinarProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(11, $document['version']);
+        $this->assertSame((int) config('project_state.version'), $document['version']);
         $this->assertCount(
             1,
             $document['sections']['webinars']['tables']['webinar_schedule_profiles'],

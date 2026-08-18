@@ -24,6 +24,13 @@ return new class extends Migration
                 ->constrained()
                 ->nullOnDelete();
 
+            // Logical Messaging bridge only. The MessageChain runtime tables are
+            // created by later Messaging migrations, so the original June Campaigns
+            // migration cannot safely add a physical cross-module foreign key here.
+            $table->unsignedBigInteger('message_chain_enrollment_id')
+                ->nullable()
+                ->unique();
+
             $table->string('source_type', 120)->nullable();
             $table->unsignedBigInteger('source_id')->nullable();
 

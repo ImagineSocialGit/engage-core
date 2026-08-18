@@ -35,7 +35,8 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(11, $document['version']);
+        $this->assertSame((int) config('project_state.version'), $document['version']);
+        $this->assertSame((int) config('project_state.sections.campaigns.version'), $document['sections']['campaigns']['version']);
         $this->assertCount(1, $document['sections']['campaigns']['tables']['campaigns']);
         $this->assertCount(1, $document['sections']['campaigns']['tables']['campaign_steps']);
         $this->assertCount(1, $document['sections']['campaigns']['tables']['campaign_step_variants']);
@@ -72,6 +73,7 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             'key' => 'production_nurture',
             'name' => 'Production nurture',
             'status' => 'active',
+            'message_chain_id' => 400,
             'is_customized' => true,
         ]);
         $this->assertDatabaseHas('campaign_steps', [
@@ -88,10 +90,16 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             'name' => 'Production email',
             'is_customized' => true,
         ]);
+        $this->assertDatabaseHas('message_chain_enrollments', [
+            'id' => 320,
+            'message_chain_version_id' => 401,
+            'status' => 'completed',
+        ]);
         $this->assertDatabaseHas('campaign_enrollments', [
             'id' => 120,
             'contact_id' => 60,
             'campaign_id' => 200,
+            'message_chain_enrollment_id' => 320,
             'current_campaign_step_id' => 210,
             'last_scheduled_message_id' => 130,
             'status' => 'paused',
@@ -172,6 +180,11 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
         $resume->resume(ProjectStateResumeManager::CATEGORY_BROADCASTS);
         $resume->resume(ProjectStateResumeManager::CATEGORY_SCHEDULED_MESSAGES);
 
+        $this->assertDatabaseHas('message_chain_enrollments', [
+            'id' => 320,
+            'message_chain_version_id' => 401,
+            'status' => 'completed',
+        ]);
         $this->assertDatabaseHas('campaign_enrollments', [
             'id' => 120,
             'status' => 'active',
@@ -254,11 +267,67 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             'updated_at' => $now,
         ]);
 
+        DB::table('message_chains')->insert([
+            'id' => 300,
+            'key' => 'production_campaign_chain',
+            'name' => 'Production campaign chain',
+            'description' => 'Source chain selected by the production Campaign.',
+            'status' => 'active',
+            'current_version_id' => null,
+            'source' => 'project_state_test',
+            'source_version' => '1',
+            'is_customized' => true,
+            'customized_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        DB::table('message_chain_versions')->insert([
+            'id' => 301,
+            'message_chain_id' => 300,
+            'version' => 1,
+            'exit_conditions' => json_encode([]),
+            'content_hash' => hash('sha256', 'production-campaign-chain-v1'),
+            'published_at' => $now,
+            'created_by' => null,
+            'created_at' => $now,
+        ]);
+
+        DB::table('message_chains')
+            ->where('id', 300)
+            ->update(['current_version_id' => 301]);
+
+        DB::table('message_chain_enrollments')->insert([
+            'id' => 320,
+            'message_chain_version_id' => 301,
+            'recipient_type' => Contact::class,
+            'recipient_id' => 60,
+            'context_type' => null,
+            'context_id' => null,
+            'origin_type' => null,
+            'origin_id' => null,
+            'surface' => 'campaigns',
+            'current_message_chain_step_id' => null,
+            'next_action_at' => null,
+            'status' => 'completed',
+            'dedupe_key' => 'project-state-campaign-chain-enrollment',
+            'started_at' => $now,
+            'paused_at' => null,
+            'resumed_at' => null,
+            'exited_at' => null,
+            'exit_reason_code' => null,
+            'completed_at' => $now,
+            'cancelled_at' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
         DB::table('campaigns')->insert([
             'id' => 100,
             'key' => 'production_nurture',
             'name' => 'Production nurture',
             'description' => 'Customized production Campaign.',
+            'message_chain_id' => 300,
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'campaign',
@@ -353,6 +422,7 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             'id' => 120,
             'contact_id' => 60,
             'campaign_id' => 100,
+            'message_chain_enrollment_id' => 320,
             'source_type' => null,
             'source_id' => null,
             'campaign_key' => 'production_nurture',
@@ -419,18 +489,53 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
         DB::table('broadcasts')->delete();
         DB::table('campaign_enrollments')->delete();
         DB::table('scheduled_messages')->delete();
+        DB::table('message_chain_enrollments')->delete();
         DB::table('campaign_step_variants')->delete();
         DB::table('campaign_steps')->delete();
         DB::table('campaigns')->delete();
+        DB::table('message_chains')->update(['current_version_id' => null]);
+        DB::table('message_chain_versions')->delete();
+        DB::table('message_chains')->delete();
         DB::table('contacts')->delete();
 
         $now = now()->startOfSecond();
+
+        DB::table('message_chains')->insert([
+            'id' => 400,
+            'key' => 'production_campaign_chain',
+            'name' => 'Fresh preset campaign chain',
+            'description' => null,
+            'status' => 'active',
+            'current_version_id' => null,
+            'source' => 'project_state_test',
+            'source_version' => '2',
+            'is_customized' => false,
+            'customized_at' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        DB::table('message_chain_versions')->insert([
+            'id' => 401,
+            'message_chain_id' => 400,
+            'version' => 1,
+            'exit_conditions' => json_encode([]),
+            'content_hash' => hash('sha256', 'fresh-preset-campaign-chain-v1'),
+            'published_at' => $now,
+            'created_by' => null,
+            'created_at' => $now,
+        ]);
+
+        DB::table('message_chains')
+            ->where('id', 400)
+            ->update(['current_version_id' => 401]);
 
         DB::table('campaigns')->insert([
             'id' => 200,
             'key' => 'production_nurture',
             'name' => 'Fresh preset nurture',
             'description' => null,
+            'message_chain_id' => 400,
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'campaign',

@@ -1936,6 +1936,7 @@
 │   │   │   ├── MarkBroadcastRecipientTerminalStatusTest.php
 │   │   │   └── ScheduleBroadcastActionTest.php
 │   │   ├── Campaigns
+│   │   │   ├── CampaignMessageChainBridgeTest.php
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
 │   │   │   ├── CampaignScheduledMessageTerminalReconciliationTest.php
 │   │   │   ├── CampaignsSetupValidationContributorTest.php
@@ -2292,4 +2293,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-591 directories, 1702 files
+591 directories, 1703 files

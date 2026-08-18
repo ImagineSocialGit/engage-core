@@ -16,6 +16,13 @@ return new class extends Migration
             $table->string('name');
             $table->text('description')->nullable();
 
+            // Logical Messaging bridge only. The MessageChain tables are created by
+            // later Messaging migrations, so the original June Campaigns migration
+            // cannot safely add a physical cross-module foreign key here.
+            $table->unsignedBigInteger('message_chain_id')
+                ->nullable()
+                ->index();
+
             $table->string('channel', 32)->index();
             $table->string('purpose', 32)->index();
             $table->string('scope', 120)->index();

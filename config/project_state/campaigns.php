@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 1,
+    'version' => 2,
     'tables' => [
         'campaigns' => [
             'mode' => 'upsert',
@@ -13,6 +13,7 @@ return [
                 'key',
                 'name',
                 'description',
+                'message_chain_id',
                 'channel',
                 'purpose',
                 'scope',
@@ -25,6 +26,9 @@ return [
                 'updated_at',
             ],
             'json_columns' => ['meta'],
+            'references' => [
+                'message_chain_id' => 'message_chains',
+            ],
         ],
 
         'campaign_steps' => [
@@ -110,6 +114,7 @@ return [
                 'id',
                 'contact_id',
                 'campaign_id',
+                'message_chain_enrollment_id',
                 'source_type',
                 'source_id',
                 'campaign_key',
@@ -139,6 +144,7 @@ return [
             'references' => [
                 'contact_id' => 'contacts',
                 'campaign_id' => 'campaigns',
+                'message_chain_enrollment_id' => 'message_chain_enrollments',
                 'current_campaign_step_id' => 'campaign_steps',
                 'last_scheduled_message_id' => 'scheduled_messages',
             ],

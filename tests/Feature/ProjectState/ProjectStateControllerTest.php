@@ -180,7 +180,7 @@ class ProjectStateControllerTest extends TestCase
         );
 
         $this->assertSame('engage-core-project-state', $document['format']);
-        $this->assertSame(11, $document['version']);
+        $this->assertSame((int) config('project_state.version'), $document['version']);
         $this->assertSame('test-client', $document['client_key']);
         $this->assertStringStartsWith('sha256:', $document['checksum']);
 

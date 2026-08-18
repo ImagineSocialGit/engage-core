@@ -30,7 +30,7 @@ class AutomationOpportunitiesProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(11, $document['version']);
+        $this->assertSame((int) config('project_state.version'), $document['version']);
         $this->assertCount(
             5,
             $document['sections']['automation_opportunities']['tables']['automation_behavior_occurrences'],

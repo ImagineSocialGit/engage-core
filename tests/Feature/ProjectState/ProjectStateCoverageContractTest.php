@@ -202,7 +202,7 @@ class ProjectStateCoverageContractTest extends TestCase
 
         $document = app(ProjectStateManager::class)->export();
 
-        $this->assertSame(11, $document['version']);
+        $this->assertSame((int) config('project_state.version'), $document['version']);
         $this->assertArrayNotHasKey(
             'inbound_message_receipts',
             $document['sections']['core']['tables'],

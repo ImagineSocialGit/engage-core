@@ -2,10 +2,12 @@
 
 namespace App\Modules\Campaigns\Models;
 
+use App\Modules\Messaging\Models\MessageChain;
 use Database\Factories\CampaignFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Campaign extends Model
@@ -25,6 +27,7 @@ class Campaign extends Model
         'key',
         'name',
         'description',
+        'message_chain_id',
         'channel',
         'purpose',
         'scope',
@@ -38,10 +41,16 @@ class Campaign extends Model
     protected function casts(): array
     {
         return [
+            'message_chain_id' => 'integer',
             'is_customized' => 'boolean',
             'customized_at' => 'datetime',
             'meta' => 'array',
         ];
+    }
+
+    public function messageChain(): BelongsTo
+    {
+        return $this->belongsTo(MessageChain::class);
     }
 
     public function steps(): HasMany

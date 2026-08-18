@@ -12,9 +12,9 @@ Messaging owns reusable MessageChains and MessageChainEnrollments.
 Campaigns references a MessageChain rather than duplicating a second chain engine.
 ```
 
-The shared Messaging foundation required for that future migration is now implemented. Campaigns already consumes immutable ScheduledMessage terminal results through the durable outbox/attempt contract and does not copy provider-attempt state.
+The shared Messaging foundation required for that migration is implemented. The persistence bridge is now also present: `campaigns.message_chain_id` selects the stable Messaging chain identity and `campaign_enrollments.message_chain_enrollment_id` can link the Campaign wrapper to generic Messaging progression. Both bridge columns remain nullable while the legacy Campaign progression engine is still active.
 
-Campaign-specific migration to MessageChains remains a separate future refactor; it is not unfinished 15B terminal-persistence work.
+The runtime cutover remains incremental. Campaigns still consumes immutable ScheduledMessage terminal results through the durable outbox/attempt contract and does not copy provider-attempt state; new enrollments are not switched to MessageChainEnrollment until the Messaging dependency/cancellation parity work is complete.
 
 ## Responsibility
 

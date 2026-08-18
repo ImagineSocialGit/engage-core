@@ -79,7 +79,7 @@ class ReportingProjectStateRoundTripTest extends TestCase
         $manager = app(ProjectStateManager::class);
         $document = $manager->export();
 
-        $this->assertSame(11, $document['version']);
+        $this->assertSame((int) config('project_state.version'), $document['version']);
         $this->assertArrayHasKey('reporting', $document['sections']);
         $this->assertSame(2, $document['sections']['reporting']['version']);
         $this->assertCount(
@@ -154,7 +154,7 @@ class ReportingProjectStateRoundTripTest extends TestCase
         );
     }
 
-    public function test_optional_reporting_section_may_be_absent_from_a_version_eleven_source_document(): void
+    public function test_optional_reporting_section_may_be_absent_from_a_current_source_document(): void
     {
         $manager = app(ProjectStateManager::class);
         $document = $manager->export();

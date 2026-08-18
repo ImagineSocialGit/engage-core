@@ -29,7 +29,7 @@ class InternalNotificationsProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(11, $document['version']);
+        $this->assertSame((int) config('project_state.version'), $document['version']);
         $this->assertCount(
             1,
             $document['sections']['internal_notifications']['tables']['team_members'],

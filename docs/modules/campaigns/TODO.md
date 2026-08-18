@@ -4,12 +4,14 @@ Work these in order. Keep Campaigns independent from FlowRoutes, Webinars, Forms
 
 ## 1. Runtime cutover first
 
+- [x] Add the nullable Campaign -> MessageChain and CampaignEnrollment -> MessageChainEnrollment schema/model bridge while preserving the legacy runtime during cutover.
 - [ ] Migrate Campaigns fully to Messaging MessageChains while preserving Campaign identity, activation, audience/enrollment intent, source context, and reporting.
 - [ ] Add/select the Campaign -> MessageChain relationship and make new Campaign enrollments create a thin CampaignEnrollment wrapper around a version-pinned MessageChainEnrollment.
 - [ ] Move current Campaign step/variant timing, channel strategy, dependencies, and generic progression into Messaging-owned MessageChain definitions/runtime.
 - [ ] Update Campaign cancellation/deactivation to use Messaging public chain-enrollment cancellation/skip actions.
 - [ ] Replace Campaign-owned step/variant progression fields only after every runtime reader and Project State path uses the MessageChain relationship.
 - [ ] Preserve current operational lifecycle semantics: Off cancels open work and skips pending messages; turning back on permits future enrollments only and never resurrects cancelled journeys.
+- [ ] Before bulk Campaign enrollment is switched to MessageChain runtime, use the shared Messaging/system bulk-dispatch backpressure path so a large audience does not synchronously create thousands of chain/send jobs from one request or one giant database transaction.
 
 ## 2. Campaign lifecycle and launch safety
 

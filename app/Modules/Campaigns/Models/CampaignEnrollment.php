@@ -3,6 +3,7 @@
 namespace App\Modules\Campaigns\Models;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -25,6 +26,7 @@ class CampaignEnrollment extends Model
     protected $fillable = [
         'contact_id',
         'campaign_id',
+        'message_chain_enrollment_id',
         'source_type',
         'source_id',
         'campaign_key',
@@ -50,6 +52,7 @@ class CampaignEnrollment extends Model
         return [
             'contact_id' => 'integer',
             'campaign_id' => 'integer',
+            'message_chain_enrollment_id' => 'integer',
             'source_id' => 'integer',
             'current_step' => 'integer',
             'current_campaign_step_id' => 'integer',
@@ -74,6 +77,11 @@ class CampaignEnrollment extends Model
     public function campaign(): BelongsTo
     {
         return $this->belongsTo(Campaign::class);
+    }
+
+    public function messageChainEnrollment(): BelongsTo
+    {
+        return $this->belongsTo(MessageChainEnrollment::class);
     }
 
     public function currentCampaignStep(): BelongsTo

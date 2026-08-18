@@ -1,6 +1,7 @@
 # Messaging TODO
 
 - [ ] Add production-shaped row-size, index-plan, retention, and pruning measurements for the immutable template/chain/delivery persistence model.
+- [ ] Add provider-aware bulk delivery orchestration/backpressure for large Campaign/Broadcast audiences: bounded recipient/enrollment chunks, bounded queue fan-out/replenishment, idempotent retries, provider/channel pacing, and production-shaped proof that a roughly 2,000-recipient burst does not create one giant transaction or an uncontrolled immediate job flood.
 - [ ] Add a safer first-class owning-module reissue/recovery mechanism for exact skipped/failed logical deliveries; do not bypass normal consent/suppression/provider gates.
 - [ ] Add dedicated `Messaging -> Opt-In Messages` management separate from ordinary module message-template pages.
 - [ ] Make readiness presentation aware of the actual delivery/consolidation/fallback path rather than treating one template row as the complete outcome.

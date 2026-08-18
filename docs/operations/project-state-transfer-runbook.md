@@ -18,7 +18,7 @@ Developer contract changes belong in [`../project-state-extension-guide.md`](../
 
 ```text
 format: engage-core-project-state
-version: 11
+version: authoritative current value in config/project_state.php
 ```
 
 The current implementation has 13 dependency-ordered section contracts and transfers 62 tables when the optional Reporting schema is installed; otherwise the Reporting section is omitted. A current-version export produced without Reporting may be imported into a Reporting-enabled target with that optional section absent; the target applies no Reporting rows. An export that does contain retained Reporting history is rejected if the target Reporting schema is absent. It explicitly classifies 53 excluded tables.
@@ -262,7 +262,7 @@ Confirm:
 
 ```text
 format = engage-core-project-state
-version = 11
+version = current project_state.version from config/project_state.php
 client_key = expected selected client
 source.environment = expected source environment
 source.database = expected source database

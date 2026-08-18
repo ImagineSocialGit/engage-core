@@ -12,7 +12,7 @@ This guide is for developers extending the Project State contract. Operators sho
 
 ```text
 format: engage-core-project-state
-version: 11
+version: authoritative current value in config/project_state.php
 ```
 
 The application accepts only the current root format version and the current version of every configured section. It does not contain in-application translators for older exports.
@@ -664,6 +664,10 @@ Bump the owning section version when its serialized table contract or import sem
 Bump the root version when a previously exported full document is no longer directly accepted or would restore different meaning.
 
 For the current implementation, most section contract changes that make prior files incompatible should also bump the root version because the application has no embedded translation layer.
+
+Current-contract tests must derive the expected root and section versions from the authoritative Project State config instead of copying the current numeric version into each assertion. Explicit numeric versions belong only in tests that intentionally exercise an older, newer, or otherwise incompatible document contract. This keeps a legitimate version bump localized to the executable contract rather than creating mechanical edits across unrelated round-trip tests.
+
+Durable docs should follow the same rule: point to `config/project_state.php` for the current numeric version unless a historical version number is itself the subject being documented.
 
 ### Do not bump versions for
 
