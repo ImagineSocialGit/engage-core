@@ -20,10 +20,10 @@
     @endphp
 
     <div class="space-y-6" data-scheduling-configuration>
-        <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <a
                 href="{{ route('crm.scheduling.index') }}"
-                class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                class="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto"
                 data-scheduling-configuration-back
             >
                 Back to Scheduling
@@ -51,7 +51,7 @@
         @endif
 
         <x-ui.card>
-            <div class="flex flex-wrap items-center justify-between gap-4" data-scheduling-resource-configuration-link>
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between" data-scheduling-resource-configuration-link>
                 <div>
                     <p class="text-sm font-semibold text-slate-900">Selective-overlap resources</p>
                     <p class="mt-1 text-sm text-slate-500">
@@ -61,7 +61,7 @@
 
                 <a
                     href="{{ route('crm.scheduling.configuration.resources.index') }}"
-                    class="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                    class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
                 >
                     Manage resources
                 </a>
@@ -69,7 +69,7 @@
         </x-ui.card>
 
         <x-ui.card>
-            <div class="flex flex-wrap items-center justify-between gap-4" data-scheduling-availability-configuration-link>
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between" data-scheduling-availability-configuration-link>
                 <div>
                     <p class="text-sm font-semibold text-slate-900">Availability and blackout rules</p>
                     <p class="mt-1 text-sm text-slate-500">
@@ -79,7 +79,7 @@
 
                 <a
                     href="{{ route('crm.scheduling.configuration.availability.index') }}"
-                    class="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                    class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
                 >
                     Manage availability
                 </a>
@@ -193,7 +193,7 @@
                     </label>
 
                     <div class="md:col-span-2 xl:col-span-4">
-                        <button type="submit" class="inline-flex rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">
+                        <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
                             Create host
                         </button>
                     </div>
@@ -211,7 +211,7 @@
                         data-crm-editable="{{ $hostEditable ? '1' : '0' }}"
                     >
                         <x-ui.card class="space-y-4">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h3 class="font-semibold text-slate-900">{{ $host->name }}</h3>
                                 <p class="mt-1 font-mono text-xs text-slate-500">{{ $host->key }}</p>
@@ -221,7 +221,7 @@
                             </span>
                         </div>
 
-                        <dl class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                        <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-4">
                             <div>
                                 <dt class="text-slate-500">Source</dt>
                                 <dd class="font-medium text-slate-900">{{ $host->source }}</dd>
@@ -300,7 +300,7 @@
                                 </label>
 
                                 <div class="self-end">
-                                    <button type="submit" class="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+                                    <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto">
                                         Save host
                                     </button>
                                 </div>
@@ -505,14 +505,14 @@
                         Customer-site services collect the service address from each booking. Only the optional label and instructions are stored on the service.
                     </p>
 
-                    <div class="flex flex-wrap gap-5 md:col-span-2 xl:col-span-4">
-                        <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-5 md:col-span-2 xl:col-span-4">
+                        <label class="inline-flex items-start gap-2 text-sm font-medium text-slate-700">
                             <input type="hidden" name="requires_confirmation" value="0">
                             <input type="checkbox" name="requires_confirmation" value="1" @checked(old('requires_confirmation'))>
                             Requires confirmation
                         </label>
 
-                        <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                        <label class="inline-flex items-start gap-2 text-sm font-medium text-slate-700">
                             <input type="hidden" name="is_public" value="0">
                             <input type="checkbox" name="is_public" value="1" @checked(old('is_public'))>
                             Publicly bookable
@@ -520,7 +520,7 @@
                     </div>
 
                     <div class="md:col-span-2 xl:col-span-4">
-                        <button type="submit" class="inline-flex rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">
+                        <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
                             Create service
                         </button>
                     </div>
@@ -541,7 +541,7 @@
                         data-crm-editable="{{ $serviceEditable ? '1' : '0' }}"
                     >
                         <x-ui.card class="space-y-5">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h3 class="font-semibold text-slate-900">{{ $service->name }}</h3>
                                 <p class="mt-1 font-mono text-xs text-slate-500">{{ $service->key }}</p>
@@ -551,7 +551,7 @@
                             </span>
                         </div>
 
-                        <dl class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
+                        <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
                             <div>
                                 <dt class="text-slate-500">Source</dt>
                                 <dd class="font-medium text-slate-900">{{ $service->source }}</dd>
@@ -749,14 +749,14 @@
                                         Customer-site services collect the service address from each booking. Only the optional label and instructions are stored on the service.
                                     </p>
 
-                                    <div class="flex flex-wrap gap-5 md:col-span-2 xl:col-span-4">
-                                        <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                                    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-5 md:col-span-2 xl:col-span-4">
+                                        <label class="inline-flex items-start gap-2 text-sm font-medium text-slate-700">
                                             <input type="hidden" name="requires_confirmation" value="0">
                                             <input type="checkbox" name="requires_confirmation" value="1" @checked($service->requires_confirmation)>
                                             Requires confirmation
                                         </label>
 
-                                        <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                                        <label class="inline-flex items-start gap-2 text-sm font-medium text-slate-700">
                                             <input type="hidden" name="is_public" value="0">
                                             <input type="checkbox" name="is_public" value="1" @checked($service->is_public)>
                                             Publicly bookable
@@ -764,7 +764,7 @@
                                     </div>
 
                                     <div class="md:col-span-2 xl:col-span-4">
-                                        <button type="submit" class="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+                                        <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto">
                                             Save service
                                         </button>
                                     </div>
@@ -799,7 +799,7 @@
                                             <div>
                                                 <input type="hidden" name="assignments[{{ $loop->index }}][scheduling_host_id]" value="{{ $host->id }}">
                                                 <input type="hidden" name="assignments[{{ $loop->index }}][is_active]" value="0">
-                                                <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-900">
+                                                <label class="inline-flex items-start gap-2 text-sm font-medium text-slate-900">
                                                     <input
                                                         type="checkbox"
                                                         name="assignments[{{ $loop->index }}][is_active]"
@@ -848,7 +848,7 @@
                                         </div>
                                     @endforelse
 
-                                    <button type="submit" class="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+                                    <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto">
                                         Save assignments
                                     </button>
                                 </form>

@@ -25,10 +25,10 @@
     @endphp
 
     <div class="space-y-6" data-scheduling-availability-configuration>
-        <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <a
                 href="{{ route('crm.scheduling.configuration.index') }}"
-                class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                class="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto"
                 data-scheduling-availability-back
             >
                 Back to configuration
@@ -201,7 +201,7 @@
                 </label>
 
                 <div class="md:col-span-2 xl:col-span-4">
-                    <button type="submit" class="inline-flex rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">
+                    <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
                         Create rule
                     </button>
                 </div>
@@ -234,7 +234,7 @@
                         data-availability-archived="0"
                     >
                         <x-ui.card class="space-y-4">
-                            <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                     <h3 class="font-semibold text-slate-900">
                                         {{ $window->is_available ? 'Available' : 'Blackout' }} · {{ $scopeOptions[$scope] ?? $scope }}
@@ -251,7 +251,7 @@
                                 </span>
                             </div>
 
-                            <dl class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                            <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-4">
                                 <div>
                                     <dt class="text-slate-500">Shape</dt>
                                     <dd class="font-medium text-slate-900">{{ $shape }}</dd>
@@ -374,7 +374,7 @@
                                         </label>
 
                                         <div class="md:col-span-2">
-                                            <button type="submit" class="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+                                            <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto">
                                                 Save rule
                                             </button>
                                         </div>
@@ -449,13 +449,13 @@
                 </label>
 
                 <div class="md:col-span-3">
-                    <button type="submit" class="inline-flex rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">Resolve slots</button>
+                    <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">Resolve slots</button>
                 </div>
             </form>
 
             @if ($previewService)
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <table class="min-w-[720px] divide-y divide-slate-200 text-sm">
                         <thead>
                             <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <th class="px-3 py-2">Local time</th>
@@ -512,7 +512,7 @@
                         data-availability-archived="1"
                     >
                         <x-ui.card class="space-y-4">
-                            <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                     <h3 class="font-semibold text-slate-900">
                                         {{ $window->is_available ? 'Available' : 'Blackout' }} · {{ $scopeOptions[$scope] ?? $scope }}
@@ -535,7 +535,7 @@
                                 >
                                     @csrf
                                     <input type="hidden" name="current_version" value="{{ $window->updated_at?->toISOString() }}">
-                                    <button type="submit" class="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">Restore rule</button>
+                                    <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto">Restore rule</button>
                                 </form>
                             @else
                                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-4" data-availability-read-only="{{ $window->id }}">

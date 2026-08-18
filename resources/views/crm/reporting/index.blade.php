@@ -20,7 +20,7 @@
 
     <div class="space-y-6">
         <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
-            <div class="p-6 sm:p-8">
+            <div class="p-5 sm:p-8">
                 <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <p class="text-sm font-semibold uppercase tracking-[0.16em] text-slate-600">
@@ -36,30 +36,30 @@
 
                     <div>
                         <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Date range</p>
-                        <div class="mt-2 flex flex-wrap gap-2">
+                        <div class="mt-2 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
                             @foreach($rangeOptions as $rangeDays)
                                 <a
                                     href="{{ route('crm.reporting.index', ['days' => $rangeDays]) }}"
-                                    class="inline-flex min-h-10 items-center justify-center rounded-xl px-4 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 {{ $report['range']['days'] === $rangeDays ? 'bg-slate-950 text-white' : 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-100' }}"
+                                    class="inline-flex min-h-10 w-full items-center justify-center rounded-xl px-3 text-sm font-semibold transition sm:w-auto sm:px-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 {{ $report['range']['days'] === $rangeDays ? 'bg-slate-950 text-white' : 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-100' }}"
                                 >
                                     {{ $rangeDays }} days
                                 </a>
                             @endforeach
                         </div>
-                        <div class="mt-3 flex flex-wrap items-center gap-4">
+                        <div class="mt-3 grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-4">
                             <a
                                 href="{{ route('crm.reporting.imports.create') }}"
-                                class="inline-flex text-sm font-semibold text-slate-700 hover:text-slate-950 hover:underline"
+                                class="inline-flex w-full text-sm font-semibold text-slate-700 hover:text-slate-950 hover:underline sm:w-auto"
                             >
                                 Import ad platform report
                             </a>
 
-                            <form method="POST" action="{{ route('crm.reporting.refresh') }}">
+                            <form method="POST" action="{{ route('crm.reporting.refresh') }}" class="w-full sm:w-auto">
                                 @csrf
                                 <input type="hidden" name="days" value="{{ $report['range']['days'] }}">
                                 <button
                                     type="submit"
-                                    class="inline-flex text-sm font-semibold text-slate-700 hover:text-slate-950 hover:underline"
+                                    class="inline-flex w-full text-left text-sm font-semibold text-slate-700 hover:text-slate-950 hover:underline sm:w-auto"
                                 >
                                     Refresh recent data
                                 </button>
@@ -87,14 +87,14 @@
                 $primaryDecision = $decisionSummary['primary'];
             @endphp
             <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
-                <div class="border-b border-slate-100 p-6 sm:p-8">
+                <div class="border-b border-slate-100 p-5 sm:p-8">
                     <h2 class="text-xl font-semibold tracking-tight text-slate-950">What to look at first</h2>
                     <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
                         Reporting prioritizes the strongest observed signal, shows the population behind the numbers, and keeps attribution limits visible. These are investigation priorities, not claims about causation.
                     </p>
                 </div>
 
-                <div class="grid gap-4 p-6 sm:p-8 lg:grid-cols-3">
+                <div class="grid gap-4 p-5 sm:p-8 lg:grid-cols-3">
                     <article class="rounded-2xl border p-5 lg:col-span-2 {{ $toneClasses[$primaryDecision['tone']] ?? $toneClasses['neutral'] }}">
                         <div class="text-xs font-bold uppercase tracking-wide opacity-70">{{ $primaryDecision['label'] }}</div>
                         <h3 class="mt-2 text-lg font-semibold">{{ $primaryDecision['title'] }}</h3>
@@ -124,7 +124,7 @@
                 </div>
 
                 @if($report['supporting_signals'] !== [])
-                    <div class="border-t border-slate-100 p-6 sm:p-8">
+                    <div class="border-t border-slate-100 p-5 sm:p-8">
                         <h3 class="font-semibold text-slate-950">Supporting signals</h3>
                         <div class="mt-4 grid gap-3 sm:grid-cols-2">
                             @foreach($report['supporting_signals'] as $insight)
@@ -145,7 +145,7 @@
                 $comparisons = $report['performance_comparisons'];
             @endphp
             <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
-                <div class="border-b border-slate-100 p-6 sm:p-8">
+                <div class="border-b border-slate-100 p-5 sm:p-8">
                     <h2 class="text-xl font-semibold tracking-tight text-slate-950">What performs differently</h2>
                     <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
                         These are directional first-party comparisons, not causal conclusions or statistical-significance claims. A variant must have at least {{ number_format((int) $comparisons['minimum_likely_human_sessions']) }} likely-human landing sessions before Reporting will rank its registration conversion.
@@ -153,7 +153,7 @@
                 </div>
 
                 @if($comparisons['highlights'] === [])
-                    <div class="p-6 sm:p-8">
+                    <div class="p-5 sm:p-8">
                         <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                             <h3 class="font-semibold text-slate-950">More comparable traffic is needed</h3>
                             <p class="mt-2 text-sm leading-6 text-slate-700">
@@ -162,7 +162,7 @@
                         </div>
                     </div>
                 @else
-                    <div class="grid gap-4 p-6 sm:p-8 lg:grid-cols-2">
+                    <div class="grid gap-4 p-5 sm:p-8 lg:grid-cols-2">
                         @foreach($comparisons['highlights'] as $comparison)
                             <article class="rounded-2xl border p-5 {{ $comparison['status'] === 'directional' ? $toneClasses['attention'] : $toneClasses['neutral'] }}">
                                 <div class="text-xs font-bold uppercase tracking-wide opacity-70">{{ $comparison['label'] }}</div>
@@ -189,7 +189,7 @@
                         <span class="text-sm font-semibold text-slate-600 group-open:hidden">Show</span>
                         <span class="hidden text-sm font-semibold text-slate-600 group-open:inline">Hide</span>
                     </summary>
-                    <div class="grid gap-3 border-t border-slate-100 p-6 sm:grid-cols-2 sm:p-8 lg:grid-cols-4">
+                    <div class="grid gap-3 border-t border-slate-100 p-5 sm:grid-cols-2 sm:p-8 lg:grid-cols-4">
                         @foreach($comparisons['groups'] as $comparison)
                             <div class="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
                                 <div class="font-semibold text-slate-950">{{ $comparison['label'] }}</div>
@@ -205,7 +205,7 @@
 
         @if($report['ad_platform_comparisons'] !== [])
             <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
-                <div class="border-b border-slate-100 p-6 sm:p-8">
+                <div class="border-b border-slate-100 p-5 sm:p-8">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                         <div>
                             <h2 class="text-xl font-semibold tracking-tight text-slate-950">Ad platform reports</h2>
@@ -217,13 +217,13 @@
                     </div>
                 </div>
 
-                <div class="space-y-5 p-6 sm:p-8">
+                <div class="space-y-5 p-5 sm:p-8">
                     @foreach($report['ad_platform_comparisons'] as $comparison)
-                        <article class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                        <article class="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-5">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                     <div class="font-semibold text-slate-950">{{ \Illuminate\Support\Str::headline($comparison['platform']) }} Ads</div>
-                                    <div class="mt-1 text-sm text-slate-600">
+                                    <div class="mt-1 break-words text-sm text-slate-600">
                                         {{ $comparison['period_start']->format('M j, Y') }} – {{ $comparison['period_end']->format('M j, Y') }}
                                         @if(filled($comparison['account_id']))
                                             · Account {{ $comparison['account_id'] }}
@@ -313,7 +313,7 @@
             </section>
         @else
             <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
-                <div class="border-b border-slate-100 p-6 sm:p-8">
+                <div class="border-b border-slate-100 p-5 sm:p-8">
                     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                         <div>
                             <h2 class="text-xl font-semibold tracking-tight text-slate-950">Registration funnel</h2>
@@ -339,7 +339,7 @@
                     </div>
                 </div>
 
-                <div class="p-6 sm:p-8">
+                <div class="p-5 sm:p-8">
                     @php
                         $landingCount = max(1, (int) ($report['funnel'][0]['count'] ?? 0));
                     @endphp
@@ -410,14 +410,14 @@
             </section>
 
             <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
-                <div class="border-b border-slate-100 p-6 sm:p-8">
+                <div class="border-b border-slate-100 p-5 sm:p-8">
                     <h2 class="text-xl font-semibold tracking-tight text-slate-950">Traffic quality</h2>
                     <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
                         Classification is intentionally conservative. Unknown traffic stays visible instead of being silently counted as human or automated.
                     </p>
                 </div>
 
-                <div class="grid gap-4 p-6 sm:grid-cols-3 sm:p-8">
+                <div class="grid gap-4 p-5 sm:grid-cols-3 sm:p-8">
                     @foreach([
                         ['key' => 'likely_human', 'label' => 'Likely human', 'description' => 'Recognized browser traffic with same-origin request signals.'],
                         ['key' => 'likely_automated', 'label' => 'Likely automated', 'description' => 'Explicit crawler, bot, or headless signals.'],
@@ -426,7 +426,7 @@
                         @php
                             $traffic = $report['traffic'][$trafficItem['key']];
                         @endphp
-                        <article class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                        <article class="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-5">
                             <div class="text-sm font-semibold text-slate-950">{{ $trafficItem['label'] }}</div>
                             <div class="mt-2 flex items-baseline gap-2">
                                 <span class="text-3xl font-bold text-slate-950">{{ number_format((int) $traffic['count']) }}</span>
@@ -439,7 +439,7 @@
             </section>
 
             <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
-                <div class="border-b border-slate-100 p-6 sm:p-8">
+                <div class="border-b border-slate-100 p-5 sm:p-8">
                     <h2 class="text-xl font-semibold tracking-tight text-slate-950">Campaign / source traffic</h2>
                     <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
                         Compare attributed traffic without assuming every campaign value represents paid media. Names come from safe UTM values; stable platform IDs are retained separately for reconciliation.
@@ -450,7 +450,7 @@
                     <div class="p-8 text-sm text-slate-600">No attributed campaign traffic was projected in this date range.</div>
                 @else
                     <div class="overflow-x-auto">
-                        <table class="min-w-full text-sm">
+                        <table class="min-w-[72rem] text-sm">
                             <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <tr>
                                     <th class="px-5 py-3">Source / medium</th>
@@ -516,7 +516,7 @@
             </section>
 
             <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
-                <div class="border-b border-slate-100 p-6 sm:p-8">
+                <div class="border-b border-slate-100 p-5 sm:p-8">
                     <h2 class="text-xl font-semibold tracking-tight text-slate-950">Compare public-facing experience</h2>
                     <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
                         These breakdowns stay aligned with the dimensions actually retained in the daily aggregates. They do not pretend arbitrary cross-filtering is available when it was not projected.
@@ -543,7 +543,7 @@
                                 @if($report[$breakdown['key']] === [])
                                     <div class="p-6 text-sm text-slate-600">No {{ strtolower($breakdown['label']) }} breakdown is available for this period.</div>
                                 @else
-                                    <table class="min-w-full text-sm">
+                                    <table class="min-w-[52rem] text-sm">
                                         <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                             <tr>
                                                 <th class="px-5 py-3">{{ $breakdown['label'] }}</th>
@@ -591,14 +591,14 @@
             </section>
 
             <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
-                <div class="border-b border-slate-100 p-6 sm:p-8">
+                <div class="border-b border-slate-100 p-5 sm:p-8">
                     <h2 class="text-xl font-semibold tracking-tight text-slate-950">After registration</h2>
                     <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
                         These metrics come from authoritative Webinar and Messaging outcomes. A provider-stage failure is not also counted as a confirmation-planning failure.
                     </p>
                 </div>
 
-                <div class="grid gap-4 p-6 sm:grid-cols-2 sm:p-8 xl:grid-cols-4">
+                <div class="grid gap-4 p-5 sm:grid-cols-2 sm:p-8 xl:grid-cols-4">
                     @foreach([
                         ['label' => 'Local registrations', 'type' => 'count', 'value' => $report['after_registration']['local_registrations'], 'note' => 'Authoritative public Webinar registrations.'],
                         ['label' => 'Browser correlation', 'type' => 'ratio', 'value' => $report['after_registration']['correlation_coverage'], 'note' => 'Registrations matched to a browser submit attempt.'],
@@ -608,7 +608,7 @@
                         ['label' => 'Joined', 'type' => 'ratio', 'value' => $report['after_registration']['join_rate'], 'note' => 'Eligible registrations after their occurrence started.'],
                         ['label' => 'Attended', 'type' => 'ratio', 'value' => $report['after_registration']['attendance_rate'], 'note' => 'Registrations in occurrences with finalized attendance.'],
                     ] as $metric)
-                        <article class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                        <article class="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-5">
                             <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ $metric['label'] }}</div>
                             @if($metric['type'] === 'count')
                                 <div class="mt-2 text-3xl font-bold text-slate-950">{{ number_format((int) $metric['value']) }}</div>
@@ -631,7 +631,7 @@
                         <span class="hidden text-sm font-semibold text-slate-600 group-open:inline">Hide</span>
                     </summary>
 
-                    <div class="grid gap-4 border-t border-slate-100 p-6 sm:grid-cols-2 sm:p-8 xl:grid-cols-4">
+                    <div class="grid gap-4 border-t border-slate-100 p-5 sm:grid-cols-2 sm:p-8 xl:grid-cols-4">
                         @foreach([
                             ['label' => 'Registration finalization', 'rows' => $report['finalization_outcomes']],
                             ['label' => 'Provider outcomes', 'rows' => $report['provider_outcomes']],
@@ -677,7 +677,7 @@
                                 @if($group['rows'] === [])
                                     <div class="p-6 text-sm text-slate-600">No {{ strtolower($group['label']) }} are available for this period.</div>
                                 @else
-                                    <table class="min-w-full text-sm">
+                                    <table class="min-w-[44rem] text-sm">
                                         <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                             <tr>
                                                 <th class="px-5 py-3">{{ $group['kind'] === 'series' ? 'Series' : 'Occurrence' }}</th>
@@ -720,7 +720,7 @@
             </section>
 
             <details class="group rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
-                <summary class="flex cursor-pointer list-none items-center justify-between gap-4 p-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-300 sm:p-8">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-4 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-300 sm:p-8">
                     <div>
                         <h2 class="text-lg font-semibold text-slate-950">Technical collection signals</h2>
                         <p class="mt-1 text-sm leading-6 text-slate-600">
@@ -731,7 +731,7 @@
                     <span class="hidden text-sm font-semibold text-slate-600 group-open:inline">Hide</span>
                 </summary>
 
-                <div class="grid gap-6 border-t border-slate-100 p-6 sm:grid-cols-2 sm:p-8">
+                <div class="grid gap-6 border-t border-slate-100 p-5 sm:grid-cols-2 sm:p-8">
                     @foreach([
                         ['label' => 'Throttled requests', 'rows' => $report['diagnostics']['throttled_requests']],
                         ['label' => 'Bot-protection results', 'rows' => $report['diagnostics']['bot_protection_results']],
@@ -743,9 +743,9 @@
                             @else
                                 <ul class="mt-3 space-y-2">
                                     @foreach($diagnostic['rows'] as $row)
-                                        <li class="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-sm ring-1 ring-slate-200">
-                                            <span>{{ \Illuminate\Support\Str::headline($row['value']) }}</span>
-                                            <span class="font-semibold">{{ number_format((int) $row['count']) }}</span>
+                                        <li class="flex items-start justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-sm ring-1 ring-slate-200">
+                                            <span class="min-w-0 break-words">{{ \Illuminate\Support\Str::headline($row['value']) }}</span>
+                                            <span class="shrink-0 font-semibold">{{ number_format((int) $row['count']) }}</span>
                                         </li>
                                     @endforeach
                                 </ul>
@@ -755,7 +755,7 @@
                 </div>
             </details>
 
-            <section class="rounded-3xl border border-slate-200 bg-slate-50/80 p-6 text-sm text-slate-700 shadow-sm sm:p-8">
+            <section class="rounded-3xl border border-slate-200 bg-slate-50/80 p-5 text-sm text-slate-700 shadow-sm sm:p-8">
                 <h2 class="font-semibold text-slate-950">How to read this report</h2>
                 <ul class="mt-3 list-disc space-y-2 pl-5 leading-6">
                     <li>Primary registration conversion uses likely-human browser-observed landing sessions as its denominator; “Observed landing” totals in breakdowns can also include automated and unknown traffic.</li>

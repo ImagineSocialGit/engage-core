@@ -167,7 +167,7 @@
 
                     @if($suggestedSlots !== [])
                         <div class="rounded-2xl border border-teal-200 bg-teal-50 p-4">
-                            <div class="flex flex-wrap items-start justify-between gap-2">
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                     <span class="text-sm font-semibold text-teal-950">Suggested open times</span>
                                     <p class="mt-1 text-xs leading-5 text-teal-800">
@@ -195,14 +195,14 @@
                                             class="sr-only"
                                             @checked(old('starts_at') === $slotValue)
                                         >
-                                        <span class="block text-sm font-semibold text-slate-900">
+                                        <span class="block break-words text-sm font-semibold text-slate-900">
                                             @if($service->usesRangeDuration())
                                                 {{ $slotLocalStart->format('D, M j, Y \a\t g:i A') }} – {{ $slotLocalEnd->format('D, M j, Y \a\t g:i A') }}
                                             @else
                                                 {{ $slotLocalStart->format('D, M j') }} · {{ $slotLocalStart->format('g:i A') }}–{{ $slotLocalEnd->format('g:i A') }}
                                             @endif
                                         </span>
-                                        <span class="mt-1 block text-xs text-slate-500">
+                                        <span class="mt-1 block break-words text-xs text-slate-500">
                                             {{ $displayTimezone }}
                                             @if($slot->totalTravelMinutes() !== null)
                                                 · travel-aware
@@ -247,10 +247,10 @@
                                             class="sr-only"
                                             @checked(old('starts_at') === $slotValue)
                                         >
-                                        <span class="block text-sm font-semibold text-slate-900">
+                                        <span class="block break-words text-sm font-semibold text-slate-900">
                                             {{ $slotLabel }}
                                         </span>
-                                        <span class="mt-1 block text-xs text-slate-500">
+                                        <span class="mt-1 block break-words text-xs text-slate-500">
                                             {{ $displayTimezone }}
                                         </span>
                                     </label>

@@ -122,14 +122,17 @@ class EngageRefreshCommandTest extends TestCase
     protected function tearDown(): void
     {
         /*
-         * This test class deliberately destroys and reconstructs the schema
-         * outside RefreshDatabase. Ensure the next RefreshDatabase test does
-         * not mistake whatever schema this test left behind for the complete
-         * migrated test schema.
-         */
-        RefreshDatabaseState::$migrated = false;
+        * This test class deliberately destroys and reconstructs the schema
+        * outside RefreshDatabase. Leave no partial or marker schema behind,
+        * then force the next RefreshDatabase test to rebuild completely.
+        */
+        try {
+            Schema::dropAllTables();
+        } finally {
+            RefreshDatabaseState::$migrated = false;
 
-        parent::tearDown();
+            parent::tearDown();
+        }
     }
 
     private function useMigrationOnlySetupValidation(): void

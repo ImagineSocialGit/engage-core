@@ -66,15 +66,15 @@
                             <p class="text-sm font-semibold text-slate-500">
                                 {{ $appointment->bookableService?->name ?? 'Appointment service' }}
                             </p>
-                            <h2 class="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+                            <h2 class="mt-1 break-words text-2xl font-semibold tracking-tight text-slate-900">
                                 {{ $appointment->title ?: 'Appointment' }}
                             </h2>
-                            <p class="mt-2 text-sm font-medium text-slate-700">
+                            <p class="mt-2 break-words text-sm font-medium text-slate-700">
                                 {{ $appointment->starts_at?->setTimezone($displayTimezone)->format('D, M j, Y \a\t g:i A') }}
                                 –
                                 {{ $appointment->ends_at?->setTimezone($displayTimezone)->format('g:i A') }}
                             </p>
-                            <p class="mt-1 text-xs text-slate-500">
+                            <p class="mt-1 break-words text-xs text-slate-500">
                                 {{ $displayTimezone }}
                             </p>
                         </div>
@@ -85,7 +85,7 @@
                     </div>
 
                     @if($appointment->description)
-                        <p class="whitespace-pre-line text-sm leading-6 text-slate-600">
+                        <p class="break-words whitespace-pre-line text-sm leading-6 text-slate-600">
                             {{ $appointment->description }}
                         </p>
                     @endif
@@ -93,7 +93,7 @@
                     <dl class="grid gap-4 border-t border-slate-200 pt-5 sm:grid-cols-2">
                         <div>
                             <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Contact</dt>
-                            <dd class="mt-1 text-sm text-slate-900">
+                            <dd class="mt-1 break-words text-sm text-slate-900">
                                 @if($appointment->contact)
                                     <a
                                         href="{{ route('crm.contacts.show', $appointment->contact) }}"
@@ -109,21 +109,21 @@
 
                         <div>
                             <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Host</dt>
-                            <dd class="mt-1 text-sm text-slate-900">
+                            <dd class="mt-1 break-words text-sm text-slate-900">
                                 {{ $appointment->schedulingHost?->name ?? 'Unhosted' }}
                             </dd>
                         </div>
 
                         <div>
                             <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Location</dt>
-                            <dd class="mt-1 text-sm text-slate-900">
+                            <dd class="mt-1 break-words text-sm text-slate-900">
                                 {{ $appointment->location_type ? str($appointment->location_type)->replace('_', ' ')->title() : 'Not specified' }}
                             </dd>
                         </div>
 
                         <div>
                             <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Source</dt>
-                            <dd class="mt-1 text-sm text-slate-900">
+                            <dd class="mt-1 break-words text-sm text-slate-900">
                                 {{ str($appointment->source)->replace('_', ' ')->title() }}
                             </dd>
                         </div>
@@ -178,7 +178,7 @@
                                         {{ collect([$attendee->email, $attendee->phone])->filter()->implode(' · ') ?: 'No contact details stored' }}
                                     </p>
                                 </div>
-                                <div class="text-left text-xs text-slate-500 sm:text-right">
+                                <div class="break-words text-left text-xs text-slate-500 sm:text-right">
                                     <p class="font-semibold text-slate-700">{{ str($attendee->role)->title() }}</p>
                                     <p class="mt-1">{{ str($attendee->status)->replace('_', ' ')->title() }}</p>
                                 </div>
@@ -215,10 +215,10 @@
                                             {{ $event->from_status ? str($event->from_status)->replace('_', ' ')->title().' → ' : '' }}{{ str($event->to_status)->replace('_', ' ')->title() }}
                                         </p>
                                         @if($event->reason)
-                                            <p class="mt-2 whitespace-pre-line text-sm text-slate-700">{{ $event->reason }}</p>
+                                            <p class="mt-2 break-words whitespace-pre-line text-sm text-slate-700">{{ $event->reason }}</p>
                                         @endif
                                     </div>
-                                    <div class="text-left text-xs text-slate-500 sm:text-right">
+                                    <div class="break-words text-left text-xs text-slate-500 sm:text-right">
                                         <p>{{ $event->occurred_at?->setTimezone($displayTimezone)->format('M j, Y g:i A') }}</p>
                                         <p class="mt-1">{{ $actorLabel }} · {{ str($event->source)->replace('_', ' ')->title() }}</p>
                                     </div>

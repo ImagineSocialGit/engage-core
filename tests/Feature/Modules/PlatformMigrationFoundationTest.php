@@ -35,6 +35,7 @@ class PlatformMigrationFoundationTest extends TestCase
         'campaigns',
         'broadcasts',
         'webinars',
+        'reporting',
     ];
 
     protected function tearDown(): void

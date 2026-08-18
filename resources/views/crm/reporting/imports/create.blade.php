@@ -4,8 +4,8 @@
     :subheading="$subheading"
     module="reporting"
 >
-    <div class="max-w-3xl space-y-6">
-        <section class="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm sm:p-8">
+    <div class="w-full max-w-3xl space-y-6">
+        <section class="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm sm:p-8">
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.16em] text-slate-600">Meta Ads · CSV first</p>
                 <h2 class="mt-2 text-xl font-semibold tracking-tight text-slate-950">Upload the raw Ads Manager export</h2>
@@ -67,9 +67,9 @@
                     </div>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-5">
-                    <x-ui.button type="submit">Review import</x-ui.button>
-                    <a href="{{ route('crm.reporting.index') }}" class="text-sm font-semibold text-slate-600 hover:underline">Back to Reporting</a>
+                <div class="grid gap-3 border-t border-slate-200 pt-5 sm:flex sm:flex-wrap sm:items-center">
+                    <x-ui.button type="submit" class="w-full sm:w-auto">Review import</x-ui.button>
+                    <a href="{{ route('crm.reporting.index') }}" class="text-center text-sm font-semibold text-slate-600 hover:underline sm:text-left">Back to Reporting</a>
                 </div>
             </form>
         </section>

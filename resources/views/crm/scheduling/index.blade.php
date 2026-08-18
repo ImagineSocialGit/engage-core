@@ -4,10 +4,10 @@
     subheading="Review upcoming appointments and schedule a contact into a currently available time."
 >
     <div class="space-y-6">
-        <div class="flex justify-end">
+        <div class="flex sm:justify-end">
             <a
                 href="{{ route('crm.scheduling.configuration.index') }}"
-                class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                class="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto"
                 data-scheduling-configuration-link
             >
                 Manage configuration
@@ -81,7 +81,7 @@
                 </div>
 
                 @if($upcomingAppointments->isEmpty())
-                    <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                    <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center sm:p-6">
                         <p class="font-semibold text-slate-900">
                             No upcoming appointments
                         </p>
@@ -119,17 +119,17 @@
                                             {{ $appointment->title ?: $appointment->bookableService?->name ?: 'Appointment' }}
                                         </a>
 
-                                        <p class="mt-1 text-sm text-slate-600">
+                                        <p class="mt-1 break-words text-sm text-slate-600">
                                             {{ $contactLabel }}
                                         </p>
 
-                                        <p class="mt-2 text-sm font-medium text-slate-900">
+                                        <p class="mt-2 break-words text-sm font-medium text-slate-900">
                                             {{ $appointment->starts_at->setTimezone($displayTimezone)->format('D, M j, Y \a\t g:i A') }}
                                             –
                                             {{ $appointment->ends_at->setTimezone($displayTimezone)->format($appointment->bookableService?->usesRangeDuration() ? 'D, M j, Y \a\t g:i A' : 'g:i A') }}
                                         </p>
 
-                                        <p class="mt-1 text-xs text-slate-500">
+                                        <p class="mt-1 break-words text-xs text-slate-500">
                                             {{ $displayTimezone }}
                                             @if($appointment->schedulingHost)
                                                 · {{ $appointment->schedulingHost->name }}
@@ -172,7 +172,7 @@
                             <input type="hidden" name="contact_id" value="{{ $selectedContact->id }}">
 
                             <div
-                                class="rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm text-teal-950"
+                                class="break-words rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm text-teal-950"
                                 data-scheduling-preselected-contact="{{ $selectedContact->id }}"
                             >
                                 <span class="font-semibold">Scheduling for:</span>
@@ -360,7 +360,7 @@
                                     <template x-for="contact in results" :key="contact.id">
                                         <button
                                             type="button"
-                                            class="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100"
+                                            class="block w-full break-words rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100"
                                             x-on:click="choose(contact)"
                                         >
                                             <span class="font-medium text-slate-900" x-text="contact.label"></span>
@@ -381,7 +381,7 @@
                             @if($selectedService->location_type === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_CUSTOMER_SITE)
                                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
                                     <h3 class="text-sm font-semibold text-slate-900">Customer service address</h3>
-                                    <p class="mt-1 text-xs text-slate-500">
+                                    <p class="mt-1 break-words text-xs text-slate-500">
                                         Enter the address where this appointment will take place. Scheduling normalizes it into the Appointment snapshot.
                                     </p>
 

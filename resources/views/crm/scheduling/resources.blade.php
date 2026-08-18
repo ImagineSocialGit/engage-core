@@ -21,10 +21,10 @@
     @endphp
 
     <div class="space-y-6" data-scheduling-resource-configuration>
-        <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <a
                 href="{{ route('crm.scheduling.configuration.index') }}"
-                class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                class="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto"
                 data-scheduling-resource-configuration-back
             >
                 Back to configuration
@@ -32,7 +32,7 @@
 
             <a
                 href="{{ route('crm.scheduling.configuration.availability.index') }}"
-                class="inline-flex items-center rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                class="inline-flex w-full items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
                 data-scheduling-resource-availability-link
             >
                 Preview availability
@@ -133,7 +133,7 @@
                     </label>
 
                     <div class="md:col-span-2 xl:col-span-4">
-                        <button type="submit" class="inline-flex rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">
+                        <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
                             Create resource
                         </button>
                     </div>
@@ -151,7 +151,7 @@
                         data-resource-editable="{{ $resourceEditable ? '1' : '0' }}"
                     >
                         <x-ui.card class="space-y-4">
-                            <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                     <h3 class="font-semibold text-slate-900">{{ $resource->name }}</h3>
                                     <p class="mt-1 font-mono text-xs text-slate-500">{{ $resource->key }}</p>
@@ -161,7 +161,7 @@
                                 </span>
                             </div>
 
-                            <dl class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                            <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-4">
                                 <div>
                                     <dt class="text-slate-500">Source</dt>
                                     <dd class="font-medium text-slate-900">{{ $resource->source }}</dd>
@@ -219,7 +219,7 @@
                                     </label>
 
                                     <div class="sm:col-span-3">
-                                        <button type="submit" class="inline-flex rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">
+                                        <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
                                             Save resource
                                         </button>
                                     </div>
@@ -257,7 +257,7 @@
                     @endphp
 
                     <x-ui.card class="space-y-4" data-resource-host-id="{{ $host->id }}">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h3 class="font-semibold text-slate-900">{{ $host->name }}</h3>
                                 <p class="mt-1 font-mono text-xs text-slate-500">{{ $host->key }}</p>
@@ -278,7 +278,7 @@
                             <input type="hidden" name="current_version" value="{{ $host->updated_at?->toISOString() }}">
 
                             <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                                <table class="min-w-[680px] divide-y divide-slate-200 text-sm">
                                     <thead>
                                         <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                             <th class="px-3 py-2">Resource</th>
@@ -331,7 +331,7 @@
                                 </table>
                             </div>
 
-                            <button type="submit" class="inline-flex rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">
+                            <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
                                 Save host capacities
                             </button>
                         </form>
@@ -362,7 +362,7 @@
                     @endphp
 
                     <x-ui.card class="space-y-4" data-resource-service-id="{{ $service->id }}">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h3 class="font-semibold text-slate-900">{{ $service->name }}</h3>
                                 <p class="mt-1 font-mono text-xs text-slate-500">{{ $service->key }}</p>
@@ -383,7 +383,7 @@
                             <input type="hidden" name="current_version" value="{{ $service->updated_at?->toISOString() }}">
 
                             <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                                <table class="min-w-[680px] divide-y divide-slate-200 text-sm">
                                     <thead>
                                         <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                             <th class="px-3 py-2">Resource</th>
@@ -436,7 +436,7 @@
                                 </table>
                             </div>
 
-                            <button type="submit" class="inline-flex rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">
+                            <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
                                 Save service requirements
                             </button>
                         </form>
@@ -462,7 +462,7 @@
             <div class="grid gap-4 xl:grid-cols-2">
                 @forelse ($effects as $effect)
                     <x-ui.card class="space-y-3" data-resource-effect="{{ $effect['service_id'] }}:{{ $effect['host_id'] }}" data-resource-effect-state="{{ $effect['state'] }}">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h3 class="font-semibold text-slate-900">{{ $effect['service_name'] }}</h3>
                                 <p class="mt-1 text-sm text-slate-500">{{ $effect['host_name'] }}</p>
@@ -491,7 +491,7 @@
                         @if ($effect['requirements'] !== [])
                             <dl class="space-y-2 text-sm">
                                 @foreach ($effect['requirements'] as $requirement)
-                                    <div class="grid grid-cols-4 gap-2 rounded-lg bg-slate-50 px-3 py-2" data-resource-effect-requirement="{{ $requirement['resource_id'] }}">
+                                    <div class="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 px-3 py-2 sm:grid-cols-4" data-resource-effect-requirement="{{ $requirement['resource_id'] }}">
                                         <div class="col-span-2">
                                             <dt class="text-slate-500">Resource</dt>
                                             <dd class="font-medium text-slate-900">{{ $requirement['resource_name'] ?? $requirement['resource_key'] }}</dd>

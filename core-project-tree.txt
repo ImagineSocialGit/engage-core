@@ -1807,11 +1807,10 @@
 │       │   │   ├── bindings
 │       │   │   │   └── index.blade.php
 │       │   │   ├── index.blade.php
-│       │   │   ├── partials
-│       │   │   │   ├── editor-modal.blade.php
-│       │   │   │   ├── navigation.blade.php
-│       │   │   │   └── point-fields.blade.php
-│       │   │   └── show.blade.php
+│       │   │   └── partials
+│       │   │       ├── editor-modal.blade.php
+│       │   │       ├── navigation.blade.php
+│       │   │       └── point-fields.blade.php
 │       │   ├── messaging
 │       │   │   └── message-templates
 │       │   │       └── index.blade.php
@@ -2285,4 +2284,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-590 directories, 1696 files
+590 directories, 1695 files
