@@ -8,9 +8,9 @@ use LogicException;
 
 final class ReportingBrowserRequestClassifier
 {
-    public const CONFIG_KEY = 'request_signals_v1';
+    public const CONFIG_KEY = 'request_signals_v2';
     public const CLASSIFIER_KEY = 'browser_request_signals';
-    public const CLASSIFIER_VERSION = 1;
+    public const CLASSIFIER_VERSION = 2;
 
     private const AUTOMATION_PATTERN = '/(?:bot|crawler|spider|slurp|bingpreview|facebookexternalhit|facebot|twitterbot|linkedinbot|discordbot|telegrambot|whatsapp|yandexbot|baiduspider|duckduckbot|semrushbot|ahrefsbot|headlesschrome|phantomjs|selenium|playwright|puppeteer|curl\/|wget\/|python-requests|go-http-client|apache-httpclient)/i';
 
@@ -56,12 +56,12 @@ final class ReportingBrowserRequestClassifier
             );
         }
 
-        if ($fetchSite !== 'same-origin') {
+        if ($fetchSite !== '' && $fetchSite !== 'same-origin') {
             return $this->classification(
                 trafficClass: 'unknown',
                 reasons: [
                     'browser_family_recognized',
-                    $fetchSite === '' ? 'fetch_metadata_missing' : 'fetch_metadata_not_same_origin',
+                    'fetch_metadata_not_same_origin',
                 ],
                 deviceClass: $deviceClass,
                 browserFamily: $browserFamily,
@@ -73,7 +73,9 @@ final class ReportingBrowserRequestClassifier
             trafficClass: 'likely_human',
             reasons: [
                 'browser_family_recognized',
-                'same_origin_fetch_metadata',
+                $fetchSite === 'same-origin'
+                    ? 'same_origin_fetch_metadata'
+                    : 'fetch_metadata_missing',
             ],
             deviceClass: $deviceClass,
             browserFamily: $browserFamily,

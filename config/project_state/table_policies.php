@@ -65,10 +65,6 @@ return [
         'reason' => 'Module installation and migration bookkeeping belongs to the target environment.',
     ],
 
-    'reporting_external_measurements' => [
-        'mode' => 'resettable',
-        'reason' => 'External platform aggregate measurements now have an authoritative manual CSV import path but remain re-importable/resettable until the retained-history lifecycle is promoted in the follow-up Project State batch.',
-    ],
 
     'reporting_sessions' => [
         'mode' => 'resettable',

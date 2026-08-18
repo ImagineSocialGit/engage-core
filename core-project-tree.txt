@@ -3,6 +3,7 @@
 │   ├── Console
 │   │   └── Commands
 │   │       ├── EngageInstallCommand.php
+│   │       ├── EngageRefreshCommand.php
 │   │       ├── EngageUserAddCommand.php
 │   │       ├── EngageUserPasswordCommand.php
 │   │       ├── ModulesInstallCommand.php
@@ -2008,7 +2009,8 @@
 │   │   │   ├── InboundNormalReplyAutomationEventTest.php
 │   │   │   └── ProcessInboundSmsMessageActionTest.php
 │   │   ├── Install
-│   │   │   └── EngageInstallCommandTest.php
+│   │   │   ├── EngageInstallCommandTest.php
+│   │   │   └── EngageRefreshCommandTest.php
 │   │   ├── Integrations
 │   │   │   └── Messaging
 │   │   │       └── Sms
@@ -2270,4 +2272,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-587 directories, 1684 files
+587 directories, 1686 files

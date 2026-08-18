@@ -400,8 +400,8 @@
                         return true
                     },
                     markRegistrationFormInteracted() {
-                        this.registrationFormInteracted = @js($botInteractionValue)
-                        this.recordRegistrationFormStart()
+                        this.registrationFormInteracted = @js($botInteractionValue);
+                        this.recordRegistrationFormStart();
                     },
                     submitRegistration(event) {
                         const attemptId = this.prepareRegistrationSubmitAttempt(

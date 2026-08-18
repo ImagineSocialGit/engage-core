@@ -298,7 +298,7 @@ The external measurement contract stores stable platform/account/campaign/group/
 
 The schema remains provider-neutral. Meta, Google, TikTok, or another platform are adapters; no vendor defines the Reporting domain model. Names may change and are display metadata. Stable platform IDs define the reconciliation identity.
 
-Through Phase 7B these rows remain re-importable/resettable rather than retained Project State history. Phase 7B now provides the first authoritative manual CSV import path; Phase 7C will make the separate lifecycle decision to retain imported external history through Project State.
+Phase 7C retains these authoritative imported rows through Project State. Re-import remains a supported ingestion behavior, but a clean rebuild no longer requires the operator to reconstruct already imported external history from source CSV files.
 
 ## Event-definition contract
 
@@ -516,7 +516,7 @@ The exact classifier implementation may use narrow FOSS-derived device/bot parsi
 
 Browser code cannot assert `likely_human` itself.
 
-The current classifier is the bounded server-owned `request_signals_v1` implementation. It parses the full request user agent transiently, retains only coarse device/browser/OS families, and discards the full string. Recognized browser-family syntax plus same-origin Fetch Metadata may classify as `likely_human`; explicit automation/headless/crawler request signatures classify as `likely_automated`; missing or ambiguous signals remain `unknown`. The classifier is deliberately conservative and versioned so a later parser can replace it without changing historical meaning.
+The current classifier is the bounded server-owned `request_signals_v2` implementation. It parses the full request user agent transiently, retains only coarse device/browser/OS families, and discards the full string. Explicit automation/headless/crawler request signatures classify as `likely_automated`. A recognized browser family on an already accepted same-origin public observation classifies as `likely_human` whether `Sec-Fetch-Site: same-origin` is present or omitted; the reason codes preserve whether Fetch Metadata was available. An explicitly non-same-origin Fetch Metadata value remains ambiguous and therefore `unknown` (and the public collection policy rejects it before persistence). Missing/unrecognized user-agent evidence also remains `unknown`. Version 1 history is not retroactively reclassified, so historical meaning remains explainable.
 
 Imported, page-only/uncorrelated, unknown, and likely-automated traffic remain visible in Reporting. They do not silently enter the primary likely-human conversion denominator.
 
@@ -880,7 +880,7 @@ reporting.attribution
     explicitly approved click-ID keys and dedicated hash key
 
 reporting.classification
-    browser_classifier = request_signals_v1
+    browser_classifier = request_signals_v2
 
 reporting.retention
     raw_observations_days = 45
@@ -937,7 +937,7 @@ Webinar denominator correctness
 uncorrelated/unknown/automated traffic separation
 producer-contributor boundary tests
 question distribution excluding answer_text
-external measurement normalization later
+external measurement normalization and retained Project State round-trip
 ```
 
 Tests should use generic fixtures. Do not make Slam Dunk, Rob, or another client name/copy part of the Reporting domain contract.
@@ -953,6 +953,9 @@ reporting_sessions
 reporting_observations
     privacy-limited raw observations intentionally reset
 
+reporting_external_measurements
+    retained authoritative imported platform history transfers
+
 reporting_daily_metrics
     retained/authoritative aggregate history transfers
 
@@ -962,7 +965,7 @@ reporting_projection_checkpoints
 
 The optional section activates only when the complete Reporting foundation schema is installed. If none of its activation tables exist, Project State omits the Reporting section; if only part of the activation schema exists, Project State fails closed. A current-version source document may omit the Reporting section when Reporting was not installed there, and a Reporting-enabled target simply applies no Reporting rows from that document. A document that does contain the Reporting section cannot validate against a target where that optional schema is absent, so retained history is never silently discarded.
 
-This preserves Reporting's Core-only optional-module architecture while allowing its 25-month aggregate history to survive controlled clean rebuilds. Raw interaction evidence and projector coordination remain intentionally rebuildable/resettable.
+This preserves Reporting's Core-only optional-module architecture while allowing both its retained daily aggregates and imported external-platform measurement history to survive controlled clean rebuilds. Raw interaction evidence and projector coordination remain intentionally rebuildable/resettable.
 
 ## Existing producer privacy debt
 
@@ -1104,7 +1107,7 @@ A short rolling rebuild runs every ten minutes for late-changing provider/delive
 
 Implemented through Project State v11.
 
-The shared Project State contract now supports schema-activated optional sections. Reporting uses that capability to transfer only `reporting_daily_metrics` when the complete Reporting foundation schema is installed. An absent source Reporting schema omits the section and remains importable into a Reporting-enabled target without manufacturing Reporting rows; a partial target schema fails closed; and a document containing Reporting history cannot validate against a target where the Reporting schema is absent.
+The shared Project State contract supports schema-activated optional sections. Reporting initially used that capability for `reporting_daily_metrics`; Phase 7C extends the same optional Reporting section to retain authoritative imported `reporting_external_measurements` history as well. An absent source Reporting schema omits the section and remains importable into a Reporting-enabled target without manufacturing Reporting rows; a partial target schema fails closed; and a document containing Reporting history cannot validate against a target where the Reporting schema is absent.
 
 Ephemeral sessions, raw observations, and projection checkpoints remain resettable and are not transferred merely to preserve aggregate history.
 
@@ -1138,11 +1141,11 @@ Preview CSVs are stored only on the local disk long enough to support the review
 
 The CRM Reporting workspace now shows imported ad-platform periods separately from Engage first-party measurements. Independent source files remain separate comparison groups so separately exported reporting snapshots are not silently combined into one platform total. Exact comparison is produced only for stable-ID rows that match retained campaign slices, including likely-human landing sessions, authoritative correlated registrations, and cost per Engage registration. Platform landing-page views and Engage sessions remain visibly distinct measurements.
 
-The external-measurement table remains re-importable/resettable through 7B. The authoritative manual import path now exists, so the next lifecycle slice should decide whether imported external history moves into retained Project State transfer.
+Phase 7C promotes `reporting_external_measurements` into retained Project State history now that the authoritative manual import path exists. The Reporting section advances to version 2, uses `identity_hash` as the upsert identity for external measurements, and retains the normalized measurement period, platform/account identity, campaign/group/creative identity and names, base metrics, result semantics, source snapshot hash, metadata, and import timestamp. Reporting sessions, raw observations, and projection checkpoints remain resettable.
 
 ## Current status
 
-Current repository state through Phase 7B:
+Current repository state through Phase 7D:
 
 ```text
 Reporting depends only on Core
@@ -1153,7 +1156,7 @@ host-scoped ephemeral sessions and attribution normalization are implemented, in
 POST /_reporting/observations is the generic stateless public transport
 resources/js/reporting/client.js is the generic fail-open browser client
 public collection requires an event-definition surface plus exact browser_hosts match
-request classification is server-owned and persists only coarse bounded results
+request classification is server-owned and persists only coarse bounded results; request_signals_v2 does not require optional Fetch Metadata when a recognized browser reaches the already same-origin-approved endpoint
 Webinars contributes namespaced browser funnel definitions through App\Support\Reporting only
 the Webinar registration page records page/CTA/modal/form/validation/throttle/bot diagnostics with bounded properties
 submit-attempt UUID correlation is available without copying the Reporting session token into Webinar state
@@ -1164,13 +1167,13 @@ public_funnel daily projection combines likely-human browser behavior with autho
 safe Webinar question distributions persist keys/version only and exclude answer_text/labels
 projection is deterministic/idempotent and maintains a versioned checkpoint
 short rolling and daily retention-horizon reconciliation rebuilds are scheduler-owned
-Project State v11 transfers retained reporting_daily_metrics through a schema-activated optional Reporting section
-reporting_sessions, reporting_observations, reporting_projection_checkpoints, and re-importable reporting_external_measurements remain resettable
+Project State v11 transfers retained reporting_daily_metrics and reporting_external_measurements through a schema-activated optional Reporting section
+reporting_sessions, reporting_observations, and reporting_projection_checkpoints remain resettable
 Reporting now owns a CRM Webinar Registration workspace over retained daily aggregates
 current Reporting, Webinar, and Messaging dependency cones have no detected module-boundary violations
 ```
 
-The first Reporting CRM workspace is implemented over the durable aggregate foundation. Phase 7B adds the concrete Meta CSV import/preview flow, period-based external measurement semantics, name-only fallback support, and stable-ID platform-vs-Engage comparison reads. The next Reporting lifecycle slice is retained Project State treatment for authoritative imported external history.
+The first Reporting CRM workspace is implemented over the durable aggregate foundation. Phase 7B adds the concrete Meta CSV import/preview flow, period-based external measurement semantics, name-only fallback support, and stable-ID platform-vs-Engage comparison reads. Phase 7C retains authoritative imported external measurement history through the optional Reporting Project State section. Phase 7D calibrates browser request classification so a recognized browser is not excluded from the primary likely-human denominator merely because the optional `Sec-Fetch-Site` header is absent; classifier provenance advances to version 2 and historical version 1 rows retain their original meaning. The next product slice is decision-oriented reporting that turns these retained inputs into prioritized client actions.
 
 ## Deferred possibilities
 

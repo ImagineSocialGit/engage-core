@@ -61,7 +61,7 @@ class ReportingPublicTransportTest extends TestCase
         $this->assertSame('facebook_feed', $observation->external_placement);
         $this->assertSame('likely_human', $observation->traffic_class);
         $this->assertSame('browser_request_signals', $observation->classifier_key);
-        $this->assertSame(1, $observation->classifier_version);
+        $this->assertSame(2, $observation->classifier_version);
         $this->assertEquals([
             'browser_family_recognized',
             'same_origin_fetch_metadata',
@@ -116,30 +116,81 @@ class ReportingPublicTransportTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame('likely_automated', $observation->traffic_class);
+        $this->assertSame('browser_request_signals', $observation->classifier_key);
+        $this->assertSame(2, $observation->classifier_version);
         $this->assertEquals(['automation_user_agent'], $observation->classification_reasons);
     }
 
-    public function test_recognized_browser_without_fetch_metadata_remains_unknown(): void
+    public function test_recognized_browser_without_fetch_metadata_is_likely_human_under_classifier_v2(): void
     {
         $this->configureBrowserEvent('public.example.test');
-        $eventId = (string) Str::uuid();
 
-        $this->postObservation(
-            host: 'public.example.test',
-            eventId: $eventId,
-            sessionToken: '0123456789abcdef0123456789abcdef',
-            includeFetchMetadata: false,
-        )->assertStatus(202);
+        foreach ([
+            'chrome' => self::BROWSER_UA,
+            'firefox' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0',
+            'safari' => 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1',
+        ] as $browser => $userAgent) {
+            $eventId = (string) Str::uuid();
 
-        $observation = ReportingObservation::query()
-            ->where('event_id', $eventId)
-            ->firstOrFail();
+            $this->postObservation(
+                host: 'public.example.test',
+                eventId: $eventId,
+                sessionToken: '0123456789abcdef0123456789abcdef',
+                userAgent: $userAgent,
+                fetchSite: null,
+            )->assertStatus(202);
 
-        $this->assertSame('unknown', $observation->traffic_class);
-        $this->assertEquals([
-            'browser_family_recognized',
-            'fetch_metadata_missing',
-        ], $observation->classification_reasons);
+            $observation = ReportingObservation::query()
+                ->where('event_id', $eventId)
+                ->firstOrFail();
+
+            $this->assertSame(
+                'likely_human',
+                $observation->traffic_class,
+                "Recognized {$browser} traffic without Fetch Metadata should remain in the likely-human bucket.",
+            );
+            $this->assertSame('browser_request_signals', $observation->classifier_key);
+            $this->assertSame(2, $observation->classifier_version);
+            $this->assertEquals([
+                'browser_family_recognized',
+                'fetch_metadata_missing',
+            ], $observation->classification_reasons);
+        }
+    }
+
+    public function test_missing_or_unrecognized_user_agent_remains_unknown_under_classifier_v2(): void
+    {
+        $this->configureBrowserEvent('public.example.test');
+
+        foreach ([
+            'missing' => [
+                'user_agent' => '',
+                'reasons' => ['user_agent_missing'],
+            ],
+            'unrecognized' => [
+                'user_agent' => 'ExampleClient/1.0',
+                'reasons' => ['user_agent_unrecognized'],
+            ],
+        ] as $case) {
+            $eventId = (string) Str::uuid();
+
+            $this->postObservation(
+                host: 'public.example.test',
+                eventId: $eventId,
+                sessionToken: '0123456789abcdef0123456789abcdef',
+                userAgent: $case['user_agent'],
+                fetchSite: null,
+            )->assertStatus(202);
+
+            $observation = ReportingObservation::query()
+                ->where('event_id', $eventId)
+                ->firstOrFail();
+
+            $this->assertSame('unknown', $observation->traffic_class);
+            $this->assertSame('browser_request_signals', $observation->classifier_key);
+            $this->assertSame(2, $observation->classifier_version);
+            $this->assertEquals($case['reasons'], $observation->classification_reasons);
+        }
     }
 
     public function test_public_transport_rejects_cross_origin_or_wrong_host_requests_without_persistence(): void
@@ -157,6 +208,13 @@ class ReportingPublicTransportTest extends TestCase
             host: 'other.example.test',
             eventId: (string) Str::uuid(),
             sessionToken: null,
+        )->assertNotFound();
+
+        $this->postObservation(
+            host: 'public.example.test',
+            eventId: (string) Str::uuid(),
+            sessionToken: null,
+            fetchSite: 'cross-site',
         )->assertNotFound();
 
         $this->assertSame(0, ReportingObservation::query()->count());
@@ -296,7 +354,7 @@ class ReportingPublicTransportTest extends TestCase
     {
         config([
             'reporting.collection.browser_enabled' => true,
-            'reporting.classification.browser_classifier' => 'request_signals_v1',
+            'reporting.classification.browser_classifier' => 'request_signals_v2',
             'reporting.ingestion.rate_limit_per_ip_per_minute' => 120,
             'reporting.ingestion.rate_limit_per_session_per_minute' => 90,
             'reporting.events' => [
@@ -324,14 +382,14 @@ class ReportingPublicTransportTest extends TestCase
         ?string $sessionToken,
         ?string $origin = null,
         string $userAgent = self::BROWSER_UA,
-        bool $includeFetchMetadata = true,
+        ?string $fetchSite = 'same-origin',
         array $query = [],
     ) {
         $origin ??= 'http://'.$host;
         $headers = $this->browserHeaders(
             origin: $origin,
             userAgent: $userAgent,
-            includeFetchMetadata: $includeFetchMetadata,
+            fetchSite: $fetchSite,
         );
 
         $headers['Host'] = $host;
@@ -351,12 +409,12 @@ class ReportingPublicTransportTest extends TestCase
     private function browserHeaders(
         string $origin,
         string $userAgent = self::BROWSER_UA,
-        bool $includeFetchMetadata = true,
+        ?string $fetchSite = 'same-origin',
     ): array {
         return array_filter([
             'Origin' => $origin,
             'User-Agent' => $userAgent,
-            'Sec-Fetch-Site' => $includeFetchMetadata ? 'same-origin' : null,
+            'Sec-Fetch-Site' => $fetchSite,
         ], fn (?string $value): bool => $value !== null);
     }
 

@@ -21,7 +21,7 @@ format: engage-core-project-state
 version: 11
 ```
 
-The current implementation has 13 dependency-ordered section contracts and transfers 61 tables when the optional Reporting schema is installed; otherwise the Reporting section is omitted. A current-version export produced without Reporting may be imported into a Reporting-enabled target with that optional section absent; the target applies no Reporting rows. An export that does contain retained Reporting history is rejected if the target Reporting schema is absent. It explicitly classifies 54 excluded tables.
+The current implementation has 13 dependency-ordered section contracts and transfers 62 tables when the optional Reporting schema is installed; otherwise the Reporting section is omitted. A current-version export produced without Reporting may be imported into a Reporting-enabled target with that optional section absent; the target applies no Reporting rows. An export that does contain retained Reporting history is rejected if the target Reporting schema is absent. It explicitly classifies 53 excluded tables.
 
 The CRM surface is owner-only:
 
@@ -58,7 +58,7 @@ Project State does not transfer:
 - users, passwords, password-reset tokens, or sessions;
 - Redis queue contents, Horizon metadata, cache, or locks;
 - failed-job history;
-- Reporting sessions, raw observations, and projection checkpoints; retained Reporting daily metrics transfer only when the Reporting schema is installed;
+- Reporting sessions, raw observations, and projection checkpoints reset; retained Reporting daily metrics and imported external measurements transfer only when the Reporting schema is installed;
 - unsupported Mortgage, Scheduling, Location, Portal, Forms, Documents, or Commerce durable state;
 - active booking holds or slot offers;
 - external provider state.

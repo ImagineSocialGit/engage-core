@@ -183,7 +183,7 @@ final class ReportingSetupValidationContributor implements SetupValidationContri
         if ($classifier !== ReportingBrowserRequestClassifier::CONFIG_KEY) {
             yield $this->error(
                 'reporting.classification.browser_classifier_invalid',
-                'Reporting browser classifier must resolve to the supported request_signals_v1 implementation.',
+                'Reporting browser classifier must resolve to the supported '.ReportingBrowserRequestClassifier::CONFIG_KEY.' implementation.',
                 'reporting.classification.browser_classifier',
             );
         }

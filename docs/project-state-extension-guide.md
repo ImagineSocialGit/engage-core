@@ -21,11 +21,11 @@ Current scope:
 
 ```text
 13 configured section contracts
-61 transferred tables when the optional Reporting schema is installed
-54 explicitly policy-controlled tables
+62 transferred tables when the optional Reporting schema is installed
+53 explicitly policy-controlled tables
 ```
 
-Reporting is the first schema-activated optional section. Its retained `reporting_daily_metrics` table transfers only when the complete Reporting activation schema is installed; Reporting sessions, raw observations, and projection checkpoints remain resettable. Mortgage and Scheduling durable data remain outside the transfer contract. Their durable tables are currently guarded by `must_be_empty` policies. Ephemeral Scheduling slot offers and booking holds are also guarded and must be empty before export.
+Reporting is the first schema-activated optional section. Its retained `reporting_daily_metrics` and `reporting_external_measurements` tables transfer only when the complete Reporting activation schema is installed; Reporting sessions, raw observations, and projection checkpoints remain resettable. Mortgage and Scheduling durable data remain outside the transfer contract. Their durable tables are currently guarded by `must_be_empty` policies. Ephemeral Scheduling slot offers and booking holds are also guarded and must be empty before export.
 
 ## Authority
 
