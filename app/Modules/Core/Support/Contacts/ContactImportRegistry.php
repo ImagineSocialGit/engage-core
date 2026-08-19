@@ -2,8 +2,8 @@
 
 namespace App\Modules\Core\Support\Contacts;
 
-use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Contracts\Contacts\ContactImportHandler;
+use App\Modules\Core\Data\Contacts\ContactImportContext;
 use App\Modules\Core\Data\Contacts\ContactImportField;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
@@ -28,7 +28,7 @@ class ContactImportRegistry
     }
 
     /**
-     * @param  array<int, ContactImportField>  $fields
+     * @param array<int, ContactImportField> $fields
      */
     public function registerFields(array $fields): self
     {
@@ -40,7 +40,7 @@ class ContactImportRegistry
     }
 
     /**
-     * @param  class-string<ContactImportHandler>  $handler
+     * @param class-string<ContactImportHandler> $handler
      */
     public function registerHandler(string $handler): self
     {
@@ -133,19 +133,10 @@ class ContactImportRegistry
         return $value === '' ? null : $value;
     }
 
-    public function handleModuleImports(Contact $contact, array $row, array $mapping): void
+    public function handleModuleImports(ContactImportContext $context): void
     {
         foreach ($this->handlers as $handler) {
-            app($handler)->handle(
-                contact: $contact,
-                row: $row,
-                mapping: $mapping,
-                mappedValue: fn (array $row, array $mapping, string $field): ?string => $this->mappedValue(
-                    row: $row,
-                    mapping: $mapping,
-                    field: $field,
-                ),
-            );
+            app($handler)->handle($context);
         }
     }
 }

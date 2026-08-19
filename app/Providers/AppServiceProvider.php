@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Console\Commands\SyncPresetsCommand;
 use App\Console\Commands\ValidateSetupCommand;
+use App\Modules\Core\Data\Contacts\ContactImportField;
+use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Support\AutomationCapabilities\AutomationActionRegistry;
 use App\Support\AutomationCapabilities\AutomationCapabilityRegistry;
 use App\Support\AutomationCapabilities\AutomationPointDefinitionRegistry;
@@ -15,6 +17,7 @@ use App\Support\ConfigContracts\ConfigContractTargetRegistry;
 use App\Support\ConfigContracts\Contracts\ModuleDefinitionConfigContract;
 use App\Support\ConfigContracts\Contracts\PresetPackageConfigContract;
 use App\Support\ConfigContracts\TargetProviders\AppConfigContractTargetProvider;
+use App\Support\ModuleIntegrations\RelationshipLocationAreaImportHandler;
 use App\Support\Modules\ModuleManager;
 use App\Support\Presets\Contracts\PresetContributor;
 use App\Support\Presets\PresetCompositionResolver;
@@ -149,6 +152,38 @@ class AppServiceProvider extends ServiceProvider
             PresetCompositionSetupValidationContributor::class,
             ReferenceRegistrySetupValidationContributor::class,
         ], 'setup.validation_contributors');
+
+        $this->app->afterResolving(
+            ContactImportRegistry::class,
+            function (ContactImportRegistry $registry, $app): void {
+                $modules = $app->make(ModuleManager::class);
+
+                if (! $modules->enabled('location')
+                    || ! in_array('relationships', $modules->enabledKeysWithDependencies(), true)
+                ) {
+                    return;
+                }
+
+                $registry
+                    ->registerFields([
+                        ContactImportField::make(
+                            key: 'relationship_location_area_key',
+                            label: 'Relationship Location Area Key',
+                            section: 'Relationship — Location',
+                            description: 'Existing active LocationArea key used for this relationship context.',
+                            sort: 2100,
+                        ),
+                        ContactImportField::make(
+                            key: 'relationship_location_area_primary',
+                            label: 'Primary Relationship Area?',
+                            section: 'Relationship — Location',
+                            description: 'Optional Yes/No value. Defaults to Yes when an area key is imported.',
+                            sort: 2110,
+                        ),
+                    ])
+                    ->registerHandler(RelationshipLocationAreaImportHandler::class);
+            },
+        );
     }
 
     public function boot(): void

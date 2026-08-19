@@ -5,6 +5,7 @@ namespace App\Modules\Core\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Actions\Contacts\CreateOrUpdateContactAction;
 use App\Modules\Core\Contracts\Contacts\UpdatesContactStatus;
+use App\Modules\Core\Data\Contacts\ContactImportContext;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Core\Models\ContactImportOccurrence;
@@ -443,13 +444,7 @@ class ContactController extends Controller
                     'contact_import_batch_id' => $importBatch->id,
                 ])->save();
 
-                $contactImportRegistry->handleModuleImports(
-                    contact: $contact,
-                    row: $data,
-                    mapping: $mapping,
-                );
-
-                ContactImportOccurrence::query()->create([
+                $occurrence = ContactImportOccurrence::query()->create([
                     'contact_import_batch_id' => $importBatch->id,
                     'contact_id' => $contact->id,
                     'row_number' => $rowNumber,
@@ -466,6 +461,16 @@ class ContactController extends Controller
                         'status_mapping' => $statusMappingResult->toMeta(),
                     ],
                 ]);
+
+                $contactImportRegistry->handleModuleImports(
+                    new ContactImportContext(
+                        contact: $contact,
+                        batch: $importBatch,
+                        occurrence: $occurrence,
+                        row: $data,
+                        mapping: $mapping,
+                    ),
+                );
 
                 $wasExisting ? $updated++ : $created++;
             }

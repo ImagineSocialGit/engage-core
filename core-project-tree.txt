@@ -191,6 +191,7 @@
 │   │   │   │   └── ContactNoteController.php
 │   │   │   ├── Data
 │   │   │   │   └── Contacts
+│   │   │   │       ├── ContactImportContext.php
 │   │   │   │       ├── ContactImportField.php
 │   │   │   │       ├── ContactImportStatusMappingResult.php
 │   │   │   │       └── ContactPanel.php
@@ -709,6 +710,8 @@
 │   │   │   │   ├── HasRealtorState.php
 │   │   │   │   ├── MortgageLoanParticipantRole.php
 │   │   │   │   └── MortgageLoanRealtorRole.php
+│   │   │   ├── Import
+│   │   │   │   └── MortgageContactImportHandler.php
 │   │   │   ├── Models
 │   │   │   │   ├── ContactMortgageProfile.php
 │   │   │   │   ├── MortgageLoanParticipant.php
@@ -739,6 +742,8 @@
 │   │   ├── Relationships
 │   │   │   ├── Actions
 │   │   │   │   └── UpsertContactRelationshipAction.php
+│   │   │   ├── Import
+│   │   │   │   └── ContactRelationshipImportHandler.php
 │   │   │   ├── Models
 │   │   │   │   └── ContactRelationship.php
 │   │   │   ├── Providers
@@ -1217,7 +1222,8 @@
 │       │   │   └── DashboardPanelProvider.php
 │       │   └── DashboardPanelRegistry.php
 │       ├── ModuleIntegrations
-│       │   └── RelationshipLocationAreaBridge.php
+│       │   ├── RelationshipLocationAreaBridge.php
+│       │   └── RelationshipLocationAreaImportHandler.php
 │       ├── Modules
 │       │   ├── Migrations
 │       │   │   ├── MigrationScopeDefinition.php
@@ -1656,6 +1662,7 @@
 │   │   │   └── TODO.md
 │   │   ├── commerce
 │   │   │   └── module_state.md
+│   │   ├── contact-import-domain-ingestion.md
 │   │   ├── core
 │   │   │   ├── module_state.md
 │   │   │   └── TODO.md
@@ -2028,6 +2035,7 @@
 │   │   │   ├── ContactControllerTest.php
 │   │   │   ├── ContactFilterResolverTest.php
 │   │   │   ├── ContactImportBatchControllerTest.php
+│   │   │   ├── ContactImportHandlerContextIntegrationTest.php
 │   │   │   ├── ContactImportProvenanceTest.php
 │   │   │   ├── ContactImportStatusMappingTest.php
 │   │   │   ├── ContactLookupControllerTest.php
@@ -2180,6 +2188,7 @@
 │   │   │   ├── ModuleRouteMiddlewareTest.php
 │   │   │   └── PlatformMigrationFoundationTest.php
 │   │   ├── Mortgage
+│   │   │   ├── MortgageContactImportHandlerTest.php
 │   │   │   └── MortgageDomainFoundationTest.php
 │   │   ├── Observability
 │   │   │   ├── ObservabilityConfigurationContractTest.php
@@ -2212,7 +2221,9 @@
 │   │   │   ├── WebinarProjectStateRoundTripTest.php
 │   │   │   └── WorkflowProjectStateRoundTripTest.php
 │   │   ├── Relationships
+│   │   │   ├── ContactRelationshipImportHandlerTest.php
 │   │   │   ├── RelationshipLocationAreaBridgeTest.php
+│   │   │   ├── RelationshipLocationAreaImportHandlerTest.php
 │   │   │   └── RelationshipsFoundationTest.php
 │   │   ├── Reporting
 │   │   │   ├── ReportingBrowserClientContractTest.php
@@ -2360,4 +2371,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-606 directories, 1755 files
+608 directories, 1764 files
