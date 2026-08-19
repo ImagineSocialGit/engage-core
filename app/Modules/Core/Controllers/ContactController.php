@@ -11,6 +11,7 @@ use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Core\Models\ContactImportOccurrence;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Core\Requests\StoreContactRequest;
+use App\Modules\Core\Services\Contacts\ContactImportProfileRegistry;
 use App\Modules\Core\Services\Contacts\ContactImportStatusMapper;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
@@ -148,17 +149,19 @@ class ContactController extends Controller
     public function previewImport(
         Request $request,
         ContactImportRegistry $contactImportRegistry,
+        ContactImportProfileRegistry $contactImportProfileRegistry,
         ContactImportStatusMapper $contactImportStatusMapper,
     ): View|RedirectResponse {
         $validated = $request->validate([
             'csv' => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
         ]);
 
+        $originalFilename = $validated['csv']->getClientOriginalName();
         $storedPath = $validated['csv']->store('imports', 'local');
 
         $request->session()->put(
             $this->importOriginalFilenameSessionKey($storedPath),
-            $validated['csv']->getClientOriginalName(),
+            $originalFilename,
         );
 
         $handle = fopen(Storage::disk('local')->path($storedPath), 'r');
@@ -192,6 +195,20 @@ class ContactController extends Controller
                 ->withInput();
         }
 
+        $importProfile = $contactImportProfileRegistry->findByFilename($originalFilename);
+        $suggestedMapping = $importProfile !== null
+            ? $contactImportProfileRegistry->suggestedMapping($importProfile, $headers->all())
+            : [];
+
+        if ($importProfile !== null) {
+            $request->session()->put(
+                $this->importProfileKeySessionKey($storedPath),
+                $importProfile->key,
+            );
+        } else {
+            $request->session()->forget($this->importProfileKeySessionKey($storedPath));
+        }
+
         $rows = [];
 
         while (($row = fgetcsv($handle)) !== false && count($rows) < 20) {
@@ -217,6 +234,8 @@ class ContactController extends Controller
             'importSections' => $contactImportRegistry->sections(),
             'contactStatuses' => $contactStatuses,
             'statusPreviewValues' => collect(),
+            'importProfile' => $importProfile,
+            'suggestedMapping' => $suggestedMapping,
         ]);
     }
 
@@ -224,6 +243,7 @@ class ContactController extends Controller
         Request $request,
         CreateOrUpdateContactAction $createOrUpdateContact,
         ContactImportRegistry $contactImportRegistry,
+        ContactImportProfileRegistry $contactImportProfileRegistry,
         ContactImportStatusMapper $contactImportStatusMapper,
     ): RedirectResponse {
         $rules = [
@@ -245,6 +265,11 @@ class ContactController extends Controller
         $validated = $request->validate($rules);
 
         $csvPath = $validated['csv_path'];
+        $profileKey = $request->session()->get($this->importProfileKeySessionKey($csvPath));
+        $importProfile = is_string($profileKey) && trim($profileKey) !== ''
+            ? $contactImportProfileRegistry->get($profileKey)
+            : null;
+        $profileDefaults = $importProfile?->defaults ?? [];
 
         $allowedMappingFields = array_values(array_unique([
             ...$contactImportRegistry->fieldKeys(),
@@ -318,6 +343,8 @@ class ContactController extends Controller
                 'csv_path' => $csvPath,
                 'mapping' => $mapping,
                 'headers' => $headers,
+                'profile_key' => $importProfile?->key,
+                'profile_defaults' => $profileDefaults,
             ],
         ]);
 
@@ -347,9 +374,10 @@ class ContactController extends Controller
                 $contactData = [];
 
                 foreach ($contactImportRegistry->contactAttributeFields() as $field) {
-                    $value = $contactImportRegistry->mappedValue(
+                    $value = $contactImportRegistry->value(
                         row: $data,
                         mapping: $mapping,
+                        defaults: $profileDefaults,
                         field: $field->key,
                     );
 
@@ -398,6 +426,7 @@ class ContactController extends Controller
                     row: $data,
                     mapping: $mapping,
                     contactImportRegistry: $contactImportRegistry,
+                    defaults: $profileDefaults,
                 );
 
                 $statusMappingResult = $contactImportStatusMapper->resolve(
@@ -469,6 +498,7 @@ class ContactController extends Controller
                         occurrence: $occurrence,
                         row: $data,
                         mapping: $mapping,
+                        defaults: $profileDefaults,
                     ),
                 );
 
@@ -503,6 +533,8 @@ class ContactController extends Controller
             mapping: $submittedStatusMapping,
             results: $statusMappingResults,
         );
+
+        $request->session()->forget($this->importProfileKeySessionKey($csvPath));
 
         $importBatch->forceFill([
             'status' => ContactImportBatch::STATUS_COMPLETED,
@@ -578,35 +610,22 @@ class ContactController extends Controller
         return 'contact_imports.'.hash('sha256', $csvPath).'.original_filename';
     }
 
+    private function importProfileKeySessionKey(string $csvPath): string
+    {
+        return 'contact_imports.'.hash('sha256', $csvPath).'.profile_key';
+    }
+
     private function mappedImportStatusValue(
         array $row,
         array $mapping,
         ContactImportRegistry $contactImportRegistry,
+        array $defaults = [],
     ): ?string {
-        $value = $contactImportRegistry->mappedValue(
+        return $contactImportRegistry->value(
             row: $row,
             mapping: $mapping,
+            defaults: $defaults,
             field: 'import_status',
         );
-
-        if ($value !== null) {
-            return $value;
-        }
-
-        $header = $mapping['import_status'] ?? null;
-
-        if (! is_string($header) || trim($header) === '') {
-            return null;
-        }
-
-        $value = $row[$header] ?? null;
-
-        if ($value === null) {
-            return null;
-        }
-
-        $value = trim((string) $value);
-
-        return $value !== '' ? $value : null;
     }
 }

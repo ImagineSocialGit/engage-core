@@ -133,6 +133,37 @@ class ContactImportRegistry
         return $value === '' ? null : $value;
     }
 
+    /**
+     * @param array<string, mixed> $row
+     * @param array<string, string> $mapping
+     * @param array<string, string> $defaults
+     */
+    public function value(
+        array $row,
+        array $mapping,
+        array $defaults,
+        string $field,
+    ): ?string {
+        return $this->mappedValue($row, $mapping, $field)
+            ?? $this->defaultValue($defaults, $field);
+    }
+
+    /**
+     * @param array<string, string> $defaults
+     */
+    private function defaultValue(array $defaults, string $field): ?string
+    {
+        $value = $defaults[$field] ?? null;
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
+    }
+
     public function handleModuleImports(ContactImportContext $context): void
     {
         foreach ($this->handlers as $handler) {

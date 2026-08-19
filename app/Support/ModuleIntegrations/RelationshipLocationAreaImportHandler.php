@@ -19,7 +19,7 @@ final class RelationshipLocationAreaImportHandler implements ContactImportHandle
 
     public function handle(ContactImportContext $context): void
     {
-        $areaKey = $context->mappedValue('relationship_location_area_key');
+        $areaKey = $context->value('relationship_location_area_key');
 
         if ($areaKey === null) {
             return;
@@ -31,7 +31,7 @@ final class RelationshipLocationAreaImportHandler implements ContactImportHandle
             );
         }
 
-        $relationshipKey = $context->mappedValue('relationship_key');
+        $relationshipKey = $context->value('relationship_key');
 
         if ($relationshipKey === null) {
             throw new InvalidArgumentException(
@@ -61,7 +61,7 @@ final class RelationshipLocationAreaImportHandler implements ContactImportHandle
             relationship: $relationship,
             area: $area,
             isPrimary: $this->boolean(
-                $context->mappedValue('relationship_location_area_primary'),
+                $context->value('relationship_location_area_primary'),
                 default: true,
             ),
             source: $context->occurrence->original_source ?? 'crm_import',

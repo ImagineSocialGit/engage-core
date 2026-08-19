@@ -193,6 +193,7 @@
 │   │   │   │   └── Contacts
 │   │   │   │       ├── ContactImportContext.php
 │   │   │   │       ├── ContactImportField.php
+│   │   │   │       ├── ContactImportProfile.php
 │   │   │   │       ├── ContactImportStatusMappingResult.php
 │   │   │   │       └── ContactPanel.php
 │   │   │   ├── Enums
@@ -217,6 +218,7 @@
 │   │   │   ├── Services
 │   │   │   │   ├── Contacts
 │   │   │   │   │   ├── ContactFilterResolver.php
+│   │   │   │   │   ├── ContactImportProfileRegistry.php
 │   │   │   │   │   └── ContactImportStatusMapper.php
 │   │   │   │   └── SiteSettings
 │   │   │   │       └── SiteSettingResolver.php
@@ -1335,6 +1337,7 @@
 │   ├── cache-keys.php
 │   ├── cache.php
 │   ├── client.php
+│   ├── contact_imports.php
 │   ├── contacts.php
 │   ├── database.php
 │   ├── events.php
@@ -1663,6 +1666,7 @@
 │   │   ├── commerce
 │   │   │   └── module_state.md
 │   │   ├── contact-import-domain-ingestion.md
+│   │   ├── contact-import-profiles.md
 │   │   ├── core
 │   │   │   ├── module_state.md
 │   │   │   └── TODO.md
@@ -1968,6 +1972,7 @@
 │   ├── make-crm-dependency-cone-dump.sh
 │   ├── make-module-dependency-cone-dump.sh
 │   ├── make-project-state-dependency-cone-dump.sh
+│   ├── make-setup-validation-config-contracts-dependency-cone-dump.sh
 │   ├── make-system-deployment-context-dump.sh
 │   ├── operations
 │   │   ├── configure-client-logging.sh
@@ -2036,6 +2041,8 @@
 │   │   │   ├── ContactFilterResolverTest.php
 │   │   │   ├── ContactImportBatchControllerTest.php
 │   │   │   ├── ContactImportHandlerContextIntegrationTest.php
+│   │   │   ├── ContactImportProfileControllerTest.php
+│   │   │   ├── ContactImportProfileRegistryTest.php
 │   │   │   ├── ContactImportProvenanceTest.php
 │   │   │   ├── ContactImportStatusMappingTest.php
 │   │   │   ├── ContactLookupControllerTest.php
@@ -2371,4 +2378,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-608 directories, 1764 files
+608 directories, 1771 files

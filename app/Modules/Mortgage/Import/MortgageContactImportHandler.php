@@ -67,23 +67,21 @@ final class MortgageContactImportHandler implements ContactImportHandler
         'mortgage_realtor_brokerage',
         'mortgage_realtor_license_number',
         'mortgage_realtor_last_referral_at',
-        'mortgage_realtor_production_period_ending_on',
-        'mortgage_realtor_production_period_months',
         'mortgage_realtor_production_loan_count',
         'mortgage_realtor_production_conventional_count',
         'mortgage_realtor_production_va_count',
         'mortgage_realtor_production_loan_volume',
-        'mortgage_realtor_production_source',
     ];
 
+    /**
+     * Observation metadata such as period/source may be profile defaults, so
+     * only actual production measurements may trigger a snapshot.
+     */
     private const REALTOR_PRODUCTION_FIELDS = [
-        'mortgage_realtor_production_period_ending_on',
-        'mortgage_realtor_production_period_months',
         'mortgage_realtor_production_loan_count',
         'mortgage_realtor_production_conventional_count',
         'mortgage_realtor_production_va_count',
         'mortgage_realtor_production_loan_volume',
-        'mortgage_realtor_production_source',
     ];
 
     public function __construct(
@@ -99,8 +97,8 @@ final class MortgageContactImportHandler implements ContactImportHandler
 
     private function importCurrentProfile(ContactImportContext $context): void
     {
-        $hasRealtorValue = $context->mappedValue('mortgage_has_realtor');
-        $originalLeadValue = $context->mappedValue('mortgage_original_lead_at');
+        $hasRealtorValue = $context->value('mortgage_has_realtor');
+        $originalLeadValue = $context->value('mortgage_original_lead_at');
 
         if ($hasRealtorValue === null && $originalLeadValue === null) {
             return;
@@ -128,45 +126,45 @@ final class MortgageContactImportHandler implements ContactImportHandler
 
     private function importLoan(ContactImportContext $context): void
     {
-        if (! $context->hasAnyMappedValue(self::LOAN_FIELDS)) {
+        if (! $context->hasAnyValue(self::LOAN_FIELDS)) {
             return;
         }
 
-        $sourceSystem = $context->mappedValue('mortgage_loan_source_system')
+        $sourceSystem = $context->value('mortgage_loan_source_system')
             ?? $context->batch->source
             ?? 'crm_csv';
-        $sourceRecordId = $context->mappedValue('mortgage_loan_source_record_id');
+        $sourceRecordId = $context->value('mortgage_loan_source_record_id');
         $mortgageStageId = $this->mortgageStageId(
-            $context->mappedValue('mortgage_loan_stage_key'),
+            $context->value('mortgage_loan_stage_key'),
         );
 
         $attributes = $this->nonNull([
             'mortgage_stage_id' => $mortgageStageId,
             'source_system' => $sourceSystem,
             'source_record_id' => $sourceRecordId,
-            'loan_originator' => $context->mappedValue('mortgage_loan_originator'),
-            'loan_purpose' => $context->mappedValue('mortgage_loan_purpose'),
-            'loan_program' => $context->mappedValue('mortgage_loan_program'),
-            'mortgage_type' => $context->mappedValue('mortgage_type'),
-            'lien_position' => $context->mappedValue('mortgage_lien_position'),
-            'loan_amount' => $this->decimal($context->mappedValue('mortgage_loan_amount'), 'mortgage_loan_amount'),
-            'note_rate' => $this->decimal($context->mappedValue('mortgage_note_rate'), 'mortgage_note_rate'),
-            'sales_price' => $this->decimal($context->mappedValue('mortgage_sales_price'), 'mortgage_sales_price'),
-            'appraised_value' => $this->decimal($context->mappedValue('mortgage_appraised_value'), 'mortgage_appraised_value'),
-            'cash_to_close' => $this->decimal($context->mappedValue('mortgage_cash_to_close'), 'mortgage_cash_to_close'),
-            'subject_property_street' => $context->mappedValue('mortgage_subject_property_street'),
-            'subject_property_city' => $context->mappedValue('mortgage_subject_property_city'),
-            'subject_property_state' => $context->mappedValue('mortgage_subject_property_state'),
-            'subject_property_zip' => $context->mappedValue('mortgage_subject_property_zip'),
-            'closed_on' => $this->date($context->mappedValue('mortgage_closed_on'), 'mortgage_closed_on'),
+            'loan_originator' => $context->value('mortgage_loan_originator'),
+            'loan_purpose' => $context->value('mortgage_loan_purpose'),
+            'loan_program' => $context->value('mortgage_loan_program'),
+            'mortgage_type' => $context->value('mortgage_type'),
+            'lien_position' => $context->value('mortgage_lien_position'),
+            'loan_amount' => $this->decimal($context->value('mortgage_loan_amount'), 'mortgage_loan_amount'),
+            'note_rate' => $this->decimal($context->value('mortgage_note_rate'), 'mortgage_note_rate'),
+            'sales_price' => $this->decimal($context->value('mortgage_sales_price'), 'mortgage_sales_price'),
+            'appraised_value' => $this->decimal($context->value('mortgage_appraised_value'), 'mortgage_appraised_value'),
+            'cash_to_close' => $this->decimal($context->value('mortgage_cash_to_close'), 'mortgage_cash_to_close'),
+            'subject_property_street' => $context->value('mortgage_subject_property_street'),
+            'subject_property_city' => $context->value('mortgage_subject_property_city'),
+            'subject_property_state' => $context->value('mortgage_subject_property_state'),
+            'subject_property_zip' => $context->value('mortgage_subject_property_zip'),
+            'closed_on' => $this->date($context->value('mortgage_closed_on'), 'mortgage_closed_on'),
         ]);
 
         $fingerprint = $this->fingerprint([
             'contact_email' => strtolower((string) $context->contact->email),
             ...$attributes,
-            'coborrower_first_name' => $context->mappedValue('mortgage_coborrower_first_name'),
-            'coborrower_last_name' => $context->mappedValue('mortgage_coborrower_last_name'),
-            'coborrower_email' => $this->email($context->mappedValue('mortgage_coborrower_email')),
+            'coborrower_first_name' => $context->value('mortgage_coborrower_first_name'),
+            'coborrower_last_name' => $context->value('mortgage_coborrower_last_name'),
+            'coborrower_email' => $this->email($context->value('mortgage_coborrower_email')),
         ]);
 
         $loanQuery = MortgageLoan::query()
@@ -223,21 +221,21 @@ final class MortgageContactImportHandler implements ContactImportHandler
                 'email' => $this->email($context->contact->email),
                 'phone' => $context->contact->phone,
                 'date_of_birth' => $this->date(
-                    $context->mappedValue('mortgage_primary_date_of_birth'),
+                    $context->value('mortgage_primary_date_of_birth'),
                     'mortgage_primary_date_of_birth',
                 ),
-                'mailing_address' => $context->mappedValue('mortgage_primary_mailing_address'),
+                'mailing_address' => $context->value('mortgage_primary_mailing_address'),
             ]),
         );
     }
 
     private function upsertCoborrower(ContactImportContext $context, MortgageLoan $loan): void
     {
-        if (! $context->hasAnyMappedValue(self::COBORROWER_FIELDS)) {
+        if (! $context->hasAnyValue(self::COBORROWER_FIELDS)) {
             return;
         }
 
-        $email = $this->email($context->mappedValue('mortgage_coborrower_email'));
+        $email = $this->email($context->value('mortgage_coborrower_email'));
         $contactId = null;
 
         if ($email !== null && strcasecmp($email, (string) $context->contact->email) !== 0) {
@@ -254,15 +252,15 @@ final class MortgageContactImportHandler implements ContactImportHandler
             ],
             $this->nonNull([
                 'contact_id' => $contactId,
-                'first_name' => $context->mappedValue('mortgage_coborrower_first_name'),
-                'last_name' => $context->mappedValue('mortgage_coborrower_last_name'),
+                'first_name' => $context->value('mortgage_coborrower_first_name'),
+                'last_name' => $context->value('mortgage_coborrower_last_name'),
                 'email' => $email,
-                'phone' => $context->mappedValue('mortgage_coborrower_phone'),
+                'phone' => $context->value('mortgage_coborrower_phone'),
                 'date_of_birth' => $this->date(
-                    $context->mappedValue('mortgage_coborrower_date_of_birth'),
+                    $context->value('mortgage_coborrower_date_of_birth'),
                     'mortgage_coborrower_date_of_birth',
                 ),
-                'mailing_address' => $context->mappedValue('mortgage_coborrower_mailing_address'),
+                'mailing_address' => $context->value('mortgage_coborrower_mailing_address'),
             ]),
         );
     }
@@ -279,11 +277,11 @@ final class MortgageContactImportHandler implements ContactImportHandler
         string $emailField,
         string $phoneField,
     ): void {
-        if (! $context->hasAnyMappedValue($fields)) {
+        if (! $context->hasAnyValue($fields)) {
             return;
         }
 
-        $email = $this->email($context->mappedValue($emailField));
+        $email = $this->email($context->value($emailField));
         $contactId = $email !== null
             ? Contact::query()->where('email', $email)->value('id')
             : null;
@@ -296,20 +294,20 @@ final class MortgageContactImportHandler implements ContactImportHandler
             ],
             $this->nonNull([
                 'contact_id' => $contactId,
-                'name' => $context->mappedValue($nameField),
+                'name' => $context->value($nameField),
                 'email' => $email,
-                'phone' => $context->mappedValue($phoneField),
+                'phone' => $context->value($phoneField),
             ]),
         );
     }
 
     private function importRealtorProfile(ContactImportContext $context): void
     {
-        if (! $context->hasAnyMappedValue(self::REALTOR_PROFILE_FIELDS)) {
+        if (! $context->hasAnyValue(self::REALTOR_PROFILE_FIELDS)) {
             return;
         }
 
-        $relationshipKey = $context->mappedValue('relationship_key');
+        $relationshipKey = $context->value('relationship_key');
 
         if ($relationshipKey === null) {
             throw new InvalidArgumentException(
@@ -329,16 +327,16 @@ final class MortgageContactImportHandler implements ContactImportHandler
         ]);
 
         $profile->fill($this->nonNull([
-            'brokerage_name' => $context->mappedValue('mortgage_realtor_brokerage'),
-            'license_number' => $context->mappedValue('mortgage_realtor_license_number'),
+            'brokerage_name' => $context->value('mortgage_realtor_brokerage'),
+            'license_number' => $context->value('mortgage_realtor_license_number'),
             'last_referral_at' => $this->optionalDateTime(
-                $context->mappedValue('mortgage_realtor_last_referral_at'),
+                $context->value('mortgage_realtor_last_referral_at'),
                 'mortgage_realtor_last_referral_at',
             ),
         ]));
         $profile->save();
 
-        if ($context->hasAnyMappedValue(self::REALTOR_PRODUCTION_FIELDS)) {
+        if ($context->hasAnyValue(self::REALTOR_PRODUCTION_FIELDS)) {
             $this->upsertRealtorProduction($context, $profile);
         }
     }
@@ -348,12 +346,12 @@ final class MortgageContactImportHandler implements ContactImportHandler
         MortgageRealtorProfile $profile,
     ): void {
         $periodEndingOn = $this->date(
-            $context->mappedValue('mortgage_realtor_production_period_ending_on'),
+            $context->value('mortgage_realtor_production_period_ending_on'),
             'mortgage_realtor_production_period_ending_on',
         ) ?? $context->batch->imported_at?->toDateString() ?? now()->toDateString();
 
         $periodMonths = $this->integer(
-            $context->mappedValue('mortgage_realtor_production_period_months'),
+            $context->value('mortgage_realtor_production_period_months'),
             'mortgage_realtor_production_period_months',
         ) ?? 12;
 
@@ -363,7 +361,7 @@ final class MortgageContactImportHandler implements ContactImportHandler
             );
         }
 
-        $source = $context->mappedValue('mortgage_realtor_production_source')
+        $source = $context->value('mortgage_realtor_production_source')
             ?? $context->batch->source
             ?? 'crm_csv';
 
@@ -371,19 +369,19 @@ final class MortgageContactImportHandler implements ContactImportHandler
             'period_ending_on' => $periodEndingOn,
             'period_months' => $periodMonths,
             'loan_count' => $this->integer(
-                $context->mappedValue('mortgage_realtor_production_loan_count'),
+                $context->value('mortgage_realtor_production_loan_count'),
                 'mortgage_realtor_production_loan_count',
             ),
             'conventional_count' => $this->integer(
-                $context->mappedValue('mortgage_realtor_production_conventional_count'),
+                $context->value('mortgage_realtor_production_conventional_count'),
                 'mortgage_realtor_production_conventional_count',
             ),
             'va_count' => $this->integer(
-                $context->mappedValue('mortgage_realtor_production_va_count'),
+                $context->value('mortgage_realtor_production_va_count'),
                 'mortgage_realtor_production_va_count',
             ),
             'loan_volume' => $this->decimal(
-                $context->mappedValue('mortgage_realtor_production_loan_volume'),
+                $context->value('mortgage_realtor_production_loan_volume'),
                 'mortgage_realtor_production_loan_volume',
             ),
             'source' => $source,

@@ -178,6 +178,37 @@ class MortgageContactImportHandlerTest extends TestCase
         $this->assertDatabaseCount('mortgage_realtor_production_snapshots', 1);
     }
 
+    public function test_realtor_production_metadata_defaults_do_not_create_empty_mortgage_profile_or_snapshot(): void
+    {
+        $contact = Contact::factory()->create([
+            'first_name' => 'Taylor',
+            'last_name' => 'Agent',
+            'email' => 'taylor@example.test',
+        ]);
+        $batch = ContactImportBatch::factory()->create([
+            'source' => 'crm_csv',
+            'imported_at' => '2026-08-19 12:00:00',
+        ]);
+
+        $handler = app(MortgageContactImportHandler::class);
+        $handler->handle($this->context(
+            contact: $contact,
+            batch: $batch,
+            rowNumber: 2,
+            row: [],
+            mapping: [],
+            defaults: [
+                'relationship_key' => 'realtor',
+                'relationship_stage' => 'target_agent',
+                'mortgage_realtor_production_period_months' => '12',
+                'mortgage_realtor_production_source' => 'agent_export',
+            ],
+        ));
+
+        $this->assertDatabaseCount('mortgage_realtor_profiles', 0);
+        $this->assertDatabaseCount('mortgage_realtor_production_snapshots', 0);
+    }
+
     /**
      * @param array<string, mixed> $row
      * @param array<string, string> $mapping
@@ -189,6 +220,7 @@ class MortgageContactImportHandlerTest extends TestCase
         array $row,
         array $mapping,
         ?string $source = 'loan_crm',
+        array $defaults = [],
     ): ContactImportContext {
         $occurrence = ContactImportOccurrence::query()->create([
             'contact_import_batch_id' => $batch->id,
@@ -207,6 +239,7 @@ class MortgageContactImportHandlerTest extends TestCase
             occurrence: $occurrence,
             row: $row,
             mapping: $mapping,
+            defaults: $defaults,
         );
     }
 }

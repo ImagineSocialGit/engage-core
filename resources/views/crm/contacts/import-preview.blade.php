@@ -7,7 +7,7 @@
         class="max-w-6xl space-y-6"
         x-data="{
             rows: @js($rows),
-            importStatusColumn: @js(old('mapping.import_status')),
+            importStatusColumn: @js(old('mapping.import_status', $suggestedMapping['import_status'] ?? null)),
             statusValues() {
                 if (! this.importStatusColumn) {
                     return [];
@@ -36,6 +36,24 @@
                 <p class="mt-1 text-sm text-slate-500">
                     Select the CSV column for each field. Required fields are marked.
                 </p>
+
+                @if ($importProfile)
+                    <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <p class="text-sm font-semibold text-slate-900">
+                            Import profile: {{ $importProfile->label }}
+                        </p>
+
+                        @if ($importProfile->description)
+                            <p class="mt-1 text-xs text-slate-600">
+                                {{ $importProfile->description }}
+                            </p>
+                        @endif
+
+                        <p class="mt-1 text-xs text-slate-500">
+                            Known columns were preselected where recognized. Review the mappings below before importing.
+                        </p>
+                    </div>
+                @endif
             </div>
 
             <form
@@ -98,7 +116,7 @@
                                         @foreach ($headers as $header)
                                             <option
                                                 value="{{ $header }}"
-                                                @selected(old("mapping.{$field->key}") === $header)
+                                                @selected(old("mapping.{$field->key}", $suggestedMapping[$field->key] ?? null) === $header)
                                             >
                                                 {{ $header }}
                                             </option>

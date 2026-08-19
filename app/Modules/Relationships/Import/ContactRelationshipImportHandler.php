@@ -18,7 +18,7 @@ final class ContactRelationshipImportHandler implements ContactImportHandler
 
     public function handle(ContactImportContext $context): void
     {
-        $relationshipKey = $context->mappedValue('relationship_key');
+        $relationshipKey = $context->value('relationship_key');
 
         if ($relationshipKey === null) {
             return;
@@ -32,20 +32,20 @@ final class ContactRelationshipImportHandler implements ContactImportHandler
         $this->upsertRelationship->handle(
             contact: $context->contact,
             relationshipKey: $relationshipKey,
-            stageKey: $context->mappedValue('relationship_stage'),
+            stageKey: $context->value('relationship_stage'),
             source: $this->importSource(
                 current: $existing?->source,
-                incoming: $context->mappedValue('relationship_source')
+                incoming: $context->value('relationship_source')
                     ?? $context->occurrence->original_source,
             ),
             subsource: $this->importSubsource(
                 current: $existing?->subsource,
-                incoming: $context->mappedValue('relationship_subsource')
+                incoming: $context->value('relationship_subsource')
                     ?? $context->occurrence->original_subsource,
             ),
             active: true,
             startedAt: $this->dateTime(
-                $context->mappedValue('relationship_started_at'),
+                $context->value('relationship_started_at'),
                 'relationship_started_at',
             ),
         );
