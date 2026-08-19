@@ -22,7 +22,6 @@ return new class extends Migration
                 ->default(HasRealtorState::Unknown->value)
                 ->index();
 
-            $table->string('market_key', 120)->nullable()->index();
             $table->timestamp('original_lead_at')->nullable()->index();
             $table->json('meta')->nullable();
             $table->timestamps();

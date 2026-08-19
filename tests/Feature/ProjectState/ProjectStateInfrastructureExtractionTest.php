@@ -46,6 +46,7 @@ class ProjectStateInfrastructureExtractionTest extends TestCase
         $this->assertEquals([
             'core',
             'relationships',
+            'location',
             'internal_notifications',
             'inbound_messaging',
             'messaging',

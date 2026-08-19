@@ -26,6 +26,7 @@ class LocationAreaAssignmentFactory extends Factory
             'subject_id' => null,
             'role' => LocationAreaAssignment::ROLE_MEMBER,
             'status' => LocationAreaAssignment::STATUS_ACTIVE,
+            'is_primary' => false,
             'starts_at' => null,
             'expires_at' => null,
             'source' => 'manual',

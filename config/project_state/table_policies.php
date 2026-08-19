@@ -109,14 +109,6 @@ return [
         'mode' => 'must_be_empty',
         'reason' => 'Location transfer support has not been added yet.',
     ],
-    'location_areas' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Location transfer support has not been added yet.',
-    ],
-    'location_area_assignments' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Location transfer support has not been added yet.',
-    ],
 
     'scheduling_hosts' => [
         'mode' => 'must_be_empty',

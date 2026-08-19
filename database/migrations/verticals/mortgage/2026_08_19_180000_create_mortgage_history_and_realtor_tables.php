@@ -129,21 +129,6 @@ return new class extends Migration
             );
         });
 
-        Schema::create('mortgage_realtor_markets', function (Blueprint $table) {
-            $table->id();
-            $table->foreignIdFor(MortgageRealtorProfile::class)
-                ->constrained()
-                ->cascadeOnDelete();
-            $table->string('market_key', 120)->index();
-            $table->boolean('is_primary')->default(false)->index();
-            $table->json('meta')->nullable();
-            $table->timestamps();
-
-            $table->unique([
-                'mortgage_realtor_profile_id',
-                'market_key',
-            ], 'mortgage_realtor_profile_market_unique');
-        });
 
         Schema::create('mortgage_realtor_production_snapshots', function (Blueprint $table) {
             $table->id();
@@ -174,7 +159,6 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('mortgage_realtor_production_snapshots');
-        Schema::dropIfExists('mortgage_realtor_markets');
         Schema::dropIfExists('mortgage_realtor_profiles');
         Schema::dropIfExists('mortgage_loan_realtors');
         Schema::dropIfExists('mortgage_loan_participants');

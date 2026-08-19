@@ -490,6 +490,7 @@
 │   │   │   └── Support
 │   │   ├── Location
 │   │   │   ├── Actions
+│   │   │   │   ├── AssignSubjectToLocationAreaAction.php
 │   │   │   │   └── NormalizeLocationInputAction.php
 │   │   │   ├── Contracts
 │   │   │   │   └── LocationNormalizationProvider.php
@@ -713,7 +714,6 @@
 │   │   │   │   ├── MortgageLoanParticipant.php
 │   │   │   │   ├── MortgageLoan.php
 │   │   │   │   ├── MortgageLoanRealtor.php
-│   │   │   │   ├── MortgageRealtorMarket.php
 │   │   │   │   ├── MortgageRealtorProductionSnapshot.php
 │   │   │   │   ├── MortgageRealtorProfile.php
 │   │   │   │   └── MortgageStage.php
@@ -1216,6 +1216,8 @@
 │       │   ├── Contracts
 │       │   │   └── DashboardPanelProvider.php
 │       │   └── DashboardPanelRegistry.php
+│       ├── ModuleIntegrations
+│       │   └── RelationshipLocationAreaBridge.php
 │       ├── Modules
 │       │   ├── Migrations
 │       │   │   ├── MigrationScopeDefinition.php
@@ -1381,6 +1383,7 @@
 │   │   ├── flow_routes.php
 │   │   ├── inbound_messaging.php
 │   │   ├── internal_notifications.php
+│   │   ├── location.php
 │   │   ├── messaging.php
 │   │   ├── mortgage.php
 │   │   ├── relationships.php
@@ -1674,6 +1677,7 @@
 │   │   │   └── module_state.md
 │   │   ├── location
 │   │   │   └── module_state.md
+│   │   ├── location-relationship-area-composition.md
 │   │   ├── messaging
 │   │   │   ├── checklist.md
 │   │   │   ├── module_state.md
@@ -2085,6 +2089,7 @@
 │   │   │           └── Telnyx
 │   │   │               └── TelnyxSmsProviderRealSendTest.php
 │   │   ├── Location
+│   │   │   ├── LocationAreaAssignmentCapabilityTest.php
 │   │   │   ├── LocationFoundationTest.php
 │   │   │   └── LocationNormalizationCapabilityTest.php
 │   │   ├── Messaging
@@ -2191,6 +2196,7 @@
 │   │   │   ├── FlowRoutesProjectStateRoundTripTest.php
 │   │   │   ├── InboundMessagingProjectStateRoundTripTest.php
 │   │   │   ├── InternalNotificationsProjectStateRoundTripTest.php
+│   │   │   ├── LocationProjectStateRoundTripTest.php
 │   │   │   ├── MessagingProjectStateRoundTripTest.php
 │   │   │   ├── MortgageProjectStateRoundTripTest.php
 │   │   │   ├── ProjectStateControllerTest.php
@@ -2206,6 +2212,7 @@
 │   │   │   ├── WebinarProjectStateRoundTripTest.php
 │   │   │   └── WorkflowProjectStateRoundTripTest.php
 │   │   ├── Relationships
+│   │   │   ├── RelationshipLocationAreaBridgeTest.php
 │   │   │   └── RelationshipsFoundationTest.php
 │   │   ├── Reporting
 │   │   │   ├── ReportingBrowserClientContractTest.php
@@ -2353,4 +2360,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-605 directories, 1749 files
+606 directories, 1755 files

@@ -49,8 +49,14 @@ class RelationshipsProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(16, $document['version']);
-        $this->assertSame(1, $document['sections']['relationships']['version']);
+        $this->assertSame(
+            (int) config('project_state.version'),
+            $document['version'],
+        );
+        $this->assertSame(
+            (int) config('project_state.sections.relationships.version'),
+            $document['sections']['relationships']['version'],
+        );
         $this->assertCount(
             2,
             $document['sections']['relationships']['tables']['contact_relationships'],

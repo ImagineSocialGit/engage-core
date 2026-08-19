@@ -15,7 +15,6 @@ class ContactMortgageProfile extends Model
     protected $fillable = [
         'contact_id',
         'has_realtor',
-        'market_key',
         'original_lead_at',
         'meta',
     ];

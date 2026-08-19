@@ -32,6 +32,7 @@ return new class extends Migration
 
             $table->string('role')->default('member')->index();
             $table->string('status')->default('active')->index();
+            $table->boolean('is_primary')->default(false)->index();
             $table->timestamp('starts_at')->nullable()->index();
             $table->timestamp('expires_at')->nullable()->index();
 
@@ -45,6 +46,10 @@ return new class extends Migration
             $table->index(['location_id', 'status'], 'location_area_assignments_location_status_index');
             $table->index(['contact_id', 'status'], 'location_area_assignments_contact_status_index');
             $table->index(['role', 'status'], 'location_area_assignments_role_status_index');
+            $table->unique(
+                ['location_area_id', 'subject_type', 'subject_id', 'role'],
+                'loc_area_subject_role_uq',
+            );
         });
     }
 

@@ -169,7 +169,7 @@ return [
 
         'location' => [
             'path' => 'database/migrations/modules/location',
-            'schema_version' => 1,
+            'schema_version' => 2,
             'migrations' => [
                 '2026_04_15_195856_create_locations_table.php',
                 '2026_04_15_195857_create_contact_locations_table.php',
@@ -255,7 +255,7 @@ return [
 
         'mortgage' => [
             'path' => 'database/migrations/verticals/mortgage',
-            'schema_version' => 3,
+            'schema_version' => 4,
             'migrations' => [
                 '2026_06_02_211108_create_mortgage_stages_table.php',
                 '2026_06_02_211116_create_contact_mortgage_profiles_table.php',

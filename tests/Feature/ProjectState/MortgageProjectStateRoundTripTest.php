@@ -10,7 +10,6 @@ use App\Modules\Mortgage\Models\ContactMortgageProfile;
 use App\Modules\Mortgage\Models\MortgageLoan;
 use App\Modules\Mortgage\Models\MortgageLoanParticipant;
 use App\Modules\Mortgage\Models\MortgageLoanRealtor;
-use App\Modules\Mortgage\Models\MortgageRealtorMarket;
 use App\Modules\Mortgage\Models\MortgageRealtorProductionSnapshot;
 use App\Modules\Mortgage\Models\MortgageRealtorProfile;
 use App\Modules\Mortgage\Models\MortgageStage;
@@ -42,12 +41,8 @@ class MortgageProjectStateRoundTripTest extends TestCase
 
     public function test_installed_mortgage_schema_round_trips_as_an_optional_project_state_section(): void
     {
-        $contact = Contact::factory()->create([
-            'email' => 'borrower@example.test',
-        ]);
-        $agent = Contact::factory()->create([
-            'email' => 'agent@example.test',
-        ]);
+        $contact = Contact::factory()->create(['email' => 'borrower@example.test']);
+        $agent = Contact::factory()->create(['email' => 'agent@example.test']);
 
         $stage = MortgageStage::query()->create([
             'key' => 'closed',
@@ -59,7 +54,6 @@ class MortgageProjectStateRoundTripTest extends TestCase
         $consumerProfile = ContactMortgageProfile::query()->create([
             'contact_id' => $contact->id,
             'has_realtor' => HasRealtorState::Yes,
-            'market_key' => 'fl_space_coast',
             'original_lead_at' => '2024-06-01 12:00:00',
             'meta' => ['source' => 'past_client_import'],
         ]);
@@ -88,7 +82,6 @@ class MortgageProjectStateRoundTripTest extends TestCase
             'first_name' => 'Borrower',
             'last_name' => 'Example',
             'email' => 'borrower@example.test',
-            'date_of_birth' => '1986-11-28',
         ]);
 
         $loanRealtor = MortgageLoanRealtor::query()->create([
@@ -113,12 +106,6 @@ class MortgageProjectStateRoundTripTest extends TestCase
             'meta' => ['specialty' => ['va_producer']],
         ]);
 
-        $market = MortgageRealtorMarket::query()->create([
-            'mortgage_realtor_profile_id' => $realtorProfile->id,
-            'market_key' => 'fl_space_coast',
-            'is_primary' => true,
-        ]);
-
         $snapshot = MortgageRealtorProductionSnapshot::query()->create([
             'mortgage_realtor_profile_id' => $realtorProfile->id,
             'period_ending_on' => '2026-08-19',
@@ -133,19 +120,18 @@ class MortgageProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(16, $document['version']);
+        $this->assertSame(17, $document['version']);
         $this->assertSame(1, $document['sections']['relationships']['version']);
-        $this->assertSame(2, $document['sections']['mortgage']['version']);
+        $this->assertSame(3, $document['sections']['mortgage']['version']);
+        $this->assertArrayNotHasKey('mortgage_realtor_markets', $document['sections']['mortgage']['tables']);
         $this->assertCount(1, $document['sections']['mortgage']['tables']['contact_mortgage_profiles']);
         $this->assertCount(1, $document['sections']['mortgage']['tables']['mortgage_loans']);
         $this->assertCount(1, $document['sections']['mortgage']['tables']['mortgage_loan_participants']);
         $this->assertCount(1, $document['sections']['mortgage']['tables']['mortgage_loan_realtors']);
         $this->assertCount(1, $document['sections']['mortgage']['tables']['mortgage_realtor_profiles']);
-        $this->assertCount(1, $document['sections']['mortgage']['tables']['mortgage_realtor_markets']);
         $this->assertCount(1, $document['sections']['mortgage']['tables']['mortgage_realtor_production_snapshots']);
 
         DB::table('mortgage_realtor_production_snapshots')->delete();
-        DB::table('mortgage_realtor_markets')->delete();
         DB::table('mortgage_realtor_profiles')->delete();
         DB::table('contact_relationships')->delete();
         DB::table('mortgage_loan_realtors')->delete();
@@ -156,7 +142,6 @@ class MortgageProjectStateRoundTripTest extends TestCase
         DB::table('contacts')->delete();
 
         $report = $projectState->validate($document);
-
         $this->assertTrue($report['valid'], implode(PHP_EOL, $report['errors']));
 
         $projectState->import($document);
@@ -165,7 +150,6 @@ class MortgageProjectStateRoundTripTest extends TestCase
             'id' => $consumerProfile->id,
             'contact_id' => $contact->id,
             'has_realtor' => HasRealtorState::Yes->value,
-            'market_key' => 'fl_space_coast',
         ]);
         $this->assertDatabaseHas('mortgage_loan_participants', [
             'id' => $participant->id,
@@ -189,21 +173,12 @@ class MortgageProjectStateRoundTripTest extends TestCase
             'id' => $realtorProfile->id,
             'contact_relationship_id' => $realtorRelationship->id,
         ]);
-        $this->assertDatabaseHas('mortgage_realtor_markets', [
-            'id' => $market->id,
-            'mortgage_realtor_profile_id' => $realtorProfile->id,
-            'market_key' => 'fl_space_coast',
-        ]);
         $this->assertDatabaseHas('mortgage_realtor_production_snapshots', [
             'id' => $snapshot->id,
             'mortgage_realtor_profile_id' => $realtorProfile->id,
             'va_count' => 50,
         ]);
 
-        $importedLoan = MortgageLoan::query()->findOrFail($loan->id);
-        $this->assertSame(
-            'closed',
-            $importedLoan->stage?->key,
-        );
+        $this->assertSame('closed', MortgageLoan::query()->findOrFail($loan->id)->stage?->key);
     }
 }

@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 2,
+    'version' => 3,
     'optional' => true,
     'activation_tables' => [
         'mortgage_stages',
@@ -10,7 +10,6 @@ return [
         'mortgage_loan_participants',
         'mortgage_loan_realtors',
         'mortgage_realtor_profiles',
-        'mortgage_realtor_markets',
         'mortgage_realtor_production_snapshots',
     ],
     'tables' => [
@@ -39,7 +38,6 @@ return [
                 'id',
                 'contact_id',
                 'has_realtor',
-                'market_key',
                 'original_lead_at',
                 'meta',
                 'created_at',
@@ -157,24 +155,6 @@ return [
             ],
         ],
 
-        'mortgage_realtor_markets' => [
-            'mode' => 'insert_empty',
-            'preserve_id' => true,
-            'order_by' => ['id'],
-            'columns' => [
-                'id',
-                'mortgage_realtor_profile_id',
-                'market_key',
-                'is_primary',
-                'meta',
-                'created_at',
-                'updated_at',
-            ],
-            'json_columns' => ['meta'],
-            'references' => [
-                'mortgage_realtor_profile_id' => 'mortgage_realtor_profiles',
-            ],
-        ],
 
         'mortgage_realtor_production_snapshots' => [
             'mode' => 'insert_empty',

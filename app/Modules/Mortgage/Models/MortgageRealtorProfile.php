@@ -30,10 +30,6 @@ class MortgageRealtorProfile extends Model
         return $this->belongsTo(ContactRelationship::class);
     }
 
-    public function markets(): HasMany
-    {
-        return $this->hasMany(MortgageRealtorMarket::class);
-    }
 
     public function productionSnapshots(): HasMany
     {
