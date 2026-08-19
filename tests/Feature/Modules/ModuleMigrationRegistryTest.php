@@ -73,7 +73,7 @@ class ModuleMigrationRegistryTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertCount(95, $currentFiles);
+        $this->assertCount(96, $currentFiles);
         $this->assertEquals($currentFiles, $registry->migrationFiles());
 
         foreach ($currentFiles as $migrationFile) {

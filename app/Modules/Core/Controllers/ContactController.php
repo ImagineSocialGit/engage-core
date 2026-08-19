@@ -7,6 +7,7 @@ use App\Modules\Core\Actions\Contacts\CreateOrUpdateContactAction;
 use App\Modules\Core\Contracts\Contacts\UpdatesContactStatus;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
+use App\Modules\Core\Models\ContactImportOccurrence;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Core\Requests\StoreContactRequest;
 use App\Modules\Core\Services\Contacts\ContactImportStatusMapper;
@@ -154,6 +155,11 @@ class ContactController extends Controller
 
         $storedPath = $validated['csv']->store('imports', 'local');
 
+        $request->session()->put(
+            $this->importOriginalFilenameSessionKey($storedPath),
+            $validated['csv']->getClientOriginalName(),
+        );
+
         $handle = fopen(Storage::disk('local')->path($storedPath), 'r');
 
         if ($handle === false) {
@@ -292,11 +298,16 @@ class ContactController extends Controller
             ->all();
 
         $importedAt = now();
+        $originalFilename = $request->session()->pull(
+            $this->importOriginalFilenameSessionKey($csvPath),
+        );
 
         $importBatch = ContactImportBatch::query()->create([
             'name' => 'Contact import '.$importedAt->format('M j, Y g:i A'),
             'source' => 'crm_csv',
-            'original_filename' => basename($csvPath),
+            'original_filename' => is_string($originalFilename) && trim($originalFilename) !== ''
+                ? basename(trim($originalFilename))
+                : basename($csvPath),
             'status' => ContactImportBatch::STATUS_PROCESSING,
             'imported_at' => $importedAt,
             'contact_count' => 0,
@@ -314,9 +325,11 @@ class ContactController extends Controller
         $skipped = 0;
         $phoneWarnings = 0;
         $statusMappingResults = [];
+        $rowNumber = 1;
 
         try {
             while (($row = fgetcsv($handle)) !== false) {
+                $rowNumber++;
                 $row = array_pad($row, count($headers), null);
 
                 $data = array_combine(
@@ -352,6 +365,16 @@ class ContactController extends Controller
                     continue;
                 }
 
+                $email = strtolower(trim((string) $email));
+
+                if ($email === '') {
+                    $skipped++;
+
+                    continue;
+                }
+
+                $contactData['email'] = $email;
+
                 if (array_key_exists('phone', $mapping)
                     && $contactImportRegistry->mappedValue(row: $data, mapping: $mapping, field: 'phone') === null
                 ) {
@@ -360,7 +383,7 @@ class ContactController extends Controller
 
                 $existingContact = Contact::query()
                     ->where('email', $email)
-                    ->first(['id', 'meta']);
+                    ->first(['id', 'source', 'subsource', 'meta']);
 
                 $wasExisting = $existingContact !== null;
 
@@ -384,10 +407,16 @@ class ContactController extends Controller
 
                 $statusMappingResults[] = $statusMappingResult;
 
+                $sourceValues = $this->contactImportSourceValues(
+                    existingContact: $existingContact,
+                    originalSource: $originalSource,
+                    originalSubsource: $originalSubsource,
+                );
+
                 $contact = $createOrUpdateContact->handle(
                     data: array_filter([
                         ...$contactData,
-                        'source' => 'import',
+                        ...$sourceValues,
                         'contact_status_id' => $statusMappingResult->isMapped()
                             ? $statusMappingResult->contactStatusId
                             : null,
@@ -419,6 +448,24 @@ class ContactController extends Controller
                     row: $data,
                     mapping: $mapping,
                 );
+
+                ContactImportOccurrence::query()->create([
+                    'contact_import_batch_id' => $importBatch->id,
+                    'contact_id' => $contact->id,
+                    'row_number' => $rowNumber,
+                    'outcome' => $wasExisting
+                        ? ContactImportOccurrence::OUTCOME_UPDATED
+                        : ContactImportOccurrence::OUTCOME_CREATED,
+                    'identity_type' => 'email',
+                    'identity_value' => $email,
+                    'original_source' => $originalSource,
+                    'original_subsource' => $originalSubsource,
+                    'original_status' => $originalStatus,
+                    'row_fingerprint' => hash('sha256', serialize($data)),
+                    'meta' => [
+                        'status_mapping' => $statusMappingResult->toMeta(),
+                    ],
+                ]);
 
                 $wasExisting ? $updated++ : $created++;
             }
@@ -472,6 +519,58 @@ class ContactController extends Controller
                 $phoneWarnings > 0 ? ", {$phoneWarnings} phone values were ignored" : '',
                 $statusMappingMeta['review_required'] ? ', status review needed for unmapped values' : ''
             ));
+    }
+
+    /**
+     * Preserve an existing meaningful acquisition source across overlapping
+     * imports while allowing a generic/blank import source to be enriched.
+     *
+     * @return array{source: string, subsource: ?string}
+     */
+    private function contactImportSourceValues(
+        ?Contact $existingContact,
+        ?string $originalSource,
+        ?string $originalSubsource,
+    ): array {
+        $currentSource = $this->nonEmptyString($existingContact?->source);
+        $currentSubsource = $this->nonEmptyString($existingContact?->subsource);
+
+        if ($currentSource !== null && strtolower($currentSource) !== 'import') {
+            $subsource = $currentSubsource;
+
+            if ($subsource === null
+                && $originalSource !== null
+                && strcasecmp($currentSource, $originalSource) === 0
+            ) {
+                $subsource = $originalSubsource;
+            }
+
+            return [
+                'source' => $currentSource,
+                'subsource' => $subsource,
+            ];
+        }
+
+        return [
+            'source' => $originalSource ?? $currentSource ?? 'import',
+            'subsource' => $originalSubsource ?? $currentSubsource,
+        ];
+    }
+
+    private function nonEmptyString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
+    }
+
+    private function importOriginalFilenameSessionKey(string $csvPath): string
+    {
+        return 'contact_imports.'.hash('sha256', $csvPath).'.original_filename';
     }
 
     private function mappedImportStatusValue(

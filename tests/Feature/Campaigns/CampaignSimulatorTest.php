@@ -59,7 +59,16 @@ class CampaignSimulatorTest extends TestCase
             fakeNow: '2026-08-18 09:00:00',
         );
 
+        $snapshot = $service->snapshot($simulation);
+
         $chainEnrollment = $simulation->messageChainEnrollment;
+
+        $this->assertSame(
+            $chainEnrollment->getKey(),
+            $snapshot['chain']['enrollment_id'],
+        );
+
+        $this->assertNotEmpty($snapshot['steps']);
 
         $this->assertInstanceOf(MessageChainEnrollment::class, $chainEnrollment);
         $this->assertSame(CampaignSimulationService::MESSAGE_CHAIN_SURFACE, $chainEnrollment->surface);

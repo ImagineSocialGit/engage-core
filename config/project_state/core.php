@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 1,
+    'version' => 2,
     'tables' => [
         'contact_statuses' => [
             'mode' => 'upsert',
@@ -72,6 +72,33 @@ return [
             'json_columns' => ['meta'],
             'references' => [
                 'contact_import_batch_id' => 'contact_import_batches',
+            ],
+        ],
+
+        'contact_import_occurrences' => [
+            'mode' => 'insert_empty',
+            'preserve_id' => true,
+            'order_by' => ['id'],
+            'columns' => [
+                'id',
+                'contact_import_batch_id',
+                'contact_id',
+                'row_number',
+                'outcome',
+                'identity_type',
+                'identity_value',
+                'original_source',
+                'original_subsource',
+                'original_status',
+                'row_fingerprint',
+                'meta',
+                'created_at',
+                'updated_at',
+            ],
+            'json_columns' => ['meta'],
+            'references' => [
+                'contact_import_batch_id' => 'contact_import_batches',
+                'contact_id' => 'contacts',
             ],
         ],
 

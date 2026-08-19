@@ -25,7 +25,7 @@ class CreateContactPermissionInvitationsForImportBatchAction
         $scheduled = 0;
         $skipped = 0;
 
-        $importBatch->contacts()
+        $importBatch->importedContactsQuery()
             ->orderBy('id')
             ->chunkById(100, function ($contacts) use ($importBatch, &$eligible, &$scheduled, &$skipped): void {
                 foreach ($contacts as $contact) {

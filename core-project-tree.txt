@@ -198,6 +198,7 @@
 │   │   │   │   └── TagType.php
 │   │   │   ├── Models
 │   │   │   │   ├── ContactImportBatch.php
+│   │   │   │   ├── ContactImportOccurrence.php
 │   │   │   │   ├── Contact.php
 │   │   │   │   ├── ContactStatus.php
 │   │   │   │   ├── ContactTag.php
@@ -1485,7 +1486,8 @@
 │   │   │   │   ├── 2026_04_15_195850_create_contacts_table.php
 │   │   │   │   ├── 2026_04_15_195851_create_contact_tags_table.php
 │   │   │   │   ├── 2026_04_15_203549_create_notes_table.php
-│   │   │   │   └── 2026_07_13_120000_create_site_settings_table.php
+│   │   │   │   ├── 2026_07_13_120000_create_site_settings_table.php
+│   │   │   │   └── 2026_08_19_161800_create_contact_import_occurrences_table.php
 │   │   │   ├── documents
 │   │   │   │   ├── 2026_07_02_000001_create_document_requirement_definitions_table.php
 │   │   │   │   ├── 2026_07_02_000002_create_document_requests_table.php
@@ -1991,6 +1993,7 @@
 │   │   │   ├── ContactControllerTest.php
 │   │   │   ├── ContactFilterResolverTest.php
 │   │   │   ├── ContactImportBatchControllerTest.php
+│   │   │   ├── ContactImportProvenanceTest.php
 │   │   │   ├── ContactImportStatusMappingTest.php
 │   │   │   ├── ContactLookupControllerTest.php
 │   │   │   ├── CoreSetupValidationContributorTest.php
@@ -2062,6 +2065,7 @@
 │   │   │   ├── ConsentDomainRegistryTest.php
 │   │   │   ├── ConsentOptInDefinitionResolverTest.php
 │   │   │   ├── ConsentRevocationControllerTest.php
+│   │   │   ├── ContactImportOccurrencePermissionInvitationTest.php
 │   │   │   ├── ContactPermissionInvitationControllerTest.php
 │   │   │   ├── ContactScheduledMessagesTerminalResultTest.php
 │   │   │   ├── CreateContactPermissionInvitationsForImportBatchActionTest.php
@@ -2150,6 +2154,7 @@
 │   │   ├── ProjectState
 │   │   │   ├── AutomationOpportunitiesProjectStateRoundTripTest.php
 │   │   │   ├── CampaignsBroadcastsProjectStateRoundTripTest.php
+│   │   │   ├── CoreContactImportProvenanceProjectStateTest.php
 │   │   │   ├── FlowRoutesProjectStateRoundTripTest.php
 │   │   │   ├── InboundMessagingProjectStateRoundTripTest.php
 │   │   │   ├── InternalNotificationsProjectStateRoundTripTest.php
@@ -2311,4 +2316,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-594 directories, 1718 files
+594 directories, 1723 files

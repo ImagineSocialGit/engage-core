@@ -512,6 +512,7 @@ Current ownership:
 | contacts | Core |
 | contact_statuses | Core |
 | contact_import_batches | Core |
+| contact_import_occurrences | Core |
 | contact_tags | Core |
 | notes | Core |
 | bookable_services | Scheduling |
@@ -583,6 +584,7 @@ Core schema freeze target:
 - contacts
 - contact_statuses
 - contact_import_batches
+- contact_import_occurrences
 - contact_tags
 - notes
 

@@ -217,7 +217,13 @@ Bad:
     WebinarSpecificContactPicker
 
 
-Core owns import batch records and import batch CRM visibility.
+Core owns import batch records, durable Contact import provenance, and import batch CRM visibility.
+
+`contact_import_occurrences` is the authoritative historical membership/evidence table for successful imported Contact rows. One canonical Contact may have many occurrences across many batches, and repeated rows inside one batch remain separate occurrences while Contact-facing batch queries return each Contact once. Each occurrence records the physical source row number, created/updated outcome, the normalized identity used for the current exact-match resolution (`email` today), original source/subsource/status values, a non-reversible row fingerprint, and compact import mapping metadata. Core does not persist the full raw source row in this table; vertical/module import handlers continue to own durable domain facts extracted from that row.
+
+`contacts.contact_import_batch_id` remains temporarily as the latest-import/legacy compatibility pointer. It is not historical membership authority. Core batch views, generic `import_batch` filtering, and downstream consumers should use the occurrence-aware Core query seam, with the legacy pointer retained as a fallback for pre-occurrence rows until that compatibility column is deliberately retired. Existing Contact fields remain the current CRM snapshot; overlapping imports must not rely on those singular fields to represent complete historical import evidence.
+
+The CRM CSV/TXT importer continues to use normalized email as its exact Contact match key. It does not perform fuzzy identity merging or split household members that share an email. The importer preserves an existing meaningful Contact source/subsource across later overlapping imports while each occurrence preserves the incoming source/subsource independently. Lifecycle/status precedence across import profiles is a separate orchestration concern and is not inferred by Core provenance.
 
 Core may expose module-owned actions on Core pages when the owning module is enabled.
 

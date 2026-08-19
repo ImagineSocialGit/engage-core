@@ -42,6 +42,11 @@ class Contact extends Model
         return $this->belongsTo(ContactImportBatch::class, 'contact_import_batch_id');
     }
 
+    public function importOccurrences(): HasMany
+    {
+        return $this->hasMany(ContactImportOccurrence::class);
+    }
+
     public function notes(): HasMany
     {
         return $this->hasMany(Note::class);

@@ -72,7 +72,13 @@ class ContactFilterResolver
         }
 
         return Contact::query()
-            ->whereIn('contact_import_batch_id', $importBatchIds)
+            ->where(function (Builder $query) use ($importBatchIds): void {
+                $query
+                    ->whereIn('contact_import_batch_id', $importBatchIds)
+                    ->orWhereHas('importOccurrences', function (Builder $occurrenceQuery) use ($importBatchIds): void {
+                        $occurrenceQuery->whereIn('contact_import_batch_id', $importBatchIds);
+                    });
+            })
             ->orderBy('id');
     }
 
@@ -86,6 +92,7 @@ class ContactFilterResolver
                 $query
                     ->where('source', 'import')
                     ->orWhereNotNull('contact_import_batch_id')
+                    ->orWhereHas('importOccurrences')
                     ->orWhere('meta->imported', true)
                     ->orWhereNotNull('meta->imported_at');
             })
