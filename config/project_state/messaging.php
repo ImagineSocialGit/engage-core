@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 1,
+    'version' => 2,
     'tables' => [
         'message_template_presets' => [
             'mode' => 'upsert',
@@ -421,6 +421,7 @@ return [
                     'targets' => [
                         'App\\Modules\\Webinars\\Models\\WebinarRegistration' => 'webinar_registrations',
                         'App\\Modules\\Webinars\\Models\\WebinarWaitlistSignup' => 'webinar_waitlist_signups',
+                        'App\\Modules\\Campaigns\\Models\\CampaignEnrollment' => 'campaign_enrollments',
                     ],
                     'deferred' => true,
                 ],
@@ -429,6 +430,7 @@ return [
                     'id_column' => 'origin_id',
                     'targets' => [
                         'App\\Modules\\Webinars\\Models\\Webinar' => 'webinars',
+                        'App\\Modules\\Campaigns\\Models\\Campaign' => 'campaigns',
                     ],
                     'deferred' => true,
                 ],
@@ -504,6 +506,7 @@ return [
                     'targets' => [
                         'App\\Modules\\Webinars\\Models\\WebinarRegistration' => 'webinar_registrations',
                         'App\\Modules\\Webinars\\Models\\WebinarWaitlistSignup' => 'webinar_waitlist_signups',
+                        'App\\Modules\\Campaigns\\Models\\CampaignEnrollment' => 'campaign_enrollments',
                         'App\\Modules\\Broadcasts\\Models\\Broadcast' => 'broadcasts',
                         'App\\Modules\\Tasks\\Models\\Task' => 'tasks',
                         'App\\Modules\\InboundMessaging\\Models\\InboundMessage' => 'inbound_messages',

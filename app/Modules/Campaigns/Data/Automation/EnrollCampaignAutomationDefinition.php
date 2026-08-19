@@ -38,6 +38,9 @@ class EnrollCampaignAutomationDefinition
         $campaignKey = self::nullableString($input['campaign_key'] ?? null);
         $onAlreadyEnrolled = self::nullableString($input['on_already_enrolled'] ?? null)
             ?? self::ON_ALREADY_ENROLLED_SKIPPED;
+        $exitConditions = is_array($input['exit_conditions'] ?? null)
+            ? $input['exit_conditions']
+            : null;
 
         return new self(
             campaignKey: $campaignKey,
@@ -45,10 +48,11 @@ class EnrollCampaignAutomationDefinition
             payload: is_array($input['payload'] ?? null) ? $input['payload'] : [],
             meta: is_array($input['meta'] ?? null) ? $input['meta'] : [],
             startContext: is_array($input['start_context'] ?? null) ? $input['start_context'] : null,
-            exitConditions: is_array($input['exit_conditions'] ?? null) ? $input['exit_conditions'] : null,
+            exitConditions: $exitConditions,
             invalidReason: match (true) {
                 $campaignKey === null => 'enroll_campaign_missing_campaign_key',
                 ! in_array($onAlreadyEnrolled, self::ON_ALREADY_ENROLLED_OPTIONS, true) => 'enroll_campaign_invalid_on_already_enrolled',
+                $exitConditions !== null && $exitConditions !== [] => 'enroll_campaign_exit_conditions_moved_to_message_chain_version',
                 default => null,
             },
         );

@@ -5,26 +5,29 @@ namespace App\Modules\Campaigns\Services\ContactShow;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Core\Contracts\Contacts\ContactShowDataProvider;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
+use App\Modules\Messaging\Models\MessageChainStep;
 use Illuminate\Support\Str;
 
 class ContactCampaignsVisibilityDataProvider implements ContactShowDataProvider
 {
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function dataFor(Contact $contact): array
     {
         $enrollments = CampaignEnrollment::query()
             ->with([
                 'campaign',
-                'currentCampaignStep',
-                'lastScheduledMessage',
+                'messageChainEnrollment.currentMessageChainStep',
+                'messageChainEnrollment.latestScheduledMessage',
             ])
             ->where('contact_id', $contact->id)
-            ->orderByRaw("FIELD(status, 'active', 'paused', 'completed', 'cancelled')")
             ->latest('started_at')
-            ->limit(6)
-            ->get();
+            ->latest('id')
+            ->limit(12)
+            ->get()
+            ->sortBy(fn (CampaignEnrollment $enrollment): int => $this->statusOrder($enrollment->messageChainEnrollment?->status))
+            ->take(6)
+            ->values();
 
         return [
             'contactVisibilitySections' => [
@@ -33,23 +36,31 @@ class ContactCampaignsVisibilityDataProvider implements ContactShowDataProvider
                     'module' => 'campaigns',
                     'description' => 'Current and recent follow-up sequence activity.',
                     'empty' => 'No follow-up sequences found.',
-                    'items' => $enrollments->map(fn (CampaignEnrollment $enrollment): array => [
-                        'title' => $this->campaignName($enrollment),
-                        'subtitle' => $enrollment->campaign_key,
-                        'status' => Str::of($enrollment->status)->replace('_', ' ')->title()->toString(),
-                        'meta' => [
-                            'Current Step' => $this->stepLabel($enrollment),
-                            'Channel' => $this->label($enrollment->channel),
-                            'Purpose' => $this->label($enrollment->purpose),
-                            'Started' => $this->date($enrollment->started_at),
-                            'Exited' => $this->date($enrollment->exited_at),
-                            'Exit Reason' => $this->label($enrollment->exit_reason),
-                            'Last Message' => $enrollment->lastScheduledMessage
-                                ? $this->label($enrollment->lastScheduledMessage->status).' '.$this->date($enrollment->lastScheduledMessage->send_at)
-                                : null,
-                        ],
-                    ])->all(),
+                    'items' => $enrollments->map(fn (CampaignEnrollment $enrollment): array => $this->item($enrollment))->all(),
                 ],
+            ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function item(CampaignEnrollment $enrollment): array
+    {
+        $chain = $enrollment->messageChainEnrollment;
+        $lastMessage = $chain?->latestScheduledMessage;
+
+        return [
+            'title' => $this->campaignName($enrollment),
+            'subtitle' => $enrollment->campaign_key,
+            'status' => $this->label($chain?->status) ?? 'Unknown',
+            'meta' => [
+                'Current Step' => $this->stepLabel($chain?->currentMessageChainStep),
+                'Started' => $this->date($chain?->started_at ?? $enrollment->started_at),
+                'Next Action' => $this->date($chain?->next_action_at),
+                'Exited' => $this->date($chain?->exited_at ?? $chain?->completed_at ?? $chain?->cancelled_at),
+                'Exit Reason' => $this->label($chain?->exit_reason_code),
+                'Last Message' => $lastMessage
+                    ? $this->label($lastMessage->status).' '.$this->date($lastMessage->send_at)
+                    : null,
             ],
         ];
     }
@@ -69,15 +80,13 @@ class ContactCampaignsVisibilityDataProvider implements ContactShowDataProvider
         return $enrollment->campaign_key ?: 'Campaign #'.$enrollment->campaign_id;
     }
 
-    private function stepLabel(CampaignEnrollment $enrollment): ?string
+    private function stepLabel(?MessageChainStep $step): ?string
     {
-        $step = $enrollment->currentCampaignStep;
-
-        if (! $step) {
-            return $enrollment->current_step ? 'Step '.$enrollment->current_step : null;
+        if (! $step instanceof MessageChainStep) {
+            return null;
         }
 
-        foreach (['name', 'title', 'key', 'message_type'] as $attribute) {
+        foreach (['name', 'key'] as $attribute) {
             $value = $step->{$attribute} ?? null;
 
             if (is_string($value) && trim($value) !== '') {
@@ -85,7 +94,19 @@ class ContactCampaignsVisibilityDataProvider implements ContactShowDataProvider
             }
         }
 
-        return 'Step '.$enrollment->current_step;
+        return 'Step #'.$step->getKey();
+    }
+
+    private function statusOrder(?string $status): int
+    {
+        return match ($status) {
+            MessageChainEnrollment::STATUS_ACTIVE => 0,
+            MessageChainEnrollment::STATUS_PAUSED => 1,
+            MessageChainEnrollment::STATUS_COMPLETED => 2,
+            MessageChainEnrollment::STATUS_EXITED => 3,
+            MessageChainEnrollment::STATUS_CANCELLED => 4,
+            default => 5,
+        };
     }
 
     private function label(?string $value): ?string

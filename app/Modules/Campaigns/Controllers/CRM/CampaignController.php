@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Campaigns\Actions\ActivateCampaignAction;
 use App\Modules\Campaigns\Actions\DeactivateCampaignAction;
 use App\Modules\Campaigns\Models\Campaign;
-use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Campaigns\Services\CampaignWorkspacePresenter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -20,10 +20,13 @@ class CampaignController extends Controller
         $campaigns = Campaign::query()
             ->withCount([
                 'steps as message_steps_count' => fn ($query) => $query->where('is_active', true),
-                'enrollments as open_enrollments_count' => fn ($query) => $query->whereIn('status', [
-                    CampaignEnrollment::STATUS_ACTIVE,
-                    CampaignEnrollment::STATUS_PAUSED,
-                ]),
+                'enrollments as open_enrollments_count' => fn ($query) => $query->whereHas(
+                    'messageChainEnrollment',
+                    fn ($chainQuery) => $chainQuery->whereIn('status', [
+                        MessageChainEnrollment::STATUS_ACTIVE,
+                        MessageChainEnrollment::STATUS_PAUSED,
+                    ]),
+                ),
             ])
             ->orderBy('name')
             ->get();

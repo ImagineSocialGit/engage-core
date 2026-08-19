@@ -4,7 +4,6 @@ namespace App\Modules\Campaigns\Actions;
 
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
-use App\Modules\Messaging\Actions\SkipScheduledMessagesAction;
 use App\Modules\Messaging\Models\MessageChain;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\ScheduledMessage;
@@ -20,7 +19,6 @@ class DeactivateCampaignAction
 
     public function __construct(
         private readonly CancelCampaignEnrollmentAction $cancelCampaignEnrollment,
-        private readonly SkipScheduledMessagesAction $skipScheduledMessages,
     ) {}
 
     /**
@@ -68,7 +66,7 @@ class DeactivateCampaignAction
 
             $this->inactivateExclusivePresetBridgeChain($lockedCampaign);
 
-            $linkedEnrollments = CampaignEnrollment::query()
+            $enrollments = CampaignEnrollment::query()
                 ->with('messageChainEnrollment')
                 ->where('campaign_id', $lockedCampaign->getKey())
                 ->whereNotNull('message_chain_enrollment_id')
@@ -85,7 +83,7 @@ class DeactivateCampaignAction
 
             $scheduledMessagesSkipped = 0;
 
-            foreach ($linkedEnrollments as $enrollment) {
+            foreach ($enrollments as $enrollment) {
                 $scheduledMessagesSkipped += ScheduledMessage::query()
                     ->where('message_chain_enrollment_id', $enrollment->message_chain_enrollment_id)
                     ->where('status', ScheduledMessage::STATUS_PENDING)
@@ -102,65 +100,13 @@ class DeactivateCampaignAction
                 );
             }
 
-            // Transitional shutdown cleanup for pre-F5 rows only. No active client
-            // Campaign state depends on this path; F7 removes it with legacy runtime.
-            $legacyEnrollments = CampaignEnrollment::query()
-                ->where('campaign_id', $lockedCampaign->getKey())
-                ->whereNull('message_chain_enrollment_id')
-                ->whereIn('status', [
-                    CampaignEnrollment::STATUS_ACTIVE,
-                    CampaignEnrollment::STATUS_PAUSED,
-                ])
-                ->lockForUpdate()
-                ->orderBy('id')
-                ->get();
-
-            $legacyPendingMessageCount = $legacyEnrollments->isEmpty()
-                ? 0
-                : ScheduledMessage::query()
-                    ->where('status', ScheduledMessage::STATUS_PENDING)
-                    ->where(function ($query) use ($lockedCampaign): void {
-                        $query
-                            ->where('meta->campaign_id', $lockedCampaign->getKey())
-                            ->orWhere('meta->campaign_key', $lockedCampaign->key);
-                    })
-                    ->count();
-
-            foreach ($legacyEnrollments as $enrollment) {
-                $this->cancelCampaignEnrollment->cancelEnrollment(
-                    enrollment: $enrollment,
-                    source: $actor,
-                    reason: self::REASON,
-                    skipPendingMessages: true,
-                    meta: array_replace_recursive([
-                        'lifecycle_source' => $source,
-                    ], $meta),
-                );
-            }
-
-            if ($legacyEnrollments->isNotEmpty()) {
-                $this->skipScheduledMessages->forMetaValue(
-                    key: 'campaign_id',
-                    value: $lockedCampaign->getKey(),
-                    reason: self::REASON,
-                );
-
-                $this->skipScheduledMessages->forMetaValue(
-                    key: 'campaign_key',
-                    value: $lockedCampaign->key,
-                    reason: self::REASON,
-                );
-
-                $scheduledMessagesSkipped += $legacyPendingMessageCount;
-            }
-
             return [
                 'campaign_id' => (int) $lockedCampaign->getKey(),
                 'campaign_key' => (string) $lockedCampaign->key,
                 'previous_status' => $previousStatus,
                 'current_status' => (string) $lockedCampaign->status,
                 'status_changed' => $statusChanged,
-                'enrollments_cancelled' => $linkedEnrollments->count() + $legacyEnrollments->count(),
+                'enrollments_cancelled' => $enrollments->count(),
                 'scheduled_messages_skipped' => $scheduledMessagesSkipped,
             ];
         }, 3);
@@ -194,15 +140,10 @@ class DeactivateCampaignAction
             return;
         }
 
-        $chain->forceFill([
-            'status' => MessageChain::STATUS_INACTIVE,
-        ])->save();
+        $chain->forceFill(['status' => MessageChain::STATUS_INACTIVE])->save();
     }
 
-    /**
-     * @param array<string, mixed> $meta
-     * @return array<string, mixed>
-     */
+    /** @param array<string, mixed> $meta @return array<string, mixed> */
     private function campaignMeta(
         Campaign $campaign,
         string $previousStatus,

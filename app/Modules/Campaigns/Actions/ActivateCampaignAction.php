@@ -81,11 +81,11 @@ class ActivateCampaignAction
 
     private function activateSelectedMessageChain(Campaign $campaign): void
     {
-        // Unbound legacy/draft Campaign records may still exist until F7/Builder
-        // validation completes. They may be activated as records, but F5 enrollment
-        // remains fail-closed until a valid selected MessageChain exists.
         if (! is_numeric($campaign->message_chain_id) || (int) $campaign->message_chain_id < 1) {
-            return;
+            throw new InvalidArgumentException(sprintf(
+                'Campaign [%s] cannot be activated without a selected MessageChain.',
+                (string) $campaign->key,
+            ));
         }
 
         $chain = MessageChain::query()

@@ -4,8 +4,11 @@ namespace Tests\Feature\ProjectState;
 
 use App\Models\User;
 use App\Modules\Broadcasts\Models\Broadcast;
+use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Support\ProjectState\ProjectStateManager;
 use App\Support\ProjectState\ProjectStateResumeManager;
@@ -52,10 +55,6 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
         $this->assertTrue($report['valid']);
         $this->assertEquals([], $report['errors']);
         $this->assertStringContainsString(
-            '[campaign_enrollments.status] [active] → [paused]',
-            $warnings,
-        );
-        $this->assertStringContainsString(
             '[broadcasts.status] [sending] → [paused]',
             $warnings,
         );
@@ -93,6 +92,10 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
         $this->assertDatabaseHas('message_chain_enrollments', [
             'id' => 320,
             'message_chain_version_id' => 401,
+            'context_type' => CampaignEnrollment::class,
+            'context_id' => 120,
+            'origin_type' => Campaign::class,
+            'origin_id' => 200,
             'status' => 'completed',
         ]);
         $this->assertDatabaseHas('campaign_enrollments', [
@@ -100,8 +103,17 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             'contact_id' => 60,
             'campaign_id' => 200,
             'message_chain_enrollment_id' => 320,
-            'current_campaign_step_id' => 210,
-            'last_scheduled_message_id' => 130,
+            'source_type' => Contact::class,
+            'source_id' => 60,
+            'campaign_key' => 'production_nurture',
+        ]);
+        $this->assertDatabaseHas('scheduled_messages', [
+            'id' => 130,
+            'context_type' => CampaignEnrollment::class,
+            'context_id' => 120,
+            'behavior_owner_type' => MessageChainEnrollment::class,
+            'behavior_owner_id' => 320,
+            'message_chain_enrollment_id' => 320,
             'status' => 'paused',
         ]);
 
@@ -154,13 +166,6 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             ),
         );
         $this->assertDatabaseHas('project_state_resume_items', [
-            'category' => 'campaign_enrollments',
-            'source_table' => 'campaign_enrollments',
-            'source_record_id' => '120',
-            'original_status' => 'active',
-            'state' => 'pending',
-        ]);
-        $this->assertDatabaseHas('project_state_resume_items', [
             'category' => 'broadcasts',
             'source_table' => 'broadcasts',
             'source_record_id' => '140',
@@ -176,18 +181,21 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
         ]);
 
         $resume = app(ProjectStateResumeManager::class);
-        $resume->resume(ProjectStateResumeManager::CATEGORY_CAMPAIGNS);
         $resume->resume(ProjectStateResumeManager::CATEGORY_BROADCASTS);
         $resume->resume(ProjectStateResumeManager::CATEGORY_SCHEDULED_MESSAGES);
 
         $this->assertDatabaseHas('message_chain_enrollments', [
             'id' => 320,
             'message_chain_version_id' => 401,
+            'context_type' => CampaignEnrollment::class,
+            'context_id' => 120,
+            'origin_type' => Campaign::class,
+            'origin_id' => 200,
             'status' => 'completed',
         ]);
         $this->assertDatabaseHas('campaign_enrollments', [
             'id' => 120,
-            'status' => 'active',
+            'message_chain_enrollment_id' => 320,
         ]);
         $this->assertDatabaseHas('broadcasts', [
             'id' => 140,
@@ -200,10 +208,6 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
         $this->assertDatabaseHas('scheduled_messages', [
             'id' => 150,
             'status' => 'pending',
-        ]);
-        $this->assertDatabaseMissing('project_state_resume_items', [
-            'category' => 'campaign_enrollments',
-            'state' => 'pending',
         ]);
         $this->assertDatabaseMissing('project_state_resume_items', [
             'category' => 'broadcasts',
@@ -302,10 +306,10 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             'message_chain_version_id' => 301,
             'recipient_type' => Contact::class,
             'recipient_id' => 60,
-            'context_type' => null,
-            'context_id' => null,
-            'origin_type' => null,
-            'origin_id' => null,
+            'context_type' => CampaignEnrollment::class,
+            'context_id' => 120,
+            'origin_type' => Campaign::class,
+            'origin_id' => 100,
             'surface' => 'campaigns',
             'current_message_chain_step_id' => null,
             'next_action_at' => null,
@@ -399,6 +403,11 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
                     'campaign_step_variant_key' => 'email',
                 ],
                 now: $now,
+                contextType: CampaignEnrollment::class,
+                contextId: 120,
+                behaviorOwnerType: MessageChainEnrollment::class,
+                behaviorOwnerId: 320,
+                messageChainEnrollmentId: 320,
             ),
             $this->scheduledMessageRow(
                 id: 150,
@@ -423,23 +432,12 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             'contact_id' => 60,
             'campaign_id' => 100,
             'message_chain_enrollment_id' => 320,
-            'source_type' => null,
-            'source_id' => null,
+            'source_type' => Contact::class,
+            'source_id' => 60,
             'campaign_key' => 'production_nurture',
-            'status' => 'active',
-            'current_step' => 1,
-            'current_campaign_step_id' => 110,
             'start_context' => json_encode(['source' => 'production']),
-            'exit_conditions' => json_encode([]),
-            'exited_at' => null,
-            'exit_reason' => null,
-            'last_scheduled_message_id' => 130,
             'dedupe_key' => 'project-state-campaign-enrollment',
             'started_at' => $now,
-            'paused_at' => null,
-            'resumed_at' => null,
-            'cancelled_at' => null,
-            'completed_at' => null,
             'meta' => json_encode(['owner' => 'production']),
             'created_at' => $now,
             'updated_at' => $now,
@@ -607,6 +605,7 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
         ?int $contextId = null,
         ?string $behaviorOwnerType = null,
         ?int $behaviorOwnerId = null,
+        ?int $messageChainEnrollmentId = null,
     ): array {
         return [
             'id' => $id,
@@ -636,7 +635,7 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             'created_at' => $now,
             'updated_at' => $now,
             'message_template_version_id' => null,
-            'message_chain_enrollment_id' => null,
+            'message_chain_enrollment_id' => $messageChainEnrollmentId,
             'message_chain_step_variant_id' => null,
         ];
     }

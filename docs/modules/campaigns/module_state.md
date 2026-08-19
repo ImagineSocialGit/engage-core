@@ -4,17 +4,19 @@
 
 Campaigns is optional.
 
-The current `campaign_steps`, `campaign_step_variants`, and Campaign-owned progression engine remain transitional. The approved longer-term target is:
+The Campaign -> Messaging MessageChain runtime cutover is complete. The ownership boundary is now:
 
 ```text
-Campaigns owns Campaign identity, activation, audience/enrollment intent, and reporting.
-Messaging owns reusable MessageChains and MessageChainEnrollments.
-Campaigns references a MessageChain rather than duplicating a second chain engine.
+Campaigns owns Campaign identity, activation, audience/enrollment intent, provenance, and Campaign-specific reporting meaning.
+Messaging owns reusable MessageChains, immutable versions, MessageChainEnrollments, timing, progression, lifecycle state, and delivery.
+Campaigns references Messaging runtime state instead of maintaining a second chain engine.
 ```
 
-The MessageChain cutover is now underway. Campaign persistence includes the Campaign -> MessageChain and CampaignEnrollment -> MessageChainEnrollment bridge columns. Messaging owns dependency-aware MessageChain execution, cancellation, pause/resume, pending-message skipping, bounded bulk delivery, and provider submission pacing.
+Campaign preset sync still converts the current compact Campaign step/variant authoring definition into a Messaging-owned MessageChain and immutable published MessageChainVersion, then stores the selected chain on `campaigns.message_chain_id`. That conversion is now only a temporary authoring bridge. `campaign_steps` and `campaign_step_variants` are not runtime progression state.
 
-Campaign preset sync now converts the current compact Campaign step/variant definition into a Messaging-owned MessageChain and immutable published MessageChainVersion, then stores the selected chain on `campaigns.message_chain_id`. New Campaign enrollment runtime has also cut over: `EnrollContactInCampaignAction` creates the CampaignEnrollment wrapper, starts the selected immutable MessageChainVersion through Messaging, and stores `campaign_enrollments.message_chain_enrollment_id`. Campaign lifecycle has now cut over as well: explicit cancellation delegates to Messaging's MessageChainEnrollment cancellation seam, Campaign deactivation cancels linked active/paused chain enrollments, and Campaign pause/resume delegates to Messaging-owned pause/resume actions. The legacy CampaignStep/CampaignStepVariant rows and CampaignEnrollment progression columns remain only as temporary compatibility authoring/read fields until workspace, validation, reporting, and Project State readers have completed the cutover.
+New Campaign enrollment creates a compact CampaignEnrollment wrapper, starts the selected immutable MessageChainVersion through Messaging, and stores `campaign_enrollments.message_chain_enrollment_id`. Explicit cancellation, Campaign deactivation, and enrollment pause/resume all delegate to Messaging-owned MessageChainEnrollment lifecycle actions. Campaign workspace/contact visibility and automation result metadata read progression/lifecycle facts from the linked MessageChainEnrollment. The old Campaign step scheduler, terminal-result progression listener, and duplicate CampaignEnrollment runtime columns have been removed.
+
+Messaging also owns dependency-aware MessageChain execution, pending-message skipping, bounded bulk delivery, and provider submission pacing.
 
 ## Responsibility
 
@@ -159,19 +161,24 @@ No generic `meta` column is planned for new Campaign definitions.
 
 A Campaign enrollment becomes a thin Campaign-specific wrapper around generic Messaging progression.
 
-Target fields:
+Current compact fields:
 
 ```text
 id
-campaign_id
 contact_id
-message_chain_enrollment_id
+campaign_id nullable
+message_chain_enrollment_id nullable during the atomic start bridge
 source_type nullable
 source_id nullable
+campaign_key
+start_context nullable
 dedupe_key nullable
-started_at
+started_at nullable
+meta nullable
 timestamps
 ```
+
+`campaign_key` is retained as stable Campaign business identity even if the optional Campaign FK is later nulled by deletion/archive maintenance. `start_context` is retained as Campaign-owned enrollment input/provenance so generic MessageChain timing/conditions can resolve start-time values without importing producer modules. `meta` may retain compact Campaign-specific provenance such as who/what paused or cancelled an enrollment; it must not become a second progression ledger.
 
 Possible Campaign-specific outcome fields should be added only when Reporting or Campaign product behavior needs them.
 
@@ -188,10 +195,6 @@ scheduled-message IDs
 ```
 
 The generic MessageChainEnrollment owns those facts.
-
-A non-null Campaign FK makes a repeated `campaign_key` unnecessary.
-
-A chain-enrollment FK makes `current_step`, `current_campaign_step_id`, `last_scheduled_message_id`, `start_context`, `exit_conditions`, and generic CampaignEnrollment metadata unnecessary.
 
 ## Campaign and MessageChain relationship
 
@@ -233,7 +236,7 @@ After chain cutover, Campaign presets should not own a second nested step/varian
 
 The transition currently converts the compact Campaign step/variant config into MessageChain, MessageChainVersion, MessageChainStep, and MessageChainStepVariant records during sync. The generated stable chain key is `campaign.{campaign_key}` and published versions are content-addressed/idempotent: an unchanged sequence reuses the current immutable version; a changed sequence publishes a new version.
 
-This compatibility conversion is temporary. The target config shape is a Campaign definition that selects a Messaging-owned `message_chain_key`; Campaign config will stop owning nested message sequence structure after the remaining runtime/read cutover.
+This compatibility conversion is temporary. Runtime/read ownership has already moved to Messaging. The target authoring config shape is a Campaign definition that selects a Messaging-owned `message_chain_key`; Campaign config will stop owning nested message sequence structure after the Builder/authoring migration.
 
 That conversion is a temporary compatibility authoring path, not a reason to retain Campaign-owned step tables permanently.
 
@@ -338,9 +341,9 @@ Campaigns may interpret final campaign outcomes after the chain completes or exi
 
 ### Terminal delivery policy
 
-A failed ScheduledMessage is a terminal accounted-for result after Messaging exhausts that delivery's safe retry policy. Campaign reconciliation consumes `ScheduledMessageTerminalResult`, whose occurrence/reason/provider facts come from the durable terminal outbox and exact delivery attempt rather than parent ScheduledMessage summary columns.
+A failed ScheduledMessage is a terminal accounted-for result after Messaging exhausts that delivery's safe retry policy. Messaging's MessageChain runner consumes ScheduledMessage terminal state and owns the decision to wait, advance, complete, or exit. Campaigns no longer listens to ScheduledMessage terminal events to advance its own step engine.
 
-Generic chain progression should determine whether the step:
+Generic chain progression determines whether the step:
 
 ```text
 waits for another pending/sending sibling
@@ -377,7 +380,7 @@ surface = campaigns
 
 When another module or FlowRoutes starts a Campaign, `campaign_enrollments.source_type/source_id` may preserve neutral business source context. That source morph is intentionally distinct from MessageChain `origin`: the producer explains why the Campaign was started, while `origin = Campaign` keeps delivery attribution tied to the Campaign that owns the journey.
 
-This preserves a durable attribution path from ScheduledMessage -> MessageChainEnrollment -> CampaignEnrollment -> Campaign while keeping the producer/source morph on CampaignEnrollment. A Campaign execution-context provider exposes transitional `start_context`/payload values to generic MessageChain timing/conditions without making Campaigns depend on the producer module. Canonical Contact/Campaign/CampaignEnrollment model values override caller-provided keys.
+This preserves a durable attribution path from ScheduledMessage -> MessageChainEnrollment -> CampaignEnrollment -> Campaign while keeping the producer/source morph on CampaignEnrollment. A Campaign execution-context provider exposes Campaign-owned `start_context`/payload values to generic MessageChain timing/conditions without making Campaigns depend on the producer module. Canonical Contact/Campaign/CampaignEnrollment model values override caller-provided keys.
 
 Campaigns should not import the source module merely to interpret that morph.
 
@@ -395,7 +398,7 @@ CancelCampaignEnrollmentAction
     records Campaign-specific cancellation reason only when independently needed
 ```
 
-Chain exit conditions remain on MessageChainVersion. New Campaign progression does not evaluate `campaign_enrollments.exit_conditions`; that column/argument remains transitional compatibility state only until the legacy enrollment schema and automation definition are cleaned up. Do not add new per-enrollment exit behavior there.
+Chain exit conditions remain on MessageChainVersion. `campaign_enrollments` no longer stores or evaluates generic exit conditions. The legacy public enrollment/FlowRoute field may remain temporarily at caller-definition boundaries so existing empty definitions still parse, but only null/empty values are accepted; non-empty per-enrollment exit conditions fail explicitly and must move to the selected MessageChainVersion. Do not reintroduce per-enrollment generic exit behavior into Campaigns.
 
 Campaign-specific exit behavior that is not reusable generic chain behavior should be expressed through a Campaign-owned cancellation/exit action invoked by the relevant producer or event seam.
 
@@ -443,6 +446,7 @@ Campaigns uses Messaging public actions for:
 ```text
 start chain
 cancel chain enrollment
+pause/resume chain enrollment
 skip pending messages
 read chain/enrollment status
 ```
@@ -601,15 +605,19 @@ Messaging remains the source of delivery execution facts.
 
 Campaigns should query through stable relationships/read services rather than copy delivery history into CampaignEnrollment metadata.
 
-## Remaining Campaign migration boundary
+## Post-cutover boundary
 
-The shared immutable template/chain, delivery-attempt, and terminal-outbox foundations already exist.
+The Campaign runtime cutover is complete:
 
-The remaining Campaign-specific cutover should:
+- Campaign selects a Messaging-owned MessageChain;
+- new enrollment starts a version-pinned MessageChainEnrollment;
+- CampaignEnrollment is a compact business/provenance wrapper;
+- Messaging owns progression, lifecycle timestamps, exit state, and ScheduledMessage terminal handling;
+- Campaign cancellation/deactivation/pause/resume delegate through Messaging public actions;
+- workspace/contact/automation reads derive runtime state from the linked chain enrollment;
+- Project State Campaigns section v3 exports the compact wrapper, while Messaging section v2 owns the chain enrollment and deferred Campaign context/origin references;
+- the legacy Campaign scheduler/listener classes and duplicate enrollment progression columns are removed.
 
-- preserve the completed Campaign-to-MessageChain relationship, new-enrollment MessageChain start path, and MessageChain-backed cancellation/pause/resume/deactivation lifecycle;
-- move Campaign workspace/reporting/automation reads to linked MessageChainEnrollment state;
-- remove the legacy Campaign step scheduler/listeners and duplicate Campaign-owned progression fields after all runtime readers move;
-- finish the dev-only fake-clock Campaign simulator against the real MessageChain runtime before client launch.
+`campaign_steps` and `campaign_step_variants` remain only as the temporary authoring projection consumed by the current Campaign message editor and preset bridge. They must not regain runtime meaning. A later Builder/authoring migration should make Messaging MessageChain definitions the direct authoring source, then remove these Campaign authoring tables.
 
-Until that dedicated cutover, current Campaign step/variant rows and metadata required by the active scheduler must be exported/imported faithfully. Do not treat provider/attempt/terminal state as Campaign-owned data.
+The next Campaign runtime-safety slice is the dev-only fake-clock simulator against the real MessageChain runtime. After that, inbound reply capture/attribution, stage-driven suppression/orchestration, client campaign definitions, and reporting can proceed as separate workstreams.

@@ -92,8 +92,6 @@
 │   │   │   │   ├── EnrollContactInCampaignAction.php
 │   │   │   │   ├── PauseCampaignEnrollmentAction.php
 │   │   │   │   ├── ResumeCampaignEnrollmentAction.php
-│   │   │   │   ├── ScheduleCampaignStepMessagesAction.php
-│   │   │   │   ├── ScheduleNextCampaignStepAction.php
 │   │   │   │   └── SyncCampaignPresetsAction.php
 │   │   │   ├── Automation
 │   │   │   │   ├── CampaignsAutomationPointAuthoringContributor.php
@@ -125,7 +123,6 @@
 │   │   │   ├── Exceptions
 │   │   │   │   └── CampaignUnavailableForEnrollmentException.php
 │   │   │   ├── Listeners
-│   │   │   │   └── ScheduleNextCampaignStepAfterScheduledMessageSent.php
 │   │   │   ├── Models
 │   │   │   │   ├── CampaignEnrollment.php
 │   │   │   │   ├── Campaign.php
@@ -1952,24 +1949,15 @@
 │   │   │   ├── CampaignEnrollmentLifecycleBridgeTest.php
 │   │   │   ├── CampaignMessageChainBridgeTest.php
 │   │   │   ├── CampaignMessageChainPresetSyncTest.php
+│   │   │   ├── CampaignMessageChainRuntimeOwnershipTest.php
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
-│   │   │   ├── CampaignScheduledMessageTerminalReconciliationTest.php
 │   │   │   ├── CampaignsSetupValidationContributorTest.php
-│   │   │   ├── CampaignStepVariantsTest.php
-│   │   │   ├── CampaignVariantDependencyAwareTest.php
 │   │   │   ├── CampaignVariantPresetSyncSpecificityTest.php
-│   │   │   ├── CampaignVariantSchedulingDurabilityTest.php
 │   │   │   ├── CampaignWorkspaceControllerTest.php
 │   │   │   ├── CompactCampaignPresetAuthoringTest.php
-│   │   │   ├── DeactivateCampaignActionTest.php
 │   │   │   ├── DeactivateCampaignCommandTest.php
 │   │   │   ├── EnrollCampaignAutomationActionHandlerTest.php
-│   │   │   ├── EnrollContactInCampaignActionTest.php
-│   │   │   ├── ScheduledMessageEventReplayTest.php
-│   │   │   ├── ScheduleNextCampaignStepActionTest.php
-│   │   │   ├── ScheduleNextCampaignStepAfterScheduledMessageSentTest.php
-│   │   │   ├── WebinarCampaignLifecycleEndToEndTest.php
-│   │   │   └── WebinarNurtureFirstAvailableVariantTest.php
+│   │   │   └── EnrollContactInCampaignActionTest.php
 │   │   ├── Clients
 │   │   │   ├── ArtisanTestEnvironmentBootstrapTest.php
 │   │   │   ├── ClientConfigFallbackTest.php
@@ -2312,4 +2300,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-592 directories, 1721 files
+592 directories, 1709 files

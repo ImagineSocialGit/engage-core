@@ -6,8 +6,6 @@ use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
-use App\Modules\Campaigns\Models\CampaignStep;
-use App\Modules\Campaigns\Models\CampaignStepVariant;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\FlowRoutes\Actions\ExecuteCurrentFlowRoutePointAction;
@@ -30,6 +28,9 @@ use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\InternalNotifications\Services\Tasks\OnlyActiveTeamMemberTaskAssignmentStrategyResolver;
 use App\Modules\Scheduling\Models\Appointment;
+use App\Modules\Messaging\Models\MessageChain;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
+use App\Modules\Messaging\Models\MessageChainVersion;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
@@ -587,32 +588,26 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
     {
         Queue::fake();
 
-        config()->set('messaging.channel_availability.email', [
-            'runtime_supported' => true,
-            'provider_enabled' => true,
-            'requires_explicit_opt_in' => false,
-            'surfaces' => [
-                'campaigns' => true,
-            ],
-            'purpose_scopes' => [
-                'marketing:webinar' => true,
-            ],
+        $chain = MessageChain::query()->create([
+            'key' => 'campaign.route_campaign',
+            'name' => 'Route Campaign chain',
+            'status' => MessageChain::STATUS_ACTIVE,
+            'source' => 'test',
+            'is_customized' => false,
         ]);
-
-        config()->set('messaging.email.definitions.marketing.webinar.campaigns.route_campaign.steps.1.variants.email', [
-            'dispatch_key' => 'campaign_step_due',
-            'payload_class' => EmailPayload::class,
-            'queue' => 'marketing',
-            'payload' => [
-                'to' => '{email}',
-                'subject' => 'Route campaign',
-                'body' => 'Route campaign body',
-            ],
+        $version = MessageChainVersion::query()->create([
+            'message_chain_id' => $chain->getKey(),
+            'version' => 1,
+            'exit_conditions' => [],
+            'content_hash' => hash('sha256', 'route-campaign-chain'),
+            'published_at' => now(),
         ]);
+        $chain->forceFill(['current_version_id' => $version->getKey()])->save();
 
         $campaign = Campaign::query()->create([
             'key' => 'route_campaign',
             'name' => 'Route Campaign',
+            'message_chain_id' => $chain->getKey(),
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar',
@@ -620,54 +615,8 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             'meta' => [],
         ]);
 
-        $step = CampaignStep::query()->create([
-            'campaign_id' => $campaign->getKey(),
-            'step_number' => 1,
-            'name' => 'Step 1',
-            'dispatch_key' => 'campaign_step_due',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
-            'variant_strategy' => 'first_available',
-            'is_active' => true,
-            'criteria' => [
-                'timing' => [
-                    'type' => 'delay',
-                    'minutes' => 15,
-                ],
-            ],
-            'meta' => [
-                'type' => 'message',
-            ],
-        ]);
-
-        CampaignStepVariant::query()->create([
-            'campaign_step_id' => $step->getKey(),
-            'key' => 'email',
-            'name' => 'Email',
-            'sort_order' => 0,
-            'dispatch_key' => 'campaign_step_due',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
-            'is_active' => true,
-            'criteria' => [],
-            'dependency_rules' => [],
-            'source_config_path' => 'messaging.email.definitions.marketing.webinar.campaigns.route_campaign.steps.1.variants.email',
-            'meta' => [],
-        ]);
-
         $setup = $this->createProgressWithPoints([
             FlowRoutePointType::EnrollCampaign->value,
-        ]);
-
-        MessageConsent::query()->create([
-            'contact_id' => $setup['progress']->contact_id,
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
-            'consented_at' => now()->subMinute(),
-            'source' => 'test',
         ]);
 
         $setup['flow_route_points'][0]->forceFill([
@@ -682,11 +631,19 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertSame('campaign_enrolled', $result->reason);
 
         $enrollment = CampaignEnrollment::query()->firstOrFail();
-        $scheduledMessage = ScheduledMessage::query()->firstOrFail();
+        $chainEnrollment = MessageChainEnrollment::query()->firstOrFail();
         $progressItem = ContactFlowRouteProgressItem::query()
             ->where('contact_flow_route_progress_id', $setup['progress']->getKey())
             ->where('flow_route_point_id', $setup['flow_route_points'][0]->getKey())
             ->firstOrFail();
+
+        $this->assertSame($chainEnrollment->getKey(), $enrollment->message_chain_enrollment_id);
+        $this->assertSame($enrollment->getMorphClass(), $chainEnrollment->context_type);
+        $this->assertSame($enrollment->getKey(), $chainEnrollment->context_id);
+        $this->assertSame($campaign->getMorphClass(), $chainEnrollment->origin_type);
+        $this->assertSame($campaign->getKey(), $chainEnrollment->origin_id);
+        $this->assertSame(MessageChainEnrollment::STATUS_COMPLETED, $chainEnrollment->status);
+        $this->assertDatabaseCount('scheduled_messages', 0);
 
         $this->assertSame(
             $enrollment->getMorphClass(),
@@ -703,33 +660,12 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             data_get($progressItem->correlation, 'campaign_enrollment_id'),
         );
         $this->assertSame(
+            $chainEnrollment->getKey(),
+            data_get($progressItem->correlation, 'message_chain_enrollment_id'),
+        );
+        $this->assertSame(
             'route_campaign',
             data_get($progressItem->correlation, 'campaign_key'),
-        );
-
-        $this->assertSame(
-            $setup['progress']->getKey(),
-            data_get($scheduledMessage->meta, 'flow_route.flow_route_progress_id'),
-        );
-        $this->assertSame(
-            $progressItem->contact_flow_route_plan_id,
-            data_get($scheduledMessage->meta, 'flow_route.flow_route_plan_id'),
-        );
-        $this->assertSame(
-            $progressItem->contact_flow_route_plan_item_id,
-            data_get($scheduledMessage->meta, 'flow_route.flow_route_plan_item_id'),
-        );
-        $this->assertSame(
-            $progressItem->getKey(),
-            data_get($scheduledMessage->meta, 'flow_route.flow_route_progress_item_id'),
-        );
-        $this->assertSame(
-            $setup['flow_route']->getKey(),
-            data_get($scheduledMessage->meta, 'flow_route.flow_route_id'),
-        );
-        $this->assertSame(
-            $setup['flow_route_points'][0]->getKey(),
-            data_get($scheduledMessage->meta, 'flow_route.flow_route_point_id'),
         );
     }
 

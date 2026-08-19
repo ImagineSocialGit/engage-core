@@ -6,6 +6,8 @@ use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Campaigns\Models\CampaignStepVariant;
 use App\Modules\Campaigns\Validation\CampaignsSetupValidationContributor;
+use App\Modules\Messaging\Models\MessageChain;
+use App\Modules\Messaging\Models\MessageChainVersion;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 use App\Support\SetupValidation\SetupValidationManager;
@@ -475,6 +477,23 @@ class CampaignsSetupValidationContributorTest extends TestCase
             'is_customized' => false,
             'meta' => [],
         ]);
+
+        $chain = MessageChain::query()->create([
+            'key' => 'campaign.runtime_campaign',
+            'name' => 'Runtime Campaign chain',
+            'status' => MessageChain::STATUS_ACTIVE,
+            'source' => 'test',
+            'is_customized' => false,
+        ]);
+        $version = MessageChainVersion::query()->create([
+            'message_chain_id' => $chain->getKey(),
+            'version' => 1,
+            'exit_conditions' => [],
+            'content_hash' => hash('sha256', 'runtime-campaign-chain'),
+            'published_at' => now(),
+        ]);
+        $chain->forceFill(['current_version_id' => $version->getKey()])->save();
+        $campaign->forceFill(['message_chain_id' => $chain->getKey()])->save();
 
         $step = CampaignStep::query()->create([
             'campaign_id' => $campaign->id,

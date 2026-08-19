@@ -12,6 +12,7 @@ use App\Modules\Messaging\Models\MessageChainEnrollment;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use RuntimeException;
 
 class EnrollContactInCampaignAction
@@ -23,9 +24,10 @@ class EnrollContactInCampaignAction
     ) {}
 
     /**
-     * Transitional compatibility arguments such as payload/startContext/meta are
-     * retained while callers and Project State still carry them. MessageChain owns
-     * progression from this point forward; dispatchKey no longer selects a CampaignStep.
+     * Legacy caller arguments remain in the public signature while preset/FlowRoute
+     * definitions finish moving to direct MessageChain authoring. MessageChainVersion
+     * owns progression and exit behavior. Non-empty enrollment exitConditions are
+     * rejected instead of being silently ignored; dispatchKey is compatibility-only.
      *
      * @param array<string, mixed> $payload
      * @param array<string, mixed>|null $meta
@@ -45,6 +47,12 @@ class EnrollContactInCampaignAction
         ?string $scope = null,
         ?string $dispatchKey = null,
     ): CampaignEnrollment {
+        if ($exitConditions !== null && $exitConditions !== []) {
+            throw new InvalidArgumentException(
+                'Campaign enrollment exit conditions are no longer supported. Configure exit conditions on the selected MessageChainVersion.',
+            );
+        }
+
         return DB::transaction(function () use (
             $contact,
             $campaignKey,
@@ -52,7 +60,6 @@ class EnrollContactInCampaignAction
             $payload,
             $meta,
             $startContext,
-            $exitConditions,
             $channel,
             $purpose,
             $scope,
@@ -73,11 +80,6 @@ class EnrollContactInCampaignAction
                 return $existingEnrollment;
             }
 
-            $this->assertNoUnlinkedLegacyOpenEnrollment(
-                contact: $contact,
-                campaign: $campaign,
-            );
-
             $messageChain = $this->messageChain($campaign);
             $startedAt = Carbon::now()->utc();
 
@@ -88,12 +90,7 @@ class EnrollContactInCampaignAction
                 'source_type' => $source?->getMorphClass(),
                 'source_id' => $source?->getKey(),
                 'campaign_key' => $campaign->key,
-                'status' => CampaignEnrollment::STATUS_ACTIVE,
-                'current_step' => null,
-                'current_campaign_step_id' => null,
                 'start_context' => $this->startContextWithPayload($startContext, $payload),
-                'exit_conditions' => $exitConditions,
-                'last_scheduled_message_id' => null,
                 'started_at' => $startedAt,
                 'meta' => $meta,
             ]);
@@ -114,10 +111,10 @@ class EnrollContactInCampaignAction
                 surface: self::SURFACE,
             );
 
-            $this->linkMessageChainEnrollment(
-                campaignEnrollment: $enrollment,
-                messageChainEnrollment: $messageChainEnrollment,
-            );
+            $enrollment->forceFill([
+                'message_chain_enrollment_id' => $messageChainEnrollment->getKey(),
+            ])->save();
+            $enrollment->setRelation('messageChainEnrollment', $messageChainEnrollment);
 
             return $enrollment
                 ->refresh()
@@ -131,8 +128,7 @@ class EnrollContactInCampaignAction
         ?string $purpose = null,
         ?string $scope = null,
     ): Campaign {
-        $query = Campaign::query()
-            ->where('key', $campaignKey);
+        $query = Campaign::query()->where('key', $campaignKey);
 
         if ($channel !== null) {
             $query->where('channel', $this->normalizeSegment($channel));
@@ -146,9 +142,7 @@ class EnrollContactInCampaignAction
             $query->where('scope', $this->normalizeSegment($scope));
         }
 
-        $campaign = $query
-            ->lockForUpdate()
-            ->first();
+        $campaign = $query->lockForUpdate()->first();
 
         if (! $campaign instanceof Campaign) {
             throw CampaignUnavailableForEnrollmentException::missing($campaignKey);
@@ -185,32 +179,6 @@ class EnrollContactInCampaignAction
             ->first();
     }
 
-    private function assertNoUnlinkedLegacyOpenEnrollment(
-        Contact $contact,
-        Campaign $campaign,
-    ): void {
-        $legacyEnrollment = CampaignEnrollment::query()
-            ->where('contact_id', $contact->getKey())
-            ->where('campaign_id', $campaign->getKey())
-            ->whereNull('message_chain_enrollment_id')
-            ->whereIn('status', [
-                CampaignEnrollment::STATUS_ACTIVE,
-                CampaignEnrollment::STATUS_PAUSED,
-            ])
-            ->lockForUpdate()
-            ->first();
-
-        if (! $legacyEnrollment instanceof CampaignEnrollment) {
-            return;
-        }
-
-        throw new RuntimeException(sprintf(
-            'Campaign [%s] has an open legacy CampaignEnrollment [%d] without a MessageChainEnrollment link. In-flight legacy enrollment conversion is intentionally unsupported by this cutover.',
-            $campaign->key,
-            (int) $legacyEnrollment->getKey(),
-        ));
-    }
-
     private function messageChain(Campaign $campaign): MessageChain
     {
         if (! is_numeric($campaign->message_chain_id) || (int) $campaign->message_chain_id < 1) {
@@ -244,36 +212,6 @@ class EnrollContactInCampaignAction
             'enrollment',
             (int) $enrollment->getKey(),
         ]);
-    }
-
-    private function linkMessageChainEnrollment(
-        CampaignEnrollment $campaignEnrollment,
-        MessageChainEnrollment $messageChainEnrollment,
-    ): void {
-        $attributes = [
-            'message_chain_enrollment_id' => $messageChainEnrollment->getKey(),
-        ];
-
-        // These fields remain only as compatibility projection until F7 removes
-        // Campaign-owned progression state from readers/schema. MessageChainEnrollment
-        // is authoritative from this cutover forward.
-        if ($messageChainEnrollment->status === MessageChainEnrollment::STATUS_COMPLETED) {
-            $completedAt = $messageChainEnrollment->completed_at ?? now();
-
-            $attributes = [
-                ...$attributes,
-                'status' => CampaignEnrollment::STATUS_COMPLETED,
-                'completed_at' => $completedAt,
-                'exited_at' => $completedAt,
-                'exit_reason' => CampaignEnrollment::EXIT_REASON_NO_NEXT_STEP,
-            ];
-        }
-
-        $campaignEnrollment->forceFill($attributes)->save();
-        $campaignEnrollment->setRelation(
-            'messageChainEnrollment',
-            $messageChainEnrollment,
-        );
     }
 
     /**

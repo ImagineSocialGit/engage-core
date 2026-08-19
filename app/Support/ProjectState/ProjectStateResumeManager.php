@@ -3,7 +3,6 @@
 namespace App\Support\ProjectState;
 
 use App\Modules\Broadcasts\Models\Broadcast;
-use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\FlowRoutes\Jobs\ContinueFlowRouteProgressJob;
 use App\Modules\FlowRoutes\Jobs\ResumeFlowRouteProgressJob;
 use App\Modules\Messaging\Jobs\ProcessMessageChainEnrollmentJob;
@@ -37,7 +36,6 @@ class ProjectStateResumeManager
     public const STATE_COMPLETED = 'completed';
 
     public const CATEGORY_MESSAGE_CHAINS = 'message_chain_enrollments';
-    public const CATEGORY_CAMPAIGNS = 'campaign_enrollments';
     public const CATEGORY_BROADCASTS = 'broadcasts';
     public const CATEGORY_FLOW_ROUTES = 'flow_routes';
     public const CATEGORY_WEBINAR_FINALIZATIONS = 'webinar_finalizations';
@@ -152,7 +150,6 @@ class ProjectStateResumeManager
         try {
             $outcomes = match ($category) {
                 self::CATEGORY_MESSAGE_CHAINS => $this->resumeMessageChains(),
-                self::CATEGORY_CAMPAIGNS => $this->resumeCampaigns(),
                 self::CATEGORY_BROADCASTS => $this->resumeBroadcasts(),
                 self::CATEGORY_FLOW_ROUTES => $this->resumeFlowRoutes(),
                 self::CATEGORY_WEBINAR_FINALIZATIONS => $this->resumeWebinarFinalizations(),
@@ -243,45 +240,6 @@ class ProjectStateResumeManager
                 report($exception);
                 $this->increment($outcomes, 'queue_failed');
             }
-        }
-
-        return $outcomes;
-    }
-
-    /** @return array<string, int> */
-    private function resumeCampaigns(): array
-    {
-        $outcomes = [];
-
-        foreach ($this->pendingItems(self::CATEGORY_CAMPAIGNS) as $item) {
-            DB::transaction(function () use ($item, &$outcomes): void {
-                $enrollment = CampaignEnrollment::query()
-                    ->lockForUpdate()
-                    ->find($this->recordId($item));
-
-                if (! $enrollment instanceof CampaignEnrollment) {
-                    $this->completeItem($item->id, 'missing');
-                    $this->increment($outcomes, 'missing');
-
-                    return;
-                }
-
-                if ($enrollment->status === CampaignEnrollment::STATUS_PAUSED) {
-                    $enrollment->forceFill([
-                        'status' => CampaignEnrollment::STATUS_ACTIVE,
-                        'paused_at' => null,
-                        'resumed_at' => now(),
-                    ])->save();
-                } elseif ($enrollment->status !== CampaignEnrollment::STATUS_ACTIVE) {
-                    $this->completeItem($item->id, 'no_longer_resumable');
-                    $this->increment($outcomes, 'no_longer_resumable');
-
-                    return;
-                }
-
-                $this->completeItem($item->id, 'activated');
-                $this->increment($outcomes, 'activated');
-            });
         }
 
         return $outcomes;
@@ -876,11 +834,6 @@ class ProjectStateResumeManager
                 'description' => 'Reactivate imported enrollments and queue only those already due.',
                 'dependencies' => [],
             ],
-            self::CATEGORY_CAMPAIGNS => [
-                'label' => 'Campaign enrollments',
-                'description' => 'Reactivate imported Campaign enrollments before terminal message events are released.',
-                'dependencies' => [],
-            ],
             self::CATEGORY_BROADCASTS => [
                 'label' => 'Interrupted Broadcasts',
                 'description' => 'Restore Broadcasts that were mid-send to their supported scheduled state before requeuing recipient messages.',
@@ -891,7 +844,6 @@ class ProjectStateResumeManager
                 'description' => 'Restore imported Route, plan, and item states and recreate continuation or timed-wait jobs.',
                 'dependencies' => [
                     self::CATEGORY_MESSAGE_CHAINS,
-                    self::CATEGORY_CAMPAIGNS,
                 ],
             ],
             self::CATEGORY_WEBINAR_FINALIZATIONS => [
@@ -899,7 +851,6 @@ class ProjectStateResumeManager
                 'description' => 'Reset stale queue claims and explicitly queue provider synchronization and message planning.',
                 'dependencies' => [
                     self::CATEGORY_MESSAGE_CHAINS,
-                    self::CATEGORY_CAMPAIGNS,
                 ],
             ],
             self::CATEGORY_SCHEDULED_MESSAGES => [
@@ -907,7 +858,6 @@ class ProjectStateResumeManager
                 'description' => 'Restore pending messages and recreate their delayed Horizon jobs, including Broadcast messages.',
                 'dependencies' => [
                     self::CATEGORY_MESSAGE_CHAINS,
-                    self::CATEGORY_CAMPAIGNS,
                     self::CATEGORY_BROADCASTS,
                 ],
             ],
@@ -916,16 +866,14 @@ class ProjectStateResumeManager
                 'description' => 'Recover safe claims and block ambiguous provider submissions from blind resending.',
                 'dependencies' => [
                     self::CATEGORY_MESSAGE_CHAINS,
-                    self::CATEGORY_CAMPAIGNS,
                     self::CATEGORY_BROADCASTS,
                 ],
             ],
             self::CATEGORY_SCHEDULED_MESSAGE_OUTBOX => [
                 'label' => 'Scheduled-message terminal events',
-                'description' => 'Release imported terminal outbox events only after their Campaign and message-chain owners are active.',
+                'description' => 'Release imported terminal outbox events only after their message-chain and Broadcast owners are active.',
                 'dependencies' => [
                     self::CATEGORY_MESSAGE_CHAINS,
-                    self::CATEGORY_CAMPAIGNS,
                     self::CATEGORY_BROADCASTS,
                 ],
             ],
@@ -934,7 +882,6 @@ class ProjectStateResumeManager
                 'description' => 'Release imported automation-event envelopes after FlowRoute waiting state has been restored.',
                 'dependencies' => [
                     self::CATEGORY_MESSAGE_CHAINS,
-                    self::CATEGORY_CAMPAIGNS,
                     self::CATEGORY_FLOW_ROUTES,
                 ],
             ],

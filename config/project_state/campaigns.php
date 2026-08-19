@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 2,
+    'version' => 3,
     'tables' => [
         'campaigns' => [
             'mode' => 'upsert',
@@ -118,58 +118,35 @@ return [
                 'source_type',
                 'source_id',
                 'campaign_key',
-                'status',
-                'current_step',
-                'current_campaign_step_id',
                 'start_context',
-                'exit_conditions',
-                'exited_at',
-                'exit_reason',
-                'last_scheduled_message_id',
                 'dedupe_key',
                 'started_at',
-                'paused_at',
-                'resumed_at',
-                'cancelled_at',
-                'completed_at',
                 'meta',
                 'created_at',
                 'updated_at',
             ],
             'json_columns' => [
                 'start_context',
-                'exit_conditions',
                 'meta',
             ],
             'references' => [
                 'contact_id' => 'contacts',
                 'campaign_id' => 'campaigns',
                 'message_chain_enrollment_id' => 'message_chain_enrollments',
-                'current_campaign_step_id' => 'campaign_steps',
-                'last_scheduled_message_id' => 'scheduled_messages',
             ],
             'polymorphic_references' => [
                 [
                     'type_column' => 'source_type',
                     'id_column' => 'source_id',
                     'targets' => [
+                        'App\\Modules\\Core\\Models\\Contact' => 'contacts',
                         'App\\Modules\\Webinars\\Models\\WebinarRegistration' => 'webinar_registrations',
                         'App\\Modules\\Webinars\\Models\\WebinarWaitlistSignup' => 'webinar_waitlist_signups',
                         'App\\Modules\\Webinars\\Models\\Webinar' => 'webinars',
                         'App\\Modules\\Webinars\\Models\\WebinarSeries' => 'webinar_series',
+                        'App\\Modules\\FlowRoutes\\Models\\ContactFlowRouteProgress' => 'contact_flow_route_progress',
                     ],
-                ],
-            ],
-            'import_value_maps' => [
-                'status' => [
-                    'active' => 'paused',
-                ],
-            ],
-            'resume_items' => [
-                [
-                    'category' => 'campaign_enrollments',
-                    'column' => 'status',
-                    'statuses' => ['active'],
+                    'deferred' => true,
                 ],
             ],
         ],

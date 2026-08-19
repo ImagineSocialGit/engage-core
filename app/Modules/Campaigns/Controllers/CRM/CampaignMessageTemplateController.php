@@ -13,6 +13,7 @@ use App\Modules\Campaigns\Requests\UpdateCampaignStepMessageTemplateRequest;
 use App\Modules\Messaging\Actions\AssignMessageTemplatePresetAction;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -161,15 +162,11 @@ class CampaignMessageTemplateController extends Controller
     private function activeEnrollmentCount(Campaign $campaign): int
     {
         return CampaignEnrollment::query()
-            ->where(function ($query) use ($campaign): void {
-                $query
-                    ->where('campaign_id', $campaign->getKey())
-                    ->orWhere('campaign_key', $campaign->key);
-            })
-            ->whereIn('status', [
-                CampaignEnrollment::STATUS_ACTIVE,
-                CampaignEnrollment::STATUS_PAUSED,
-            ])
+            ->where('campaign_id', $campaign->getKey())
+            ->whereHas('messageChainEnrollment', fn ($query) => $query->whereIn('status', [
+                MessageChainEnrollment::STATUS_ACTIVE,
+                MessageChainEnrollment::STATUS_PAUSED,
+            ]))
             ->count();
     }
 
@@ -177,11 +174,12 @@ class CampaignMessageTemplateController extends Controller
     {
         return ScheduledMessage::query()
             ->where('status', ScheduledMessage::STATUS_PENDING)
-            ->where(function ($query) use ($campaign): void {
-                $query
-                    ->where('meta->campaign_id', $campaign->getKey())
-                    ->orWhere('meta->campaign_key', $campaign->key);
-            })
+            ->whereHas(
+                'messageChainEnrollment',
+                fn ($query) => $query
+                    ->where('origin_type', $campaign->getMorphClass())
+                    ->where('origin_id', $campaign->getKey()),
+            )
             ->count();
     }
 

@@ -6,6 +6,7 @@ use App\Modules\Campaigns\Actions\CancelCampaignEnrollmentAction;
 use App\Modules\Campaigns\Data\Automation\CancelCampaignAutomationDefinition;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Support\AutomationCapabilities\Contracts\AutomationActionHandler;
 use App\Support\AutomationCapabilities\Data\AutomationActionContext;
 use App\Support\AutomationCapabilities\Data\AutomationActionResult;
@@ -108,22 +109,30 @@ class CancelCampaignAutomationActionHandler implements AutomationActionHandler
     /** @return array<string, mixed> */
     private function enrollmentMeta(CampaignEnrollment $enrollment): array
     {
+        $enrollment->loadMissing(['campaign', 'messageChainEnrollment']);
+        $campaign = $enrollment->campaign;
+        $chainEnrollment = $enrollment->messageChainEnrollment;
+
         return [
             'id' => $enrollment->getKey(),
             'contact_id' => $enrollment->contact_id,
             'campaign_id' => $enrollment->campaign_id,
             'campaign_key' => $enrollment->campaign_key,
-            'channel' => $enrollment->channel,
-            'purpose' => $enrollment->purpose,
-            'scope' => $enrollment->scope,
-            'status' => $enrollment->status,
-            'current_step' => $enrollment->current_step,
-            'current_campaign_step_id' => $enrollment->current_campaign_step_id,
-            'last_scheduled_message_id' => $enrollment->last_scheduled_message_id,
-            'started_at' => $enrollment->started_at?->toISOString(),
-            'cancelled_at' => $enrollment->cancelled_at?->toISOString(),
-            'exited_at' => $enrollment->exited_at?->toISOString(),
-            'exit_reason' => $enrollment->exit_reason,
+            'channel' => $campaign?->channel,
+            'purpose' => $campaign?->purpose,
+            'scope' => $campaign?->scope,
+            'message_chain_enrollment_id' => $chainEnrollment?->getKey(),
+            'status' => $chainEnrollment?->status,
+            'message_chain_status' => $chainEnrollment?->status,
+            'message_chain_version_id' => $chainEnrollment?->message_chain_version_id,
+            'current_message_chain_step_id' => $chainEnrollment?->current_message_chain_step_id,
+            'next_action_at' => $chainEnrollment?->next_action_at?->toISOString(),
+            'started_at' => $chainEnrollment?->started_at?->toISOString()
+                ?? $enrollment->started_at?->toISOString(),
+            'cancelled_at' => $chainEnrollment?->cancelled_at?->toISOString(),
+            'exited_at' => $chainEnrollment?->exited_at?->toISOString(),
+            'completed_at' => $chainEnrollment?->completed_at?->toISOString(),
+            'exit_reason' => $chainEnrollment?->exit_reason_code,
         ];
     }
 }

@@ -12,6 +12,7 @@ use App\Modules\Campaigns\Models\CampaignStepVariant;
 use App\Modules\Campaigns\Services\CampaignMessageDefinitionResolver;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Models\MessageChain;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 use Illuminate\Support\Collection;
@@ -590,7 +591,7 @@ class CampaignsSetupValidationContributor implements SetupValidationContributor
     {
         /** @var Collection<int, Campaign> $campaigns */
         $campaigns = Campaign::query()
-            ->with(['steps.variants'])
+            ->with(['messageChain', 'steps.variants'])
             ->orderBy('key')
             ->get();
 
@@ -612,6 +613,57 @@ class CampaignsSetupValidationContributor implements SetupValidationContributor
                 );
 
                 continue;
+            }
+
+            $messageChain = $campaign->messageChain;
+
+            if (! $messageChain instanceof MessageChain) {
+                yield $this->error(
+                    code: 'campaigns.runtime_message_chain_missing',
+                    message: "Active Campaign [{$campaign->key}] must select a published Messaging MessageChain.",
+                    path: "{$campaignPath}.message_chain_id",
+                    context: [
+                        'campaign_id' => $campaign->getKey(),
+                        'campaign_key' => $campaign->key,
+                        'message_chain_id' => $campaign->message_chain_id,
+                    ],
+                );
+
+                continue;
+            }
+
+            if ($messageChain->status !== MessageChain::STATUS_ACTIVE) {
+                yield $this->error(
+                    code: 'campaigns.runtime_message_chain_inactive',
+                    message: "Active Campaign [{$campaign->key}] selects MessageChain [{$messageChain->key}] with status [{$messageChain->status}].",
+                    path: "{$campaignPath}.message_chain_id",
+                    context: [
+                        'campaign_id' => $campaign->getKey(),
+                        'campaign_key' => $campaign->key,
+                        'message_chain_id' => $messageChain->getKey(),
+                        'message_chain_key' => $messageChain->key,
+                        'message_chain_status' => $messageChain->status,
+                    ],
+                );
+            }
+
+            try {
+                $messageChain->requireCurrentVersion();
+            } catch (Throwable $exception) {
+                yield $this->error(
+                    code: 'campaigns.runtime_message_chain_version_missing',
+                    message: "Active Campaign [{$campaign->key}] selects MessageChain [{$messageChain->key}] without a usable published current version.",
+                    path: "{$campaignPath}.message_chain_id",
+                    context: [
+                        'campaign_id' => $campaign->getKey(),
+                        'campaign_key' => $campaign->key,
+                        'message_chain_id' => $messageChain->getKey(),
+                        'message_chain_key' => $messageChain->key,
+                    ],
+                    meta: [
+                        'exception' => $exception::class,
+                    ],
+                );
             }
 
             $duplicateStepNumbers = $campaign->steps

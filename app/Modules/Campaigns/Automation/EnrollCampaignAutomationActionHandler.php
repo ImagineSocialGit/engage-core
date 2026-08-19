@@ -216,19 +216,19 @@ class EnrollCampaignAutomationActionHandler implements AutomationActionHandler
             'contact_id' => $enrollment->contact_id,
             'campaign_id' => $enrollment->campaign_id,
             'campaign_key' => $enrollment->campaign_key,
-            'status' => $chainEnrollment?->status ?? $enrollment->status,
             'message_chain_enrollment_id' => $chainEnrollment?->getKey(),
+            'status' => $chainEnrollment?->status,
             'message_chain_status' => $chainEnrollment?->status,
             'message_chain_version_id' => $chainEnrollment?->message_chain_version_id,
             'current_message_chain_step_id' => $chainEnrollment?->current_message_chain_step_id,
             'next_action_at' => $chainEnrollment?->next_action_at?->toISOString(),
-            // Transitional compatibility keys. These are not progression authority.
-            'current_step' => $enrollment->current_step,
-            'current_campaign_step_id' => $enrollment->current_campaign_step_id,
-            'last_scheduled_message_id' => $enrollment->last_scheduled_message_id,
             'started_at' => $chainEnrollment?->started_at?->toISOString()
                 ?? $enrollment->started_at?->toISOString(),
+            'paused_at' => $chainEnrollment?->paused_at?->toISOString(),
+            'resumed_at' => $chainEnrollment?->resumed_at?->toISOString(),
             'exited_at' => $chainEnrollment?->exited_at?->toISOString(),
+            'completed_at' => $chainEnrollment?->completed_at?->toISOString(),
+            'cancelled_at' => $chainEnrollment?->cancelled_at?->toISOString(),
             'exit_reason' => $chainEnrollment?->exit_reason_code,
         ];
     }

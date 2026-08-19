@@ -17,7 +17,6 @@ use App\Modules\Messaging\Services\MessageChainExecutionContextResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Queue;
-use RuntimeException;
 use Tests\TestCase;
 
 class EnrollContactInCampaignActionTest extends TestCase
@@ -46,7 +45,6 @@ class EnrollContactInCampaignActionTest extends TestCase
                 'market' => 'tampa',
                 'payload' => ['existing' => 'kept'],
             ],
-            exitConditions: [['field' => 'contact.status', 'operator' => 'equals', 'value' => 'engaged']],
         );
 
         $chainEnrollment = $enrollment->messageChainEnrollment;
@@ -69,12 +67,9 @@ class EnrollContactInCampaignActionTest extends TestCase
         $this->assertSame($enrollment->dedupe_key, $chainEnrollment->dedupe_key);
         $this->assertSame($source->getMorphClass(), $enrollment->source_type);
         $this->assertSame((int) $source->getKey(), (int) $enrollment->source_id);
-        $this->assertNull($enrollment->current_campaign_step_id);
-        $this->assertNull($enrollment->last_scheduled_message_id);
         $this->assertDatabaseCount('scheduled_messages', 0);
 
         $expectedNextActionAt = $chainEnrollment->started_at?->copy()->addHours(2);
-
         $this->assertNotNull($expectedNextActionAt);
         $this->assertTrue(
             $chainEnrollment->next_action_at?->equalTo($expectedNextActionAt) ?? false,
@@ -93,6 +88,25 @@ class EnrollContactInCampaignActionTest extends TestCase
         $this->assertSame($enrollment->getKey(), data_get($context, 'campaign_enrollment.id'));
         $this->assertSame($contact->getKey(), data_get($context, 'contact.id'));
         $this->assertSame($chain->getKey(), $campaign->message_chain_id);
+    }
+
+    public function test_non_empty_enrollment_exit_conditions_are_rejected_instead_of_silently_ignored(): void
+    {
+        Queue::fake();
+
+        [$campaign] = $this->campaignWithChain('legacy_exit_conditions');
+        $contact = Contact::factory()->create();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Configure exit conditions on the selected MessageChainVersion');
+
+        app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $campaign->key,
+            exitConditions: [
+                ['field' => 'contact.status', 'operator' => 'equals', 'value' => 'engaged'],
+            ],
+        );
     }
 
     public function test_it_returns_existing_open_message_chain_enrollment_without_duplicate_start(): void
@@ -187,7 +201,7 @@ class EnrollContactInCampaignActionTest extends TestCase
             chainStatus: MessageChain::STATUS_INACTIVE,
         );
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('is not active');
 
         try {
@@ -215,7 +229,7 @@ class EnrollContactInCampaignActionTest extends TestCase
             'meta' => [],
         ]);
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('has no selected MessageChain');
 
         try {
@@ -229,7 +243,7 @@ class EnrollContactInCampaignActionTest extends TestCase
         }
     }
 
-    public function test_chain_with_no_active_step_completes_initial_compatibility_projection(): void
+    public function test_chain_with_no_active_step_completes_in_messaging_without_duplicate_campaign_progression_state(): void
     {
         Queue::fake();
 
@@ -244,33 +258,38 @@ class EnrollContactInCampaignActionTest extends TestCase
         );
 
         $this->assertSame(MessageChainEnrollment::STATUS_COMPLETED, $enrollment->messageChainEnrollment->status);
-        $this->assertSame(CampaignEnrollment::STATUS_COMPLETED, $enrollment->status);
-        $this->assertNotNull($enrollment->completed_at);
-        $this->assertSame(CampaignEnrollment::EXIT_REASON_NO_NEXT_STEP, $enrollment->exit_reason);
+        $this->assertSame(MessageChainEnrollment::STATUS_COMPLETED, $enrollment->runtimeStatus());
+        $this->assertDatabaseMissing('campaign_enrollments', [
+            'id' => $enrollment->getKey(),
+            'message_chain_enrollment_id' => null,
+        ]);
     }
 
-    public function test_unlinked_open_legacy_enrollment_fails_loudly_instead_of_dual_running(): void
+    public function test_unlinked_wrapper_does_not_claim_runtime_openness(): void
     {
         Queue::fake();
 
-        [$campaign] = $this->campaignWithChain('legacy_guard');
+        [$campaign] = $this->campaignWithChain('atomic_bridge_guard');
         $contact = Contact::factory()->create();
 
-        CampaignEnrollment::query()->create([
+        $unlinked = CampaignEnrollment::query()->create([
             'contact_id' => $contact->getKey(),
             'campaign_id' => $campaign->getKey(),
             'campaign_key' => $campaign->key,
-            'status' => CampaignEnrollment::STATUS_ACTIVE,
             'started_at' => now(),
         ]);
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('open legacy CampaignEnrollment');
-
-        app(EnrollContactInCampaignAction::class)->handle(
+        $linked = app(EnrollContactInCampaignAction::class)->handle(
             contact: $contact,
             campaignKey: $campaign->key,
         );
+
+        $this->assertNull($unlinked->runtimeStatus());
+        $this->assertFalse($unlinked->isOpen());
+        $this->assertNotNull($linked->message_chain_enrollment_id);
+        $this->assertTrue($linked->isOpen());
+        $this->assertDatabaseCount('campaign_enrollments', 2);
+        $this->assertDatabaseCount('message_chain_enrollments', 1);
     }
 
     /**

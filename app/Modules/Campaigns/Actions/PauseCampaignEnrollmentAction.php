@@ -19,9 +19,7 @@ class PauseCampaignEnrollmentAction
         private readonly PauseMessageChainEnrollmentAction $pauseMessageChainEnrollment,
     ) {}
 
-    /**
-     * @param array<string, mixed>|null $meta
-     */
+    /** @param array<string, mixed>|null $meta */
     public function handle(
         Contact $contact,
         string $campaignKey,
@@ -49,18 +47,10 @@ class PauseCampaignEnrollmentAction
             return null;
         }
 
-        return $this->pauseEnrollment(
-            enrollment: $enrollment,
-            source: $source,
-            reason: $reason,
-            skipPendingMessages: $skipPendingMessages,
-            meta: $meta,
-        );
+        return $this->pauseEnrollment($enrollment, $source, $reason, $skipPendingMessages, $meta);
     }
 
-    /**
-     * @param array<string, mixed>|null $meta
-     */
+    /** @param array<string, mixed>|null $meta */
     public function pauseEnrollment(
         CampaignEnrollment $enrollment,
         ?Model $source = null,
@@ -69,24 +59,12 @@ class PauseCampaignEnrollmentAction
         ?array $meta = null,
     ): CampaignEnrollment {
         $enrollmentId = (int) $enrollment->getKey();
-        $campaignId = is_numeric($enrollment->campaign_id)
-            ? (int) $enrollment->campaign_id
-            : null;
+        $campaignId = is_numeric($enrollment->campaign_id) ? (int) $enrollment->campaign_id : null;
         $reason = $this->reason($reason);
 
-        return DB::transaction(function () use (
-            $enrollmentId,
-            $campaignId,
-            $source,
-            $reason,
-            $skipPendingMessages,
-            $meta,
-        ): CampaignEnrollment {
+        return DB::transaction(function () use ($enrollmentId, $campaignId, $source, $reason, $skipPendingMessages, $meta): CampaignEnrollment {
             if ($campaignId !== null) {
-                Campaign::query()
-                    ->whereKey($campaignId)
-                    ->lockForUpdate()
-                    ->first();
+                Campaign::query()->whereKey($campaignId)->lockForUpdate()->first();
             }
 
             $lockedEnrollment = CampaignEnrollment::query()
@@ -99,27 +77,12 @@ class PauseCampaignEnrollmentAction
             if (! $chainEnrollment instanceof MessageChainEnrollment) {
                 throw new RuntimeException(sprintf(
                     'CampaignEnrollment [%d] cannot be paused because it has no linked MessageChainEnrollment.',
-                    (int) $lockedEnrollment->getKey(),
+                    $enrollmentId,
                 ));
             }
 
-            if ($chainEnrollment->isTerminal()) {
+            if ($chainEnrollment->isTerminal() || $chainEnrollment->status === MessageChainEnrollment::STATUS_PAUSED) {
                 return $lockedEnrollment;
-            }
-
-            if ($chainEnrollment->status === MessageChainEnrollment::STATUS_PAUSED) {
-                if ($lockedEnrollment->status !== CampaignEnrollment::STATUS_PAUSED
-                    || ! $lockedEnrollment->paused_at?->equalTo($chainEnrollment->paused_at)
-                ) {
-                    $lockedEnrollment->forceFill([
-                        'status' => CampaignEnrollment::STATUS_PAUSED,
-                        'paused_at' => $chainEnrollment->paused_at,
-                    ])->save();
-                }
-
-                $lockedEnrollment->setRelation('messageChainEnrollment', $chainEnrollment);
-
-                return $lockedEnrollment->refresh()->load('messageChainEnrollment');
             }
 
             $paused = $this->pauseMessageChainEnrollment->handle(
@@ -133,10 +96,7 @@ class PauseCampaignEnrollmentAction
             }
 
             $existingMeta = is_array($lockedEnrollment->meta) ? $lockedEnrollment->meta : [];
-
             $lockedEnrollment->forceFill([
-                'status' => CampaignEnrollment::STATUS_PAUSED,
-                'paused_at' => $paused->paused_at,
                 'meta' => array_replace_recursive($existingMeta, [
                     'lifecycle' => [
                         'last_pause' => [
@@ -160,10 +120,6 @@ class PauseCampaignEnrollmentAction
     {
         $reason = is_string($reason) ? trim($reason) : '';
 
-        return mb_substr(
-            $reason !== '' ? $reason : self::DEFAULT_REASON,
-            0,
-            96,
-        );
+        return mb_substr($reason !== '' ? $reason : self::DEFAULT_REASON, 0, 96);
     }
 }

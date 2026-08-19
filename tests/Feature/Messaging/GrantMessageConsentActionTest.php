@@ -198,17 +198,12 @@ class GrantMessageConsentActionTest extends TestCase
         $enrollment = CampaignEnrollment::create([
             'contact_id' => $contact->id,
             'campaign_key' => 'webinar_attended',
-            'channel' => MessageChannel::Email->value,
-            'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'webinar',
-            'status' => CampaignEnrollment::STATUS_PAUSED,
-            'current_step' => 2,
+            'start_context' => ['source' => 'consent-test'],
             'started_at' => now()->subDays(2),
-            'paused_at' => now()->subDay(),
-            'resumed_at' => null,
-        ]);
+            'meta' => ['marker' => 'unchanged'],
+        ])->fresh();
 
-        $pausedAt = $enrollment->paused_at;
+        $updatedAt = $enrollment->updated_at?->copy();
 
         app(GrantMessageConsentAction::class)->handle($contact, [
             'channel' => MessageChannel::Email->value,
@@ -219,9 +214,8 @@ class GrantMessageConsentActionTest extends TestCase
 
         $enrollment->refresh();
 
-        $this->assertSame(CampaignEnrollment::STATUS_PAUSED, $enrollment->status);
-        $this->assertSame(2, $enrollment->current_step);
-        $this->assertTrue($enrollment->paused_at->equalTo($pausedAt));
-        $this->assertNull($enrollment->resumed_at);
+        $this->assertEquals(['source' => 'consent-test'], $enrollment->start_context);
+        $this->assertEquals(['marker' => 'unchanged'], $enrollment->meta);
+        $this->assertTrue($enrollment->updated_at?->equalTo($updatedAt) ?? false);
     }
 }

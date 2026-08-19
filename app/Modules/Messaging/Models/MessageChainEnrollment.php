@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class MessageChainEnrollment extends Model
@@ -88,6 +89,11 @@ class MessageChainEnrollment extends Model
     {
         return $this->hasMany(ScheduledMessage::class)
             ->orderBy('id');
+    }
+
+    public function latestScheduledMessage(): HasOne
+    {
+        return $this->hasOne(ScheduledMessage::class)->ofMany('id', 'max');
     }
 
     public function scopeDue(Builder $query): Builder

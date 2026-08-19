@@ -57,9 +57,8 @@ class CampaignEnrollmentLifecycleBridgeTest extends TestCase
         );
 
         $this->assertInstanceOf(CampaignEnrollment::class, $cancelled);
-        $this->assertSame(CampaignEnrollment::STATUS_CANCELLED, $cancelled->status);
-        $this->assertSame('high_intent_reply', $cancelled->exit_reason);
-        $this->assertSame('high_intent_reply', data_get($cancelled->meta, 'cancellation.reason'));
+        $this->assertSame(MessageChainEnrollment::STATUS_CANCELLED, $cancelled->runtimeStatus());
+        $this->assertSame('high_intent_reply', data_get($cancelled->meta, 'lifecycle.last_cancellation.reason'));
 
         $chainEnrollment->refresh();
         $this->assertSame(MessageChainEnrollment::STATUS_CANCELLED, $chainEnrollment->status);
@@ -91,7 +90,7 @@ class CampaignEnrollmentLifecycleBridgeTest extends TestCase
         );
 
         $this->assertInstanceOf(CampaignEnrollment::class, $paused);
-        $this->assertSame(CampaignEnrollment::STATUS_PAUSED, $paused->status);
+        $this->assertSame(MessageChainEnrollment::STATUS_PAUSED, $paused->runtimeStatus());
         $this->assertSame(MessageChainEnrollment::STATUS_PAUSED, $paused->messageChainEnrollment->status);
         $this->assertSame('human_reply', data_get($paused->meta, 'lifecycle.last_pause.reason'));
         $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $pending->refresh()->status);
@@ -105,7 +104,7 @@ class CampaignEnrollmentLifecycleBridgeTest extends TestCase
         );
 
         $this->assertInstanceOf(CampaignEnrollment::class, $resumed);
-        $this->assertSame(CampaignEnrollment::STATUS_ACTIVE, $resumed->status);
+        $this->assertSame(MessageChainEnrollment::STATUS_ACTIVE, $resumed->runtimeStatus());
         $this->assertSame(MessageChainEnrollment::STATUS_ACTIVE, $resumed->messageChainEnrollment->status);
         $this->assertSame(
             'human_follow_up_complete',
@@ -164,12 +163,15 @@ class CampaignEnrollmentLifecycleBridgeTest extends TestCase
 
         foreach ([$firstEnrollment, $secondEnrollment] as $enrollment) {
             $enrollment->refresh();
-            $this->assertSame(CampaignEnrollment::STATUS_CANCELLED, $enrollment->status);
+            $this->assertSame(MessageChainEnrollment::STATUS_CANCELLED, $enrollment->runtimeStatus());
             $this->assertSame(
                 MessageChainEnrollment::STATUS_CANCELLED,
                 $enrollment->messageChainEnrollment()->firstOrFail()->status,
             );
-            $this->assertSame(DeactivateCampaignAction::REASON, $enrollment->exit_reason);
+            $this->assertSame(
+                DeactivateCampaignAction::REASON,
+                data_get($enrollment->meta, 'lifecycle.last_cancellation.reason'),
+            );
         }
 
         $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $firstPending->refresh()->status);
@@ -182,8 +184,8 @@ class CampaignEnrollmentLifecycleBridgeTest extends TestCase
 
         $this->assertSame(Campaign::STATUS_ACTIVE, $campaign->refresh()->status);
         $this->assertSame(MessageChain::STATUS_ACTIVE, $chain->refresh()->status);
-        $this->assertSame(CampaignEnrollment::STATUS_CANCELLED, $firstEnrollment->refresh()->status);
-        $this->assertSame(CampaignEnrollment::STATUS_CANCELLED, $secondEnrollment->refresh()->status);
+        $this->assertSame(MessageChainEnrollment::STATUS_CANCELLED, $firstEnrollment->refresh()->runtimeStatus());
+        $this->assertSame(MessageChainEnrollment::STATUS_CANCELLED, $secondEnrollment->refresh()->runtimeStatus());
 
         $newContact = Contact::factory()->create([
             'email' => 'deactivate-new@example.test',
@@ -193,8 +195,44 @@ class CampaignEnrollmentLifecycleBridgeTest extends TestCase
             campaignKey: $campaign->key,
         );
 
-        $this->assertSame(CampaignEnrollment::STATUS_ACTIVE, $newEnrollment->status);
+        $this->assertSame(MessageChainEnrollment::STATUS_ACTIVE, $newEnrollment->runtimeStatus());
         $this->assertSame(MessageChainEnrollment::STATUS_ACTIVE, $newEnrollment->messageChainEnrollment->status);
+    }
+
+    public function test_archived_campaign_cannot_be_reactivated(): void
+    {
+        [$campaign, $chain] = $this->campaignWithChain(
+            suffix: 'archived-campaign',
+            campaignStatus: Campaign::STATUS_ARCHIVED,
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Archived Campaign');
+
+        try {
+            app(ActivateCampaignAction::class)->handle($campaign, source: 'test');
+        } finally {
+            $this->assertSame(Campaign::STATUS_ARCHIVED, $campaign->refresh()->status);
+            $this->assertSame(MessageChain::STATUS_ACTIVE, $chain->refresh()->status);
+        }
+    }
+
+    public function test_activation_requires_a_selected_published_message_chain(): void
+    {
+        $campaign = Campaign::query()->create([
+            'key' => 'unbound',
+            'name' => 'Unbound Campaign',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'campaign_test',
+            'status' => Campaign::STATUS_INACTIVE,
+            'meta' => [],
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('without a selected MessageChain');
+
+        app(ActivateCampaignAction::class)->handle($campaign, source: 'test');
     }
 
     public function test_activation_rejects_an_archived_selected_message_chain(): void

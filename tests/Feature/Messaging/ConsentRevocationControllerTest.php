@@ -245,13 +245,11 @@ class ConsentRevocationControllerTest extends TestCase
         $enrollment = CampaignEnrollment::create([
             'contact_id' => $contact->id,
             'campaign_key' => 'webinar_attended',
-            'channel' => MessageChannel::Email->value,
-            'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'webinar',
-            'status' => CampaignEnrollment::STATUS_ACTIVE,
-            'current_step' => 2,
+            'start_context' => ['source' => 'unsubscribe-test'],
             'started_at' => now()->subDays(2),
-        ]);
+            'meta' => ['marker' => 'unchanged'],
+        ])->fresh();
+        $updatedAt = $enrollment->updated_at?->copy();
 
         $this->post($this->marketingConfirmationUrl($contact))
             ->assertOk()
@@ -259,12 +257,9 @@ class ConsentRevocationControllerTest extends TestCase
 
         $enrollment->refresh();
 
-        $this->assertSame(
-            CampaignEnrollment::STATUS_ACTIVE,
-            $enrollment->status
-        );
-        $this->assertSame(2, $enrollment->current_step);
-        $this->assertNull($enrollment->paused_at);
+        $this->assertEquals(['source' => 'unsubscribe-test'], $enrollment->start_context);
+        $this->assertEquals(['marker' => 'unchanged'], $enrollment->meta);
+        $this->assertTrue($enrollment->updated_at?->equalTo($updatedAt) ?? false);
     }
 
     private function createContact(): Contact

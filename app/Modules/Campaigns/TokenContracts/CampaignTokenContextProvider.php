@@ -14,7 +14,7 @@ class CampaignTokenContextProvider implements TokenContextProvider
             sourceTokens: [
                 'contact.first_name', 'contact.last_name', 'contact.name', 'contact.email', 'contact.phone',
                 'campaign.id', 'campaign.key', 'campaign.name', 'campaign.description', 'campaign.channel', 'campaign.purpose', 'campaign.scope', 'campaign.status',
-                'campaign_enrollment.id', 'campaign_enrollment.campaign_key', 'campaign_enrollment.status', 'campaign_enrollment.current_step',
+                'campaign_enrollment.id', 'campaign_enrollment.campaign_key', 'campaign_enrollment.message_chain_enrollment_id', 'campaign_enrollment.started_at',
             ],
             channels: ['email', 'sms'], purposes: ['marketing'], surfaces: ['campaigns'],
         );

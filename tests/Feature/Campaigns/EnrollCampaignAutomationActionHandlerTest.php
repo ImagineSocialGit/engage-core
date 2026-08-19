@@ -80,6 +80,33 @@ class EnrollCampaignAutomationActionHandlerTest extends TestCase
         $this->assertDatabaseCount('campaign_enrollments', 2);
     }
 
+    public function test_non_empty_legacy_exit_conditions_fail_definition_validation(): void
+    {
+        $campaign = $this->activeCampaignWithChain('automation_exit_conditions');
+        $contact = Contact::factory()->create();
+
+        $result = app(EnrollCampaignAutomationActionHandler::class)->handle(
+            new AutomationActionContext(
+                input: [
+                    'campaign_key' => $campaign->key,
+                    'exit_conditions' => [
+                        ['field' => 'contact.status', 'operator' => 'equals', 'value' => 'engaged'],
+                    ],
+                ],
+                subject: $contact,
+                models: ['current_contact' => $contact],
+                source: $contact,
+            ),
+        );
+
+        $this->assertSame(AutomationActionResult::STATUS_FAILED, $result->status);
+        $this->assertSame(
+            'enroll_campaign_exit_conditions_moved_to_message_chain_version',
+            $result->reason,
+        );
+        $this->assertDatabaseCount('campaign_enrollments', 0);
+    }
+
     public function test_it_skips_inactive_campaign_with_explicit_reason(): void
     {
         $campaign = Campaign::factory()->create([
