@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 1,
+    'version' => 2,
     'optional' => true,
     'activation_tables' => [
         'mortgage_stages',
@@ -143,19 +143,17 @@ return [
             'order_by' => ['id'],
             'columns' => [
                 'id',
-                'contact_id',
-                'relationship_stage_key',
+                'contact_relationship_id',
                 'brokerage_name',
                 'license_number',
                 'last_referral_at',
-                'last_contact_at',
                 'meta',
                 'created_at',
                 'updated_at',
             ],
             'json_columns' => ['meta'],
             'references' => [
-                'contact_id' => 'contacts',
+                'contact_relationship_id' => 'contact_relationships',
             ],
         ],
 

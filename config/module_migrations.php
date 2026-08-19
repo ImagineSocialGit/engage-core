@@ -50,6 +50,14 @@ return [
             ],
         ],
 
+        'relationships' => [
+            'path' => 'database/migrations/modules/relationships',
+            'schema_version' => 1,
+            'migrations' => [
+                '2026_08_19_175000_create_contact_relationships_table.php',
+            ],
+        ],
+
         'messaging' => [
             'path' => 'database/migrations/modules/messaging',
             'schema_version' => 1,
@@ -247,7 +255,7 @@ return [
 
         'mortgage' => [
             'path' => 'database/migrations/verticals/mortgage',
-            'schema_version' => 2,
+            'schema_version' => 3,
             'migrations' => [
                 '2026_06_02_211108_create_mortgage_stages_table.php',
                 '2026_06_02_211116_create_contact_mortgage_profiles_table.php',

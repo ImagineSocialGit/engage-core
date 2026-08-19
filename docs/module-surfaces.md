@@ -59,6 +59,7 @@ Tasks
 Webinars
 Routes
 Reporting
+Relationships
 ```
 
 Loud does not mean every enabled module must receive a top-level sidebar item. Navigation should still reflect frequency, importance, and the shared UI/UX rules. A loud module may live under a grouped navigation area or be reached contextually when that produces a simpler product.
@@ -261,6 +262,7 @@ This registry records the current product direction. Reclassification requires a
 | Documents | universal | loud | Provide request, upload, review, and checklist workflows; requirement design may remain developer/operator work. |
 | Commerce | universal | loud | Provide custom storefront/offers, purchase history, provider-backed checkout orchestration, and cross-provider inventory coordination while specialized payment, shipping/warehouse, POS, and deep store operations remain external. |
 | Location | universal | silent | Provide normalized location facts and supporting contracts through consuming modules; no standalone Location product by default. |
+| Relationships | universal | loud | Provide relationship-scoped Contact workspaces; normal daily lists must not mix materially different relationship populations. |
 | Events | universal | loud | Provide concrete Event catalog, readiness, lifecycle, and attendance workflows. |
 | Mortgage | vertical | loud | Provide mortgage-specific records, workflow meaning, and operations. |
 | PetServices | vertical | loud | Provide pet-service-specific records, workflows, and operations when implemented. |
@@ -272,6 +274,8 @@ Integrations/adapters remain outside this registry because they are not product 
 ## Navigation rule
 
 Top-level navigation is scarce product space.
+
+When Relationships is explicitly enabled, client-facing Contact navigation should prefer configured relationship workspaces (for example Leads and Realtors) over one undifferentiated all-Contacts destination. A mixed all-Contacts view is an administrative/export/debug surface, not the normal daily operating list.
 
 Use this default:
 

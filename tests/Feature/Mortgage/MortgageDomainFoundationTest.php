@@ -14,10 +14,8 @@ use App\Modules\Mortgage\Models\MortgageRealtorMarket;
 use App\Modules\Mortgage\Models\MortgageRealtorProductionSnapshot;
 use App\Modules\Mortgage\Models\MortgageRealtorProfile;
 use App\Modules\Mortgage\Models\MortgageStage;
-use Illuminate\Database\Migrations\Migrator;
-use Illuminate\Foundation\Application;
+use App\Modules\Relationships\Models\ContactRelationship;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -25,21 +23,12 @@ class MortgageDomainFoundationTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function tearDown(): void
+    /**
+     * @return array<int, string>
+     */
+    protected function additionalTestMigrationModuleKeys(): array
     {
-        RefreshDatabaseState::$migrated = false;
-
-        parent::tearDown();
-    }
-
-    public function createApplication(): Application
-    {
-        $app = parent::createApplication();
-        $app->make(Migrator::class)->path(
-            $app->basePath('database/migrations/verticals/mortgage'),
-        );
-
-        return $app;
+        return ['mortgage'];
     }
 
     public function test_current_consumer_facts_are_separate_from_repeatable_loan_history(): void
@@ -174,9 +163,15 @@ class MortgageDomainFoundationTest extends TestCase
     {
         $contact = Contact::factory()->create();
 
-        $profile = MortgageRealtorProfile::query()->create([
+        $relationship = ContactRelationship::query()->create([
             'contact_id' => $contact->id,
-            'relationship_stage_key' => 'target_agent',
+            'relationship_key' => 'realtor',
+            'stage_key' => 'target_agent',
+            'is_active' => true,
+        ]);
+
+        $profile = MortgageRealtorProfile::query()->create([
+            'contact_relationship_id' => $relationship->id,
         ]);
 
         MortgageRealtorMarket::query()->create([
@@ -201,7 +196,7 @@ class MortgageDomainFoundationTest extends TestCase
             'source' => 'fl_va_agents',
         ]);
 
-        $this->assertSame('target_agent', $profile->relationship_stage_key);
+        $this->assertSame('target_agent', $profile->contactRelationship->stage_key);
         $this->assertCount(2, $profile->fresh()->markets);
         $this->assertCount(1, $profile->fresh()->productionSnapshots);
         $this->assertSame(

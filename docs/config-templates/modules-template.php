@@ -14,6 +14,7 @@ use App\Modules\Location\Providers\LocationModuleServiceProvider;
 use App\Modules\Messaging\Providers\MessagingModuleServiceProvider;
 use App\Modules\Mortgage\Providers\MortgageModuleServiceProvider;
 use App\Modules\Portal\Providers\PortalModuleServiceProvider;
+use App\Modules\Relationships\Providers\RelationshipsModuleServiceProvider;
 use App\Modules\Reporting\Providers\ReportingModuleServiceProvider;
 use App\Modules\Scheduling\Providers\SchedulingModuleServiceProvider;
 use App\Modules\Tasks\Providers\TasksModuleServiceProvider;
@@ -152,6 +153,14 @@ return [
             ],
         ],
 
+        'relationships' => [
+            'name' => 'Relationships',
+            'depends_on' => ['core'],
+            'providers' => [
+                RelationshipsModuleServiceProvider::class,
+            ],
+        ],
+
         'scheduling' => [
             'name' => 'Scheduling',
             'depends_on' => ['core'],
@@ -245,7 +254,7 @@ return [
 
         'mortgage' => [
             'name' => 'Mortgage',
-            'depends_on' => ['core'],
+            'depends_on' => ['relationships'],
             'providers' => [
                 MortgageModuleServiceProvider::class,
             ],

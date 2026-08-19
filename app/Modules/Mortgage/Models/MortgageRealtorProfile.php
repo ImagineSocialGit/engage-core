@@ -2,7 +2,7 @@
 
 namespace App\Modules\Mortgage\Models;
 
-use App\Modules\Core\Models\Contact;
+use App\Modules\Relationships\Models\ContactRelationship;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,24 +13,21 @@ class MortgageRealtorProfile extends Model
     use HasFactory;
 
     protected $fillable = [
-        'contact_id',
-        'relationship_stage_key',
+        'contact_relationship_id',
         'brokerage_name',
         'license_number',
         'last_referral_at',
-        'last_contact_at',
         'meta',
     ];
 
     protected $casts = [
         'last_referral_at' => 'datetime',
-        'last_contact_at' => 'datetime',
         'meta' => 'array',
     ];
 
-    public function contact(): BelongsTo
+    public function contactRelationship(): BelongsTo
     {
-        return $this->belongsTo(Contact::class);
+        return $this->belongsTo(ContactRelationship::class);
     }
 
     public function markets(): HasMany

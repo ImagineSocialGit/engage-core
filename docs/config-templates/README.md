@@ -213,6 +213,7 @@ Preset groups are composition-only. Durable preset ownership belongs to contribu
 | `webinar-post-event-template.php` | Webinar post-event provider orchestration such as attendance recording, playback resolution, follow-up dispatch, and automation events. |
 | `permission-invitations-template.php` | Imported-contact one-time permission invitation copy, public preference page copy/style, and accepted consent scopes. |
 | `contact-status-presets-template.php` | Core contact status definitions. |
+| `relationships-template.php` | Contact relationship types, relationship-specific stages, labels, visibility, and the configured default relationship workspace. |
 | `presets-root-template.php` | Root preset loading/orchestration config. |
 | `modules-template.php` | Module enablement, dependencies, dashboard slots, and module tone settings. |
 | `client-request-intake-template.md` | Structured intake notes for client config/setup requests. |

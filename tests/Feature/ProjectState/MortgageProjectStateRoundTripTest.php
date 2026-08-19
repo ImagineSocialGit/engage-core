@@ -14,11 +14,9 @@ use App\Modules\Mortgage\Models\MortgageRealtorMarket;
 use App\Modules\Mortgage\Models\MortgageRealtorProductionSnapshot;
 use App\Modules\Mortgage\Models\MortgageRealtorProfile;
 use App\Modules\Mortgage\Models\MortgageStage;
+use App\Modules\Relationships\Models\ContactRelationship;
 use App\Support\ProjectState\ProjectStateManager;
-use Illuminate\Database\Migrations\Migrator;
-use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -26,21 +24,12 @@ class MortgageProjectStateRoundTripTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function tearDown(): void
+    /**
+     * @return array<int, string>
+     */
+    protected function additionalTestMigrationModuleKeys(): array
     {
-        RefreshDatabaseState::$migrated = false;
-
-        parent::tearDown();
-    }
-
-    public function createApplication(): Application
-    {
-        $app = parent::createApplication();
-        $app->make(Migrator::class)->path(
-            $app->basePath('database/migrations/verticals/mortgage'),
-        );
-
-        return $app;
+        return ['mortgage'];
     }
 
     protected function setUp(): void
@@ -111,9 +100,16 @@ class MortgageProjectStateRoundTripTest extends TestCase
             'email' => 'agent@example.test',
         ]);
 
-        $realtorProfile = MortgageRealtorProfile::query()->create([
+        $realtorRelationship = ContactRelationship::query()->create([
             'contact_id' => $agent->id,
-            'relationship_stage_key' => 'strategic_partner',
+            'relationship_key' => 'realtor',
+            'stage_key' => 'strategic_partner',
+            'source' => 'agent_database',
+            'is_active' => true,
+        ]);
+
+        $realtorProfile = MortgageRealtorProfile::query()->create([
+            'contact_relationship_id' => $realtorRelationship->id,
             'meta' => ['specialty' => ['va_producer']],
         ]);
 
@@ -137,8 +133,9 @@ class MortgageProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(15, $document['version']);
-        $this->assertSame(1, $document['sections']['mortgage']['version']);
+        $this->assertSame(16, $document['version']);
+        $this->assertSame(1, $document['sections']['relationships']['version']);
+        $this->assertSame(2, $document['sections']['mortgage']['version']);
         $this->assertCount(1, $document['sections']['mortgage']['tables']['contact_mortgage_profiles']);
         $this->assertCount(1, $document['sections']['mortgage']['tables']['mortgage_loans']);
         $this->assertCount(1, $document['sections']['mortgage']['tables']['mortgage_loan_participants']);
@@ -150,6 +147,7 @@ class MortgageProjectStateRoundTripTest extends TestCase
         DB::table('mortgage_realtor_production_snapshots')->delete();
         DB::table('mortgage_realtor_markets')->delete();
         DB::table('mortgage_realtor_profiles')->delete();
+        DB::table('contact_relationships')->delete();
         DB::table('mortgage_loan_realtors')->delete();
         DB::table('mortgage_loan_participants')->delete();
         DB::table('mortgage_loans')->delete();
@@ -180,6 +178,16 @@ class MortgageProjectStateRoundTripTest extends TestCase
             'mortgage_loan_id' => $loan->id,
             'contact_id' => $agent->id,
             'role' => MortgageLoanRealtorRole::BuyerAgent->value,
+        ]);
+        $this->assertDatabaseHas('contact_relationships', [
+            'id' => $realtorRelationship->id,
+            'contact_id' => $agent->id,
+            'relationship_key' => 'realtor',
+            'stage_key' => 'strategic_partner',
+        ]);
+        $this->assertDatabaseHas('mortgage_realtor_profiles', [
+            'id' => $realtorProfile->id,
+            'contact_relationship_id' => $realtorRelationship->id,
         ]);
         $this->assertDatabaseHas('mortgage_realtor_markets', [
             'id' => $market->id,

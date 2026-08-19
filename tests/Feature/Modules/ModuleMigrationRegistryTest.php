@@ -23,6 +23,7 @@ class ModuleMigrationRegistryTest extends TestCase
 
         $this->assertEquals([
             'core',
+            'relationships',
             'messaging',
             'inbound_messaging',
             'internal_notifications',
@@ -43,6 +44,15 @@ class ModuleMigrationRegistryTest extends TestCase
             'mortgage',
         ], array_keys($registry->modules()));
 
+        $this->assertSame(
+            'database/migrations/modules/relationships',
+            $registry->requireModule('relationships')->path,
+        );
+        $this->assertSame(1, $registry->requireModule('relationships')->schemaVersion);
+        $this->assertEquals([
+            '2026_08_19_175000_create_contact_relationships_table.php',
+        ], $registry->requireModule('relationships')->migrationFiles);
+
         $this->assertFalse($registry->hasModule('dashboard'));
         $this->assertFalse($registry->hasModule('integrations'));
         $this->assertTrue($registry->hasModule('reporting'));
@@ -57,7 +67,7 @@ class ModuleMigrationRegistryTest extends TestCase
             'database/migrations/verticals/mortgage',
             $registry->requireModule('mortgage')->path,
         );
-        $this->assertSame(2, $registry->requireModule('mortgage')->schemaVersion);
+        $this->assertSame(3, $registry->requireModule('mortgage')->schemaVersion);
         $this->assertEquals([
             '2026_06_02_211108_create_mortgage_stages_table.php',
             '2026_06_02_211116_create_contact_mortgage_profiles_table.php',
@@ -79,7 +89,7 @@ class ModuleMigrationRegistryTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertCount(97, $currentFiles);
+        $this->assertCount(98, $currentFiles);
         $this->assertEquals($currentFiles, $registry->migrationFiles());
 
         foreach ($currentFiles as $migrationFile) {

@@ -34,6 +34,7 @@ Use `../module-boundaries.md` for platform-wide ownership/dependency rules, `../
 | Documents | Universal; loud | `documents/module_state.md` |
 | Commerce | Universal; loud | `commerce/module_state.md` |
 | Location | Universal; silent | `location/module_state.md` |
+| Relationships | Universal; loud | `relationships/module_state.md` |
 | Events | Planned universal; loud | `events/module_state.md` |
 | Mortgage | Current vertical; loud | `mortgage/module_state.md` |
 | PetServices | Planned vertical; loud | `pet-services/module_state.md` |

@@ -19,6 +19,7 @@ class PlatformMigrationFoundationTest extends TestCase
 
     private const COMPLETE_TEST_MODULE_KEYS = [
         'core',
+        'relationships',
         'messaging',
         'inbound_messaging',
         'internal_notifications',

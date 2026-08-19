@@ -45,6 +45,7 @@ class ProjectStateInfrastructureExtractionTest extends TestCase
         $this->assertSame((int) config('project_state.version'), $registry->version());
         $this->assertEquals([
             'core',
+            'relationships',
             'internal_notifications',
             'inbound_messaging',
             'messaging',

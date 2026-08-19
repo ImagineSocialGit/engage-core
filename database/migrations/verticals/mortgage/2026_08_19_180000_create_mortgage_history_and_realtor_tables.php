@@ -3,6 +3,7 @@
 use App\Modules\Core\Models\Contact;
 use App\Modules\Mortgage\Models\MortgageRealtorProfile;
 use App\Modules\Mortgage\Models\MortgageStage;
+use App\Modules\Relationships\Models\ContactRelationship;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -107,17 +108,25 @@ return new class extends Migration
 
         Schema::create('mortgage_realtor_profiles', function (Blueprint $table) {
             $table->id();
-            $table->foreignIdFor(Contact::class)
-                ->unique()
-                ->constrained()
-                ->cascadeOnDelete();
-            $table->string('relationship_stage_key', 120)->nullable()->index();
+            $table->foreignIdFor(ContactRelationship::class);
             $table->string('brokerage_name')->nullable()->index();
             $table->string('license_number', 120)->nullable()->index();
             $table->timestamp('last_referral_at')->nullable()->index();
-            $table->timestamp('last_contact_at')->nullable()->index();
             $table->json('meta')->nullable();
             $table->timestamps();
+
+            $table->foreign(
+                'contact_relationship_id',
+                'mortgage_realtor_rel_fk',
+            )
+                ->references('id')
+                ->on('contact_relationships')
+                ->cascadeOnDelete();
+
+            $table->unique(
+                'contact_relationship_id',
+                'mortgage_realtor_rel_uq',
+            );
         });
 
         Schema::create('mortgage_realtor_markets', function (Blueprint $table) {

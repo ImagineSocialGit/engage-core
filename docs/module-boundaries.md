@@ -118,6 +118,32 @@ lead_follow_up_route
 
 Vertical modules may use vertical-specific nouns for real vertical-owned records and behaviors. They should not rename Core Contact inside generic config/runtime identifiers.
 
+## Contact identity vs business relationships
+
+Core `Contact` is the canonical person identity. Distinct business contexts for that person belong to the Relationships module rather than separate duplicate person records or an ever-growing set of Core Contact columns.
+
+A Contact may participate in several relationships at once, for example consumer/customer plus collaborator/Realtor/partner.
+
+Normal CRM operating views must be relationship-scoped. Materially different relationship populations should not be mixed into the same default Contact list merely because they share Core identity storage. A Contact with multiple relationships may appear in each relevant workspace. A mixed all-Contacts view is primarily an administrative/export/debug/identity-management surface.
+
+Relationship-specific stage/source state belongs to the relationship context. Vertical modules may specialize a relationship through their own records, but should not duplicate generic relationship stage/classification fields merely to attach vertical data.
+
+Preferred shape:
+
+```text
+Core Contact
+    -> Relationships ContactRelationship
+        -> optional vertical specialization
+```
+
+Not:
+
+```text
+separate Lead and Collaborator person tables for the same human
+vertical profile duplicating generic relationship stage
+one default CRM list mixing unrelated relationship populations
+```
+
 ## Installed Schema vs Enabled Features
 
 Shared platform, core, and reusable capability-module tables may exist in every install.
@@ -512,7 +538,6 @@ Current ownership:
 | contacts | Core |
 | contact_statuses | Core |
 | contact_import_batches | Core |
-| contact_import_occurrences | Core |
 | contact_tags | Core |
 | notes | Core |
 | bookable_services | Scheduling |
@@ -584,7 +609,6 @@ Core schema freeze target:
 - contacts
 - contact_statuses
 - contact_import_batches
-- contact_import_occurrences
 - contact_tags
 - notes
 
@@ -1010,12 +1034,14 @@ Accepted dependency direction:
 - Commerce may optionally use Messaging, Broadcasts, Campaigns, FlowRoutes, Portal, and Reporting through public services/contracts when those modules are enabled
 - Commerce may use Integrations through provider contracts/role resolvers and may bind multiple provider packages to different commerce capabilities in the same client ecosystem
 - Location -> Core
+- Relationships -> Core
 - Events -> Core
 - Events remains independently usable and must not depend on FlowRoutes, Messaging, Campaigns, Broadcasts, Tasks, Music, Experiences, Commerce, Webinars, Reporting, or Location
 - Experiences may consume Core, Events, and Commerce as foundation dependencies and may optionally consume Messaging, Tasks, FlowRoutes, InternalNotifications, Reporting, Location, and Integrations through public seams
 - PetServices may consume Core, Scheduling, Portal, Forms, Documents, Tasks, Messaging, Campaigns, FlowRoutes, Reporting, and Integrations as needed
 - Music may consume Core, Events, Commerce, Experiences, Messaging, Campaigns, Broadcasts, FlowRoutes, Tasks, Reporting, Scheduling, Portal, Location, and Integrations as needed
-- Mortgage may consume Core, Workflow, FlowRoutes, Tasks, Messaging, Campaigns, Broadcasts, Webinars, Reporting, and Integrations as needed
+- Mortgage -> Relationships (and therefore Core transitively)
+- Mortgage may optionally coordinate with Workflow, FlowRoutes, Tasks, Messaging, Campaigns, Broadcasts, Webinars, Reporting, Location, and Integrations only through public/shared seams when those capabilities are enabled
 - Messaging may use Integrations through provider contracts/managers
 - Webinars may use Integrations through provider contracts/managers
 - Mortgage may use Integrations through provider contracts/managers
@@ -1026,6 +1052,7 @@ Avoid:
 - Core -> Messaging
 - Core -> InboundMessaging
 - Core -> InternalNotifications
+- Core -> Relationships
 - Core -> Tasks
 - Core -> Webinars
 - Core -> Campaigns

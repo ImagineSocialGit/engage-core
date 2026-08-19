@@ -54,7 +54,7 @@ class CoreContactImportProvenanceProjectStateTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(15, $document['version']);
+        $this->assertSame(16, $document['version']);
         $this->assertSame(2, $document['sections']['core']['version']);
         $this->assertCount(1, $document['sections']['core']['tables']['contact_import_occurrences']);
         $this->assertSame(

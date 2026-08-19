@@ -15,13 +15,13 @@ Project State status: transferred when the optional Mortgage schema is installed
 
 Mortgage is optional and should not be installed by default.
 
-Its declared runtime dependency remains:
+Its declared runtime dependency is now:
 
 ```text
-Mortgage -> Core
+Mortgage -> Relationships -> Core
 ```
 
-Mortgage must not directly import private Workflow, FlowRoutes, Tasks, Messaging, Campaigns, Webinars, Reporting, or provider implementation classes merely because a mortgage workflow may ultimately interact with those capabilities. Cross-module outcomes use public Core/shared automation seams and owning-module actions/contracts.
+Mortgage must not directly import private Workflow, FlowRoutes, Tasks, Messaging, Campaigns, Webinars, Reporting, Location, or provider implementation classes merely because a mortgage workflow may ultimately interact with those capabilities. Cross-module outcomes use public/shared seams and owning-module actions/contracts.
 
 ## Ownership
 
@@ -30,13 +30,15 @@ Mortgage owns mortgage-specific durable facts and interpretation, including:
 - current consumer mortgage facts that do not belong on the generic Contact;
 - mortgage loan/application/history records;
 - borrower/co-borrower participation on a loan;
-- mortgage-specific Realtor/agent relationship profiles;
+- mortgage-specific Realtor specialization attached to a generic ContactRelationship;
 - Realtor market coverage and imported production snapshots;
 - buyer/listing-agent participation snapshots on loans;
 - mortgage stages for loan/process meaning;
 - provider-neutral LOS contracts and mortgage-specific LOS interpretation later.
 
-Core continues to own generic Contact identity, generic acquisition source fields, lifecycle Contact status infrastructure, tags, and generic import provenance.
+Core continues to own canonical Contact identity and generic import provenance.
+
+Relationships owns generic business-relationship identity, relationship-specific stage/source/subsource, active lifecycle, and normal relationship-workspace selection.
 
 Campaigns continues to own generic Campaign identity/enrollment behavior. Messaging continues to own channel authorization and delivery. Mortgage must not encode those concerns in its tables.
 
@@ -53,13 +55,15 @@ has_realtor
     yes | no | unknown
 
 market_key
-    config/client-defined market identity; no Slam Dunk geography is hard-coded
+    config/client-defined current mortgage market identity
 
 original_lead_at
     earliest reliable mortgage lead date when known
 ```
 
 The profile is intentionally not a loan-history row. Loan amount, rate, purpose, program, property, and close date are repeatable loan facts and live on `mortgage_loans`.
+
+The current `market_key` remains Mortgage-owned in this slice. A later optional Location bridge will decide how client markets map to Location-owned areas without adding a hard Mortgage -> Location dependency.
 
 ### `mortgage_loans`
 
@@ -96,21 +100,41 @@ A null `contact_id` means unresolved/not safely linked, not missing source histo
 
 Buyer/listing-agent participation on a loan.
 
-Like borrower participants, the row keeps source name/email/phone snapshots and may optionally link to a canonical Contact. Historical loan evidence does not depend on a Realtor Contact already existing.
+Like borrower participants, the row keeps source name/email/phone snapshots and may optionally link to a canonical Contact. Historical loan evidence does not depend on a Realtor ContactRelationship already existing.
 
 ### `mortgage_realtor_profiles`
 
-One mortgage Realtor/agent relationship profile per Contact.
+One mortgage-specific Realtor specialization per Relationships-owned `ContactRelationship`.
 
-`relationship_stage_key` is intentionally a string/config-owned business key rather than a hard-coded universal enum. Client-specific stages such as Target Agent, Strategic Partner, or Referral Partner can be selected later without making those labels Core concepts.
+The generic relationship row owns:
 
-The profile also owns relationship-level facts such as brokerage/license references and last referral/contact timestamps when known.
+```text
+relationship key
+relationship stage
+relationship source/subsource
+active/inactive state
+```
+
+Mortgage owns only vertical-specific profile facts:
+
+```text
+brokerage_name
+license_number
+last_referral_at
+meta
+```
+
+This prevents generic concepts such as Target Agent, Strategic Partner, Referral Partner, or Inactive Agent from becoming Mortgage schema fields while still allowing a mortgage client to configure a relationship labeled Realtor.
+
+Mortgage does not hard-code the relationship key `realtor`; the client/vertical relationship definition and later Mortgage import/action config will select the appropriate relationship.
 
 ### `mortgage_realtor_markets`
 
-Many-to-one structured market coverage for a Realtor profile.
+Many-to-one structured market coverage for a Realtor Mortgage profile.
 
-A Realtor may cover multiple markets; one may be marked primary. Market keys remain configuration/client-owned. This supports future rules such as matching a preapproved consumer's `market_key` to eligible strategic Realtor partners without forcing Mortgage to depend on Location.
+A Realtor may cover multiple markets; one may be marked primary. This table is intentionally retained as the current vertical persistence shape until the next Location-integration slice defines a public optional area/market bridge.
+
+Do not make Mortgage read/write Location private tables directly. Do not make Location a hard Mortgage dependency solely for this feature.
 
 ### `mortgage_realtor_production_snapshots`
 
@@ -129,7 +153,7 @@ Production data is historical snapshot evidence, not permanent counters on the R
 
 Stable keyed loan/process stages.
 
-Mortgage stages are distinct from the client's main CRM Contact lifecycle statuses. Stacey's consumer lifecycle statuses remain a Core/Workflow-facing Contact-status concern; registering/attending a Webinar or importing a historical loan must not silently rewrite those statuses.
+Mortgage stages are distinct from both Core ContactStatus and Relationships relationship stages.
 
 ## Import architecture
 
@@ -137,6 +161,7 @@ The supplied Slam Dunk exports established the following requirements:
 
 ```text
 one Contact may appear in many imported files
+one Contact may participate in multiple business relationships
 one borrower may have many loans/properties
 one loan may contain primary + co-borrower data
 co-borrowers may share a primary borrower's email
@@ -146,24 +171,27 @@ agent lists may provide production metrics independently of loan history
 
 Core Phase 1A owns row-level import occurrence/provenance and canonical exact-email Contact resolution.
 
-Mortgage import handlers will be added in the next slice. They must:
+Relationships owns the durable business-context assignment used to distinguish consumer and Realtor populations.
+
+Mortgage import handlers added later must:
 
 - consume Core's public Contact import registry/handler seam;
+- call public Relationships mutation seams for relationship assignment instead of writing relationship tables directly;
 - persist Mortgage-owned facts only;
 - perform idempotent/reconciliation logic inside Mortgage actions/services;
 - preserve unresolved participant/counterparty snapshots instead of forcing unsafe Contact merges;
 - never make Core understand mortgage columns;
 - never grant Messaging consent or enroll Campaigns directly from Mortgage persistence code.
 
-Import-profile orchestration may later combine Core status/source mapping, Mortgage persistence, Messaging imported consent, and Campaign enrollment through the appropriate public seams.
+Import-profile orchestration may later combine Core identity/provenance, Relationships assignment, Mortgage persistence, Messaging imported consent, and Campaign enrollment through the appropriate public seams.
 
-CSV/TXT remains the CRM import format. XLS/XLSX client files should be converted externally before operator import; the Core importer will not add spreadsheet parsing solely for this rollout.
+CSV/TXT remains the CRM import format. XLS/XLSX client files should be converted externally before operator import.
 
 ## Project State
 
-Mortgage now has an optional Project State section.
+Mortgage has an optional Project State section.
 
-Activation requires the complete Mortgage schema. When the Mortgage vertical is not installed, the section is omitted. A partially installed Mortgage schema is a Project State contract error rather than silently exporting incomplete state.
+Activation requires the complete Mortgage schema. Its section is serialized after Core and Relationships because `mortgage_realtor_profiles.contact_relationship_id` references Relationships-owned state.
 
 Transferred tables:
 
@@ -199,28 +227,30 @@ provider package
     owns vendor-specific API/webhook/email parsing and translation
 ```
 
-Provider-specific transport/parsing must not hard-code downstream Contact-status, Task, Campaign, Messaging, or FlowRoute behavior.
+Provider-specific transport/parsing must not hard-code downstream Contact-status, Task, Campaign, Messaging, Relationship, or FlowRoute behavior.
 
-## FlowRoutes / cross-module orchestration
+## Cross-module orchestration
 
 When Mortgage has an automation-worthy outcome, it records Mortgage domain state first and then emits a neutral shared automation event. FlowRoutes may consume that seam without Mortgage taking a direct FlowRoutes dependency.
 
 When another module needs to mutate Mortgage state, it must call a public Mortgage action/service/contract. It must not write Mortgage tables directly.
 
+When Mortgage needs generic relationship state, it calls Relationships public actions/services. It must not duplicate relationship stages on Mortgage models.
+
 Do not add `flow_route_*`, `campaign_*`, or provider-specific foreign keys to Mortgage artifacts merely for provenance symmetry.
 
-## Deferred from this persistence foundation
+## Deferred
 
 Not implemented by this slice:
 
+- client-specific relationship definitions/stages;
+- relationship-scoped CRM list/navigation implementation;
+- optional Location-backed Realtor market capability;
 - client-specific import profiles and field mappings;
-- loan/realtor import idempotency actions;
+- loan/Realtor import idempotency actions;
 - co-borrower secondary Contact creation/resolution policy;
-- client Contact-status presets;
-- Realtor relationship-stage preset/config authoring;
 - referral event/metric accounting;
 - LOS provider packages;
-- CRM Mortgage UI/workspace;
 - Campaign family/priority behavior;
 - Messaging imported-consent behavior;
 - high-intent reply orchestration.
