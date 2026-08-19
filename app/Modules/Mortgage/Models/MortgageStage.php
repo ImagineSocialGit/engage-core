@@ -11,15 +11,22 @@ class MortgageStage extends Model
     use HasFactory;
 
     protected $fillable = [
+        'key',
         'name',
         'category',
+        'is_active',
         'sort_order',
     ];
 
-    public function mortgageProfiles(): HasMany
+    protected $casts = [
+        'is_active' => 'boolean',
+        'sort_order' => 'integer',
+    ];
+
+    public function loans(): HasMany
     {
         return $this->hasMany(
-            ContactMortgageProfile::class,
+            MortgageLoan::class,
             'mortgage_stage_id',
         );
     }

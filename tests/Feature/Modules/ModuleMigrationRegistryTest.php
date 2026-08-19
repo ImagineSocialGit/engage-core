@@ -57,6 +57,12 @@ class ModuleMigrationRegistryTest extends TestCase
             'database/migrations/verticals/mortgage',
             $registry->requireModule('mortgage')->path,
         );
+        $this->assertSame(2, $registry->requireModule('mortgage')->schemaVersion);
+        $this->assertEquals([
+            '2026_06_02_211108_create_mortgage_stages_table.php',
+            '2026_06_02_211116_create_contact_mortgage_profiles_table.php',
+            '2026_08_19_180000_create_mortgage_history_and_realtor_tables.php',
+        ], $registry->requireModule('mortgage')->migrationFiles);
     }
 
     public function test_every_current_migration_has_exactly_one_registered_owner(): void
@@ -73,7 +79,7 @@ class ModuleMigrationRegistryTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertCount(96, $currentFiles);
+        $this->assertCount(97, $currentFiles);
         $this->assertEquals($currentFiles, $registry->migrationFiles());
 
         foreach ($currentFiles as $migrationFile) {

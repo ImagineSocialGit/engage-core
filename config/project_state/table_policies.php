@@ -79,14 +79,6 @@ return [
         'reason' => 'Reporting projection checkpoints are local derived-work coordination and intentionally reset during Project State rebuilds.',
     ],
 
-    'mortgage_stages' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Mortgage transfer support has not been added yet.',
-    ],
-    'contact_mortgage_profiles' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Mortgage transfer support has not been added yet.',
-    ],
 
     'inbound_message_receipts' => [
         'mode' => 'terminal_only',

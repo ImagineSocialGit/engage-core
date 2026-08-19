@@ -247,10 +247,11 @@ return [
 
         'mortgage' => [
             'path' => 'database/migrations/verticals/mortgage',
-            'schema_version' => 1,
+            'schema_version' => 2,
             'migrations' => [
                 '2026_06_02_211108_create_mortgage_stages_table.php',
                 '2026_06_02_211116_create_contact_mortgage_profiles_table.php',
+                '2026_08_19_180000_create_mortgage_history_and_realtor_tables.php',
             ],
         ],
     ],

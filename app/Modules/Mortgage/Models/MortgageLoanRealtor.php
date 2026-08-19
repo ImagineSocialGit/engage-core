@@ -3,28 +3,36 @@
 namespace App\Modules\Mortgage\Models;
 
 use App\Modules\Core\Models\Contact;
-use App\Modules\Mortgage\Enums\HasRealtorState;
+use App\Modules\Mortgage\Enums\MortgageLoanRealtorRole;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class ContactMortgageProfile extends Model
+class MortgageLoanRealtor extends Model
 {
     use HasFactory;
 
     protected $fillable = [
+        'mortgage_loan_id',
         'contact_id',
-        'has_realtor',
-        'market_key',
-        'original_lead_at',
+        'role',
+        'position',
+        'name',
+        'email',
+        'phone',
         'meta',
     ];
 
     protected $casts = [
-        'has_realtor' => HasRealtorState::class,
-        'original_lead_at' => 'datetime',
+        'role' => MortgageLoanRealtorRole::class,
+        'position' => 'integer',
         'meta' => 'array',
     ];
+
+    public function loan(): BelongsTo
+    {
+        return $this->belongsTo(MortgageLoan::class, 'mortgage_loan_id');
+    }
 
     public function contact(): BelongsTo
     {

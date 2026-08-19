@@ -10,15 +10,11 @@ return new class extends Migration
     {
         Schema::create('mortgage_stages', function (Blueprint $table) {
             $table->id();
-
-            $table->string('name')->unique();
-
+            $table->string('key', 120)->unique();
+            $table->string('name');
             $table->string('category')->index();
-
-            $table->unsignedSmallInteger('sort_order')
-                ->default(0)
-                ->index();
-
+            $table->boolean('is_active')->default(true)->index();
+            $table->unsignedSmallInteger('sort_order')->default(0)->index();
             $table->timestamps();
         });
     }

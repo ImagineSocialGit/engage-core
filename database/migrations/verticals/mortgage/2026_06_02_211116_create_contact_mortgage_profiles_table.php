@@ -1,7 +1,7 @@
 <?php
 
 use App\Modules\Core\Models\Contact;
-use App\Modules\Mortgage\Models\MortgageStage;
+use App\Modules\Mortgage\Enums\HasRealtorState;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -14,36 +14,18 @@ return new class extends Migration
             $table->id();
 
             $table->foreignIdFor(Contact::class)
+                ->unique()
                 ->constrained()
                 ->cascadeOnDelete();
 
-            $table->foreignIdFor(MortgageStage::class)
-                ->nullable()
-                ->constrained()
-                ->nullOnDelete();
+            $table->string('has_realtor', 16)
+                ->default(HasRealtorState::Unknown->value)
+                ->index();
 
-            $table->string('title')->nullable();
-
-            $table->decimal('loan_amount', 12, 2)->nullable();
-
-            $table->decimal('rate', 6, 3)->nullable();
-
-            $table->string('mortgage_type')->nullable()->index();
-
-            $table->string('loan_purpose')->nullable()->index();
-
-            $table->string('loan_program')->nullable()->index();
-
-            $table->string('lien_position')->nullable()->index();
-
+            $table->string('market_key', 120)->nullable()->index();
+            $table->timestamp('original_lead_at')->nullable()->index();
             $table->json('meta')->nullable();
-
             $table->timestamps();
-
-            $table->index([
-                'contact_id',
-                'mortgage_stage_id',
-            ]);
         });
     }
 

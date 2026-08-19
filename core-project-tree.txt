@@ -704,8 +704,18 @@
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   ├── Data
+│   │   │   ├── Enums
+│   │   │   │   ├── HasRealtorState.php
+│   │   │   │   ├── MortgageLoanParticipantRole.php
+│   │   │   │   └── MortgageLoanRealtorRole.php
 │   │   │   ├── Models
 │   │   │   │   ├── ContactMortgageProfile.php
+│   │   │   │   ├── MortgageLoanParticipant.php
+│   │   │   │   ├── MortgageLoan.php
+│   │   │   │   ├── MortgageLoanRealtor.php
+│   │   │   │   ├── MortgageRealtorMarket.php
+│   │   │   │   ├── MortgageRealtorProductionSnapshot.php
+│   │   │   │   ├── MortgageRealtorProfile.php
 │   │   │   │   └── MortgageStage.php
 │   │   │   ├── Providers
 │   │   │   │   └── MortgageModuleServiceProvider.php
@@ -1360,6 +1370,7 @@
 │   │   ├── inbound_messaging.php
 │   │   ├── internal_notifications.php
 │   │   ├── messaging.php
+│   │   ├── mortgage.php
 │   │   ├── reporting.php
 │   │   ├── table_policies.php
 │   │   ├── tasks.php
@@ -1583,7 +1594,8 @@
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
-│   │           └── 2026_06_02_211116_create_contact_mortgage_profiles_table.php
+│   │           ├── 2026_06_02_211116_create_contact_mortgage_profiles_table.php
+│   │           └── 2026_08_19_180000_create_mortgage_history_and_realtor_tables.php
 │   ├── schema
 │   └── seeders
 │       ├── DatabaseSeeder.php
@@ -2143,6 +2155,8 @@
 │   │   │   ├── ModuleNavigationTest.php
 │   │   │   ├── ModuleRouteMiddlewareTest.php
 │   │   │   └── PlatformMigrationFoundationTest.php
+│   │   ├── Mortgage
+│   │   │   └── MortgageDomainFoundationTest.php
 │   │   ├── Observability
 │   │   │   ├── ObservabilityConfigurationContractTest.php
 │   │   │   └── RequestCorrelationTest.php
@@ -2159,6 +2173,7 @@
 │   │   │   ├── InboundMessagingProjectStateRoundTripTest.php
 │   │   │   ├── InternalNotificationsProjectStateRoundTripTest.php
 │   │   │   ├── MessagingProjectStateRoundTripTest.php
+│   │   │   ├── MortgageProjectStateRoundTripTest.php
 │   │   │   ├── ProjectStateControllerTest.php
 │   │   │   ├── ProjectStateCoverageContractTest.php
 │   │   │   ├── ProjectStateExporterExtractionTest.php
@@ -2316,4 +2331,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-594 directories, 1723 files
+596 directories, 1736 files

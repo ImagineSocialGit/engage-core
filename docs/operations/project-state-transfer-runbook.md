@@ -21,7 +21,7 @@ format: engage-core-project-state
 version: authoritative current value in config/project_state.php
 ```
 
-The current implementation has 13 dependency-ordered section contracts and transfers 62 tables when the optional Reporting schema is installed; otherwise the Reporting section is omitted. A current-version export produced without Reporting may be imported into a Reporting-enabled target with that optional section absent; the target applies no Reporting rows. An export that does contain retained Reporting history is rejected if the target Reporting schema is absent. It explicitly classifies 53 excluded tables.
+The current contract includes dependency-ordered Core/universal sections plus optional Reporting and optional Mortgage sections. Reporting is included only when its activation schema is installed. Mortgage is included only when the complete Mortgage vertical schema is installed. A document containing an optional section is rejected when the target does not have that section's activation schema.
 
 The CRM surface is owner-only:
 
@@ -59,7 +59,7 @@ Project State does not transfer:
 - Redis queue contents, Horizon metadata, cache, or locks;
 - failed-job history;
 - Reporting sessions, raw observations, and projection checkpoints reset; retained Reporting daily metrics and imported external measurements transfer only when the Reporting schema is installed;
-- unsupported Mortgage, Scheduling, Location, Portal, Forms, Documents, or Commerce durable state;
+- unsupported Scheduling, Location, Portal, Forms, Documents, or Commerce durable state; Mortgage durable state transfers when the complete optional Mortgage schema is installed;
 - active booking holds or slot offers;
 - external provider state.
 
@@ -108,7 +108,7 @@ Proceed only when all are true:
 
 Stop and extend the contract when:
 
-- Mortgage or Scheduling durable rows must survive;
+- an installed Mortgage schema is partial/outside the current Mortgage section contract, or unsupported Scheduling durable rows must survive;
 - an unsupported module table contains required data;
 - a new table or column is unclassified;
 - a polymorphic relation points to an unexported target that must survive;

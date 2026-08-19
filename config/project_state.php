@@ -2,7 +2,7 @@
 
 return [
     'format' => 'engage-core-project-state',
-    'version' => 14,
+    'version' => 15,
 
     /*
     |--------------------------------------------------------------------------
@@ -38,6 +38,7 @@ return [
     */
     'sections' => [
         'core' => require __DIR__.'/project_state/core.php',
+        'mortgage' => require __DIR__.'/project_state/mortgage.php',
         'internal_notifications' => require __DIR__.'/project_state/internal_notifications.php',
         'inbound_messaging' => require __DIR__.'/project_state/inbound_messaging.php',
         'messaging' => require __DIR__.'/project_state/messaging.php',

@@ -14,6 +14,7 @@ Use this for repeatable platform-wide checks. It is not backlog.
 - Confirm the change is an architectural/product fix, not test-shaped legacy preservation.
 - Confirm no new direct cross-module model/table writes were introduced where a public action/service belongs.
 - While the pre-rollout migration convention applies, use replacement create-table migrations rather than new alter-table migrations.
+- Before finalizing a MySQL migration, review every generated foreign-key, unique-key, and index identifier against MySQL's 64-character identifier limit; give long constraints concise explicit names instead of relying on Laravel defaults.
 - Run `php artisan optimize:clear` after config, route, provider, or view changes when applicable.
 - Update docs only when architecture or operator/client behavior changed.
 
