@@ -1,9 +1,8 @@
-
 # Campaigns TODO
 
 Work these in order. Keep Campaigns independent from FlowRoutes, Webinars, Forms, Scheduling, InboundMessaging, and other producer modules; use shared/public automation seams instead of direct module dependencies.
 
-## 1. Runtime cutover complete; simulator next
+## 1. Runtime cutover and simulator complete
 
 - [x] Migrate Campaign runtime fully to Messaging MessageChains while preserving Campaign identity, activation, audience/enrollment intent, source context, and reporting meaning.
 - [x] Make new Campaign enrollments create a compact CampaignEnrollment wrapper around a version-pinned MessageChainEnrollment.
@@ -12,7 +11,7 @@ Work these in order. Keep Campaigns independent from FlowRoutes, Webinars, Forms
 - [x] Remove duplicate CampaignEnrollment progression/lifecycle columns, Campaign step-scheduling actions, and Campaign ScheduledMessage terminal-progression listeners after readers and Project State moved to MessageChainEnrollment authority.
 - [x] Preserve operational lifecycle semantics: Off cancels open work and skips pending messages; turning back on permits future enrollments only and never resurrects cancelled journeys. Campaign-generated MessageChains are lifecycle-aligned without forcing a reusable/shared chain off for unrelated consumers.
 - [x] Add generic MessageChain and Campaign enrollment pause/resume lifecycle seams. Pause skips unsent pending messages for that enrollment, does not rewrite already-sending/terminal work, and resume preserves remaining future delay or immediately re-evaluates a materialized skipped wave.
-- [ ] Add the dev-only Campaign simulator next: enroll a test contact, set/fake the clock, advance through scheduled moments, run the real MessageChain progression path, and inspect would-schedule/send/skip/block/complete behavior without provider delivery. It must be unavailable in production.
+- [x] Add the dev-only Campaign simulator: enroll a test contact, set/fake the clock, advance through scheduled moments, run the real MessageChain/ScheduledMessage path synchronously, inspect materialized/sent/skipped/failed/completed behavior, isolate simulator records from normal background progression/recovery, route local delivery to DevMessageSink, and reset simulator-owned state. The reusable testing-tool pattern is documented in `docs/testing-tools.md`.
 - [ ] Migrate Campaign Builder/preset authoring to direct Messaging MessageChain definitions, then remove the temporary `campaign_steps` / `campaign_step_variants` authoring projection.
 
 ## 2. Campaign lifecycle and launch safety

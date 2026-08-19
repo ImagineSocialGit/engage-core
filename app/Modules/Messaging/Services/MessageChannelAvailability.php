@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Services;
 
 use App\Modules\Messaging\Enums\MessageChannel;
+use App\Support\TestingTools\TestingToolRuntime;
 
 class MessageChannelAvailability
 {
@@ -40,6 +41,12 @@ class MessageChannelAvailability
         bool $requireProvider = false,
     ): bool {
         $channel = $this->normalizeChannel($channel);
+
+        $surface = $this->effectiveSurface($surface);
+
+        if ($surface === null) {
+            return false;
+        }
 
         if (! $this->isRuntimeSupported($channel)) {
             return false;
@@ -99,6 +106,23 @@ class MessageChannelAvailability
             fn (string $channel): string => $this->normalizeChannel($channel),
             $channels,
         )))));
+    }
+
+    private function effectiveSurface(string $surface): ?string
+    {
+        $surface = trim($surface);
+
+        if (! str_starts_with($surface, 'testing:')) {
+            return $surface;
+        }
+
+        if (! app(TestingToolRuntime::class)->active()) {
+            return null;
+        }
+
+        $surface = substr($surface, strlen('testing:'));
+
+        return $surface !== '' ? $surface : null;
     }
 
     private function surfaceVisible(string $channel, string $surface): bool

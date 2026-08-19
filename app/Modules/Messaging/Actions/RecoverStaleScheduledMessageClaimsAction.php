@@ -31,6 +31,10 @@ class RecoverStaleScheduledMessageClaimsAction
         $ids = ScheduledMessageDeliveryAttempt::query()
             ->active()
             ->where('lease_expires_at', '<=', now())
+            ->whereHas(
+                'scheduledMessage',
+                fn ($query) => $query->backgroundEligible(),
+            )
             ->orderBy('id')
             ->limit($this->deliveryPolicy->recoveryBatchSize())
             ->pluck('id');

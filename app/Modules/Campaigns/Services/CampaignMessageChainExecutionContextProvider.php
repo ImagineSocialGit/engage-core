@@ -14,11 +14,13 @@ class CampaignMessageChainExecutionContextProvider implements MessageChainExecut
 {
     private const SURFACE = 'campaigns';
 
+    private const TESTING_SURFACE = 'testing:campaigns';
+
     public function supports(MessageChainEnrollment $enrollment): bool
     {
         $enrollment->loadMissing(['recipient', 'context', 'origin']);
 
-        return $enrollment->surface === self::SURFACE
+        return in_array($enrollment->surface, [self::SURFACE, self::TESTING_SURFACE], true)
             && $enrollment->recipient instanceof Contact
             && $enrollment->context instanceof CampaignEnrollment
             && $enrollment->origin instanceof Campaign;

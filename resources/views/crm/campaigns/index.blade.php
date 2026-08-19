@@ -48,6 +48,21 @@
             </div>
         </section>
 
+        @if(app()->environment('local'))
+            <section class="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
+                <div>
+                    <div class="text-sm font-bold text-amber-950">Development testing</div>
+                    <p class="mt-1 break-words text-sm text-amber-800">Use the Campaign Simulator to fake time and exercise the real MessageChain runtime without provider delivery.</p>
+                </div>
+                <a
+                    href="{{ route('crm.campaigns.simulator.index') }}"
+                    class="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-amber-950 px-5 text-sm font-bold text-white hover:bg-amber-900 sm:mt-0 sm:w-auto"
+                >
+                    Open simulator
+                </a>
+            </section>
+        @endif
+
         <section class="min-w-0 overflow-hidden rounded-3xl border border-rose-200 bg-white/95 shadow-sm">
             @forelse($campaigns as $campaign)
                 @php

@@ -111,7 +111,8 @@
 │   │   │   ├── Controllers
 │   │   │   │   └── CRM
 │   │   │   │       ├── CampaignController.php
-│   │   │   │       └── CampaignMessageTemplateController.php
+│   │   │   │       ├── CampaignMessageTemplateController.php
+│   │   │   │       └── CampaignSimulatorController.php
 │   │   │   ├── Data
 │   │   │   │   ├── Automation
 │   │   │   │   │   ├── CancelCampaignAutomationDefinition.php
@@ -136,6 +137,7 @@
 │   │   │   │   ├── CampaignMessageChainDefinitionBuilder.php
 │   │   │   │   ├── CampaignMessageChainExecutionContextProvider.php
 │   │   │   │   ├── CampaignMessageDefinitionResolver.php
+│   │   │   │   ├── CampaignSimulationService.php
 │   │   │   │   ├── CampaignWorkspacePresenter.php
 │   │   │   │   └── ContactShow
 │   │   │   │       └── ContactCampaignsVisibilityDataProvider.php
@@ -1265,6 +1267,9 @@
 │       ├── Testing
 │       │   ├── ArtisanTestDatabaseLock.php
 │       │   └── ArtisanTestEnvironmentBootstrap.php
+│       ├── TestingTools
+│       │   ├── TestingToolGuard.php
+│       │   └── TestingToolRuntime.php
 │       ├── TokenContracts
 │       │   ├── Contracts
 │       │   │   ├── ComputedTokenValueProvider.php
@@ -1681,6 +1686,7 @@
 │   ├── product-principles.md
 │   ├── project-organization.md
 │   ├── project-state-extension-guide.md
+│   ├── testing-tools.md
 │   ├── TODO.md
 │   └── ui-ux-guide.md
 ├── ops
@@ -1806,7 +1812,10 @@
 │       │   │   ├── index.blade.php
 │       │   │   ├── message-templates
 │       │   │   │   └── index.blade.php
-│       │   │   └── show.blade.php
+│       │   │   ├── show.blade.php
+│       │   │   └── simulator
+│       │   │       ├── index.blade.php
+│       │   │       └── show.blade.php
 │       │   ├── contacts
 │       │   │   ├── import-batches
 │       │   │   │   ├── index.blade.php
@@ -1951,6 +1960,7 @@
 │   │   │   ├── CampaignMessageChainPresetSyncTest.php
 │   │   │   ├── CampaignMessageChainRuntimeOwnershipTest.php
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
+│   │   │   ├── CampaignSimulatorTest.php
 │   │   │   ├── CampaignsSetupValidationContributorTest.php
 │   │   │   ├── CampaignVariantPresetSyncSpecificityTest.php
 │   │   │   ├── CampaignWorkspaceControllerTest.php
@@ -2116,7 +2126,8 @@
 │   │   │   ├── SmsMessagingServiceTest.php
 │   │   │   ├── SmsPayloadTest.php
 │   │   │   ├── SmsSendGuardTest.php
-│   │   │   └── TeamMemberNotificationPreferenceTest.php
+│   │   │   ├── TeamMemberNotificationPreferenceTest.php
+│   │   │   └── TestingSurfaceBackgroundIsolationTest.php
 │   │   ├── Modules
 │   │   │   ├── ContactShowModuleVisibilityTest.php
 │   │   │   ├── ModuleDependencyBoundaryTest.php
@@ -2300,4 +2311,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-592 directories, 1709 files
+594 directories, 1718 files

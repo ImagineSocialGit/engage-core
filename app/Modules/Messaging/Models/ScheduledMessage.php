@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Models;
 
 use Database\Factories\ScheduledMessageFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -124,6 +125,42 @@ class ScheduledMessage extends Model
         return $this->hasMany(ScheduledMessageComponent::class)
             ->orderBy('sort_order')
             ->orderBy('id');
+    }
+
+
+    public function scopeBackgroundEligible(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            $query
+                ->whereNull('message_chain_enrollment_id')
+                ->orWhereHas(
+                    'messageChainEnrollment',
+                    fn (Builder $enrollment): Builder => $enrollment
+                        ->where(function (Builder $surface): void {
+                            $surface
+                                ->whereNull('surface')
+                                ->orWhere(
+                                    'surface',
+                                    'not like',
+                                    MessageChainEnrollment::TESTING_SURFACE_PREFIX.'%',
+                                );
+                        }),
+                );
+        });
+    }
+
+    public function isTestingRuntime(): bool
+    {
+        if ($this->message_chain_enrollment_id === null) {
+            return false;
+        }
+
+        $enrollment = $this->relationLoaded('messageChainEnrollment')
+            ? $this->getRelation('messageChainEnrollment')
+            : $this->messageChainEnrollment()->first();
+
+        return $enrollment instanceof MessageChainEnrollment
+            && $enrollment->isTestingSurface();
     }
 
     /**

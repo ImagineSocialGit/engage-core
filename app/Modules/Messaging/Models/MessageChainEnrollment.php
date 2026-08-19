@@ -17,6 +17,8 @@ class MessageChainEnrollment extends Model
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_CANCELLED = 'cancelled';
 
+    public const TESTING_SURFACE_PREFIX = 'testing:';
+
     protected $fillable = [
         'message_chain_version_id',
         'recipient_type',
@@ -101,7 +103,18 @@ class MessageChainEnrollment extends Model
         return $query
             ->where('status', self::STATUS_ACTIVE)
             ->whereNotNull('next_action_at')
-            ->where('next_action_at', '<=', now());
+            ->where('next_action_at', '<=', now())
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereNull('surface')
+                    ->orWhere('surface', 'not like', self::TESTING_SURFACE_PREFIX.'%');
+            });
+    }
+
+    public function isTestingSurface(): bool
+    {
+        return is_string($this->surface)
+            && str_starts_with($this->surface, self::TESTING_SURFACE_PREFIX);
     }
 
     public function isActive(): bool

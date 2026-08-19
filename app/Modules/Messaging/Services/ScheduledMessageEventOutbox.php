@@ -9,6 +9,7 @@ use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Models\ScheduledMessageDeliveryAttempt;
 use App\Modules\Messaging\Models\ScheduledMessageOutboxEvent;
+use App\Support\TestingTools\TestingToolRuntime;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -20,6 +21,10 @@ use Throwable;
 
 class ScheduledMessageEventOutbox
 {
+    public function __construct(
+        private readonly TestingToolRuntime $testingToolRuntime,
+    ) {}
+
     public function record(
         ScheduledMessage $scheduledMessage,
         string $eventType,
@@ -111,6 +116,10 @@ class ScheduledMessageEventOutbox
     {
         $now = now();
         $ids = ScheduledMessageOutboxEvent::query()
+            ->whereHas(
+                'scheduledMessage',
+                fn ($query) => $query->backgroundEligible(),
+            )
             ->where(function ($query) use ($now): void {
                 $query
                     ->where(function ($pending) use ($now): void {
@@ -150,6 +159,18 @@ class ScheduledMessageEventOutbox
                 || $outboxEvent->status === ScheduledMessageOutboxEvent::STATUS_PUBLISHED
             ) {
                 return null;
+            }
+
+            if (! $this->testingToolRuntime->active()) {
+                $scheduledMessage = $outboxEvent->scheduledMessage()
+                    ->with('messageChainEnrollment')
+                    ->first();
+
+                if ($scheduledMessage instanceof ScheduledMessage
+                    && $scheduledMessage->isTestingRuntime()
+                ) {
+                    return null;
+                }
             }
 
             if ($outboxEvent->status === ScheduledMessageOutboxEvent::STATUS_PROCESSING

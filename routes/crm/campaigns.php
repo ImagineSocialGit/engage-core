@@ -2,6 +2,8 @@
 
 use App\Modules\Campaigns\Controllers\CRM\CampaignController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignMessageTemplateController;
+use App\Modules\Campaigns\Controllers\CRM\CampaignSimulatorController;
+use App\Support\TestingTools\TestingToolGuard;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('module:campaigns')
@@ -10,6 +12,25 @@ Route::middleware('module:campaigns')
     ->group(function () {
         Route::get('/', [CampaignController::class, 'index'])
             ->name('index');
+
+        if (app(TestingToolGuard::class)->routesMayRegister()) {
+            Route::prefix('testing/simulator')
+                ->name('simulator.')
+                ->group(function (): void {
+                    Route::get('/', [CampaignSimulatorController::class, 'index'])
+                        ->name('index');
+                    Route::post('/', [CampaignSimulatorController::class, 'store'])
+                        ->name('store');
+                    Route::get('/{simulation}', [CampaignSimulatorController::class, 'show'])
+                        ->name('show');
+                    Route::post('/{simulation}/process', [CampaignSimulatorController::class, 'process'])
+                        ->name('process');
+                    Route::post('/{simulation}/advance', [CampaignSimulatorController::class, 'advance'])
+                        ->name('advance');
+                    Route::delete('/{simulation}', [CampaignSimulatorController::class, 'destroy'])
+                        ->name('destroy');
+                });
+        }
 
         Route::prefix('message-templates')
             ->name('message-templates.')
