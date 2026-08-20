@@ -10,6 +10,8 @@ enum FlowRoutePointType: string
     case Condition = 'condition';
     case BranchEvaluate = 'branch_evaluate';
     case ChangeStatus = 'change_status';
+    case AddContactTag = 'add_contact_tag';
+    case RemoveContactTag = 'remove_contact_tag';
     case CreateTask = 'create_task';
     case SendMessage = 'send_message';
     case EnrollCampaign = 'enroll_campaign';

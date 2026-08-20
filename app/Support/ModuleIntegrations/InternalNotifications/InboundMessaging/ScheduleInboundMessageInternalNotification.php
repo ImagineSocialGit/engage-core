@@ -1,12 +1,11 @@
 <?php
 
-namespace App\Modules\InternalNotifications\Listeners;
+namespace App\Support\ModuleIntegrations\InternalNotifications\InboundMessaging;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\InboundMessaging\Events\InboundMessageReceived;
 use App\Modules\InboundMessaging\Models\InboundMessage;
 use App\Modules\InternalNotifications\Actions\ScheduleInternalNotificationAction;
-use App\Modules\InternalNotifications\Services\InboundMessaging\InboundMessageNotificationRecipientResolver;
 use App\Modules\InternalNotifications\Services\InternalNotificationRecipient;
 use BackedEnum;
 use Illuminate\Support\Str;

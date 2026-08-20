@@ -26,7 +26,7 @@ use App\Modules\FlowRoutes\PointHandlers\NoopPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\WaitPointHandler;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Modules\InternalNotifications\Models\TeamMember;
-use App\Modules\InternalNotifications\Services\Tasks\OnlyActiveTeamMemberTaskAssignmentStrategyResolver;
+use App\Support\ModuleIntegrations\InternalNotifications\Tasks\OnlyActiveTeamMemberTaskAssignmentStrategyResolver;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Messaging\Models\MessageChain;
 use App\Modules\Messaging\Models\MessageChainEnrollment;

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\InternalNotifications\Services\Tasks;
+namespace App\Support\ModuleIntegrations\InternalNotifications\Tasks;
 
 use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\Tasks\Contracts\TaskAssignmentStrategyResolverContract;

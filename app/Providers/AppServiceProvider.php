@@ -9,6 +9,12 @@ use App\Modules\Campaigns\Import\CampaignEnrollmentContactImportPostProcessor;
 use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Messaging\Import\MarketingPermissionContactImportPostProcessor;
+use App\Modules\InboundMessaging\Events\InboundMessageReceived;
+use App\Support\ModuleIntegrations\InternalNotifications\InboundMessaging\ScheduleInboundMessageInternalNotification;
+use App\Support\ModuleIntegrations\InternalNotifications\Tasks\InternalNotificationTaskScheduler;
+use App\Support\ModuleIntegrations\InternalNotifications\Tasks\OnlyActiveTeamMemberTaskAssignmentStrategyResolver;
+use App\Support\ModuleIntegrations\InternalNotifications\Tasks\TeamMemberTaskAssignedRecipientResolver;
+use App\Support\ModuleIntegrations\InternalNotifications\Tasks\TeamMemberTaskAssigneeOptionProvider;
 use App\Support\AutomationCapabilities\AutomationActionRegistry;
 use App\Support\AutomationCapabilities\AutomationCapabilityRegistry;
 use App\Support\AutomationCapabilities\AutomationPointDefinitionRegistry;
@@ -156,6 +162,28 @@ class AppServiceProvider extends ServiceProvider
             ReferenceRegistrySetupValidationContributor::class,
         ], 'setup.validation_contributors');
 
+        $enabledModules = $this->app->make(ModuleManager::class)->enabledKeysWithDependencies();
+
+        if (in_array('internal_notifications', $enabledModules, true)
+            && in_array('tasks', $enabledModules, true)
+        ) {
+            $this->app->tag([
+                OnlyActiveTeamMemberTaskAssignmentStrategyResolver::class,
+            ], 'tasks.assignment_strategy_resolvers');
+
+            $this->app->tag([
+                TeamMemberTaskAssignedRecipientResolver::class,
+            ], 'crm.tasks.assigned_recipient_resolvers');
+
+            $this->app->tag([
+                TeamMemberTaskAssigneeOptionProvider::class,
+            ], 'tasks.assignee_option_providers');
+
+            $this->app->tag([
+                InternalNotificationTaskScheduler::class,
+            ], 'tasks.notification_schedulers');
+        }
+
         $this->app->afterResolving(
             ContactImportRegistry::class,
             function (ContactImportRegistry $registry, $app): void {
@@ -225,6 +253,17 @@ class AppServiceProvider extends ServiceProvider
             AutomationEventRecorded::class,
             RecordAutomationEventCorrelationEvidenceAction::class,
         );
+
+        $enabledModules = $this->app->make(ModuleManager::class)->enabledKeysWithDependencies();
+
+        if (in_array('internal_notifications', $enabledModules, true)
+            && in_array('inbound_messaging', $enabledModules, true)
+        ) {
+            Event::listen(
+                InboundMessageReceived::class,
+                ScheduleInboundMessageInternalNotification::class,
+            );
+        }
 
         if ($this->app->runningInConsole()) {
             $this->commands([

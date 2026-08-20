@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\InternalNotifications\Services\Tasks;
+namespace App\Support\ModuleIntegrations\InternalNotifications\Tasks;
 
 use App\Models\User;
 use App\Modules\InternalNotifications\Models\TeamMember;

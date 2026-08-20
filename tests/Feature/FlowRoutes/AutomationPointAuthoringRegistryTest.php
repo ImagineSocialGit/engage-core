@@ -26,6 +26,8 @@ class AutomationPointAuthoringRegistryTest extends TestCase
         $this->assertEqualsCanonicalizing([
             'wait',
             'change_status',
+            'add_contact_tag',
+            'remove_contact_tag',
             'create_task',
             'send_message',
             'enroll_campaign',

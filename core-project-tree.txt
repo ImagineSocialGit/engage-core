@@ -176,6 +176,13 @@
 │   │   │   │   │   └── UpdateContactStatusAction.php
 │   │   │   │   └── ContactStatuses
 │   │   │   │       └── SyncContactStatusPresetsAction.php
+│   │   │   ├── Automation
+│   │   │   │   ├── AddContactTagAutomationActionHandler.php
+│   │   │   │   ├── ContactTagAutomationPointAuthoringContributor.php
+│   │   │   │   ├── ContactTagAutomationPointDefinitionContributor.php
+│   │   │   │   └── RemoveContactTagAutomationActionHandler.php
+│   │   │   ├── Capabilities
+│   │   │   │   └── CoreAutomationCapabilityContributor.php
 │   │   │   ├── ConfigContracts
 │   │   │   │   ├── ContactStatusConfigContractTargetProvider.php
 │   │   │   │   └── ContactStatusDefinitionConfigContract.php
@@ -482,7 +489,6 @@
 │   │   │   │   └── TeamMemberController.php
 │   │   │   ├── Data
 │   │   │   ├── Listeners
-│   │   │   │   └── ScheduleInboundMessageInternalNotification.php
 │   │   │   ├── Models
 │   │   │   │   ├── TeamMemberNotificationPreference.php
 │   │   │   │   └── TeamMember.php
@@ -491,7 +497,6 @@
 │   │   │   ├── Requests
 │   │   │   ├── Services
 │   │   │   │   ├── InboundMessaging
-│   │   │   │   │   └── InboundMessageNotificationRecipientResolver.php
 │   │   │   │   ├── InternalNotificationChannelResolver.php
 │   │   │   │   ├── InternalNotificationGate.php
 │   │   │   │   ├── InternalNotificationPreferences
@@ -501,10 +506,6 @@
 │   │   │   │   │   ├── TeamMemberMessageRecipientGate.php
 │   │   │   │   │   └── TeamMemberMessageRecipientPayloadProvider.php
 │   │   │   │   └── Tasks
-│   │   │   │       ├── InternalNotificationTaskScheduler.php
-│   │   │   │       ├── OnlyActiveTeamMemberTaskAssignmentStrategyResolver.php
-│   │   │   │       ├── TeamMemberTaskAssignedRecipientResolver.php
-│   │   │   │       └── TeamMemberTaskAssigneeOptionProvider.php
 │   │   │   └── Support
 │   │   ├── Location
 │   │   │   ├── Actions
@@ -1245,6 +1246,15 @@
 │       │   │   └── DashboardPanelProvider.php
 │       │   └── DashboardPanelRegistry.php
 │       ├── ModuleIntegrations
+│       │   ├── InternalNotifications
+│       │   │   ├── InboundMessaging
+│       │   │   │   ├── InboundMessageNotificationRecipientResolver.php
+│       │   │   │   └── ScheduleInboundMessageInternalNotification.php
+│       │   │   └── Tasks
+│       │   │       ├── InternalNotificationTaskScheduler.php
+│       │   │       ├── OnlyActiveTeamMemberTaskAssignmentStrategyResolver.php
+│       │   │       ├── TeamMemberTaskAssignedRecipientResolver.php
+│       │   │       └── TeamMemberTaskAssigneeOptionProvider.php
 │       │   ├── RelationshipLocationAreaBridge.php
 │       │   └── RelationshipLocationAreaImportHandler.php
 │       ├── Modules
@@ -2072,6 +2082,7 @@
 │   │   │   ├── ContactImportTreatmentRegistryTest.php
 │   │   │   ├── ContactLookupControllerTest.php
 │   │   │   ├── ContactStatusImportTreatmentTest.php
+│   │   │   ├── ContactTagAutomationTest.php
 │   │   │   ├── CoreSetupValidationContributorTest.php
 │   │   │   └── SyncContactStatusPresetsActionTest.php
 │   │   ├── CRM
@@ -2093,6 +2104,7 @@
 │   │   │   ├── AutomationPointExtensionRegistryTest.php
 │   │   │   ├── CompactFlowRoutePresetAuthoringTest.php
 │   │   │   ├── ContactStatusAutomationImpactResolverTest.php
+│   │   │   ├── ContactTagAutomationCapabilityTest.php
 │   │   │   ├── FlowRouteAutomationEventPersistenceTest.php
 │   │   │   ├── FlowRouteBindingControllerTest.php
 │   │   │   ├── FlowRouteConditionBranchPointTest.php
@@ -2408,4 +2420,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-613 directories, 1796 files
+618 directories, 1803 files

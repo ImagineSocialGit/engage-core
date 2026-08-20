@@ -106,6 +106,7 @@ class FlowRouteDataConditionEvaluator implements FlowRouteConditionEvaluator
             'progress_meta',
             'workflow_profile',
             'contact',
+            'contact_tags',
             'contact_status',
             'flow_route',
             'flow_route_point',
@@ -182,6 +183,7 @@ class FlowRouteDataConditionEvaluator implements FlowRouteConditionEvaluator
             'progress_meta' => $context->progress->meta ?? [],
             'workflow_profile' => $this->modelData($context->progress->contactWorkflowProfile),
             'contact' => $this->modelData($context->progress->contact),
+            'contact_tags' => $this->contactTagsData($context),
             'contact_status' => $this->modelData($context->progress->contactStatus),
             'flow_route' => $this->modelData($context->progress->flowRoute),
             'flow_route_point' => $this->modelData($context->flowRoutePoint),
@@ -196,6 +198,25 @@ class FlowRouteDataConditionEvaluator implements FlowRouteConditionEvaluator
         }
 
         return Arr::get($data, $path);
+    }
+
+    /**
+     * @return array{values: array<int, string>}
+     */
+    private function contactTagsData(PointExecutionContext $context): array
+    {
+        $contact = $context->progress->contact;
+
+        if (! $contact) {
+            return ['values' => []];
+        }
+
+        return [
+            'values' => $contact->tags()
+                ->orderBy('tag')
+                ->pluck('tag')
+                ->all(),
+        ];
     }
 
     /**

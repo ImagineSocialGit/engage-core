@@ -350,6 +350,8 @@ return [
         'condition',
         'branch_evaluate',
         'event_wait',
+        'add_contact_tag',
+        'remove_contact_tag',
         'create_task',
         'send_message',
         'change_status',

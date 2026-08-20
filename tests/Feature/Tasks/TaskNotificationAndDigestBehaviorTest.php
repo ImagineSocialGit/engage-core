@@ -3,8 +3,8 @@
 namespace Tests\Feature\Tasks;
 
 use App\Modules\InternalNotifications\Models\TeamMember;
-use App\Modules\InternalNotifications\Services\Tasks\OnlyActiveTeamMemberTaskAssignmentStrategyResolver;
-use App\Modules\InternalNotifications\Services\Tasks\TeamMemberTaskAssignedRecipientResolver;
+use App\Support\ModuleIntegrations\InternalNotifications\Tasks\OnlyActiveTeamMemberTaskAssignmentStrategyResolver;
+use App\Support\ModuleIntegrations\InternalNotifications\Tasks\TeamMemberTaskAssignedRecipientResolver;
 use App\Modules\Tasks\Actions\BuildTaskDigestsAction;
 use App\Modules\Tasks\Actions\CreateTaskAction;
 use App\Modules\Tasks\Actions\NotifyAssignedTaskRecipientsAction;

@@ -322,6 +322,52 @@ class FlowRouteConditionBranchPointTest extends TestCase
         $this->assertSame($branchPoint->id, $progress->current_flow_route_point_id);
     }
 
+    public function test_condition_point_can_check_current_contact_tags(): void
+    {
+        $scenario = $this->scenario();
+
+        $scenario['contact']->tags()->create([
+            'tag' => 'webinar:attended',
+        ]);
+
+        $conditionPoint = $this->routePoint(
+            flowRoute: $scenario['flow_route'],
+            type: FlowRoutePointType::Condition->value,
+            sortOrder: 10,
+            key: 'condition',
+            isStart: true,
+            definition: [
+                'conditions' => [
+                    [
+                        'source' => 'contact_tags',
+                        'path' => 'values',
+                        'operator' => 'contains',
+                        'value' => 'webinar:attended',
+                    ],
+                ],
+                'on_pass' => PointExecutionResult::STATUS_COMPLETED,
+                'on_fail' => PointExecutionResult::STATUS_BLOCKED,
+            ],
+        );
+
+        $nextPoint = $this->routePoint(
+            flowRoute: $scenario['flow_route'],
+            type: FlowRoutePointType::Noop->value,
+            sortOrder: 20,
+            key: 'next',
+        );
+
+        $conditionPoint->forceFill([
+            'next_flow_route_point_id' => $nextPoint->getKey(),
+        ])->save();
+
+        $progress = $this->progress($scenario, $conditionPoint);
+        $result = app(ExecuteCurrentFlowRoutePointAction::class)->handle($progress);
+
+        $this->assertSame(PointExecutionResult::STATUS_COMPLETED, $result->status);
+        $this->assertSame('condition_point_passed', $result->reason);
+    }
+
     public function test_unsupported_condition_fails_safely(): void
     {
         $scenario = $this->scenario();

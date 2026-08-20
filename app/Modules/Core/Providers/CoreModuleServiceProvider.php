@@ -2,6 +2,11 @@
 
 namespace App\Modules\Core\Providers;
 
+use App\Modules\Core\Automation\AddContactTagAutomationActionHandler;
+use App\Modules\Core\Automation\ContactTagAutomationPointAuthoringContributor;
+use App\Modules\Core\Automation\ContactTagAutomationPointDefinitionContributor;
+use App\Modules\Core\Automation\RemoveContactTagAutomationActionHandler;
+use App\Modules\Core\Capabilities\CoreAutomationCapabilityContributor;
 use App\Modules\Core\ConfigContracts\ContactStatusConfigContractTargetProvider;
 use App\Modules\Core\ConfigContracts\ContactStatusDefinitionConfigContract;
 use App\Modules\Core\Console\Commands\SyncContactStatusPresetsCommand;
@@ -25,6 +30,23 @@ class CoreModuleServiceProvider extends ServiceProvider
         $this->app->singleton(ContactPanelRegistry::class);
         $this->app->singleton(ContactImportTreatmentRegistry::class);
         $this->app->singleton(ContactImportPostProcessorRegistry::class);
+
+        $this->app->tag([
+            CoreAutomationCapabilityContributor::class,
+        ], 'automation.capability_contributors');
+
+        $this->app->tag([
+            ContactTagAutomationPointDefinitionContributor::class,
+        ], 'automation.point_definition_contributors');
+
+        $this->app->tag([
+            ContactTagAutomationPointAuthoringContributor::class,
+        ], 'automation.point_authoring_contributors');
+
+        $this->app->tag([
+            AddContactTagAutomationActionHandler::class,
+            RemoveContactTagAutomationActionHandler::class,
+        ], 'automation.action_handlers');
 
         $this->app->singleton(ContactShowDataRegistry::class, function ($app): ContactShowDataRegistry {
             return new ContactShowDataRegistry(
