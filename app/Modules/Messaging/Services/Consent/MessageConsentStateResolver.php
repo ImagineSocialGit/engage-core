@@ -7,20 +7,31 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ConsentRevocation;
 use App\Modules\Messaging\Models\MessageConsent;
+use App\Modules\Messaging\Services\ConsentDomainRegistry;
 
 class MessageConsentStateResolver
 {
+    public function __construct(
+        private readonly ConsentDomainRegistry $consentDomainRegistry,
+    ) {}
+
     public function latestConsent(
         Contact|int $contact,
         MessageChannel|string $channel,
         MessagePurpose|string $purpose,
         string $scope,
     ): ?MessageConsent {
+        $canonicalScope = $this->consentDomainRegistry->domainFor(
+            channel: $channel,
+            purpose: $purpose,
+            scope: $scope,
+        );
+
         return MessageConsent::query()
             ->where('contact_id', $this->contactId($contact))
             ->where('channel', $this->enumValue($channel))
             ->where('purpose', $this->enumValue($purpose))
-            ->where('scope', $this->normalizeSegment($scope))
+            ->where('scope', $canonicalScope)
             ->orderByDesc('consented_at')
             ->orderByDesc('id')
             ->first();
@@ -32,11 +43,17 @@ class MessageConsentStateResolver
         MessagePurpose|string $purpose,
         string $scope,
     ): ?ConsentRevocation {
+        $canonicalScope = $this->consentDomainRegistry->domainFor(
+            channel: $channel,
+            purpose: $purpose,
+            scope: $scope,
+        );
+
         return ConsentRevocation::query()
             ->where('contact_id', $this->contactId($contact))
             ->where('channel', $this->enumValue($channel))
             ->where('purpose', $this->enumValue($purpose))
-            ->where('scope', $this->normalizeSegment($scope))
+            ->where('scope', $canonicalScope)
             ->orderByDesc('revoked_at')
             ->orderByDesc('id')
             ->first();

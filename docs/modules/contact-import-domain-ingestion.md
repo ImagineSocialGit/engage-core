@@ -25,9 +25,32 @@ Core must not interpret Mortgage, Relationships, Location, Campaigns, Messaging,
 - the already-persisted ContactImportOccurrence
 - the normalized CSV row
 - the submitted mapping
-- a module-neutral `mappedValue()` helper
+- module-neutral value resolution with explicit treatment overrides
 
 The occurrence is created before module handlers run so every handler consumes the same durable Core row evidence.
+
+## Operator treatment layer
+
+The import preview exposes reusable treatment targets contributed through Core's `ContactImportTreatmentRegistry`. A target can support either:
+
+- one fixed destination applied to every successfully imported row; or
+- a CSV source column whose distinct values are explicitly mapped to CRM destinations.
+
+The preview profiles the staged CSV and shows source-value counts before import. Up to 100 distinct nonblank values per column are displayed; higher-cardinality remainder values stay unchanged rather than being guessed. Blank and unmapped values are counted separately.
+
+Treatment precedence is intentional:
+
+```text
+operator treatment
+    -> mapped CSV value
+        -> import-profile default
+```
+
+Treatment changes current CRM/domain state only. Source evidence remains source evidence: raw/profile source, subsource, status evidence and each treatment's source column/value remain recorded in import provenance.
+
+Current generic treatment targets include Contact Status and additive Contact Tags. Relationships contributes Relationship and Relationship Stage targets when enabled. Relationship Stage destinations carry their relationship identity so a stage can never be applied without its owning relationship. Modules may add future targets without teaching Core their business vocabulary.
+
+The former one-off `status_mapping` request path is retired. Contact status now uses the same generic treatment mechanism as other controlled business values.
 
 ## Relationships import
 
@@ -83,9 +106,9 @@ This import/domain layer still does **not** add:
 - XLS/XLSX parsing
 - fuzzy Contact identity matching
 - automatic creation of co-borrower or Realtor Contacts
-- automatic lifecycle/status interpretation from historical export labels
+- automatic lifecycle/status interpretation from historical export labels without explicit operator mapping
 - campaign enrollment
 - imported marketing consent grants
 - reply-response orchestration
 
-Campaign family/priority arbitration is now Campaign-owned and intentionally remains outside the import handlers. A later orchestration slice may request Campaign enrollment after CRM/domain state and scoped Messaging consent are established.
+Campaign family/priority arbitration is now Campaign-owned and intentionally remains outside the import handlers. The next orchestration layers can use explicit import treatment as the CRM/domain decision, then establish scoped Messaging consent and request Campaign enrollment.

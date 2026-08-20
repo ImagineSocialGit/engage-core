@@ -181,7 +181,9 @@ class ContactControllerTest extends TestCase
         $response->assertSee('Legacy Status');
         $response->assertSee('name="mapping[email]"', false);
         $response->assertSee('name="mapping[import_status]"', false);
-        $response->assertSee('Status Mapping');
+        $response->assertSee('Import Treatment');
+        $response->assertSee('Contact Status');
+        $response->assertSee('Apply based on a CSV field');
         $response->assertSee('New');
         $response->assertSee('name="csv_path"', false);
     }

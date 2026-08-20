@@ -24,7 +24,11 @@ class ConsentOptInDefinitionResolver
     ): array {
         $channel = $this->enumValue($channel);
         $purpose = $this->enumValue($purpose);
-        $domain = $this->consentDomainRegistry->domainForScope($messageScope);
+        $domain = $this->consentDomainRegistry->domainFor(
+            channel: $channel,
+            purpose: $purpose,
+            scope: $messageScope,
+        );
         $domainDefinition = $this->consentDomainRegistry->definition($domain) ?? [];
 
         $defaults = config("messaging.consent.opt_in_defaults.{$channel}.{$purpose}", []);

@@ -137,14 +137,17 @@ class ContactImportRegistry
      * @param array<string, mixed> $row
      * @param array<string, string> $mapping
      * @param array<string, string> $defaults
+     * @param array<string, string> $overrides
      */
     public function value(
         array $row,
         array $mapping,
         array $defaults,
         string $field,
+        array $overrides = [],
     ): ?string {
-        return $this->mappedValue($row, $mapping, $field)
+        return $this->defaultValue($overrides, $field)
+            ?? $this->mappedValue($row, $mapping, $field)
             ?? $this->defaultValue($defaults, $field);
     }
 

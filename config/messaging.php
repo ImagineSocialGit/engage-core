@@ -75,6 +75,18 @@ return [
         'require_active_consent' => true,
 
         /*
+        | Optional channel + purpose overrides may intentionally collapse many
+        | operational scopes into one stored consent domain. Keep this empty by
+        | default so existing clients remain narrow unless their disclosure and
+        | policy explicitly authorize broader consent.
+        |
+        | Example client override:
+        | 'email' => ['marketing' => 'marketing'],
+        | 'sms' => ['marketing' => 'marketing'],
+        */
+        'channel_purpose_domains' => [],
+
+        /*
         | Generic consent acknowledgements are Messaging-owned system copy.
         | Module-owned consent domains supply the human-readable topic and may
         | override copy per channel/purpose from their own config when needed.

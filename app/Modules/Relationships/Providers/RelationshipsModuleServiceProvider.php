@@ -4,7 +4,10 @@ namespace App\Modules\Relationships\Providers;
 
 use App\Modules\Core\Data\Contacts\ContactImportField;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
+use App\Modules\Core\Support\Contacts\ContactImportTreatmentRegistry;
 use App\Modules\Relationships\Import\ContactRelationshipImportHandler;
+use App\Modules\Relationships\Import\Treatments\RelationshipStageImportTreatmentTarget;
+use App\Modules\Relationships\Import\Treatments\RelationshipTypeImportTreatmentTarget;
 use App\Modules\Relationships\Validation\RelationshipsSetupValidationContributor;
 use Illuminate\Support\ServiceProvider;
 
@@ -18,8 +21,14 @@ class RelationshipsModuleServiceProvider extends ServiceProvider
         );
     }
 
-    public function boot(ContactImportRegistry $contactImports): void
-    {
+    public function boot(
+        ContactImportRegistry $contactImports,
+        ContactImportTreatmentRegistry $treatments,
+    ): void {
+        $treatments
+            ->registerTarget(RelationshipTypeImportTreatmentTarget::class)
+            ->registerTarget(RelationshipStageImportTreatmentTarget::class);
+
         $contactImports
             ->registerFields([
                 ContactImportField::make(

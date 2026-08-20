@@ -49,7 +49,7 @@ class ContactImportHandlerContextIntegrationTest extends TestCase
                     'email' => 'Email',
                     'source' => 'Source',
                 ],
-                'status_mapping' => [],
+                'treatments' => [],
             ]);
 
         $response->assertRedirect(route('crm.contacts.index'));

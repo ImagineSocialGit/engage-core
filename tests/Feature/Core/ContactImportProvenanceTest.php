@@ -144,7 +144,7 @@ class ContactImportProvenanceTest extends TestCase
             ->post(route('crm.contacts.import.process'), [
                 'csv_path' => $csvPath,
                 'mapping' => $mapping,
-                'status_mapping' => [],
+                'treatments' => [],
             ]);
 
         $response->assertRedirect(route('crm.contacts.index'));

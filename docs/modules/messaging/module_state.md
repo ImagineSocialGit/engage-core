@@ -755,26 +755,79 @@ Message identity and consent identity remain separate:
 
 ```text
 Message identity
-    channel + purpose + scope
+    channel + purpose + operational scope
 
 Consent identity
     channel + purpose + consent domain
 ```
 
-`ConsentDomainRegistry` resolution remains:
+Operational scope describes what a specific message is doing. Consent domain describes
+the permission boundary that authorizes it.
+
+`ConsentDomainRegistry` supports two layers of resolution:
 
 ```text
-exact mapping wins
-otherwise longest registered prefix wins
-equal-specificity ambiguity fails loudly
-unknown unmapped scope falls back to itself
+1. optional client policy: channel + purpose -> consent domain
+2. otherwise scope policy:
+       exact mapping wins
+       otherwise longest registered prefix wins
+       equal-specificity ambiguity fails loudly
+       unknown unmapped scope falls back to itself
 ```
 
-Current Webinar message scopes may intentionally share the `webinar` consent domain.
+The channel-purpose layer exists for deliberately broad authorization such as:
 
-`GrantMessageConsentAction`, `ImportMessageConsentAction`, `RevokeMessageConsentAction`, and `MessageGate` normalize through this registry.
+```text
+email + marketing + any operational marketing scope -> marketing
+sms   + marketing + any operational marketing scope -> marketing
+```
 
-Imported consent uses the dedicated import path so it does not emit a grant acknowledgement.
+It is disabled by default. A client must explicitly configure both the broad domain and
+the affected channel/purpose mappings. This prevents a generic platform change from
+silently broadening another client's disclosure or permission policy.
+
+Email and SMS remain separate consent identities even when both resolve to the same
+named domain. An email unsubscribe therefore revokes email marketing without revoking
+SMS marketing; SMS STOP revokes SMS marketing without revoking email marketing.
+
+CRM/Campaign classification must not be encoded as consent scope. Status, relationship,
+tags, Location, source, Campaign family/priority, and similar business facts decide
+which authorized marketing is appropriate. Moving a Contact from one marketing journey
+to another does not require new consent when both journeys resolve to the same active
+channel-purpose domain.
+
+Example selected-client policy:
+
+```php
+'consent' => [
+    'channel_purpose_domains' => [
+        'email' => ['marketing' => 'marketing'],
+        'sms' => ['marketing' => 'marketing'],
+    ],
+],
+
+'consent_domains' => [
+    'marketing' => [
+        'topic' => 'marketing communications',
+        'scopes' => [],
+        'scope_prefixes' => [],
+        'opt_in' => [],
+    ],
+],
+```
+
+`GrantMessageConsentAction`, `ImportMessageConsentAction`, `RevokeMessageConsentAction`,
+`MessageGate`, consent-state resolution, permission-invitation eligibility, and opt-in
+acknowledgement resolution all use the canonical channel + purpose + scope resolution
+path.
+
+Imported consent uses the dedicated import path so it does not emit a grant
+acknowledgement.
+
+Existing consent rows are not automatically broadened when a client enables a broader
+channel-purpose policy. Historical rows remain evidence of the permission identity that
+was actually stored. Any production reclassification/backfill must be explicit and
+based on verified disclosure evidence rather than a generic migration.
 
 ### Consent acknowledgement resolution
 

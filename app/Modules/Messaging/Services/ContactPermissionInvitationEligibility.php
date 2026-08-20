@@ -5,14 +5,14 @@ namespace App\Modules\Messaging\Services;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
-use App\Modules\Messaging\Models\ConsentRevocation;
-use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Services\Consent\MessageConsentStateResolver;
 
 class ContactPermissionInvitationEligibility
 {
     public function __construct(
         private readonly ContactPermissionInvitationService $permissionInvitationService,
+        private readonly MessageConsentStateResolver $consentStateResolver,
     ) {}
 
     public function eligibleForImportedContactEmailInvitation(Contact $contact): bool
@@ -44,25 +44,12 @@ class ContactPermissionInvitationEligibility
 
     private function hasActiveMarketingEmailConsent(Contact $contact, string $scope): bool
     {
-        $consent = MessageConsent::query()
-            ->where('contact_id', $contact->getKey())
-            ->where('channel', MessageChannel::Email->value)
-            ->where('purpose', MessagePurpose::Marketing->value)
-            ->where('scope', $scope)
-            ->whereNotNull('consented_at')
-            ->first();
-
-        if (! $consent) {
-            return false;
-        }
-
-        return ! ConsentRevocation::query()
-            ->where('contact_id', $contact->getKey())
-            ->where('channel', MessageChannel::Email->value)
-            ->where('purpose', MessagePurpose::Marketing->value)
-            ->where('scope', $scope)
-            ->where('revoked_at', '>=', $consent->consented_at)
-            ->exists();
+        return $this->consentStateResolver->isActive(
+            contact: $contact,
+            channel: MessageChannel::Email,
+            purpose: MessagePurpose::Marketing,
+            scope: $scope,
+        );
     }
 
     private function hasExistingImportedContactPermissionInvitationMessage(Contact $contact): bool

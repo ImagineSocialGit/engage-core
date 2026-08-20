@@ -44,7 +44,11 @@ class MessageGate
             return false;
         }
 
-        $consentDomain = $this->consentDomainRegistry->domainForScope($scope);
+        $consentDomain = $this->consentDomainRegistry->domainFor(
+            channel: $channel,
+            purpose: $purpose,
+            scope: $scope,
+        );
 
         if (
             ! $this->consentStateResolver->isActive($contact, $channel, $purpose, $consentDomain)

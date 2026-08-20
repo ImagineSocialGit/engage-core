@@ -5,6 +5,7 @@ namespace Tests\Feature\Messaging;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Messaging\Actions\CreateContactPermissionInvitationsForImportBatchAction;
+use App\Modules\Messaging\Actions\ImportMessageConsentAction;
 use App\Modules\Messaging\Actions\SkipScheduledMessagesAction;
 use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Enums\MessageChannel;
@@ -111,12 +112,19 @@ class CreateContactPermissionInvitationsForImportBatchActionTest extends TestCas
         $this->assertSame(0, ScheduledMessage::query()->count());
     }
 
-    public function test_it_skips_contacts_that_already_have_required_marketing_email_consent(): void
+    public function test_it_recognizes_one_shared_marketing_domain_as_covering_multiple_required_scopes(): void
     {
         config([
             'messaging.permission_invitations.consent.scopes' => [
                 'broadcast',
                 'campaign',
+            ],
+            'messaging.consent.channel_purpose_domains.email.marketing' => 'marketing',
+            'messaging.consent_domains.marketing' => [
+                'topic' => 'marketing communications',
+                'scopes' => [],
+                'scope_prefixes' => [],
+                'opt_in' => [],
             ],
         ]);
 
@@ -128,16 +136,21 @@ class CreateContactPermissionInvitationsForImportBatchActionTest extends TestCas
             'contact_import_batch_id' => $importBatch->id,
         ]);
 
-        foreach (['broadcast', 'campaign'] as $scope) {
-            MessageConsent::query()->create([
-                'contact_id' => $contact->id,
-                'channel' => MessageChannel::Email->value,
-                'purpose' => MessagePurpose::Marketing->value,
-                'scope' => $scope,
-                'consented_at' => now(),
-                'source' => 'test',
-            ]);
-        }
+        app(ImportMessageConsentAction::class)->handle(
+            contact: $contact,
+            channel: MessageChannel::Email->value,
+            purpose: MessagePurpose::Marketing->value,
+            scope: 'campaign',
+            source: 'test',
+        );
+
+        $this->assertSame(1, MessageConsent::query()->count());
+        $this->assertDatabaseHas('message_consents', [
+            'contact_id' => $contact->id,
+            'channel' => MessageChannel::Email->value,
+            'purpose' => MessagePurpose::Marketing->value,
+            'scope' => 'marketing',
+        ]);
 
         $result = app(CreateContactPermissionInvitationsForImportBatchAction::class)
             ->handle($importBatch);

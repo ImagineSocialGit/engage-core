@@ -6,7 +6,10 @@ use App\Modules\Core\ConfigContracts\ContactStatusConfigContractTargetProvider;
 use App\Modules\Core\ConfigContracts\ContactStatusDefinitionConfigContract;
 use App\Modules\Core\Console\Commands\SyncContactStatusPresetsCommand;
 use App\Modules\Core\Data\Contacts\ContactImportField;
+use App\Modules\Core\Import\Treatments\ContactStatusImportTreatmentTarget;
+use App\Modules\Core\Import\Treatments\ContactTagsImportTreatmentTarget;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
+use App\Modules\Core\Support\Contacts\ContactImportTreatmentRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Core\Support\Contacts\ContactShowDataRegistry;
 use App\Modules\Core\TokenContracts\ContactTokenSourceProvider;
@@ -19,6 +22,7 @@ class CoreModuleServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(ContactPanelRegistry::class);
+        $this->app->singleton(ContactImportTreatmentRegistry::class);
 
         $this->app->singleton(ContactShowDataRegistry::class, function ($app): ContactShowDataRegistry {
             return new ContactShowDataRegistry(
@@ -128,8 +132,12 @@ class CoreModuleServiceProvider extends ServiceProvider
         );
     }
 
-    public function boot(): void
+    public function boot(ContactImportTreatmentRegistry $treatments): void
     {
+        $treatments
+            ->registerTarget(ContactStatusImportTreatmentTarget::class)
+            ->registerTarget(ContactTagsImportTreatmentTarget::class);
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 SyncContactStatusPresetsCommand::class,

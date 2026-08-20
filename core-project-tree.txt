@@ -183,6 +183,7 @@
 │   │   │   ├── Contracts
 │   │   │   │   └── Contacts
 │   │   │   │       ├── ContactImportHandler.php
+│   │   │   │       ├── ContactImportTreatmentTarget.php
 │   │   │   │       ├── ContactPanelProvider.php
 │   │   │   │       ├── ContactShowDataProvider.php
 │   │   │   │       └── UpdatesContactStatus.php
@@ -196,10 +197,17 @@
 │   │   │   │       ├── ContactImportContext.php
 │   │   │   │       ├── ContactImportField.php
 │   │   │   │       ├── ContactImportProfile.php
-│   │   │   │       ├── ContactImportStatusMappingResult.php
+│   │   │   │       ├── ContactImportTreatmentApplication.php
+│   │   │   │       ├── ContactImportTreatmentDefinition.php
+│   │   │   │       ├── ContactImportTreatmentResolution.php
+│   │   │   │       ├── ContactImportTreatmentSelection.php
 │   │   │   │       └── ContactPanel.php
 │   │   │   ├── Enums
 │   │   │   │   └── TagType.php
+│   │   │   ├── Import
+│   │   │   │   └── Treatments
+│   │   │   │       ├── ContactStatusImportTreatmentTarget.php
+│   │   │   │       └── ContactTagsImportTreatmentTarget.php
 │   │   │   ├── Models
 │   │   │   │   ├── ContactImportBatch.php
 │   │   │   │   ├── ContactImportOccurrence.php
@@ -220,13 +228,13 @@
 │   │   │   ├── Services
 │   │   │   │   ├── Contacts
 │   │   │   │   │   ├── ContactFilterResolver.php
-│   │   │   │   │   ├── ContactImportProfileRegistry.php
-│   │   │   │   │   └── ContactImportStatusMapper.php
+│   │   │   │   │   └── ContactImportProfileRegistry.php
 │   │   │   │   └── SiteSettings
 │   │   │   │       └── SiteSettingResolver.php
 │   │   │   ├── Support
 │   │   │   │   └── Contacts
 │   │   │   │       ├── ContactImportRegistry.php
+│   │   │   │       ├── ContactImportTreatmentRegistry.php
 │   │   │   │       ├── ContactPanelRegistry.php
 │   │   │   │       └── ContactShowDataRegistry.php
 │   │   │   ├── TokenContracts
@@ -747,7 +755,10 @@
 │   │   │   ├── Actions
 │   │   │   │   └── UpsertContactRelationshipAction.php
 │   │   │   ├── Import
-│   │   │   │   └── ContactRelationshipImportHandler.php
+│   │   │   │   ├── ContactRelationshipImportHandler.php
+│   │   │   │   └── Treatments
+│   │   │   │       ├── RelationshipStageImportTreatmentTarget.php
+│   │   │   │       └── RelationshipTypeImportTreatmentTarget.php
 │   │   │   ├── Models
 │   │   │   │   └── ContactRelationship.php
 │   │   │   ├── Providers
@@ -2046,8 +2057,10 @@
 │   │   │   ├── ContactImportProfileControllerTest.php
 │   │   │   ├── ContactImportProfileRegistryTest.php
 │   │   │   ├── ContactImportProvenanceTest.php
-│   │   │   ├── ContactImportStatusMappingTest.php
+│   │   │   ├── ContactImportTreatmentControllerTest.php
+│   │   │   ├── ContactImportTreatmentRegistryTest.php
 │   │   │   ├── ContactLookupControllerTest.php
+│   │   │   ├── ContactStatusImportTreatmentTest.php
 │   │   │   ├── CoreSetupValidationContributorTest.php
 │   │   │   └── SyncContactStatusPresetsActionTest.php
 │   │   ├── CRM
@@ -2231,6 +2244,7 @@
 │   │   │   └── WorkflowProjectStateRoundTripTest.php
 │   │   ├── Relationships
 │   │   │   ├── ContactRelationshipImportHandlerTest.php
+│   │   │   ├── RelationshipImportTreatmentTest.php
 │   │   │   ├── RelationshipLocationAreaBridgeTest.php
 │   │   │   ├── RelationshipLocationAreaImportHandlerTest.php
 │   │   │   └── RelationshipsFoundationTest.php
@@ -2380,4 +2394,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-608 directories, 1773 files
+611 directories, 1784 files

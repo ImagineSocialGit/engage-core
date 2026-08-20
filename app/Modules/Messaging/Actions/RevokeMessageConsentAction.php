@@ -32,7 +32,11 @@ class RevokeMessageConsentAction
 
         return DB::transaction(function () use ($contact, $validated): array {
             $scope = isset($validated['scope'])
-                ? $this->consentDomainRegistry->domainForScope($validated['scope'])
+                ? $this->consentDomainRegistry->domainFor(
+                    channel: $validated['channel'],
+                    purpose: $validated['purpose'],
+                    scope: $validated['scope'],
+                )
                 : null;
 
             if ($scope !== null) {
@@ -66,7 +70,11 @@ class RevokeMessageConsentAction
                 )
                 ->map(
                     fn (string $scope): string => $this->consentDomainRegistry
-                        ->domainForScope($scope)
+                        ->domainFor(
+                            channel: $validated['channel'],
+                            purpose: $validated['purpose'],
+                            scope: $scope,
+                        )
                 )
                 ->unique()
                 ->values();

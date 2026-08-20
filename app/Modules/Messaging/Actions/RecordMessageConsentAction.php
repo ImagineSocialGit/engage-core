@@ -34,7 +34,11 @@ class RecordMessageConsentAction
         $channel = $this->normalizeSegment($validated['channel']);
         $purpose = $this->normalizeSegment($validated['purpose']);
         $requestedScope = $this->normalizeSegment($validated['scope']);
-        $domain = $this->consentDomainRegistry->domainForScope($requestedScope);
+        $domain = $this->consentDomainRegistry->domainFor(
+            channel: $channel,
+            purpose: $purpose,
+            scope: $requestedScope,
+        );
         $consentedAt = isset($validated['consented_at'])
             ? Carbon::parse($validated['consented_at'])
             : now();

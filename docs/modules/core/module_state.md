@@ -186,6 +186,8 @@ Current Core contact extension points include:
 - `ContactShowDataRegistry`
 - `ContactImportHandler`
 - `ContactImportRegistry`
+- `ContactImportTreatmentTarget`
+- `ContactImportTreatmentRegistry`
 
 Core owns generic contact lookup behavior used by CRM modules.
 
@@ -223,7 +225,7 @@ Core owns import batch records, durable Contact import provenance, and import ba
 
 `contacts.contact_import_batch_id` remains temporarily as the latest-import/legacy compatibility pointer. It is not historical membership authority. Core batch views, generic `import_batch` filtering, and downstream consumers should use the occurrence-aware Core query seam, with the legacy pointer retained as a fallback for pre-occurrence rows until that compatibility column is deliberately retired. Existing Contact fields remain the current CRM snapshot; overlapping imports must not rely on those singular fields to represent complete historical import evidence.
 
-The CRM CSV/TXT importer continues to use normalized email as its exact Contact match key. It does not perform fuzzy identity merging or split household members that share an email. The importer preserves an existing meaningful Contact source/subsource across later overlapping imports while each occurrence preserves the incoming source/subsource independently. Lifecycle/status precedence across import profiles is a separate orchestration concern and is not inferred by Core provenance.
+The CRM CSV/TXT importer continues to use normalized email as its exact Contact match key. It does not perform fuzzy identity merging or split household members that share an email. The importer preserves an existing meaningful Contact source/subsource across later overlapping imports while each occurrence preserves the incoming source/subsource independently. Core does not infer lifecycle/status treatment from source labels or filenames. Operators may explicitly apply fixed or source-value-mapped treatment through the generic import-treatment registry. Treatment takes precedence over raw mapping/profile defaults for the controlled destination while source evidence remains preserved in occurrence/contact import metadata.
 
 Core may expose module-owned actions on Core pages when the owning module is enabled.
 

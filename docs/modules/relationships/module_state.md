@@ -48,7 +48,7 @@ Relationship geography must not be duplicated into generic `market_key` columns 
 
 ## Import composition
 
-Core Contact imports can now assign/update configured relationship types and stages through the public Relationships import handler. Acquisition source/subsource is preserved rather than casually overwritten by later overlapping imports. Optional Location-area mapping composes through the app-level bridge when Location is explicitly enabled.
+Core Contact imports can assign/update configured relationship types and stages through the public Relationships import handler. Relationships also contributes generic import-treatment targets so an operator may apply one Relationship to all successfully imported rows or map distinct CSV values to configured Relationships/stages. A Relationship Stage treatment also establishes its owning Relationship identity, preventing cross-relationship stage ambiguity. Acquisition source/subsource is preserved rather than casually overwritten by later overlapping imports. Optional Location-area mapping composes through the app-level bridge when Location is explicitly enabled.
 
 ## Project State
 

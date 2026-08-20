@@ -55,6 +55,30 @@ class ConsentOptInDefinitionResolverTest extends TestCase
         $this->assertStringContainsString('STOP', $message);
     }
 
+    public function test_broad_marketing_policy_uses_the_marketing_domain_topic(): void
+    {
+        Config::set('client.name', 'Acme Events');
+        Config::set('messaging.consent_domains.marketing', [
+            'topic' => 'marketing communications',
+            'scopes' => [],
+            'scope_prefixes' => [],
+            'opt_in' => [],
+        ]);
+        Config::set('messaging.consent.channel_purpose_domains.email.marketing', 'marketing');
+
+        $definition = app(ConsentOptInDefinitionResolver::class)->resolve(
+            channel: 'email',
+            purpose: 'marketing',
+            messageScope: 'future_campaign_scope',
+        );
+
+        $this->assertSame('marketing', $definition['scope']);
+        $this->assertStringContainsString(
+            'marketing communications',
+            $definition['payload']['body'],
+        );
+    }
+
     public function test_client_or_module_config_can_override_domain_copy(): void
     {
         Config::set('webinars.consent_domains.webinar.opt_in.email.marketing', [

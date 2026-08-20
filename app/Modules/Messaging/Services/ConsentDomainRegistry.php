@@ -2,6 +2,8 @@
 
 namespace App\Modules\Messaging\Services;
 
+use App\Modules\Messaging\Enums\MessageChannel;
+use App\Modules\Messaging\Enums\MessagePurpose;
 use InvalidArgumentException;
 
 class ConsentDomainRegistry
@@ -56,6 +58,23 @@ class ConsentDomainRegistry
         }
 
         return $definitions;
+    }
+
+    public function domainFor(
+        MessageChannel|string $channel,
+        MessagePurpose|string $purpose,
+        string $scope,
+    ): string {
+        $channel = $this->enumValue($channel);
+        $purpose = $this->enumValue($purpose);
+
+        $configuredDomain = $this->channelPurposeDomain($channel, $purpose);
+
+        if ($configuredDomain !== null) {
+            return $configuredDomain;
+        }
+
+        return $this->domainForScope($scope);
     }
 
     public function domainForScope(string $scope): string
@@ -274,6 +293,174 @@ class ConsentDomainRegistry
             }
         }
 
+        foreach ($this->channelPurposeDomainValidationIssues($seenDomains) as $issue) {
+            $issues[] = $issue;
+        }
+
+        return $issues;
+    }
+
+    private function channelPurposeDomain(string $channel, string $purpose): ?string
+    {
+        if (! in_array($channel, MessageChannel::values(), true)) {
+            throw new InvalidArgumentException("Unsupported message channel [{$channel}].");
+        }
+
+        if (! in_array($purpose, MessagePurpose::values(), true)) {
+            throw new InvalidArgumentException("Unsupported message purpose [{$purpose}].");
+        }
+
+        $configured = config('messaging.consent.channel_purpose_domains', []);
+
+        if ($configured === null || $configured === []) {
+            return null;
+        }
+
+        if (! is_array($configured)) {
+            throw new InvalidArgumentException(
+                'Messaging consent channel-purpose domains configuration must be an array.',
+            );
+        }
+
+        $channelConfig = $configured[$channel] ?? [];
+
+        if ($channelConfig === null || $channelConfig === []) {
+            return null;
+        }
+
+        if (! is_array($channelConfig)) {
+            throw new InvalidArgumentException(
+                "Messaging consent channel-purpose domain configuration for [{$channel}] must be an array.",
+            );
+        }
+
+        if (! array_key_exists($purpose, $channelConfig)) {
+            return null;
+        }
+
+        $domain = $channelConfig[$purpose];
+
+        if (! $this->filledString($domain)) {
+            throw new InvalidArgumentException(
+                "Messaging consent channel-purpose domain for [{$channel}:{$purpose}] must be a non-empty string.",
+            );
+        }
+
+        $domain = $this->normalizeSegment($domain);
+
+        if ($this->definition($domain) === null) {
+            throw new InvalidArgumentException(
+                "Messaging consent channel-purpose domain [{$channel}:{$purpose}] references unknown consent domain [{$domain}].",
+            );
+        }
+
+        return $domain;
+    }
+
+    /**
+     * @param array<string, string> $knownDomains
+     * @return array<int, array{code: string, message: string, path: string, context: array<string, mixed>}>
+     */
+    private function channelPurposeDomainValidationIssues(array $knownDomains): array
+    {
+        $issues = [];
+        $configured = config('messaging.consent.channel_purpose_domains', []);
+        $rootPath = 'messaging.consent.channel_purpose_domains';
+
+        if ($configured === null || $configured === []) {
+            return [];
+        }
+
+        if (! is_array($configured)) {
+            return [
+                $this->issue(
+                    'messaging.consent_channel_purpose_domains.invalid',
+                    'Messaging consent channel-purpose domains configuration must be an array.',
+                    $rootPath,
+                    [],
+                ),
+            ];
+        }
+
+        foreach ($configured as $channel => $purposeMappings) {
+            $channelPath = "{$rootPath}.{$channel}";
+            $normalizedChannel = is_string($channel)
+                ? $this->normalizeSegment($channel)
+                : '';
+
+            if (! in_array($normalizedChannel, MessageChannel::values(), true)) {
+                $issues[] = $this->issue(
+                    'messaging.consent_channel_purpose_domain.channel_invalid',
+                    "Consent channel-purpose mapping uses unsupported channel [{$channel}].",
+                    $channelPath,
+                    ['channel' => $channel],
+                );
+
+                continue;
+            }
+
+            if (! is_array($purposeMappings)) {
+                $issues[] = $this->issue(
+                    'messaging.consent_channel_purpose_domain.invalid',
+                    "Consent channel-purpose mapping for [{$normalizedChannel}] must be an array.",
+                    $channelPath,
+                    ['channel' => $normalizedChannel],
+                );
+
+                continue;
+            }
+
+            foreach ($purposeMappings as $purpose => $domain) {
+                $path = "{$channelPath}.{$purpose}";
+                $normalizedPurpose = is_string($purpose)
+                    ? $this->normalizeSegment($purpose)
+                    : '';
+
+                if (! in_array($normalizedPurpose, MessagePurpose::values(), true)) {
+                    $issues[] = $this->issue(
+                        'messaging.consent_channel_purpose_domain.purpose_invalid',
+                        "Consent channel-purpose mapping uses unsupported purpose [{$purpose}].",
+                        $path,
+                        [
+                            'channel' => $normalizedChannel,
+                            'purpose' => $purpose,
+                        ],
+                    );
+
+                    continue;
+                }
+
+                if (! $this->filledString($domain)) {
+                    $issues[] = $this->issue(
+                        'messaging.consent_channel_purpose_domain.domain_invalid',
+                        "Consent channel-purpose mapping [{$normalizedChannel}:{$normalizedPurpose}] must reference a non-empty consent domain key.",
+                        $path,
+                        [
+                            'channel' => $normalizedChannel,
+                            'purpose' => $normalizedPurpose,
+                        ],
+                    );
+
+                    continue;
+                }
+
+                $normalizedDomain = $this->normalizeSegment($domain);
+
+                if (! isset($knownDomains[$normalizedDomain])) {
+                    $issues[] = $this->issue(
+                        'messaging.consent_channel_purpose_domain.domain_unknown',
+                        "Consent channel-purpose mapping [{$normalizedChannel}:{$normalizedPurpose}] references unknown consent domain [{$normalizedDomain}].",
+                        $path,
+                        [
+                            'channel' => $normalizedChannel,
+                            'purpose' => $normalizedPurpose,
+                            'domain' => $normalizedDomain,
+                        ],
+                    );
+                }
+            }
+        }
+
         return $issues;
     }
 
@@ -320,6 +507,13 @@ class ConsentDomainRegistry
                 : '',
             $values,
         ))));
+    }
+
+    private function enumValue(MessageChannel|MessagePurpose|string $value): string
+    {
+        return $value instanceof MessageChannel || $value instanceof MessagePurpose
+            ? $value->value
+            : $this->normalizeSegment($value);
     }
 
     private function normalizePrefix(string $value): string

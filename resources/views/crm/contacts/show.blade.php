@@ -244,11 +244,18 @@
                     </form>
                 @endif
 
-                @if (data_get($contact->meta, 'import.status_mapping.state') === 'unmapped')
+                @php
+                    $hasGenericImportTreatments = is_array(data_get($contact->meta, 'import.treatments'));
+                    $importStatusTreatmentState = $hasGenericImportTreatments
+                        ? data_get($contact->meta, 'import.treatments.contact_status.state')
+                        : data_get($contact->meta, 'import.status_mapping.state');
+                @endphp
+
+                @if ($importStatusTreatmentState === 'unmapped')
                     <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                         <p class="text-sm font-semibold text-amber-900">Imported status needs review</p>
                         <p class="mt-1 text-sm text-amber-800">
-                            {{ data_get($contact->meta, 'import.original_status') ?: 'Unmapped imported status' }}
+                            {{ data_get($contact->meta, 'import.original_status') ?: data_get($contact->meta, 'import.treatments.contact_status.source_value') ?: 'Unmapped imported status' }}
                         </p>
                     </div>
                 @elseif (data_get($contact->meta, 'import.original_status'))
