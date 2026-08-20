@@ -8,6 +8,7 @@ use App\Modules\Core\Console\Commands\SyncContactStatusPresetsCommand;
 use App\Modules\Core\Data\Contacts\ContactImportField;
 use App\Modules\Core\Import\Treatments\ContactStatusImportTreatmentTarget;
 use App\Modules\Core\Import\Treatments\ContactTagsImportTreatmentTarget;
+use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportTreatmentRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
@@ -23,6 +24,7 @@ class CoreModuleServiceProvider extends ServiceProvider
     {
         $this->app->singleton(ContactPanelRegistry::class);
         $this->app->singleton(ContactImportTreatmentRegistry::class);
+        $this->app->singleton(ContactImportPostProcessorRegistry::class);
 
         $this->app->singleton(ContactShowDataRegistry::class, function ($app): ContactShowDataRegistry {
             return new ContactShowDataRegistry(

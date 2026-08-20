@@ -12,6 +12,7 @@ use App\Modules\Core\Models\ContactImportOccurrence;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Core\Requests\StoreContactRequest;
 use App\Modules\Core\Services\Contacts\ContactImportProfileRegistry;
+use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportTreatmentRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
@@ -150,6 +151,7 @@ class ContactController extends Controller
         ContactImportRegistry $contactImportRegistry,
         ContactImportProfileRegistry $contactImportProfileRegistry,
         ContactImportTreatmentRegistry $treatmentRegistry,
+        ContactImportPostProcessorRegistry $postProcessorRegistry,
     ): View|RedirectResponse {
         $validated = $request->validate([
             'csv' => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
@@ -197,6 +199,9 @@ class ContactController extends Controller
         $importProfile = $contactImportProfileRegistry->findByFilename($originalFilename);
         $suggestedMapping = $importProfile !== null
             ? $contactImportProfileRegistry->suggestedMapping($importProfile, $headers->all())
+            : [];
+        $postImportSummaries = $importProfile !== null
+            ? $postProcessorRegistry->summaries($importProfile->postImport)
             : [];
 
         if ($importProfile !== null) {
@@ -299,6 +304,7 @@ class ContactController extends Controller
             'treatmentDefinitions' => $treatmentRegistry->definitions(),
             'importProfile' => $importProfile,
             'suggestedMapping' => $suggestedMapping,
+            'postImportSummaries' => $postImportSummaries,
         ]);
     }
 
@@ -308,6 +314,7 @@ class ContactController extends Controller
         ContactImportRegistry $contactImportRegistry,
         ContactImportProfileRegistry $contactImportProfileRegistry,
         ContactImportTreatmentRegistry $treatmentRegistry,
+        ContactImportPostProcessorRegistry $postProcessorRegistry,
     ): RedirectResponse {
         $rules = [
             'csv_path' => ['required', 'string'],
@@ -359,6 +366,8 @@ class ContactController extends Controller
             ? $contactImportProfileRegistry->get($profileKey)
             : null;
         $profileDefaults = $importProfile?->defaults ?? [];
+        $postImportConfig = $importProfile?->postImport ?? [];
+        $postImportSummaries = $postProcessorRegistry->summaries($postImportConfig);
 
         $allowedMappingFields = array_values(array_unique([
             ...$contactImportRegistry->fieldKeys(),
@@ -377,6 +386,7 @@ class ContactController extends Controller
             headers: $headers,
         );
         $treatmentStats = $this->initializeTreatmentStats($treatmentSelections);
+        $postImportStats = $this->initializePostImportStats($postImportConfig);
 
         $importedAt = now();
         $originalFilename = $request->session()->pull(
@@ -401,6 +411,8 @@ class ContactController extends Controller
                 'profile_key' => $importProfile?->key,
                 'profile_defaults' => $profileDefaults,
                 'treatment_selections' => $treatmentRegistry->selectionsMeta($treatmentSelections),
+                'post_import_config' => $postImportConfig,
+                'post_import_summaries' => $postImportSummaries,
             ],
         ]);
 
@@ -548,17 +560,18 @@ class ContactController extends Controller
                     ],
                 ]);
 
-                $contactImportRegistry->handleModuleImports(
-                    new ContactImportContext(
-                        contact: $contact,
-                        batch: $importBatch,
-                        occurrence: $occurrence,
-                        row: $data,
-                        mapping: $mapping,
-                        defaults: $profileDefaults,
-                        overrides: $treatmentResolution->fieldOverrides,
-                    ),
+                $context = new ContactImportContext(
+                    contact: $contact,
+                    batch: $importBatch,
+                    occurrence: $occurrence,
+                    row: $data,
+                    mapping: $mapping,
+                    defaults: $profileDefaults,
+                    overrides: $treatmentResolution->fieldOverrides,
+                    profileKey: $importProfile?->key,
                 );
+
+                $contactImportRegistry->handleModuleImports($context);
 
                 $treatmentRegistry->apply(
                     resolution: $treatmentResolution,
@@ -567,6 +580,30 @@ class ContactController extends Controller
                     occurrence: $occurrence,
                     actor: $request->user(),
                 );
+
+                $postImportResults = $postProcessorRegistry->process(
+                    context: $context,
+                    configured: $postImportConfig,
+                );
+                $postImportMeta = $postProcessorRegistry->resultsMeta($postImportResults);
+
+                $this->recordPostImportStats($postImportStats, $postImportResults);
+
+                if ($postImportMeta !== []) {
+                    $occurrence->forceFill([
+                        'meta' => array_replace_recursive(
+                            is_array($occurrence->meta) ? $occurrence->meta : [],
+                            ['post_import' => $postImportMeta],
+                        ),
+                    ])->save();
+
+                    $contact->forceFill([
+                        'meta' => array_replace_recursive(
+                            is_array($contact->meta) ? $contact->meta : [],
+                            ['import' => ['post_import' => $postImportMeta]],
+                        ),
+                    ])->save();
+                }
 
                 $wasExisting ? $updated++ : $created++;
             }
@@ -585,6 +622,10 @@ class ContactController extends Controller
                         stats: $treatmentStats,
                         selections: $treatmentSelections,
                     ),
+                    'post_import' => $this->postImportBatchMeta(
+                        stats: $postImportStats,
+                        config: $postImportConfig,
+                    ),
                 ]),
             ])->save();
 
@@ -597,6 +638,10 @@ class ContactController extends Controller
             stats: $treatmentStats,
             selections: $treatmentSelections,
         );
+        $postImportMeta = $this->postImportBatchMeta(
+            stats: $postImportStats,
+            config: $postImportConfig,
+        );
 
         $request->session()->forget($this->importProfileKeySessionKey($csvPath));
 
@@ -607,18 +652,20 @@ class ContactController extends Controller
             'failed_count' => $skipped,
             'meta' => array_replace_recursive($importBatch->meta ?? [], [
                 'treatments' => $treatmentMeta,
+                'post_import' => $postImportMeta,
             ]),
         ])->save();
 
         return redirect()
             ->route('crm.contacts.index')
             ->with('success', sprintf(
-                'Import complete. %d created, %d updated, %d skipped%s%s.',
+                'Import complete. %d created, %d updated, %d skipped%s%s%s.',
                 $created,
                 $updated,
                 $skipped,
                 $phoneWarnings > 0 ? ", {$phoneWarnings} phone values were ignored" : '',
                 $this->treatmentReviewRequired($treatmentMeta) ? ', treatment review needed for unmapped values' : '',
+                $this->postImportReviewRequired($postImportMeta) ? ', post-import review needed' : '',
             ));
     }
 
@@ -709,6 +756,79 @@ class ContactController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $config
+     * @return array<string, array{applied_count: int, partial_count: int, skipped_count: int, blocked_count: int, failed_count: int}>
+     */
+    private function initializePostImportStats(array $config): array
+    {
+        $stats = [];
+
+        foreach (array_keys($config) as $processorKey) {
+            $stats[$processorKey] = [
+                'applied_count' => 0,
+                'partial_count' => 0,
+                'skipped_count' => 0,
+                'blocked_count' => 0,
+                'failed_count' => 0,
+            ];
+        }
+
+        return $stats;
+    }
+
+    /**
+     * @param array<string, array{applied_count: int, partial_count: int, skipped_count: int, blocked_count: int, failed_count: int}> $stats
+     * @param array<string, \App\Modules\Core\Data\Contacts\ContactImportPostProcessResult> $results
+     */
+    private function recordPostImportStats(array &$stats, array $results): void
+    {
+        foreach ($results as $processorKey => $result) {
+            $counter = $result->state.'_count';
+
+            if (isset($stats[$processorKey][$counter])) {
+                $stats[$processorKey][$counter]++;
+            }
+        }
+    }
+
+    /**
+     * @param array<string, array{applied_count: int, partial_count: int, skipped_count: int, blocked_count: int, failed_count: int}> $stats
+     * @param array<string, array<string, mixed>> $config
+     * @return array<string, mixed>
+     */
+    private function postImportBatchMeta(array $stats, array $config): array
+    {
+        $processors = [];
+        $reviewRequired = false;
+
+        foreach ($stats as $processorKey => $counts) {
+            $processorReviewRequired = $counts['partial_count'] > 0
+                || $counts['skipped_count'] > 0
+                || $counts['blocked_count'] > 0
+                || $counts['failed_count'] > 0;
+            $reviewRequired = $reviewRequired || $processorReviewRequired;
+
+            $processors[$processorKey] = [
+                'config' => $config[$processorKey] ?? [],
+                ...$counts,
+                'review_required' => $processorReviewRequired,
+            ];
+        }
+
+        return [
+            'configured' => $config !== [],
+            'processors' => $processors,
+            'review_required' => $reviewRequired,
+        ];
+    }
+
+    /** @param array<string, mixed> $postImportMeta */
+    private function postImportReviewRequired(array $postImportMeta): bool
+    {
+        return ($postImportMeta['review_required'] ?? false) === true;
     }
 
     private function nonEmptyString(mixed $value): ?string

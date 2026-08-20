@@ -5,7 +5,10 @@ namespace App\Providers;
 use App\Console\Commands\SyncPresetsCommand;
 use App\Console\Commands\ValidateSetupCommand;
 use App\Modules\Core\Data\Contacts\ContactImportField;
+use App\Modules\Campaigns\Import\CampaignEnrollmentContactImportPostProcessor;
+use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
+use App\Modules\Messaging\Import\MarketingPermissionContactImportPostProcessor;
 use App\Support\AutomationCapabilities\AutomationActionRegistry;
 use App\Support\AutomationCapabilities\AutomationCapabilityRegistry;
 use App\Support\AutomationCapabilities\AutomationPointDefinitionRegistry;
@@ -182,6 +185,26 @@ class AppServiceProvider extends ServiceProvider
                         ),
                     ])
                     ->registerHandler(RelationshipLocationAreaImportHandler::class);
+            },
+        );
+
+        $this->app->afterResolving(
+            ContactImportPostProcessorRegistry::class,
+            function (ContactImportPostProcessorRegistry $registry, $app): void {
+                $modules = $app->make(ModuleManager::class);
+                $enabled = $modules->enabledKeysWithDependencies();
+
+                if (in_array('messaging', $enabled, true)) {
+                    $registry->registerProcessor(
+                        MarketingPermissionContactImportPostProcessor::class,
+                    );
+                }
+
+                if (in_array('campaigns', $enabled, true)) {
+                    $registry->registerProcessor(
+                        CampaignEnrollmentContactImportPostProcessor::class,
+                    );
+                }
             },
         );
     }

@@ -48,6 +48,27 @@
                         </p>
                     </div>
                 @endif
+
+                @if (! empty($postImportSummaries))
+                    <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                        <p class="text-sm font-semibold text-amber-950">
+                            After each successful row
+                        </p>
+
+                        <ul class="mt-2 space-y-1 text-xs text-amber-900">
+                            @foreach ($postImportSummaries as $behavior)
+                                <li>
+                                    <span class="font-semibold">{{ $behavior['label'] }}:</span>
+                                    {{ $behavior['summary'] }}
+                                </li>
+                            @endforeach
+                        </ul>
+
+                        <p class="mt-2 text-xs text-amber-800">
+                            These actions come from the detected server-side import profile. Review them before importing.
+                        </p>
+                    </div>
+                @endif
             </div>
 
             <form

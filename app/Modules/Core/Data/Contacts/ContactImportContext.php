@@ -22,6 +22,7 @@ final class ContactImportContext
         public readonly array $mapping,
         public readonly array $defaults = [],
         public readonly array $overrides = [],
+        public readonly ?string $profileKey = null,
     ) {}
 
     public function mappedValue(string $field): ?string

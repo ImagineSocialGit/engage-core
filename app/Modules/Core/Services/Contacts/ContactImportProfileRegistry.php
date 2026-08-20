@@ -3,6 +3,7 @@
 namespace App\Modules\Core\Services\Contacts;
 
 use App\Modules\Core\Data\Contacts\ContactImportProfile;
+use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use InvalidArgumentException;
 
@@ -10,6 +11,7 @@ final class ContactImportProfileRegistry
 {
     public function __construct(
         private readonly ContactImportRegistry $imports,
+        private readonly ContactImportPostProcessorRegistry $postProcessors,
     ) {}
 
     /**
@@ -19,10 +21,7 @@ final class ContactImportProfileRegistry
     {
         $configured = config('contact_imports.profiles', []);
 
-        if (
-            ! is_array($configured)
-            || ($configured !== [] && array_is_list($configured))
-        ) {
+        if (! is_array($configured) || ($configured !== [] && array_is_list($configured))) {
             throw new InvalidArgumentException(
                 'Contact import profiles configuration must be a keyed array.',
             );
@@ -37,6 +36,10 @@ final class ContactImportProfileRegistry
                     'Each Contact import profile must use a string key and array definition.',
                 );
             }
+
+            $definition['post_import'] = $this->postProcessors->normalizeConfig(
+                $definition['post_import'] ?? [],
+            );
 
             $profiles[$key] = ContactImportProfile::fromArray(
                 key: $key,

@@ -96,3 +96,55 @@ Core `config/contact_imports.php` remains empty by default.
 Do not use profile defaults for Contact email identity. Profiles may not define a
 default `email`. Shared-email co-borrower handling and domain-history reconciliation
 remain the responsibility of the existing import/domain handlers.
+## Post-import behavior
+
+A profile may optionally declare server-owned `post_import` behavior. This is not
+submitted by the browser and is validated through the same profile registry used by
+`setup:validate`.
+
+Post-import behavior runs only after Core has persisted the Contact and
+`ContactImportOccurrence`, module-owned domain handlers have consumed the row, and
+operator-selected treatments have been applied.
+
+The mapping preview must show every configured post-import behavior before the
+operator submits the import. Profiles must never hide consent grants, Campaign
+enrollment, or similar side effects.
+
+Post-import processors are registry-driven optional capabilities. Core does not import
+Messaging or Campaigns. App-level composition registers processors only when their
+owning modules are enabled.
+
+Current reusable processors are:
+
+- `marketing_permission`: silently imports Marketing permission for explicitly
+  configured email/SMS channels and one operational scope. Messaging canonicalizes
+  that request through the current channel/purpose consent-domain policy. Active
+  consent is reused. A currently revoked channel is never reactivated merely because
+  the Contact appears in a later import; that requires a separate valid re-grant
+  event. A missing/invalid SMS destination does not prevent available email permission
+  from being imported; the row records a partial/reviewable outcome.
+- `campaign_enrollment`: requests enrollment in one configured Campaign through the
+  normal Campaign action. Existing open enrollment remains idempotent and Campaign
+  family/priority arbitration remains authoritative.
+
+These processors do not make post-import orchestration transactional with Contact
+identity/domain ingestion. A blocked/unavailable Campaign or one unavailable channel
+is recorded for review without undoing the successfully imported Contact row.
+
+Example generic shape:
+
+```php
+'post_import' => [
+    'marketing_permission' => [
+        'channels' => ['email', 'sms'],
+        'scope' => 'lead_nurture',
+    ],
+    'campaign_enrollment' => [
+        'campaign_key' => 'lead_nurture',
+    ],
+],
+```
+
+Client profiles should enable these only when the intended Campaign and permission
+policy are actually defined. Do not add placeholder Campaign keys merely to make an
+import profile look complete.

@@ -12,6 +12,7 @@ final class ContactImportProfile
      * @param array<int, string> $filenameContains
      * @param array<string, string> $defaults
      * @param array<string, array<int, string>> $aliases
+     * @param array<string, array<string, mixed>> $postImport
      */
     public function __construct(
         public readonly string $key,
@@ -20,6 +21,7 @@ final class ContactImportProfile
         public readonly array $filenameContains,
         public readonly array $defaults,
         public readonly array $aliases,
+        public readonly array $postImport = [],
     ) {}
 
     /**
@@ -39,7 +41,7 @@ final class ContactImportProfile
 
         $unknown = array_values(array_diff(
             array_keys($definition),
-            ['label', 'description', 'filename_contains', 'defaults', 'aliases'],
+            ['label', 'description', 'filename_contains', 'defaults', 'aliases', 'post_import'],
         ));
 
         if ($unknown !== []) {
@@ -68,6 +70,10 @@ final class ContactImportProfile
             $allowedFieldKeys,
             $key,
         );
+        $postImport = self::keyedArray(
+            $definition['post_import'] ?? [],
+            "{$key}.post_import",
+        );
 
         return new self(
             key: $key,
@@ -76,6 +82,7 @@ final class ContactImportProfile
             filenameContains: $filenameContains,
             defaults: $defaults,
             aliases: $aliases,
+            postImport: $postImport,
         );
     }
 
@@ -170,9 +177,7 @@ final class ContactImportProfile
         return $value !== '' ? $value : null;
     }
 
-    /**
-     * @return array<int, string>
-     */
+    /** @return array<int, string> */
     private static function stringList(mixed $value, string $path): array
     {
         if (! is_array($value) || ! array_is_list($value)) {
@@ -202,10 +207,7 @@ final class ContactImportProfile
      */
     private static function defaults(mixed $value, array $allowedFieldKeys, string $key): array
     {
-        if (
-            ! is_array($value)
-            || ($value !== [] && array_is_list($value))
-        ) {
+        if (! is_array($value) || ($value !== [] && array_is_list($value))) {
             throw new InvalidArgumentException(
                 "Contact import profile [{$key}.defaults] must be a keyed array.",
             );
@@ -245,10 +247,7 @@ final class ContactImportProfile
      */
     private static function aliases(mixed $value, array $allowedFieldKeys, string $key): array
     {
-        if (
-            ! is_array($value)
-            || ($value !== [] && array_is_list($value))
-        ) {
+        if (! is_array($value) || ($value !== [] && array_is_list($value))) {
             throw new InvalidArgumentException(
                 "Contact import profile [{$key}.aliases] must be a keyed array.",
             );
@@ -271,5 +270,25 @@ final class ContactImportProfile
         }
 
         return $aliases;
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private static function keyedArray(mixed $value, string $path): array
+    {
+        if (! is_array($value) || ($value !== [] && array_is_list($value))) {
+            throw new InvalidArgumentException(
+                "Contact import profile [{$path}] must be a keyed array.",
+            );
+        }
+
+        foreach ($value as $key => $definition) {
+            if (! is_string($key) || trim($key) === '' || ! is_array($definition)) {
+                throw new InvalidArgumentException(
+                    "Contact import profile [{$path}] entries must use non-empty string keys and array definitions.",
+                );
+            }
+        }
+
+        return $value;
     }
 }
