@@ -124,6 +124,8 @@
 │   │   │   │   └── CampaignStepVariantPresetDefinition.php
 │   │   │   ├── Exceptions
 │   │   │   │   └── CampaignUnavailableForEnrollmentException.php
+│   │   │   ├── Import
+│   │   │   │   └── CampaignEnrollmentContactImportPostProcessor.php
 │   │   │   ├── Listeners
 │   │   │   ├── Models
 │   │   │   │   ├── CampaignEnrollment.php
@@ -183,6 +185,7 @@
 │   │   │   ├── Contracts
 │   │   │   │   └── Contacts
 │   │   │   │       ├── ContactImportHandler.php
+│   │   │   │       ├── ContactImportPostProcessor.php
 │   │   │   │       ├── ContactImportTreatmentTarget.php
 │   │   │   │       ├── ContactPanelProvider.php
 │   │   │   │       ├── ContactShowDataProvider.php
@@ -196,6 +199,7 @@
 │   │   │   │   └── Contacts
 │   │   │   │       ├── ContactImportContext.php
 │   │   │   │       ├── ContactImportField.php
+│   │   │   │       ├── ContactImportPostProcessResult.php
 │   │   │   │       ├── ContactImportProfile.php
 │   │   │   │       ├── ContactImportTreatmentApplication.php
 │   │   │   │       ├── ContactImportTreatmentDefinition.php
@@ -233,6 +237,7 @@
 │   │   │   │       └── SiteSettingResolver.php
 │   │   │   ├── Support
 │   │   │   │   └── Contacts
+│   │   │   │       ├── ContactImportPostProcessorRegistry.php
 │   │   │   │       ├── ContactImportRegistry.php
 │   │   │   │       ├── ContactImportTreatmentRegistry.php
 │   │   │   │       ├── ContactPanelRegistry.php
@@ -606,6 +611,8 @@
 │   │   │   │   ├── ScheduledMessageFailed.php
 │   │   │   │   ├── ScheduledMessageSent.php
 │   │   │   │   └── ScheduledMessageSkipped.php
+│   │   │   ├── Import
+│   │   │   │   └── MarketingPermissionContactImportPostProcessor.php
 │   │   │   ├── Jobs
 │   │   │   │   ├── ProcessDueMessageChainEnrollmentsJob.php
 │   │   │   │   ├── ProcessMessageChainEnrollmentJob.php
@@ -2017,6 +2024,7 @@
 │   │   │   ├── MarkBroadcastRecipientTerminalStatusTest.php
 │   │   │   └── ScheduleBroadcastActionTest.php
 │   │   ├── Campaigns
+│   │   │   ├── CampaignEnrollmentContactImportPostProcessorTest.php
 │   │   │   ├── CampaignEnrollmentLifecycleBridgeTest.php
 │   │   │   ├── CampaignMessageChainBridgeTest.php
 │   │   │   ├── CampaignMessageChainPresetSyncTest.php
@@ -2054,6 +2062,8 @@
 │   │   │   ├── ContactFilterResolverTest.php
 │   │   │   ├── ContactImportBatchControllerTest.php
 │   │   │   ├── ContactImportHandlerContextIntegrationTest.php
+│   │   │   ├── ContactImportPostProcessingControllerTest.php
+│   │   │   ├── ContactImportPostProcessorRegistryTest.php
 │   │   │   ├── ContactImportProfileControllerTest.php
 │   │   │   ├── ContactImportProfileRegistryTest.php
 │   │   │   ├── ContactImportProvenanceTest.php
@@ -2147,6 +2157,7 @@
 │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailedTest.php
 │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest.php
 │   │   │   ├── MarkClaimedPermissionInvitationSentAfterScheduledMessageSentTest.php
+│   │   │   ├── MarketingPermissionContactImportPostProcessorTest.php
 │   │   │   ├── MessageChainDuplicationTest.php
 │   │   │   ├── MessageChainEnrollmentPauseResumeTest.php
 │   │   │   ├── MessageChainEnrollmentRunnerTest.php
@@ -2394,4 +2405,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-611 directories, 1784 files
+613 directories, 1793 files
