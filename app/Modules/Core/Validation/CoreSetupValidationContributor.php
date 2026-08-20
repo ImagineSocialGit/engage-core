@@ -2,16 +2,18 @@
 
 namespace App\Modules\Core\Validation;
 
-use App\Support\SetupValidation\Contracts\SetupValidationContributor;
-use App\Support\SetupValidation\Data\SetupValidationFinding;
+use App\Modules\Core\Services\Contacts\ContactImportProfileRegistry;
 use App\Support\Presets\Enums\PresetDomain;
 use App\Support\Presets\PresetCompositionResolver;
 use App\Support\Presets\PresetPackageResolver;
+use App\Support\SetupValidation\Contracts\SetupValidationContributor;
+use App\Support\SetupValidation\Data\SetupValidationFinding;
 use Throwable;
 
 class CoreSetupValidationContributor implements SetupValidationContributor
 {
     private const SOURCE = 'preset_composition.contact_statuses';
+    private const IMPORT_PROFILE_SOURCE = 'contact_imports.profiles';
     private const MODULE = 'core';
 
     private const CLIENT_FACING_NOUNS = [
@@ -41,8 +43,96 @@ class CoreSetupValidationContributor implements SetupValidationContributor
     public function __construct(
         private readonly PresetCompositionResolver $compositionResolver,
         private readonly PresetPackageResolver $packageResolver,
+        private readonly ContactImportProfileRegistry $importProfiles,
     ) {}
-public function findings(): iterable
+
+    public function findings(): iterable
+    {
+        yield from $this->validateContactImportProfiles();
+        yield from $this->validateContactStatusPresets();
+    }
+
+    /**
+     * @return iterable<int, SetupValidationFinding>
+     */
+    private function validateContactImportProfiles(): iterable
+    {
+        try {
+            $profiles = $this->importProfiles->all();
+        } catch (Throwable $exception) {
+            yield $this->error(
+                code: 'core.contact_import_profiles.config_invalid',
+                message: $exception->getMessage(),
+                path: self::IMPORT_PROFILE_SOURCE,
+                source: self::IMPORT_PROFILE_SOURCE,
+            );
+
+            return;
+        }
+
+        $filenameHints = [];
+
+        foreach ($profiles as $profile) {
+            foreach ($profile->filenameContains as $hint) {
+                $normalizedHint = mb_strtolower(trim($hint));
+
+                if ($normalizedHint === '') {
+                    continue;
+                }
+
+                $filenameHints[] = [
+                    'profile_key' => $profile->key,
+                    'hint' => $normalizedHint,
+                ];
+            }
+        }
+
+        for ($left = 0, $count = count($filenameHints); $left < $count; $left++) {
+            for ($right = $left + 1; $right < $count; $right++) {
+                $first = $filenameHints[$left];
+                $second = $filenameHints[$right];
+
+                if ($first['profile_key'] === $second['profile_key']) {
+                    continue;
+                }
+
+                if (
+                    ! str_contains($first['hint'], $second['hint'])
+                    && ! str_contains($second['hint'], $first['hint'])
+                ) {
+                    continue;
+                }
+
+                yield $this->error(
+                    code: 'core.contact_import_profiles.filename_match_ambiguous',
+                    message: sprintf(
+                        'Contact import profiles [%s] and [%s] have overlapping filename hints [%s] and [%s], so one uploaded filename can match both profiles.',
+                        $first['profile_key'],
+                        $second['profile_key'],
+                        $first['hint'],
+                        $second['hint'],
+                    ),
+                    path: self::IMPORT_PROFILE_SOURCE,
+                    context: [
+                        'profile_keys' => [
+                            $first['profile_key'],
+                            $second['profile_key'],
+                        ],
+                        'filename_hints' => [
+                            $first['hint'],
+                            $second['hint'],
+                        ],
+                    ],
+                    source: self::IMPORT_PROFILE_SOURCE,
+                );
+            }
+        }
+    }
+
+    /**
+     * @return iterable<int, SetupValidationFinding>
+     */
+    private function validateContactStatusPresets(): iterable
     {
         $presetKey = $this->packageResolver->resolvePresetKey();
 
@@ -79,11 +169,6 @@ public function findings(): iterable
             );
         }
     }
-
-    /**
-     * @param array<int|string, mixed> $statusKeys
-     * @return iterable<int, SetupValidationFinding>
-     */
 
     /**
      * @param array<string, mixed> $definition
@@ -213,12 +298,13 @@ public function findings(): iterable
         string $message,
         string $path,
         array $context = [],
+        string $source = self::SOURCE,
     ): SetupValidationFinding {
         return new SetupValidationFinding(
             severity: SetupValidationFinding::SEVERITY_ERROR,
             code: $code,
             message: $message,
-            source: self::SOURCE,
+            source: $source,
             path: $path,
             module: self::MODULE,
             context: $context,

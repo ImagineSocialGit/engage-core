@@ -25,6 +25,33 @@ are server-side configuration and are not accepted from request input.
 The preview remains authoritative. Operators must be able to review and change all
 suggested CSV column mappings before import.
 
+## Setup validation
+
+`php artisan setup:validate` validates the effective client import-profile
+configuration through Core's registered import-profile registry.
+
+Validation is generic. It does not encode a particular client's profile names,
+dataset inventory, labels, module list, or expected source files.
+
+The validator checks that:
+
+- the profile container and each profile definition have the supported shape;
+- profile keys and fields satisfy the reusable profile contract;
+- aliases/defaults reference import fields actually registered for the current
+  enabled module composition;
+- profile defaults do not attempt to invent Contact email identity;
+- filename hints from different profiles do not overlap in a way that can make
+  one uploaded filename match more than one profile.
+
+This means client configuration correctness belongs in setup validation and
+deployment/setup checks rather than in tests that hard-code one client's current
+configuration contents.
+
+Module-owned import handlers remain responsible for validating row-level business
+values at import time. Where a module later needs static validation of one of its
+own profile defaults, that module should contribute the validation without moving
+the business rule into Core.
+
 ## Excel files
 
 Engage Core intentionally does not support XLS/XLSX runtime parsing. Convert workbook

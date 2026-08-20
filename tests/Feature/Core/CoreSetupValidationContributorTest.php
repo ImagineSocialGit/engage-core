@@ -42,7 +42,84 @@ class CoreSetupValidationContributorTest extends TestCase
         $this->assertSame([], $this->findings());
     }
 
+    public function test_it_accepts_valid_generic_contact_import_profile_configuration(): void
+    {
+        $this->setValidContactStatusPreset();
 
+        Config::set('contact_imports.profiles', [
+            'known_export' => [
+                'label' => 'Known Export',
+                'filename_contains' => [
+                    'known-export',
+                ],
+                'defaults' => [
+                    'source' => 'legacy_crm',
+                ],
+                'aliases' => [
+                    'email' => [
+                        'Email Address',
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->assertSame([], $this->findings());
+    }
+
+    public function test_it_reports_invalid_contact_import_profile_configuration(): void
+    {
+        $this->setValidContactStatusPreset();
+
+        Config::set('contact_imports.profiles', [
+            'known_export' => [
+                'label' => 'Known Export',
+                'defaults' => [
+                    '__not_a_registered_import_field__' => 'value',
+                ],
+            ],
+        ]);
+
+        $findings = $this->findings();
+
+        $this->assertSame([
+            'core.contact_import_profiles.config_invalid',
+        ], array_column($findings, 'code'));
+        $this->assertSame([
+            'contact_imports.profiles',
+        ], array_column($findings, 'source'));
+        $this->assertSame([
+            'contact_imports.profiles',
+        ], array_column($findings, 'path'));
+    }
+
+    public function test_it_reports_overlapping_contact_import_profile_filename_hints(): void
+    {
+        $this->setValidContactStatusPreset();
+
+        Config::set('contact_imports.profiles', [
+            'closed' => [
+                'label' => 'Closed',
+                'filename_contains' => [
+                    'closed',
+                ],
+            ],
+            'closed_loans' => [
+                'label' => 'Closed Loans',
+                'filename_contains' => [
+                    'closed loans',
+                ],
+            ],
+        ]);
+
+        $findings = $this->findings();
+
+        $this->assertSame([
+            'core.contact_import_profiles.filename_match_ambiguous',
+        ], array_column($findings, 'code'));
+        $this->assertSame([
+            'contact_imports.profiles',
+        ], array_column($findings, 'source'));
+    }
 
     public function test_it_reports_required_fields_key_mismatch_and_invalid_meta(): void
     {
@@ -194,7 +271,6 @@ class CoreSetupValidationContributorTest extends TestCase
         $this->assertSame([], $this->findings());
     }
 
-
     public function test_it_uses_default_package_when_client_preset_is_missing(): void
     {
         Config::set('client.preset', null);
@@ -219,6 +295,23 @@ class CoreSetupValidationContributorTest extends TestCase
         ]);
 
         $this->assertSame([], $this->findings());
+    }
+
+    private function setValidContactStatusPreset(): void
+    {
+        $this->setPresetPackage([
+            'default',
+        ]);
+
+        Config::set('presets.modules.core.contact-statuses.groups.default', [
+            'new',
+        ]);
+
+        Config::set('presets.modules.core.contact-statuses.definitions.new', [
+            'key' => 'new',
+            'name' => 'New',
+            'meta' => [],
+        ]);
     }
 
     /**
