@@ -1,11 +1,13 @@
 # Messaging TODO
 
 - [x] Add the bounded template-composition persistence/resolution foundation: platform, client, client-family, context, context-family, and message-specific authoring layers resolve only at publish time into immutable MessageTemplateVersion content.
+- [x] Add config-authoritative composition-layer sync before template publication, preserving customized DB-owned layers unless force mode is explicitly requested and pruning stale uncustomized config layers.
 - [x] Keep reply routing separate from message-copy composition by storing direct/template-definition `reply_profile_key` on the usage assignment rather than the content preset; MessageChain variants continue to own their immutable reply-profile snapshot.
 - [x] Group attended/missed Webinar follow-up members under one Post-Webinar Follow-Up business family while preserving outcome/channel-specific members.
+- [x] Start the Rob The Mortgage Coach pilot by moving genuinely identical top-level Webinar email actions into shared client-family composition: confirmation CTA/cancel link, standard reminder CTA, and post-webinar CTA set. Keep deliberate live-reminder overrides explicit.
 - [ ] Cut the Message Templates editor over to composition-aware authoring: business family first, inherited-source labels, explicit shared vs message override editing, affected-message counts, resolved preview, and impact review before publish.
 - [ ] Add bounded semantic content slots where top-level payload composition is insufficient for repeated content embedded inside body text (for example greeting, event-details block, closing/signature, and CTA placement). Do not introduce arbitrary recursive fragments.
-- [ ] Migrate Rob The Mortgage Coach into the composition model as the first operator/usability pilot, then use Slam Dunk as the second reality check before generalizing client authoring guidance.
+- [ ] Complete the Rob operator/usability pilot through the composition-aware editor, then use Slam Dunk as the second reality check before generalizing client authoring guidance.
 - [ ] Remove or reduce obsolete duplicated editable payload storage in the preset/assignment/catalog compatibility bridge only after the composition-aware editor no longer depends on materialized preset payloads.
 - [ ] Add reply-profile authoring UX so message usages/MessageChain variants can select a stable business reply profile while provider addresses/numbers remain implementation details; preserve notification-only behavior when no downstream automation is configured.
 - [ ] Add first-class CTA click tracking attributable to ScheduledMessage + logical CTA, with scanner/prefetch protection, compact evidence, explicit retention, and Webinar replay links as an initial consumer rather than a Webinar-owned tracking silo.

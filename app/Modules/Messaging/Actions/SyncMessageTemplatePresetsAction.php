@@ -8,6 +8,7 @@ use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Services\MessageDefinitionConfigSetResolver;
 use App\Modules\Messaging\Services\MessageDefinitionModuleAvailability;
+use App\Modules\Messaging\Services\MessageTemplateCompositionIdentityResolver;
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use Illuminate\Support\Facades\DB;
@@ -21,17 +22,20 @@ class SyncMessageTemplatePresetsAction
         private readonly PublishMessageTemplateVersionAction $publishMessageTemplateVersion,
         private readonly MessageDefinitionConfigSetResolver $configSetResolver,
         private readonly MessageDefinitionModuleAvailability $moduleAvailability,
+        private readonly MessageTemplateCompositionIdentityResolver $compositionIdentity,
+        private readonly SyncMessageTemplateCompositionLayersAction $syncCompositionLayers,
     ) {}
 
     /**
-     * @return array{created: int, updated: int, customized_skipped: int, stale_removed: int, assignments_created: int, assignments_updated: int, assignments_preserved: int, catalog_entries_created: int, catalog_entries_updated: int, templates_created: int, templates_updated: int, templates_customized_skipped: int, template_versions_created: int, template_versions_reused: int, templates_archived: int}
+     * @return array{created: int, updated: int, customized_skipped: int, stale_removed: int, assignments_created: int, assignments_updated: int, assignments_preserved: int, catalog_entries_created: int, catalog_entries_updated: int, templates_created: int, templates_updated: int, templates_customized_skipped: int, template_versions_created: int, template_versions_reused: int, templates_archived: int, composition_layers_created: int, composition_layers_updated: int, composition_layers_customized_skipped: int, composition_layers_stale_removed: int}
      */
     public function handle(bool $force = false): array
     {
-        $definitions = iterator_to_array($this->definitionsFromConfig(), false);
-        $this->assertUniqueDefinitionKeys($definitions);
+        return DB::transaction(function () use ($force): array {
+            $compositionResult = $this->syncCompositionLayers->handle($force);
+            $definitions = iterator_to_array($this->definitionsFromConfig(), false);
+            $this->assertUniqueDefinitionKeys($definitions);
 
-        return DB::transaction(function () use ($definitions, $force): array {
             $result = [
                 'created' => 0,
                 'updated' => 0,
@@ -48,6 +52,10 @@ class SyncMessageTemplatePresetsAction
                 'template_versions_created' => 0,
                 'template_versions_reused' => 0,
                 'templates_archived' => 0,
+                'composition_layers_created' => $compositionResult['created'],
+                'composition_layers_updated' => $compositionResult['updated'],
+                'composition_layers_customized_skipped' => $compositionResult['customized_skipped'],
+                'composition_layers_stale_removed' => $compositionResult['stale_removed'],
             ];
 
             foreach ($definitions as $definition) {
@@ -72,6 +80,8 @@ class SyncMessageTemplatePresetsAction
                     preset: $preset,
                     force: $force,
                     composition: $definition['composition'],
+                    surface: $definition['assignment']['surface'] ?? null,
+                    configPath: (string) $definition['preset']['source_config_path'],
                 );
                 $result[$templateResult['template']]++;
                 $result[$templateResult['version']]++;
@@ -169,6 +179,8 @@ class SyncMessageTemplatePresetsAction
         MessageTemplatePreset $preset,
         bool $force,
         array $composition,
+        ?string $surface,
+        string $configPath,
     ): array {
         $template = MessageTemplate::query()
             ->where('key', $preset->key)
@@ -192,6 +204,15 @@ class SyncMessageTemplatePresetsAction
             }
 
             $payload = $version->payload();
+            $this->assertValidPayloadTokens(
+                payload: $payload,
+                dispatchKeys: $preset->dispatchKeys(),
+                channel: (string) $preset->channel,
+                purpose: (string) $preset->purpose,
+                scope: (string) $preset->scope,
+                surface: $surface,
+                configPath: $configPath,
+            );
 
             $preset->forceFill([
                 'name' => $template->name,
@@ -223,6 +244,21 @@ class SyncMessageTemplatePresetsAction
             messageTemplate: $template,
             payload: is_array($preset->payload) ? $preset->payload : [],
         );
+        $effectivePayload = $version->payload();
+
+        $this->assertValidPayloadTokens(
+            payload: $effectivePayload,
+            dispatchKeys: $preset->dispatchKeys(),
+            channel: (string) $preset->channel,
+            purpose: (string) $preset->purpose,
+            scope: (string) $preset->scope,
+            surface: $surface,
+            configPath: $configPath,
+        );
+
+        $preset->forceFill([
+            'tokens' => $this->messageTemplateTokenValidator->tokensFromPayload($effectivePayload),
+        ])->save();
 
         return [
             'template' => $templateResult,
@@ -661,16 +697,6 @@ class SyncMessageTemplatePresetsAction
             leafDefinitionKey: $campaignTemplate ? null : $leafDefinitionKey,
         );
 
-        $this->assertValidPayloadTokens(
-            payload: $payload,
-            dispatchKeys: $dispatchKeys,
-            channel: $channel,
-            purpose: $purpose,
-            scope: $scope,
-            surface: $surface,
-            configPath: $configPath,
-        );
-
         $meta = array_replace_recursive(
             is_array($definition['meta'] ?? null) ? $definition['meta'] : [],
             [
@@ -754,12 +780,12 @@ class SyncMessageTemplatePresetsAction
                 ],
             ],
             'composition' => [
-                'context_key' => $this->compositionContextKey(
+                'context_key' => $this->compositionIdentity->contextKey(
                     templateSetKey: $templateSetKey,
                     campaignKey: $campaignKey,
                     campaignTemplate: $campaignTemplate,
                 ),
-                'family_key' => $this->compositionFamilyKey(
+                'family_key' => $this->compositionIdentity->familyKey(
                     scope: $scope,
                     sourceMessageType: $sourceMessageType,
                     campaignTemplate: $campaignTemplate,
@@ -803,7 +829,7 @@ class SyncMessageTemplatePresetsAction
         } else {
             $moduleKey = $this->moduleKeyForScope($scope);
             $moduleLabel = $this->moduleLabel($moduleKey);
-            $businessFamilyKey = $this->compositionFamilyKey(
+            $businessFamilyKey = $this->compositionIdentity->familyKey(
                 scope: $scope,
                 sourceMessageType: $sourceMessageType,
                 campaignTemplate: false,
@@ -968,67 +994,6 @@ class SyncMessageTemplatePresetsAction
             'campaigns' => 'Campaigns',
             'webinars' => 'Webinars',
             default => 'Messaging',
-        };
-    }
-
-    private function compositionContextKey(
-        ?string $templateSetKey,
-        ?string $campaignKey,
-        bool $campaignTemplate,
-    ): ?string {
-        if ($campaignTemplate) {
-            return $campaignKey !== null
-                ? $this->normalizeSegment($campaignKey)
-                : null;
-        }
-
-        if ($templateSetKey === null
-            || $templateSetKey === MessageDefinitionConfigSetResolver::DEFAULT_TEMPLATE_SET_KEY
-        ) {
-            return null;
-        }
-
-        return $this->normalizeSegment($templateSetKey);
-    }
-
-    private function compositionFamilyKey(
-        string $scope,
-        string $sourceMessageType,
-        bool $campaignTemplate,
-    ): string {
-        if ($campaignTemplate) {
-            return 'campaign_message';
-        }
-
-        $scope = $this->normalizeSegment($scope);
-        $sourceMessageType = $this->normalizeSegment($sourceMessageType);
-
-        return match (true) {
-            $scope === 'webinar'
-                && in_array($sourceMessageType, ['confirmation', 'confirmations'], true)
-                    => 'confirmation',
-
-            $scope === 'webinar'
-                && in_array($sourceMessageType, ['opt_in', 'opt_ins'], true)
-                    => 'opt_in',
-
-            $scope === 'webinar'
-                && in_array($sourceMessageType, ['reminder', 'reminders'], true)
-                    => 'reminder',
-
-            $scope === 'webinar'
-                && in_array($sourceMessageType, ['post_attended', 'post_missed'], true)
-                    => 'post_webinar_follow_up',
-
-            $scope === 'webinar_waitlist'
-                && in_array($sourceMessageType, ['alert', 'alerts'], true)
-                    => 'waitlist_alert',
-
-            $scope === 'webinar_waitlist'
-                && in_array($sourceMessageType, ['opt_in', 'opt_ins'], true)
-                    => 'waitlist_opt_in',
-
-            default => $this->normalizeSegment(Str::singular($sourceMessageType)),
         };
     }
 

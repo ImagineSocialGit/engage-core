@@ -14,6 +14,8 @@ class MessageConfigValidator
         private readonly QueueContract $queueContract,
         private readonly MessageDefinitionConfigSetResolver $configSetResolver,
         private readonly MessageDefinitionModuleAvailability $moduleAvailability,
+        private readonly MessageTemplateCompositionConfigRegistry $compositionConfig,
+        private readonly MessageTemplateCompositionIdentityResolver $compositionIdentity,
     ) {}
 
     /**
@@ -80,6 +82,7 @@ class MessageConfigValidator
                     channel: $channel,
                     purpose: $purpose,
                     scope: $scope,
+                    templateSetKey: $templateSetKey,
                 ),
             );
         }
@@ -97,6 +100,7 @@ class MessageConfigValidator
         string $channel,
         string $purpose,
         string $scope,
+        ?string $templateSetKey,
     ): array {
         $issues = [];
 
@@ -163,6 +167,16 @@ class MessageConfigValidator
                 if (($nestedDefinition['enabled'] ?? true) === false) {
                     continue;
                 }
+
+                $nestedDefinition = $this->withConfiguredComposition(
+                    definition: $nestedDefinition,
+                    channel: $channel,
+                    scope: $scope,
+                    templateSetKey: $templateSetKey,
+                    sourceMessageType: $messageType,
+                    campaignKey: null,
+                    campaignTemplate: false,
+                );
 
                 $issues = array_merge(
                     $issues,
@@ -276,6 +290,16 @@ class MessageConfigValidator
                         continue;
                     }
 
+                    $variantDefinition = $this->withConfiguredComposition(
+                        definition: $variantDefinition,
+                        channel: $channel,
+                        scope: $scope,
+                        templateSetKey: null,
+                        sourceMessageType: 'campaign_step',
+                        campaignKey: $campaignKey,
+                        campaignTemplate: true,
+                    );
+
                     $issues = array_merge(
                         $issues,
                         $this->validateDefinition(
@@ -292,6 +316,43 @@ class MessageConfigValidator
         }
 
         return $issues;
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     * @return array<string, mixed>
+     */
+    private function withConfiguredComposition(
+        array $definition,
+        string $channel,
+        string $scope,
+        ?string $templateSetKey,
+        string $sourceMessageType,
+        ?string $campaignKey,
+        bool $campaignTemplate,
+    ): array {
+        $payload = $definition['payload'] ?? null;
+
+        if (! is_array($payload)) {
+            return $definition;
+        }
+
+        $definition['payload'] = $this->compositionConfig->resolve(
+            channel: $channel,
+            sourcePayload: $payload,
+            contextKey: $this->compositionIdentity->contextKey(
+                templateSetKey: $templateSetKey,
+                campaignKey: $campaignKey,
+                campaignTemplate: $campaignTemplate,
+            ),
+            familyKey: $this->compositionIdentity->familyKey(
+                scope: $scope,
+                sourceMessageType: $sourceMessageType,
+                campaignTemplate: $campaignTemplate,
+            ),
+        );
+
+        return $definition;
     }
 
     /**

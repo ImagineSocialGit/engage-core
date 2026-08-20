@@ -565,6 +565,7 @@
 │   │   │   │   ├── ScheduleMessageAction.php
 │   │   │   │   ├── SkipScheduledMessagesAction.php
 │   │   │   │   ├── StartMessageChainEnrollmentAction.php
+│   │   │   │   ├── SyncMessageTemplateCompositionLayersAction.php
 │   │   │   │   ├── SyncMessageTemplatePresetsAction.php
 │   │   │   │   └── UpsertMessageTemplateCompositionLayerAction.php
 │   │   │   ├── Automation
@@ -705,6 +706,8 @@
 │   │   │   │   ├── MessageRecipientPayloadResolver.php
 │   │   │   │   ├── MessageSendTimeResolver.php
 │   │   │   │   ├── MessageSuppressionService.php
+│   │   │   │   ├── MessageTemplateCompositionConfigRegistry.php
+│   │   │   │   ├── MessageTemplateCompositionIdentityResolver.php
 │   │   │   │   ├── MessageTemplateCompositionResolver.php
 │   │   │   │   ├── MessageTemplateCompositionSchema.php
 │   │   │   │   ├── MessageTemplatePresetAssignmentResolver.php
@@ -1400,6 +1403,7 @@
 │   ├── logging.php
 │   ├── mail.php
 │   ├── messaging
+│   │   ├── composition.php
 │   │   ├── delivery_consolidation.php
 │   │   ├── email
 │   │   │   └── definitions
@@ -1685,6 +1689,7 @@
 │   │   ├── client-request-intake-template.md
 │   │   ├── contact-status-presets-template.php
 │   │   ├── flow-routes-template.php
+│   │   ├── messaging-composition-template.php
 │   │   ├── messaging-email-template.php
 │   │   ├── messaging-sms-template.php
 │   │   ├── modules-template.php
@@ -2210,8 +2215,11 @@
 │   │   │   ├── MessageEligibilityGateTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
 │   │   │   ├── MessageTemplateBehaviorOwnershipValidationTest.php
+│   │   │   ├── MessageTemplateCompositionConfigIntegrationTest.php
+│   │   │   ├── MessageTemplateCompositionConfigSyncTest.php
 │   │   │   ├── MessageTemplateCompositionSyncTest.php
 │   │   │   ├── MessageTemplateCompositionTest.php
+│   │   │   ├── MessageTemplateCompositionValidationTest.php
 │   │   │   ├── MessageTemplateEditorVersionCutoverTest.php
 │   │   │   ├── MessageTemplatePresetAssignmentResolverTest.php
 │   │   │   ├── MessageTemplatePresetControllerTest.php
@@ -2449,4 +2457,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-620 directories, 1830 files
+620 directories, 1838 files

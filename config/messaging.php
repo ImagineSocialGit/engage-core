@@ -187,6 +187,8 @@ return [
         ],
     ],
 
+    'composition' => require __DIR__.'/messaging/composition.php',
+
     'reply_profiles' => [],
 
     'inbound' => [
