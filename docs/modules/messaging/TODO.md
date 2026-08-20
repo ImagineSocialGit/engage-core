@@ -1,8 +1,15 @@
 # Messaging TODO
 
-- [ ] Add reply-profile authoring UX so templates/MessageChain variants can select a stable business reply profile while provider addresses/numbers remain implementation details; preserve notification-only behavior when no downstream automation is configured.
+- [x] Add the bounded template-composition persistence/resolution foundation: platform, client, client-family, context, context-family, and message-specific authoring layers resolve only at publish time into immutable MessageTemplateVersion content.
+- [x] Keep reply routing separate from message-copy composition by storing direct/template-definition `reply_profile_key` on the usage assignment rather than the content preset; MessageChain variants continue to own their immutable reply-profile snapshot.
+- [x] Group attended/missed Webinar follow-up members under one Post-Webinar Follow-Up business family while preserving outcome/channel-specific members.
+- [ ] Cut the Message Templates editor over to composition-aware authoring: business family first, inherited-source labels, explicit shared vs message override editing, affected-message counts, resolved preview, and impact review before publish.
+- [ ] Add bounded semantic content slots where top-level payload composition is insufficient for repeated content embedded inside body text (for example greeting, event-details block, closing/signature, and CTA placement). Do not introduce arbitrary recursive fragments.
+- [ ] Migrate Rob The Mortgage Coach into the composition model as the first operator/usability pilot, then use Slam Dunk as the second reality check before generalizing client authoring guidance.
+- [ ] Remove or reduce obsolete duplicated editable payload storage in the preset/assignment/catalog compatibility bridge only after the composition-aware editor no longer depends on materialized preset payloads.
+- [ ] Add reply-profile authoring UX so message usages/MessageChain variants can select a stable business reply profile while provider addresses/numbers remain implementation details; preserve notification-only behavior when no downstream automation is configured.
 - [ ] Add first-class CTA click tracking attributable to ScheduledMessage + logical CTA, with scanner/prefetch protection, compact evidence, explicit retention, and Webinar replay links as an initial consumer rather than a Webinar-owned tracking silo.
-- [ ] Add production-shaped row-size, index-plan, retention, and pruning measurements for the immutable template/chain/delivery persistence model.
+- [ ] Add production-shaped row-size, index-plan, retention, and pruning measurements for the immutable template/chain/delivery persistence model, including composition-layer cardinality and resolved-version growth.
 - [ ] Add provider-aware bulk delivery orchestration/backpressure for large Campaign/Broadcast audiences: bounded recipient/enrollment chunks, bounded queue fan-out/replenishment, idempotent retries, provider/channel pacing, and production-shaped proof that a roughly 2,000-recipient burst does not create one giant transaction or an uncontrolled immediate job flood.
 - [ ] Add a safer first-class owning-module reissue/recovery mechanism for exact skipped/failed logical deliveries; do not bypass normal consent/suppression/provider gates.
 - [ ] Add dedicated `Messaging -> Opt-In Messages` management separate from ordinary module message-template pages.

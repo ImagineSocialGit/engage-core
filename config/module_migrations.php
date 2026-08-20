@@ -60,7 +60,7 @@ return [
 
         'messaging' => [
             'path' => 'database/migrations/modules/messaging',
-            'schema_version' => 1,
+            'schema_version' => 2,
             'migrations' => [
                 '2026_05_15_215534_create_message_consents_table.php',
                 '2026_05_15_215834_create_consent_revocations_table.php',

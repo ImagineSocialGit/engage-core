@@ -46,6 +46,15 @@ See [Config Contracts and Token Contracts](config-contracts.md) and the
 9. Campaign message templates resolve by `channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key`, not author-created per-step message names.
 10. Campaign step variants reference Messaging-owned template presets/assignments and must not own reusable payload copy.
 11. Messaging template presets own reusable copy and safe DB-editable message payloads.
+    11a. Messaging composition is an authoring concern. Shared platform/client/family/context values
+    resolve into a complete immutable `MessageTemplateVersion` at publish time; runtime sending never
+    walks inheritance.
+
+    11b. Composition scopes are explicit and bounded. Do not author arbitrary recursive fragments,
+    parent trees, or giant metadata blobs to simulate inheritance.
+
+    11c. Reply routing is not message copy. `reply_profile_key` belongs to the usage/assignment or
+    immutable MessageChain variant that owns reply behavior, not to an inheritable content layer.
 12. Messaging template catalog entries own browsing/grouping metadata for template review; they do not own runtime behavior.
 13. Webinar schedule profiles/profile items own all Webinar lifecycle message timing, schedules, conditions, enablement, and Webinar-specific skip behavior, including immediate lifecycle messages.
 14. FlowRoute presets own automation/control-flow routing and concrete `FlowRoutePoint` definitions. `FlowRoutePoint` directly owns its type/configuration; there is no global reusable `Point` model/template layer. Reaching a `send_message` point determines when that action occurs unless the point itself explicitly owns additional behavior.
@@ -66,7 +75,7 @@ See [Config Contracts and Token Contracts](config-contracts.md) and the
 29. Direct non-chain delayed-message conditions may persist in bounded ScheduledMessage metadata for send-time revalidation. MessageChain conditions remain on immutable step/variant definitions and are evaluated when the wave becomes actionable.
 30. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
 31. Module docs are the source of truth for module ownership and client-facing scope. Configs should not create a module feature that the owning module does not support.
-32. Commerce config may support Engage Core-owned storefront/presentation and provider-role orchestration, but must not invent payment processing, warehouse/shipping fulfillment, deep provider store operations, or provider-specific behavior that the owning contracts do not support. Location remains supporting geographic capability rather than a GIS, routing, or map-provider replacement.
+32. Commerce config may support Engage Core-owned storefront/presentation, promotion/source presentation, and provider-role orchestration. When a provider is configured as pricing/promotion authority, Core storefront config may style or explain the current provider-backed price/discount/offer state and may identify a promotion/source entry point such as a QR campaign, but it must not invent a competing price, discount rule, eligibility calculation, payment flow, warehouse/shipping workflow, deep provider store operation, or unsupported provider-specific behavior. Location remains supporting geographic capability rather than a GIS, routing, or map-provider replacement.
 33. Messaging-owned delivery composition may attach compatible consent acknowledgements to one physical lifecycle message through immutable `ScheduledMessageComponent` rows. Covered intent keys and consent IDs remain relationally auditable, and uncovered required acknowledgements need an explicit standalone fallback.
 34. Do not author `delivery_consolidation_*` placeholders or persistence recipes. Component placement is selected by Messaging policy and rendered from pinned immutable template versions.
 35. Public Webinar registration presentation is client-configurable. Tests and config audits should validate structure, accessibility, legal-link validity, channel/consent behavior, and runtime safety rather than identical client copy or exact Tailwind class counts.

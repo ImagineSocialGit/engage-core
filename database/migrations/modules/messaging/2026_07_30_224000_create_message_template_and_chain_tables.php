@@ -21,6 +21,8 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->string('channel', 32)->index();
             $table->string('status', 32)->default('active')->index();
+            $table->string('composition_context_key', 191)->nullable();
+            $table->string('composition_family_key', 191)->nullable();
             $table->unsignedBigInteger('current_version_id')->nullable()->index();
             $table->string('source', 64)->nullable()->index();
             $table->string('source_version', 64)->nullable();
@@ -31,6 +33,10 @@ return new class extends Migration
             $table->index(
                 ['channel', 'status'],
                 'message_templates_channel_status_index',
+            );
+            $table->index(
+                ['channel', 'composition_context_key', 'composition_family_key'],
+                'message_templates_composition_lookup_index',
             );
         });
 
@@ -67,6 +73,35 @@ return new class extends Migration
                 ->references('id')
                 ->on('message_template_versions')
                 ->nullOnDelete();
+        });
+
+        Schema::create('message_template_composition_layers', function (Blueprint $table): void {
+            $table->id();
+            $table->char('identity_key', 64)->unique();
+            $table->string('scope_type', 32);
+            $table->string('channel', 32);
+            $table->string('client_key', 96)->nullable();
+            $table->string('context_key', 191)->nullable();
+            $table->string('family_key', 191)->nullable();
+            $table->foreignIdFor(MessageTemplate::class)
+                ->nullable()
+                ->constrained()
+                ->cascadeOnDelete();
+            $table->json('payload');
+            $table->string('source', 64)->nullable();
+            $table->string('source_version', 64)->nullable();
+            $table->boolean('is_customized')->default(false);
+            $table->timestamp('customized_at')->nullable();
+            $table->timestamps();
+
+            $table->index(
+                ['channel', 'scope_type', 'client_key'],
+                'mtcl_channel_scope_client_idx',
+            );
+            $table->index(
+                ['channel', 'client_key', 'context_key', 'family_key'],
+                'mtcl_composition_lookup_idx',
+            );
         });
 
         Schema::create('message_chains', function (Blueprint $table): void {
@@ -192,6 +227,8 @@ return new class extends Migration
 
         Schema::dropIfExists('message_chain_versions');
         Schema::dropIfExists('message_chains');
+
+        Schema::dropIfExists('message_template_composition_layers');
 
         Schema::table('message_templates', function (Blueprint $table): void {
             $table->dropForeign(['current_version_id']);

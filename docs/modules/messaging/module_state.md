@@ -262,6 +262,29 @@ Editing creates a new version and updates `message_templates.current_version_id`
 
 Existing chains and scheduled messages remain pinned to their prior version IDs.
 
+### Bounded authoring composition
+
+Message content may be composed at authoring time through explicit, bounded Messaging-owned
+composition layers. Supported scope identities are platform, client, client-wide family,
+context, context-family, and specific message.
+
+`MessageTemplate` stores the generic `composition_context_key` and
+`composition_family_key` selectors used to resolve applicable shared authoring state.
+`message_template_composition_layers` stores partial channel-specific payload fields only.
+It has no recursive parent relationship and no generic metadata recipe.
+
+Publishing resolves the applicable layers plus the current source definition and any explicit
+message override into one complete `MessageTemplateVersion`. Runtime delivery never resolves
+composition and never changes an already-published version because a shared layer is edited later.
+
+Reply routing remains separate from content composition. A reusable preset does not own
+`reply_profile_key`; assignment/usage identity owns direct-definition reply routing and immutable
+MessageChain variants own chain-runtime reply routing.
+
+Current config payloads remain authoritative source definitions until a client is deliberately
+migrated into shared composition. Do not create shared rows and assume they override duplicated
+source fields that are still present in config.
+
 ## Message chains
 
 ### `message_chains`

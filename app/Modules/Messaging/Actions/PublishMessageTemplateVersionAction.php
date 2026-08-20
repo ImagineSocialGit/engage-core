@@ -5,12 +5,17 @@ namespace App\Modules\Messaging\Actions;
 use App\Models\User;
 use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplateVersion;
+use App\Modules\Messaging\Services\MessageTemplateCompositionResolver;
 use Illuminate\Support\Facades\DB;
 use JsonException;
 use RuntimeException;
 
 class PublishMessageTemplateVersionAction
 {
+    public function __construct(
+        private readonly MessageTemplateCompositionResolver $compositionResolver,
+    ) {}
+
     /**
      * @param array<string, mixed> $payload
      */
@@ -30,6 +35,11 @@ class PublishMessageTemplateVersionAction
                 ->whereKey($messageTemplate->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            $payload = $this->compositionResolver->resolve(
+                messageTemplate: $template,
+                sourcePayload: $payload,
+            );
 
             $rendererKey = $this->rendererKey($template);
             $subject = $this->subject($payload);

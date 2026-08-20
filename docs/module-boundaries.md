@@ -1268,7 +1268,7 @@ Examples:
 - Resend powers email
 - Telnyx/Twilio power SMS
 - Zoom powers webinar behavior
-- commerce provider packages may power catalog, checkout, order, POS, inventory, or reconciliation capabilities according to the client-configured provider roles
+- commerce provider packages may power catalog, pricing, promotions/discounts, checkout, order, POS, inventory, or reconciliation capabilities according to the client-configured provider roles
 - External calendar adapters may power Scheduling sync later
 - Geocoding/address providers may power Location later
 - Arive may power mortgage LOS behavior later
@@ -1282,9 +1282,11 @@ the place where Contact, Workflow, FlowRoute, Task, Campaign, Commerce, Mortgage
 other cross-module business behavior is hard-coded.
 
 Commerce is explicitly allowed to compose multiple provider adapters at once. Do not force
-catalog, checkout/payment, inventory, POS, order, and fulfillment roles through one global
-provider selection when the client ecosystem assigns those roles differently. The same
-provider may satisfy several roles when appropriate.
+catalog, pricing/promotion, checkout/payment, inventory, POS, order, and fulfillment roles
+through one global provider selection when the client ecosystem assigns those roles differently.
+The same provider may satisfy several roles when appropriate. When a provider is the configured
+pricing or promotion authority, Engage Core may present and style that state but must not create
+a competing price/discount truth or reimplement provider-owned eligibility/calculation rules.
 
 Do not make a third-party middleware/integration SaaS a required architectural layer merely
 to synchronize providers. When Engage Core already owns the relevant orchestration contract,

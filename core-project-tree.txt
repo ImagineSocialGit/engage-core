@@ -565,7 +565,8 @@
 │   │   │   │   ├── ScheduleMessageAction.php
 │   │   │   │   ├── SkipScheduledMessagesAction.php
 │   │   │   │   ├── StartMessageChainEnrollmentAction.php
-│   │   │   │   └── SyncMessageTemplatePresetsAction.php
+│   │   │   │   ├── SyncMessageTemplatePresetsAction.php
+│   │   │   │   └── UpsertMessageTemplateCompositionLayerAction.php
 │   │   │   ├── Automation
 │   │   │   │   ├── MessagingAutomationPointAuthoringContributor.php
 │   │   │   │   ├── MessagingAutomationPointDefinitionContributor.php
@@ -644,6 +645,7 @@
 │   │   │   │   ├── MessageConsent.php
 │   │   │   │   ├── MessageSuppression.php
 │   │   │   │   ├── MessageTemplateCatalogEntry.php
+│   │   │   │   ├── MessageTemplateCompositionLayer.php
 │   │   │   │   ├── MessageTemplate.php
 │   │   │   │   ├── MessageTemplatePresetAssignment.php
 │   │   │   │   ├── MessageTemplatePreset.php
@@ -703,6 +705,8 @@
 │   │   │   │   ├── MessageRecipientPayloadResolver.php
 │   │   │   │   ├── MessageSendTimeResolver.php
 │   │   │   │   ├── MessageSuppressionService.php
+│   │   │   │   ├── MessageTemplateCompositionResolver.php
+│   │   │   │   ├── MessageTemplateCompositionSchema.php
 │   │   │   │   ├── MessageTemplatePresetAssignmentResolver.php
 │   │   │   │   ├── MessageTemplateTokenValidator.php
 │   │   │   │   ├── MessageTemplateUsageResolver.php
@@ -2206,6 +2210,8 @@
 │   │   │   ├── MessageEligibilityGateTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
 │   │   │   ├── MessageTemplateBehaviorOwnershipValidationTest.php
+│   │   │   ├── MessageTemplateCompositionSyncTest.php
+│   │   │   ├── MessageTemplateCompositionTest.php
 │   │   │   ├── MessageTemplateEditorVersionCutoverTest.php
 │   │   │   ├── MessageTemplatePresetAssignmentResolverTest.php
 │   │   │   ├── MessageTemplatePresetControllerTest.php
@@ -2443,4 +2449,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-620 directories, 1824 files
+620 directories, 1830 files

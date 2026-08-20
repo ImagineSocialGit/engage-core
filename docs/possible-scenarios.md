@@ -37,8 +37,8 @@ A fan buys a merch item from the artist store.
 Expected shape:
 
 ```text
-Commerce or Music records purchase.
-Commerce/Music emits AutomationEventRecorded(commerce.purchase.completed or music.merch.purchased).
+Commerce records/reconciles the purchase through its provider-neutral purchase seam.
+Commerce emits the provider-neutral purchase outcome; Music may interpret that outcome into music-specific fan/customer meaning when needed.
 FlowRoutes starts the selected merch route.
 The route may:
     update fan/customer status or segment;
@@ -69,6 +69,28 @@ commerce.product.available
 ```
 
 The route or campaign should target contacts through Music/Commerce interest facts rather than broad contact-only assumptions.
+
+### Printed merch QR promotion to online storefront
+
+An artist prints a QR code on merchandise packaging that offers a customer a provider-backed discount on a later online order.
+
+Expected shape:
+
+```text
+physical merchandise bag / insert
+    -> QR identifies a stable promotion/source
+    -> customer opens an Engage Core storefront route or provider-backed promotion link
+    -> Commerce resolves current provider-authoritative price, sale, and promotion state
+    -> Engage Core controls storefront styling/presentation
+    -> configured checkout/promotion provider applies the actual discount under its own rules
+    -> verified order/provider reconciliation records the real discount and purchase
+    -> Commerce retains compact promotion/source attribution when useful
+    -> optional Reporting / Campaign / FlowRoute consumers use provider-neutral outcomes
+```
+
+For a Shopify-backed client, Shopify may own pricing, discount-rule execution, online checkout, orders, and authoritative inventory while Engage Core owns the storefront experience and cross-channel orchestration. A QR may therefore activate a Shopify-backed discount without forcing the customer into a Shopify-themed storefront.
+
+Do not create a second Core promotion engine merely to support the QR. Core may own the campaign identity, presentation, attribution, and provider handoff while the configured promotion authority remains responsible for final eligibility and calculation.
 
 ### Show attendance or show signup follow-up
 

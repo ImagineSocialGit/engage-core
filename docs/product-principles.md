@@ -184,11 +184,12 @@ Engage Core
 
 specialized external provider
     keeps the capabilities it performs better or more securely, such as payment
-    processing, deep ecommerce/store operations, warehouse/shipping fulfillment,
-    point-of-sale execution, or another provider-owned operational domain
+    processing, authoritative pricing/discount execution, deep ecommerce/store operations,
+    warehouse/shipping fulfillment, point-of-sale execution, or another provider-owned
+    operational domain
 ```
 
-A client may use several providers at once. Provider roles must be explicit and composable rather than assuming one vendor owns the whole business ecosystem.
+A client may use several providers at once. Provider roles must be explicit and composable rather than assuming one vendor owns the whole business ecosystem. A Core-owned customer experience may present provider-authoritative facts—such as current price, promotion state, or inventory availability—without becoming a second authority for those facts.
 
 Avoid introducing a separate middleware/integration SaaS account merely to synchronize providers when Engage Core can perform that bounded orchestration directly through provider-neutral contracts and installed provider packages.
 

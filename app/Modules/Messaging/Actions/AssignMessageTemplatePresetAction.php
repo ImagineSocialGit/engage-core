@@ -26,6 +26,7 @@ class AssignMessageTemplatePresetAction
         ?Model $context = null,
         array $meta = [],
         ?string $definitionKey = null,
+        ?string $replyProfileKey = null,
     ): MessageTemplatePresetAssignment {
         $attributes = [
             'channel' => $this->normalizeSegment($channel),
@@ -33,6 +34,7 @@ class AssignMessageTemplatePresetAction
             'scope' => $this->normalizeSegment($scope),
             'surface' => $surface !== null ? $this->normalizeSegment($surface) : null,
             'message_type' => $messageType !== null ? $this->normalizeSegment($messageType) : $preset->message_type,
+            'reply_profile_key' => $this->normalizeNullableSegment($replyProfileKey),
             'definition_key' => $this->normalizeNullableSegment($definitionKey),
             'campaign_key' => $campaignKey !== null ? $this->normalizeSegment($campaignKey) : null,
             'campaign_step' => $campaignStep,

@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 2,
+    'version' => 3,
     'tables' => [
         'message_template_presets' => [
             'mode' => 'upsert',
@@ -17,7 +17,6 @@ return [
                 'purpose',
                 'scope',
                 'message_type',
-                'reply_profile_key',
                 'payload_class',
                 'queue',
                 'dispatch_keys',
@@ -79,6 +78,7 @@ return [
                 'scope',
                 'surface',
                 'message_type',
+                'reply_profile_key',
                 'definition_key',
                 'campaign_key',
                 'campaign_step',
@@ -149,6 +149,8 @@ return [
                 'description',
                 'channel',
                 'status',
+                'composition_context_key',
+                'composition_family_key',
                 'current_version_id',
                 'source',
                 'source_version',
@@ -159,6 +161,34 @@ return [
             ],
             'deferred_references' => [
                 'current_version_id' => 'message_template_versions',
+            ],
+        ],
+
+        'message_template_composition_layers' => [
+            'mode' => 'upsert',
+            'identity' => ['identity_key'],
+            'preserve_id' => false,
+            'order_by' => ['scope_type', 'channel', 'client_key', 'context_key', 'family_key', 'id'],
+            'columns' => [
+                'id',
+                'identity_key',
+                'scope_type',
+                'channel',
+                'client_key',
+                'context_key',
+                'family_key',
+                'message_template_id',
+                'payload',
+                'source',
+                'source_version',
+                'is_customized',
+                'customized_at',
+                'created_at',
+                'updated_at',
+            ],
+            'json_columns' => ['payload'],
+            'references' => [
+                'message_template_id' => 'message_templates',
             ],
         ],
 

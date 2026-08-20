@@ -19,6 +19,7 @@ class MessageTemplatePresetAssignmentFactory extends Factory
             'scope' => 'webinar',
             'surface' => null,
             'message_type' => 'confirmation',
+            'reply_profile_key' => null,
             'definition_key' => null,
             'campaign_key' => null,
             'campaign_step' => null,

@@ -20,6 +20,8 @@ class MessageTemplate extends Model
         'description',
         'channel',
         'status',
+        'composition_context_key',
+        'composition_family_key',
         'current_version_id',
         'source',
         'source_version',
@@ -39,6 +41,11 @@ class MessageTemplate extends Model
     public function currentVersion(): BelongsTo
     {
         return $this->belongsTo(MessageTemplateVersion::class, 'current_version_id');
+    }
+
+    public function compositionLayers(): HasMany
+    {
+        return $this->hasMany(MessageTemplateCompositionLayer::class);
     }
 
     public function versions(): HasMany

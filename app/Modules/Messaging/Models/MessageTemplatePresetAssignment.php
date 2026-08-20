@@ -25,6 +25,7 @@ class MessageTemplatePresetAssignment extends Model
         'scope',
         'surface',
         'message_type',
+        'reply_profile_key',
         'definition_key',
         'campaign_key',
         'campaign_step',

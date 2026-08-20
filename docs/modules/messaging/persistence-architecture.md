@@ -281,6 +281,36 @@ Rules:
 
 A new row is created only when authored content changes.
 
+## Bounded template-composition authoring state
+
+`message_template_composition_layers` is low-cardinality authoring state, not runtime delivery
+state. It stores only partial payload fields at fixed scopes:
+
+```text
+platform
+client
+client-wide family
+context
+context + family
+specific message
+```
+
+The table intentionally has no recursive parent relationship and no generic `meta` column.
+Important selectors are first-class. Partial payload JSON is justified because the set of
+channel fields is closed and validated, one row is stored per meaningful authoring scope, and
+the payload is not copied per recipient or delivery.
+
+`MessageTemplate` stores compact `composition_context_key` and `composition_family_key` selectors
+for resolution and impact analysis.
+
+Composition is resolved only when publishing `MessageTemplateVersion`. The immutable version is
+the complete runtime artifact. Scheduled messages and provider attempts do not store composition
+recipes or shared-layer snapshots.
+
+The current config/preset payload remains the source definition during the compatibility cutover.
+As clients are deliberately migrated, genuinely inherited fields should be removed from duplicated
+source definitions rather than copied into both source payload and shared composition layers.
+
 ## Implemented Messaging chain schema
 
 ## `message_chains`

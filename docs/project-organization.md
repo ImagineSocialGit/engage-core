@@ -226,7 +226,7 @@ Universal modules are reusable capability modules. They may be disabled for many
 | Portal | Loud | External/customer accounts, authentication, invitations, contact-account links, and customer-facing shell. |
 | Forms | Loud | Form definitions/versions plus submission, review, and public/portal form workflows. |
 | Documents | Loud | Document requests, uploads, review events, checklist state, and document lifecycle workflows. |
-| Commerce | Loud | Provider-neutral purchase history plus planned custom storefront/offers, checkout orchestration, provider mappings, and inventory-effect orchestration across client-configured provider roles. The current repository implements only the customer/product/order history foundation. |
+| Commerce | Loud | Provider-neutral catalog, custom storefront, provider-authoritative pricing/promotion presentation, checkout/purchase attribution, and cross-channel inventory-effect orchestration across client-configured provider roles; current repository implements only the customer/product/order history foundation. |
 | Location | Silent | Reusable normalized location/address facts and optional geographic provider results used through consuming modules; no standalone Location product by default. |
 
 ### Planned universal modules
@@ -261,7 +261,7 @@ Approved implementation order:
 
 ```text
 Events foundation and Project State support
--> provider-neutral Commerce role contracts, canonical mappings, storefront/checkout/inventory orchestration, reconciliation, and Project State support
+-> provider-neutral Commerce role contracts, canonical mappings, provider-authoritative pricing/promotion projection, storefront/checkout attribution, inventory orchestration, reconciliation, and Project State support
 -> first concrete client provider package(s) behind those Commerce seams
 -> Experiences entitlement and operational benefit fulfillment
 -> optional Music/Bandsintown and cross-module automation/audience contributors
@@ -374,7 +374,7 @@ does not own vendor-specific business meaning.
 | Telnyx | Messaging / InboundMessaging |
 | Twilio | Messaging / InboundMessaging |
 | Zoom | Webinars |
-| Commerce catalog/checkout/order/inventory provider packages | Commerce |
+| Commerce catalog/pricing/promotion/checkout/order/inventory provider packages | Commerce |
 | External calendar providers, later | Scheduling |
 | Geocoding/address providers, later | Location |
 | LOS providers such as Arive, later | Mortgage |
@@ -410,7 +410,7 @@ Examples:
 | Customer login/account | Portal |
 | Intake questionnaire | Forms |
 | Uploaded file/document request | Documents |
-| External commerce purchase/inventory sync or provider-backed checkout orchestration | Commerce + the configured provider package(s) |
+| External commerce pricing/promotion display, purchase/inventory sync, or provider-backed checkout orchestration | Commerce + the configured provider package(s) |
 | Canonical concert/seminar/open-house occurrence | Events |
 | VIP entitlement, participant, credential, or scan | Experiences |
 | Dog profile/training goals | PetServices |

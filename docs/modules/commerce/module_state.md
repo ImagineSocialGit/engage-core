@@ -8,7 +8,7 @@ No single commerce, payment, point-of-sale, inventory, or fulfillment provider i
 
 A concise definition:
 
-> Commerce owns the provider-neutral catalog identity, Engage Core storefront/presentation, checkout orchestration, purchase reconciliation, inventory-effect orchestration, purchase history, and cross-provider commerce contracts that optional modules use without owning provider-specific payment, warehouse, shipping, or deep store-operation internals.
+> Commerce owns the provider-neutral catalog identity, Engage Core storefront/presentation, provider-authoritative price/promotion projection, checkout orchestration, purchase reconciliation, inventory-effect orchestration, purchase history, promotion/source attribution, and cross-provider commerce contracts that optional modules use without owning provider-specific payment, discount-rule execution, warehouse, shipping, or deep store-operation internals.
 
 ## Current implementation status
 
@@ -38,6 +38,8 @@ no product-variant model
 no Commerce offer model
 no provider contracts or provider manager/role registry
 no normalized multi-provider product/variant mapping
+no provider-authoritative pricing/promotion read model or resolver
+no durable promotion/source attribution seam
 no inventory-effect/adjustment orchestration
 no configured inventory-authority resolution
 no provider adapters for the planned Commerce seams
@@ -67,7 +69,8 @@ Create or manage a focused Engage Core public offer/storefront presentation.
 Associate an offer with one or more sellable variants.
 Publish an eligible offer.
 Review inventory availability/projection status.
-Open the authoritative provider record when deeper store or fulfillment work belongs there.
+Review the current customer-facing price, sale state, and provider-backed promotion that the Engage Core storefront will present.
+Open the authoritative provider record when deeper store, promotion-rule, or fulfillment work belongs there.
 ```
 
 Operator/developer work:
@@ -106,10 +109,12 @@ Engage Core should own the parts where its combined CRM/module context creates u
 ```text
 custom storefront/presentation
 CRM-aware buying flows
+provider-authoritative price/discount/offer presentation
 cross-module purchase meaning
 normalized purchase history
 cross-provider product identity
 inventory-effect orchestration
+promotion/source attribution
 cross-provider reconciliation
 automation/read-model outcomes
 ```
@@ -120,6 +125,8 @@ External providers may remain authoritative for one or more of:
 payment processing
 secure payment-data handling
 order creation
+pricing rules
+promotion/discount eligibility and calculation
 inventory quantity
 warehouse operations
 shipping
@@ -142,6 +149,8 @@ Conceptual provider roles/capabilities may include:
 
 ```text
 catalog authority/source
+pricing authority
+promotion/discount authority
 inventory authority
 online checkout/order provider
 payment processor
@@ -175,9 +184,11 @@ Which canonical product and variant is this?
 Which external provider identities represent it?
 Which Engage Core offer/storefront presentation exposes it?
 May that offer be published?
-Which provider-backed checkout or transaction was initiated?
+What authoritative price, sale price, discount, or promotion state should that storefront present now?
+Which provider-backed checkout, promotion context, or transaction was initiated?
 Which authoritative order and order items were reconciled?
 Which Core Contact or provider customer owns the purchase?
+What source/promotion attribution should be retained for business reporting and automation?
 What inventory effect did the business activity create?
 Does that effect require an authoritative provider mutation or only reconciliation?
 What provider-neutral purchase/inventory outcome should consumers receive?
@@ -212,15 +223,19 @@ product/offer discovery
 custom layouts and presentation
 CRM-aware content
 variant selection
+authoritative price/sale/promotion presentation
 cart presentation when useful
 cross-module context
 custom calls to action
+provider-backed promotion activation or deep-link handoff
 provider-backed checkout initiation
 ```
 
 Commerce should not require clients to build the customer experience inside a provider theme/template environment when Engage Core can present it better.
 
-The storefront boundary does not make Engage Core the payment processor, warehouse, shipping system, tax engine, or deep store-operations platform.
+When an external provider is configured as pricing or promotion authority, the Engage Core storefront should display that provider's current customer-facing price, compare-at/sale state, discount eligibility, or promotion state through a provider-neutral projection/read seam. Core may control how that state is styled and explained, but it must not silently invent a competing price or duplicate the provider's discount-rule engine.
+
+The storefront boundary does not make Engage Core the payment processor, promotion-rule engine, warehouse, shipping system, tax engine, or deep store-operations platform.
 
 Payment execution must remain behind an external provider's secure primitives.
 
@@ -248,9 +263,11 @@ canonical normalized product-variant identity
 provider identity mappings for Commerce products/variants
 provider-neutral public offer/storefront identity and presentation state
 offer-to-variant availability
+provider-authoritative storefront pricing/promotion projections
 public offer publication decisions
-provider-neutral cart/checkout orchestration contracts
+provider-neutral promotion/deep-link and cart/checkout orchestration contracts
 provider customer/contact reconciliation
+promotion/source attribution associated with Commerce visits/checkouts/purchases when justified
 normalized order identity
 normalized order-item purchase snapshots
 compact order lifecycle history
@@ -294,6 +311,7 @@ Core Contact identity
 provider credentials or webhook secrets
 raw card/payment credentials
 provider-specific secure payment internals
+provider-native pricing/promotion rule execution when an external provider owns that authority
 a general payment ledger unless later justified
 warehouse management
 shipping-label execution
@@ -320,7 +338,7 @@ Commerce may normalize provider status, inventory effects, and history without c
 
 Authority is a configured business contract.
 
-Do not assume the provider that produced a sale is also the inventory authority, order authority, payment processor, or fulfillment system.
+Do not assume the provider that produced a sale is also the pricing authority, promotion/discount authority, inventory authority, order authority, payment processor, or fulfillment system.
 
 Conceptual examples:
 
@@ -343,6 +361,20 @@ internal package consumption
 ```
 
 This distinction prevents double-decrements.
+
+The same authority rule applies to customer-facing price and promotions:
+
+```text
+external provider is pricing/promotion authority
+    -> Commerce reads or refreshes the authoritative customer-facing state
+    -> Engage Core may cache/project that state for storefront rendering
+    -> checkout revalidates when required
+    -> provider remains authoritative for final eligibility/calculation
+
+Engage Core-authored storefront promotion presentation
+    -> Core may own the label, artwork, placement, campaign/source identity, and CTA
+    -> if redemption depends on a provider-backed discount, Core carries/resolves the provider promotion context rather than recreating its rules
+```
 
 Commerce may keep normalized local projections/caches required for storefront presentation and business logic, but the configured authority remains authoritative for the facts assigned to that role.
 
@@ -376,6 +408,8 @@ A provider package owns only the vendor-specific implementation it can authorita
 
 ```text
 catalog/product lookup
+pricing and compare-at/sale-state reads
+promotion/discount reads, eligibility, or provider-backed activation/deep-link generation
 checkout/session creation
 order reads/reconciliation
 inventory reads/adjustments
@@ -399,6 +433,8 @@ Likely capability contracts/services include:
 CommerceProviderRegistry
 CommerceProviderRoleResolver
 CommerceCatalogProvider
+CommercePricingProvider
+CommercePromotionProvider
 CommerceCheckoutProvider
 CommerceOrderProvider
 CommerceInventoryProvider
@@ -406,6 +442,8 @@ CommerceWebhookReconciler
 CommerceProductReadService
 CommerceVariantReadService
 CommerceOfferReadService
+CommerceStorefrontStateResolver
+CommercePromotionLinkResolver
 CommerceOrderReadService
 CommercePurchaseHistoryQuery
 CommerceContactLinker
@@ -433,7 +471,7 @@ payment-only provider
     may not own catalog or inventory
 
 full commerce provider
-    may implement catalog, checkout, orders, inventory, and fulfillment-facing reads
+    may implement catalog, pricing, promotions, checkout, orders, inventory, and fulfillment-facing reads
 ```
 
 Role resolution should fail loudly when an intended workflow requires a capability that no installed/configured provider implements.
@@ -511,7 +549,7 @@ Do not rely on SKU equality as the only cross-provider identity rule.
 
 SKU may help suggest mappings, but durable reconciliation should use explicit provider identity mappings once confirmed.
 
-Price and availability authority are role/configuration decisions. Commerce should revalidate authoritative provider state before checkout or inventory-sensitive publication when required by the selected provider contract.
+Price, promotion/discount, and availability authority are role/configuration decisions. Commerce should resolve the current authoritative storefront state through provider-neutral reads/projections and revalidate provider state before checkout or inventory-sensitive publication when required by the selected provider contract. A local projection is a rendering/performance aid, not permission for Core to drift from the configured authority.
 
 ## Inventory orchestration
 
@@ -654,7 +692,7 @@ Do not build a warehouse-management subsystem merely because providers expose wa
 
 A Commerce offer is the Engage Core-authored public presentation and publication identity.
 
-An offer is not automatically a second provider product.
+An offer is not automatically a second provider product, provider discount, or provider promotion. It may present and activate provider-backed commercial state while Core owns the storefront experience around it.
 
 It may provide:
 
@@ -690,6 +728,41 @@ another marketplace/channel
 ```
 
 Commerce should not assume only one sales surface exists.
+
+## Pricing, discounts, promotions, and attribution
+
+Commerce must distinguish **presentation and attribution** from **pricing/promotion authority**.
+
+When a configured provider owns price or discount logic:
+
+```text
+provider
+    owns authoritative base price / compare-at price / sale price
+    owns promotion eligibility, combination rules, usage limits, and final discount calculation
+
+Commerce
+    resolves that state through provider-neutral contracts
+    may cache/project it for storefront rendering
+    styles and explains it in the Engage Core storefront
+    preserves compact promotion/source attribution where useful
+    carries provider-backed promotion context into checkout
+```
+
+A public campaign or physical QR code is a valid Commerce entry point. For example:
+
+```text
+printed merchandise bag
+    -> QR code identifies a stable promotion/source
+    -> QR opens an Engage Core storefront route or a provider-backed promotion link
+    -> Commerce resolves the current provider-authoritative product price and promotion state
+    -> customer sees the discount/offer in the Engage Core-controlled storefront when that provider contract supports it
+    -> checkout receives the provider-backed promotion context
+    -> verified order reconciliation records the actual provider-calculated discount and retains justified source/promotion attribution
+```
+
+The QR code itself does not create a second discount engine. A provider-native shareable discount link may be used directly, or a stable Core-owned attribution URL may resolve/redirect into the provider-backed promotion path. The implementation choice should preserve one authoritative discount calculation and avoid leaking provider-specific URL semantics into generic Commerce contracts.
+
+Core-owned attribution should remain compact. Prefer stable campaign/source/promotion identity and relationships needed for reporting or automation; do not copy complete query strings, provider payloads, or rendered storefront state into generic metadata.
 
 ## Public Commerce host
 
@@ -740,10 +813,11 @@ Commerce public checkout initiation should:
 load the current offer and selected canonical variant through Commerce read services
 run Commerce and optional upstream promotion gates
 resolve the configured checkout provider capability
-revalidate authoritative availability/pricing when required
+revalidate authoritative availability/pricing/promotion state when required
+carry the selected provider-backed promotion context without recalculating provider-owned discount rules
 create/update the provider-backed checkout/cart/session
 obtain the provider-supported next checkout/payment step
-record only minimal operational correlation required for reconciliation
+record only minimal operational correlation and justified source/promotion attribution required for reconciliation/reporting
 ```
 
 Do not store raw payment data.
@@ -1049,6 +1123,8 @@ required provider credentials are present outside test/dev sink modes
 public Commerce host is valid and client-configured
 webhook configuration is complete for enabled inbound provider flows
 configured provider mappings reference valid canonical products/variants
+configured pricing/promotion authority is resolvable for storefronts that require provider-backed commercial state
+provider-backed promotion links/contexts can be resolved without Core inventing a competing discount rule
 configured inventory authority is resolvable
 an inventory effect cannot be routed into an impossible/missing authority path
 Event-linked offers can resolve the Events promotion gate when Events is enabled
@@ -1064,17 +1140,19 @@ Validation should report actionable findings without making external provider ca
 2. provider-neutral capability/role contracts and provider registration
 3. canonical product-variant schema/model
 4. normalized multi-provider product/variant mapping
-5. Commerce offer/storefront presentation schema/model
-6. durable inventory-effect/orchestration contract with idempotency and loop prevention
-7. Project State Commerce section and current-format version bump
-8. first required external provider package(s) for the concrete client roles
-9. verified webhook inbox integration and idempotent order/inventory reconciliation
-10. provider-neutral purchase-confirmed outcome
-11. Commerce CRM operations
-12. client-configured public storefront/offer surface and provider-backed checkout
-13. optional Event promotion gate integration
-14. Experiences package mapping/grant and inventory-component consumption
-15. optional Contact filters, Messaging, FlowRoutes, and Reporting contributors
+5. provider-authoritative pricing/promotion read and projection contracts
+6. Commerce offer/storefront presentation schema/model
+7. durable promotion/source attribution seam for storefront/checkout/purchase flows
+8. durable inventory-effect/orchestration contract with idempotency and loop prevention
+9. Project State Commerce section and current-format version bump
+10. first required external provider package(s) for the concrete client roles
+11. verified webhook inbox integration and idempotent order/inventory reconciliation
+12. provider-neutral purchase-confirmed outcome
+13. Commerce CRM operations
+14. client-configured public storefront/offer surface with provider-backed promotions and checkout
+15. optional Event promotion gate integration
+16. Experiences package mapping/grant and inventory-component consumption
+17. optional Contact filters, Messaging, FlowRoutes, and Reporting contributors
 ```
 
 Provider/contracts, canonical mappings, persistence, Project State, and reconciliation must precede production cross-provider orchestration.
@@ -1088,6 +1166,8 @@ Engage Core
     owns custom storefront presentation and orchestration
 
 Shopify
+    owns authoritative catalog pricing for this client
+    owns provider-native discounts/promotions and final discount calculation
     owns authoritative inventory
     owns online order/fulfillment operations
     owns or coordinates the provider-backed online checkout/payment path
@@ -1101,9 +1181,17 @@ Square venue sale
     -> Commerce adjusts Shopify because Shopify is the configured inventory authority
 
 Engage Core storefront sale completed through Shopify
-    -> Shopify processes the order and changes its own inventory
-    -> Commerce reconciles the authoritative Shopify order/inventory result
-    -> Commerce does NOT send a second decrement
+    -> Core renders the storefront using current Shopify-authoritative pricing/promotion state
+    -> Shopify processes the order, calculates the final provider-owned discount, and changes its own inventory
+    -> Commerce reconciles the authoritative Shopify order/discount/inventory result
+    -> Commerce does NOT send a second decrement or recalculate the Shopify discount
+
+Printed merch-bag QR promotion
+    -> QR identifies the physical-bag promotion/source
+    -> Core storefront or Shopify-backed promotion link opens with the provider promotion context
+    -> Core presents the current Shopify-authoritative price/offer state in the Engage storefront when using the Core route
+    -> Shopify applies the actual 10% discount at checkout according to its configured rules
+    -> Commerce reconciles the resulting order and can attribute the purchase back to the bag/QR promotion
 
 Experience package purchase
     -> Experiences resolves package component meaning
@@ -1126,7 +1214,7 @@ warehouse/bin management
 shipping-label execution
 carrier management
 deep provider fulfillment administration
-complex promotion/discount engine
+Core-owned complex promotion/discount rule engine when an authoritative provider already owns those rules
 multi-provider payment splitting
 retained checkout-session history
 customer self-service order portal
@@ -1140,6 +1228,8 @@ Additional commerce providers are not conceptually deferred; they should be impl
 
 ```text
 Engage Core owns storefront experience and commerce orchestration where that creates unique value.
+When a provider is configured as pricing/promotion authority, the Engage Core storefront must reflect that authoritative price/discount/offer state rather than maintain a competing rule set.
+Core may own promotion presentation and source attribution while the configured provider owns final discount eligibility/calculation and secure checkout execution.
 Specialized external platforms remain responsible for payment processing, deep store operations, warehouse/shipping fulfillment, or other capabilities they perform better.
 Do not require a separate middleware SaaS when direct provider packages can connect the client's existing systems.
 Do not assume one commerce provider per client.
