@@ -285,6 +285,13 @@ Current config payloads remain authoritative source definitions until a client i
 migrated into shared composition. Do not create shared rows and assume they override duplicated
 source fields that are still present in config.
 
+The CRM Message Templates workspace is composition-aware. Existing shared layers may be
+edited at their owned scope with an affected-message review before publish. Message-specific
+edits are persisted only as top-level delta fields in a message-scoped composition layer.
+The source MessageTemplatePreset payload remains partial and source-owned. Publishing shared
+or message-level edits creates complete immutable MessageTemplateVersion records; already
+pinned ScheduledMessages are not rewritten.
+
 ## Message chains
 
 ### `message_chains`

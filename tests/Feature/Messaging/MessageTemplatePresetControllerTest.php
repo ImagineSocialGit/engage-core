@@ -4,7 +4,9 @@ namespace Tests\Feature\Messaging;
 
 use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
+use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
+use App\Modules\Messaging\Models\MessageTemplateCompositionLayer;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Payloads\EmailPayload;
@@ -247,16 +249,22 @@ class MessageTemplatePresetControllerTest extends TestCase
             ]));
 
         $preset->refresh();
+        $template = MessageTemplate::query()->where('key', $preset->key)->firstOrFail();
+        $template->load('currentVersion');
+        $override = MessageTemplateCompositionLayer::query()
+            ->where('scope_type', MessageTemplateCompositionLayer::SCOPE_MESSAGE)
+            ->where('message_template_id', $template->getKey())
+            ->firstOrFail();
 
-        $this->assertSame('Updated Confirmation', $preset->name);
-        $this->assertSame('Updated helper copy.', $preset->description);
-        $this->assertSame('New subject {first_name}', $preset->payload['subject']);
-        $this->assertSame('New body for {first_name}.', $preset->payload['body']);
-        $this->assertSame('Join Now', $preset->payload['cta']['label']);
-        $this->assertSame('{webinar_join_url}', $preset->payload['cta']['url']);
-        $this->assertSame('Footer copy.', $preset->payload['footer']);
-        $this->assertTrue($preset->is_customized);
-        $this->assertNotNull($preset->customized_at);
+        $this->assertSame('Old subject', $preset->payload['subject']);
+        $this->assertSame('Old body.', $preset->payload['body']);
+        $this->assertFalse($preset->is_customized);
+        $this->assertNull($preset->customized_at);
+        $this->assertSame('New subject {first_name}', $override->payload['subject']);
+        $this->assertSame('New body for {first_name}.', $override->payload['body']);
+        $this->assertSame('Join Now', $override->payload['cta']['label']);
+        $this->assertSame('Footer copy.', $override->payload['footer']);
+        $this->assertSame('New subject {first_name}', $template->currentVersion->payload()['subject']);
         $this->assertEqualsCanonicalizing(['first_name', 'webinar_join_url'], $preset->tokens);
     }
 
@@ -299,9 +307,17 @@ class MessageTemplatePresetControllerTest extends TestCase
             ]));
 
         $preset->refresh();
+        $template = MessageTemplate::query()->where('key', $preset->key)->firstOrFail();
+        $template->load('currentVersion');
+        $override = MessageTemplateCompositionLayer::query()
+            ->where('scope_type', MessageTemplateCompositionLayer::SCOPE_MESSAGE)
+            ->where('message_template_id', $template->getKey())
+            ->firstOrFail();
 
-        $this->assertSame('Hi {first_name}, your webinar starts soon.', $preset->payload['message']);
-        $this->assertTrue($preset->is_customized);
+        $this->assertSame('Old reminder.', $preset->payload['message']);
+        $this->assertFalse($preset->is_customized);
+        $this->assertSame('Hi {first_name}, your webinar starts soon.', $override->payload['message']);
+        $this->assertSame('Hi {first_name}, your webinar starts soon.', $template->currentVersion->payload()['message']);
         $this->assertEquals(['first_name'], $preset->tokens);
     }
 
@@ -423,15 +439,21 @@ class MessageTemplatePresetControllerTest extends TestCase
             ]));
 
         $preset->refresh();
+        $template = MessageTemplate::query()->where('key', $preset->key)->firstOrFail();
+        $template->load('currentVersion');
+        $override = MessageTemplateCompositionLayer::query()
+            ->where('scope_type', MessageTemplateCompositionLayer::SCOPE_MESSAGE)
+            ->where('message_template_id', $template->getKey())
+            ->firstOrFail();
 
-        $this->assertSame('Replay ready {first_name}', $preset->payload['subject']);
-        $this->assertSame('Watch the replay and take the next step. {cta}', $preset->payload['body']);
-        $this->assertSame('Watch Replay', $preset->payload['ctas'][0]['label']);
-        $this->assertSame('{webinar_playback_url}', $preset->payload['ctas'][0]['url']);
-        $this->assertSame('Start Pre-Approval', $preset->payload['ctas'][1]['label']);
-        $this->assertSame('https://robthemortgagecoach.my1003app.com/322051/register', $preset->payload['ctas'][1]['url']);
-        $this->assertTrue($preset->is_customized);
-        $this->assertNotNull($preset->customized_at);
+        $this->assertSame('Thanks for Joining', $preset->payload['subject']);
+        $this->assertSame('Replay ready {first_name}', $override->payload['subject']);
+        $this->assertSame('Watch the replay and take the next step. {cta}', $override->payload['body']);
+        $this->assertSame('Watch Replay', $override->payload['ctas'][0]['label']);
+        $this->assertSame('{webinar_playback_url}', $override->payload['ctas'][0]['url']);
+        $this->assertSame('Start Pre-Approval', $override->payload['ctas'][1]['label']);
+        $this->assertFalse($preset->is_customized);
         $this->assertEqualsCanonicalizing(['cta', 'first_name', 'webinar_playback_url'], $preset->tokens);
+        $this->assertSame('Replay ready {first_name}', $template->currentVersion->payload()['subject']);
     }
 }

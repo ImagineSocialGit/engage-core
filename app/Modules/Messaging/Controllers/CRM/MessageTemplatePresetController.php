@@ -5,13 +5,19 @@ namespace App\Modules\Messaging\Controllers\CRM;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Modules\Messaging\Actions\PublishMessageTemplateVersionAction;
+use App\Modules\Messaging\Actions\UpsertMessageTemplateCompositionLayerAction;
 use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
+use App\Modules\Messaging\Models\MessageTemplateCompositionLayer;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
-use App\Modules\Messaging\Models\MessageTemplateVersion;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
+use App\Modules\Messaging\Requests\UpdateMessageTemplateCompositionLayerRequest;
 use App\Modules\Messaging\Requests\UpdateMessageTemplatePresetRequest;
+use App\Modules\Messaging\Services\MessageTemplateCompositionEditorPresenter;
+use App\Modules\Messaging\Services\MessageTemplateCompositionImpactResolver;
+use App\Modules\Messaging\Services\MessageTemplateCompositionIdentityResolver;
+use App\Modules\Messaging\Services\MessageTemplateCompositionResolver;
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
 use App\Modules\Messaging\Services\MessageTemplateUsageResolver;
 use Illuminate\Contracts\View\View;
@@ -21,6 +27,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class MessageTemplatePresetController extends Controller
 {
@@ -28,8 +35,8 @@ class MessageTemplatePresetController extends Controller
         Request $request,
         MessageTemplateUsageResolver $usageResolver,
         MessageTemplateTokenValidator $messageTemplateTokenValidator,
-    ): View
-    {
+        MessageTemplateCompositionEditorPresenter $compositionPresenter,
+    ): View {
         $catalogEntries = MessageTemplateCatalogEntry::query()
             ->active()
             ->whereHas('messageTemplatePreset', fn ($query) => $query->active())
@@ -61,9 +68,21 @@ class MessageTemplatePresetController extends Controller
         $selectedGroup = $this->selectedGroup($request, $catalogGroups);
         $selectedGroupEntries = $selectedGroup['entries'] ?? collect();
         $selectedPreset = $this->selectedPreset($request, $selectedGroupEntries);
+        $selectedCatalogEntry = $selectedPreset instanceof MessageTemplatePreset
+            ? $selectedGroupEntries->first(
+                fn (MessageTemplateCatalogEntry $entry): bool => (int) $entry->message_template_preset_id === (int) $selectedPreset->getKey(),
+            )
+            : null;
 
         $selectedTemplate = null;
         $currentTemplateVersion = null;
+        $compositionState = [
+            'effective_payload' => [],
+            'baseline_payload' => [],
+            'message_override' => null,
+            'shared_layers' => collect(),
+            'field_sources' => [],
+        ];
 
         if ($selectedPreset instanceof MessageTemplatePreset) {
             $selectedPreset->load([
@@ -76,10 +95,19 @@ class MessageTemplatePresetController extends Controller
                 ->where('key', $selectedPreset->key)
                 ->first();
             $currentTemplateVersion = $selectedTemplate?->currentVersion;
+
+            if ($selectedTemplate instanceof MessageTemplate) {
+                $compositionState = $compositionPresenter->forTemplate($selectedTemplate, $selectedPreset);
+            } else {
+                $compositionState['effective_payload'] = is_array($selectedPreset->payload)
+                    ? $selectedPreset->payload
+                    : [];
+                $compositionState['baseline_payload'] = $compositionState['effective_payload'];
+            }
         }
 
         $editablePayload = $selectedPreset
-            ? $this->editablePayload($selectedPreset, $currentTemplateVersion)
+            ? $this->editablePayload($selectedPreset, $compositionState['effective_payload'])
             : [];
 
         return view('crm.messaging.message-templates.index', [
@@ -89,13 +117,17 @@ class MessageTemplatePresetController extends Controller
             'selectedGroup' => $selectedGroup,
             'selectedGroupEntries' => $selectedGroupEntries,
             'selectedPreset' => $selectedPreset,
+            'selectedCatalogEntry' => $selectedCatalogEntry,
             'selectedTemplate' => $selectedTemplate,
             'currentTemplateVersion' => $currentTemplateVersion,
             'filterOptions' => $filterOptions,
             'filters' => $filters,
             'editablePayload' => $editablePayload,
-            'tokens' => $messageTemplateTokenValidator->tokensFromPayload($editablePayload),
+            'tokens' => $messageTemplateTokenValidator->tokensFromPayload($compositionState['effective_payload']),
             'usageSummaries' => $selectedPreset ? $usageResolver->forPreset($selectedPreset) : collect(),
+            'sharedCompositionLayers' => $compositionState['shared_layers'],
+            'messageOverrideLayer' => $compositionState['message_override'],
+            'fieldSources' => $compositionState['field_sources'],
         ]);
     }
 
@@ -103,73 +135,194 @@ class MessageTemplatePresetController extends Controller
         UpdateMessageTemplatePresetRequest $request,
         MessageTemplatePreset $messageTemplatePreset,
         MessageTemplateTokenValidator $messageTemplateTokenValidator,
+        MessageTemplateCompositionResolver $compositionResolver,
+        MessageTemplateCompositionIdentityResolver $compositionIdentityResolver,
+        UpsertMessageTemplateCompositionLayerAction $upsertCompositionLayer,
         PublishMessageTemplateVersionAction $publishMessageTemplateVersion,
     ): RedirectResponse {
-        $payload = array_replace_recursive(
-            $this->versionedPayloadFor($messageTemplatePreset),
-            $request->safePayload(),
-        );
-        $customizedAt = now();
-
-        DB::transaction(function () use (
-            $request,
-            $messageTemplatePreset,
-            $messageTemplateTokenValidator,
-            $publishMessageTemplateVersion,
-            $payload,
-            $customizedAt,
-        ): void {
-            $messageTemplatePreset->forceFill([
-                'name' => $request->validated('name'),
-                'description' => $request->validated('description'),
-                'payload' => $payload,
-                'tokens' => $messageTemplateTokenValidator->tokensFromPayload($payload),
-                'is_customized' => true,
-                'customized_at' => $customizedAt,
-            ])->save();
-
-            $messageTemplate = MessageTemplate::query()->firstOrNew([
-                'key' => $messageTemplatePreset->key,
-            ]);
-            $messageTemplate->forceFill([
-                'name' => $request->validated('name'),
-                'description' => $request->validated('description'),
+        $messageTemplate = MessageTemplate::query()->firstOrCreate(
+            ['key' => $messageTemplatePreset->key],
+            [
+                'name' => $messageTemplatePreset->name,
+                'description' => $messageTemplatePreset->description,
                 'channel' => $messageTemplatePreset->channel,
                 'status' => $messageTemplatePreset->isActive()
                     ? MessageTemplate::STATUS_ACTIVE
                     : MessageTemplate::STATUS_INACTIVE,
-                'source' => $messageTemplate->exists
-                    ? $messageTemplate->source
-                    : $messageTemplatePreset->source,
-                'source_version' => $this->sourceVersion($messageTemplatePreset->source_version),
-                'is_customized' => true,
-                'customized_at' => $customizedAt,
-            ])->save();
+                'composition_family_key' => $compositionIdentityResolver->familyKey(
+                    scope: (string) $messageTemplatePreset->scope,
+                    sourceMessageType: (string) $messageTemplatePreset->message_type,
+                    campaignTemplate: false,
+                ),
+                'source' => $messageTemplatePreset->source,
+                'source_version' => is_int($messageTemplatePreset->source_version)
+                    ? (string) $messageTemplatePreset->source_version
+                    : null,
+            ],
+        );
+        $sourcePayload = is_array($messageTemplatePreset->payload)
+            ? $messageTemplatePreset->payload
+            : [];
+        $submittedPayload = $request->safePayload();
+        $baselinePayload = $compositionResolver->resolveWithoutMessageOverride(
+            $messageTemplate,
+            $sourcePayload,
+        );
+        $overridePayload = $this->payloadDelta($baselinePayload, $submittedPayload);
+        $actor = $request->user();
 
-            $actor = $request->user();
+        DB::transaction(function () use (
+            $messageTemplate,
+            $messageTemplatePreset,
+            $messageTemplateTokenValidator,
+            $upsertCompositionLayer,
+            $publishMessageTemplateVersion,
+            $sourcePayload,
+            $overridePayload,
+            $actor,
+        ): void {
+            $existingOverride = MessageTemplateCompositionLayer::query()
+                ->where('scope_type', MessageTemplateCompositionLayer::SCOPE_MESSAGE)
+                ->where('message_template_id', $messageTemplate->getKey())
+                ->first();
 
-            $publishMessageTemplateVersion->handle(
+            if ($overridePayload === []) {
+                $existingOverride?->delete();
+
+                $messageTemplate->forceFill([
+                    'is_customized' => false,
+                    'customized_at' => null,
+                ])->save();
+            } else {
+                $override = $upsertCompositionLayer->handle(
+                    scopeType: MessageTemplateCompositionLayer::SCOPE_MESSAGE,
+                    channel: (string) $messageTemplate->channel,
+                    payload: $overridePayload,
+                    messageTemplate: $messageTemplate,
+                    source: 'crm',
+                    isCustomized: true,
+                );
+
+                $messageTemplate->forceFill([
+                    'is_customized' => true,
+                    'customized_at' => $override->customized_at ?? now(),
+                ])->save();
+            }
+
+            $version = $publishMessageTemplateVersion->handle(
                 messageTemplate: $messageTemplate,
-                payload: $payload,
+                payload: $sourcePayload,
                 createdBy: $actor instanceof User ? $actor : null,
             );
+
+            $messageTemplatePreset->forceFill([
+                'tokens' => $messageTemplateTokenValidator->tokensFromPayload($version->payload()),
+            ])->save();
         });
 
-        $catalogEntry = $messageTemplatePreset->catalogEntries()
-            ->active()
-            ->orderBy('item_order')
-            ->orderBy('item_label')
-            ->first();
-
         return redirect()
-            ->route('crm.messaging.message-templates.index', array_filter([
-                'channel' => $catalogEntry?->channel ?? $messageTemplatePreset->channel,
-                'purpose' => $catalogEntry?->purpose ?? $messageTemplatePreset->purpose,
-                'module' => $catalogEntry?->module_key,
-                'group' => $catalogEntry?->group_key,
-                'preset' => $messageTemplatePreset->getKey(),
-            ], static fn (mixed $value): bool => $value !== null && $value !== ''))
-            ->with('status', 'Message template updated.');
+            ->route('crm.messaging.message-templates.index', $this->redirectParams($messageTemplatePreset))
+            ->with('status', $overridePayload === []
+                ? 'Message override cleared. The message now inherits shared content again.'
+                : 'Message override published. Existing scheduled message versions were not changed.');
+    }
+
+    public function updateCompositionLayer(
+        UpdateMessageTemplateCompositionLayerRequest $request,
+        MessageTemplateCompositionLayer $messageTemplateCompositionLayer,
+        MessageTemplateCompositionImpactResolver $impactResolver,
+        MessageTemplateCompositionResolver $compositionResolver,
+        MessageTemplateTokenValidator $messageTemplateTokenValidator,
+        UpsertMessageTemplateCompositionLayerAction $upsertCompositionLayer,
+        PublishMessageTemplateVersionAction $publishMessageTemplateVersion,
+    ): RedirectResponse {
+        $this->assertEditableSharedLayer($messageTemplateCompositionLayer);
+
+        $proposedPayload = $request->safePayload();
+        $affected = $impactResolver->templatesChangedByProposedPayload(
+            $messageTemplateCompositionLayer,
+            $proposedPayload,
+        );
+
+        foreach ($affected as $item) {
+            /** @var MessageTemplate $template */
+            $template = $item['template'];
+            /** @var MessageTemplatePreset $preset */
+            $preset = $item['preset'];
+            $effectivePayload = $compositionResolver->resolveWithLayerPayload(
+                $template,
+                is_array($preset->payload) ? $preset->payload : [],
+                $messageTemplateCompositionLayer,
+                $proposedPayload,
+            );
+            $surface = $preset->catalogEntries()->active()->orderBy('item_order')->orderBy('id')->value('surface');
+            $this->assertPublishablePayload($preset, $effectivePayload);
+
+            $issues = $messageTemplateTokenValidator->validatePayload(
+                payload: $effectivePayload,
+                dispatchKeys: $preset->dispatchKeys(),
+                channel: $preset->channel,
+                purpose: $preset->purpose,
+                scope: $preset->scope,
+                surface: is_string($surface) && trim($surface) !== '' ? trim($surface) : null,
+                path: 'payload',
+            );
+
+            $error = collect($issues)->firstWhere('level', 'error');
+
+            if (is_array($error)) {
+                throw ValidationException::withMessages([
+                    'payload' => (string) ($error['message'] ?? 'The shared content would create an invalid message.'),
+                ]);
+            }
+        }
+
+        $actor = $request->user();
+
+        DB::transaction(function () use (
+            $messageTemplateCompositionLayer,
+            $proposedPayload,
+            $affected,
+            $messageTemplateTokenValidator,
+            $upsertCompositionLayer,
+            $publishMessageTemplateVersion,
+            $actor,
+        ): void {
+            $updatedLayer = $upsertCompositionLayer->handle(
+                scopeType: $messageTemplateCompositionLayer->scope_type,
+                channel: $messageTemplateCompositionLayer->channel,
+                payload: $proposedPayload,
+                clientKey: $messageTemplateCompositionLayer->client_key,
+                contextKey: $messageTemplateCompositionLayer->context_key,
+                familyKey: $messageTemplateCompositionLayer->family_key,
+                source: $messageTemplateCompositionLayer->source,
+                sourceVersion: $messageTemplateCompositionLayer->source_version,
+                isCustomized: true,
+            );
+
+            $messageTemplateCompositionLayer->setRawAttributes($updatedLayer->getAttributes(), true);
+
+            foreach ($affected as $item) {
+                /** @var MessageTemplate $template */
+                $template = $item['template'];
+                /** @var MessageTemplatePreset $preset */
+                $preset = $item['preset'];
+                $version = $publishMessageTemplateVersion->handle(
+                    messageTemplate: $template,
+                    payload: is_array($preset->payload) ? $preset->payload : [],
+                    createdBy: $actor instanceof User ? $actor : null,
+                );
+
+                $preset->forceFill([
+                    'tokens' => $messageTemplateTokenValidator->tokensFromPayload($version->payload()),
+                ])->save();
+            }
+        });
+
+        return back()->with(
+            'status',
+            'Shared content published to '.$affected->count().' '.Str::plural('message', $affected->count()).'. Existing scheduled versions were not changed.',
+        );
     }
 
     /**
@@ -179,40 +332,16 @@ class MessageTemplatePresetController extends Controller
     private function filterOptions(Collection $catalogEntries): array
     {
         return [
-            'channels' => $catalogEntries
-                ->pluck('channel')
-                ->filter()
-                ->unique()
-                ->sort()
-                ->map(fn (string $channel): array => [
-                    'value' => $channel,
-                    'label' => $this->channelLabel($channel),
-                ])
-                ->values()
-                ->all(),
-            'purposes' => $catalogEntries
-                ->pluck('purpose')
-                ->filter()
-                ->unique()
-                ->sort()
-                ->map(fn (string $purpose): array => [
-                    'value' => $purpose,
-                    'label' => Str::headline(str_replace('_', ' ', $purpose)),
-                ])
-                ->values()
-                ->all(),
+            'channels' => $catalogEntries->pluck('channel')->filter()->unique()->sort()
+                ->map(fn (string $channel): array => ['value' => $channel, 'label' => $this->channelLabel($channel)])->values()->all(),
+            'purposes' => $catalogEntries->pluck('purpose')->filter()->unique()->sort()
+                ->map(fn (string $purpose): array => ['value' => $purpose, 'label' => Str::headline(str_replace('_', ' ', $purpose))])->values()->all(),
             'modules' => $catalogEntries
-                ->mapWithKeys(fn (MessageTemplateCatalogEntry $entry): array => [
-                    $entry->module_key => $entry->module_label,
-                ])
+                ->mapWithKeys(fn (MessageTemplateCatalogEntry $entry): array => [$entry->module_key => $entry->module_label])
                 ->filter(fn (mixed $label, mixed $key): bool => is_string($key) && $key !== '' && is_string($label) && $label !== '')
                 ->sort()
-                ->map(fn (string $label, string $key): array => [
-                    'value' => $key,
-                    'label' => $label,
-                ])
-                ->values()
-                ->all(),
+                ->map(fn (string $label, string $key): array => ['value' => $key, 'label' => $label])
+                ->values()->all(),
         ];
     }
 
@@ -229,9 +358,7 @@ class MessageTemplatePresetController extends Controller
         ];
     }
 
-    /**
-     * @param array<int, array{value: string, label: string}> $options
-     */
+    /** @param array<int, array{value: string, label: string}> $options */
     private function validFilterValue(mixed $value, array $options): ?string
     {
         if (! is_string($value) || trim($value) === '') {
@@ -239,9 +366,8 @@ class MessageTemplatePresetController extends Controller
         }
 
         $value = trim($value);
-        $allowed = array_column($options, 'value');
 
-        return in_array($value, $allowed, true) ? $value : null;
+        return in_array($value, array_column($options, 'value'), true) ? $value : null;
     }
 
     /**
@@ -278,26 +404,15 @@ class MessageTemplatePresetController extends Controller
                     'channel' => $first->channel,
                     'purpose' => $first->purpose,
                     'scope' => $first->scope,
-                    'entries' => $entries
-                        ->sortBy([
-                            ['item_order', 'asc'],
-                            ['item_label', 'asc'],
-                        ])
-                        ->values(),
+                    'entries' => $entries->sortBy([['item_order', 'asc'], ['item_label', 'asc']])->values(),
                 ];
             })
-            ->sortBy([
-                ['module_label', 'asc'],
-                ['purpose', 'asc'],
-                ['channel', 'asc'],
-                ['label', 'asc'],
-            ])
+            ->sortBy([['module_label', 'asc'], ['purpose', 'asc'], ['channel', 'asc'], ['label', 'asc']])
             ->values();
     }
 
     /**
      * @param Collection<int, array{key: string, label: string, module_key: string, module_label: string, channel: string, purpose: string, scope: string, entries: Collection<int, MessageTemplateCatalogEntry>}> $catalogGroups
-     * @return array{key: string, label: string, module_key: string, module_label: string, channel: string, purpose: string, scope: string, entries: Collection<int, MessageTemplateCatalogEntry>}|null
      */
     private function selectedGroup(Request $request, Collection $catalogGroups): ?array
     {
@@ -314,9 +429,7 @@ class MessageTemplatePresetController extends Controller
         return $catalogGroups->first();
     }
 
-    /**
-     * @param Collection<int, MessageTemplateCatalogEntry> $selectedGroupEntries
-     */
+    /** @param Collection<int, MessageTemplateCatalogEntry> $selectedGroupEntries */
     private function selectedPreset(Request $request, Collection $selectedGroupEntries): ?MessageTemplatePreset
     {
         $selectedId = $request->integer('preset');
@@ -339,76 +452,45 @@ class MessageTemplatePresetController extends Controller
     }
 
     /**
-     * @return array<string, mixed>
+     * @param array<string,mixed> $baseline
+     * @param array<string,mixed> $submitted
+     * @return array<string,mixed>
      */
-    private function versionedPayloadFor(
-        MessageTemplatePreset $messageTemplatePreset,
-    ): array {
-        $messageTemplate = MessageTemplate::query()
-            ->with('currentVersion')
-            ->where('key', $messageTemplatePreset->key)
-            ->first();
-
-        return $messageTemplate?->currentVersion?->payload()
-            ?? (is_array($messageTemplatePreset->payload)
-                ? $messageTemplatePreset->payload
-                : []);
-    }
-
-    private function sourceVersion(mixed $value): ?string
+    private function payloadDelta(array $baseline, array $submitted): array
     {
-        if (is_int($value)) {
-            return (string) $value;
+        $delta = [];
+
+        foreach ($submitted as $key => $value) {
+            if (! array_key_exists($key, $baseline) || $baseline[$key] !== $value) {
+                $delta[$key] = $value;
+            }
         }
 
-        if (! is_string($value)) {
-            return null;
-        }
-
-        $value = trim($value);
-
-        return $value !== '' ? $value : null;
+        return $delta;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function editablePayload(
-        MessageTemplatePreset $preset,
-        ?MessageTemplateVersion $version = null,
-    ): array {
-        $payload = $version?->payload() ?? $preset->payload ?? [];
-
+    /** @return array<string,mixed> */
+    private function editablePayload(MessageTemplatePreset $preset, array $payload): array
+    {
         if ($preset->payload_class === EmailPayload::class) {
             return [
                 'subject' => Arr::get($payload, 'subject', ''),
                 'body' => Arr::get($payload, 'body', ''),
                 'footer' => Arr::get($payload, 'footer', ''),
-                'cta' => [
-                    'label' => Arr::get($payload, 'cta.label', ''),
-                    'url' => Arr::get($payload, 'cta.url', ''),
-                ],
+                'cta' => ['label' => Arr::get($payload, 'cta.label', ''), 'url' => Arr::get($payload, 'cta.url', '')],
                 'ctas' => $this->editableCtas(Arr::get($payload, 'ctas', [])),
-                'secondary_link' => [
-                    'label' => Arr::get($payload, 'secondary_link.label', ''),
-                    'url' => Arr::get($payload, 'secondary_link.url', ''),
-                ],
+                'secondary_link' => ['label' => Arr::get($payload, 'secondary_link.label', ''), 'url' => Arr::get($payload, 'secondary_link.url', '')],
             ];
         }
 
         if ($preset->payload_class === SmsPayload::class) {
-            return [
-                'message' => Arr::get($payload, 'message', ''),
-            ];
+            return ['message' => Arr::get($payload, 'message', '')];
         }
 
         return $payload;
     }
 
-    /**
-     * @param mixed $ctas
-     * @return array<int, array{label: string, url: string}>
-     */
+    /** @param mixed $ctas @return array<int,array{label:string,url:string}> */
     private function editableCtas(mixed $ctas): array
     {
         if (! is_array($ctas) || ! array_is_list($ctas)) {
@@ -430,11 +512,63 @@ class MessageTemplatePresetController extends Controller
         )));
     }
 
+    /** @return array<string,mixed> */
+    private function redirectParams(MessageTemplatePreset $preset): array
+    {
+        $catalogEntry = $preset->catalogEntries()->active()->orderBy('item_order')->orderBy('item_label')->first();
+
+        return array_filter([
+            'channel' => $catalogEntry?->channel ?? $preset->channel,
+            'purpose' => $catalogEntry?->purpose ?? $preset->purpose,
+            'module' => $catalogEntry?->module_key,
+            'group' => $catalogEntry?->group_key,
+            'preset' => $preset->getKey(),
+        ], static fn (mixed $value): bool => $value !== null && $value !== '');
+    }
+
+    /** @param array<string,mixed> $payload */
+    private function assertPublishablePayload(MessageTemplatePreset $preset, array $payload): void
+    {
+        if ($preset->payload_class === EmailPayload::class) {
+            $subject = $payload['subject'] ?? null;
+            $body = $payload['body'] ?? null;
+
+            if (! is_string($subject) || trim($subject) === '' || ! is_string($body) || trim($body) === '') {
+                throw ValidationException::withMessages([
+                    'payload' => 'The shared change would leave an email without a subject or body.',
+                ]);
+            }
+        }
+
+        if ($preset->payload_class === SmsPayload::class) {
+            $message = $payload['message'] ?? null;
+
+            if (! is_string($message) || trim($message) === '') {
+                throw ValidationException::withMessages([
+                    'payload' => 'The shared change would leave an SMS message empty.',
+                ]);
+            }
+        }
+    }
+
+    private function assertEditableSharedLayer(MessageTemplateCompositionLayer $layer): void
+    {
+        abort_if($layer->scope_type === MessageTemplateCompositionLayer::SCOPE_PLATFORM, 403);
+        abort_if($layer->scope_type === MessageTemplateCompositionLayer::SCOPE_MESSAGE, 404);
+        abort_unless($this->normalizeClientKey($layer->client_key) === $this->normalizeClientKey(config('client.key')), 404);
+    }
+
+    private function normalizeClientKey(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return str_replace('-', '_', strtolower(trim($value)));
+    }
+
     private function channelLabel(string $channel): string
     {
-        return match ($channel) {
-            'sms' => 'SMS',
-            default => Str::headline($channel),
-        };
+        return $channel === 'sms' ? 'SMS' : Str::headline($channel);
     }
 }

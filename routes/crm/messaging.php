@@ -11,11 +11,13 @@ Route::middleware('module:messaging')
         Route::get('/', [MessageTemplatePresetController::class, 'index'])
             ->name('index');
 
+        Route::patch('/composition-layers/{messageTemplateCompositionLayer}', [MessageTemplatePresetController::class, 'updateCompositionLayer'])
+            ->name('composition-layers.update');
+
         Route::patch('/{messageTemplatePreset}', [MessageTemplatePresetController::class, 'update'])
             ->name('update');
     });
 
-// Messaging-owned extension of the Contacts import-batch workspace.
 Route::prefix(config('contacts.routes.plural'))
     ->name('crm.contacts.')
     ->middleware('module:messaging')

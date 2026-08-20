@@ -4,6 +4,7 @@ namespace App\Modules\Messaging\Actions;
 
 use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
+use App\Modules\Messaging\Models\MessageTemplateCompositionLayer;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Services\MessageDefinitionConfigSetResolver;
@@ -186,12 +187,32 @@ class SyncMessageTemplatePresetsAction
             ->where('key', $preset->key)
             ->first();
 
+        $messageOverride = $template instanceof MessageTemplate
+            ? MessageTemplateCompositionLayer::query()
+                ->where('scope_type', MessageTemplateCompositionLayer::SCOPE_MESSAGE)
+                ->where('message_template_id', $template->getKey())
+                ->first()
+            : null;
+
+        if ($force && $messageOverride instanceof MessageTemplateCompositionLayer) {
+            $messageOverride->delete();
+            $messageOverride = null;
+        }
+
         if (! $template instanceof MessageTemplate) {
             $template = MessageTemplate::query()->create(
                 $this->versionedTemplateAttributes($preset, $composition),
             );
             $templateResult = 'templates_created';
-        } elseif ($template->is_customized && ! $force) {
+        } elseif (
+            $template->is_customized
+            && ! $force
+            && ! ($messageOverride instanceof MessageTemplateCompositionLayer)
+        ) {
+            // Legacy whole-template customization remains protected. Composition-aware
+            // message overrides are handled below so source/config changes can still
+            // update the inherited baseline without materializing the resolved payload
+            // back into MessageTemplatePreset.payload.
             $template->loadMissing('currentVersion');
 
             if ($template->currentVersion === null) {
@@ -234,9 +255,17 @@ class SyncMessageTemplatePresetsAction
                     : 'template_versions_reused',
             ];
         } else {
-            $template->forceFill(
-                $this->versionedTemplateAttributes($preset, $composition),
-            )->save();
+            $attributes = $this->versionedTemplateAttributes($preset, $composition);
+
+            if ($messageOverride instanceof MessageTemplateCompositionLayer && ! $force) {
+                $attributes['is_customized'] = true;
+                $attributes['customized_at'] = $template->customized_at
+                    ?? $messageOverride->customized_at
+                    ?? $messageOverride->updated_at
+                    ?? now();
+            }
+
+            $template->forceFill($attributes)->save();
             $templateResult = 'templates_updated';
         }
 

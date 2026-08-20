@@ -666,6 +666,7 @@
 │   │   │   │   └── MessagingModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   │   ├── StoreContactPermissionInvitationConsentRequest.php
+│   │   │   │   ├── UpdateMessageTemplateCompositionLayerRequest.php
 │   │   │   │   └── UpdateMessageTemplatePresetRequest.php
 │   │   │   ├── Rules
 │   │   │   │   ├── ConsentRevocationRules.php
@@ -707,7 +708,9 @@
 │   │   │   │   ├── MessageSendTimeResolver.php
 │   │   │   │   ├── MessageSuppressionService.php
 │   │   │   │   ├── MessageTemplateCompositionConfigRegistry.php
+│   │   │   │   ├── MessageTemplateCompositionEditorPresenter.php
 │   │   │   │   ├── MessageTemplateCompositionIdentityResolver.php
+│   │   │   │   ├── MessageTemplateCompositionImpactResolver.php
 │   │   │   │   ├── MessageTemplateCompositionResolver.php
 │   │   │   │   ├── MessageTemplateCompositionSchema.php
 │   │   │   │   ├── MessageTemplatePresetAssignmentResolver.php
@@ -2217,6 +2220,7 @@
 │   │   │   ├── MessageTemplateBehaviorOwnershipValidationTest.php
 │   │   │   ├── MessageTemplateCompositionConfigIntegrationTest.php
 │   │   │   ├── MessageTemplateCompositionConfigSyncTest.php
+│   │   │   ├── MessageTemplateCompositionEditorTest.php
 │   │   │   ├── MessageTemplateCompositionSyncTest.php
 │   │   │   ├── MessageTemplateCompositionTest.php
 │   │   │   ├── MessageTemplateCompositionValidationTest.php
@@ -2457,4 +2461,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-620 directories, 1838 files
+620 directories, 1842 files

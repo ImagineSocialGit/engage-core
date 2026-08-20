@@ -17,14 +17,10 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
         return true;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:2000'],
             'payload' => ['required', 'array'],
             'payload.subject' => ['nullable', 'string', 'max:255', Rule::requiredIf($this->isEmailPayload())],
             'payload.body' => ['nullable', 'string', 'max:10000', Rule::requiredIf($this->isEmailPayload())],
@@ -56,11 +52,7 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
                 return;
             }
 
-            $submittedPayload = $this->input('payload', []);
-            $submittedPayload = is_array($submittedPayload)
-                ? $this->cleanPayload($submittedPayload)
-                : [];
-
+            $submittedPayload = $this->safePayloadFromInput();
             $payload = array_replace_recursive(
                 is_array($preset->payload) ? $preset->payload : [],
                 $submittedPayload,
@@ -87,22 +79,17 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
                     continue;
                 }
 
-                $path = is_string($issue['path'] ?? null) && trim($issue['path']) !== ''
-                    ? $issue['path']
-                    : 'payload';
-
-                $message = is_string($issue['message'] ?? null) && trim($issue['message']) !== ''
-                    ? $issue['message']
-                    : 'The message template contains an invalid token.';
-
-                $validator->errors()->add($path, $message);
+                $validator->errors()->add(
+                    is_string($issue['path'] ?? null) && trim($issue['path']) !== '' ? $issue['path'] : 'payload',
+                    is_string($issue['message'] ?? null) && trim($issue['message']) !== ''
+                        ? $issue['message']
+                        : 'The message template contains an invalid token.',
+                );
             }
         });
     }
 
-    /**
-     * @return array<string, string>
-     */
+    /** @return array<string, string> */
     public function messages(): array
     {
         return [
@@ -112,22 +99,25 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
         ];
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function safePayload(): array
     {
-        $payload = $this->validated('payload');
+        return $this->cleanPayload($this->validated('payload'));
+    }
 
-        return $this->cleanPayload(is_array($payload) ? $payload : []);
+    /** @return array<string, mixed> */
+    private function safePayloadFromInput(): array
+    {
+        return $this->cleanPayload($this->input('payload', []));
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param mixed $payload
      * @return array<string, mixed>
      */
-    private function cleanPayload(array $payload): array
+    private function cleanPayload(mixed $payload): array
     {
+        $payload = is_array($payload) ? $payload : [];
         $clean = [];
 
         foreach (['subject', 'body', 'message', 'footer'] as $key) {
