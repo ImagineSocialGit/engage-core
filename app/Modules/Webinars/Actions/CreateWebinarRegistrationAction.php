@@ -15,8 +15,6 @@ use App\Modules\Webinars\Data\WebinarRegistrationFinalizationResult;
 use App\Modules\Webinars\Data\WebinarRegistrationResult;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
-use App\Modules\Webinars\Services\WebinarRegistrationQuestionResolver;
-use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,8 +30,7 @@ class CreateWebinarRegistrationAction
         private readonly PhoneNumberNormalizer $phoneNumberNormalizer,
         private readonly GrantMessageConsentsAction $grantMessageConsentsAction,
         private readonly CreateOrUpdateContactAction $createOrUpdateContact,
-        private readonly WebinarRegisterPageConfig $registerPageConfig,
-        private readonly WebinarRegistrationQuestionResolver $questionResolver,
+        private readonly StoreWebinarRegistrationResponsesAction $storeRegistrationResponses,
         private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
         private readonly FinalizeWebinarRegistrationAction $finalizeRegistration,
         private readonly QueueWebinarRegistrationFinalizationAction $queueFinalization,
@@ -128,11 +125,7 @@ class CreateWebinarRegistrationAction
             ->first();
 
         if ($registration instanceof WebinarRegistration) {
-            $this->storeRegistrationResponses(
-                validated: $validated,
-                webinar: $webinar,
-                registration: $registration,
-            );
+            $this->storeRegistrationResponses($validated, $registration);
 
             $result = WebinarRegistrationResult::existing(
                 registration: $registration,
@@ -184,11 +177,7 @@ class CreateWebinarRegistrationAction
             ],
         ]);
 
-        $this->storeRegistrationResponses(
-            validated: $validated,
-            webinar: $webinar,
-            registration: $registration,
-        );
+        $this->storeRegistrationResponses($validated, $registration);
 
         $consentGrants = $this->storeMessageConsents(
             validated: $validated,
@@ -222,7 +211,6 @@ class CreateWebinarRegistrationAction
 
     private function storeRegistrationResponses(
         array $validated,
-        Webinar $webinar,
         WebinarRegistration $registration,
     ): void {
         $submittedAnswers = $validated['registration_questions'] ?? null;
@@ -237,36 +225,10 @@ class CreateWebinarRegistrationAction
             );
         }
 
-        $webinar->loadMissing('webinarSeries');
-        $series = $webinar->webinarSeries;
-
-        if (! $series) {
-            throw new LogicException(
-                'Webinar registration questions require a Webinar series.',
-            );
-        }
-
-        $content = $this->registerPageConfig->content(
-            page: 'register',
-            seriesSlug: $series->slug,
-            seriesMeta: is_array($series->meta) ? $series->meta : [],
-        );
-        $questions = $this->questionResolver->resolve(
-            data_get($content, 'registration.questions', []),
-        );
-        $snapshots = $this->questionResolver->responseSnapshots(
-            questions: $questions,
+        $this->storeRegistrationResponses->handle(
+            registration: $registration,
             submittedAnswers: $submittedAnswers,
         );
-
-        foreach ($snapshots as $snapshot) {
-            $registration->responses()->updateOrCreate(
-                [
-                    'question_key' => $snapshot['question_key'],
-                ],
-                $snapshot,
-            );
-        }
     }
 
     private function stageFinalization(

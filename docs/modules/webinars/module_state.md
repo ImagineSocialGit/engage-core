@@ -358,11 +358,22 @@ landing
 registration
 ```
 
-The public registration view passes the resolved registration content, style, and runtime tokens into the registration modal.
-
-Registration-owned presentation includes the modal's:
+The registration bucket owns the reusable form contract and its presentation mode:
 
 ```text
+presentation = modal | inline
+page_revision = producer-owned bounded revision identifier
+```
+
+Core defaults to `modal`. A client or permitted series override may select `inline` without changing registration persistence, validation, consent handling, provider synchronization, Messaging behavior, or Reporting event semantics. The public registration view passes the same resolved registration content, style, and runtime tokens into the shared registration-form component in either mode.
+
+In `modal` mode, registration CTAs open the dialog. In `inline` mode, the form is rendered in the landing-page hero and CTAs scroll/focus that form instead of opening a second selling step. Reporting continues to receive the configured `presentation` dimension; `webinar.modal.open` is emitted only for the modal experience.
+
+Registration-owned presentation includes:
+
+```text
+presentation and page revision
+form-card copy
 consent header
 section headings and supporting copy
 field labels/placeholders/helpers
@@ -465,6 +476,29 @@ runtime rendering safety
 ```
 
 Tests should not require identical prose across clients, count exact Tailwind utility strings, or make one client's presentation the canonical copy for another client.
+
+### Registration-question placement and open responses
+
+Registration questions remain Webinar-owned, configuration-driven definitions persisted as `WebinarRegistrationResponse` snapshots. A question may declare:
+
+```text
+placement = registration | post_registration
+```
+
+Missing `placement` remains backward-compatible with `registration`. Initial-placement questions participate in the registration POST exactly as before. `post_registration` questions are deliberately excluded from the registration request so a successful local registration is never contingent on answering enrichment questions afterward.
+
+Supported question types include:
+
+```text
+select
+textarea
+```
+
+`textarea` definitions own their `required` and `max_length` rules in configuration. Persisted open responses use the existing response table: the stable answer key/label identify an open response while the attendee's text is stored in `answer_text`. No separate response table or client-specific columns are required.
+
+When effective post-registration questions exist, a successful registration redirects to a signed, replacement-aware Page 2 before the normal thank-you page. That page resolves the canonical registration and preserves the existing truthful public registration states (`processing`, `confirmed`, `delayed`, `cancelled`). Submitting the questions updates only that registration's configured post-registration response snapshots and then continues to the existing thank-you page. Leaving Page 2 without submitting does not cancel, roll back, or otherwise invalidate the already-created registration.
+
+The `registration.fields.last_name.enabled` boolean may hide and prohibit last-name input for clients that intentionally want a shorter registration form. Core defaults it to enabled. This is presentation/validation configuration only; it does not change Contact identity rules or make arbitrary core identity fields configurable through Webinar copy.
 
 ## Webinar message chains and bindings
 

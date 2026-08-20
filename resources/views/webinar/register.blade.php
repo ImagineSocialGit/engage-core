@@ -162,7 +162,7 @@
     <section
         x-data="webinarRegistrationPage(@js([
             'countdownTarget' => $countdownTarget,
-            'formOpen' => $errors->any(),
+            'formOpen' => $reportingPresentation === 'modal' && $errors->any(),
             'transactionalSmsConsent' => (bool) old('transactional_sms_consent'),
             'marketingSmsConsent' => (bool) old('marketing_sms_consent'),
             'reporting' => [
@@ -182,9 +182,16 @@
             :style="$style"
             :tokens="$tokens"
             :series="$series"
+            :webinar="$webinar"
             :event-details-items="$eventDetailsItems"
             :countdown-target="$countdownTarget"
             :hero-countdown="$heroCountdown"
+            :registration-page="$registrationPage"
+            :registration-tokens="$registrationTokens"
+            :registration-style="$registrationStyle"
+            :webinar-registration-channels="$webinarRegistrationChannels ?? []"
+            :registration-prefill="$registrationPrefill ?? []"
+            :registration-presentation="$reportingPresentation"
         />
 
         <div>
@@ -627,15 +634,18 @@
             :target="$countdownTarget"
         />
 
-        <x-webinars.registration-form-modal
-            :page="$registrationPage"
-            :tokens="$registrationTokens"
-            :style="$registrationStyle"
-            :series="$series"
-            :webinar="$webinar"
-            :webinar-registration-channels="$webinarRegistrationChannels ?? []"
-            :registration-prefill="$registrationPrefill ?? []"
-        />
+        @if($reportingPresentation === 'modal')
+            <x-webinars.registration-form-modal
+                presentation="modal"
+                :page="$registrationPage"
+                :tokens="$registrationTokens"
+                :style="$registrationStyle"
+                :series="$series"
+                :webinar="$webinar"
+                :webinar-registration-channels="$webinarRegistrationChannels ?? []"
+                :registration-prefill="$registrationPrefill ?? []"
+            />
+        @endif
 
     </section>
 </x-layouts.public>

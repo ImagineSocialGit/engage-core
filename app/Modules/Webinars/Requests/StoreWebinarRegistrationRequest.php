@@ -107,7 +107,12 @@ class StoreWebinarRegistrationRequest extends FormRequest
     {
         $rules = [
             'first_name' => ['required', 'string', 'max:100'],
-            'last_name' => ['nullable', 'string', 'max:100'],
+            'last_name' => [
+                Rule::prohibitedIf(! $this->registrationFieldEnabled('last_name')),
+                'nullable',
+                'string',
+                'max:100',
+            ],
             'email' => ['required', 'email', 'max:255'],
             'webinar_id' => ['required', 'integer', 'min:1'],
 
@@ -381,11 +386,14 @@ class StoreWebinarRegistrationRequest extends FormRequest
 
         return $this->registrationQuestions = app(
             WebinarRegistrationQuestionResolver::class,
-        )->resolve(data_get(
-            $this->registrationContent(),
-            'registration.questions',
-            [],
-        ));
+        )->resolveForPlacement(
+            data_get(
+                $this->registrationContent(),
+                'registration.questions',
+                [],
+            ),
+            WebinarRegistrationQuestionResolver::PLACEMENT_REGISTRATION,
+        );
     }
 
     /**
@@ -412,6 +420,15 @@ class StoreWebinarRegistrationRequest extends FormRequest
             seriesSlug: $seriesSlug,
             seriesMeta: is_array($series?->meta) ? $series->meta : [],
         );
+    }
+
+    private function registrationFieldEnabled(string $field): bool
+    {
+        return data_get(
+            $this->registrationContent(),
+            "registration.fields.{$field}.enabled",
+            true,
+        ) === true;
     }
 
     private function channelAvailable(string $channel, string $purpose, string $scope): bool

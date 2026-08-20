@@ -187,6 +187,10 @@ class WebinarRegisterPageDefinitionValidator
 
         $violations = array_merge(
             $violations,
+            $this->validateRegistrationPresentation(
+                $registration,
+                "{$path}.registration",
+            ),
             $this->validateDisclosures(
                 $registration,
                 "{$path}.registration",
@@ -209,8 +213,68 @@ class WebinarRegisterPageDefinitionValidator
     }
 
     /**
+     * @param array<string, mixed> $registration
      * @return array<int, array{code: string, message: string, path: string, context: array<string, mixed>}>
      */
+    private function validateRegistrationPresentation(
+        array $registration,
+        string $path,
+    ): array {
+        $violations = [];
+        if (array_key_exists('presentation', $registration)) {
+            $presentation = $registration['presentation'];
+
+            if (! is_string($presentation)
+                || ! in_array(trim($presentation), ['modal', 'inline'], true)
+            ) {
+                $violations[] = $this->violation(
+                    code: 'webinars.register_page.presentation_invalid',
+                    message: 'Webinar registration presentation must be modal or inline.',
+                    path: "{$path}.presentation",
+                    context: ['configured_value' => $presentation],
+                );
+            }
+        }
+
+        if (array_key_exists('page_revision', $registration)) {
+            $pageRevision = $registration['page_revision'];
+
+            if (! is_string($pageRevision)
+                || trim($pageRevision) === ''
+                || mb_strlen(trim($pageRevision)) > 80
+            ) {
+                $violations[] = $this->violation(
+                    code: 'webinars.register_page.page_revision_invalid',
+                    message: 'Webinar registration page_revision must be a non-empty string no longer than 80 characters.',
+                    path: "{$path}.page_revision",
+                    context: ['configured_value' => $pageRevision],
+                );
+            }
+        }
+
+        if (data_get($registration, 'fields.last_name') !== null
+            && array_key_exists(
+                'enabled',
+                is_array(data_get($registration, 'fields.last_name'))
+                    ? data_get($registration, 'fields.last_name')
+                    : [],
+            )
+        ) {
+            $lastNameEnabled = data_get($registration, 'fields.last_name.enabled');
+
+            if (! is_bool($lastNameEnabled)) {
+                $violations[] = $this->violation(
+                    code: 'webinars.register_page.field_configuration_invalid',
+                    message: 'Webinar registration fields.last_name.enabled must be boolean when configured.',
+                    path: "{$path}.fields.last_name.enabled",
+                    context: ['configured_value' => $lastNameEnabled],
+                );
+            }
+        }
+
+        return $violations;
+    }
+
     /**
      * @param array<string, mixed> $registration
      * @return array<int, array{code: string, message: string, path: string, context: array<string, mixed>}>

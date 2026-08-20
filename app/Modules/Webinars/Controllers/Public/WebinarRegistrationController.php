@@ -12,7 +12,9 @@ use App\Modules\Webinars\Actions\ResolveWebinarRegistrationReplacementChainActio
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use App\Modules\Webinars\Requests\StoreWebinarRegistrationRequest;
+use App\Modules\Webinars\Services\WebinarRegistrationQuestionResolver;
 use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
+use App\Modules\Webinars\Support\WebinarRegistrationPostQuestionLinkGenerator;
 use App\Modules\Webinars\Support\WebinarRegistrationThankYouLinkGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
@@ -137,6 +139,9 @@ class WebinarRegistrationController extends Controller
         string $seriesSlug,
         CreateWebinarRegistrationAction $createWebinarRegistrationAction,
         GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
+        WebinarRegisterPageConfig $config,
+        WebinarRegistrationQuestionResolver $questionResolver,
+        WebinarRegistrationPostQuestionLinkGenerator $postQuestionLinks,
         WebinarRegistrationThankYouLinkGenerator $thankYouLinks,
     ): RedirectResponse {
         $series = $getActiveWebinarSeriesAction->findBySlug($seriesSlug);
@@ -157,8 +162,20 @@ class WebinarRegistrationController extends Controller
             $webinar,
         );
 
+        $content = $config->content(
+            page: 'register',
+            seriesSlug: $series->slug,
+            seriesMeta: is_array($series->meta) ? $series->meta : [],
+        );
+        $postRegistrationQuestions = $questionResolver->resolveForPlacement(
+            data_get($content, 'registration.questions', []),
+            WebinarRegistrationQuestionResolver::PLACEMENT_POST_REGISTRATION,
+        );
+
         return redirect()->to(
-            $thankYouLinks->forRegistration($result->registration),
+            $postRegistrationQuestions !== []
+                ? $postQuestionLinks->forRegistration($result->registration)
+                : $thankYouLinks->forRegistration($result->registration),
         );
     }
 

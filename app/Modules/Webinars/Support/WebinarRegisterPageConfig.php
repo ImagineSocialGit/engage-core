@@ -24,6 +24,7 @@ class WebinarRegisterPageConfig
         'legal_links',
         'questions_section',
         'questions',
+        'post_registration',
     ];
 
     /**

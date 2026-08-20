@@ -6,9 +6,22 @@
     'webinar',
     'webinarRegistrationChannels' => [],
     'registrationPrefill' => [],
+    'presentation' => 'modal',
 ])
 
 @php
+    $inlinePresentation = $presentation === 'inline';
+    $lastNameEnabled = data_get($page, 'fields.last_name.enabled', true) === true;
+    $fieldGridClass = data_get(
+        $style,
+        $inlinePresentation
+            ? 'registration.inline_field_grid'
+            : 'registration.modal_field_grid',
+        $inlinePresentation
+            ? 'grid gap-4 sm:grid-cols-2'
+            : 'grid gap-4',
+    );
+
     $checkbox = array_replace_recursive(
         config('webinars.style.components.checkbox', []),
         config('webinars.register.style.components.checkbox', []),
@@ -24,7 +37,10 @@
         : [];
     $registrationQuestions = app(
         \App\Modules\Webinars\Services\WebinarRegistrationQuestionResolver::class,
-    )->resolve($page['questions'] ?? []);
+    )->resolveForPlacement(
+        $page['questions'] ?? [],
+        \App\Modules\Webinars\Services\WebinarRegistrationQuestionResolver::PLACEMENT_REGISTRATION,
+    );
     $questionInputClass = data_get(
         $style,
         'components.input.base',
@@ -305,37 +321,46 @@
 @endphp
 
 <div
-    x-cloak
-    x-show="formOpen"
-    x-ref="registrationModal"
-    @keydown="trapRegistrationModalFocus($event)"
-    @keydown.escape.window="formOpen && closeRegistrationModal()"
-    x-transition:enter="transition ease-out duration-200"
-    x-transition:enter-start="opacity-0 scale-105"
-    x-transition:enter-end="opacity-100 scale-100"
-    x-transition:leave="transition ease-in duration-150"
-    x-transition:leave-start="opacity-100 scale-100"
-    x-transition:leave-end="opacity-0 scale-105"
-    class="fixed inset-0 z-50 overflow-y-auto p-3 sm:p-6"
-    aria-labelledby="register-modal-title"
-    aria-modal="true"
-    role="dialog"
+    @if($inlinePresentation)
+        id="webinar-registration-form"
+        class="w-full scroll-mt-6"
+    @else
+        x-cloak
+        x-show="formOpen"
+        x-ref="registrationModal"
+        @keydown="trapRegistrationModalFocus($event)"
+        @keydown.escape.window="formOpen && closeRegistrationModal()"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 scale-105"
+        x-transition:enter-end="opacity-100 scale-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 scale-100"
+        x-transition:leave-end="opacity-0 scale-105"
+        class="fixed inset-0 z-50 overflow-y-auto p-3 sm:p-6"
+        aria-labelledby="register-modal-title"
+        aria-modal="true"
+        role="dialog"
+    @endif
 >
-    <div
-        class="fixed inset-0 bg-black/70"
-        @click="closeRegistrationModal()"
-    ></div>
+    @unless($inlinePresentation)
+        <div
+            class="fixed inset-0 bg-black/70"
+            @click="closeRegistrationModal()"
+        ></div>
+    @endunless
 
     <div
-        class="relative z-10 mx-auto flex min-h-full w-full max-w-2xl items-start sm:items-center"
-        @click.stop
+        class="{{ $inlinePresentation ? 'w-full' : 'relative z-10 mx-auto flex min-h-full w-full max-w-2xl items-start sm:items-center' }}"
+        @unless($inlinePresentation)
+            @click.stop
+        @endunless
     >
-        <x-ui.card class="{{ $style['form_card']['class'] ?? '' }} max-h-[calc(100dvh-1.5rem)] w-full overflow-y-auto sm:max-h-[calc(100dvh-3rem)]">
+        <x-ui.card class="{{ $style['form_card']['class'] ?? '' }} {{ $inlinePresentation ? 'w-full' : 'max-h-[calc(100dvh-1.5rem)] w-full overflow-y-auto sm:max-h-[calc(100dvh-3rem)]' }}">
             <div class="mb-6 flex items-start justify-between gap-4">
                 <div class="space-y-2">
                     @if(filled($page['form_card']['title'] ?? null))
                         <h2
-                            id="register-modal-title"
+                            id="{{ $inlinePresentation ? 'register-inline-title' : 'register-modal-title' }}"
                             class="text-2xl font-bold tracking-tight text-slate-900"
                         >
                             {{ $page['form_card']['title'] }}
@@ -349,15 +374,17 @@
                     @endif
                 </div>
 
-                <button
-                    type="button"
-                    x-ref="registrationModalClose"
-                    @click="closeRegistrationModal()"
-                    class="inline-flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                    aria-label="Close registration form"
-                >
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                @unless($inlinePresentation)
+                    <button
+                        type="button"
+                        x-ref="registrationModalClose"
+                        @click="closeRegistrationModal()"
+                        class="inline-flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                        aria-label="Close registration form"
+                    >
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                @endunless
             </div>
 
             <form
@@ -490,7 +517,7 @@
                         {{ $message }}
                     </div>
                 @enderror
-                <div class="grid gap-4 sm:grid-cols-2">
+                <div class="{{ $fieldGridClass }}">
                     <div>
                         <x-ui.form.label for="first_name">
                             {{ $page['fields']['first_name']['label'] ?? 'First Name' }}
@@ -514,30 +541,32 @@
                         @enderror
                     </div>
 
-                    <div>
-                        <x-ui.form.label for="last_name">
-                            {{ $page['fields']['last_name']['label'] ?? 'Last Name' }}
-                        </x-ui.form.label>
+                    @if($lastNameEnabled)
+                        <div>
+                            <x-ui.form.label for="last_name">
+                                {{ $page['fields']['last_name']['label'] ?? 'Last Name' }}
+                            </x-ui.form.label>
 
-                        <x-ui.form.input
-                            id="last_name"
-                            name="last_name"
-                            autocomplete="family-name"
-                            maxlength="100"
-                            :aria-invalid="$errors->has('last_name') ? 'true' : 'false'"
-                            :value="old('last_name', $registrationPrefill['last_name'] ?? null)"
-                            :placeholder="$page['fields']['last_name']['placeholder'] ?? 'Last name'"
-                        />
+                            <x-ui.form.input
+                                id="last_name"
+                                name="last_name"
+                                autocomplete="family-name"
+                                maxlength="100"
+                                :aria-invalid="$errors->has('last_name') ? 'true' : 'false'"
+                                :value="old('last_name', $registrationPrefill['last_name'] ?? null)"
+                                :placeholder="$page['fields']['last_name']['placeholder'] ?? 'Last name'"
+                            />
 
-                        @error('last_name')
-                            <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
-                                {{ $message }}
-                            </p>
-                        @enderror
-                    </div>
+                            @error('last_name')
+                                <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                                    {{ $message }}
+                                </p>
+                            @enderror
+                        </div>
+                    @endif
                 </div>
 
-                <div class="grid gap-4 sm:grid-cols-2">
+                <div class="{{ $fieldGridClass }}">
                     <div>
                         <x-ui.form.label for="email">
                             {{ $page['fields']['email']['label'] ?? 'Email Address' }}
@@ -658,28 +687,44 @@
                                         @endif
                                     </label>
 
-                                    <select
-                                        id="registration_question_{{ $questionKey }}"
-                                        name="registration_questions[{{ $questionKey }}][answer]"
-                                        x-model="selectedAnswer"
-                                        class="{{ $questionInputClass }}"
-                                        @if($question['required'])
-                                            required
-                                            aria-required="true"
-                                        @endif
-                                        aria-invalid="{{ $errors->has($answerPath) ? 'true' : 'false' }}"
-                                    >
-                                        <option value="">{{ $question['placeholder'] }}</option>
+                                    @if($question['type'] === \App\Modules\Webinars\Services\WebinarRegistrationQuestionResolver::TYPE_TEXTAREA)
+                                        <textarea
+                                            id="registration_question_{{ $questionKey }}"
+                                            name="registration_questions[{{ $questionKey }}][answer]"
+                                            rows="4"
+                                            maxlength="{{ $question['max_length'] }}"
+                                            class="{{ $questionInputClass }} min-h-28 resize-y"
+                                            placeholder="{{ $question['placeholder'] }}"
+                                            @if($question['required'])
+                                                required
+                                                aria-required="true"
+                                            @endif
+                                            aria-invalid="{{ $errors->has($answerPath) ? 'true' : 'false' }}"
+                                        >{{ old($answerPath) }}</textarea>
+                                    @else
+                                        <select
+                                            id="registration_question_{{ $questionKey }}"
+                                            name="registration_questions[{{ $questionKey }}][answer]"
+                                            x-model="selectedAnswer"
+                                            class="{{ $questionInputClass }}"
+                                            @if($question['required'])
+                                                required
+                                                aria-required="true"
+                                            @endif
+                                            aria-invalid="{{ $errors->has($answerPath) ? 'true' : 'false' }}"
+                                        >
+                                            <option value="">{{ $question['placeholder'] }}</option>
 
-                                        @foreach($question['options'] as $option)
-                                            <option
-                                                value="{{ $option['key'] }}"
-                                                @selected($selectedAnswer === $option['key'])
-                                            >
-                                                {{ $option['label'] }}
-                                            </option>
-                                        @endforeach
-                                    </select>
+                                            @foreach($question['options'] as $option)
+                                                <option
+                                                    value="{{ $option['key'] }}"
+                                                    @selected($selectedAnswer === $option['key'])
+                                                >
+                                                    {{ $option['label'] }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    @endif
 
                                     @if(filled($question['helper'] ?? null))
                                         <p class="text-xs font-medium leading-5 text-slate-500">
@@ -1057,6 +1102,12 @@
                     </span>
                     <span x-cloak x-show="submitting">Submitting…</span>
                 </x-ui.button>
+
+                @if(filled($page['form_card']['helper_text'] ?? null))
+                    <p class="text-center text-xs font-medium leading-5 text-slate-500">
+                        {{ $page['form_card']['helper_text'] }}
+                    </p>
+                @endif
 
                 @if(
                     (($page['legal_links']['enabled'] ?? false) && $legalLinks->isNotEmpty())

@@ -67,6 +67,10 @@ export default function webinarRegistrationPage(config = {}) {
             }
 
             this.$watch('formOpen', (isOpen) => {
+                if (this.reportingPresentation !== 'modal') {
+                    return
+                }
+
                 this.handleRegistrationModalState(isOpen)
 
                 if (isOpen) {
@@ -76,7 +80,7 @@ export default function webinarRegistrationPage(config = {}) {
                 }
             })
 
-            if (this.formOpen) {
+            if (this.formOpen && this.reportingPresentation === 'modal') {
                 this.$nextTick(() => {
                     this.handleRegistrationModalState(true)
                     this.recordRegistrationModalOpen('validation_return')
@@ -132,7 +136,39 @@ export default function webinarRegistrationPage(config = {}) {
                 cta_location: this.reportingLastCtaLocation,
             })
 
+            if (this.reportingPresentation === 'inline') {
+                this.focusInlineRegistrationForm()
+                return
+            }
+
             this.formOpen = true
+        },
+
+        focusInlineRegistrationForm() {
+            this.$nextTick(() => {
+                const wrapper = document.getElementById('webinar-registration-form')
+
+                if (!(wrapper instanceof HTMLElement)) {
+                    return
+                }
+
+                wrapper.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start',
+                })
+
+                const firstField = wrapper.querySelector([
+                    'input:not([type="hidden"]):not([disabled])',
+                    'select:not([disabled])',
+                    'textarea:not([disabled])',
+                ].join(','))
+
+                window.setTimeout(() => {
+                    if (firstField instanceof HTMLElement) {
+                        firstField.focus({ preventScroll: true })
+                    }
+                }, 300)
+            })
         },
 
         recordRegistrationModalOpen(openReason) {
@@ -240,6 +276,10 @@ export default function webinarRegistrationPage(config = {}) {
         },
 
         handleRegistrationModalState(isOpen) {
+            if (this.reportingPresentation !== 'modal') {
+                return
+            }
+
             if (isOpen) {
                 this.registrationModalPreviouslyFocusedElement = document.activeElement instanceof HTMLElement
                     ? document.activeElement
@@ -293,7 +333,7 @@ export default function webinarRegistrationPage(config = {}) {
         },
 
         trapRegistrationModalFocus(event) {
-            if (!this.formOpen || event.key !== 'Tab') {
+            if (this.reportingPresentation !== 'modal' || !this.formOpen || event.key !== 'Tab') {
                 return
             }
 
@@ -322,7 +362,9 @@ export default function webinarRegistrationPage(config = {}) {
         },
 
         closeRegistrationModal() {
-            this.formOpen = false
+            if (this.reportingPresentation === 'modal') {
+                this.formOpen = false
+            }
         },
 
         closeModals() {
@@ -352,7 +394,7 @@ export default function webinarRegistrationPage(config = {}) {
 
             this.stickyObserver?.disconnect()
 
-            if (this.formOpen) {
+            if (this.formOpen && this.reportingPresentation === 'modal') {
                 this.restoreRegistrationModalDocumentState()
             }
         },

@@ -37,6 +37,7 @@ return [
         'registration' => [
             'questions_section' => true,
             'questions' => true,
+            'post_registration' => true,
         ],
     ],
 
@@ -175,6 +176,36 @@ return [
             'title' => 'Help us tailor the class',
         ],
         'questions' => [],
+        'post_registration' => [
+            'meta_title' => 'Webinar Registration Questions',
+            'meta_description' => 'Share any questions you would like covered during the live class.',
+            'eyebrow' => 'Registration received',
+            'title' => 'Your details are saved. Now help us tailor the class.',
+            'body' => 'We are finishing your webinar confirmation while you send us the questions that matter most to you.',
+            'class_details_title' => 'Class Details',
+            'questions_eyebrow' => 'Before the class',
+            'questions_title' => 'What would you like us to cover?',
+            'questions_body' => null,
+            'submit_label' => 'Submit My Questions',
+            'helper_text' => 'These answers are optional unless a question is marked required and do not affect whether your registration was received.',
+            'states' => [
+                'confirmed' => [
+                    'eyebrow' => 'You’re registered',
+                    'title' => 'You’re in. Now help us tailor the class.',
+                    'body' => 'Your webinar registration is confirmed. Send us the questions that matter most to you before the class.',
+                ],
+                'processing' => [
+                    'eyebrow' => 'Registration received',
+                    'title' => 'Your details are saved. Now help us tailor the class.',
+                    'body' => 'We are finishing your webinar confirmation while you send us the questions that matter most to you.',
+                ],
+                'delayed' => [
+                    'eyebrow' => 'Registration received',
+                    'title' => 'Your details are saved.',
+                    'body' => 'Final confirmation is taking longer than usual. You do not need to register again, and you can still send us your questions for the class.',
+                ],
+            ],
+        ],
         'consents' => [
             'transactional' => [
                 'email' => true,
@@ -209,6 +240,7 @@ return [
                 'placeholder' => 'Enter your first name',
             ],
             'last_name' => [
+                'enabled' => true,
                 'label' => 'Last Name',
                 'placeholder' => 'Enter your last name',
             ],

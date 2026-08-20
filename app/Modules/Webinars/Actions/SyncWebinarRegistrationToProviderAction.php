@@ -3,6 +3,7 @@
 namespace App\Modules\Webinars\Actions;
 
 use App\Modules\Webinars\Data\WebinarProviderSyncResult;
+use App\Modules\Webinars\Exceptions\ProviderRegistrationPreparationConnectionException;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Services\WebinarStateCanonicalizer;
 use Illuminate\Http\Client\ConnectionException;
@@ -243,6 +244,14 @@ class SyncWebinarRegistrationToProviderAction
      */
     private function classifyFailure(Throwable $exception): array
     {
+        if ($exception instanceof ProviderRegistrationPreparationConnectionException) {
+            return [
+                'status' => 'retryable_failure',
+                'result_status' => WebinarProviderSyncResult::STATUS_RETRYABLE_FAILURE,
+                'reason' => 'provider_pre_submission_connection_failed',
+            ];
+        }
+
         if ($exception instanceof RequestException) {
             $statusCode = $exception->response->status();
 

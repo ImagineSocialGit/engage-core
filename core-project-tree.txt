@@ -1012,6 +1012,7 @@
 │   │   │   │   ├── ResolveWebinarRegistrationReplacementChainAction.php
 │   │   │   │   ├── RetryWebinarRegistrationFinalizationAction.php
 │   │   │   │   ├── StartWebinarMessageChainEnrollmentAction.php
+│   │   │   │   ├── StoreWebinarRegistrationResponsesAction.php
 │   │   │   │   ├── SyncWebinarRegistrationToProviderAction.php
 │   │   │   │   ├── SyncWebinarScheduleProfileChainsAction.php
 │   │   │   │   ├── SyncWebinarScheduleProfilesAction.php
@@ -1041,6 +1042,7 @@
 │   │   │   │   ├── Public
 │   │   │   │   │   ├── WebinarJoinRedirectController.php
 │   │   │   │   │   ├── WebinarPlaybackRedirectController.php
+│   │   │   │   │   ├── WebinarPostRegistrationQuestionController.php
 │   │   │   │   │   ├── WebinarRegistrationCancellationController.php
 │   │   │   │   │   ├── WebinarRegistrationController.php
 │   │   │   │   │   └── WebinarWaitlistSignupController.php
@@ -1070,6 +1072,8 @@
 │   │   │   │   └── WebinarTag.php
 │   │   │   ├── EventDefinitions
 │   │   │   │   └── WebinarBehaviorEventDefinitionContributor.php
+│   │   │   ├── Exceptions
+│   │   │   │   └── ProviderRegistrationPreparationConnectionException.php
 │   │   │   ├── Jobs
 │   │   │   │   ├── CancelWebinarRegistrationWithProviderJob.php
 │   │   │   │   ├── NotifyWebinarWaitlistJob.php
@@ -1098,6 +1102,7 @@
 │   │   │   ├── Requests
 │   │   │   │   ├── ReplaceWebinarOccurrenceRequest.php
 │   │   │   │   ├── ResolveWebinarRegistrationReconciliationRequest.php
+│   │   │   │   ├── StoreWebinarPostRegistrationQuestionsRequest.php
 │   │   │   │   ├── StoreWebinarRegistrationRequest.php
 │   │   │   │   ├── StoreWebinarSeriesRequest.php
 │   │   │   │   ├── StoreWebinarWaitlistSignupRequest.php
@@ -1134,6 +1139,7 @@
 │   │   │   │   ├── WebinarPlaybackLinkGenerator.php
 │   │   │   │   ├── WebinarRegisterPageConfig.php
 │   │   │   │   ├── WebinarRegistrationCancelLinkGenerator.php
+│   │   │   │   ├── WebinarRegistrationPostQuestionLinkGenerator.php
 │   │   │   │   └── WebinarRegistrationThankYouLinkGenerator.php
 │   │   │   ├── TokenContracts
 │   │   │   │   ├── WebinarMessageTokenValueProvider.php
@@ -1966,6 +1972,7 @@
 │       │   ├── index.blade.php
 │       │   ├── join-confirm.blade.php
 │       │   ├── notify-me.blade.php
+│       │   ├── post-registration-questions.blade.php
 │       │   ├── register.blade.php
 │       │   ├── registration-cancellation-confirm.blade.php
 │       │   ├── registration-cancelled.blade.php
@@ -2378,7 +2385,9 @@
 │   │   │   ├── WebinarMessageTemplateSetConfigTest.php
 │   │   │   ├── WebinarOccurrenceReplacementControllerTest.php
 │   │   │   ├── WebinarOccurrenceReplacementTest.php
+│   │   │   ├── WebinarPostRegistrationQuestionTest.php
 │   │   │   ├── WebinarProviderEventTypeFoundationTest.php
+│   │   │   ├── WebinarProviderPreSubmissionFailureTest.php
 │   │   │   ├── WebinarRegisterPageConfigTest.php
 │   │   │   ├── WebinarRegistrationBoundaryContractTest.php
 │   │   │   ├── WebinarRegistrationCombinedConsentTest.php
@@ -2390,8 +2399,10 @@
 │   │   │   ├── WebinarRegistrationMessageConsolidationTest.php
 │   │   │   ├── WebinarRegistrationOccurrenceResolutionTest.php
 │   │   │   ├── WebinarRegistrationOperatorRecoveryTest.php
+│   │   │   ├── WebinarRegistrationPresentationConfigTest.php
 │   │   │   ├── WebinarRegistrationProviderSyncTest.php
 │   │   │   ├── WebinarRegistrationQuestionConfigTest.php
+│   │   │   ├── WebinarRegistrationQuestionPlacementTest.php
 │   │   │   ├── WebinarRegistrationQuestionTest.php
 │   │   │   ├── WebinarRegistrationThankYouTest.php
 │   │   │   ├── WebinarRegistrationTrustVariantTest.php
@@ -2420,4 +2431,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-618 directories, 1803 files
+619 directories, 1813 files

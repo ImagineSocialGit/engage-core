@@ -3,6 +3,7 @@
 use App\Modules\Messaging\Controllers\Public\ConsentRevocationController;
 use App\Modules\Webinars\Controllers\Public\WebinarJoinRedirectController;
 use App\Modules\Webinars\Controllers\Public\WebinarPlaybackRedirectController;
+use App\Modules\Webinars\Controllers\Public\WebinarPostRegistrationQuestionController;
 use App\Modules\Webinars\Controllers\Public\WebinarRegistrationCancellationController;
 use App\Modules\Webinars\Controllers\Public\WebinarRegistrationController;
 use App\Modules\Webinars\Controllers\Public\WebinarWaitlistSignupController;
@@ -48,6 +49,16 @@ Route::middleware('module:webinars')->group(function () {
     Route::post('/{seriesSlug}', [WebinarRegistrationController::class, 'store'])
         ->middleware(['signed:relative', 'throttle:webinar-registration'])
         ->name('webinar.registration.store');
+
+    Route::get('/{seriesSlug}/thank-you/{registration}/questions', [WebinarPostRegistrationQuestionController::class, 'show'])
+        ->middleware(['signed:relative', 'throttle:12,1'])
+        ->whereNumber('registration')
+        ->name('webinar.registration.questions.show');
+
+    Route::post('/{seriesSlug}/thank-you/{registration}/questions', [WebinarPostRegistrationQuestionController::class, 'store'])
+        ->middleware(['signed:relative', 'throttle:12,1'])
+        ->whereNumber('registration')
+        ->name('webinar.registration.questions.store');
 
     Route::get('/{seriesSlug}/thank-you/{registration}', [WebinarRegistrationController::class, 'showThankYou'])
         ->middleware('signed:relative')

@@ -6,6 +6,13 @@
     'eventDetailsItems',
     'countdownTarget',
     'heroCountdown',
+    'webinar',
+    'registrationPage' => [],
+    'registrationTokens' => [],
+    'registrationStyle' => [],
+    'webinarRegistrationChannels' => [],
+    'registrationPrefill' => [],
+    'registrationPresentation' => 'modal',
 ])
 
 @php
@@ -207,7 +214,7 @@
                 @endforeach
             @endif
 
-            @if(filled($hero['authority_line'] ?? null))
+            @if($registrationPresentation !== 'inline' && filled($hero['authority_line'] ?? null))
                 <p class="{{ $tokens['muted'] ?? 'text-sm text-slate-500' }} mt-5 font-extrabold">
                     {{ $hero['authority_line'] }}
                 </p>
@@ -232,6 +239,21 @@
                         @endif
                     @endforeach
                 </ul>
+            @endif
+
+            @if($registrationPresentation === 'inline')
+                <x-webinars.event-details
+                    :page="$page"
+                    :items="$eventDetailsItems"
+                    :style="$style"
+                    :tokens="$tokens"
+                />
+
+                @if(filled($hero['authority_line'] ?? null))
+                    <p class="{{ $tokens['muted'] ?? 'text-sm text-slate-500' }} mt-5 font-extrabold">
+                        {{ $hero['authority_line'] }}
+                    </p>
+                @endif
             @endif
 
             @if($urgencyStats['enabled'] ?? false)
@@ -267,7 +289,20 @@
             @endif
         </div>
 
-        @if($primaryCta['enabled'] ?? false)
+        @if($registrationPresentation === 'inline')
+            <div class="w-full lg:pl-4">
+                <x-webinars.registration-form-modal
+                    presentation="inline"
+                    :page="$registrationPage"
+                    :tokens="$registrationTokens"
+                    :style="$registrationStyle"
+                    :series="$series"
+                    :webinar="$webinar"
+                    :webinar-registration-channels="$webinarRegistrationChannels"
+                    :registration-prefill="$registrationPrefill"
+                />
+            </div>
+        @elseif($primaryCta['enabled'] ?? false)
             <div class="{{ $primaryCtaStyle['wrapper'] ?? 'mt-10 flex flex-col gap-4 text-left' }}">
                 @if($webinarTitle['enabled'] ?? false)
                     <span class="{{ $webinarTitleStyle['contact'] ?? 'text-xl text-white/85' }}">

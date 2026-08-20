@@ -9,6 +9,12 @@ class WebinarRegistrationQuestionResolver
 {
     public const TYPE_SELECT = 'select';
 
+    public const TYPE_TEXTAREA = 'textarea';
+
+    public const PLACEMENT_REGISTRATION = 'registration';
+
+    public const PLACEMENT_POST_REGISTRATION = 'post_registration';
+
     private const MAX_QUESTIONS = 20;
 
     private const MAX_OPTIONS = 50;
@@ -16,6 +22,10 @@ class WebinarRegistrationQuestionResolver
     private const DEFAULT_OTHER_MAX_LENGTH = 500;
 
     private const MAX_OTHER_MAX_LENGTH = 2000;
+
+    private const DEFAULT_TEXT_MAX_LENGTH = 1000;
+
+    private const MAX_TEXT_MAX_LENGTH = 5000;
 
     /**
      * @return array<int, array<string, mixed>>
@@ -64,6 +74,21 @@ class WebinarRegistrationQuestionResolver
         }
 
         return $questions;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function resolveForPlacement(
+        mixed $definitions,
+        string $placement,
+    ): array {
+        $this->assertSupportedPlacement($placement);
+
+        return array_values(array_filter(
+            $this->resolve($definitions),
+            fn (array $question): bool => $question['placement'] === $placement,
+        ));
     }
 
     public function normalizeSubmittedAnswers(mixed $answers): mixed
@@ -131,6 +156,24 @@ class WebinarRegistrationQuestionResolver
         foreach ($questions as $question) {
             $key = $question['key'];
             $path = "registration_questions.{$key}";
+
+            if ($question['type'] === self::TYPE_TEXTAREA) {
+                $rules[$path] = [
+                    Rule::requiredIf($question['required'] === true),
+                    'nullable',
+                    'array:answer',
+                ];
+                $rules["{$path}.answer"] = [
+                    Rule::requiredIf($question['required'] === true),
+                    'nullable',
+                    'string',
+                    'max:'.$question['max_length'],
+                ];
+                $rules["{$path}.other"] = ['prohibited'];
+
+                continue;
+            }
+
             $selectedAnswer = data_get($submittedAnswers, "{$key}.answer");
             $other = is_array($question['other'] ?? null)
                 ? $question['other']
@@ -183,6 +226,17 @@ class WebinarRegistrationQuestionResolver
             $path = "registration_questions.{$key}";
 
             $messages["{$path}.required"] = "Answer the question: {$label}";
+
+            if ($question['type'] === self::TYPE_TEXTAREA) {
+                $messages["{$path}.answer.required"] = "Answer the question: {$label}";
+                $messages["{$path}.answer.max"] = sprintf(
+                    'Your answer may not be longer than %d characters.',
+                    $question['max_length'],
+                );
+
+                continue;
+            }
+
             $messages["{$path}.answer.required"] = "Choose an answer for: {$label}";
             $messages["{$path}.answer.in"] = 'Choose one of the available answers.';
 
@@ -233,6 +287,39 @@ class WebinarRegistrationQuestionResolver
                         "Required Webinar registration question [{$question['key']}] was not answered.",
                     );
                 }
+
+                continue;
+            }
+
+            if ($question['type'] === self::TYPE_TEXTAREA) {
+                $answerText = $this->nullableString($submitted['answer'] ?? null);
+
+                if ($answerText === null) {
+                    if ($question['required'] === true) {
+                        throw new InvalidArgumentException(
+                            "Required Webinar registration question [{$question['key']}] was not answered.",
+                        );
+                    }
+
+                    continue;
+                }
+
+                if (mb_strlen($answerText) > $question['max_length']) {
+                    throw new InvalidArgumentException(
+                        "Webinar registration question [{$question['key']}] answer is too long.",
+                    );
+                }
+
+                $snapshots[] = [
+                    'question_key' => $question['key'],
+                    'question_label' => $question['label'],
+                    'question_type' => $question['type'],
+                    'answer_key' => 'text',
+                    'answer_label' => 'Open response',
+                    'answer_text' => $answerText,
+                    'definition_version' => $question['definition_version'],
+                    'sort_order' => $question['sort_order'],
+                ];
 
                 continue;
             }
@@ -311,30 +398,58 @@ class WebinarRegistrationQuestionResolver
         );
         $type = $this->nullableString($definition['type'] ?? null)
             ?? self::TYPE_SELECT;
+        $placement = $this->nullableString($definition['placement'] ?? null)
+            ?? self::PLACEMENT_REGISTRATION;
 
-        if ($type !== self::TYPE_SELECT) {
+        $this->assertSupportedPlacement($placement, $key);
+
+        if (! in_array($type, [self::TYPE_SELECT, self::TYPE_TEXTAREA], true)) {
             throw new InvalidArgumentException(
                 "Webinar registration question [{$key}] type [{$type}] is not supported.",
             );
         }
 
-        $options = $this->normalizeOptions(
-            $definition['options'] ?? null,
-            $key,
-        );
-        $other = $this->normalizeOther(
-            $definition['other'] ?? null,
-            $key,
-            $options,
-        );
+        $options = [];
+        $other = null;
+        $maxLength = null;
+
+        if ($type === self::TYPE_SELECT) {
+            $options = $this->normalizeOptions(
+                $definition['options'] ?? null,
+                $key,
+            );
+            $other = $this->normalizeOther(
+                $definition['other'] ?? null,
+                $key,
+                $options,
+            );
+        } else {
+            if (array_key_exists('options', $definition) && $definition['options'] !== null) {
+                throw new InvalidArgumentException(
+                    "Webinar registration question [{$key}] textarea type may not define options.",
+                );
+            }
+
+            if (array_key_exists('other', $definition) && $definition['other'] !== null) {
+                throw new InvalidArgumentException(
+                    "Webinar registration question [{$key}] textarea type may not define other configuration.",
+                );
+            }
+
+            $maxLength = $this->textMaxLength(
+                $definition['max_length'] ?? self::DEFAULT_TEXT_MAX_LENGTH,
+                $key,
+            );
+        }
 
         return [
             'key' => $key,
             'label' => $label,
             'type' => $type,
+            'placement' => $placement,
             'required' => ($definition['required'] ?? false) === true,
             'placeholder' => $this->nullableString($definition['placeholder'] ?? null)
-                ?? 'Select an option',
+                ?? ($type === self::TYPE_TEXTAREA ? 'Type your answer' : 'Select an option'),
             'helper' => $this->nullableString($definition['helper'] ?? null),
             'definition_version' => $this->definitionVersion(
                 $definition['definition_version'] ?? 1,
@@ -342,6 +457,7 @@ class WebinarRegistrationQuestionResolver
             ),
             'options' => $options,
             'other' => $other,
+            'max_length' => $maxLength,
             'sort_order' => ($index + 1) * 10,
         ];
     }
@@ -455,6 +571,42 @@ class WebinarRegistrationQuestionResolver
             'required' => ($definition['required'] ?? true) === true,
             'max_length' => $maxLength,
         ];
+    }
+
+    private function textMaxLength(mixed $value, string $questionKey): int
+    {
+        if (! is_int($value)
+            || $value < 1
+            || $value > self::MAX_TEXT_MAX_LENGTH
+        ) {
+            throw new InvalidArgumentException(sprintf(
+                'Webinar registration question [%s] max_length must be between 1 and %d.',
+                $questionKey,
+                self::MAX_TEXT_MAX_LENGTH,
+            ));
+        }
+
+        return $value;
+    }
+
+    private function assertSupportedPlacement(
+        string $placement,
+        ?string $questionKey = null,
+    ): void {
+        if (in_array($placement, [
+            self::PLACEMENT_REGISTRATION,
+            self::PLACEMENT_POST_REGISTRATION,
+        ], true)) {
+            return;
+        }
+
+        $subject = $questionKey !== null
+            ? "Webinar registration question [{$questionKey}]"
+            : 'Webinar registration question';
+
+        throw new InvalidArgumentException(
+            "{$subject} placement [{$placement}] is not supported.",
+        );
     }
 
     private function requiredKey(mixed $value, string $field): string

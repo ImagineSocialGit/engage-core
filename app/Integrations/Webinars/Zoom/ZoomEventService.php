@@ -8,8 +8,10 @@ use App\Modules\Webinars\Data\ProviderRecordingData;
 use App\Modules\Webinars\Data\ProviderWebinarData;
 use App\Modules\Webinars\Data\ProviderWebinarSnapshot;
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
+use App\Modules\Webinars\Exceptions\ProviderRegistrationPreparationConnectionException;
 use App\Modules\Webinars\Services\WebinarTimezoneResolver;
 use Carbon\Carbon;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use InvalidArgumentException;
@@ -32,7 +34,16 @@ class ZoomEventService
         string $eventId,
         array $data,
     ): array {
-        $response = $this->client()->post(
+        try {
+            $client = $this->client();
+        } catch (ConnectionException $exception) {
+            throw new ProviderRegistrationPreparationConnectionException(
+                'Unable to prepare the Webinar provider registration request because provider authentication could not be reached.',
+                previous: $exception,
+            );
+        }
+
+        $response = $client->post(
             sprintf('/%s/%s/registrants', $this->plural($eventType), rawurlencode($eventId)),
             [
                 'email' => $data['email'],
