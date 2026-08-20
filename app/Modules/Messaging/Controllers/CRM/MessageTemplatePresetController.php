@@ -168,6 +168,16 @@ class MessageTemplatePresetController extends Controller
             $messageTemplate,
             $sourcePayload,
         );
+
+        $submittedPayload = $this->preserveTrackingKeys(
+            baseline: $messageTemplate->currentPayload(),
+            submitted: $submittedPayload,
+        );
+        $submittedPayload = $this->preserveTrackingKeys(
+            baseline: $baselinePayload,
+            submitted: $submittedPayload,
+        );
+
         $overridePayload = $this->payloadDelta($baselinePayload, $submittedPayload);
         $actor = $request->user();
 
@@ -467,6 +477,59 @@ class MessageTemplatePresetController extends Controller
         }
 
         return $delta;
+    }
+
+    /**
+     * tracking_key is immutable structural identity for a link, not operator-facing
+     * copy. Preserve it when CRM editing changes the label or destination.
+     *
+     * @param array<string,mixed> $baseline
+     * @param array<string,mixed> $submitted
+     * @return array<string,mixed>
+     */
+    private function preserveTrackingKeys(array $baseline, array $submitted): array
+    {
+        foreach (['cta', 'secondary_link'] as $key) {
+            $baselineLink = $baseline[$key] ?? null;
+            $submittedLink = $submitted[$key] ?? null;
+
+            if (! is_array($baselineLink)
+                || ! is_array($submittedLink)
+                || ! is_string($baselineLink['tracking_key'] ?? null)
+                || trim($baselineLink['tracking_key']) === ''
+            ) {
+                continue;
+            }
+
+            $submitted[$key]['tracking_key'] = trim($baselineLink['tracking_key']);
+        }
+
+        $baselineCtas = $baseline['ctas'] ?? null;
+        $submittedCtas = $submitted['ctas'] ?? null;
+
+        if (is_array($baselineCtas)
+            && array_is_list($baselineCtas)
+            && is_array($submittedCtas)
+            && array_is_list($submittedCtas)
+        ) {
+            foreach ($submittedCtas as $index => $submittedCta) {
+                $baselineCta = $baselineCtas[$index] ?? null;
+
+                if (! is_array($submittedCta)
+                    || ! is_array($baselineCta)
+                    || ! is_string($baselineCta['tracking_key'] ?? null)
+                    || trim($baselineCta['tracking_key']) === ''
+                ) {
+                    continue;
+                }
+
+                $submitted['ctas'][$index]['tracking_key'] = trim(
+                    $baselineCta['tracking_key'],
+                );
+            }
+        }
+
+        return $submitted;
     }
 
     /** @return array<string,mixed> */

@@ -16,6 +16,7 @@ use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Jobs\ProcessDueMessageChainEnrollmentsJob;
+use App\Modules\Messaging\Jobs\PruneScheduledMessageCtaEngagementsJob;
 use App\Modules\Messaging\Jobs\PublishScheduledMessageOutboxEventsJob;
 use App\Modules\Messaging\Jobs\RecoverStaleScheduledMessageClaimsJob;
 use App\Modules\Messaging\Listeners\AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal;
@@ -140,6 +141,11 @@ class MessagingModuleServiceProvider extends ServiceProvider
                 $schedule
                     ->job(new PublishScheduledMessageOutboxEventsJob())
                     ->everyMinute()
+                    ->withoutOverlapping();
+
+                $schedule
+                    ->job(new PruneScheduledMessageCtaEngagementsJob())
+                    ->daily()
                     ->withoutOverlapping();
             },
         );

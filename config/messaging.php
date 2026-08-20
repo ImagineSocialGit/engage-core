@@ -130,6 +130,13 @@ return [
         'dedupe_enabled' => true,
     ],
 
+    'cta_tracking' => [
+        'enabled' => true,
+        'retention_days' => 180,
+        'prune_batch_size' => 1000,
+        'prune_max_rows_per_run' => 10000,
+    ],
+
     'bulk_delivery' => [
         'chunk_size' => env('MESSAGING_BULK_CHUNK_SIZE', 100),
         'release_interval_seconds' => env('MESSAGING_BULK_RELEASE_INTERVAL_SECONDS', 15),

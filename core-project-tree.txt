@@ -559,6 +559,7 @@
 │   │   │   │   ├── PublishMessageChainVersionAction.php
 │   │   │   │   ├── PublishMessageTemplateVersionAction.php
 │   │   │   │   ├── RecordMessageConsentAction.php
+│   │   │   │   ├── RecordScheduledMessageCtaEngagementAction.php
 │   │   │   │   ├── RecoverStaleScheduledMessageClaimsAction.php
 │   │   │   │   ├── ResumeMessageChainEnrollmentAction.php
 │   │   │   │   ├── RevokeMessageConsentAction.php
@@ -599,7 +600,8 @@
 │   │   │   │   │   └── MessageTemplatePresetController.php
 │   │   │   │   └── Public
 │   │   │   │       ├── ConsentRevocationController.php
-│   │   │   │       └── ContactPermissionInvitationController.php
+│   │   │   │       ├── ContactPermissionInvitationController.php
+│   │   │   │       └── CtaEngagementRedirectController.php
 │   │   │   ├── Data
 │   │   │   │   ├── Automation
 │   │   │   │   │   └── SendMessageAutomationDefinition.php
@@ -627,6 +629,7 @@
 │   │   │   ├── Jobs
 │   │   │   │   ├── ProcessDueMessageChainEnrollmentsJob.php
 │   │   │   │   ├── ProcessMessageChainEnrollmentJob.php
+│   │   │   │   ├── PruneScheduledMessageCtaEngagementsJob.php
 │   │   │   │   ├── PublishScheduledMessageOutboxEventsJob.php
 │   │   │   │   ├── RecoverStaleScheduledMessageClaimsJob.php
 │   │   │   │   └── SendScheduledMessageJob.php
@@ -652,6 +655,7 @@
 │   │   │   │   ├── MessageTemplatePreset.php
 │   │   │   │   ├── MessageTemplateVersion.php
 │   │   │   │   ├── ScheduledMessageComponent.php
+│   │   │   │   ├── ScheduledMessageCtaEngagement.php
 │   │   │   │   ├── ScheduledMessageDeliveryAttempt.php
 │   │   │   │   ├── ScheduledMessageOutboxEvent.php
 │   │   │   │   ├── ScheduledMessage.php
@@ -683,6 +687,7 @@
 │   │   │   │   ├── ContactShow
 │   │   │   │   │   ├── ContactMessagingShowDataProvider.php
 │   │   │   │   │   └── ContactScheduledMessagesVisibilityDataProvider.php
+│   │   │   │   ├── CtaTrackingRequestClassifier.php
 │   │   │   │   ├── DevMessageSink.php
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailMessagingService.php
@@ -733,6 +738,7 @@
 │   │   │   │       ├── SmsProviderManager.php
 │   │   │   │       └── SmsSendGuard.php
 │   │   │   ├── Support
+│   │   │   │   ├── CtaTrackingLinkGenerator.php
 │   │   │   │   ├── EmailConsentRevocationLinkGenerator.php
 │   │   │   │   ├── EmailReplyAddressGenerator.php
 │   │   │   │   └── MessageDefinitionConfigPath.php
@@ -1628,7 +1634,8 @@
 │   │   │   │   ├── 2026_05_19_221010_create_message_suppressions_table.php
 │   │   │   │   ├── 2026_07_01_000001_create_contact_permission_invitations_table.php
 │   │   │   │   ├── 2026_07_30_224000_create_message_template_and_chain_tables.php
-│   │   │   │   └── 2026_07_30_224001_create_message_chain_runtime_support_tables.php
+│   │   │   │   ├── 2026_07_30_224001_create_message_chain_runtime_support_tables.php
+│   │   │   │   └── 2026_08_20_203000_create_scheduled_message_cta_engagements_table.php
 │   │   │   ├── portal
 │   │   │   │   ├── 2026_04_15_195870_create_portal_users_table.php
 │   │   │   │   ├── 2026_04_15_195871_create_portal_contact_links_table.php
@@ -1749,6 +1756,7 @@
 │   │   ├── location-relationship-area-composition.md
 │   │   ├── messaging
 │   │   │   ├── checklist.md
+│   │   │   ├── cta-engagement-tracking.md
 │   │   │   ├── module_state.md
 │   │   │   ├── permission-invitations.md
 │   │   │   ├── persistence-architecture.md
@@ -2189,6 +2197,7 @@
 │   │   │   ├── ContactPermissionInvitationControllerTest.php
 │   │   │   ├── ContactScheduledMessagesTerminalResultTest.php
 │   │   │   ├── CreateContactPermissionInvitationsForImportBatchActionTest.php
+│   │   │   ├── CtaEngagementTrackingTest.php
 │   │   │   ├── DispatchConsentOptInMessageActionTest.php
 │   │   │   ├── DispatchMessageActionTest.php
 │   │   │   ├── EmailMessagingServiceTest.php
@@ -2220,6 +2229,7 @@
 │   │   │   ├── MessageTemplateBehaviorOwnershipValidationTest.php
 │   │   │   ├── MessageTemplateCompositionConfigIntegrationTest.php
 │   │   │   ├── MessageTemplateCompositionConfigSyncTest.php
+│   │   │   ├── MessageTemplateCompositionCustomizationSyncTest.php
 │   │   │   ├── MessageTemplateCompositionEditorTest.php
 │   │   │   ├── MessageTemplateCompositionSyncTest.php
 │   │   │   ├── MessageTemplateCompositionTest.php
@@ -2461,4 +2471,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-620 directories, 1842 files
+620 directories, 1852 files

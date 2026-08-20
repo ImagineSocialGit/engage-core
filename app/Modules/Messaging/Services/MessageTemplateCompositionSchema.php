@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Services;
 
 use App\Modules\Messaging\Models\MessageTemplateCompositionLayer;
+use App\Modules\Messaging\Support\CtaTrackingLinkGenerator;
 use InvalidArgumentException;
 
 class MessageTemplateCompositionSchema
@@ -184,7 +185,7 @@ class MessageTemplateCompositionSchema
             );
         }
 
-        $unsupported = array_diff(array_keys($value), ['label', 'url']);
+        $unsupported = array_diff(array_keys($value), ['tracking_key', 'label', 'url']);
 
         if ($unsupported !== []) {
             throw new InvalidArgumentException(
@@ -201,6 +202,15 @@ class MessageTemplateCompositionSchema
                     "Composition field [{$key}.{$field}] must be a string or null.",
                 );
             }
+        }
+
+        if (array_key_exists('tracking_key', $value)
+            && $value['tracking_key'] !== null
+            && ! CtaTrackingLinkGenerator::isValidTrackingKey($value['tracking_key'])
+        ) {
+            throw new InvalidArgumentException(
+                "Composition field [{$key}.tracking_key] must be a stable lowercase tracking key of at most 96 characters.",
+            );
         }
     }
 

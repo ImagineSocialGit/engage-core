@@ -151,6 +151,12 @@ class ScheduledMessage extends Model
             ->orderBy('id');
     }
 
+    public function ctaEngagements(): HasMany
+    {
+        return $this->hasMany(ScheduledMessageCtaEngagement::class)
+            ->orderBy('cta_key')
+            ->orderBy('classification');
+    }
 
     public function scopeBackgroundEligible(Builder $query): Builder
     {

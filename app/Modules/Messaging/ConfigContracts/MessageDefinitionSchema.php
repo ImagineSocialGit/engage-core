@@ -43,6 +43,7 @@ class MessageDefinitionSchema
     public static function link(): ConfigSchema
     {
         return ConfigSchema::object([
+            'tracking_key' => ConfigField::optional(ConfigSchema::string()),
             'label' => ConfigField::required(ConfigSchema::string()),
             'url' => ConfigField::required(ConfigSchema::string()),
         ]);

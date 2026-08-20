@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 3,
+    'version' => 4,
     'tables' => [
         'message_template_presets' => [
             'mode' => 'upsert',
@@ -630,6 +630,24 @@ return [
                         'deferred' => true,
                     ],
                 ],
+            ],
+        ],
+
+        'scheduled_message_cta_engagements' => [
+            'mode' => 'insert_empty',
+            'preserve_id' => true,
+            'order_by' => ['id'],
+            'columns' => [
+                'id',
+                'scheduled_message_id',
+                'cta_key',
+                'classification',
+                'occurrence_count',
+                'first_occurred_at',
+                'last_occurred_at',
+            ],
+            'references' => [
+                'scheduled_message_id' => 'scheduled_messages',
             ],
         ],
 

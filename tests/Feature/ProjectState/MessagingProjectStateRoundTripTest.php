@@ -36,6 +36,7 @@ class MessagingProjectStateRoundTripTest extends TestCase
         $this->assertSame((int) config('project_state.version'), $document['version']);
         $this->assertCount(1, $document['sections']['messaging']['tables']['message_templates']);
         $this->assertCount(2, $document['sections']['messaging']['tables']['scheduled_messages']);
+        $this->assertCount(1, $document['sections']['messaging']['tables']['scheduled_message_cta_engagements']);
         $this->assertCount(2, $document['sections']['messaging']['tables']['scheduled_message_delivery_attempts']);
 
         $this->prepareFreshPresetSyncedTarget();
@@ -158,6 +159,14 @@ class MessagingProjectStateRoundTripTest extends TestCase
             'id' => 160,
             'message_template_version_id' => 211,
             'status' => 'sent',
+        ]);
+
+        $this->assertDatabaseHas('scheduled_message_cta_engagements', [
+            'id' => 165,
+            'scheduled_message_id' => 160,
+            'cta_key' => 'replay',
+            'classification' => 'likely_human',
+            'occurrence_count' => 2,
         ]);
         $this->assertDatabaseHas('contact_permission_invitations', [
             'id' => 155,
@@ -613,6 +622,16 @@ class MessagingProjectStateRoundTripTest extends TestCase
             ),
         ]);
 
+        DB::table('scheduled_message_cta_engagements')->insert([
+            'id' => 165,
+            'scheduled_message_id' => 160,
+            'cta_key' => 'replay',
+            'classification' => 'likely_human',
+            'occurrence_count' => 2,
+            'first_occurred_at' => $now,
+            'last_occurred_at' => $now->copy()->addMinute(),
+        ]);
+
         DB::table('contact_permission_invitations')->insert([
             'id' => 155,
             'contact_id' => 60,
@@ -725,6 +744,7 @@ class MessagingProjectStateRoundTripTest extends TestCase
         DB::table('scheduled_message_components')->delete();
         DB::table('scheduled_message_render_contexts')->delete();
         DB::table('contact_permission_invitations')->delete();
+        DB::table('scheduled_message_cta_engagements')->delete();
         DB::table('scheduled_messages')->delete();
         DB::table('message_chain_enrollments')->delete();
         DB::table('consent_revocations')->delete();

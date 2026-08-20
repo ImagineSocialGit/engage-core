@@ -10,6 +10,7 @@ use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplateCompositionLayer;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
+use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -144,6 +145,122 @@ class MessageTemplateCompositionEditorTest extends TestCase
         $this->assertNotSame($oldSecond->getKey(), $secondTemplate->current_version_id);
         $this->assertSame('Shared old', $oldFirst->fresh()->payload()['message']);
         $this->assertSame('Shared old', $oldSecond->fresh()->payload()['message']);
+    }
+
+    public function test_tracked_cta_identity_survives_shared_and_message_copy_edits(): void
+    {
+        config()->set('modules.enabled', ['messaging']);
+        config()->set('client.key', 'fixture-client');
+
+        $user = User::factory()->create();
+
+        $preset = MessageTemplatePreset::factory()->create([
+            'key' => 'fixture.follow-up.email',
+            'name' => 'Fixture Follow-up',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'fixture',
+            'message_type' => 'follow_up',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'notifications',
+            'dispatch_keys' => ['fixture_dispatched'],
+            'payload' => [
+                'subject' => 'Follow up',
+                'body' => 'Choose a next step: {cta}',
+            ],
+            'tokens' => [],
+        ]);
+
+        MessageTemplateCatalogEntry::factory()
+            ->forPreset($preset)
+            ->create([
+                'module_key' => 'messaging',
+                'module_label' => 'Messaging',
+                'surface' => 'message_templates',
+                'group_key' => 'fixture:follow-up',
+                'group_label' => 'Fixture Follow-up',
+                'item_key' => $preset->key,
+                'item_label' => $preset->name,
+                'item_order' => 10,
+                'usage_type' => 'fixture',
+            ]);
+
+        $template = MessageTemplate::query()->create([
+            'key' => $preset->key,
+            'name' => $preset->name,
+            'channel' => 'email',
+            'status' => MessageTemplate::STATUS_ACTIVE,
+            'composition_family_key' => 'follow_up',
+            'source' => 'test',
+        ]);
+
+        $layer = app(UpsertMessageTemplateCompositionLayerAction::class)->handle(
+            scopeType: MessageTemplateCompositionLayer::SCOPE_FAMILY,
+            channel: 'email',
+            payload: [
+                'ctas' => [
+                    [
+                        'tracking_key' => 'replay',
+                        'label' => 'Watch',
+                        'url' => 'https://example.test/replay',
+                    ],
+                    [
+                        'tracking_key' => 'pre_approval',
+                        'label' => 'Apply',
+                        'url' => 'https://example.test/apply',
+                    ],
+                ],
+            ],
+            clientKey: 'fixture-client',
+            familyKey: 'follow_up',
+            source: 'config',
+            isCustomized: false,
+        );
+
+        app(PublishMessageTemplateVersionAction::class)->handle(
+            $template,
+            $preset->payload,
+        );
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->patch(route('crm.messaging.message-templates.composition-layers.update', $layer), [
+                'payload' => [
+                    'ctas' => [
+                        ['label' => 'Watch the replay', 'url' => 'https://example.test/replay'],
+                        ['label' => 'Get started', 'url' => 'https://example.test/apply'],
+                    ],
+                ],
+            ])
+            ->assertRedirect();
+
+        $layer->refresh();
+
+        $this->assertSame('replay', $layer->payload['ctas'][0]['tracking_key']);
+        $this->assertSame('pre_approval', $layer->payload['ctas'][1]['tracking_key']);
+
+        $this->actingAs($user)
+            ->patch('http://crm.'.config('app.root_domain').'/message-templates/'.$preset->getKey(), [
+                'payload' => [
+                    'subject' => 'Follow up',
+                    'body' => 'Choose a next step: {cta}',
+                    'ctas' => [
+                        ['label' => 'Watch the replay', 'url' => 'https://example.test/replay'],
+                        ['label' => 'Apply now', 'url' => 'https://example.test/apply-now'],
+                    ],
+                ],
+            ])
+            ->assertRedirect();
+
+        $override = MessageTemplateCompositionLayer::query()
+            ->where('scope_type', MessageTemplateCompositionLayer::SCOPE_MESSAGE)
+            ->where('message_template_id', $template->getKey())
+            ->sole();
+
+        $this->assertSame('replay', $override->payload['ctas'][0]['tracking_key']);
+        $this->assertSame('pre_approval', $override->payload['ctas'][1]['tracking_key']);
+        $this->assertSame('https://example.test/apply-now', $override->payload['ctas'][1]['url']);
     }
 
     /** @return array{MessageTemplatePreset, MessageTemplate} */

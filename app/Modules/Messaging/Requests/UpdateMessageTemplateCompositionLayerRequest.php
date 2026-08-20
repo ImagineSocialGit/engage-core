@@ -101,20 +101,43 @@ class UpdateMessageTemplateCompositionLayerRequest extends FormRequest
             }
 
             if (in_array($key, ['cta', 'secondary_link'], true) && is_array($value)) {
-                $clean[$key] = [
+                $currentLink = is_array($current[$key] ?? null) ? $current[$key] : [];
+
+                $clean[$key] = array_filter([
+                    'tracking_key' => is_string($currentLink['tracking_key'] ?? null)
+                        ? trim($currentLink['tracking_key'])
+                        : null,
                     'label' => is_string($value['label'] ?? null) ? trim($value['label']) : null,
                     'url' => is_string($value['url'] ?? null) ? trim($value['url']) : null,
-                ];
+                ], static fn (mixed $item): bool => $item !== null && $item !== '');
                 continue;
             }
 
             if ($key === 'ctas' && is_array($value) && array_is_list($value)) {
+                $currentCtas = is_array($current['ctas'] ?? null) && array_is_list($current['ctas'])
+                    ? $current['ctas']
+                    : [];
+
                 $clean['ctas'] = array_values(array_map(
-                    static fn (mixed $cta): array => [
-                        'label' => is_array($cta) && is_string($cta['label'] ?? null) ? trim($cta['label']) : null,
-                        'url' => is_array($cta) && is_string($cta['url'] ?? null) ? trim($cta['url']) : null,
-                    ],
+                    static function (mixed $cta, int $index) use ($currentCtas): array {
+                        $currentCta = is_array($currentCtas[$index] ?? null)
+                            ? $currentCtas[$index]
+                            : [];
+
+                        return array_filter([
+                            'tracking_key' => is_string($currentCta['tracking_key'] ?? null)
+                                ? trim($currentCta['tracking_key'])
+                                : null,
+                            'label' => is_array($cta) && is_string($cta['label'] ?? null)
+                                ? trim($cta['label'])
+                                : null,
+                            'url' => is_array($cta) && is_string($cta['url'] ?? null)
+                                ? trim($cta['url'])
+                                : null,
+                        ], static fn (mixed $item): bool => $item !== null && $item !== '');
+                    },
                     $value,
+                    array_keys($value),
                 ));
             }
         }

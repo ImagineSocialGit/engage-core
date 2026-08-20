@@ -4,6 +4,7 @@ namespace App\Modules\Messaging\Payloads;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Contracts\Email\EmailMessage;
+use App\Modules\Messaging\Support\CtaTrackingLinkGenerator;
 use App\Modules\Messaging\Support\EmailConsentRevocationLinkGenerator;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Support\Clients\ViewResolver;
@@ -407,9 +408,13 @@ class EmailPayload implements EmailMessage
 
     private function resolvedArray(string $key, array $value): array
     {
-        return $this->interpolateRecursive(
+        $resolved = $this->interpolateRecursive(
             $value !== [] ? $value : $this->configArray($key)
         );
+
+        return in_array($key, ['cta', 'secondary_link'], true)
+            ? $this->withTrackedDestination($resolved)
+            : $resolved;
     }
 
     private function resolvedListArray(string $key, array $value): array
@@ -422,12 +427,48 @@ class EmailPayload implements EmailMessage
 
         return array_values(array_filter(
             array_map(
-                fn (mixed $item): ?array => is_array($item)
-                    ? $this->interpolateRecursive($item)
-                    : null,
+                function (mixed $item) use ($key): ?array {
+                    if (! is_array($item)) {
+                        return null;
+                    }
+
+                    $item = $this->interpolateRecursive($item);
+
+                    return $key === 'ctas'
+                        ? $this->withTrackedDestination($item)
+                        : $item;
+                },
                 $resolved,
             ),
         ));
+    }
+
+    /**
+     * @param array<string,mixed> $link
+     * @return array<string,mixed>
+     */
+    private function withTrackedDestination(array $link): array
+    {
+        $scheduledMessageId = self::nullableInt(
+            data_get($this->meta, 'delivery.scheduled_message_id'),
+        );
+        $trackingKey = $link['tracking_key'] ?? null;
+        $destination = $link['url'] ?? null;
+
+        if ($scheduledMessageId === null
+            || ! CtaTrackingLinkGenerator::isValidTrackingKey($trackingKey)
+            || ! CtaTrackingLinkGenerator::isTrackableDestination($destination)
+        ) {
+            return $link;
+        }
+
+        $link['url'] = app(CtaTrackingLinkGenerator::class)->forScheduledMessage(
+            scheduledMessageId: $scheduledMessageId,
+            ctaKey: trim((string) $trackingKey),
+            destination: trim((string) $destination),
+        );
+
+        return $link;
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Modules\Messaging\Services;
 
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Support\CtaTrackingLinkGenerator;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Support\Queues\QueueContract;
 
@@ -533,6 +534,51 @@ class MessageConfigValidator
             foreach (['label', 'url'] as $requiredLinkKey) {
                 if (! $this->filledString($payload[$linkKey][$requiredLinkKey] ?? null)) {
                     $issues[] = $this->issue('error', "{$path}.{$linkKey}.{$requiredLinkKey}", "Payload [{$linkKey}] requires [{$requiredLinkKey}].");
+                }
+            }
+
+            if (array_key_exists('tracking_key', $payload[$linkKey])
+                && ! CtaTrackingLinkGenerator::isValidTrackingKey($payload[$linkKey]['tracking_key'])
+            ) {
+                $issues[] = $this->issue(
+                    'error',
+                    "{$path}.{$linkKey}.tracking_key",
+                    "Payload [{$linkKey}.tracking_key] must be a stable lowercase tracking key of at most 96 characters.",
+                );
+            }
+        }
+
+        if (array_key_exists('ctas', $payload)) {
+            $ctas = $payload['ctas'];
+
+            if (! is_array($ctas) || ! array_is_list($ctas)) {
+                $issues[] = $this->issue('error', "{$path}.ctas", 'Payload [ctas] must be a list of links.');
+            } else {
+                foreach ($ctas as $index => $cta) {
+                    if (! is_array($cta)) {
+                        $issues[] = $this->issue('error', "{$path}.ctas.{$index}", 'Payload CTA must be an array.');
+                        continue;
+                    }
+
+                    foreach (['label', 'url'] as $requiredLinkKey) {
+                        if (! $this->filledString($cta[$requiredLinkKey] ?? null)) {
+                            $issues[] = $this->issue(
+                                'error',
+                                "{$path}.ctas.{$index}.{$requiredLinkKey}",
+                                "Payload CTA requires [{$requiredLinkKey}].",
+                            );
+                        }
+                    }
+
+                    if (array_key_exists('tracking_key', $cta)
+                        && ! CtaTrackingLinkGenerator::isValidTrackingKey($cta['tracking_key'])
+                    ) {
+                        $issues[] = $this->issue(
+                            'error',
+                            "{$path}.ctas.{$index}.tracking_key",
+                            'Payload CTA tracking_key must be a stable lowercase tracking key of at most 96 characters.',
+                        );
+                    }
                 }
             }
         }
