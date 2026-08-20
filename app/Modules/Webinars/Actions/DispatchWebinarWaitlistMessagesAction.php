@@ -7,6 +7,7 @@ use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use App\Modules\Webinars\Services\WebinarMessageAreaRegistry;
+use App\Modules\Webinars\Services\WebinarWaitlistNotificationStartResolver;
 
 class DispatchWebinarWaitlistMessagesAction
 {
@@ -18,6 +19,7 @@ class DispatchWebinarWaitlistMessagesAction
         private readonly StartWebinarMessageChainEnrollmentAction $startMessageChainEnrollment,
         private readonly MessageChannelAvailability $messageChannelAvailability,
         private readonly WebinarMessageAreaRegistry $messageAreaRegistry,
+        private readonly WebinarWaitlistNotificationStartResolver $notificationStartResolver,
     ) {}
 
     public function handle(
@@ -62,7 +64,7 @@ class DispatchWebinarWaitlistMessagesAction
             messageAreaKey: 'waitlist',
             recipient: $signup->contact,
             context: $signup,
-            startedAt: now(),
+            startedAt: $this->notificationStartResolver->resolve($signup, $webinar),
             required: false,
         );
 

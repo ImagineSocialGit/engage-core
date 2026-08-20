@@ -56,6 +56,10 @@ class WebinarPostEventConfigContract implements ConfigContract
                         ConfigSchema::integer(),
                         365,
                     ),
+                    'notification_lead_days' => ConfigField::defaulted(
+                        ConfigSchema::integer(),
+                        0,
+                    ),
                     'channels' => ConfigField::defaulted(
                         ConfigSchema::listOf(ConfigSchema::string(
                             allowedValues: ['email', 'sms'],
@@ -66,6 +70,7 @@ class WebinarPostEventConfigContract implements ConfigContract
                 [
                     'enabled' => false,
                     'duration_days' => 365,
+                    'notification_lead_days' => 0,
                     'channels' => [],
                 ],
             ),
@@ -75,9 +80,6 @@ class WebinarPostEventConfigContract implements ConfigContract
                 ),
             ])),
             'outcome_messages' => ConfigField::required(ConfigSchema::object([
-                // Legacy fields remain accepted during client-config migration,
-                // but message-area enablement and identity now live under
-                // webinars.message_areas.
                 'enabled' => ConfigField::optional(ConfigSchema::boolean()),
                 'dispatch_key' => ConfigField::optional(ConfigSchema::string()),
                 'purpose' => ConfigField::optional(ConfigSchema::string()),

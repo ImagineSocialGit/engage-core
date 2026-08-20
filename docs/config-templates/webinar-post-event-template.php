@@ -73,10 +73,15 @@ return [
     | Webinar-owned. Enabling this does not grant Messaging consent. Only
     | channels with current marketing consent in the Webinar consent domain
     | are retained on the recurring subscription.
+    |
+    | notification_lead_days delays recurring missed-attendee availability
+    | messages until that many days before the next occurrence. It does not
+    | delay ordinary one-shot public waitlist notifications.
     */
     'future_availability_subscription' => [
         'enabled' => false,
         'duration_days' => 365,
+        'notification_lead_days' => 0,
         'channels' => [
             'email',
             'sms',
@@ -90,7 +95,7 @@ return [
         'scope' => 'webinar',
         'channels' => [
             'email',
-            'sms'
+            'sms',
         ],
 
         'conditions' => [

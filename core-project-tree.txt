@@ -1125,7 +1125,8 @@
 │   │   │   │   ├── WebinarScheduleProfileDefinitionResolver.php
 │   │   │   │   ├── WebinarScheduleProfileResolver.php
 │   │   │   │   ├── WebinarStateCanonicalizer.php
-│   │   │   │   └── WebinarTimezoneResolver.php
+│   │   │   │   ├── WebinarTimezoneResolver.php
+│   │   │   │   └── WebinarWaitlistNotificationStartResolver.php
 │   │   │   ├── Support
 │   │   │   │   ├── WebinarJoinBrowserProof.php
 │   │   │   │   ├── WebinarJoinLinkGenerator.php
@@ -2087,6 +2088,7 @@
 │   │   │   └── EventsFoundationTest.php
 │   │   ├── FlowRoutes
 │   │   │   ├── AutomationEventReceiptTest.php
+│   │   │   ├── AutomationEventWorkflowContextTest.php
 │   │   │   ├── AutomationPointAuthoringRegistryTest.php
 │   │   │   ├── AutomationPointExtensionRegistryTest.php
 │   │   │   ├── CompactFlowRoutePresetAuthoringTest.php
@@ -2391,6 +2393,7 @@
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
 │   │   │   ├── WebinarStateCanonicalizerTest.php
 │   │   │   ├── WebinarTokenReferenceContractTest.php
+│   │   │   ├── WebinarWaitlistNotificationStartResolverTest.php
 │   │   │   ├── WebinarWaitlistSignupControllerTest.php
 │   │   │   ├── ZoomMeetingProviderContractTest.php
 │   │   │   └── ZoomWebinarServiceSnapshotTest.php
@@ -2405,4 +2408,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-613 directories, 1793 files
+613 directories, 1796 files

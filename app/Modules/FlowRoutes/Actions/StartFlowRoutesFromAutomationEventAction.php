@@ -7,6 +7,7 @@ use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Services\FlowRouteTriggerBindingResolver;
+use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use Illuminate\Support\Facades\DB;
 
 class StartFlowRoutesFromAutomationEventAction
@@ -67,14 +68,19 @@ class StartFlowRoutesFromAutomationEventAction
                 return $existingProgress;
             }
 
+            $workflowProfile = ContactWorkflowProfile::query()
+                ->where('contact_id', $event->contactId)
+                ->lockForUpdate()
+                ->first();
+
             $currentFlowRoutePoint = $this->startingFlowRoutePoint($flowRoute);
 
             $progress = ContactFlowRouteProgress::query()->create([
                 'contact_id' => $event->contactId,
                 'subject_type' => $event->subjectType,
                 'subject_id' => $event->subjectId,
-                'contact_status_id' => null,
-                'contact_workflow_profile_id' => null,
+                'contact_status_id' => $workflowProfile?->contact_status_id,
+                'contact_workflow_profile_id' => $workflowProfile?->getKey(),
                 'flow_route_id' => $flowRoute->getKey(),
                 'current_flow_route_point_id' => $currentFlowRoutePoint?->getKey(),
                 'status' => ContactFlowRouteProgress::STATUS_ACTIVE,

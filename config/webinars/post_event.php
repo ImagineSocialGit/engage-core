@@ -38,6 +38,7 @@ return [
     'future_availability_subscription' => [
         'enabled' => false,
         'duration_days' => 365,
+        'notification_lead_days' => 0,
         'channels' => [],
     ],
 
