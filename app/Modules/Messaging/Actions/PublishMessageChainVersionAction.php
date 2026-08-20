@@ -304,7 +304,7 @@ class PublishMessageChainVersionAction
             "MessageChainStep [{$stepKey}] variant [{$key}] message_template_version_id",
         );
 
-        return [
+        $normalized = [
             'key' => $key,
             'sort_order' => $this->nonNegativeInteger(
                 $variant['sort_order'] ?? $defaultSortOrder,
@@ -336,6 +336,16 @@ class PublishMessageChainVersionAction
             ),
             'is_active' => (bool) ($variant['is_active'] ?? true),
         ];
+
+        $replyProfileKey = $this->nullableSegment(
+            $variant['reply_profile_key'] ?? null,
+        );
+
+        if ($replyProfileKey !== null) {
+            $normalized['reply_profile_key'] = $replyProfileKey;
+        }
+
+        return $normalized;
     }
 
     /**

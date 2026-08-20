@@ -26,7 +26,7 @@ class TasksProjectStateRoundTripTest extends TestCase
 
         $this->assertIsArray($sections);
         $this->assertEquals(
-            ['core', 'relationships', 'mortgage', 'internal_notifications', 'inbound_messaging', 'messaging', 'webinars', 'tasks', 'campaigns', 'broadcasts', 'workflow', 'automation_opportunities', 'automation_events', 'flow_routes', 'reporting'],
+            ['core', 'relationships', 'location', 'mortgage', 'internal_notifications', 'inbound_messaging', 'messaging', 'webinars', 'tasks', 'campaigns', 'broadcasts', 'workflow', 'automation_opportunities', 'automation_events', 'flow_routes', 'reporting'],
             array_keys($sections),
         );
 

@@ -222,6 +222,9 @@ class DispatchMessageAction
             messageTemplateVersionId: is_numeric($definition['message_template_version_id'] ?? null)
                 ? (int) $definition['message_template_version_id']
                 : null,
+            replyProfileKey: is_string($definition['reply_profile_key'] ?? null)
+                ? $definition['reply_profile_key']
+                : null,
         );
     }
 

@@ -20,6 +20,7 @@ class MessageDefinitionSchema
             'key' => ConfigField::optional(ConfigSchema::string()),
             'enabled' => ConfigField::defaulted(ConfigSchema::boolean(), true),
             'message_type' => ConfigField::optional(ConfigSchema::string()),
+            'reply_profile_key' => ConfigField::optional(ConfigSchema::string(nullable: true)),
             'channel' => ConfigField::optional(ConfigSchema::string(allowedValues: [$channel])),
             'purpose' => ConfigField::optional(ConfigSchema::string(allowedValues: MessagePurpose::values())),
             'scope' => ConfigField::optional(ConfigSchema::string()),

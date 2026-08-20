@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 1,
+    'version' => 2,
     'tables' => [
         'inbound_messages' => [
             'mode' => 'insert_empty',
@@ -25,6 +25,9 @@ return [
                 'classification',
                 'purpose',
                 'scope',
+                'correlated_scheduled_message_id',
+                'reply_intent_key',
+                'reply_correlation_method',
                 'received_at',
                 'processed_at',
                 'meta',
@@ -32,6 +35,9 @@ return [
                 'updated_at',
             ],
             'json_columns' => ['meta'],
+            'deferred_references' => [
+                'correlated_scheduled_message_id' => 'scheduled_messages',
+            ],
             'polymorphic_references' => [
                 [
                     'type_column' => 'sender_type',

@@ -44,11 +44,13 @@ class ScheduleMessageAction
         ?int $messageTemplateVersionId = null,
         ?MessageChainEnrollment $messageChainEnrollment = null,
         ?MessageChainStepVariant $messageChainStepVariant = null,
+        ?string $replyProfileKey = null,
     ): ScheduledMessage {
         $channel = $this->normalizeEnumValue($channel);
         $purpose = $this->normalizeEnumValue($purpose);
         $scope = $this->normalizeSegment($scope);
         $messageType = $this->normalizeSegment($messageType);
+        $replyProfileKey = $this->nullableString($replyProfileKey);
         [
             $messageChainEnrollmentId,
             $messageChainStepVariantId,
@@ -125,6 +127,9 @@ class ScheduleMessageAction
             'message_chain_step_variant_id' => $messageChainStepVariantId,
             'channel' => $channel,
             'message_type' => $messageType,
+            'reply_profile_key' => $messageChainStepVariantId === null
+                ? $replyProfileKey
+                : null,
             'purpose' => $purpose,
             'scope' => $scope,
             'payload_class' => $payloadClass,

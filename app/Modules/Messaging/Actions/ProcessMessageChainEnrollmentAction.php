@@ -733,6 +733,7 @@ class ProcessMessageChainEnrollmentAction
             messageTemplateVersionId: (int) $variant->message_template_version_id,
             messageChainEnrollment: $enrollment,
             messageChainStepVariant: $variant,
+            replyProfileKey: $variant->reply_profile_key,
         );
     }
 

@@ -7,6 +7,7 @@
 
 ## Join-signal integrity
 
+- [ ] Consume generic Messaging CTA click tracking for replay/registration/application links once available, and distinguish trusted human clicks from scanner/prefetch activity before treating them as engagement evidence.
 - [ ] Separate raw join-link resolver hits from trusted human interaction so scanners/prefetchers do not become attendance/engagement evidence.
 - [ ] Preserve enough join-link history to distinguish scanner/prefetch hits from later genuine interaction without retaining unnecessary sensitive request data.
 

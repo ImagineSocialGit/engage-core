@@ -34,6 +34,13 @@ return new class extends Migration
             $table->string('purpose')->nullable()->index();
             $table->string('scope')->nullable()->index();
 
+            $table->foreignId('correlated_scheduled_message_id')
+                ->nullable()
+                ->constrained('scheduled_messages')
+                ->nullOnDelete();
+            $table->string('reply_intent_key', 96)->nullable();
+            $table->string('reply_correlation_method', 32)->nullable();
+
             $table->timestamp('received_at')->nullable()->index();
             $table->timestamp('processed_at')->nullable()->index();
 

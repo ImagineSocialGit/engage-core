@@ -187,7 +187,13 @@ return [
         ],
     ],
 
+    'reply_profiles' => [],
+
     'inbound' => [
+        'reply_correlation' => [
+            'sms_lookback_days' => 90,
+        ],
+
         'handlers' => [
             'sms' => [
                 'consent_revocation' => [

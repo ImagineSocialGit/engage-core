@@ -693,6 +693,10 @@ class SyncMessageTemplatePresetsAction
                 'purpose' => $purpose,
                 'scope' => $scope,
                 'message_type' => $messageType,
+                'reply_profile_key' => is_string($definition['reply_profile_key'] ?? null)
+                    && trim($definition['reply_profile_key']) !== ''
+                        ? trim($definition['reply_profile_key'])
+                        : null,
                 'payload_class' => trim($definition['payload_class']),
                 'queue' => trim($definition['queue']),
                 'dispatch_keys' => $dispatchKeys,

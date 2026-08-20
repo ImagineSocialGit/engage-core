@@ -248,17 +248,19 @@ class ScheduledMessagePayloadResolver
         ScheduledMessage $scheduledMessage,
         array $payload,
     ): array {
-        if (! filled($scheduledMessage->provider_idempotency_key)) {
-            return $payload;
+        $delivery = [
+            'scheduled_message_id' => (int) $scheduledMessage->getKey(),
+        ];
+
+        if (filled($scheduledMessage->provider_idempotency_key)) {
+            $delivery['provider_idempotency_key'] =
+                $scheduledMessage->provider_idempotency_key;
         }
 
         $payload['meta'] = array_replace_recursive(
             is_array($payload['meta'] ?? null) ? $payload['meta'] : [],
             [
-                'delivery' => [
-                    'provider_idempotency_key' =>
-                        $scheduledMessage->provider_idempotency_key,
-                ],
+                'delivery' => $delivery,
             ],
         );
 

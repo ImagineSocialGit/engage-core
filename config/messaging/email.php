@@ -14,6 +14,8 @@ return [
 
     'provider' => env('EMAIL_PROVIDER', 'resend'),
 
+    'inbound_domain' => env('INBOUND_EMAIL_DOMAIN'),
+
     'from' => [
         'transactional' => [
             'address' => env('FROM_EMAIL_TRANSACTIONAL', env('MAIL_FROM_ADDRESS')),

@@ -159,6 +159,7 @@ return new class extends Migration
             $table->string('purpose', 32)->index();
             $table->string('scope', 120)->index();
             $table->string('message_type', 128)->index();
+            $table->string('reply_profile_key', 96)->nullable();
             $table->string('queue', 96)->nullable()->index();
             $table->json('dependency_policy')->nullable();
             $table->json('conditions')->nullable();

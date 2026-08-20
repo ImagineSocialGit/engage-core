@@ -30,6 +30,7 @@ class MessageChainStepVariant extends Model
         'purpose',
         'scope',
         'message_type',
+        'reply_profile_key',
         'queue',
         'dependency_policy',
         'conditions',
@@ -63,7 +64,7 @@ class MessageChainStepVariant extends Model
      */
     public function definition(): array
     {
-        return [
+        $definition = [
             'key' => $this->key,
             'sort_order' => (int) $this->sort_order,
             'message_template_version_id' =>
@@ -81,6 +82,14 @@ class MessageChainStepVariant extends Model
                 : null,
             'is_active' => (bool) $this->is_active,
         ];
+
+        if (is_string($this->reply_profile_key)
+            && trim($this->reply_profile_key) !== ''
+        ) {
+            $definition['reply_profile_key'] = trim($this->reply_profile_key);
+        }
+
+        return $definition;
     }
 
     public function scopeActive(Builder $query): Builder

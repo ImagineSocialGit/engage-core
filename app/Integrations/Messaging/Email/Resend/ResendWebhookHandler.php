@@ -3,6 +3,7 @@
 namespace App\Integrations\Messaging\Email\Resend;
 
 use App\Modules\InboundMessaging\Actions\Email\HandleInboundEmailWebhookAction;
+use App\Modules\InboundMessaging\Actions\Email\RecordInboundEmailAction;
 use App\Modules\InboundMessaging\Contracts\Email\EmailWebhookHandler;
 use App\Modules\InboundMessaging\Services\Email\EmailWebhookPayload;
 use App\Modules\Messaging\Models\MessageSuppression;
@@ -14,6 +15,8 @@ class ResendWebhookHandler implements EmailWebhookHandler
     public function __construct(
         private readonly ResendWebhookVerifier $verifier,
         private readonly HandleInboundEmailWebhookAction $handleInboundEmailWebhookAction,
+        private readonly RecordInboundEmailAction $recordInboundEmailAction,
+        private readonly ResendReceivedEmailClient $receivedEmailClient,
         private readonly WebhookInbox $webhookInbox,
     ) {}
 
@@ -40,6 +43,38 @@ class ResendWebhookHandler implements EmailWebhookHandler
             eventType: $payload->eventType(),
             payload: $payload->payload,
             processor: function () use ($payload, $eventId): array {
+                if ($payload->eventType() === 'email.received') {
+                    $emailId = $payload->data('email_id');
+
+                    if (! is_string($emailId) || trim($emailId) === '') {
+                        throw new \RuntimeException(
+                            'Resend email.received webhook did not contain data.email_id.',
+                        );
+                    }
+
+                    $received = $this->receivedEmailClient->retrieve(trim($emailId));
+                    $to = is_array($received['to'] ?? null)
+                        ? $received['to']
+                        : (is_array($payload->data('to')) ? $payload->data('to') : []);
+
+                    $this->recordInboundEmailAction->handle(
+                        provider: MessageSuppression::PROVIDER_RESEND,
+                        providerEventId: $eventId,
+                        providerMessageId: trim($emailId),
+                        from: is_string($received['from'] ?? null)
+                            ? $received['from']
+                            : $payload->data('from'),
+                        toAddresses: $to,
+                        text: is_string($received['text'] ?? null) ? $received['text'] : null,
+                        html: is_string($received['html'] ?? null) ? $received['html'] : null,
+                        receivedAt: $received['created_at']
+                            ?? $payload->data('created_at')
+                            ?? now(),
+                    );
+
+                    return ['http_status' => 204];
+                }
+
                 $this->handleInboundEmailWebhookAction->handle(
                     event: $payload->payload,
                     sourceEventId: $eventId,

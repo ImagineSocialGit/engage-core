@@ -6,6 +6,7 @@
 
 ## Routes product completion
 
+- [ ] Add simple inbound-reply authoring conditions for reply profile and normalized intent so clients can opt into different routes per conversation source; no matching/configured Route must remain a valid notification-only outcome.
 Preserve the implemented linear Route boundary and current placement/eligibility rules.
 
 - [ ] Add new Route creation.

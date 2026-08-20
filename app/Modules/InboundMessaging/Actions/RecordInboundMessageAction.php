@@ -101,6 +101,11 @@ class RecordInboundMessageAction
             'classification' => $data['classification'],
             'purpose' => $data['purpose'] ?? null,
             'scope' => $data['scope'] ?? null,
+            'correlated_scheduled_message_id' =>
+                $data['correlated_scheduled_message_id'] ?? null,
+            'reply_intent_key' => $data['reply_intent_key'] ?? null,
+            'reply_correlation_method' =>
+                $data['reply_correlation_method'] ?? null,
             'received_at' => $data['received_at'] ?? null,
             'processed_at' => $data['processed_at'] ?? null,
             'meta' => $data['meta'] ?? null,
@@ -374,6 +379,13 @@ class RecordInboundMessageAction
                         'classification' => $inboundMessage->classification,
                         'purpose' => $this->value($inboundMessage->purpose),
                         'scope' => $inboundMessage->scope,
+                        'scheduled_message_id' =>
+                            $inboundMessage->correlated_scheduled_message_id,
+                        'reply_profile_key' =>
+                            $inboundMessage->correlatedScheduledMessage?->replyProfileKey(),
+                        'reply_intent_key' => $inboundMessage->reply_intent_key,
+                        'correlation_method' =>
+                            $inboundMessage->reply_correlation_method,
                         'received_at' => $inboundMessage->received_at?->toISOString(),
                     ],
                 ],

@@ -64,7 +64,7 @@ return [
             'migrations' => [
                 '2026_05_15_215534_create_message_consents_table.php',
                 '2026_05_15_215834_create_consent_revocations_table.php',
-                '2026_05_19_211538_create_scheduled_messages_table.php',
+                '2026_05_19_154534_create_scheduled_messages_table.php',
                 '2026_05_19_211539_create_message_template_presets_table.php',
                 '2026_05_19_211540_create_message_template_preset_assignments_table.php',
                 '2026_05_19_211541_create_message_template_catalog_entries_table.php',

@@ -87,7 +87,7 @@ class WebinarPostRegistrationQuestionTest extends TestCase
         [$series, $webinar] = $this->webinarFixture('post-question-redirect');
 
         $response = $this->post(
-            $this->registrationPath($series, $webinar),
+            $this->registrationUrl($series, $webinar),
             $this->registrationPayload(),
         );
 
@@ -106,7 +106,7 @@ class WebinarPostRegistrationQuestionTest extends TestCase
         [$series, $webinar] = $this->webinarFixture('post-question-persistence');
 
         $this->post(
-            $this->registrationPath($series, $webinar),
+            $this->registrationUrl($series, $webinar),
             $this->registrationPayload(),
         )->assertRedirect();
 
@@ -240,12 +240,20 @@ class WebinarPostRegistrationQuestionTest extends TestCase
         );
     }
 
+    private function registrationUrl(
+        WebinarSeries $series,
+        Webinar $webinar,
+    ): string {
+        return $this->webinarOrigin($series)
+            .$this->registrationPath($series, $webinar);
+    }
+
     private function postQuestionPath(
         string $routeName,
         WebinarSeries $series,
         WebinarRegistration $registration,
     ): string {
-        return URL::temporarySignedRoute(
+        $path = URL::temporarySignedRoute(
             $routeName,
             now()->addHour(),
             [
@@ -253,6 +261,23 @@ class WebinarPostRegistrationQuestionTest extends TestCase
                 'registration' => $registration,
             ],
             absolute: false,
+        );
+
+        return $this->webinarOrigin($series).$path;
+    }
+
+    private function webinarOrigin(WebinarSeries $series): string
+    {
+        $showUrl = route('webinar.show', $series->slug);
+        $scheme = parse_url($showUrl, PHP_URL_SCHEME);
+        $host = parse_url($showUrl, PHP_URL_HOST);
+        $port = parse_url($showUrl, PHP_URL_PORT);
+
+        return sprintf(
+            '%s://%s%s',
+            is_string($scheme) ? $scheme : 'http',
+            is_string($host) ? $host : 'localhost',
+            is_int($port) ? ':'.$port : '',
         );
     }
 }

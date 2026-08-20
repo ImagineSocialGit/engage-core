@@ -4,7 +4,9 @@ namespace App\Modules\InboundMessaging\Models;
 
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
@@ -32,6 +34,9 @@ class InboundMessage extends Model
         'classification',
         'purpose',
         'scope',
+        'correlated_scheduled_message_id',
+        'reply_intent_key',
+        'reply_correlation_method',
         'received_at',
         'processed_at',
         'meta',
@@ -41,6 +46,7 @@ class InboundMessage extends Model
     {
         return [
             'sender_id' => 'integer',
+            'correlated_scheduled_message_id' => 'integer',
             'channel' => MessageChannel::class,
             'purpose' => MessagePurpose::class,
             'received_at' => 'datetime',
@@ -67,6 +73,14 @@ class InboundMessage extends Model
     public function sender(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    public function correlatedScheduledMessage(): BelongsTo
+    {
+        return $this->belongsTo(
+            ScheduledMessage::class,
+            'correlated_scheduled_message_id',
+        );
     }
 
     public function markProcessed(): void

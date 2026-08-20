@@ -8,6 +8,12 @@ The current raw SMS request copy in `inbound_messages.meta`, full email event da
 
 The approved target stores one raw provider receipt and one normalized inbound business record.
 
+## Reply correlation foundation
+
+Normal replies may carry narrow first-class correlation evidence back to the originating `ScheduledMessage`. Email correlation may be exact through a signed per-message Reply-To identity; SMS correlation is explicitly heuristic and bounded to recent sent deliveries for the same Contact/destination. `reply_intent_key` is deterministic/config-driven classification evidence, not an automatic business outcome.
+
+The neutral `inbound_message.normal_reply` event exposes compact correlation/profile/intent identity for optional automation consumers. InternalNotifications remains free to notify a human even when no automation route exists. Domain-specific labels, tags, statuses, tasks, acknowledgements, and other consequences remain configuration/owning-module behavior rather than InboundMessaging features.
+
 ## Responsibility
 
 InboundMessaging owns:

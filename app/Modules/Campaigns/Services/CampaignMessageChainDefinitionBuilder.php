@@ -129,6 +129,9 @@ class CampaignMessageChainDefinitionBuilder
             'purpose' => $this->normalizeSegment($variant->purpose),
             'scope' => $this->normalizeSegment($variant->scope),
             'message_type' => $this->normalizeSegment($messageType),
+            'reply_profile_key' => $this->nullableSegment(
+                $definition['reply_profile_key'] ?? null,
+            ),
             'queue' => $this->nullableSegment($definition['queue'] ?? null),
             'dependency_policy' => is_array($variant->dependency_rules)
                 && $variant->dependency_rules !== []

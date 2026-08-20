@@ -34,6 +34,7 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
     {
         yield from $this->validateQueueContract();
         yield from $this->validateConsentDomains();
+        yield from $this->validateReplyProfiles();
         yield from $this->validateConfigRoutes();
         yield from $this->validateCustomizedPresets();
         yield from $this->validateActiveAssignments();
@@ -71,6 +72,83 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
                 path: $issue['path'],
                 context: $issue['context'],
             );
+        }
+    }
+
+    /**
+     * @return iterable<int, SetupValidationFinding>
+     */
+    private function validateReplyProfiles(): iterable
+    {
+        $domain = config('messaging.email.inbound_domain');
+
+        if (is_string($domain) && trim($domain) !== ''
+            && filter_var(trim($domain), FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) === false
+        ) {
+            yield $this->error(
+                code: 'messaging.inbound_email_domain_invalid',
+                message: 'Messaging inbound email domain must be a hostname without scheme or path.',
+                source: 'messaging.email.inbound_domain',
+                path: 'messaging.email.inbound_domain',
+            );
+        }
+
+        $profiles = config('messaging.reply_profiles', []);
+
+        if (! is_array($profiles)) {
+            yield $this->error(
+                code: 'messaging.reply_profiles_invalid',
+                message: 'Messaging reply profiles must be an array.',
+                source: 'messaging.reply_profiles',
+                path: 'messaging.reply_profiles',
+            );
+
+            return;
+        }
+
+        foreach ($profiles as $profileKey => $profile) {
+            if (! is_string($profileKey) || trim($profileKey) === '' || ! is_array($profile)) {
+                yield $this->error(
+                    code: 'messaging.reply_profile_invalid',
+                    message: 'Each Messaging reply profile requires a non-empty key and array definition.',
+                    source: 'messaging.reply_profiles',
+                    path: 'messaging.reply_profiles',
+                );
+
+                continue;
+            }
+
+            $intents = $profile['intents'] ?? [];
+
+            if (! is_array($intents)) {
+                yield $this->error(
+                    code: 'messaging.reply_profile_intents_invalid',
+                    message: "Messaging reply profile [{$profileKey}] intents must be an array.",
+                    source: 'messaging.reply_profiles',
+                    path: "messaging.reply_profiles.{$profileKey}.intents",
+                );
+
+                continue;
+            }
+
+            foreach ($intents as $intentKey => $intent) {
+                $keywords = is_array($intent) ? ($intent['keywords'] ?? null) : null;
+
+                if (! is_string($intentKey) || trim($intentKey) === ''
+                    || ! is_array($keywords)
+                    || $keywords === []
+                    || collect($keywords)->contains(
+                        fn (mixed $keyword): bool => ! is_string($keyword) || trim($keyword) === '',
+                    )
+                ) {
+                    yield $this->error(
+                        code: 'messaging.reply_profile_intent_invalid',
+                        message: "Messaging reply profile [{$profileKey}] contains an invalid intent definition.",
+                        source: 'messaging.reply_profiles',
+                        path: "messaging.reply_profiles.{$profileKey}.intents",
+                    );
+                }
+            }
         }
     }
 

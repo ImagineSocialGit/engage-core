@@ -31,6 +31,9 @@ class MessageDispatchDefinitionNormalizer
             $definitionPurpose = $this->normalizeOptionalSegment($definition['purpose'] ?? null) ?? $purpose;
             $definitionScope = $this->normalizeOptionalSegment($definition['scope'] ?? null) ?? $scope;
             $messageType = $this->normalizeOptionalSegment($definition['message_type'] ?? null);
+            $replyProfileKey = $this->normalizeOptionalSegment(
+                $definition['reply_profile_key'] ?? null,
+            );
 
             if ($messageType === null) {
                 throw new InvalidArgumentException('Inline message definition ['.$index.'] is missing [message_type].');
@@ -47,6 +50,7 @@ class MessageDispatchDefinitionNormalizer
                 'purpose' => $definitionPurpose,
                 'scope' => $definitionScope,
                 'message_type' => $messageType,
+                'reply_profile_key' => $replyProfileKey,
                 'config_path' => is_string($definition['config_path'] ?? null) && trim($definition['config_path']) !== ''
                     ? trim($definition['config_path'])
                     : null,

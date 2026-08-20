@@ -17,6 +17,7 @@ return new class extends Migration
 
             $table->string('channel')->index();
             $table->string('message_type')->index();
+            $table->string('reply_profile_key', 96)->nullable();
             $table->string('purpose')->index();
             $table->string('scope')->index();
             $table->string('payload_class');

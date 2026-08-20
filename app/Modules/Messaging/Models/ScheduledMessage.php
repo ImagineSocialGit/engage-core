@@ -38,6 +38,7 @@ class ScheduledMessage extends Model
         'message_chain_step_variant_id',
         'channel',
         'message_type',
+        'reply_profile_key',
         'purpose',
         'scope',
         'payload_class',
@@ -96,6 +97,29 @@ class ScheduledMessage extends Model
     public function messageChainStepVariant(): BelongsTo
     {
         return $this->belongsTo(MessageChainStepVariant::class);
+    }
+
+    public function replyProfileKey(): ?string
+    {
+        if (is_string($this->reply_profile_key)
+            && trim($this->reply_profile_key) !== ''
+        ) {
+            return trim($this->reply_profile_key);
+        }
+
+        if ($this->message_chain_step_variant_id === null) {
+            return null;
+        }
+
+        $variant = $this->relationLoaded('messageChainStepVariant')
+            ? $this->getRelation('messageChainStepVariant')
+            : $this->messageChainStepVariant()->first();
+
+        return $variant instanceof MessageChainStepVariant
+            && is_string($variant->reply_profile_key)
+            && trim($variant->reply_profile_key) !== ''
+                ? trim($variant->reply_profile_key)
+                : null;
     }
 
     public function deliveryAttempts(): HasMany
