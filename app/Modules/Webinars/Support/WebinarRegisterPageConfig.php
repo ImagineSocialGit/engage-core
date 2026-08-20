@@ -99,6 +99,7 @@ class WebinarRegisterPageConfig
      */
     private const ATOMIC_REGISTRATION_LIST_PATHS = [
         'questions',
+        'consents.transactional.registration_grants',
         'fields.consent_messages.email.disclosure_refs',
         'fields.consent_messages.sms.disclosure_refs',
         'fields.marketing_consent_messages.combined.disclosure_refs',

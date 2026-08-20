@@ -210,6 +210,10 @@ return [
             'transactional' => [
                 'email' => true,
                 'sms' => true,
+                // Optional channels granted by the registration submission
+                // itself. Runtime rejects channels that Messaging marks as
+                // requiring an explicit opt-in.
+                'registration_grants' => [],
             ],
             'marketing' => [
                 'email' => true,

@@ -2437,6 +2437,7 @@
 │   │   │   ├── WebinarRegistrationDisclosurePresentationTest.php
 │   │   │   ├── WebinarRegistrationFrontendContractTest.php
 │   │   │   ├── WebinarRegistrationMessageConsolidationTest.php
+│   │   │   ├── WebinarRegistrationMinimalFieldValidationTest.php
 │   │   │   ├── WebinarRegistrationOccurrenceResolutionTest.php
 │   │   │   ├── WebinarRegistrationOperatorRecoveryTest.php
 │   │   │   ├── WebinarRegistrationPresentationConfigTest.php
@@ -2444,6 +2445,7 @@
 │   │   │   ├── WebinarRegistrationQuestionConfigTest.php
 │   │   │   ├── WebinarRegistrationQuestionPlacementTest.php
 │   │   │   ├── WebinarRegistrationQuestionTest.php
+│   │   │   ├── WebinarRegistrationSubmissionGrantTest.php
 │   │   │   ├── WebinarRegistrationThankYouTest.php
 │   │   │   ├── WebinarRegistrationTrustVariantTest.php
 │   │   │   ├── WebinarReplacementPublicLifecycleTest.php
@@ -2471,4 +2473,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-620 directories, 1852 files
+620 directories, 1854 files

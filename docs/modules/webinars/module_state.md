@@ -389,7 +389,7 @@ Client copy is not a shared executable contract. Different clients may use diffe
 
 ### Registration consent-field contract
 
-Registration field availability is an explicit boolean contract under the resolved registration content:
+Registration field availability is an explicit boolean contract under the resolved registration content. Transactional registration may also declare channels that are accepted by the act of submitting the registration itself:
 
 ```php
 'registration' => [
@@ -397,6 +397,8 @@ Registration field availability is an explicit boolean contract under the resolv
         'transactional' => [
             'email' => true,
             'sms' => true,
+            'registration_grants' => [],
+            'required_channels' => ['email'],
         ],
         'marketing' => [
             'email' => false,
@@ -406,36 +408,53 @@ Registration field availability is an explicit boolean contract under the resolv
 ],
 ```
 
-The four boolean leaves are required configuration decisions. Do not infer field availability from whether copy happens to exist, and do not represent availability as an empty numeric list that may merge ambiguously.
+The four boolean leaves remain explicit presentation decisions for consent fields. Do not infer field availability from whether copy happens to exist, and do not represent availability as an empty numeric list that may merge ambiguously.
 
-Effective presentation and acceptance are the intersection of:
+`transactional.registration_grants` is an optional atomic list of transactional channels for which the registration submission itself is the consent event. It is deliberately narrower than the ordinary consent-field contract:
+
+- it may contain only `email` or `sms`;
+- it may apply only to transactional Webinar scope;
+- it must never grant marketing consent;
+- a channel is effective only when Messaging exposes it for `webinar_registrations` and `MessageChannelAvailability::requiresExplicitOptIn()` is false;
+- setup validation must reject a configured registration grant for a channel that Messaging marks as requiring explicit opt-in.
+
+This keeps a client free to use a minimal registration form for operational email while preserving explicit channel opt-in where the provider/carrier contract requires it. In particular, an SMS channel marked `requires_explicit_opt_in = true` must still use its explicit unchecked SMS control; hiding that control must not convert registration submission into SMS consent.
+
+Effective transactional acceptance is the union of:
 
 ```text
-configured consent boolean = true
-AND
-Messaging channel availability exposes that channel for webinar_registrations
+valid registration_grants
+PLUS
+selected configured consent fields that are operationally available
 ```
 
-The registration modal and `StoreWebinarRegistrationRequest` must resolve the same effective client/series configuration. A consent field that is disabled by config or unavailable operationally must not render and must be rejected when manually posted. At least one effective transactional channel must remain available and selected. The phone field becomes required only when an effective SMS consent field is selected.
+A configured `required_channels` entry is satisfied by either an effective registration grant for that channel or the corresponding selected explicit field. The shared registration component and `StoreWebinarRegistrationRequest` must resolve the same rule so browser-side and server-side validation cannot disagree.
+
+A registration-submission grant is still recorded through Messaging's normal `MessageConsent` authority with Webinar registration provenance. The registration snapshot includes the channel under `meta.accepted_channels.transactional`; consent metadata identifies `consent_basis = registration_submission`. Re-registration may add newly accepted channels to the existing registration snapshot, but omission of an already accepted channel is not a revocation. Revocation remains Messaging-owned.
+
+A consent field that is disabled by config or unavailable operationally must not render and must be rejected when manually posted. The phone field becomes required only when an effective SMS consent field is selected.
 
 Current intended defaults:
 
 ```text
 Core
-    transactional email = true
-    transactional SMS = true
+    transactional email field = true
+    transactional SMS field = true
+    transactional registration grants = []
     marketing email = true
     marketing SMS = true
 
 Slam Dunk CRM
-    transactional email = true
-    transactional SMS = true
+    transactional email field = true
+    transactional SMS field = true
+    transactional registration grants = []
     marketing email = false
     marketing SMS = false
 
 Rob the Mortgage Coach
-    transactional email = true
-    transactional SMS = true
+    transactional email field = false
+    transactional SMS field = true
+    transactional registration grants = [email]
     marketing email = false
     marketing SMS = false
 ```

@@ -251,8 +251,13 @@ class StoreWebinarRegistrationRequest extends FormRequest
     private function hasRequiredTransactionalConsent(): bool
     {
         $requiredChannels = $this->requiredTransactionalChannels();
+        $registrationGrantedChannels = $this->registrationGrantedTransactionalChannels();
 
         if ($requiredChannels === []) {
+            if ($registrationGrantedChannels !== []) {
+                return true;
+            }
+
             foreach (['transactional_email_consent', 'transactional_sms_consent'] as $field) {
                 if ($this->consentFieldSelectable($field) && $this->boolean($field)) {
                     return true;
@@ -263,6 +268,10 @@ class StoreWebinarRegistrationRequest extends FormRequest
         }
 
         foreach ($requiredChannels as $channel) {
+            if (in_array($channel, $registrationGrantedChannels, true)) {
+                continue;
+            }
+
             $field = "transactional_{$channel}_consent";
 
             if (! $this->consentFieldSelectable($field) || ! $this->boolean($field)) {
@@ -271,6 +280,32 @@ class StoreWebinarRegistrationRequest extends FormRequest
         }
 
         return true;
+    }
+
+    /** @return array<int, string> */
+    private function registrationGrantedTransactionalChannels(): array
+    {
+        $channels = data_get(
+            $this->registrationConsentConfiguration(),
+            'transactional.registration_grants',
+            [],
+        );
+
+        if (! is_array($channels)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(
+            $channels,
+            fn (mixed $channel): bool => is_string($channel)
+                && in_array($channel, ['email', 'sms'], true)
+                && ! app(MessageChannelAvailability::class)->requiresExplicitOptIn($channel)
+                && $this->channelAvailable(
+                    $channel,
+                    'transactional',
+                    'webinar',
+                ),
+        )));
     }
 
     /** @return array<int, string> */
@@ -297,7 +332,16 @@ class StoreWebinarRegistrationRequest extends FormRequest
         $requiredChannels = $this->requiredTransactionalChannels();
 
         if ($requiredChannels === ['email']) {
-            return 'Choose email so we can send your webinar confirmation and access details.';
+            $configuredRegistrationGrants = data_get(
+                $this->registrationConsentConfiguration(),
+                'transactional.registration_grants',
+                [],
+            );
+
+            return is_array($configuredRegistrationGrants)
+                && in_array('email', $configuredRegistrationGrants, true)
+                    ? 'Webinar email confirmations are not available for this registration right now.'
+                    : 'Choose email so we can send your webinar confirmation and access details.';
         }
 
         if ($requiredChannels === ['sms']) {

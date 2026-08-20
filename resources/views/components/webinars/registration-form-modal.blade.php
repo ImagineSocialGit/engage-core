@@ -50,6 +50,20 @@
     $transactionalChannels = $webinarRegistrationChannels['transactional'] ?? ['email'];
     $marketingChannels = $webinarRegistrationChannels['marketing'] ?? ['email'];
 
+    $registrationGrantedTransactionalChannels = collect(
+        data_get($page, 'consents.transactional.registration_grants', []),
+    )
+        ->filter(fn (mixed $channel): bool => is_string($channel)
+            && in_array($channel, ['email', 'sms'], true)
+            && in_array($channel, $transactionalChannels, true)
+            && ! app(\App\Modules\Messaging\Services\MessageChannelAvailability::class)
+                ->requiresExplicitOptIn($channel))
+        ->unique()
+        ->values();
+    $transactionalEmailRegistrationGranted = $registrationGrantedTransactionalChannels->contains('email');
+    $transactionalSmsRegistrationGranted = $registrationGrantedTransactionalChannels->contains('sms');
+    $hasRegistrationGrantedTransactionalChannel = $registrationGrantedTransactionalChannels->isNotEmpty();
+
     $transactionalEmailConfigured = data_get($page, 'consents.transactional.email', true) === true;
     $transactionalSmsConfigured = data_get($page, 'consents.transactional.sms', true) === true;
     $marketingEmailConfigured = data_get($page, 'consents.marketing.email', true) === true;
@@ -405,6 +419,9 @@
                     marketingSmsConsent: @js((bool) old('marketing_sms_consent')),
                     transactionalEmailRequired: @js($transactionalEmailRequired),
                     transactionalSmsRequired: @js($transactionalSmsRequired),
+                    transactionalEmailRegistrationGranted: @js($transactionalEmailRegistrationGranted),
+                    transactionalSmsRegistrationGranted: @js($transactionalSmsRegistrationGranted),
+                    hasRegistrationGrantedTransactionalChannel: @js($hasRegistrationGrantedTransactionalChannel),
                     hasExplicitRequiredTransactionalChannels: @js($hasExplicitRequiredTransactionalChannels),
                     registrationFormReady: '',
                     registrationFormInteracted: '',
@@ -412,16 +429,26 @@
                     transactionalConsentError: false,
                     submitting: false,
                     hasRequiredTransactionalConsent() {
-                        if (this.transactionalEmailRequired && ! this.transactionalEmailConsent) {
+                        if (
+                            this.transactionalEmailRequired
+                            && ! this.transactionalEmailRegistrationGranted
+                            && ! this.transactionalEmailConsent
+                        ) {
                             return false
                         }
 
-                        if (this.transactionalSmsRequired && ! this.transactionalSmsConsent) {
+                        if (
+                            this.transactionalSmsRequired
+                            && ! this.transactionalSmsRegistrationGranted
+                            && ! this.transactionalSmsConsent
+                        ) {
                             return false
                         }
 
                         if (! this.hasExplicitRequiredTransactionalChannels) {
-                            return this.transactionalEmailConsent || this.transactionalSmsConsent
+                            return this.hasRegistrationGrantedTransactionalChannel
+                                || this.transactionalEmailConsent
+                                || this.transactionalSmsConsent
                         }
 
                         return true

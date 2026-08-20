@@ -2,6 +2,7 @@
 
 namespace App\Modules\Webinars\Services;
 
+use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
 use InvalidArgumentException;
 
@@ -15,6 +16,7 @@ class WebinarRegisterPageDefinitionValidator
     public function __construct(
         private readonly WebinarRegisterPageConfig $pageConfig,
         private readonly WebinarRegistrationQuestionResolver $questionResolver,
+        private readonly MessageChannelAvailability $messageChannelAvailability,
     ) {}
 
     /**
@@ -191,6 +193,10 @@ class WebinarRegisterPageDefinitionValidator
                 $registration,
                 "{$path}.registration",
             ),
+            $this->validateTransactionalRegistrationGrants(
+                $registration,
+                "{$path}.registration",
+            ),
             $this->validateDisclosures(
                 $registration,
                 "{$path}.registration",
@@ -268,6 +274,79 @@ class WebinarRegisterPageDefinitionValidator
                     message: 'Webinar registration fields.last_name.enabled must be boolean when configured.',
                     path: "{$path}.fields.last_name.enabled",
                     context: ['configured_value' => $lastNameEnabled],
+                );
+            }
+        }
+
+        return $violations;
+    }
+
+    /**
+     * @param array<string, mixed> $registration
+     * @return array<int, array{code: string, message: string, path: string, context: array<string, mixed>}>
+     */
+    private function validateTransactionalRegistrationGrants(
+        array $registration,
+        string $path,
+    ): array {
+        $configured = data_get(
+            $registration,
+            'consents.transactional.registration_grants',
+        );
+
+        if ($configured === null) {
+            return [];
+        }
+
+        $grantsPath = "{$path}.consents.transactional.registration_grants";
+
+        if (! is_array($configured) || ! array_is_list($configured)) {
+            return [$this->violation(
+                code: 'webinars.register_page.registration_grants_invalid',
+                message: 'Webinar transactional registration_grants must be a list of communication channels.',
+                path: $grantsPath,
+                context: ['received_type' => get_debug_type($configured)],
+            )];
+        }
+
+        $violations = [];
+        $seen = [];
+
+        foreach ($configured as $index => $channel) {
+            $itemPath = "{$grantsPath}.{$index}";
+
+            if (! is_string($channel)
+                || ! in_array($channel, ['email', 'sms'], true)
+            ) {
+                $violations[] = $this->violation(
+                    code: 'webinars.register_page.registration_grants_invalid',
+                    message: 'Webinar transactional registration_grants may contain only email or sms.',
+                    path: $itemPath,
+                    context: ['configured_value' => $channel],
+                );
+
+                continue;
+            }
+
+            if (isset($seen[$channel])) {
+                $violations[] = $this->violation(
+                    code: 'webinars.register_page.registration_grants_invalid',
+                    message: "Webinar transactional registration_grants contains duplicate channel [{$channel}].",
+                    path: $itemPath,
+                    context: ['channel' => $channel],
+                );
+
+                continue;
+            }
+
+            $seen[$channel] = true;
+
+            if ($this->messageChannelAvailability->requiresExplicitOptIn($channel)) {
+                $violations[] = $this->violation(
+                    code: 'webinars.register_page.registration_grant_requires_explicit_opt_in',
+                    message: "Webinar transactional channel [{$channel}] cannot be granted by registration submission because Messaging requires explicit opt-in for that channel.",
+                    path: $itemPath,
+                    context: ['channel' => $channel],
                 );
             }
         }

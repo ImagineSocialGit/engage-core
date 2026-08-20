@@ -15,6 +15,7 @@ use App\Modules\Webinars\Data\WebinarRegistrationFinalizationResult;
 use App\Modules\Webinars\Data\WebinarRegistrationResult;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +31,7 @@ class CreateWebinarRegistrationAction
         private readonly PhoneNumberNormalizer $phoneNumberNormalizer,
         private readonly GrantMessageConsentsAction $grantMessageConsentsAction,
         private readonly CreateOrUpdateContactAction $createOrUpdateContact,
+        private readonly WebinarRegisterPageConfig $registerPageConfig,
         private readonly StoreWebinarRegistrationResponsesAction $storeRegistrationResponses,
         private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
         private readonly FinalizeWebinarRegistrationAction $finalizeRegistration,
@@ -126,6 +128,11 @@ class CreateWebinarRegistrationAction
 
         if ($registration instanceof WebinarRegistration) {
             $this->storeRegistrationResponses($validated, $registration);
+            $this->mergeAcceptedChannels(
+                registration: $registration,
+                validated: $validated,
+                webinar: $webinar,
+            );
 
             $result = WebinarRegistrationResult::existing(
                 registration: $registration,
@@ -134,6 +141,7 @@ class CreateWebinarRegistrationAction
                     request: $request,
                     contact: $contact,
                     registration: $registration,
+                    webinar: $webinar,
                 ),
             );
 
@@ -167,11 +175,13 @@ class CreateWebinarRegistrationAction
                         validated: $validated,
                         purpose: MessagePurpose::Transactional,
                         scope: 'webinar',
+                        webinar: $webinar,
                     ),
                     'marketing' => $this->acceptedChannels(
                         validated: $validated,
                         purpose: MessagePurpose::Marketing,
                         scope: 'webinar_nurture',
+                        webinar: $webinar,
                     ),
                 ],
             ],
@@ -184,6 +194,7 @@ class CreateWebinarRegistrationAction
             request: $request,
             contact: $contact,
             registration: $registration,
+            webinar: $webinar,
             now: $now,
         );
 
@@ -373,10 +384,29 @@ class CreateWebinarRegistrationAction
         Request $request,
         Contact $contact,
         WebinarRegistration $registration,
+        Webinar $webinar,
         mixed $now = null,
     ): array {
         $now ??= now();
         $grants = [];
+
+        foreach ($this->registrationGrantedTransactionalChannels($webinar) as $channel) {
+            $grants[] = [
+                'channel' => $channel,
+                'purpose' => MessagePurpose::Transactional->value,
+                'scope' => 'webinar',
+                'consented_at' => $now,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'source' => 'webinar_registration',
+                'meta' => [
+                    'webinar_registration_id' => $registration->getKey(),
+                    'webinar_id' => $registration->webinar_id,
+                    'webinar_slug' => $registration->webinar_slug,
+                    'consent_basis' => 'registration_submission',
+                ],
+            ];
+        }
 
         foreach ($this->consentDefinitions() as $field => $definition) {
             if (! ($validated[$field] ?? false)) {
@@ -392,6 +422,16 @@ class CreateWebinarRegistrationAction
                 continue;
             }
 
+            if ($definition['purpose'] === MessagePurpose::Transactional
+                && in_array(
+                    $definition['channel']->value,
+                    $this->registrationGrantedTransactionalChannels($webinar),
+                    true,
+                )
+            ) {
+                continue;
+            }
+
             $grants[] = [
                 'channel' => $definition['channel']->value,
                 'purpose' => $definition['purpose']->value,
@@ -404,6 +444,7 @@ class CreateWebinarRegistrationAction
                     'webinar_registration_id' => $registration->getKey(),
                     'webinar_id' => $registration->webinar_id,
                     'webinar_slug' => $registration->webinar_slug,
+                    'consent_basis' => 'explicit_selection',
                 ],
             ];
         }
@@ -444,13 +485,56 @@ class CreateWebinarRegistrationAction
         ];
     }
 
+    private function mergeAcceptedChannels(
+        WebinarRegistration $registration,
+        array $validated,
+        Webinar $webinar,
+    ): void {
+        $meta = is_array($registration->meta)
+            ? $registration->meta
+            : [];
+        $accepted = is_array($meta['accepted_channels'] ?? null)
+            ? $meta['accepted_channels']
+            : [];
+
+        foreach ([
+            MessagePurpose::Transactional->value => 'webinar',
+            MessagePurpose::Marketing->value => 'webinar_nurture',
+        ] as $purposeValue => $scope) {
+            $purpose = MessagePurpose::from($purposeValue);
+            $existing = is_array($accepted[$purposeValue] ?? null)
+                ? $accepted[$purposeValue]
+                : [];
+            $incoming = $this->acceptedChannels(
+                validated: $validated,
+                purpose: $purpose,
+                scope: $scope,
+                webinar: $webinar,
+            );
+
+            $accepted[$purposeValue] = array_values(array_unique([
+                ...array_values(array_filter(
+                    $existing,
+                    fn (mixed $channel): bool => is_string($channel),
+                )),
+                ...$incoming,
+            ]));
+        }
+
+        $meta['accepted_channels'] = $accepted;
+        $registration->forceFill(['meta' => $meta])->save();
+    }
+
     /** @return array<int, string> */
     private function acceptedChannels(
         array $validated,
         MessagePurpose $purpose,
         string $scope,
+        Webinar $webinar,
     ): array {
-        $channels = [];
+        $channels = $purpose === MessagePurpose::Transactional
+            ? $this->registrationGrantedTransactionalChannels($webinar)
+            : [];
 
         foreach ([MessageChannel::Email, MessageChannel::Sms] as $channel) {
             if (! ($validated["{$purpose->value}_{$channel->value}_consent"] ?? false)) {
@@ -469,6 +553,45 @@ class CreateWebinarRegistrationAction
             $channels[] = $channel->value;
         }
 
-        return $channels;
+        return array_values(array_unique($channels));
+    }
+
+    /** @return array<int, string> */
+    private function registrationGrantedTransactionalChannels(Webinar $webinar): array
+    {
+        $webinar->loadMissing('webinarSeries');
+        $series = $webinar->webinarSeries;
+
+        if (! $series) {
+            return [];
+        }
+
+        $content = $this->registerPageConfig->content(
+            page: 'register',
+            seriesSlug: $series->slug,
+            seriesMeta: is_array($series->meta) ? $series->meta : [],
+        );
+        $channels = data_get(
+            $content,
+            'registration.consents.transactional.registration_grants',
+            [],
+        );
+
+        if (! is_array($channels)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(
+            $channels,
+            fn (mixed $channel): bool => is_string($channel)
+                && in_array($channel, ['email', 'sms'], true)
+                && ! $this->messageChannelAvailability->requiresExplicitOptIn($channel)
+                && $this->messageChannelAvailability->isVisibleForSurface(
+                    channel: $channel,
+                    surface: 'webinar_registrations',
+                    purpose: MessagePurpose::Transactional->value,
+                    scope: 'webinar',
+                ),
+        )));
     }
 }
