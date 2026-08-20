@@ -5,10 +5,10 @@ namespace App\Modules\Campaigns\Actions;
 use App\Modules\Campaigns\Exceptions\CampaignUnavailableForEnrollmentException;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Campaigns\Services\CampaignEnrollmentArbitrator;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\StartMessageChainEnrollmentAction;
 use App\Modules\Messaging\Models\MessageChain;
-use App\Modules\Messaging\Models\MessageChainEnrollment;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +21,7 @@ class EnrollContactInCampaignAction
 
     public function __construct(
         private readonly StartMessageChainEnrollmentAction $startMessageChainEnrollment,
+        private readonly CampaignEnrollmentArbitrator $enrollmentArbitrator,
     ) {}
 
     /**
@@ -64,24 +65,30 @@ class EnrollContactInCampaignAction
             $purpose,
             $scope,
         ): CampaignEnrollment {
-            $campaign = $this->resolveCampaign(
+            $candidate = $this->resolveCampaign(
                 campaignKey: $campaignKey,
                 channel: $channel,
                 purpose: $purpose,
                 scope: $scope,
             );
 
-            $existingEnrollment = $this->existingOpenEnrollment(
+            $arbitration = $this->enrollmentArbitrator->handle(
                 contact: $contact,
-                campaign: $campaign,
+                candidate: $candidate,
+                source: $source,
             );
+            $campaign = $arbitration->campaign;
 
-            if ($existingEnrollment instanceof CampaignEnrollment) {
-                return $existingEnrollment;
+            if ($arbitration->existingEnrollment instanceof CampaignEnrollment) {
+                return $arbitration->existingEnrollment;
             }
 
             $messageChain = $this->messageChain($campaign);
             $startedAt = Carbon::now()->utc();
+            $enrollmentMeta = $this->withArbitrationMeta(
+                meta: $meta,
+                arbitrationMeta: $arbitration->enrollmentMeta(),
+            );
 
             $enrollment = CampaignEnrollment::query()->create([
                 'contact_id' => $contact->getKey(),
@@ -92,7 +99,7 @@ class EnrollContactInCampaignAction
                 'campaign_key' => $campaign->key,
                 'start_context' => $this->startContextWithPayload($startContext, $payload),
                 'started_at' => $startedAt,
-                'meta' => $meta,
+                'meta' => $enrollmentMeta,
             ]);
 
             $dedupeKey = $this->dedupeKey($campaign, $enrollment);
@@ -142,7 +149,7 @@ class EnrollContactInCampaignAction
             $query->where('scope', $this->normalizeSegment($scope));
         }
 
-        $campaign = $query->lockForUpdate()->first();
+        $campaign = $query->first();
 
         if (! $campaign instanceof Campaign) {
             throw CampaignUnavailableForEnrollmentException::missing($campaignKey);
@@ -156,27 +163,6 @@ class EnrollContactInCampaignAction
         }
 
         return $campaign;
-    }
-
-    private function existingOpenEnrollment(
-        Contact $contact,
-        Campaign $campaign,
-    ): ?CampaignEnrollment {
-        return CampaignEnrollment::query()
-            ->with('messageChainEnrollment')
-            ->where('contact_id', $contact->getKey())
-            ->where('campaign_id', $campaign->getKey())
-            ->whereNotNull('message_chain_enrollment_id')
-            ->whereHas(
-                'messageChainEnrollment',
-                fn ($query) => $query->whereIn('status', [
-                    MessageChainEnrollment::STATUS_ACTIVE,
-                    MessageChainEnrollment::STATUS_PAUSED,
-                ]),
-            )
-            ->orderByDesc('id')
-            ->lockForUpdate()
-            ->first();
     }
 
     private function messageChain(Campaign $campaign): MessageChain
@@ -236,6 +222,23 @@ class EnrollContactInCampaignAction
         );
 
         return $startContext;
+    }
+
+    /**
+     * @param array<string, mixed>|null $meta
+     * @param array<string, mixed> $arbitrationMeta
+     * @return array<string, mixed>|null
+     */
+    private function withArbitrationMeta(?array $meta, array $arbitrationMeta): ?array
+    {
+        if ($arbitrationMeta === []) {
+            return $meta;
+        }
+
+        return array_replace_recursive(
+            $meta ?? [],
+            $arbitrationMeta,
+        );
     }
 
     private function normalizeSegment(string $value): string

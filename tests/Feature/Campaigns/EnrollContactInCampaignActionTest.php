@@ -166,6 +166,157 @@ class EnrollContactInCampaignActionTest extends TestCase
         $this->assertDatabaseCount('message_chain_enrollments', 2);
     }
 
+
+    public function test_higher_priority_campaign_supersedes_open_lower_priority_family_enrollment(): void
+    {
+        Queue::fake();
+
+        [$lower] = $this->campaignWithChain(
+            key: 'family_lower',
+            familyKey: 'consumer_nurture',
+            priority: 10,
+        );
+        [$higher] = $this->campaignWithChain(
+            key: 'family_higher',
+            familyKey: 'consumer_nurture',
+            priority: 20,
+        );
+        $contact = Contact::factory()->create();
+
+        $lowerEnrollment = app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $lower->key,
+        );
+
+        $higherEnrollment = app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $higher->key,
+        );
+
+        $this->assertSame(
+            MessageChainEnrollment::STATUS_CANCELLED,
+            $lowerEnrollment->messageChainEnrollment->refresh()->status,
+        );
+        $this->assertSame(
+            MessageChainEnrollment::STATUS_ACTIVE,
+            $higherEnrollment->messageChainEnrollment->status,
+        );
+        $this->assertSame(
+            'campaign_family_superseded',
+            data_get($lowerEnrollment->refresh()->meta, 'lifecycle.last_cancellation.reason'),
+        );
+        $this->assertSame(
+            'consumer_nurture',
+            data_get($higherEnrollment->meta, 'campaign_family.family_key'),
+        );
+        $this->assertSame(
+            'family_lower',
+            data_get($higherEnrollment->meta, 'campaign_family.superseded.0.campaign_key'),
+        );
+        $this->assertDatabaseCount('campaign_enrollments', 2);
+    }
+
+    public function test_lower_priority_campaign_is_blocked_by_open_higher_priority_family_enrollment(): void
+    {
+        Queue::fake();
+
+        [$higher] = $this->campaignWithChain(
+            key: 'family_blocker',
+            familyKey: 'consumer_nurture',
+            priority: 50,
+        );
+        [$lower] = $this->campaignWithChain(
+            key: 'family_candidate',
+            familyKey: 'consumer_nurture',
+            priority: 10,
+        );
+        $contact = Contact::factory()->create();
+
+        $incumbent = app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $higher->key,
+        );
+
+        try {
+            app(EnrollContactInCampaignAction::class)->handle(
+                contact: $contact,
+                campaignKey: $lower->key,
+            );
+            $this->fail('Expected lower-priority family enrollment to be blocked.');
+        } catch (CampaignUnavailableForEnrollmentException $exception) {
+            $this->assertSame(
+                CampaignUnavailableForEnrollmentException::REASON_FAMILY_BLOCKED,
+                $exception->reason,
+            );
+            $this->assertSame('consumer_nurture', $exception->familyKey);
+            $this->assertSame(10, $exception->campaignPriority);
+            $this->assertSame($higher->key, $exception->blockingCampaignKey);
+            $this->assertSame(50, $exception->blockingPriority);
+            $this->assertSame((int) $incumbent->getKey(), $exception->blockingEnrollmentId);
+        }
+
+        $this->assertSame(
+            MessageChainEnrollment::STATUS_ACTIVE,
+            $incumbent->messageChainEnrollment->refresh()->status,
+        );
+        $this->assertDatabaseCount('campaign_enrollments', 1);
+    }
+
+    public function test_equal_priority_family_campaign_keeps_the_existing_incumbent(): void
+    {
+        Queue::fake();
+
+        [$first] = $this->campaignWithChain(
+            key: 'family_equal_first',
+            familyKey: 'realtor_nurture',
+            priority: 20,
+        );
+        [$second] = $this->campaignWithChain(
+            key: 'family_equal_second',
+            familyKey: 'realtor_nurture',
+            priority: 20,
+        );
+        $contact = Contact::factory()->create();
+
+        app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $first->key,
+        );
+
+        $this->expectException(CampaignUnavailableForEnrollmentException::class);
+        $this->expectExceptionMessage('is not lower than candidate priority');
+
+        try {
+            app(EnrollContactInCampaignAction::class)->handle(
+                contact: $contact,
+                campaignKey: $second->key,
+            );
+        } finally {
+            $this->assertDatabaseCount('campaign_enrollments', 1);
+        }
+    }
+
+    public function test_campaigns_without_a_family_remain_independently_enrollable(): void
+    {
+        Queue::fake();
+
+        [$first] = $this->campaignWithChain('independent_one');
+        [$second] = $this->campaignWithChain('independent_two');
+        $contact = Contact::factory()->create();
+
+        app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $first->key,
+        );
+        app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $second->key,
+        );
+
+        $this->assertDatabaseCount('campaign_enrollments', 2);
+        $this->assertDatabaseCount('message_chain_enrollments', 2);
+    }
+
     public function test_inactive_campaign_is_rejected_before_chain_start(): void
     {
         Queue::fake();
@@ -300,6 +451,8 @@ class EnrollContactInCampaignActionTest extends TestCase
         string $campaignStatus = Campaign::STATUS_ACTIVE,
         string $chainStatus = MessageChain::STATUS_ACTIVE,
         bool $stepActive = true,
+        ?string $familyKey = null,
+        int $priority = 0,
     ): array {
         $templateVersion = $this->templateVersion("fixture.{$key}.email");
 
@@ -347,6 +500,8 @@ class EnrollContactInCampaignActionTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'campaign_test',
             'status' => $campaignStatus,
+            'family_key' => $familyKey,
+            'priority' => $priority,
             'meta' => [],
         ]);
 

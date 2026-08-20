@@ -72,19 +72,20 @@ When Location is not explicitly enabled, these fields/handler are not registered
 
 This does not change Scheduling's location snapshots, normalization, or travel-time behavior.
 
+## Client profile layer
+
+Known client/export CSV shapes can now contribute filename hints, mapping aliases, and trusted dataset defaults through the generic Contact import-profile registry. The profile layer is configuration-driven and validated by `setup:validate`; generic tests do not assert a particular client's profile inventory or values.
+
 ## Intentionally deferred
 
-This slice does **not** add:
+This import/domain layer still does **not** add:
 
 - XLS/XLSX parsing
 - fuzzy Contact identity matching
 - automatic creation of co-borrower or Realtor Contacts
-- client-specific column/header aliases
-- per-dataset import profiles or literal/default mapped values
-- Slam Dunk status orchestration
-- campaign family/priority arbitration
+- automatic lifecycle/status interpretation from historical export labels
 - campaign enrollment
 - imported marketing consent grants
 - reply-response orchestration
 
-Client import profiles are the next layer. They will translate known Slam Dunk exports into these stable generic mapping keys and provide dataset-level constants such as relationship type, source system, and default lifecycle treatment without teaching Core about Slam Dunk.
+Campaign family/priority arbitration is now Campaign-owned and intentionally remains outside the import handlers. A later orchestration slice may request Campaign enrollment after CRM/domain state and scoped Messaging consent are established.

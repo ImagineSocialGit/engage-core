@@ -20,6 +20,8 @@ class CampaignPresetDefinition
         public readonly string $channel,
         public readonly string $purpose,
         public readonly string $scope,
+        public readonly ?string $familyKey,
+        public readonly int $priority,
         public readonly string $status,
         public readonly string $dispatchKey,
         public readonly string $variantStrategy,
@@ -48,6 +50,9 @@ class CampaignPresetDefinition
         $scope = self::normalizeSegment(
             self::requiredString($data['scope'] ?? null, 'campaign scope'),
         );
+        $familyKey = self::nullableString($data['family_key'] ?? null);
+        $familyKey = $familyKey !== null ? self::normalizeSegment($familyKey) : null;
+        $priority = self::priority($data['priority'] ?? 0);
         $dispatchKey = 'campaign_step_due';
         $variantStrategy = self::variantStrategy(
             $data['variant_strategy'] ?? 'first_available',
@@ -96,6 +101,8 @@ class CampaignPresetDefinition
             ),
             purpose: $purpose,
             scope: $scope,
+            familyKey: $familyKey,
+            priority: $priority,
             status: self::campaignStatus($data['status'] ?? null),
             dispatchKey: $dispatchKey,
             variantStrategy: $variantStrategy,
@@ -145,6 +152,17 @@ class CampaignPresetDefinition
         }
 
         return $strategy;
+    }
+
+    private static function priority(mixed $value): int
+    {
+        if (! is_int($value)) {
+            throw new InvalidArgumentException(
+                'Campaign priority must be an integer.'
+            );
+        }
+
+        return $value;
     }
 
     private static function campaignStatus(mixed $value): string

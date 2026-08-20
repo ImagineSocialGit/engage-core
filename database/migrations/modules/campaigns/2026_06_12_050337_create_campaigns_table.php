@@ -29,6 +29,9 @@ return new class extends Migration
 
             $table->string('status', 32)->default('active')->index();
 
+            $table->string('family_key', 120)->nullable()->index();
+            $table->integer('priority')->default(0);
+
             $table->string('source_version')->nullable();
 
             $table->boolean('is_customized')->default(false)->index();
@@ -41,6 +44,10 @@ return new class extends Migration
             $table->index(['channel', 'purpose', 'scope', 'status']);
             $table->index(['key', 'status']);
             $table->index(['key', 'source_version']);
+            $table->index(
+                ['family_key', 'priority', 'status'],
+                'campaign_family_priority_status_idx',
+            );
         });
     }
 

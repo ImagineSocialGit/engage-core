@@ -19,6 +19,8 @@ class CampaignFactory extends Factory
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => Campaign::STATUS_ACTIVE,
+            'family_key' => null,
+            'priority' => 0,
             'source_version' => null,
             'is_customized' => false,
             'customized_at' => null,

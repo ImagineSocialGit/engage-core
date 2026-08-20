@@ -131,6 +131,13 @@ class CampaignPresetDefinitionConfigContract implements ConfigContract
             ),
             'purpose' => ConfigField::required(ConfigSchema::string()),
             'scope' => ConfigField::required(ConfigSchema::string()),
+            'family_key' => ConfigField::optional(
+                ConfigSchema::string(nullable: true),
+            ),
+            'priority' => ConfigField::defaulted(
+                ConfigSchema::integer(),
+                0,
+            ),
             'status' => ConfigField::defaulted(
                 ConfigSchema::string(
                     allowedValues: [

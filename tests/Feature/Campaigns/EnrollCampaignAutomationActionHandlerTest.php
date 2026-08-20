@@ -107,6 +107,44 @@ class EnrollCampaignAutomationActionHandlerTest extends TestCase
         $this->assertDatabaseCount('campaign_enrollments', 0);
     }
 
+
+    public function test_family_arbitration_returns_a_structured_skipped_result_when_higher_priority_campaign_is_open(): void
+    {
+        Queue::fake();
+
+        $higher = $this->activeCampaignWithChain(
+            key: 'automation_family_higher',
+            familyKey: 'consumer_nurture',
+            priority: 40,
+        );
+        $lower = $this->activeCampaignWithChain(
+            key: 'automation_family_lower',
+            familyKey: 'consumer_nurture',
+            priority: 10,
+        );
+        $contact = Contact::factory()->create();
+
+        $first = app(EnrollCampaignAutomationActionHandler::class)->handle(
+            $this->context($higher->key, $contact),
+        );
+        $blocked = app(EnrollCampaignAutomationActionHandler::class)->handle(
+            $this->context($lower->key, $contact),
+        );
+
+        $this->assertSame(AutomationActionResult::STATUS_COMPLETED, $first->status);
+        $this->assertSame(AutomationActionResult::STATUS_SKIPPED, $blocked->status);
+        $this->assertSame(
+            CampaignUnavailableForEnrollmentException::REASON_FAMILY_BLOCKED,
+            $blocked->reason,
+        );
+        $this->assertSame('consumer_nurture', $blocked->output['campaign_family_key']);
+        $this->assertSame(10, $blocked->output['campaign_priority']);
+        $this->assertSame($higher->key, $blocked->output['blocking_campaign_key']);
+        $this->assertSame(40, $blocked->output['blocking_campaign_priority']);
+        $this->assertNotNull($blocked->output['blocking_campaign_enrollment_id']);
+        $this->assertDatabaseCount('campaign_enrollments', 1);
+    }
+
     public function test_it_skips_inactive_campaign_with_explicit_reason(): void
     {
         $campaign = Campaign::factory()->create([
@@ -144,9 +182,9 @@ class EnrollCampaignAutomationActionHandlerTest extends TestCase
         $this->assertDatabaseCount('campaign_enrollments', 0);
     }
 
-    private function context(string $campaignKey): AutomationActionContext
+    private function context(string $campaignKey, ?Contact $contact = null): AutomationActionContext
     {
-        $contact = Contact::factory()->create();
+        $contact ??= Contact::factory()->create();
 
         return new AutomationActionContext(
             input: [
@@ -163,7 +201,11 @@ class EnrollCampaignAutomationActionHandlerTest extends TestCase
         );
     }
 
-    private function activeCampaignWithChain(string $key): Campaign
+    private function activeCampaignWithChain(
+        string $key,
+        ?string $familyKey = null,
+        int $priority = 0,
+    ): Campaign
     {
         $template = MessageTemplate::query()->create([
             'key' => "fixture.{$key}.email",
@@ -220,6 +262,8 @@ class EnrollCampaignAutomationActionHandlerTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'campaign_test',
             'status' => Campaign::STATUS_ACTIVE,
+            'family_key' => $familyKey,
+            'priority' => $priority,
             'meta' => [],
         ]);
     }

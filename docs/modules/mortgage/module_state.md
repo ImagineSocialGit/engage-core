@@ -62,9 +62,15 @@ If Location is not enabled, Mortgage remains functional; market-aware behavior i
 
 ## Import boundary
 
-Mortgage import handlers added later must consume Core import seams, call Relationships public mutation seams, and persist only Mortgage-owned facts. Optional geographic assignment uses the app-level Relationships/Location bridge. Mortgage persistence code must not grant Messaging consent or enroll Campaigns directly.
+Mortgage import handlers consume Core import seams, call Relationships public mutation seams when relationship context is needed, and persist only Mortgage-owned facts. Optional geographic assignment uses the app-level Relationships/Location bridge. Mortgage persistence code must not grant Messaging consent or enroll Campaigns directly.
 
 CSV/TXT remains the CRM import format; source XLS/XLSX files are converted externally before import.
+
+## Current import execution
+
+Mortgage now consumes Core's durable import context to reconcile current mortgage facts, repeatable loans, borrower/co-borrower snapshots, historical Realtor participation, Realtor specialization, and time-bounded production observations. Stable source record identity is preferred; deterministic source fingerprints provide replay safety when the source lacks one. Safe exact-email reuse is allowed, while shared-email co-borrowers remain snapshots rather than being forced into one Contact identity.
+
+Client/export-specific header profiles remain client configuration and are validated through generic setup/config validation rather than hard-coded platform tests.
 
 ## Project State
 
@@ -84,11 +90,8 @@ Market/region state transfers through Location Project State rather than Mortgag
 
 ## Deferred
 
-- client-specific import profiles and mappings;
-- loan/Realtor import idempotency/reconciliation actions;
 - co-borrower Contact-resolution policy beyond exact safe identity matches;
 - referral event/metric accounting;
 - LOS provider packages;
-- Campaign family/priority behavior;
 - imported Messaging consent orchestration;
 - high-intent reply orchestration.

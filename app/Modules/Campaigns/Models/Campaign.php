@@ -28,6 +28,8 @@ class Campaign extends Model
         'name',
         'description',
         'message_chain_id',
+        'family_key',
+        'priority',
         'channel',
         'purpose',
         'scope',
@@ -42,6 +44,7 @@ class Campaign extends Model
     {
         return [
             'message_chain_id' => 'integer',
+        'priority' => 'integer',
             'is_customized' => 'boolean',
             'customized_at' => 'datetime',
             'meta' => 'array',

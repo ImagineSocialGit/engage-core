@@ -102,6 +102,8 @@ class SyncCampaignPresetsAction
                 'channel' => $this->normalizeSegment($definition->channel),
                 'purpose' => $this->normalizeSegment($definition->purpose),
                 'scope' => $this->normalizeSegment($definition->scope),
+                'family_key' => $definition->familyKey,
+                'priority' => $definition->priority,
                 'status' => $this->normalizeSegment($definition->status),
                 'source_version' => $definition->sourceVersion,
                 'is_customized' => false,
@@ -126,6 +128,8 @@ class SyncCampaignPresetsAction
             'channel' => $this->normalizeSegment($definition->channel),
             'purpose' => $this->normalizeSegment($definition->purpose),
             'scope' => $this->normalizeSegment($definition->scope),
+            'family_key' => $definition->familyKey,
+            'priority' => $definition->priority,
             'source_version' => $definition->sourceVersion,
             'meta' => $this->campaignMeta(
                 campaign: $campaign,

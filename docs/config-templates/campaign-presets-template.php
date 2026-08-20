@@ -27,6 +27,9 @@ return [
     | - campaign_step_due is the fixed dispatch key for every step and variant
     | - Campaign variant_strategy cascades unless a step explicitly overrides it
     | - Campaign and step channel summaries are derived from their variants
+    | - optional family_key groups mutually exclusive same-lane Campaigns
+    | - priority defaults to 0; a higher priority may supersede a lower-priority
+    |   open enrollment in the same family; equal priority keeps the incumbent
     | - omit child is_active when true; include it only to disable that child
     | - omit empty criteria, dependency_rules, and meta objects
     |

@@ -120,9 +120,9 @@ class MortgageProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(17, $document['version']);
-        $this->assertSame(1, $document['sections']['relationships']['version']);
-        $this->assertSame(3, $document['sections']['mortgage']['version']);
+        $this->assertSame((int) config('project_state.version'), $document['version']);
+        $this->assertSame((int) config('project_state.sections.relationships.version'), $document['sections']['relationships']['version']);
+        $this->assertSame((int) config('project_state.sections.mortgage.version'), $document['sections']['mortgage']['version']);
         $this->assertArrayNotHasKey('mortgage_realtor_markets', $document['sections']['mortgage']['tables']);
         $this->assertCount(1, $document['sections']['mortgage']['tables']['contact_mortgage_profiles']);
         $this->assertCount(1, $document['sections']['mortgage']['tables']['mortgage_loans']);

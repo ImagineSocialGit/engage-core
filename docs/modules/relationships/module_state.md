@@ -46,6 +46,10 @@ app/Support/ModuleIntegrations
 
 Relationship geography must not be duplicated into generic `market_key` columns or vertical-specific market tables when Location is the configured source of truth.
 
+## Import composition
+
+Core Contact imports can now assign/update configured relationship types and stages through the public Relationships import handler. Acquisition source/subsource is preserved rather than casually overwritten by later overlapping imports. Optional Location-area mapping composes through the app-level bridge when Location is explicitly enabled.
+
 ## Project State
 
 Relationships Project State is imported after Core and before Location/Mortgage consumers. Contact relationship records transfer as durable business-context state.
@@ -53,7 +57,5 @@ Relationships Project State is imported after Core and before Location/Mortgage 
 ## Deferred
 
 - relationship-scoped CRM list/navigation implementation;
-- client-specific relationship definitions and labels;
 - client UI for choosing default relationship workspace;
-- relationship-aware bulk actions and exports;
-- import-profile orchestration that assigns relationships through the public action seam.
+- relationship-aware bulk actions and exports.

@@ -73,6 +73,8 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             'name' => 'Production nurture',
             'status' => 'active',
             'message_chain_id' => 400,
+            'family_key' => 'consumer_nurture',
+            'priority' => 30,
             'is_customized' => true,
         ]);
         $this->assertDatabaseHas('campaign_steps', [
@@ -336,6 +338,8 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'campaign',
             'status' => 'active',
+            'family_key' => 'consumer_nurture',
+            'priority' => 30,
             'source_version' => '1',
             'is_customized' => true,
             'customized_at' => $now,

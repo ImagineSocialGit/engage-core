@@ -213,7 +213,7 @@ return [
 
         'campaigns' => [
             'path' => 'database/migrations/modules/campaigns',
-            'schema_version' => 1,
+            'schema_version' => 2,
             'migrations' => [
                 '2026_06_12_050337_create_campaigns_table.php',
                 '2026_06_12_050338_create_campaign_steps_table.php',

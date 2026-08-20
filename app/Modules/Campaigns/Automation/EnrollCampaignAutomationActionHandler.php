@@ -104,6 +104,11 @@ class EnrollCampaignAutomationActionHandler implements AutomationActionHandler
                 output: [
                     'campaign_key' => $exception->campaignKey,
                     'campaign_status' => $exception->campaignStatus,
+                    'campaign_family_key' => $exception->familyKey,
+                    'campaign_priority' => $exception->campaignPriority,
+                    'blocking_campaign_key' => $exception->blockingCampaignKey,
+                    'blocking_campaign_priority' => $exception->blockingPriority,
+                    'blocking_campaign_enrollment_id' => $exception->blockingEnrollmentId,
                     'error' => $exception->getMessage(),
                     'enroll_campaign_definition' => $definition->toMetaPayload(),
                 ],

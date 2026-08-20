@@ -53,6 +53,11 @@ class ModuleMigrationRegistryTest extends TestCase
             '2026_08_19_175000_create_contact_relationships_table.php',
         ], $registry->requireModule('relationships')->migrationFiles);
 
+        $this->assertSame(
+            2,
+            $registry->requireModule('campaigns')->schemaVersion,
+        );
+
         $this->assertFalse($registry->hasModule('dashboard'));
         $this->assertFalse($registry->hasModule('integrations'));
         $this->assertTrue($registry->hasModule('reporting'));

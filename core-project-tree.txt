@@ -117,6 +117,7 @@
 │   │   │   │   ├── Automation
 │   │   │   │   │   ├── CancelCampaignAutomationDefinition.php
 │   │   │   │   │   └── EnrollCampaignAutomationDefinition.php
+│   │   │   │   ├── CampaignEnrollmentArbitrationResult.php
 │   │   │   │   ├── CampaignPresetDefinition.php
 │   │   │   │   ├── CampaignPresetSyncResult.php
 │   │   │   │   ├── CampaignStepPresetDefinition.php
@@ -134,6 +135,7 @@
 │   │   │   ├── Requests
 │   │   │   │   └── UpdateCampaignStepMessageTemplateRequest.php
 │   │   │   ├── Services
+│   │   │   │   ├── CampaignEnrollmentArbitrator.php
 │   │   │   │   ├── CampaignMessageChainDefinitionBuilder.php
 │   │   │   │   ├── CampaignMessageChainExecutionContextProvider.php
 │   │   │   │   ├── CampaignMessageDefinitionResolver.php
@@ -2378,4 +2380,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-608 directories, 1771 files
+608 directories, 1773 files

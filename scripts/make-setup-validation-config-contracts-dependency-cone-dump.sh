@@ -62,6 +62,7 @@ for dir in \
     app/Support/ConfigContracts \
     app/Support/TokenContracts \
     app/Support/AutomationCapabilities \
+    app/Support/SetupValidation \
     app/Support/Setup \
     app/Support/Validation
 do

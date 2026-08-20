@@ -29,6 +29,8 @@ class CompactCampaignPresetAuthoringTest extends TestCase
         $this->assertSame('multi', $definition->channel);
         $this->assertSame('marketing', $definition->purpose);
         $this->assertSame('webinar_nurture', $definition->scope);
+        $this->assertSame('consumer_nurture', $definition->familyKey);
+        $this->assertSame(15, $definition->priority);
         $this->assertSame('campaign_step_due', $definition->dispatchKey);
         $this->assertSame('send_all_eligible', $definition->variantStrategy);
         $this->assertSame('7', $definition->sourceVersion);
@@ -105,6 +107,8 @@ class CompactCampaignPresetAuthoringTest extends TestCase
         $this->assertSame('multi', $campaign->channel);
         $this->assertSame('marketing', $campaign->purpose);
         $this->assertSame('webinar_nurture', $campaign->scope);
+        $this->assertSame('consumer_nurture', $campaign->family_key);
+        $this->assertSame(15, $campaign->priority);
 
         $steps = CampaignStep::query()
             ->where('campaign_id', $campaign->id)
@@ -132,6 +136,18 @@ class CompactCampaignPresetAuthoringTest extends TestCase
         $this->assertSame(
             [null],
             $firstStepVariants->pluck('source_config_path')->unique()->values()->all(),
+        );
+    }
+
+    public function test_campaign_priority_must_be_an_integer(): void
+    {
+        $definition = $this->compactDefinition();
+        $definition['priority'] = '15';
+
+        $this->assertDefinitionInvalid(
+            definition: $definition,
+            messageFragment: 'priority must be an integer',
+            label: 'priority string',
         );
     }
 
@@ -246,6 +262,8 @@ class CompactCampaignPresetAuthoringTest extends TestCase
             'description' => 'Generic compact Campaign definition.',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
+            'family_key' => 'Consumer-Nurture',
+            'priority' => 15,
             'variant_strategy' => 'send_all_eligible',
             'source_version' => 7,
             'steps' => [

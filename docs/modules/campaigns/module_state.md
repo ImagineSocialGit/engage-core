@@ -64,6 +64,30 @@ Campaigns does not own:
 
 Campaigns may depend on Core and Messaging.
 
+## Campaign family / priority arbitration
+
+Campaigns owns optional same-lane exclusivity for Campaign enrollment. This is a Campaign business rule, not generic MessageChain progression.
+
+```text
+family_key = null
+    Campaign is independent; existing enrollment behavior is unchanged
+
+family_key = same value
+    Campaigns are mutually exclusive for one Contact while an enrollment is active/paused
+
+priority = higher integer
+    candidate may supersede lower-priority open family enrollments
+
+priority = equal or lower
+    existing open family enrollment remains incumbent and the candidate is blocked
+```
+
+Supersession uses `CancelCampaignEnrollmentAction`, which delegates to Messaging-owned MessageChainEnrollment cancellation and pending-message skipping. The candidate enrollment and any supersession cancellations occur in one database transaction so a failed new start does not strand the prior journey as cancelled.
+
+Family arbitration is opt-in. Existing Campaigns with no `family_key` do not become mutually exclusive. Family keys are generic stable business-lane identifiers and must not encode Mortgage, Webinar, or other producer-module branching into Campaign runtime code.
+
+Compact arbitration provenance may be retained in CampaignEnrollment metadata; generic chain progression and delivery history remain Messaging-owned.
+
 ## Runtime variant availability
 
 Campaign variant availability is provider-aware. A variant is currently available only when Messaging exposes its channel for the Campaign surface, its purpose/scope is enabled, and the channel's provider is enabled.
@@ -93,6 +117,7 @@ Enrollment failure reasons remain distinct:
 ```text
 campaign_missing
 campaign_inactive
+campaign_family_blocked
 ```
 
 Routine preset sync may update non-customized Campaign definitions but must not silently overwrite existing operational status.
@@ -145,6 +170,8 @@ key
 name
 description nullable
 message_chain_id
+family_key nullable
+priority
 status
 source nullable
 source_version nullable
@@ -227,6 +254,7 @@ description
 status installation default
 selected MessageChain key
 Campaign-specific classification/segment defaults when needed
+optional family key + integer priority for same-lane exclusivity
 source version
 ```
 
@@ -615,7 +643,7 @@ The Campaign runtime cutover is complete:
 - Messaging owns progression, lifecycle timestamps, exit state, and ScheduledMessage terminal handling;
 - Campaign cancellation/deactivation/pause/resume delegate through Messaging public actions;
 - workspace/contact/automation reads derive runtime state from the linked chain enrollment;
-- Project State Campaigns section v3 exports the compact wrapper, while Messaging section v2 owns the chain enrollment and deferred Campaign context/origin references;
+- Project State Campaigns section exports the compact wrapper using the current contract in `config/project_state/campaigns.php`, while Messaging section v2 owns the chain enrollment and deferred Campaign context/origin references;
 - the legacy Campaign scheduler/listener classes and duplicate enrollment progression columns are removed.
 
 `campaign_steps` and `campaign_step_variants` remain only as the temporary authoring projection consumed by the current Campaign message editor and preset bridge. They must not regain runtime meaning. A later Builder/authoring migration should make Messaging MessageChain definitions the direct authoring source, then remove these Campaign authoring tables.

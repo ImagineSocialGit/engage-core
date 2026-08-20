@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 3,
+    'version' => 4,
     'tables' => [
         'campaigns' => [
             'mode' => 'upsert',
@@ -18,6 +18,8 @@ return [
                 'purpose',
                 'scope',
                 'status',
+                'family_key',
+                'priority',
                 'source_version',
                 'is_customized',
                 'customized_at',

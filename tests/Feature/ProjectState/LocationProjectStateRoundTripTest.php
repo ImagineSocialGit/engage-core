@@ -53,8 +53,8 @@ class LocationProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(17, $document['version']);
-        $this->assertSame(1, $document['sections']['location']['version']);
+        $this->assertSame((int) config('project_state.version'), $document['version']);
+        $this->assertSame((int) config('project_state.sections.location.version'), $document['sections']['location']['version']);
         $this->assertCount(1, $document['sections']['location']['tables']['location_areas']);
         $this->assertCount(1, $document['sections']['location']['tables']['location_area_assignments']);
 

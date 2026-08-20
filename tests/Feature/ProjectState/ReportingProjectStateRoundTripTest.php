@@ -81,7 +81,7 @@ class ReportingProjectStateRoundTripTest extends TestCase
 
         $this->assertSame((int) config('project_state.version'), $document['version']);
         $this->assertArrayHasKey('reporting', $document['sections']);
-        $this->assertSame(2, $document['sections']['reporting']['version']);
+        $this->assertSame((int) config('project_state.sections.reporting.version'), $document['sections']['reporting']['version']);
         $this->assertCount(
             1,
             $document['sections']['reporting']['tables']['reporting_daily_metrics'],

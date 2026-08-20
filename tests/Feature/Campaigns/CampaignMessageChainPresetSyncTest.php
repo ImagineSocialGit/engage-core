@@ -58,6 +58,8 @@ class CampaignMessageChainPresetSyncTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame((int) $chain->getKey(), (int) $campaign->message_chain_id);
+        $this->assertSame('consumer_nurture', $campaign->family_key);
+        $this->assertSame(25, $campaign->priority);
         $this->assertSame('campaign_preset_bridge', $chain->source);
         $this->assertSame('7', $chain->source_version);
         $this->assertSame(MessageChain::STATUS_INACTIVE, $chain->status);
@@ -183,6 +185,8 @@ class CampaignMessageChainPresetSyncTest extends TestCase
             'description' => 'Fixture compact Campaign definition.',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
+            'family_key' => 'consumer-nurture',
+            'priority' => 25,
             'status' => 'inactive',
             'variant_strategy' => 'dependency_aware',
             'source_version' => 7,
