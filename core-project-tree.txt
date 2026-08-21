@@ -61,6 +61,7 @@
 │   │   ├── Broadcasts
 │   │   │   ├── Actions
 │   │   │   │   ├── CancelBroadcastAction.php
+│   │   │   │   ├── DuplicateBroadcastAction.php
 │   │   │   │   ├── ScheduleBroadcastAction.php
 │   │   │   │   └── ScheduleBroadcastRecipientChunkAction.php
 │   │   │   ├── Contracts
@@ -80,6 +81,7 @@
 │   │   │   │   └── BroadcastsModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   │   ├── PreviewBroadcastAudienceRequest.php
+│   │   │   │   ├── SaveBroadcastMessageTemplateRequest.php
 │   │   │   │   ├── StoreBroadcastRequest.php
 │   │   │   │   └── UpdateBroadcastRequest.php
 │   │   │   ├── Services
@@ -562,6 +564,7 @@
 │   │   │   │   ├── CancelMessageChainEnrollmentAction.php
 │   │   │   │   ├── ClaimScheduledMessageForSendingAction.php
 │   │   │   │   ├── CreateContactPermissionInvitationsForImportBatchAction.php
+│   │   │   │   ├── CreateReusableMessageTemplateAction.php
 │   │   │   │   ├── DispatchConsentOptInMessageAction.php
 │   │   │   │   ├── DispatchMessageAction.php
 │   │   │   │   ├── DispatchMessageIntentsAction.php
@@ -745,6 +748,7 @@
 │   │   │   │   ├── PhoneNumberNormalizer.php
 │   │   │   │   ├── ProviderSubmissionLimiter.php
 │   │   │   │   ├── ResolvedMessageDispatchBuilder.php
+│   │   │   │   ├── ReusableMessageTemplateCatalog.php
 │   │   │   │   ├── RouteAuthoringMessageTemplateEligibilityResolver.php
 │   │   │   │   ├── ScheduledMessageComponentComposer.php
 │   │   │   │   ├── ScheduledMessageDeliveryLeaseManager.php
@@ -1949,7 +1953,8 @@
 │       │   │   ├── edit.blade.php
 │       │   │   ├── index.blade.php
 │       │   │   ├── partials
-│       │   │   │   └── audience-builder.blade.php
+│       │   │   │   ├── audience-builder.blade.php
+│       │   │   │   └── reusable-message-picker.blade.php
 │       │   │   └── show.blade.php
 │       │   ├── campaigns
 │       │   │   ├── edit.blade.php
@@ -2097,6 +2102,7 @@
 │   │   │   ├── BroadcastAudiencePreviewTest.php
 │   │   │   ├── BroadcastBulkSchedulingTest.php
 │   │   │   ├── BroadcastControllerTest.php
+│   │   │   ├── BroadcastMessageReuseTest.php
 │   │   │   ├── BroadcastModelTest.php
 │   │   │   ├── BroadcastResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── CancelBroadcastActionTest.php
@@ -2152,6 +2158,7 @@
 │   │   │   ├── ContactImportPostProcessorRegistryTest.php
 │   │   │   ├── ContactImportProfileControllerTest.php
 │   │   │   ├── ContactImportProfileRegistryTest.php
+│   │   │   ├── ContactImportProfileTreatmentTargetsTest.php
 │   │   │   ├── ContactImportProvenanceTest.php
 │   │   │   ├── ContactImportTreatmentControllerTest.php
 │   │   │   ├── ContactImportTreatmentRegistryTest.php
@@ -2242,6 +2249,7 @@
 │   │   │   ├── ContactPermissionInvitationControllerTest.php
 │   │   │   ├── ContactScheduledMessagesTerminalResultTest.php
 │   │   │   ├── CreateContactPermissionInvitationsForImportBatchActionTest.php
+│   │   │   ├── CreateReusableMessageTemplateActionTest.php
 │   │   │   ├── CtaEngagementTrackingTest.php
 │   │   │   ├── DispatchConsentOptInMessageActionTest.php
 │   │   │   ├── DispatchMessageActionTest.php
@@ -2523,4 +2531,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-627 directories, 1897 files
+627 directories, 1905 files

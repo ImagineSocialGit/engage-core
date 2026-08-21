@@ -10,11 +10,17 @@ Route::middleware('module:broadcasts')
         Route::get('/', [BroadcastController::class, 'index'])
             ->name('index');
 
+        Route::post('/audience-preview', [BroadcastController::class, 'previewAudience'])
+            ->name('audience-preview');
+
         Route::post('/', [BroadcastController::class, 'store'])
             ->name('store');
 
-        Route::post('/audience-preview', [BroadcastController::class, 'previewAudience'])
-            ->name('audience-preview');
+        Route::post('/{broadcast}/save-message-template', [BroadcastController::class, 'saveMessageTemplate'])
+            ->name('save-message-template');
+
+        Route::post('/{broadcast}/duplicate', [BroadcastController::class, 'duplicate'])
+            ->name('duplicate');
 
         Route::get('/{broadcast}', [BroadcastController::class, 'show'])
             ->name('show');

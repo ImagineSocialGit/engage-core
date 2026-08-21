@@ -17,6 +17,8 @@ Messaging delivery attempts and terminal outbox events remain authoritative for 
 
 The broader Broadcast content refactor remains future work. `broadcasts.payload`, `broadcast_recipients.scheduled_message_ids`, and generic Broadcast metadata are still transitional. The approved future target stores one authored immutable message version per Broadcast and one compact ScheduledMessage relationship per recipient.
 
+Current CRM authoring now supports explicit reusable-copy promotion without performing that persistence cutover. A regular Broadcast can be saved into Messaging's existing Message Templates catalog, which creates the canonical reusable `MessageTemplate` / immutable version and catalog presentation. Future Broadcasts may load a copy of the latest published reusable version into their current draft. The Broadcast still owns its current runtime `payload` until the separate persistence refactor is performed.
+
 ## Responsibility
 
 Broadcasts owns one-time and batch sends.
@@ -95,6 +97,8 @@ Scheduling pins exactly one immutable version.
 Existing recipient deliveries never change when the draft is edited later.
 
 The private template may remain hidden from the general reusable-template browser unless an operator explicitly promotes or duplicates it into reusable library content.
+
+The current pre-cutover CRM implementation supports that explicit promotion from an existing regular Broadcast. Promotion creates a separate CRM-authored Messaging template/catalog identity; it does not attach the source Broadcast to that template and does not make the reusable template the runtime owner of the existing Broadcast payload.
 
 Remove the target `broadcasts.payload` JSON column.
 
@@ -392,12 +396,22 @@ SMS
 
 Keep duplicate-send protection secondary and collapsible.
 
-A future “Make a new Broadcast from this” action can:
+Reusable message authoring is explicit:
 
 ```text
-create a new Broadcast
-create or reuse a private template identity according to copy-edit intent
-start with a new draft version
+Save to Message Templates
+    copy the regular Broadcast message into Messaging's reusable template/catalog infrastructure
+    publish an immutable Messaging version
+    expose the saved message on the existing Message Templates screen
+
+Start from a saved message
+    load the latest published reusable version into the current Broadcast draft
+    editing the Broadcast does not mutate the saved template
+
+Make a new Broadcast from this
+    create a new draft Broadcast with the same channel/content
+    clear audience, exclusions, schedule, and delivery counts
+    require the operator to choose WHO again before scheduling
 ```
 
 Do not persist clone lineage unless audit/reporting needs prove it useful.

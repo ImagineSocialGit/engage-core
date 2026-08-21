@@ -27,6 +27,27 @@ final class ContactImportProfileRegistry
             );
         }
 
+        $configuredTreatmentTargets = config('contact_import_treatments.profiles', []);
+
+        if (! is_array($configuredTreatmentTargets) || ($configuredTreatmentTargets !== [] && array_is_list($configuredTreatmentTargets))) {
+            throw new InvalidArgumentException(
+                'Contact import treatment-profile configuration must be a keyed array.',
+            );
+        }
+
+        $unknownTreatmentProfiles = array_values(array_diff(
+            array_keys($configuredTreatmentTargets),
+            array_keys($configured),
+        ));
+
+        if ($unknownTreatmentProfiles !== []) {
+            sort($unknownTreatmentProfiles);
+
+            throw new InvalidArgumentException(
+                'Contact import treatment-profile configuration references unknown profile(s): '.implode(', ', $unknownTreatmentProfiles).'.',
+            );
+        }
+
         $profiles = [];
         $allowedFieldKeys = $this->allowedFieldKeys();
 
@@ -40,6 +61,10 @@ final class ContactImportProfileRegistry
             $definition['post_import'] = $this->postProcessors->normalizeConfig(
                 $definition['post_import'] ?? [],
             );
+
+            if (array_key_exists($key, $configuredTreatmentTargets)) {
+                $definition['treatment_targets'] = $configuredTreatmentTargets[$key];
+            }
 
             $profiles[$key] = ContactImportProfile::fromArray(
                 key: $key,

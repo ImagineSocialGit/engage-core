@@ -17,7 +17,9 @@ A profile may provide only:
 
 - filename hints used to select one unambiguous profile;
 - header aliases used to preselect mapping choices;
-- trusted dataset-level default values for registered import fields.
+- trusted dataset-level default values for registered import fields;
+- optional treatment-target applicability for the known population;
+- optional registered post-import behavior.
 
 Mapped non-blank CSV values take precedence over profile defaults. Explicit operator
 import treatment takes precedence over both when a treatment owns the same destination.
@@ -69,6 +71,44 @@ unchanged and are recorded for review rather than being inferred.
 
 Treatment targets are registry-driven. Optional modules contribute their own targets
 without adding their models or business rules to Core.
+
+### Profile-specific treatment applicability
+
+A known import profile may narrow the treatment controls that are relevant to that
+source population. This is presentation/acceptance policy for the import workflow; it
+does not move Contact Status, Relationships, stages, or tags into Core.
+
+The effective profile contract accepts an optional `treatment_targets` list. Client
+configuration may supply that list through a separate client applicability overlay:
+
+```text
+client/{client-key}/config/contact_import_treatments.php
+    -> contact_import_treatments.profiles.{profile_key}
+```
+
+Semantics:
+
+```text
+profile has no treatment-target list
+    all currently available registered treatment targets remain visible/accepted
+
+profile has an explicit treatment-target list
+    preview renders only those registered targets
+    process rejects any browser-submitted target outside that list
+
+uploaded file matches no profile
+    full advanced registered treatment catalog remains available
+```
+
+This allows the operator surface to reflect the population being imported instead of
+showing every technically possible treatment on every known file. For example, a client
+may expose Contact Status + Tags for consumer/lead profiles while exposing Relationship
++ Relationship Stage + Tags for Realtor/partner profiles. The rule is configured by the
+client profile; Core does not hard-code "consumer", "Realtor", or another business noun.
+
+A Contact may still participate in more than one business context. A narrowed import
+profile is a routine-workflow affordance, not a restriction on the canonical Contact
+model or later relationship/status management.
 
 ## Setup validation
 

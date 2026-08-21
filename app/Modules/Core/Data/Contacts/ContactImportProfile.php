@@ -13,6 +13,7 @@ final class ContactImportProfile
      * @param array<string, string> $defaults
      * @param array<string, array<int, string>> $aliases
      * @param array<string, array<string, mixed>> $postImport
+     * @param array<int, string>|null $treatmentTargets
      */
     public function __construct(
         public readonly string $key,
@@ -22,6 +23,7 @@ final class ContactImportProfile
         public readonly array $defaults,
         public readonly array $aliases,
         public readonly array $postImport = [],
+        public readonly ?array $treatmentTargets = null,
     ) {}
 
     /**
@@ -41,7 +43,7 @@ final class ContactImportProfile
 
         $unknown = array_values(array_diff(
             array_keys($definition),
-            ['label', 'description', 'filename_contains', 'defaults', 'aliases', 'post_import'],
+            ['label', 'description', 'filename_contains', 'defaults', 'aliases', 'post_import', 'treatment_targets'],
         ));
 
         if ($unknown !== []) {
@@ -74,6 +76,9 @@ final class ContactImportProfile
             $definition['post_import'] ?? [],
             "{$key}.post_import",
         );
+        $treatmentTargets = array_key_exists('treatment_targets', $definition)
+            ? self::stringList($definition['treatment_targets'], "{$key}.treatment_targets")
+            : null;
 
         return new self(
             key: $key,
@@ -83,6 +88,7 @@ final class ContactImportProfile
             defaults: $defaults,
             aliases: $aliases,
             postImport: $postImport,
+            treatmentTargets: $treatmentTargets,
         );
     }
 

@@ -53,9 +53,9 @@ final class ContactImportTreatmentRegistry
     /**
      * @return Collection<int, ContactImportTreatmentDefinition>
      */
-    public function definitions(): Collection
+    public function definitions(?array $allowedTargetKeys = null): Collection
     {
-        return collect($this->availableTargets())
+        return collect($this->availableTargetsFor($allowedTargetKeys))
             ->map(fn (ContactImportTreatmentTarget $target): ContactImportTreatmentDefinition => $target->definition())
             ->sortBy([
                 ['section', 'asc'],
@@ -70,9 +70,12 @@ final class ContactImportTreatmentRegistry
      * @param array<int, string> $headers
      * @return array<string, ContactImportTreatmentSelection>
      */
-    public function normalizeSubmitted(array $submitted, array $headers): array
-    {
-        $available = $this->availableTargets();
+    public function normalizeSubmitted(
+        array $submitted,
+        array $headers,
+        ?array $allowedTargetKeys = null,
+    ): array {
+        $available = $this->availableTargetsFor($allowedTargetKeys);
         $normalized = [];
 
         foreach ($submitted as $targetKey => $selection) {
@@ -335,6 +338,40 @@ final class ContactImportTreatmentRegistry
         }
 
         return $meta;
+    }
+
+    /**
+     * @param array<int, string>|null $allowedTargetKeys
+     * @return array<string, ContactImportTreatmentTarget>
+     */
+    private function availableTargetsFor(?array $allowedTargetKeys): array
+    {
+        $available = $this->availableTargets();
+
+        if ($allowedTargetKeys === null) {
+            return $available;
+        }
+
+        $allowedTargetKeys = array_values(array_unique(array_map(
+            static fn (mixed $key): string => is_string($key) ? trim($key) : '',
+            $allowedTargetKeys,
+        )));
+        $allowedTargetKeys = array_values(array_filter(
+            $allowedTargetKeys,
+            static fn (string $key): bool => $key !== '',
+        ));
+
+        $unknown = array_values(array_diff($allowedTargetKeys, array_keys($available)));
+
+        if ($unknown !== []) {
+            sort($unknown);
+
+            throw new InvalidArgumentException(
+                'Contact import profile references unavailable treatment target(s): '.implode(', ', $unknown).'.',
+            );
+        }
+
+        return array_intersect_key($available, array_fill_keys($allowedTargetKeys, true));
     }
 
     /**

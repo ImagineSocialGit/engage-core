@@ -50,6 +50,16 @@
                     </form>
                 @endif
 
+                @if($broadcast->isRegularBroadcast())
+                    <form method="POST" action="{{ route('crm.broadcasts.duplicate', $broadcast) }}" class="w-full sm:w-auto">
+                        @csrf
+
+                        <x-ui.button type="submit" variant="secondary" class="w-full justify-center sm:w-auto">
+                            Make a new Broadcast from this
+                        </x-ui.button>
+                    </form>
+                @endif
+
                 @if(! in_array($broadcast->status, [
                     \App\Modules\Broadcasts\Models\Broadcast::STATUS_COMPLETED,
                     \App\Modules\Broadcasts\Models\Broadcast::STATUS_CANCELLED,
@@ -163,6 +173,48 @@
                             <div class="mt-2 whitespace-pre-line break-words rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                                 {{ $broadcast->payload['body'] ?? '' }}
                             </div>
+                        </div>
+                    @endif
+
+                    @if($broadcast->isRegularBroadcast())
+                        <div class="border-t border-slate-200 pt-5">
+                            <div>
+                                <h3 class="text-sm font-semibold text-slate-900">
+                                    Save this message for reuse
+                                </h3>
+                                <p class="mt-1 text-xs leading-5 text-slate-500">
+                                    Add this copy to Message Templates so it can be loaded into future Broadcasts. The saved template is independent from this Broadcast.
+                                </p>
+                            </div>
+
+                            <form method="POST" action="{{ route('crm.broadcasts.save-message-template', $broadcast) }}" class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                                @csrf
+
+                                <div>
+                                    <x-ui.form.label for="reusable_template_name">
+                                        Template Name
+                                    </x-ui.form.label>
+
+                                    <x-ui.form.input
+                                        id="reusable_template_name"
+                                        name="name"
+                                        value="{{ old('name', $broadcast->name) }}"
+                                        maxlength="191"
+                                        required
+                                    />
+                                </div>
+
+                                <x-ui.button type="submit" class="w-full justify-center sm:w-auto">
+                                    Save to Message Templates
+                                </x-ui.button>
+                            </form>
+
+                            <a
+                                href="{{ route('crm.messaging.message-templates.index') }}"
+                                class="mt-3 inline-flex text-xs font-semibold text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-900"
+                            >
+                                Open Message Templates
+                            </a>
                         </div>
                     @endif
                 </x-ui.card>

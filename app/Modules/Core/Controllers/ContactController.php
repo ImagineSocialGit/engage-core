@@ -325,7 +325,9 @@ class ContactController extends Controller
             'columnProfiles' => $columnProfiles,
             'csvPath' => $storedPath,
             'importSections' => $contactImportRegistry->sections(),
-            'treatmentDefinitions' => $treatmentRegistry->definitions(),
+            'treatmentDefinitions' => $treatmentRegistry->definitions(
+                allowedTargetKeys: $importProfile?->treatmentTargets,
+            ),
             'importProfile' => $importProfile,
             'suggestedMapping' => $suggestedMapping,
             'postImportSummaries' => $postImportSummaries,
@@ -425,6 +427,7 @@ class ContactController extends Controller
                 ? $validated['treatments']
                 : [],
             headers: $headers,
+            allowedTargetKeys: $importProfile?->treatmentTargets,
         );
         $treatmentStats = $this->initializeTreatmentStats($treatmentSelections);
         $postImportStats = $this->initializePostImportStats($postImportConfig);

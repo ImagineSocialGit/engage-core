@@ -12,4 +12,5 @@
 - [x] Keep imported-contact permission invitations secondary to normal Broadcast authoring and hide invitation controls when no eligible contacts exist.
 - [x] Collapse duplicate-send protection by default with a clear summary.
 - [x] Refine the guided authoring sequence: recipients -> preview -> channel/content -> duplicate protection/review -> schedule/send.
-- [ ] Add `Make a new Broadcast from this` when useful; add clone lineage persistence only if a real audit/product need proves it necessary.
+- [x] Add `Make a new Broadcast from this` with a clean WHO/timing reset; do not persist clone lineage without a proven audit/product need.
+- [x] Let regular Broadcast copy be explicitly saved into Messaging's existing reusable Message Templates catalog and loaded into later Broadcast drafts.

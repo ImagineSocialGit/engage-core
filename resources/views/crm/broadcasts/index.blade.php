@@ -39,6 +39,33 @@
                     x-data="{
                         recipientFilterType: @js(old('recipient_filter_type', 'all')),
                         channel: @js(old('channel', $availableBroadcastChannels[0] ?? 'email')),
+                        reusableMessages: @js($reusableMessageTemplates),
+                        selectedReusableMessageId: '',
+                        subject: @js(old('subject', '')),
+                        body: @js(old('body', '')),
+                        message: @js(old('message', '')),
+                        availableReusableMessages() {
+                            return this.reusableMessages.filter((template) => template.channel === this.channel);
+                        },
+                        applyReusableMessage() {
+                            const selected = this.reusableMessages.find(
+                                (template) => String(template.id) === String(this.selectedReusableMessageId),
+                            );
+
+                            if (! selected || selected.channel !== this.channel) {
+                                return;
+                            }
+
+                            const payload = selected.payload || {};
+
+                            if (this.channel === 'sms') {
+                                this.message = payload.message || '';
+                                return;
+                            }
+
+                            this.subject = payload.subject || '';
+                            this.body = payload.body || '';
+                        },
                     }"
                 >
                     @csrf
@@ -73,6 +100,7 @@
                             id="channel"
                             name="channel"
                             x-model="channel"
+                            x-on:change="selectedReusableMessageId = ''"
                         >
                             @foreach($availableBroadcastChannels as $availableBroadcastChannel)
                                 <option value="{{ $availableBroadcastChannel }}">
@@ -87,6 +115,9 @@
                     <input type="hidden" name="channel" value="{{ $availableBroadcastChannels[0] ?? 'email' }}">
                 @endif
 
+                    @include('crm.broadcasts.partials.reusable-message-picker', [
+                        'reusableMessageTemplates' => $reusableMessageTemplates,
+                    ])
 
                     <div>
                         <x-ui.form.label for="name">
@@ -112,6 +143,7 @@
                             id="subject"
                             name="subject"
                             value="{{ old('subject') }}"
+                            x-model="subject"
                             x-bind:required="channel === 'email'"
                         />
 
@@ -127,6 +159,7 @@
                             id="body"
                             name="body"
                             rows="8"
+                            x-model="body"
                             x-bind:required="channel === 'email'"
                         >{{ old('body') }}</x-ui.form.textarea>
 
@@ -142,6 +175,7 @@
                             id="message"
                             name="message"
                             rows="5"
+                            x-model="message"
                             x-bind:required="channel === 'sms'"
                         >{{ old('message') }}</x-ui.form.textarea>
 

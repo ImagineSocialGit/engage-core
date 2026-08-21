@@ -4,11 +4,13 @@ namespace App\Modules\Broadcasts\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Broadcasts\Actions\CancelBroadcastAction;
+use App\Modules\Broadcasts\Actions\DuplicateBroadcastAction;
 use App\Modules\Broadcasts\Actions\ScheduleBroadcastAction;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Broadcasts\Requests\StoreBroadcastRequest;
 use App\Modules\Broadcasts\Requests\PreviewBroadcastAudienceRequest;
+use App\Modules\Broadcasts\Requests\SaveBroadcastMessageTemplateRequest;
 use App\Modules\Broadcasts\Requests\UpdateBroadcastRequest;
 use App\Modules\Broadcasts\Services\BroadcastRecipientResolver;
 use App\Modules\Broadcasts\Services\BroadcastAudiencePreviewService;
@@ -16,13 +18,16 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Core\Services\Contacts\ContactFilterResolver;
 use App\Modules\Core\Support\Contacts\ContactFilterCriterionRegistry;
+use App\Modules\Messaging\Actions\CreateReusableMessageTemplateAction;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
+use App\Modules\Messaging\Services\ReusableMessageTemplateCatalog;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\View\View;
+use InvalidArgumentException;
 
 class BroadcastController extends Controller
 {
@@ -32,6 +37,7 @@ class BroadcastController extends Controller
         private readonly BroadcastRecipientResolver $broadcastRecipientResolver,
         private readonly BroadcastAudiencePreviewService $broadcastAudiencePreview,
         private readonly MessageChannelAvailability $messageChannelAvailability,
+        private readonly ReusableMessageTemplateCatalog $reusableMessageTemplates,
     ) {}
 
     public function index(Request $request): View
@@ -46,6 +52,9 @@ class BroadcastController extends Controller
             'heading' => 'Broadcasts',
             'broadcasts' => $broadcasts,
             'availableBroadcastChannels' => $this->availableRegularBroadcastChannels(),
+            'reusableMessageTemplates' => $this->reusableMessageTemplates->definitions(
+                $this->availableRegularBroadcastChannels(),
+            ),
             'audienceCriteria' => $this->contactFilterCriteria->definitions(),
             'permissionInvitationPreview' => $this->newPermissionInvitationPreview($request),
             'importBatches' => $this->importBatches(),
@@ -110,6 +119,62 @@ class BroadcastController extends Controller
         );
     }
 
+    public function saveMessageTemplate(
+        SaveBroadcastMessageTemplateRequest $request,
+        Broadcast $broadcast,
+        CreateReusableMessageTemplateAction $createReusableMessageTemplate,
+    ): RedirectResponse {
+        if (! $broadcast->isRegularBroadcast()) {
+            return redirect()
+                ->route('crm.broadcasts.show', $broadcast)
+                ->with('error', 'Opt-in invitations cannot be saved as reusable Broadcast messages.');
+        }
+
+        try {
+            $createReusableMessageTemplate->handle(
+                name: $request->templateName(),
+                channel: (string) $broadcast->channel,
+                purpose: (string) $broadcast->purpose,
+                scope: (string) $broadcast->scope,
+                dispatchKey: (string) $broadcast->dispatch_key,
+                messageType: is_string($broadcast->message_type) ? $broadcast->message_type : null,
+                payloadClass: (string) $broadcast->payload_class,
+                queue: is_string($broadcast->queue) ? $broadcast->queue : null,
+                payload: is_array($broadcast->payload) ? $broadcast->payload : [],
+                createdBy: $request->user(),
+            );
+        } catch (InvalidArgumentException $exception) {
+            return redirect()
+                ->route('crm.broadcasts.show', $broadcast)
+                ->with('error', $exception->getMessage());
+        }
+
+        return redirect()
+            ->route('crm.broadcasts.show', $broadcast)
+            ->with('success', 'Message saved to Message Templates. It is now available when composing future Broadcasts.');
+    }
+
+    public function duplicate(
+        Request $request,
+        Broadcast $broadcast,
+        DuplicateBroadcastAction $duplicateBroadcast,
+    ): RedirectResponse {
+        if (! $broadcast->isRegularBroadcast()) {
+            return redirect()
+                ->route('crm.broadcasts.show', $broadcast)
+                ->with('error', 'Opt-in invitations cannot be duplicated as regular Broadcasts.');
+        }
+
+        $copy = $duplicateBroadcast->handle(
+            broadcast: $broadcast,
+            actor: $request->user(),
+        );
+
+        return redirect()
+            ->route('crm.broadcasts.edit', $copy)
+            ->with('success', 'New Broadcast draft created from this message. Choose who should receive it before scheduling.');
+    }
+
     public function show(Broadcast $broadcast): View
     {
         $broadcast->loadCount([
@@ -156,6 +221,9 @@ class BroadcastController extends Controller
             'heading' => $broadcast->isPermissionInvitation() ? 'Edit Opt-In Invitation' : 'Edit Broadcast',
             'broadcast' => $broadcast,
             'availableBroadcastChannels' => $this->availableRegularBroadcastChannels($broadcast->channel),
+            'reusableMessageTemplates' => $this->reusableMessageTemplates->definitions(
+                $this->availableRegularBroadcastChannels($broadcast->channel),
+            ),
             'audienceCriteria' => $this->contactFilterCriteria->definitions(),
             'selectedRecipientContacts' => $this->selectedContactOptions(
                 session()->getOldInput('contact_ids', $broadcast->recipient_filter['contact_ids'] ?? []),
