@@ -67,8 +67,11 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
                 'data-webinar-message-review-modal="'.$webinar->getKey().'"',
                 false,
             )
-            ->assertSee('data-message-chain-channel="email"', false)
-            ->assertSee('data-message-chain-channel="sms"', false);
+            ->assertSee('data-message-editor-carousel', false)
+            ->assertSee('data-message-editor-channel="email"', false)
+            ->assertSee('data-message-editor-channel="sms"', false)
+            ->assertSee('data-message-editor-published-preview', false)
+            ->assertSee('data-message-editor-form', false);
 
         $html = $response->getContent();
         $upcomingPosition = strpos($html, 'data-upcoming-webinars');
@@ -79,7 +82,7 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
         $this->assertLessThan($workspacePosition, $upcomingPosition);
     }
 
-    public function test_series_message_page_uses_same_carousel_for_shared_preview_and_series_owned_editing(): void
+    public function test_series_message_page_uses_same_editable_carousel_for_shared_and_series_owned_copy(): void
     {
         [$profile] = $this->profileAndChain();
         $series = WebinarSeries::factory()->create([
@@ -97,7 +100,9 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
             )
             ->assertSee('data-webinar-message-carousel', false)
             ->assertSee('data-webinar-message-ownership="shared"', false)
-            ->assertDontSee('data-message-chain-edit-form', false);
+            ->assertSee('data-message-editor-carousel', false)
+            ->assertSee('data-message-editor-published-preview', false)
+            ->assertSee('data-message-editor-form', false);
 
         app(DuplicateWebinarSeriesMessageChainsAction::class)->handle(
             targetSeries: $series,
@@ -108,7 +113,8 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
             ->get(route('crm.webinar-series.message-chains.show', $series))
             ->assertOk()
             ->assertSee('data-webinar-message-ownership="series"', false)
-            ->assertSee('data-message-chain-edit-form', false);
+            ->assertSee('data-message-editor-carousel', false)
+            ->assertSee('data-message-editor-form', false);
     }
 
     /**

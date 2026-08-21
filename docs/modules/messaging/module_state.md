@@ -292,6 +292,13 @@ The source MessageTemplatePreset payload remains partial and source-owned. Publi
 or message-level edits creates complete immutable MessageTemplateVersion records; already
 pinned ScheduledMessages are not rewritten.
 
+Normal message-copy review and editing uses the canonical Messaging carousel/editor rather
+than a permanent side-by-side preview/editor layout. A catalog family opens one message at a
+time, the top bar identifies the channel plus Published copy/Edit copy state, and Edit replaces
+the published preview in the same frame with populated operator-facing fields. Saving still
+runs through the composition-aware publish path above, so the simple editing surface does not
+materialize inherited fields back into source config.
+
 ## Message chains
 
 ### `message_chains`
@@ -423,21 +430,28 @@ edit URLs
 
 Owning modules may add business context, friendly anchor labels, and safe edit links around this projection.
 
-Client/operator MessageChain UX should default to:
+Client/operator message-copy UX should default to the same canonical Messaging carousel/editor whether the caller is presenting a MessageChain or a catalog family:
 
 ```text
 Email / SMS channel choice
+Published copy / Edit copy state across the top
 one message visible at a time
-human-readable timing
+human-readable timing/context when available
 previous / next navigation
+large left/right click or tap gutters
+swipe navigation on touch screens
 published-copy preview
-optional link to the reusable Message Templates editor
-inline copy editing only when the owning module deliberately supports it
+Edit replaces that preview with populated fields in the same frame
+Save & publish / Cancel
 ```
+
+Explicit Previous/Next controls remain available for discoverability and accessibility even when the wider gutters are clickable. Dirty edits must never be discarded silently when the operator changes channel or message.
+
+Owning modules may add business context and may choose whether a particular message is editable, but they should reuse this shell instead of rebuilding stacked message panels or side-by-side preview/editor layouts. The Message Templates workspace is the generic catalog consumer; Webinar is the first MessageChain consumer with inline editing. Campaigns and other chain-owning modules should adopt the same shell when their authoring UX is touched rather than creating a competing editor pattern.
 
 Do not make the normal client mental model a page containing every chain, step, variant, and payload form expanded simultaneously.
 
-The carousel is a presentation/authoring pattern, not a new runtime abstraction. Immutable MessageTemplateVersion and MessageChainVersion ownership remains unchanged, and existing enrollments stay pinned to the versions they started with.
+The carousel is a presentation/authoring pattern, not a new runtime abstraction. Immutable MessageTemplateVersion and MessageChainVersion ownership remains unchanged, and existing enrollments stay pinned to the versions they started with. Carousel position, edit state, and dirty state remain browser/view state and are not persisted.
 
 ## Chain enrollment
 

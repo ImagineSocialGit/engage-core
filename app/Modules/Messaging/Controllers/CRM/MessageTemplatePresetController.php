@@ -15,6 +15,7 @@ use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Requests\UpdateMessageTemplateCompositionLayerRequest;
 use App\Modules\Messaging\Requests\UpdateMessageTemplatePresetRequest;
 use App\Modules\Messaging\Services\MessageTemplateCompositionEditorPresenter;
+use App\Modules\Messaging\Services\MessageTemplateCatalogCarouselPresenter;
 use App\Modules\Messaging\Services\MessageTemplateCompositionImpactResolver;
 use App\Modules\Messaging\Services\MessageTemplateCompositionIdentityResolver;
 use App\Modules\Messaging\Services\MessageTemplateCompositionResolver;
@@ -36,6 +37,7 @@ class MessageTemplatePresetController extends Controller
         MessageTemplateUsageResolver $usageResolver,
         MessageTemplateTokenValidator $messageTemplateTokenValidator,
         MessageTemplateCompositionEditorPresenter $compositionPresenter,
+        MessageTemplateCatalogCarouselPresenter $catalogCarouselPresenter,
     ): View {
         $catalogEntries = MessageTemplateCatalogEntry::query()
             ->active()
@@ -68,6 +70,7 @@ class MessageTemplatePresetController extends Controller
         $selectedGroup = $this->selectedGroup($request, $catalogGroups);
         $selectedGroupEntries = $selectedGroup['entries'] ?? collect();
         $selectedPreset = $this->selectedPreset($request, $selectedGroupEntries);
+        $messageLibrary = $catalogCarouselPresenter->present($selectedGroupEntries);
         $selectedCatalogEntry = $selectedPreset instanceof MessageTemplatePreset
             ? $selectedGroupEntries->first(
                 fn (MessageTemplateCatalogEntry $entry): bool => (int) $entry->message_template_preset_id === (int) $selectedPreset->getKey(),
@@ -118,6 +121,7 @@ class MessageTemplatePresetController extends Controller
             'selectedGroupEntries' => $selectedGroupEntries,
             'selectedPreset' => $selectedPreset,
             'selectedCatalogEntry' => $selectedCatalogEntry,
+            'messageLibrary' => $messageLibrary,
             'selectedTemplate' => $selectedTemplate,
             'currentTemplateVersion' => $currentTemplateVersion,
             'filterOptions' => $filterOptions,

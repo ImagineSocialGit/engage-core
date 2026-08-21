@@ -89,12 +89,13 @@ class WebinarMessageChainPresentationService
                         $message['areas'] = $areas->all();
                         $message['area_label'] = $areas->implode(' · ');
                         $message['series_owned'] = $seriesOwned;
-                        $message['update_action'] = $seriesOwned
-                            ? route(
-                                'crm.webinar-series.message-chains.variants.update',
-                                [$series, $message['variant_id']],
-                            )
-                            : null;
+                        $message['update_action'] = route(
+                            'crm.webinar-series.message-chains.variants.update',
+                            [$series, $message['variant_id']],
+                        );
+                        $message['edit_note'] = $seriesOwned
+                            ? 'Publishing creates a new immutable template and chain version for this Webinar series. Existing enrollments stay pinned to the version they already started with.'
+                            : 'This series currently uses shared defaults. The first edit automatically creates a series-specific copy, then publishes the change without altering the shared default for other Webinar series.';
                     }
                     unset($message);
                 }

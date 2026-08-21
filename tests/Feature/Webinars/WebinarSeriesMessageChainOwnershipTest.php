@@ -157,15 +157,23 @@ class WebinarSeriesMessageChainOwnershipTest extends TestCase
         );
     }
 
-    public function test_crm_can_create_and_edit_a_series_owned_message_chain(): void
+    public function test_crm_edits_shared_copy_through_the_carousel_and_automatically_creates_series_owned_messages(): void
     {
-        [$profile] = $this->registrationProfileAndChain();
+        [$profile, $profileChain] = $this->registrationProfileAndChain();
         $series = WebinarSeries::factory()->create([
             'title' => 'Editable Series',
             'slug' => 'editable-series',
             'webinar_schedule_profile_id' => $profile->getKey(),
         ]);
         $user = User::factory()->create();
+        $profileVersionId = $profileChain->current_version_id;
+        $sharedVariant = $profileChain
+            ->requireCurrentVersion()
+            ->steps
+            ->firstWhere('key', 'confirmation_email')
+            ?->variants
+            ->firstOrFail();
+        $sharedTemplateVersionId = $sharedVariant->message_template_version_id;
 
         $this->withoutMiddleware(ForceStagingAccess::class);
 
@@ -176,38 +184,18 @@ class WebinarSeriesMessageChainOwnershipTest extends TestCase
                 false,
             ))
             ->assertOk()
-            ->assertSee('Create custom message chain')
-            ->assertSee('This series’ effective schedule profile');
-
-        $this->actingAs($user)
-            ->post('http://crm.'.config('app.root_domain').route(
-                'crm.webinar-series.message-chains.duplicate',
-                $series,
-                false,
-            ))
-            ->assertRedirect(route(
-                'crm.webinar-series.message-chains.show',
-                $series,
-            ));
-
-        $variant = WebinarSeriesMessageChainBinding::query()
-            ->with('messageChain.currentVersion.steps.variants')
-            ->where('webinar_series_id', $series->getKey())
-            ->where('message_area_key', 'confirmation')
-            ->firstOrFail()
-            ->messageChain
-            ->requireCurrentVersion()
-            ->steps
-            ->firstWhere('key', 'confirmation_email')
-            ?->variants
-            ->firstOrFail();
+            ->assertSee('data-webinar-message-ownership="shared"', false)
+            ->assertSee('data-message-editor-carousel', false)
+            ->assertSee('data-message-editor-published-preview', false)
+            ->assertSee('data-message-editor-form', false);
 
         $this->actingAs($user)
             ->patch('http://crm.'.config('app.root_domain').route(
                 'crm.webinar-series.message-chains.variants.update',
-                [$series, $variant],
+                [$series, $sharedVariant],
                 false,
             ), [
+                '_editing_message_id' => 'variant:'.$sharedVariant->getKey(),
                 'payload' => [
                     'subject' => 'Updated from CRM',
                     'body' => 'CRM-owned series copy.',
@@ -218,6 +206,35 @@ class WebinarSeriesMessageChainOwnershipTest extends TestCase
                 $series,
             ));
 
+        $seriesBinding = WebinarSeriesMessageChainBinding::query()
+            ->with('messageChain.currentVersion.steps.variants.messageTemplateVersion')
+            ->where('webinar_series_id', $series->getKey())
+            ->where('message_area_key', 'confirmation')
+            ->firstOrFail();
+        $seriesChain = $seriesBinding->messageChain;
+        $seriesVariant = $seriesChain
+            ->requireCurrentVersion()
+            ->steps
+            ->firstWhere('key', 'confirmation_email')
+            ?->variants
+            ->firstOrFail();
+
+        $this->assertNotSame($profileChain->getKey(), $seriesChain->getKey());
+        $this->assertSame('Updated from CRM', $seriesVariant->messageTemplateVersion?->subject);
+
+        $profileChain->refresh();
+        $this->assertSame($profileVersionId, $profileChain->current_version_id);
+        $this->assertSame(
+            $sharedTemplateVersionId,
+            $profileChain
+                ->requireCurrentVersion()
+                ->steps
+                ->firstWhere('key', 'confirmation_email')
+                ?->variants
+                ->firstOrFail()
+                ->message_template_version_id,
+        );
+
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').route(
                 'crm.webinar-series.message-chains.show',
@@ -225,9 +242,9 @@ class WebinarSeriesMessageChainOwnershipTest extends TestCase
                 false,
             ))
             ->assertOk()
-            ->assertSee('Custom series chain')
+            ->assertSee('data-webinar-message-ownership="series"', false)
             ->assertSee('Updated from CRM')
-            ->assertSee('Publish updated copy');
+            ->assertSee('data-message-editor-form', false);
     }
 
     public function test_series_deletion_removes_unreferenced_owned_chains_and_templates(): void

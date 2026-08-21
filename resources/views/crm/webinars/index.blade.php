@@ -1,9 +1,16 @@
 <x-layouts.crm :title="$title" :heading="$heading">
+    @php
+        $requestedMessageWebinarId = request()->integer('messages');
+        $initialMessageWebinarId = collect($upcomingWebinars ?? [])->contains(
+            fn ($webinar): bool => (int) $webinar->getKey() === $requestedMessageWebinarId,
+        ) ? $requestedMessageWebinarId : null;
+    @endphp
+
     <div
         class="space-y-6"
         x-data="{
             activeDevTestingModal: null,
-            activeMessageWebinar: null,
+            activeMessageWebinar: @js($initialMessageWebinarId),
             openDevTestingModal(name) {
                 this.activeDevTestingModal = name;
             },
@@ -257,23 +264,24 @@
                 </header>
 
                 <div class="p-4 sm:p-6">
-                    <x-messaging.message-chain-carousel
+                    <x-messaging.message-editor-carousel
                         :presentation="$messageReview"
-                        :editable="false"
+                        :editable="true"
+                        :form-context="['webinar_id' => $upcomingWebinar->getKey()]"
                     />
                 </div>
 
                 <footer class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <p class="text-xs leading-5 text-slate-500">
-                        This is the current published sequence for this Webinar series. Existing scheduled or enrolled messages remain pinned to their published versions.
+                        Review and edit the published sequence here. Saving publishes a new immutable version for future Webinar messaging; existing scheduled or enrolled messages remain pinned to the versions they already use.
                     </p>
 
                     @if($upcomingWebinar->webinarSeries)
                         <a
                             href="{{ route('crm.webinar-series.message-chains.show', $upcomingWebinar->webinarSeries) }}"
-                            class="inline-flex min-h-10 w-full shrink-0 items-center justify-center rounded-full bg-slate-950 px-4 text-sm font-extrabold text-white hover:bg-slate-800 sm:w-auto"
+                            class="inline-flex min-h-10 w-full shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-extrabold text-slate-700 hover:bg-slate-50 sm:w-auto"
                         >
-                            Review or edit messages
+                            Open full sequence
                         </a>
                     @endif
                 </footer>

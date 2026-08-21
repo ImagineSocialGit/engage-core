@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Modules\Messaging\Models\MessageChainStepVariant;
 use App\Modules\Webinars\Actions\DuplicateWebinarSeriesMessageChainsAction;
+use App\Modules\Webinars\Actions\ResolveWebinarSeriesEditableMessageVariantAction;
 use App\Modules\Webinars\Actions\UpdateWebinarSeriesMessageTemplateAction;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Modules\Webinars\Models\WebinarSeriesMessageChainBinding;
@@ -100,19 +101,25 @@ class WebinarSeriesMessageChainController extends Controller
         UpdateWebinarSeriesMessageTemplateRequest $request,
         WebinarSeries $series,
         MessageChainStepVariant $variant,
+        ResolveWebinarSeriesEditableMessageVariantAction $resolveEditableVariant,
         UpdateWebinarSeriesMessageTemplateAction $updateMessageTemplate,
     ): RedirectResponse {
         $actor = $request->user();
+        $user = $actor instanceof User ? $actor : null;
+        $editableVariant = $resolveEditableVariant->handle(
+            series: $series,
+            variant: $variant,
+            createdBy: $user,
+        );
 
         $updateMessageTemplate->handle(
             series: $series,
-            variant: $variant,
+            variant: $editableVariant,
             payload: $request->safePayload(),
-            createdBy: $actor instanceof User ? $actor : null,
+            createdBy: $user,
         );
 
-        return redirect()
-            ->route('crm.webinar-series.message-chains.show', $series)
-            ->with('success', 'Series message copy updated and a new immutable chain version was published.');
+        return redirect($request->successRedirectUrl($series))
+            ->with('success', 'Message copy published for this Webinar series. Existing enrollments remain pinned to their current versions.');
     }
 }

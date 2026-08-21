@@ -739,6 +739,7 @@
 │   │   │   │   ├── MessageRecipientPayloadResolver.php
 │   │   │   │   ├── MessageSendTimeResolver.php
 │   │   │   │   ├── MessageSuppressionService.php
+│   │   │   │   ├── MessageTemplateCatalogCarouselPresenter.php
 │   │   │   │   ├── MessageTemplateCompositionConfigRegistry.php
 │   │   │   │   ├── MessageTemplateCompositionEditorPresenter.php
 │   │   │   │   ├── MessageTemplateCompositionIdentityResolver.php
@@ -1066,6 +1067,7 @@
 │   │   │   │   ├── ResolveWebinarRegistrationPublicStatusAction.php
 │   │   │   │   ├── ResolveWebinarRegistrationReconciliationAction.php
 │   │   │   │   ├── ResolveWebinarRegistrationReplacementChainAction.php
+│   │   │   │   ├── ResolveWebinarSeriesEditableMessageVariantAction.php
 │   │   │   │   ├── RetryWebinarRegistrationFinalizationAction.php
 │   │   │   │   ├── StartWebinarMessageChainEnrollmentAction.php
 │   │   │   │   ├── StoreWebinarRegistrationResponsesAction.php
@@ -1928,7 +1930,8 @@
 │       │   │   ├── favicons.blade.php
 │       │   │   └── public.blade.php
 │       │   ├── messaging
-│       │   │   └── message-chain-carousel.blade.php
+│       │   │   ├── message-chain-carousel.blade.php
+│       │   │   └── message-editor-carousel.blade.php
 │       │   ├── section.blade.php
 │       │   ├── tasks
 │       │   ├── ui
@@ -2297,6 +2300,7 @@
 │   │   │   ├── MessageEligibilityGateTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
 │   │   │   ├── MessageTemplateBehaviorOwnershipValidationTest.php
+│   │   │   ├── MessageTemplateCarouselEditorTest.php
 │   │   │   ├── MessageTemplateCompositionConfigIntegrationTest.php
 │   │   │   ├── MessageTemplateCompositionConfigSyncTest.php
 │   │   │   ├── MessageTemplateCompositionCustomizationSyncTest.php
@@ -2547,4 +2551,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-631 directories, 1917 files
+631 directories, 1921 files

@@ -3,6 +3,7 @@
 ## Message/readiness follow-up
 
 - [x] Make upcoming Webinars the primary CRM workspace section and add channel-first effective MessageChain review/editing with one message visible at a time.
+- [x] Make Webinar message copy editable directly in the canonical Messaging carousel, including automatic series copy-on-write for shared defaults, published/edit mode at the top, click/tap gutters, touch swipe, and return-to-Webinar editing context.
 
 - [ ] Verify generated Webinar URL schemes through the current public URL/token resolution path.
 - [ ] Make Webinar readiness presentation delivery-consolidation/fallback aware where the current surface can misstate actual send readiness.

@@ -3,6 +3,8 @@
 namespace App\Modules\Webinars\Requests;
 
 use App\Modules\Messaging\Models\MessageChainStepVariant;
+use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -13,12 +15,12 @@ class UpdateWebinarSeriesMessageTemplateRequest extends FormRequest
         return true;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
+            '_editing_message_id' => ['nullable', 'string', 'max:191'],
+            'webinar_id' => ['nullable', 'integer', 'exists:webinars,id'],
             'payload' => ['required', 'array'],
             'payload.subject' => [
                 'nullable',
@@ -42,15 +44,17 @@ class UpdateWebinarSeriesMessageTemplateRequest extends FormRequest
             'payload.cta' => ['nullable', 'array'],
             'payload.cta.label' => ['nullable', 'string', 'max:255'],
             'payload.cta.url' => ['nullable', 'string', 'max:1000'],
+            'payload.ctas' => ['nullable', 'array'],
+            'payload.ctas.*' => ['nullable', 'array'],
+            'payload.ctas.*.label' => ['nullable', 'string', 'max:255'],
+            'payload.ctas.*.url' => ['nullable', 'string', 'max:1000'],
             'payload.secondary_link' => ['nullable', 'array'],
             'payload.secondary_link.label' => ['nullable', 'string', 'max:255'],
             'payload.secondary_link.url' => ['nullable', 'string', 'max:1000'],
         ];
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function safePayload(): array
     {
         $payload = $this->validated('payload');
@@ -80,17 +84,93 @@ class UpdateWebinarSeriesMessageTemplateRequest extends FormRequest
                 continue;
             }
 
-            $clean[$key] = [
-                'label' => is_string($link['label'] ?? null)
-                    ? trim($link['label'])
-                    : '',
-                'url' => is_string($link['url'] ?? null)
-                    ? trim($link['url'])
-                    : '',
-            ];
+            $label = is_string($link['label'] ?? null)
+                ? trim($link['label'])
+                : '';
+            $url = is_string($link['url'] ?? null)
+                ? trim($link['url'])
+                : '';
+
+            if ($label !== '' || $url !== '') {
+                $clean[$key] = array_filter([
+                    'label' => $label !== '' ? $label : null,
+                    'url' => $url !== '' ? $url : null,
+                ], static fn (mixed $value): bool => $value !== null);
+            }
+        }
+
+        $ctas = $payload['ctas'] ?? null;
+
+        if (is_array($ctas) && array_is_list($ctas)) {
+            $cleanCtas = [];
+
+            foreach ($ctas as $cta) {
+                if (! is_array($cta)) {
+                    continue;
+                }
+
+                $label = is_string($cta['label'] ?? null)
+                    ? trim($cta['label'])
+                    : '';
+                $url = is_string($cta['url'] ?? null)
+                    ? trim($cta['url'])
+                    : '';
+
+                if ($label === '' && $url === '') {
+                    continue;
+                }
+
+                $cleanCtas[] = array_filter([
+                    'label' => $label !== '' ? $label : null,
+                    'url' => $url !== '' ? $url : null,
+                ], static fn (mixed $value): bool => $value !== null);
+            }
+
+            if ($cleanCtas !== []) {
+                $clean['ctas'] = $cleanCtas;
+            }
         }
 
         return $clean;
+    }
+
+    public function successRedirectUrl(WebinarSeries $series): string
+    {
+        return $this->webinarRedirectUrl($series)
+            ?? route('crm.webinar-series.message-chains.show', $series);
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        $series = $this->route('series');
+
+        if ($series instanceof WebinarSeries) {
+            return $this->successRedirectUrl($series);
+        }
+
+        return parent::getRedirectUrl();
+    }
+
+    private function webinarRedirectUrl(WebinarSeries $series): ?string
+    {
+        $webinarId = (int) $this->input('webinar_id', 0);
+
+        if ($webinarId <= 0) {
+            return null;
+        }
+
+        $belongsToSeries = Webinar::query()
+            ->whereKey($webinarId)
+            ->where('webinar_series_id', $series->getKey())
+            ->exists();
+
+        if (! $belongsToSeries) {
+            return null;
+        }
+
+        return route('crm.webinar-series.index', [
+            'messages' => $webinarId,
+        ]);
     }
 
     private function variant(): ?MessageChainStepVariant

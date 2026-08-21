@@ -30,10 +30,10 @@
                         Webinar message sequence
                     </p>
                     <h2 class="mt-2 text-2xl font-black tracking-tight text-slate-950">
-                        Review {{ $series->title }} messages
+                        {{ $series->title }}
                     </h2>
                     <p class="mt-2 text-sm leading-6 text-slate-600">
-                        Switch between Email and SMS, then move through one message at a time in the order it appears in the configured sequence.
+                        Review one message at a time. Choose Edit to replace the published preview with the editable copy, then save and continue through the sequence.
                     </p>
 
                     <div class="mt-4 flex flex-wrap gap-2 text-xs font-bold text-slate-600">
@@ -69,45 +69,41 @@
             </div>
         </section>
 
-        @if($bindings->isNotEmpty())
-            <section class="rounded-2xl border border-amber-200 bg-amber-50/60 px-5 py-4 text-sm text-amber-950">
+        <section class="rounded-2xl border {{ $bindings->isNotEmpty() ? 'border-amber-200 bg-amber-50/60' : 'border-indigo-200 bg-indigo-50/60' }} px-5 py-4 text-sm {{ $bindings->isNotEmpty() ? 'text-amber-950' : 'text-indigo-950' }}">
+            @if($bindings->isNotEmpty())
                 <p class="font-bold">Changes apply to future enrollments.</p>
                 <p class="mt-1 leading-6">
-                    Publishing an edit creates a new immutable template and chain version for this series. Existing enrollments stay pinned to the version they already started with.
+                    Saving publishes a new immutable template and chain version for this series. Existing enrollments stay pinned to the version they already started with.
                 </p>
-            </section>
-        @endif
+            @else
+                <p class="font-bold">This series currently uses shared message defaults.</p>
+                <p class="mt-1 leading-6">
+                    You can still edit directly below. The first edit automatically creates a series-specific copy before publishing, so other Webinar series keep their shared wording.
+                </p>
+            @endif
+        </section>
 
         <section
             data-webinar-message-carousel
             data-webinar-message-ownership="{{ $bindings->isNotEmpty() ? 'series' : 'shared' }}"
-            class="space-y-4"
         >
-            <x-messaging.message-chain-carousel
+            <x-messaging.message-editor-carousel
                 :presentation="$messageReview"
-                :editable="$bindings->isNotEmpty()"
+                :editable="true"
                 empty-message="No effective Webinar messages are available for this series."
             />
         </section>
 
-        @if($bindings->isEmpty())
-            <section class="rounded-3xl border border-indigo-200 bg-indigo-50/50 p-4 shadow-sm sm:p-6">
-                <div class="max-w-3xl">
-                    <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-indigo-700">
-                        Customize only this series
-                    </p>
-                    <h2 class="mt-2 text-xl font-black tracking-tight text-slate-950">
-                        Create series-specific messages
-                    </h2>
-                    <p class="mt-2 text-sm leading-6 text-slate-700">
-                        The preview above is using the current shared defaults. Create a custom sequence only when this series needs different wording. The new sequence initially reuses the same immutable templates, then publishes series-owned versions only for messages you actually edit.
-                    </p>
-                </div>
+        @if($bindings->isEmpty() && $sourceSeriesOptions->isNotEmpty())
+            <details class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <summary class="cursor-pointer text-sm font-extrabold text-slate-900">
+                    Advanced: start the whole sequence from another Webinar series
+                </summary>
 
                 <form
                     method="POST"
                     action="{{ route('crm.webinar-series.message-chains.duplicate', $series) }}"
-                    class="mt-6 max-w-xl space-y-4"
+                    class="mt-5 max-w-xl space-y-4"
                 >
                     @csrf
 
@@ -120,7 +116,6 @@
                             name="source_webinar_series_id"
                             class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-0"
                         >
-                            <option value="">This series' current shared defaults</option>
                             @foreach ($sourceSeriesOptions as $sourceSeries)
                                 <option value="{{ $sourceSeries->getKey() }}">
                                     {{ $sourceSeries->title }}
@@ -128,7 +123,7 @@
                             @endforeach
                         </select>
                         <p class="mt-2 text-xs leading-5 text-slate-600">
-                            Choosing another series copies its effective published messages as a starting point without linking future edits.
+                            This copies the other series' effective published sequence as the starting point. Future edits are independent.
                         </p>
                     </div>
 
@@ -136,10 +131,10 @@
                         type="submit"
                         class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-5 text-center text-sm font-extrabold text-white transition hover:bg-slate-800 sm:w-auto"
                     >
-                        Create custom messages
+                        Copy sequence
                     </button>
                 </form>
-            </section>
+            </details>
         @endif
     </div>
 </x-layouts.crm>
