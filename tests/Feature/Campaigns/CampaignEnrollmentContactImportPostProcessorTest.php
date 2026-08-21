@@ -62,6 +62,45 @@ class CampaignEnrollmentContactImportPostProcessorTest extends TestCase
         $this->assertSame(27, $result->meta['message_chain_enrollment_id']);
     }
 
+    public function test_it_uses_stable_profile_entry_identity_and_defers_eager_progression(): void
+    {
+        $enrollment = new CampaignEnrollment();
+        $enrollment->setAttribute('id', 31);
+        $enrollment->setAttribute('message_chain_enrollment_id', 41);
+        $action = Mockery::mock(EnrollContactInCampaignAction::class);
+        $action->shouldReceive('handle')
+            ->once()
+            ->andReturnUsing(function (
+                Contact $contact,
+                string $campaignKey,
+                mixed $source = null,
+                array $payload = [],
+                ?array $meta = null,
+                ?array $startContext = null,
+                ?array $exitConditions = null,
+                ?string $channel = null,
+                ?string $purpose = null,
+                ?string $scope = null,
+                ?string $dispatchKey = null,
+                ?string $entryKey = null,
+                bool $eagerProcess = true,
+            ) use ($enrollment): CampaignEnrollment {
+                $this->assertSame('candidate_campaign', $campaignKey);
+                $this->assertSame(
+                    'contact_import:test_profile:candidate_campaign',
+                    $entryKey,
+                );
+                $this->assertFalse($eagerProcess);
+
+                return $enrollment;
+            });
+
+        $processor = new CampaignEnrollmentContactImportPostProcessor($action);
+        $processor->handle($this->context(), [
+            'campaign_key' => 'candidate_campaign',
+        ]);
+    }
+
     private function context(): ContactImportContext
     {
         $contact = new Contact(['email' => 'person@example.test']);

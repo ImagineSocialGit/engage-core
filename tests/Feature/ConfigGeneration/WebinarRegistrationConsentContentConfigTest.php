@@ -23,7 +23,11 @@ class WebinarRegistrationConsentContentConfigTest extends TestCase
         );
 
         $this->assertSame([
-            'transactional' => ['email' => true, 'sms' => true],
+            'transactional' => [
+                'email' => true,
+                'sms' => true,
+                'registration_grants' => [],
+            ],
             'marketing' => ['email' => true, 'sms' => true],
         ], data_get($content, 'registration.consents'));
 

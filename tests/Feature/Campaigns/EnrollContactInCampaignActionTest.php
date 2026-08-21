@@ -8,6 +8,7 @@ use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\PublishMessageChainVersionAction;
+use App\Modules\Messaging\Jobs\ProcessMessageChainEnrollmentJob;
 use App\Modules\Messaging\Models\MessageChain;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\MessageChainStep;
@@ -446,6 +447,63 @@ class EnrollContactInCampaignActionTest extends TestCase
     /**
      * @return array{0: Campaign, 1: MessageChain, 2: \App\Modules\Messaging\Models\MessageChainVersion}
      */
+    public function test_explicit_entry_key_is_idempotent_after_terminal_completion(): void
+    {
+        Queue::fake();
+
+        [$campaign] = $this->campaignWithChain('stable_entry');
+        $contact = Contact::factory()->create();
+
+        $first = app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $campaign->key,
+            entryKey: 'contact_import:stacey_cold_leads:cold_lead_nurture',
+            eagerProcess: false,
+        );
+
+        $first->messageChainEnrollment->forceFill([
+            'status' => MessageChainEnrollment::STATUS_COMPLETED,
+            'current_message_chain_step_id' => null,
+            'next_action_at' => null,
+            'completed_at' => now(),
+        ])->save();
+
+        $second = app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $campaign->key,
+            entryKey: 'contact_import:stacey_cold_leads:cold_lead_nurture',
+            eagerProcess: false,
+        );
+
+        $this->assertTrue($first->is($second));
+        $this->assertStringStartsWith('campaign_entry:', (string) $first->dedupe_key);
+        $this->assertSame(
+            'contact_import:stacey_cold_leads:cold_lead_nurture',
+            data_get($first->start_context, 'entry_key'),
+        );
+        $this->assertDatabaseCount('campaign_enrollments', 1);
+        $this->assertDatabaseCount('message_chain_enrollments', 1);
+    }
+
+    public function test_non_eager_entry_persists_due_chain_without_immediate_progression_job(): void
+    {
+        Queue::fake();
+
+        [$campaign] = $this->campaignWithChain('bounded_import_entry');
+        $contact = Contact::factory()->create();
+
+        $enrollment = app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $campaign->key,
+            entryKey: 'contact_import:bounded_profile:bounded_import_entry',
+            eagerProcess: false,
+        );
+
+        $this->assertSame(MessageChainEnrollment::STATUS_ACTIVE, $enrollment->runtimeStatus());
+        $this->assertNotNull($enrollment->messageChainEnrollment?->next_action_at);
+        Queue::assertNotPushed(ProcessMessageChainEnrollmentJob::class);
+    }
+
     private function campaignWithChain(
         string $key,
         string $campaignStatus = Campaign::STATUS_ACTIVE,

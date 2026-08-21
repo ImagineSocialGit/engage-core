@@ -32,6 +32,7 @@ class StartMessageChainEnrollmentAction
         Carbon|string|null $startedAt = null,
         ?string $surface = null,
         ?string $startStepKey = null,
+        bool $eagerProcess = true,
     ): MessageChainEnrollment {
         $dedupeKey = $this->dedupeKey($dedupeKey);
         $surface = $this->nullableSegment($surface, 96);
@@ -141,7 +142,7 @@ class StartMessageChainEnrollmentAction
         /** @var MessageChainEnrollment $enrollment */
         $enrollment = $result['enrollment'];
 
-        if ($result['dispatch'] === true) {
+        if ($eagerProcess && $result['dispatch'] === true) {
             $this->dispatch($enrollment);
         }
 

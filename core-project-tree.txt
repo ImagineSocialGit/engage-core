@@ -1728,6 +1728,7 @@
 │   │   │   ├── module_state.md
 │   │   │   └── TODO.md
 │   │   ├── campaigns
+│   │   │   ├── entry-and-launch-safety.md
 │   │   │   ├── module_state.md
 │   │   │   └── TODO.md
 │   │   ├── commerce
@@ -2215,6 +2216,7 @@
 │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest.php
 │   │   │   ├── MarkClaimedPermissionInvitationSentAfterScheduledMessageSentTest.php
 │   │   │   ├── MarketingPermissionContactImportPostProcessorTest.php
+│   │   │   ├── MessageChainBulkDrainTest.php
 │   │   │   ├── MessageChainDuplicationTest.php
 │   │   │   ├── MessageChainEnrollmentPauseResumeTest.php
 │   │   │   ├── MessageChainEnrollmentRunnerTest.php
@@ -2297,6 +2299,7 @@
 │   │   │   └── PresetCompositionSyncCutoverTest.php
 │   │   ├── ProjectState
 │   │   │   ├── AutomationOpportunitiesProjectStateRoundTripTest.php
+│   │   │   ├── CampaignImportSourceReferenceContractTest.php
 │   │   │   ├── CampaignsBroadcastsProjectStateRoundTripTest.php
 │   │   │   ├── CoreContactImportProvenanceProjectStateTest.php
 │   │   │   ├── FlowRoutesProjectStateRoundTripTest.php
@@ -2476,4 +2479,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-620 directories, 1857 files
+620 directories, 1860 files

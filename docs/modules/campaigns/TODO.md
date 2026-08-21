@@ -8,8 +8,8 @@ Work these in order. Keep Campaigns independent from FlowRoutes, Webinars, Forms
 
 ## 2. Campaign lifecycle and launch safety
 
-- [ ] Add bounded bulk Campaign audience enrollment orchestration for operator/import-driven starts so large recipient sets reuse the generic bulk policy instead of creating an unbounded burst of enrollment/progression jobs.
-- [ ] Define a generic Campaign entry/start contract so activation never implies audience selection; enrollment must come from an explicit operator action or shared automation/public action seam.
+- [x] Add bounded bulk Campaign audience enrollment orchestration for Contact-import/operator-driven starts: import enrollment suppresses eager MessageChain progression and Messaging drains due enrollments through `BulkMessageDeliveryPolicy` on the `bulk_messages` queue.
+- [x] Define a generic Campaign entry/start contract: activation never implies audience selection, `EnrollContactInCampaignAction` remains the public single-Contact seam, and optional stable `entryKey` identity makes import/automation retries idempotent across terminal history.
 - [ ] Define the shared trigger-authoring/binding seam needed by the Campaign Builder's `What starts this campaign?` stage without introducing Campaigns -> FlowRoutes or FlowRoutes -> Campaigns private coupling.
 - [ ] Support business exits such as conversion, qualifying status changes, application started, appointment booked, or other configured outcomes by invoking Campaign-owned cancellation through neutral events/public automation seams.
 - [ ] Support campaign-response outcomes without hardcoding client phrases in Campaigns. Client-configured rules such as `YES`, `READY`, `GAME PLAN`, `LATER`, `NO`, or `DONE` should react through neutral inbound-reply events and public automation actions.

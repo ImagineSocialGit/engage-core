@@ -83,6 +83,8 @@ final class CampaignEnrollmentContactImportPostProcessor implements ContactImpor
                         'profile_key' => $context->profileKey,
                     ],
                 ],
+                entryKey: $this->entryKey($context, $config['campaign_key']),
+                eagerProcess: false,
                 startContext: [
                     'source' => 'contact_import',
                     'contact_import_batch_id' => (int) $context->batch->getKey(),
@@ -126,5 +128,18 @@ final class CampaignEnrollmentContactImportPostProcessor implements ContactImpor
             ],
             message: 'Campaign enrollment is active or was already open.',
         );
+    }
+
+    private function entryKey(ContactImportContext $context, string $campaignKey): string
+    {
+        $profileKey = is_string($context->profileKey) && trim($context->profileKey) !== ''
+            ? trim($context->profileKey)
+            : 'batch_'.(int) $context->batch->getKey();
+
+        return implode(':', [
+            'contact_import',
+            $profileKey,
+            $campaignKey,
+        ]);
     }
 }

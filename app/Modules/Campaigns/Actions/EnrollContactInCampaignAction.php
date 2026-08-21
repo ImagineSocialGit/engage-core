@@ -47,12 +47,16 @@ class EnrollContactInCampaignAction
         ?string $purpose = null,
         ?string $scope = null,
         ?string $dispatchKey = null,
+        ?string $entryKey = null,
+        bool $eagerProcess = true,
     ): CampaignEnrollment {
         if ($exitConditions !== null && $exitConditions !== []) {
             throw new InvalidArgumentException(
                 'Campaign enrollment exit conditions are no longer supported. Configure exit conditions on the selected MessageChainVersion.',
             );
         }
+
+        $entryKey = $this->normalizeEntryKey($entryKey);
 
         return DB::transaction(function () use (
             $contact,
@@ -64,6 +68,8 @@ class EnrollContactInCampaignAction
             $channel,
             $purpose,
             $scope,
+            $entryKey,
+            $eagerProcess,
         ): CampaignEnrollment {
             $candidate = $this->resolveCampaign(
                 campaignKey: $campaignKey,
@@ -71,6 +77,25 @@ class EnrollContactInCampaignAction
                 purpose: $purpose,
                 scope: $scope,
             );
+
+            if ($entryKey !== null) {
+                $existingEntry = $this->existingEntry(
+                    contact: $contact,
+                    campaign: $candidate,
+                    entryKey: $entryKey,
+                );
+
+                if ($existingEntry instanceof CampaignEnrollment) {
+                    return $existingEntry;
+                }
+            }
+
+            if (! $candidate->isActive()) {
+                throw CampaignUnavailableForEnrollmentException::inactive(
+                    campaignKey: $candidate->key,
+                    campaignStatus: $candidate->status,
+                );
+            }
 
             $arbitration = $this->enrollmentArbitrator->handle(
                 contact: $contact,
@@ -90,6 +115,10 @@ class EnrollContactInCampaignAction
                 arbitrationMeta: $arbitration->enrollmentMeta(),
             );
 
+            $dedupeKey = $entryKey !== null
+                ? $this->entryDedupeKey($candidate, $contact, $entryKey)
+                : null;
+
             $enrollment = CampaignEnrollment::query()->create([
                 'contact_id' => $contact->getKey(),
                 'campaign_id' => $campaign->getKey(),
@@ -97,16 +126,23 @@ class EnrollContactInCampaignAction
                 'source_type' => $source?->getMorphClass(),
                 'source_id' => $source?->getKey(),
                 'campaign_key' => $campaign->key,
-                'start_context' => $this->startContextWithPayload($startContext, $payload),
+                'dedupe_key' => $dedupeKey,
+                'start_context' => $this->startContextWithPayload(
+                    startContext: $startContext,
+                    payload: $payload,
+                    entryKey: $entryKey,
+                ),
                 'started_at' => $startedAt,
                 'meta' => $enrollmentMeta,
             ]);
 
-            $dedupeKey = $this->dedupeKey($campaign, $enrollment);
+            if ($dedupeKey === null) {
+                $dedupeKey = $this->dedupeKey($campaign, $enrollment);
 
-            $enrollment->forceFill([
-                'dedupe_key' => $dedupeKey,
-            ])->save();
+                $enrollment->forceFill([
+                    'dedupe_key' => $dedupeKey,
+                ])->save();
+            }
 
             $messageChainEnrollment = $this->startMessageChainEnrollment->handle(
                 messageChain: $messageChain,
@@ -116,6 +152,7 @@ class EnrollContactInCampaignAction
                 origin: $campaign,
                 startedAt: $startedAt,
                 surface: self::SURFACE,
+                eagerProcess: $eagerProcess,
             );
 
             $enrollment->forceFill([
@@ -155,13 +192,6 @@ class EnrollContactInCampaignAction
             throw CampaignUnavailableForEnrollmentException::missing($campaignKey);
         }
 
-        if (! $campaign->isActive()) {
-            throw CampaignUnavailableForEnrollmentException::inactive(
-                campaignKey: $campaign->key,
-                campaignStatus: $campaign->status,
-            );
-        }
-
         return $campaign;
     }
 
@@ -188,6 +218,47 @@ class EnrollContactInCampaignAction
         return $messageChain;
     }
 
+    private function existingEntry(
+        Contact $contact,
+        Campaign $campaign,
+        string $entryKey,
+    ): ?CampaignEnrollment {
+        $dedupeKey = $this->entryDedupeKey($campaign, $contact, $entryKey);
+
+        $enrollment = CampaignEnrollment::query()
+            ->with('messageChainEnrollment')
+            ->where('dedupe_key', $dedupeKey)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $enrollment instanceof CampaignEnrollment) {
+            return null;
+        }
+
+        if ((int) $enrollment->contact_id !== (int) $contact->getKey()
+            || (int) $enrollment->campaign_id !== (int) $campaign->getKey()
+        ) {
+            throw new RuntimeException(
+                'Campaign entry key resolved to a conflicting enrollment identity.',
+            );
+        }
+
+        return $enrollment;
+    }
+
+    private function entryDedupeKey(
+        Campaign $campaign,
+        Contact $contact,
+        string $entryKey,
+    ): string {
+        return implode(':', [
+            'campaign_entry',
+            (int) $campaign->getKey(),
+            (int) $contact->getKey(),
+            hash('sha256', $entryKey),
+        ]);
+    }
+
     private function dedupeKey(
         Campaign $campaign,
         CampaignEnrollment $enrollment,
@@ -205,21 +276,30 @@ class EnrollContactInCampaignAction
      * @param array<string, mixed> $payload
      * @return array<string, mixed>|null
      */
-    private function startContextWithPayload(?array $startContext, array $payload): ?array
-    {
-        if ($payload === []) {
+    private function startContextWithPayload(
+        ?array $startContext,
+        array $payload,
+        ?string $entryKey = null,
+    ): ?array {
+        if ($payload === [] && $entryKey === null) {
             return $startContext;
         }
 
         $startContext ??= [];
-        $existingPayload = is_array($startContext['payload'] ?? null)
-            ? $startContext['payload']
-            : [];
 
-        $startContext['payload'] = array_replace_recursive(
-            $existingPayload,
-            $payload,
-        );
+        if ($entryKey !== null) {
+            $startContext['entry_key'] = $entryKey;
+        }
+        if ($payload !== []) {
+            $existingPayload = is_array($startContext['payload'] ?? null)
+                ? $startContext['payload']
+                : [];
+
+            $startContext['payload'] = array_replace_recursive(
+                $existingPayload,
+                $payload,
+            );
+        }
 
         return $startContext;
     }
@@ -239,6 +319,24 @@ class EnrollContactInCampaignAction
             $meta ?? [],
             $arbitrationMeta,
         );
+    }
+
+
+    private function normalizeEntryKey(?string $entryKey): ?string
+    {
+        if (! is_string($entryKey) || trim($entryKey) === '') {
+            return null;
+        }
+
+        $entryKey = trim($entryKey);
+
+        if (mb_strlen($entryKey) > 255) {
+            throw new InvalidArgumentException(
+                'Campaign entry key cannot exceed 255 characters.',
+            );
+        }
+
+        return $entryKey;
     }
 
     private function normalizeSegment(string $value): string

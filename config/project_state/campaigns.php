@@ -142,6 +142,7 @@ return [
                     'id_column' => 'source_id',
                     'targets' => [
                         'App\\Modules\\Core\\Models\\Contact' => 'contacts',
+                        'App\\Modules\\Core\\Models\\ContactImportOccurrence' => 'contact_import_occurrences',
                         'App\\Modules\\Webinars\\Models\\WebinarRegistration' => 'webinar_registrations',
                         'App\\Modules\\Webinars\\Models\\WebinarWaitlistSignup' => 'webinar_waitlist_signups',
                         'App\\Modules\\Webinars\\Models\\Webinar' => 'webinars',

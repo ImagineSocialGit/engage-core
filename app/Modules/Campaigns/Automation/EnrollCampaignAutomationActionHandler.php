@@ -97,6 +97,7 @@ class EnrollCampaignAutomationActionHandler implements AutomationActionHandler
                         $definition->startContext,
                     ),
                 exitConditions: $definition->exitConditions,
+                entryKey: $this->entryKey($context, $definition->campaignKey),
             );
         } catch (CampaignUnavailableForEnrollmentException $exception) {
             return AutomationActionResult::skipped(
@@ -146,6 +147,22 @@ class EnrollCampaignAutomationActionHandler implements AutomationActionHandler
                 'enroll_campaign_definition' => $definition->toMetaPayload(),
             ],
         );
+    }
+
+
+    private function entryKey(
+        AutomationActionContext $context,
+        string $campaignKey,
+    ): ?string {
+        if (! is_string($context->executionKey) || trim($context->executionKey) === '') {
+            return null;
+        }
+
+        return implode(':', [
+            'automation',
+            trim($context->executionKey),
+            $campaignKey,
+        ]);
     }
 
     private function existingOpenEnrollment(
