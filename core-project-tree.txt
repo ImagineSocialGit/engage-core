@@ -586,6 +586,7 @@
 │   │   │   │   └── SmsMessageDefinitionConfigContract.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
+│   │   │   │       ├── AuditEmailHygieneCommand.php
 │   │   │   │       └── SyncMessageTemplatePresetsCommand.php
 │   │   │   ├── Contracts
 │   │   │   │   ├── Email
@@ -616,6 +617,8 @@
 │   │   │   │   │   ├── MessageSendResult.php
 │   │   │   │   │   ├── ScheduledMessageTerminalResult.php
 │   │   │   │   │   └── SmsSendDecision.php
+│   │   │   │   ├── Email
+│   │   │   │   │   └── EmailHygieneResult.php
 │   │   │   │   ├── MessageData.php
 │   │   │   │   └── ResolvedMessageDispatch.php
 │   │   │   ├── Enums
@@ -693,6 +696,8 @@
 │   │   │   │   ├── CtaTrackingRequestClassifier.php
 │   │   │   │   ├── DevMessageSink.php
 │   │   │   │   ├── Email
+│   │   │   │   │   ├── EmailDomainHealthChecker.php
+│   │   │   │   │   ├── EmailHygieneService.php
 │   │   │   │   │   ├── EmailMessagingService.php
 │   │   │   │   │   └── EmailProviderManager.php
 │   │   │   │   ├── MessageChainExecutionContextResolver.php
@@ -2195,6 +2200,7 @@
 │   │   │   ├── LocationFoundationTest.php
 │   │   │   └── LocationNormalizationCapabilityTest.php
 │   │   ├── Messaging
+│   │   │   ├── AuditEmailHygieneCommandTest.php
 │   │   │   ├── BulkMessageDeliveryPolicyTest.php
 │   │   │   ├── CampaignVariantTemplateAssignmentResolutionTest.php
 │   │   │   ├── CanonicalMessageTemplateRuntimeCutoverTest.php
@@ -2210,6 +2216,7 @@
 │   │   │   ├── CtaEngagementTrackingTest.php
 │   │   │   ├── DispatchConsentOptInMessageActionTest.php
 │   │   │   ├── DispatchMessageActionTest.php
+│   │   │   ├── EmailHygieneServiceTest.php
 │   │   │   ├── EmailMessagingServiceTest.php
 │   │   │   ├── EmailPayloadTest.php
 │   │   │   ├── EmailReplyAddressGeneratorTest.php
@@ -2486,4 +2493,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-620 directories, 1867 files
+621 directories, 1873 files

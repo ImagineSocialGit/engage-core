@@ -11,6 +11,7 @@ use App\Modules\Messaging\ConfigContracts\EmailMessageDefinitionConfigContract;
 use App\Modules\Messaging\ConfigContracts\MessagingConfigContractTargetProvider;
 use App\Modules\Messaging\ConfigContracts\PermissionInvitationConfigContract;
 use App\Modules\Messaging\ConfigContracts\SmsMessageDefinitionConfigContract;
+use App\Modules\Messaging\Console\Commands\AuditEmailHygieneCommand;
 use App\Modules\Messaging\Console\Commands\SyncMessageTemplatePresetsCommand;
 use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
@@ -179,6 +180,7 @@ class MessagingModuleServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
+                AuditEmailHygieneCommand::class,
                 SyncMessageTemplatePresetsCommand::class,
             ]);
         }
