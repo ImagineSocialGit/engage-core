@@ -719,6 +719,7 @@
 │   │   │   │   │   ├── EmailMessagingService.php
 │   │   │   │   │   └── EmailProviderManager.php
 │   │   │   │   ├── MessageChainExecutionContextResolver.php
+│   │   │   │   ├── MessageChainPresentationService.php
 │   │   │   │   ├── MessageChainTimingResolver.php
 │   │   │   │   ├── MessageChannelAvailability.php
 │   │   │   │   ├── MessageConfigValidator.php
@@ -1174,6 +1175,7 @@
 │   │   │   │   ├── WebinarMessageAreaRegistry.php
 │   │   │   │   ├── WebinarMessageChainBindingResolver.php
 │   │   │   │   ├── WebinarMessageChainExecutionContextProvider.php
+│   │   │   │   ├── WebinarMessageChainPresentationService.php
 │   │   │   │   ├── WebinarMessageReadinessService.php
 │   │   │   │   ├── WebinarPostEventMessageRecipientGate.php
 │   │   │   │   ├── WebinarPostEventReplayPreflight.php
@@ -1925,6 +1927,8 @@
 │       │   │   ├── crm.blade.php
 │       │   │   ├── favicons.blade.php
 │       │   │   └── public.blade.php
+│       │   ├── messaging
+│       │   │   └── message-chain-carousel.blade.php
 │       │   ├── section.blade.php
 │       │   ├── tasks
 │       │   ├── ui
@@ -2280,6 +2284,7 @@
 │   │   │   ├── MessageChainDuplicationTest.php
 │   │   │   ├── MessageChainEnrollmentPauseResumeTest.php
 │   │   │   ├── MessageChainEnrollmentRunnerTest.php
+│   │   │   ├── MessageChainPresentationServiceTest.php
 │   │   │   ├── MessageChainRuntimeParityTest.php
 │   │   │   ├── MessageChainVersionPersistenceTest.php
 │   │   │   ├── MessageChannelAvailabilityTest.php
@@ -2488,6 +2493,7 @@
 │   │   │   ├── WebinarFunnelFactContributorTest.php
 │   │   │   ├── WebinarJoinBrowserProofTest.php
 │   │   │   ├── WebinarMessageAreaRegistryTest.php
+│   │   │   ├── WebinarMessageChainReviewWorkspaceTest.php
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
 │   │   │   ├── WebinarMessageTemplateSetConfigTest.php
@@ -2541,4 +2547,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-630 directories, 1912 files
+631 directories, 1917 files

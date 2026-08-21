@@ -18,6 +18,7 @@ use App\Modules\Webinars\Requests\StoreWebinarSeriesRequest;
 use App\Modules\Webinars\Requests\SyncWebinarSeriesRequest;
 use App\Modules\Webinars\Requests\UpdateWebinarSeriesProviderEventTypeRequest;
 use App\Modules\Webinars\Requests\UpdateWebinarSeriesScheduleProfileRequest;
+use App\Modules\Webinars\Services\WebinarMessageChainPresentationService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\RedirectResponse;
@@ -34,8 +35,11 @@ class WebinarController extends Controller
         private readonly GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction,
     ) {}
 
-    public function index(Request $request): View
-    {
+    public function index(
+        Request $request,
+        WebinarMessageChainPresentationService $messageChainPresentation,
+    ): View {
+
         $series = WebinarSeries::query()
             ->with([
                 'webinarScheduleProfile',
@@ -61,6 +65,16 @@ class WebinarController extends Controller
             ->orderBy('id')
             ->limit(6)
             ->get();
+
+        $upcomingMessageReviews = collect();
+
+        if (function_exists('module_enabled') && module_enabled('messaging')) {
+            $upcomingMessageReviews = $upcomingWebinars
+                ->mapWithKeys(fn (Webinar $webinar): array => [
+                    (int) $webinar->getKey() => $messageChainPresentation
+                        ->forWebinar($webinar),
+                ]);
+        }
 
         $pendingPostEventReviews = collect();
 
@@ -152,6 +166,7 @@ class WebinarController extends Controller
             'series' => $series,
             'scheduleProfiles' => $scheduleProfiles,
             'upcomingWebinars' => $upcomingWebinars,
+            'upcomingMessageReviews' => $upcomingMessageReviews,
             'pendingPostEventReviews' => $pendingPostEventReviews,
             'registrationAttentionCount' => $registrationAttentionCount,
             'attentionCount' => $pendingPostEventReviews->count() + $registrationAttentionCount,

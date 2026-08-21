@@ -2,6 +2,8 @@
 
 ## Message/readiness follow-up
 
+- [x] Make upcoming Webinars the primary CRM workspace section and add channel-first effective MessageChain review/editing with one message visible at a time.
+
 - [ ] Verify generated Webinar URL schemes through the current public URL/token resolution path.
 - [ ] Make Webinar readiness presentation delivery-consolidation/fallback aware where the current surface can misstate actual send readiness.
 

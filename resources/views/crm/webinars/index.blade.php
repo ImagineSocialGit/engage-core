@@ -3,8 +3,15 @@
         class="space-y-6"
         x-data="{
             activeDevTestingModal: null,
+            activeMessageWebinar: null,
             openDevTestingModal(name) {
                 this.activeDevTestingModal = name;
+            },
+            openMessageReview(webinarId) {
+                this.activeMessageWebinar = webinarId;
+            },
+            closeMessageReview() {
+                this.activeMessageWebinar = null;
             }
         }"
     >
@@ -118,7 +125,164 @@
             </div>
         @endif
 
-        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <section data-upcoming-webinars class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h2 class="text-xl font-black tracking-tight text-slate-950">Upcoming webinars</h2>
+                    <p class="mt-1 text-sm leading-6 text-slate-600">The next sessions currently eligible to run for their series.</p>
+                </div>
+                <a
+                    href="#event-operations"
+                    class="text-sm font-extrabold text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
+                >
+                    View event details & recovery
+                </a>
+            </div>
+
+            <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                @forelse(($upcomingWebinars ?? collect()) as $upcomingWebinar)
+                    @php
+                        $upcomingRegistrationUrl = filled($upcomingWebinar->webinarSeries?->slug)
+                            ? route('webinar.show', ['seriesSlug' => $upcomingWebinar->webinarSeries->slug])
+                            : null;
+                        $isLive = $upcomingWebinar->starts_at?->lte(now()) && $upcomingWebinar->ends_at?->gt(now());
+                        $registrationCount = (int) ($upcomingWebinar->registrations_count ?? 0);
+                        $messageReview = $upcomingMessageReviews[$upcomingWebinar->getKey()] ?? null;
+                        $hasMessageReview = is_array($messageReview)
+                            && (int) ($messageReview['message_count'] ?? 0) > 0;
+                    @endphp
+
+                    <article class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                            <div>
+                                <p class="text-xs font-extrabold uppercase tracking-[0.14em] {{ $isLive ? 'text-emerald-700' : 'text-slate-500' }}">
+                                    {{ $isLive ? 'Live now' : 'Upcoming' }}
+                                </p>
+                                <h3 class="mt-1 text-base font-black text-slate-950">{{ $upcomingWebinar->title }}</h3>
+                                <p class="mt-1 text-sm text-slate-500">{{ $upcomingWebinar->webinarSeries?->title ?? 'Webinar series' }}</p>
+                            </div>
+                            <span class="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-slate-700 ring-1 ring-slate-200">
+                                {{ $registrationCount }} {{ $registrationCount === 1 ? 'registration' : 'registrations' }}
+                            </span>
+                        </div>
+
+                        <p class="mt-4 text-sm font-bold text-slate-900">
+                            {{ $upcomingWebinar->starts_at?->copy()->setTimezone($upcomingWebinar->timezone)->format('M j, Y · g:i A') ?? 'Start time pending' }}
+                        </p>
+                        <p class="mt-1 text-xs text-slate-500">{{ $upcomingWebinar->timezone }}</p>
+
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            @if($hasMessageReview)
+                                <button
+                                    type="button"
+                                    data-webinar-message-review-button
+                                    x-on:click="openMessageReview({{ $upcomingWebinar->getKey() }})"
+                                    class="inline-flex min-h-9 items-center justify-center rounded-full bg-slate-950 px-3 text-xs font-extrabold text-white hover:bg-slate-800"
+                                >
+                                    View messages
+                                </button>
+                            @endif
+
+                            <a
+                                href="#webinar-{{ $upcomingWebinar->getKey() }}"
+                                class="inline-flex min-h-9 items-center justify-center rounded-full border border-slate-300 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
+                            >
+                                Event details
+                            </a>
+
+                            @if($upcomingRegistrationUrl)
+                                <a
+                                    href="{{ $upcomingRegistrationUrl }}"
+                                    target="_blank"
+                                    rel="noopener"
+                                    class="inline-flex min-h-9 items-center justify-center rounded-full border border-slate-300 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
+                                >
+                                    Registration page
+                                </a>
+                            @endif
+                        </div>
+                    </article>
+                @empty
+                    <div class="md:col-span-2 xl:col-span-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
+                        <p class="font-bold text-slate-900">No upcoming webinars are scheduled.</p>
+                        <p class="mt-1 text-sm text-slate-600">Use Advanced setup when you are ready to add or sync the next occurrence.</p>
+                    </div>
+                @endforelse
+            </div>
+        </section>
+
+@foreach(($upcomingWebinars ?? collect()) as $upcomingWebinar)
+    @php
+        $messageReview = $upcomingMessageReviews[$upcomingWebinar->getKey()] ?? null;
+        $hasMessageReview = is_array($messageReview)
+            && (int) ($messageReview['message_count'] ?? 0) > 0;
+    @endphp
+
+    @if($hasMessageReview)
+        <div
+            x-show="activeMessageWebinar === {{ $upcomingWebinar->getKey() }}"
+            x-cloak
+            x-on:keydown.escape.window="closeMessageReview()"
+            x-on:click.self="closeMessageReview()"
+            data-webinar-message-review-modal="{{ $upcomingWebinar->getKey() }}"
+            class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 px-3 py-4 sm:px-6"
+        >
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="{{ $upcomingWebinar->title }} messages"
+                class="max-h-[calc(100vh-2rem)] w-full max-w-6xl overflow-y-auto rounded-3xl bg-white shadow-2xl"
+            >
+                <header class="sticky top-0 z-10 flex flex-col gap-3 border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:flex-row sm:items-start sm:justify-between sm:px-6">
+                    <div>
+                        <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                            Upcoming webinar messages
+                        </p>
+                        <h2 class="mt-1 text-xl font-black tracking-tight text-slate-950">
+                            {{ $upcomingWebinar->title }}
+                        </h2>
+                        <p class="mt-1 text-sm text-slate-600">
+                            {{ $upcomingWebinar->starts_at?->copy()->setTimezone($upcomingWebinar->timezone)->format('M j, Y · g:i A') }}
+                            · {{ (int) ($messageReview['message_count'] ?? 0) }} {{ (int) ($messageReview['message_count'] ?? 0) === 1 ? 'message' : 'messages' }}
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        x-on:click="closeMessageReview()"
+                        class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-extrabold text-slate-700 hover:bg-slate-50"
+                    >
+                        Close
+                    </button>
+                </header>
+
+                <div class="p-4 sm:p-6">
+                    <x-messaging.message-chain-carousel
+                        :presentation="$messageReview"
+                        :editable="false"
+                    />
+                </div>
+
+                <footer class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <p class="text-xs leading-5 text-slate-500">
+                        This is the current published sequence for this Webinar series. Existing scheduled or enrolled messages remain pinned to their published versions.
+                    </p>
+
+                    @if($upcomingWebinar->webinarSeries)
+                        <a
+                            href="{{ route('crm.webinar-series.message-chains.show', $upcomingWebinar->webinarSeries) }}"
+                            class="inline-flex min-h-10 w-full shrink-0 items-center justify-center rounded-full bg-slate-950 px-4 text-sm font-extrabold text-white hover:bg-slate-800 sm:w-auto"
+                        >
+                            Review or edit messages
+                        </a>
+                    @endif
+                </footer>
+            </div>
+        </div>
+    @endif
+@endforeach
+
+        <section data-webinar-workspace-intro class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                 <div class="max-w-3xl">
                     <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
@@ -230,77 +394,7 @@
             @endif
         </section>
 
-        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <h2 class="text-xl font-black tracking-tight text-slate-950">Upcoming webinars</h2>
-                    <p class="mt-1 text-sm leading-6 text-slate-600">The next sessions currently eligible to run for their series.</p>
-                </div>
-                <a
-                    href="#event-operations"
-                    class="text-sm font-extrabold text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
-                >
-                    View event details & recovery
-                </a>
-            </div>
 
-            <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                @forelse(($upcomingWebinars ?? collect()) as $upcomingWebinar)
-                    @php
-                        $upcomingRegistrationUrl = filled($upcomingWebinar->webinarSeries?->slug)
-                            ? route('webinar.show', ['seriesSlug' => $upcomingWebinar->webinarSeries->slug])
-                            : null;
-                        $isLive = $upcomingWebinar->starts_at?->lte(now()) && $upcomingWebinar->ends_at?->gt(now());
-                        $registrationCount = (int) ($upcomingWebinar->registrations_count ?? 0);
-                    @endphp
-
-                    <article class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                            <div>
-                                <p class="text-xs font-extrabold uppercase tracking-[0.14em] {{ $isLive ? 'text-emerald-700' : 'text-slate-500' }}">
-                                    {{ $isLive ? 'Live now' : 'Upcoming' }}
-                                </p>
-                                <h3 class="mt-1 text-base font-black text-slate-950">{{ $upcomingWebinar->title }}</h3>
-                                <p class="mt-1 text-sm text-slate-500">{{ $upcomingWebinar->webinarSeries?->title ?? 'Webinar series' }}</p>
-                            </div>
-                            <span class="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-slate-700 ring-1 ring-slate-200">
-                                {{ $registrationCount }} {{ $registrationCount === 1 ? 'registration' : 'registrations' }}
-                            </span>
-                        </div>
-
-                        <p class="mt-4 text-sm font-bold text-slate-900">
-                            {{ $upcomingWebinar->starts_at?->copy()->setTimezone($upcomingWebinar->timezone)->format('M j, Y · g:i A') ?? 'Start time pending' }}
-                        </p>
-                        <p class="mt-1 text-xs text-slate-500">{{ $upcomingWebinar->timezone }}</p>
-
-                        <div class="mt-4 flex flex-wrap gap-2">
-                            <a
-                                href="#webinar-{{ $upcomingWebinar->getKey() }}"
-                                class="inline-flex min-h-9 items-center justify-center rounded-full border border-slate-300 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
-                            >
-                                Event details
-                            </a>
-
-                            @if($upcomingRegistrationUrl)
-                                <a
-                                    href="{{ $upcomingRegistrationUrl }}"
-                                    target="_blank"
-                                    rel="noopener"
-                                    class="inline-flex min-h-9 items-center justify-center rounded-full bg-slate-950 px-3 text-xs font-extrabold text-white hover:bg-slate-800"
-                                >
-                                    Registration page
-                                </a>
-                            @endif
-                        </div>
-                    </article>
-                @empty
-                    <div class="md:col-span-2 xl:col-span-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
-                        <p class="font-bold text-slate-900">No upcoming webinars are scheduled.</p>
-                        <p class="mt-1 text-sm text-slate-600">Use Advanced setup when you are ready to add or sync the next occurrence.</p>
-                    </div>
-                @endforelse
-            </div>
-        </section>
 
         <div id="event-operations" class="space-y-6">
             <div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">

@@ -27,53 +27,80 @@
             <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div class="max-w-3xl">
                     <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
-                        Series-owned messaging
+                        Webinar message sequence
                     </p>
                     <h2 class="mt-2 text-2xl font-black tracking-tight text-slate-950">
-                        {{ $series->title }}
+                        Review {{ $series->title }} messages
                     </h2>
                     <p class="mt-2 text-sm leading-6 text-slate-600">
-                        The schedule profile controls the default timing and copy. Creating a custom chain gives this series its own immutable versions without changing any other series.
+                        Switch between Email and SMS, then move through one message at a time in the order it appears in the configured sequence.
                     </p>
 
-                    <dl class="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-600">
-                        <div>
-                            <dt class="font-bold text-slate-900">Schedule profile</dt>
-                            <dd>{{ $scheduleProfile?->name ?? 'No active profile' }}</dd>
-                        </div>
-                        <div>
-                            <dt class="font-bold text-slate-900">Ownership</dt>
-                            <dd>{{ $bindings->isNotEmpty() ? 'Custom series chain' : 'Profile defaults' }}</dd>
-                        </div>
-                        @if ($bindings->isNotEmpty())
-                            <div>
-                                <dt class="font-bold text-slate-900">Bound areas</dt>
-                                <dd>{{ $bindings->pluck('message_area_key')->unique()->count() }}</dd>
-                            </div>
-                        @endif
-                    </dl>
+                    <div class="mt-4 flex flex-wrap gap-2 text-xs font-bold text-slate-600">
+                        <span class="rounded-full bg-slate-100 px-3 py-1.5">
+                            {{ $scheduleProfile?->name ?? 'No active schedule profile' }}
+                        </span>
+                        <span class="rounded-full {{ $bindings->isNotEmpty() ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100' }} px-3 py-1.5">
+                            {{ $bindings->isNotEmpty() ? 'Customized for this series' : 'Using shared defaults' }}
+                        </span>
+                        <span class="rounded-full bg-slate-100 px-3 py-1.5">
+                            {{ (int) ($messageReview['message_count'] ?? 0) }} {{ (int) ($messageReview['message_count'] ?? 0) === 1 ? 'message' : 'messages' }}
+                        </span>
+                    </div>
                 </div>
 
-                <a
-                    href="{{ route('crm.webinar-series.index') }}"
-                    class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 px-5 text-center text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
-                >
-                    Back to webinars
-                </a>
+                <div class="grid gap-2 sm:flex sm:flex-wrap">
+                    @if(\Illuminate\Support\Facades\Route::has('crm.messaging.message-templates.index'))
+                        <a
+                            href="{{ route('crm.messaging.message-templates.index', ['module' => 'webinars']) }}"
+                            class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-center text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
+                        >
+                            Message Templates
+                        </a>
+                    @endif
+
+                    <a
+                        href="{{ route('crm.webinar-series.index') }}"
+                        class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-5 text-center text-sm font-extrabold text-white transition hover:bg-slate-800 sm:w-auto"
+                    >
+                        Back to webinars
+                    </a>
+                </div>
             </div>
         </section>
 
-        @if ($bindings->isEmpty())
+        @if($bindings->isNotEmpty())
+            <section class="rounded-2xl border border-amber-200 bg-amber-50/60 px-5 py-4 text-sm text-amber-950">
+                <p class="font-bold">Changes apply to future enrollments.</p>
+                <p class="mt-1 leading-6">
+                    Publishing an edit creates a new immutable template and chain version for this series. Existing enrollments stay pinned to the version they already started with.
+                </p>
+            </section>
+        @endif
+
+        <section
+            data-webinar-message-carousel
+            data-webinar-message-ownership="{{ $bindings->isNotEmpty() ? 'series' : 'shared' }}"
+            class="space-y-4"
+        >
+            <x-messaging.message-chain-carousel
+                :presentation="$messageReview"
+                :editable="$bindings->isNotEmpty()"
+                empty-message="No effective Webinar messages are available for this series."
+            />
+        </section>
+
+        @if($bindings->isEmpty())
             <section class="rounded-3xl border border-indigo-200 bg-indigo-50/50 p-4 shadow-sm sm:p-6">
                 <div class="max-w-3xl">
                     <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-indigo-700">
-                        Create a custom chain
+                        Customize only this series
                     </p>
                     <h2 class="mt-2 text-xl font-black tracking-tight text-slate-950">
-                        Duplicate the complete message sequence
+                        Create series-specific messages
                     </h2>
                     <p class="mt-2 text-sm leading-6 text-slate-700">
-                        The duplicated chain initially reuses immutable template versions. Editing a message then creates a series-owned template version and republishes only this series’ chain.
+                        The preview above is using the current shared defaults. Create a custom sequence only when this series needs different wording. The new sequence initially reuses the same immutable templates, then publishes series-owned versions only for messages you actually edit.
                     </p>
                 </div>
 
@@ -93,7 +120,7 @@
                             name="source_webinar_series_id"
                             class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-0"
                         >
-                            <option value="">This series’ effective schedule profile</option>
+                            <option value="">This series' current shared defaults</option>
                             @foreach ($sourceSeriesOptions as $sourceSeries)
                                 <option value="{{ $sourceSeries->getKey() }}">
                                     {{ $sourceSeries->title }}
@@ -101,7 +128,7 @@
                             @endforeach
                         </select>
                         <p class="mt-2 text-xs leading-5 text-slate-600">
-                            Choosing another series copies its effective message chains, including any published custom wording, without linking future edits.
+                            Choosing another series copies its effective published messages as a starting point without linking future edits.
                         </p>
                     </div>
 
@@ -109,193 +136,10 @@
                         type="submit"
                         class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-5 text-center text-sm font-extrabold text-white transition hover:bg-slate-800 sm:w-auto"
                     >
-                        Create custom message chain
+                        Create custom messages
                     </button>
                 </form>
             </section>
-        @else
-            <section class="rounded-3xl border border-amber-200 bg-amber-50/60 px-5 py-4 text-sm text-amber-950">
-                <p class="font-bold">Published enrollments stay pinned.</p>
-                <p class="mt-1 leading-6">
-                    Saving copy publishes a new immutable template and chain version. Existing enrollments continue using the version they started with; new enrollments use the latest published version.
-                </p>
-            </section>
-
-            <div class="space-y-6">
-                @foreach ($chains as $chain)
-                    <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                        <header class="border-b border-slate-200 bg-slate-50 px-4 py-5 sm:px-6">
-                            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                                <div>
-                                    <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
-                                        {{ $chain['areas']->implode(' · ') }}
-                                    </p>
-                                    <h2 class="mt-1 text-xl font-black tracking-tight text-slate-950">
-                                        {{ $chain['name'] }}
-                                    </h2>
-                                    @if ($chain['description'])
-                                        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                                            {{ $chain['description'] }}
-                                        </p>
-                                    @endif
-                                </div>
-
-                                <span class="inline-flex rounded-full bg-white px-3 py-1 text-xs font-extrabold text-slate-700 ring-1 ring-slate-200">
-                                    Chain version {{ $chain['version'] }}
-                                </span>
-                            </div>
-                        </header>
-
-                        <div class="divide-y divide-slate-200">
-                            @foreach ($chain['steps'] as $step)
-                                <div class="px-4 py-5 sm:px-6 sm:py-6">
-                                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                        <div>
-                                            <h3 class="text-base font-black text-slate-950">
-                                                {{ $step['name'] }}
-                                            </h3>
-                                            <p class="mt-1 text-xs font-semibold text-slate-500">
-                                                {{ $step['timing'] }}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div class="mt-5 grid gap-5 xl:grid-cols-2">
-                                        @foreach ($step['variants'] as $variant)
-                                            @php
-                                                $payload = $variant['payload'];
-                                            @endphp
-
-                                            <form
-                                                method="POST"
-                                                action="{{ route('crm.webinar-series.message-chains.variants.update', [$series, $variant['id']]) }}"
-                                                class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5"
-                                            >
-                                                @csrf
-                                                @method('PATCH')
-
-                                                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                                                    <div>
-                                                        <p class="font-black text-slate-950">
-                                                            {{ $variant['template_name'] }}
-                                                        </p>
-                                                        <p class="mt-1 text-xs text-slate-500">
-                                                            {{ strtoupper($variant['channel']) }}
-                                                            · {{ \Illuminate\Support\Str::headline($variant['purpose']) }}
-                                                            · template version {{ $variant['template_version'] }}
-                                                        </p>
-                                                    </div>
-
-                                                    <span class="rounded-full bg-white px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
-                                                        {{ \Illuminate\Support\Str::headline($variant['message_type']) }}
-                                                    </span>
-                                                </div>
-
-                                                <div class="mt-5 space-y-4">
-                                                    @if ($variant['channel'] === 'email')
-                                                        <div>
-                                                            <label class="block text-sm font-bold text-slate-900">
-                                                                Subject
-                                                            </label>
-                                                            <input
-                                                                type="text"
-                                                                name="payload[subject]"
-                                                                value="{{ $payload['subject'] ?? '' }}"
-                                                                maxlength="255"
-                                                                required
-                                                                class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-0"
-                                                            >
-                                                        </div>
-
-                                                        <div>
-                                                            <label class="block text-sm font-bold text-slate-900">
-                                                                Body
-                                                            </label>
-                                                            <textarea
-                                                                name="payload[body]"
-                                                                rows="10"
-                                                                maxlength="10000"
-                                                                required
-                                                                class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-0"
-                                                            >{{ $payload['body'] ?? '' }}</textarea>
-                                                        </div>
-                                                    @else
-                                                        <div>
-                                                            <label class="block text-sm font-bold text-slate-900">
-                                                                SMS message
-                                                            </label>
-                                                            <textarea
-                                                                name="payload[message]"
-                                                                rows="6"
-                                                                maxlength="1600"
-                                                                required
-                                                                class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-0"
-                                                            >{{ $payload['message'] ?? '' }}</textarea>
-                                                        </div>
-                                                    @endif
-
-                                                    @if (array_key_exists('footer', $payload))
-                                                        <div>
-                                                            <label class="block text-sm font-bold text-slate-900">
-                                                                Footer
-                                                            </label>
-                                                            <textarea
-                                                                name="payload[footer]"
-                                                                rows="3"
-                                                                maxlength="2000"
-                                                                class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-0"
-                                                            >{{ $payload['footer'] ?? '' }}</textarea>
-                                                        </div>
-                                                    @endif
-
-                                                    @foreach (['cta' => 'Primary link', 'secondary_link' => 'Secondary link'] as $linkKey => $linkLabel)
-                                                        @if (is_array($payload[$linkKey] ?? null))
-                                                            <div class="grid gap-3 sm:grid-cols-2">
-                                                                <div>
-                                                                    <label class="block text-sm font-bold text-slate-900">
-                                                                        {{ $linkLabel }} label
-                                                                    </label>
-                                                                    <input
-                                                                        type="text"
-                                                                        name="payload[{{ $linkKey }}][label]"
-                                                                        value="{{ $payload[$linkKey]['label'] ?? '' }}"
-                                                                        maxlength="255"
-                                                                        class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-0"
-                                                                    >
-                                                                </div>
-
-                                                                <div>
-                                                                    <label class="block text-sm font-bold text-slate-900">
-                                                                        {{ $linkLabel }} URL
-                                                                    </label>
-                                                                    <input
-                                                                        type="text"
-                                                                        name="payload[{{ $linkKey }}][url]"
-                                                                        value="{{ $payload[$linkKey]['url'] ?? '' }}"
-                                                                        maxlength="1000"
-                                                                        class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-0"
-                                                                    >
-                                                                </div>
-                                                            </div>
-                                                        @endif
-                                                    @endforeach
-                                                </div>
-
-                                                <button
-                                                    type="submit"
-                                                    class="mt-5 inline-flex min-h-10 w-full items-center justify-center rounded-full bg-slate-950 px-4 text-center text-sm font-extrabold text-white transition hover:bg-slate-800 sm:w-auto"
-                                                >
-                                                    Publish updated copy
-                                                </button>
-                                            </form>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </section>
-                @endforeach
-            </div>
         @endif
     </div>
 </x-layouts.crm>

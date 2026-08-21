@@ -856,6 +856,31 @@ scope = webinar
 
 Marketing nurture remains Campaign-owned and starts through Campaign/FlowRoutes integration rather than being mislabeled as a transactional Webinar chain.
 
+## Webinar message review UX
+
+The normal Webinar workspace is upcoming-session first.
+
+For each upcoming Webinar, operators should be able to review the effective published message sequence without leaving the workspace. Webinars resolves the effective series/profile MessageChain bindings, then consumes Messaging's generic chain presentation seam.
+
+The Webinar review pattern is:
+
+```text
+Upcoming Webinar
+    -> View messages
+        -> Email / SMS
+        -> one current published message at a time
+        -> human-readable timing and business area
+        -> previous / next
+        -> optional Message Templates link
+        -> series message editor when series-specific changes are needed
+```
+
+The series message page uses the same carousel projection for both shared defaults and series-owned custom chains.
+
+Shared/profile-owned messages are previewed read-only. If the series needs different copy, the operator explicitly creates series-specific messages through the existing copy-on-write ownership path. Once series-owned, the same carousel exposes one message editor at a time and publishes through the existing immutable template/chain actions.
+
+This presentation must not add a second message-chain runtime, duplicate payload persistence, or mutable scheduled-message copy. The modal and carousel are derived from current immutable Messaging versions.
+
 ## CRM visibility
 
 Webinars may contribute CRM visibility through module-owned providers and views.

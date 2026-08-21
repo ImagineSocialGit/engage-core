@@ -6,6 +6,7 @@
 - [x] Group attended/missed Webinar follow-up members under one Post-Webinar Follow-Up business family while preserving outcome/channel-specific members.
 - [x] Start the Rob The Mortgage Coach pilot by moving genuinely identical top-level Webinar email actions into shared client-family composition: confirmation CTA/cancel link, standard reminder CTA, and post-webinar CTA set. Keep deliberate live-reminder overrides explicit.
 - [x] Cut the Message Templates editor over to composition-aware authoring: business family first, inherited-source labels, explicit shared vs message override editing, affected-message counts, resolved preview, and impact review before publish.
+- [x] Add a reusable channel-first MessageChain presentation/carousel seam so owning modules can review one published Email/SMS message at a time without exposing stacked chain internals; Webinar is the first consumer.
 - [ ] Add bounded semantic content slots where top-level payload composition is insufficient for repeated content embedded inside body text (for example greeting, event-details block, closing/signature, and CTA placement). Do not introduce arbitrary recursive fragments.
 - [ ] Complete the Rob operator/usability pilot through the composition-aware editor, then use Slam Dunk as the second reality check before generalizing client authoring guidance.
 - [ ] Remove or reduce obsolete duplicated editable payload storage in the preset/assignment/catalog compatibility bridge only after the composition-aware editor no longer depends on materialized preset payloads.

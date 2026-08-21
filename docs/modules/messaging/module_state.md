@@ -395,6 +395,50 @@ dependency_aware
 
 The exact strategy may live on the step or its immutable version definition, but it must not be inferred from channel names or timing collisions.
 
+## Message-chain presentation and carousel authoring
+
+Messaging owns the reusable read/presentation seam for current immutable MessageChains.
+
+`MessageChainPresentationService` projects the active current version into business-facing channel groups without copying or persisting another message definition:
+
+```text
+MessageChain
+    -> current immutable MessageChainVersion
+    -> active ordered steps
+    -> active channel variants
+    -> pinned MessageTemplateVersion payloads
+    -> channel-first presentation
+```
+
+The presentation is derived only. It does not persist:
+
+```text
+preview payload copies
+message counts
+timing summaries
+channel labels
+carousel position
+edit URLs
+```
+
+Owning modules may add business context, friendly anchor labels, and safe edit links around this projection.
+
+Client/operator MessageChain UX should default to:
+
+```text
+Email / SMS channel choice
+one message visible at a time
+human-readable timing
+previous / next navigation
+published-copy preview
+optional link to the reusable Message Templates editor
+inline copy editing only when the owning module deliberately supports it
+```
+
+Do not make the normal client mental model a page containing every chain, step, variant, and payload form expanded simultaneously.
+
+The carousel is a presentation/authoring pattern, not a new runtime abstraction. Immutable MessageTemplateVersion and MessageChainVersion ownership remains unchanged, and existing enrollments stay pinned to the versions they started with.
+
 ## Chain enrollment
 
 ### `message_chain_enrollments`
