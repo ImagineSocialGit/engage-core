@@ -12,6 +12,7 @@ use App\Modules\Forms\Models\FormSubmission;
 use App\Modules\Forms\Models\FormVersion;
 use App\Modules\Forms\Services\FormSubmissionContactMapper;
 use App\Modules\Forms\Services\FormSubmissionValidator;
+use App\Modules\Forms\Services\FormSubmissionVerificationPolicy;
 use App\Modules\Forms\Services\PublishedFormResolver;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,7 @@ final class CreateFormSubmissionAction
         private readonly PublishedFormResolver $forms,
         private readonly FormSubmissionValidator $validator,
         private readonly FormSubmissionContactMapper $contacts,
+        private readonly FormSubmissionVerificationPolicy $verifications,
     ) {}
 
     public function handle(FormSubmissionInput $input): FormSubmissionResult
@@ -43,6 +45,8 @@ final class CreateFormSubmissionAction
         );
         $this->validator->validateConfiguration($form);
         $this->contacts->validateConfiguration($form);
+        $this->verifications->validateConfiguration($form);
+        $this->verifications->validate($form, $input->verification);
         $normalized = $this->validator->validate($form, $input->values);
 
         try {
@@ -95,6 +99,10 @@ final class CreateFormSubmissionAction
 
         if ($input->hasExternalIdentity()) {
             $runtimeMeta['idempotency_fingerprint'] = $fingerprint;
+        }
+
+        if ($input->verification !== null) {
+            $runtimeMeta['verification'] = $input->verification->evidence();
         }
 
         $submission = FormSubmission::query()->create([
@@ -193,13 +201,27 @@ final class CreateFormSubmissionAction
 
     private function fingerprint(FormSubmissionInput $input): string
     {
+        $logicalRequest = [
+            'form_key' => $input->formKey,
+            'source' => $input->source,
+            'values' => $this->canonicalize($input->values),
+            'meta' => $this->canonicalize($input->meta),
+        ];
+
+        if ($input->verification !== null) {
+            $logicalRequest['verification'] = $this->canonicalize(
+                $input->verification->evidence(),
+            );
+        }
+
         try {
-            $encoded = json_encode([
-                'form_key' => $input->formKey,
-                'source' => $input->source,
-                'values' => $this->canonicalize($input->values),
-                'meta' => $this->canonicalize($input->meta),
-            ], JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $encoded = json_encode(
+                $logicalRequest,
+                JSON_THROW_ON_ERROR
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE,
+            );
         } catch (JsonException $exception) {
             throw new \InvalidArgumentException(
                 'Form submission logical request must be JSON-encodable.',

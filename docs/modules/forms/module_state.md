@@ -397,7 +397,7 @@ Submission, values, Contact resolution/update, and additive tag writes occur in 
 
 `provider + external_id` is the durable external idempotency identity. Both values must be present together. The authoritative pre-rollout `create_form_submissions_table` migration enforces their uniqueness when non-null; MySQL's multiple-NULL behavior continues allowing Forms submissions that do not participate in external replay protection.
 
-The submission runtime stores an internal logical-request fingerprint in `form_submissions.meta._forms`. The fingerprint includes the form key, source, submitted field values, and durable submission meta. IP address, user agent, and raw transport payload are evidence snapshots but are not replay identity. A valid retry therefore returns the original pinned submission even when the definition's current version has since advanced.
+The submission runtime stores an internal logical-request fingerprint in `form_submissions.meta._forms`. The fingerprint includes the form key, source, submitted field values, durable submission meta, and normalized server-authored verification evidence when verification is present. IP address, user agent, and raw transport payload are evidence snapshots but are not replay identity. A valid retry therefore returns the original pinned submission even when the definition's current version has since advanced. Reusing one external identity with different verification evidence is a conflicting logical request rather than a way to replace the original trust evidence.
 
 Engage Sites and other transports should generate one stable external UUID per logical submission attempt and reuse the same UUID after transport uncertainty.
 
@@ -473,6 +473,58 @@ The POST endpoint requires `Content-Type: application/json`. Its request contrac
 `provenance` is an optional JSON object authored by the authenticated calling application from the original browser request. It may contain only `ip_address` and `user_agent`. The signature covers the complete exact body so Engage Core can detect tampering; HTTPS still provides transport confidentiality. A caller may omit either or both values when its privacy policy does not retain them. When omitted, Forms stores `null`; it never mislabels the authenticated Engage Sites server or proxy as the visitor. The peer address remains available to authentication and rate limiting at the HTTP boundary.
 
 Visitor provenance is evidence, not durable replay identity. A legitimate retry may therefore carry different or absent provenance and still replay the original submission; the first accepted submission retains its original snapshots. Unknown envelope or provenance keys fail validation.
+
+### Server-authored verification attestation
+
+An authenticated caller may attach normalized human-verification evidence beneath the dedicated top-level `verification` envelope:
+
+```json
+{
+  "verification": {
+    "provider": "turnstile",
+    "outcome": "passed",
+    "verified_at": "2026-08-20T19:59:30+00:00",
+    "hostname": "artist.example.com",
+    "action": "artist_updates"
+  }
+}
+```
+
+This envelope is not browser-owned metadata. Engage Sites first verifies the browser token with its configured human-verification provider, discards the raw token, and then authors this bounded result before signing the complete Core request. Core authenticates the calling application through the existing HMAC boundary and derives `authenticated_client_id` from that authenticated client; the browser cannot supply or override it.
+
+Accepted verification evidence is normalized into `form_submissions.meta._forms.verification` with:
+
+```text
+version
+provider
+outcome
+verified_at
+hostname
+action
+authenticated_client_id
+```
+
+The raw provider token, provider secret, IP address, user agent, and unrestricted provider response are not valid verification-envelope fields and are never copied into the Forms-owned verification evidence.
+
+The v1 attestation contract accepts only a normalized `passed` outcome. `verified_at` must be an RFC3339 timestamp with an explicit timezone. Evidence more than 60 seconds in the future is rejected. By default, presented evidence may be no older than 600 seconds.
+
+Per-form enforcement is versioned under server-only `FormVersion.settings.submission.verification`:
+
+```php
+'verification' => [
+    'required' => true,
+    'providers' => ['turnstile'],
+    'max_age_seconds' => 300,
+    'action' => 'artist_updates',
+    'require_hostname' => true,
+],
+```
+
+`required` defaults to `false`, so existing Forms and existing external callers remain compatible until a specific published FormVersion deliberately opts in. When verification is required, at least one accepted provider must be configured. Setup validation checks this policy with the rest of the published submission contract.
+
+The Core policy is provider-neutral. It can compare provider identity, evidence age, action, and hostname presence, but it does not call Cloudflare or reinterpret provider-specific payloads. Provider verification remains the responsibility of the authenticated edge/application caller.
+
+Human verification establishes only that the configured anti-bot provider accepted the interaction. It does not prove email ownership, phone ownership, or marketing consent. Contact promotion, channel verification, and Messaging consent remain separate lifecycle decisions.
 
 ### Shared authentication contract
 

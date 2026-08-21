@@ -7,6 +7,7 @@ use App\Modules\Forms\Models\FormVersion;
 use App\Modules\Forms\Services\ExternalFormIntakeClientResolver;
 use App\Modules\Forms\Services\FormSubmissionContactMapper;
 use App\Modules\Forms\Services\FormSubmissionValidator;
+use App\Modules\Forms\Services\FormSubmissionVerificationPolicy;
 use App\Modules\Forms\Services\FormSchemaNormalizer;
 use App\Modules\Forms\Services\PublishedFormResolver;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
@@ -25,6 +26,7 @@ final class FormsSetupValidationContributor implements SetupValidationContributo
         private readonly PublishedFormResolver $publishedForms,
         private readonly FormSubmissionValidator $submissions,
         private readonly FormSubmissionContactMapper $contacts,
+        private readonly FormSubmissionVerificationPolicy $verifications,
         private readonly ExternalFormIntakeClientResolver $externalClients,
     ) {}
 
@@ -135,6 +137,17 @@ final class FormsSetupValidationContributor implements SetupValidationContributo
                     code: 'forms.runtime.submission_mapping_invalid',
                     message: $exception->getMessage(),
                     path: "form_versions.{$version->getKey()}.settings",
+                    context: $versionContext,
+                );
+            }
+
+            try {
+                $this->verifications->validateConfiguration($published);
+            } catch (DomainException $exception) {
+                yield $this->error(
+                    code: 'forms.runtime.submission_verification_invalid',
+                    message: $exception->getMessage(),
+                    path: "form_versions.{$version->getKey()}.settings.submission.verification",
                     context: $versionContext,
                 );
             }

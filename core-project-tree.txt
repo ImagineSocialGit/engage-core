@@ -411,6 +411,7 @@
 │   │   │   │   ├── FormPresetSyncResult.php
 │   │   │   │   ├── FormSubmissionInput.php
 │   │   │   │   ├── FormSubmissionResult.php
+│   │   │   │   ├── FormSubmissionVerification.php
 │   │   │   │   ├── NormalizedFormSubmission.php
 │   │   │   │   ├── NormalizedFormSubmissionValue.php
 │   │   │   │   └── PublishedForm.php
@@ -433,6 +434,7 @@
 │   │   │   │   ├── FormSchemaNormalizer.php
 │   │   │   │   ├── FormSubmissionContactMapper.php
 │   │   │   │   ├── FormSubmissionValidator.php
+│   │   │   │   ├── FormSubmissionVerificationPolicy.php
 │   │   │   │   └── PublishedFormResolver.php
 │   │   │   ├── Support
 │   │   │   └── Validation
@@ -2164,6 +2166,7 @@
 │   │   │   ├── FormPresetSyncTest.php
 │   │   │   ├── FormsFoundationTest.php
 │   │   │   ├── FormsSetupValidationContributorTest.php
+│   │   │   ├── FormSubmissionVerificationTest.php
 │   │   │   └── PublishedFormRuntimeTest.php
 │   │   ├── InboundMessaging
 │   │   │   ├── HandleInboundEmailWebhookActionTest.php
@@ -2473,4 +2476,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-620 directories, 1854 files
+620 directories, 1857 files

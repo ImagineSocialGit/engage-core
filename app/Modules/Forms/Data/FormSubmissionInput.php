@@ -30,6 +30,8 @@ final readonly class FormSubmissionInput
 
     public ?string $userAgent;
 
+    public ?FormSubmissionVerification $verification;
+
     public bool $publicOnly;
 
     /**
@@ -47,6 +49,7 @@ final readonly class FormSubmissionInput
         array $meta = [],
         ?string $ipAddress = null,
         ?string $userAgent = null,
+        ?FormSubmissionVerification $verification = null,
         bool $publicOnly = false,
     ) {
         $formKey = trim($formKey);
@@ -92,6 +95,7 @@ final readonly class FormSubmissionInput
         $this->meta = $meta;
         $this->ipAddress = $ipAddress;
         $this->userAgent = $this->nullableString($userAgent, 'userAgent', 65535);
+        $this->verification = $verification;
         $this->publicOnly = $publicOnly;
     }
 

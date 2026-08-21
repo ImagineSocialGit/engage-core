@@ -5,6 +5,7 @@ namespace App\Modules\Forms\Controllers\External;
 use App\Modules\Forms\Actions\CreateFormSubmissionAction;
 use App\Modules\Forms\Data\ExternalFormIntakeClient;
 use App\Modules\Forms\Data\FormSubmissionInput;
+use App\Modules\Forms\Data\FormSubmissionVerification;
 use App\Modules\Forms\Exceptions\FormSubmissionReplayConflictException;
 use App\Modules\Forms\Exceptions\FormSubmissionValidationException;
 use App\Modules\Forms\Http\Middleware\AuthenticateExternalFormIntake;
@@ -35,7 +36,7 @@ final class ExternalFormIntakeController
         $errors = [];
         $unknownKeys = array_values(array_diff(
             array_keys($payload),
-            ['external_id', 'values', 'meta', 'provenance'],
+            ['external_id', 'values', 'meta', 'provenance', 'verification'],
         ));
 
         if ($unknownKeys !== []) {
@@ -57,6 +58,10 @@ final class ExternalFormIntakeController
             $errors['provenance'][] = 'The provenance field must be a JSON object.';
         }
 
+        if (property_exists($document, 'verification') && ! $document->verification instanceof stdClass) {
+            $errors['verification'][] = 'The verification field must be a JSON object.';
+        }
+
         $provenance = is_array($payload['provenance'] ?? null)
             ? $payload['provenance']
             : [];
@@ -72,6 +77,27 @@ final class ExternalFormIntakeController
             );
         }
 
+        $verification = is_array($payload['verification'] ?? null)
+            ? $payload['verification']
+            : [];
+        $unknownVerificationKeys = array_values(array_diff(
+            array_keys($verification),
+            [
+                'provider',
+                'outcome',
+                'verified_at',
+                'hostname',
+                'action',
+            ],
+        ));
+
+        if ($unknownVerificationKeys !== []) {
+            $errors['verification'][] = sprintf(
+                'Unknown verification key(s): %s.',
+                implode(', ', $unknownVerificationKeys),
+            );
+        }
+
         $validator = Validator::make($payload, [
             'external_id' => ['required', 'string', 'uuid', 'max:255'],
             'values' => ['required', 'array'],
@@ -79,6 +105,12 @@ final class ExternalFormIntakeController
             'provenance' => ['sometimes', 'array'],
             'provenance.ip_address' => ['sometimes', 'nullable', 'string', 'ip', 'max:45'],
             'provenance.user_agent' => ['sometimes', 'nullable', 'string', 'max:65535'],
+            'verification' => ['sometimes', 'array'],
+            'verification.provider' => ['required_with:verification', 'string', 'max:64'],
+            'verification.outcome' => ['required_with:verification', 'string', 'max:32'],
+            'verification.verified_at' => ['required_with:verification', 'string', 'max:64'],
+            'verification.hostname' => ['sometimes', 'nullable', 'string', 'max:253'],
+            'verification.action' => ['sometimes', 'nullable', 'string', 'max:64'],
         ]);
 
         foreach ($validator->errors()->toArray() as $key => $messages) {
@@ -108,6 +140,27 @@ final class ExternalFormIntakeController
         }
 
         try {
+            $verificationEvidence = array_key_exists('verification', $payload)
+                ? new FormSubmissionVerification(
+                    provider: (string) ($payload['verification']['provider'] ?? ''),
+                    outcome: (string) ($payload['verification']['outcome'] ?? ''),
+                    verifiedAt: (string) ($payload['verification']['verified_at'] ?? ''),
+                    hostname: isset($payload['verification']['hostname'])
+                        ? (string) $payload['verification']['hostname']
+                        : null,
+                    action: isset($payload['verification']['action'])
+                        ? (string) $payload['verification']['action']
+                        : null,
+                    authenticatedClientId: $client->id,
+                )
+                : null;
+        } catch (InvalidArgumentException $exception) {
+            return $this->validationFailed($request, [
+                'verification' => [$exception->getMessage()],
+            ]);
+        }
+
+        try {
             $result = $this->submissions->handle(new FormSubmissionInput(
                 formKey: $form,
                 values: $payload['values'],
@@ -118,6 +171,7 @@ final class ExternalFormIntakeController
                 meta: $payload['meta'] ?? [],
                 ipAddress: $payload['provenance']['ip_address'] ?? null,
                 userAgent: $payload['provenance']['user_agent'] ?? null,
+                verification: $verificationEvidence,
                 publicOnly: true,
             ));
         } catch (FormSubmissionValidationException $exception) {
