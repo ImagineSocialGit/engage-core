@@ -10,10 +10,12 @@ use App\Modules\Forms\Exceptions\FormSubmissionReplayConflictException;
 use App\Modules\Forms\Models\FormDefinition;
 use App\Modules\Forms\Models\FormSubmission;
 use App\Modules\Forms\Models\FormVersion;
+use App\Modules\Forms\Services\FormSubmissionConsentIntentResolver;
 use App\Modules\Forms\Services\FormSubmissionContactMapper;
 use App\Modules\Forms\Services\FormSubmissionValidator;
 use App\Modules\Forms\Services\FormSubmissionVerificationPolicy;
 use App\Modules\Forms\Services\PublishedFormResolver;
+use App\Support\ModuleIntegrations\Forms\FormSubmissionConsentBridge;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use JsonException;
@@ -24,6 +26,8 @@ final class CreateFormSubmissionAction
         private readonly PublishedFormResolver $forms,
         private readonly FormSubmissionValidator $validator,
         private readonly FormSubmissionContactMapper $contacts,
+        private readonly FormSubmissionConsentIntentResolver $consentIntents,
+        private readonly FormSubmissionConsentBridge $consentBridge,
         private readonly FormSubmissionVerificationPolicy $verifications,
     ) {}
 
@@ -45,6 +49,8 @@ final class CreateFormSubmissionAction
         );
         $this->validator->validateConfiguration($form);
         $this->contacts->validateConfiguration($form);
+        $consentIntents = $this->consentIntents->resolve($form);
+        $this->consentBridge->validateConfiguration($form, $consentIntents);
         $this->verifications->validateConfiguration($form);
         $this->verifications->validate($form, $input->verification);
         $normalized = $this->validator->validate($form, $input->values);
@@ -55,6 +61,7 @@ final class CreateFormSubmissionAction
                 $form,
                 $normalized,
                 $fingerprint,
+                $consentIntents,
             ): FormSubmissionResult {
                 if ($input->hasExternalIdentity()) {
                     $existing = $this->existingSubmission($input, lock: true);
@@ -69,6 +76,7 @@ final class CreateFormSubmissionAction
                     form: $form,
                     normalized: $normalized,
                     fingerprint: $fingerprint,
+                    consentIntents: $consentIntents,
                 );
             }, attempts: 3);
         } catch (QueryException $exception) {
@@ -91,6 +99,7 @@ final class CreateFormSubmissionAction
         PublishedForm $form,
         NormalizedFormSubmission $normalized,
         string $fingerprint,
+        array $consentIntents,
     ): FormSubmissionResult {
         $contact = $this->contacts->map($form, $normalized->payload);
         $runtimeMeta = [
@@ -128,6 +137,14 @@ final class CreateFormSubmissionAction
         foreach ($normalized->values as $value) {
             $submission->values()->create($value->persistenceAttributes());
         }
+
+        $this->consentBridge->apply(
+            form: $form,
+            submission: $submission,
+            contact: $contact,
+            payload: $normalized->payload,
+            intents: $consentIntents,
+        );
 
         return new FormSubmissionResult(
             submissionId: (int) $submission->getKey(),

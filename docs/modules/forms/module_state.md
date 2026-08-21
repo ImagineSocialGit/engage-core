@@ -612,6 +612,13 @@ submission:
         music: interest:music
         tour: interest:tour
         vip: interest:vip
+  consents:
+    - field: email_marketing_consent
+      channel: email
+      purpose: marketing
+    - field: sms_marketing_consent
+      channel: sms
+      purpose: marketing
 ```
 
 `contact.fields` maps supported Contact attributes to frozen form field keys. Email mapping is required whenever Contact mapping exists. Email must map an `email` field, phone must map a `tel` field, and name components must map `text` fields.
@@ -622,7 +629,15 @@ Tag mappings are server-owned value-to-tag allowlists. Submitted values select o
 
 Invalid submission rules or Contact/tag mappings fail closed. `FormsSetupValidationContributor` reports these invalid published contracts before runtime handoff.
 
-Messaging consent grants remain an optional bridge and are not performed by this Forms runtime.
+Consent mappings are server-owned and intentionally contain only `field`, `channel`, and `purpose`. Forms does not accept a consent `scope` or consent-domain key in the mapping. A configured consent field must be a `checkbox` or `boolean` field, and a `true` normalized value means explicit acceptance. `false`, omitted, or null values do not revoke existing permission; revocation remains owned by Messaging unsubscribe/STOP/preference flows.
+
+Forms resolves the consent intent but does not own Messaging state. `FormSubmissionConsentBridge` is an optional shared integration seam. When Messaging is enabled, the Messaging implementation requires an explicit `channel + purpose -> consent domain` policy before it will grant anything. This prevents a consent-enabled form from silently falling back to a narrow operational scope. When Messaging is disabled, the submitted consent answer remains durable on the pinned FormSubmission/FormSubmissionValue graph but no MessageConsent is created and no later retroactive grant is implied.
+
+A successful bridge grant uses the existing Messaging `GrantMessageConsentAction`. The stored permission identity therefore follows Messaging's configured channel+purpose domain, while the originating form field and FormSubmission/FormVersion IDs are retained as bounded provenance pointers. The bridge does not duplicate disclosure text, provider payloads, interest tags, or human-verification evidence into Messaging metadata. The immutable FormVersion plus the pinned submission/value/provenance graph remains the source evidence.
+
+Interest/tag mappings remain separate from permission. Tags answer who should receive a relevant campaign or broadcast; Messaging consent answers whether that channel+purpose is authorized.
+
+Human verification and channel ownership remain distinct from this explicit consent action. A passed Turnstile attestation does not itself grant consent, and this bridge does not prove control of an email address or phone number.
 
 ## Definitions and versions
 

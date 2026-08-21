@@ -5,11 +5,13 @@ namespace App\Modules\Forms\Validation;
 use App\Modules\Forms\Models\FormDefinition;
 use App\Modules\Forms\Models\FormVersion;
 use App\Modules\Forms\Services\ExternalFormIntakeClientResolver;
+use App\Modules\Forms\Services\FormSubmissionConsentIntentResolver;
 use App\Modules\Forms\Services\FormSubmissionContactMapper;
 use App\Modules\Forms\Services\FormSubmissionValidator;
 use App\Modules\Forms\Services\FormSubmissionVerificationPolicy;
 use App\Modules\Forms\Services\FormSchemaNormalizer;
 use App\Modules\Forms\Services\PublishedFormResolver;
+use App\Support\ModuleIntegrations\Forms\FormSubmissionConsentBridge;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 use DomainException;
@@ -26,6 +28,8 @@ final class FormsSetupValidationContributor implements SetupValidationContributo
         private readonly PublishedFormResolver $publishedForms,
         private readonly FormSubmissionValidator $submissions,
         private readonly FormSubmissionContactMapper $contacts,
+        private readonly FormSubmissionConsentIntentResolver $consentIntents,
+        private readonly FormSubmissionConsentBridge $consentBridge,
         private readonly FormSubmissionVerificationPolicy $verifications,
         private readonly ExternalFormIntakeClientResolver $externalClients,
     ) {}
@@ -137,6 +141,21 @@ final class FormsSetupValidationContributor implements SetupValidationContributo
                     code: 'forms.runtime.submission_mapping_invalid',
                     message: $exception->getMessage(),
                     path: "form_versions.{$version->getKey()}.settings",
+                    context: $versionContext,
+                );
+            }
+
+            try {
+                $consentIntents = $this->consentIntents->resolve($published);
+                $this->consentBridge->validateConfiguration(
+                    $published,
+                    $consentIntents,
+                );
+            } catch (DomainException $exception) {
+                yield $this->error(
+                    code: 'forms.runtime.submission_consent_invalid',
+                    message: $exception->getMessage(),
+                    path: "form_versions.{$version->getKey()}.settings.submission.consents",
                     context: $versionContext,
                 );
             }

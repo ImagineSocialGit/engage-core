@@ -424,6 +424,7 @@
 │   │   │   │   ├── ExternalFormIntakeClient.php
 │   │   │   │   ├── ExternalPublishedForm.php
 │   │   │   │   ├── FormPresetSyncResult.php
+│   │   │   │   ├── FormSubmissionConsentIntent.php
 │   │   │   │   ├── FormSubmissionInput.php
 │   │   │   │   ├── FormSubmissionResult.php
 │   │   │   │   ├── FormSubmissionVerification.php
@@ -447,6 +448,7 @@
 │   │   │   ├── Services
 │   │   │   │   ├── ExternalFormIntakeClientResolver.php
 │   │   │   │   ├── FormSchemaNormalizer.php
+│   │   │   │   ├── FormSubmissionConsentIntentResolver.php
 │   │   │   │   ├── FormSubmissionContactMapper.php
 │   │   │   │   ├── FormSubmissionValidator.php
 │   │   │   │   ├── FormSubmissionVerificationPolicy.php
@@ -1307,6 +1309,12 @@
 │       │   │   └── DashboardPanelProvider.php
 │       │   └── DashboardPanelRegistry.php
 │       ├── ModuleIntegrations
+│       │   ├── Forms
+│       │   │   ├── Contracts
+│       │   │   │   └── FormSubmissionConsentHandler.php
+│       │   │   ├── FormSubmissionConsentBridge.php
+│       │   │   └── Messaging
+│       │   │       └── GrantFormSubmissionMessagingConsent.php
 │       │   ├── InternalNotifications
 │       │   │   ├── InboundMessaging
 │       │   │   │   ├── InboundMessageNotificationRecipientResolver.php
@@ -2211,6 +2219,8 @@
 │   │   │   ├── FormPresetSyncTest.php
 │   │   │   ├── FormsFoundationTest.php
 │   │   │   ├── FormsSetupValidationContributorTest.php
+│   │   │   ├── FormSubmissionConsentIntentResolverTest.php
+│   │   │   ├── FormSubmissionMessagingConsentBridgeTest.php
 │   │   │   ├── FormSubmissionVerificationTest.php
 │   │   │   └── PublishedFormRuntimeTest.php
 │   │   ├── InboundMessaging
@@ -2531,4 +2541,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-627 directories, 1905 files
+630 directories, 1912 files

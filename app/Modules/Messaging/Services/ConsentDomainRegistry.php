@@ -65,16 +65,29 @@ class ConsentDomainRegistry
         MessagePurpose|string $purpose,
         string $scope,
     ): string {
-        $channel = $this->enumValue($channel);
-        $purpose = $this->enumValue($purpose);
-
-        $configuredDomain = $this->channelPurposeDomain($channel, $purpose);
+        $configuredDomain = $this->channelPurposeDomainFor(
+            channel: $channel,
+            purpose: $purpose,
+        );
 
         if ($configuredDomain !== null) {
             return $configuredDomain;
         }
 
         return $this->domainForScope($scope);
+    }
+
+    public function channelPurposeDomainFor(
+        MessageChannel|string $channel,
+        MessagePurpose|string $purpose,
+    ): ?string {
+        $channel = $this->enumValue($channel);
+        $purpose = $this->enumValue($purpose);
+
+        return $this->configuredChannelPurposeDomain(
+            channel: $channel,
+            purpose: $purpose,
+        );
     }
 
     public function domainForScope(string $scope): string
@@ -300,7 +313,7 @@ class ConsentDomainRegistry
         return $issues;
     }
 
-    private function channelPurposeDomain(string $channel, string $purpose): ?string
+    private function configuredChannelPurposeDomain(string $channel, string $purpose): ?string
     {
         if (! in_array($channel, MessageChannel::values(), true)) {
             throw new InvalidArgumentException("Unsupported message channel [{$channel}].");

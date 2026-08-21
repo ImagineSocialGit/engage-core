@@ -859,6 +859,35 @@ channel-purpose policy. Historical rows remain evidence of the permission identi
 was actually stored. Any production reclassification/backfill must be explicit and
 based on verified disclosure evidence rather than a generic migration.
 
+### Forms consent bridge
+
+Forms may declare server-owned consent intents using only:
+
+```text
+field + channel + purpose
+```
+
+Forms does not choose a Messaging consent domain and does not pass an interest/CRM scope
+as the permission boundary. The optional Forms-to-Messaging integration requires
+`ConsentDomainRegistry::channelPurposeDomainFor()` to resolve an explicit configured
+domain for every declared channel/purpose before it grants consent.
+
+This fail-closed requirement is deliberate. A client using narrow scope consent can keep
+that policy unchanged, but a FormVersion that is intended to establish broad marketing
+permission cannot silently fall back to a narrow form or campaign scope.
+
+When a normalized consent field is `true`, the integration grants through
+`GrantMessageConsentAction`. A false, omitted, or null field does not revoke existing
+consent; unsubscribe, STOP, preference updates, and other Messaging-owned revocation
+flows remain authoritative.
+
+Forms passes only bounded provenance pointers such as the FormSubmission ID,
+FormVersion ID, and accepting field key. It does not copy disclosure text, interest
+tags, Turnstile evidence, or arbitrary form payloads into MessageConsent metadata.
+Campaigns and Broadcasts remain unchanged: they keep their operational message scopes
+and continue to rely on the Messaging gate, which resolves those scopes to the active
+channel+purpose consent domain.
+
 ### Consent acknowledgement resolution
 
 `ConsentOptInDefinitionResolver` owns acknowledgement copy and domain topic resolution.

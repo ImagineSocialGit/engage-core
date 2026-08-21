@@ -11,6 +11,8 @@ use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Messaging\Import\MarketingPermissionContactImportPostProcessor;
 use App\Modules\InboundMessaging\Events\InboundMessageReceived;
+use App\Support\ModuleIntegrations\Forms\FormSubmissionConsentBridge;
+use App\Support\ModuleIntegrations\Forms\Messaging\GrantFormSubmissionMessagingConsent;
 use App\Support\ModuleIntegrations\InternalNotifications\InboundMessaging\ScheduleInboundMessageInternalNotification;
 use App\Support\ModuleIntegrations\InternalNotifications\Tasks\InternalNotificationTaskScheduler;
 use App\Support\ModuleIntegrations\InternalNotifications\Tasks\OnlyActiveTeamMemberTaskAssignmentStrategyResolver;
@@ -54,6 +56,25 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(ModuleManager::class);
+
+        $this->app->singleton(
+            FormSubmissionConsentBridge::class,
+            function ($app): FormSubmissionConsentBridge {
+                $enabled = $app->make(ModuleManager::class)
+                    ->enabledKeysWithDependencies();
+                $handlers = [];
+
+                if (in_array('forms', $enabled, true)
+                    && in_array('messaging', $enabled, true)
+                ) {
+                    $handlers[] = $app->make(
+                        GrantFormSubmissionMessagingConsent::class,
+                    );
+                }
+
+                return new FormSubmissionConsentBridge($handlers);
+            },
+        );
 
         $this->app->singleton(AutomationCapabilityRegistry::class, function ($app): AutomationCapabilityRegistry {
             return new AutomationCapabilityRegistry(
