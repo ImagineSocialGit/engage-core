@@ -194,6 +194,27 @@ Broadcast-owned exclusions may remain:
 
 Do not copy the resolved Contact ID list into the Broadcast row after BroadcastRecipient rows are created.
 
+Composite audience criteria remain inside the existing `recipient_filter` contract:
+
+```json
+{
+    "type": "criteria",
+    "criteria": {
+    "status": ["3"],
+    "relationship": ["realtor:target_agent"],
+    "source": ["Database"]
+    }
+}
+```
+
+Criteria use AND between criterion categories and OR between selected values inside one category.
+
+Core owns the generic `ContactFilterCriterion` / registry/query seam. Core contributes generic source, subsource, tag, and import-batch criteria. Optional modules such as Workflow and Relationships may contribute their own criteria through that Core contract. Broadcasts consumes the generic Core seam and must not import those modules directly.
+
+Empty, unknown, or stale criteria fail closed to zero Contacts rather than broadening to all Contacts.
+
+The one-time imported-contact permission invitation remains Messaging-owned. Broadcasts may surface that special path only when the existing canonical eligibility preview reports eligible Contacts.
+
 ## BroadcastRecipient persistence
 
 Current fields:
@@ -347,10 +368,10 @@ No private Broadcast template/payload path should reimplement invitation token g
 Recommended normal flow:
 
 ```text
-1. choose channel
-2. write the message
-3. choose recipients
-4. review exclusions and count
+1. choose recipients / audience
+2. preview count, consent context, and prior Broadcast overlap
+3. choose channel and write the message
+4. review duplicate-send exclusions and timing
 5. schedule/send
 ```
 

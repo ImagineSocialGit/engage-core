@@ -1046,6 +1046,27 @@ Accepted dependency direction:
 - Webinars may use Integrations through provider contracts/managers
 - Mortgage may use Integrations through provider contracts/managers
 
+Broadcast recipient-filter extension rules:
+
+```json
+{
+  "type": "criteria",
+  "criteria": {
+    "status": ["3"],
+    "relationship": ["realtor:target_agent"],
+    "source": ["Database"]
+  }
+}
+```
+
+- Core owns the generic Contact-filter criterion contract, registry, normalization, and query composition seam.
+- Core contributes generic source, subsource, tag, and import-batch criteria.
+- Workflow may contribute current Contact status criteria through the Core-owned extension contract.
+- Relationships may contribute relationship/stage criteria through the Core-owned extension contract.
+- Broadcasts must consume the generic Core seam and must not directly import Workflow or Relationships internals merely to author audiences.
+- Composite criteria use AND between criterion categories and OR within one criterion's selected values.
+- Empty, unknown, or stale criteria fail closed to zero Contacts rather than broadening to all.
+
 Avoid:
 
 - Core -> feature modules

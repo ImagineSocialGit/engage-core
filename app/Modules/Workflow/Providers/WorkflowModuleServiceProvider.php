@@ -10,6 +10,7 @@ use App\Modules\Workflow\Listeners\DispatchContactWorkflowStatusChangedFromAutom
 use App\Modules\Workflow\Listeners\RecordManualStatusTransitionAutomationBehavior;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use App\Modules\Workflow\Services\Contacts\WorkflowContactStatusUpdater;
+use App\Modules\Workflow\Services\Contacts\Filters\StatusContactFilterCriterion;
 use App\Modules\Workflow\Services\ContactShow\ContactWorkflowVisibilityDataProvider;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -29,6 +30,10 @@ class WorkflowModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             ContactWorkflowVisibilityDataProvider::class,
         ], 'core.contact_show_data_providers');
+
+        $this->app->tag([
+            StatusContactFilterCriterion::class,
+        ], 'core.contact_filter_criteria');
     }
 
     public function boot(): void

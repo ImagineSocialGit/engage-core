@@ -2,7 +2,10 @@
 
 namespace App\Modules\Core\Requests\Concerns;
 
+use App\Modules\Core\Support\Contacts\ContactFilterCriterionRegistry;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 trait NormalizesContactFilter
 {
@@ -14,14 +17,18 @@ trait NormalizesContactFilter
         string $tagField = 'contact_tag',
         string $idsField = 'contact_ids',
         string $importBatchIdsField = 'import_batch_ids',
+        string $criteriaField = 'contact_criteria',
     ): array {
         return [
-            $typeField => ['required', 'string', Rule::in(['all', 'tag', 'contact_ids', 'imported', 'import_batch'])],
+            $typeField => ['required', 'string', Rule::in(['all', 'criteria', 'tag', 'contact_ids', 'imported', 'import_batch'])],
             $tagField => ['nullable', 'string', 'max:100', 'required_if:'.$typeField.',tag'],
             $idsField => ['nullable', 'array', 'required_if:'.$typeField.',contact_ids'],
             $idsField.'.*' => ['integer', Rule::exists('contacts', 'id')],
             $importBatchIdsField => ['nullable', 'array', 'required_if:'.$typeField.',import_batch'],
             $importBatchIdsField.'.*' => ['integer', Rule::exists('contact_import_batches', 'id')],
+            $criteriaField => ['nullable', 'array', 'required_if:'.$typeField.',criteria'],
+            $criteriaField.'.*' => ['nullable', 'array'],
+            $criteriaField.'.*.*' => ['nullable', 'string', 'max:191'],
         ];
     }
 
@@ -35,10 +42,18 @@ trait NormalizesContactFilter
         string $tagField = 'contact_tag',
         string $idsField = 'contact_ids',
         string $importBatchIdsField = 'import_batch_ids',
+        string $criteriaField = 'contact_criteria',
     ): array {
         $type = $this->normalizedContactFilterType($validated[$typeField] ?? null);
 
         return match ($type) {
+            'criteria' => [
+                'type' => 'criteria',
+                'criteria' => $this->normalizedContactCriteria(
+                    $validated[$criteriaField] ?? [],
+                    $criteriaField,
+                ),
+            ],
             'tag' => [
                 'type' => 'tag',
                 'tags' => $this->normalizedContactFilterTags([
@@ -99,5 +114,23 @@ trait NormalizesContactFilter
                 : null,
             $values,
         ))));
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function normalizedContactCriteria(mixed $criteria, string $field): array
+    {
+        if (! is_array($criteria)) {
+            return [];
+        }
+
+        try {
+            return app(ContactFilterCriterionRegistry::class)->normalize($criteria);
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                $field => $exception->getMessage(),
+            ]);
+        }
     }
 }

@@ -55,6 +55,7 @@ class UpdateBroadcastRequest extends FormRequest
             typeField: 'recipient_filter_type',
             tagField: 'recipient_tag',
             idsField: 'contact_ids',
+            criteriaField: 'recipient_criteria',
         ));
     }
 
@@ -86,6 +87,7 @@ class UpdateBroadcastRequest extends FormRequest
                 typeField: 'recipient_filter_type',
                 tagField: 'recipient_tag',
                 idsField: 'contact_ids',
+                criteriaField: 'recipient_criteria',
             ),
             validated: $validated,
         );

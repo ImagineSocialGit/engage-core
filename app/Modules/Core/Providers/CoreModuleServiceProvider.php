@@ -13,6 +13,11 @@ use App\Modules\Core\Console\Commands\SyncContactStatusPresetsCommand;
 use App\Modules\Core\Data\Contacts\ContactImportField;
 use App\Modules\Core\Import\Treatments\ContactStatusImportTreatmentTarget;
 use App\Modules\Core\Import\Treatments\ContactTagsImportTreatmentTarget;
+use App\Modules\Core\Services\Contacts\Filters\ImportBatchContactFilterCriterion;
+use App\Modules\Core\Services\Contacts\Filters\SourceContactFilterCriterion;
+use App\Modules\Core\Services\Contacts\Filters\SubsourceContactFilterCriterion;
+use App\Modules\Core\Services\Contacts\Filters\TagContactFilterCriterion;
+use App\Modules\Core\Support\Contacts\ContactFilterCriterionRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportTreatmentRegistry;
@@ -30,6 +35,19 @@ class CoreModuleServiceProvider extends ServiceProvider
         $this->app->singleton(ContactPanelRegistry::class);
         $this->app->singleton(ContactImportTreatmentRegistry::class);
         $this->app->singleton(ContactImportPostProcessorRegistry::class);
+
+        $this->app->tag([
+            SourceContactFilterCriterion::class,
+            SubsourceContactFilterCriterion::class,
+            TagContactFilterCriterion::class,
+            ImportBatchContactFilterCriterion::class,
+        ], 'core.contact_filter_criteria');
+
+        $this->app->singleton(ContactFilterCriterionRegistry::class, function ($app): ContactFilterCriterionRegistry {
+            return new ContactFilterCriterionRegistry(
+                criteria: $app->tagged('core.contact_filter_criteria'),
+            );
+        });
 
         $this->app->tag([
             CoreAutomationCapabilityContributor::class,

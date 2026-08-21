@@ -13,6 +13,9 @@ Route::middleware('module:broadcasts')
         Route::post('/', [BroadcastController::class, 'store'])
             ->name('store');
 
+        Route::post('/audience-preview', [BroadcastController::class, 'previewAudience'])
+            ->name('audience-preview');
+
         Route::get('/{broadcast}', [BroadcastController::class, 'show'])
             ->name('show');
 

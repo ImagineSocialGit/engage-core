@@ -1,7 +1,7 @@
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
-    subheading="Regular broadcasts and imported-contact opt-in invitations are separate send types."
+    subheading="Choose who should receive a message, review what they have already received, then compose and send."
 >
     <div class="space-y-6">
         @if (session('success'))
@@ -16,7 +16,7 @@
             </x-ui.feedback.alert>
         @endif
 
-        <div class="grid gap-6 xl:grid-cols-2">
+        <div class="space-y-6">
             <x-ui.card class="space-y-5">
                 <div>
                     <div class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
@@ -45,6 +45,24 @@
 
                     <input type="hidden" name="broadcast_type" value="{{ \App\Modules\Broadcasts\Models\Broadcast::BROADCAST_TYPE_REGULAR }}">
 
+                    @include('crm.broadcasts.partials.audience-builder', [
+                        'audienceCriteria' => $audienceCriteria,
+                        'recipientFilterType' => old('recipient_filter_type', 'criteria'),
+                        'recipientCriteria' => old('recipient_criteria', []),
+                        'recipientTag' => old('recipient_tag'),
+                        'selectedRecipientContacts' => $selectedRecipientContacts,
+                        'excludableBroadcasts' => $excludableBroadcasts,
+                        'excludeBroadcastIds' => old('exclude_broadcast_ids', []),
+                        'excludeBroadcastStatuses' => old('exclude_broadcast_statuses', [
+                            \App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SCHEDULED,
+                            \App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SENT,
+                        ]),
+                    ])
+
+                    <div class="border-t border-slate-200 pt-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">2. Message</p>
+                    </div>
+
                     @if(count($availableBroadcastChannels) > 1)
                     <div>
                         <x-ui.form.label for="channel">
@@ -69,16 +87,6 @@
                     <input type="hidden" name="channel" value="{{ $availableBroadcastChannels[0] ?? 'email' }}">
                 @endif
 
-                    @php
-                        $excludeBroadcastIds = collect(old('exclude_broadcast_ids', []))
-                            ->map(fn ($id) => (int) $id)
-                            ->all();
-
-                        $excludeBroadcastStatuses = old('exclude_broadcast_statuses', [
-                            \App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SCHEDULED,
-                            \App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SENT,
-                        ]);
-                    @endphp
 
                     <div>
                         <x-ui.form.label for="name">
@@ -144,124 +152,8 @@
                         <x-ui.form.error name="message" />
                     </div>
 
-                    <div>
-                        <x-ui.form.label for="recipient_filter_type">
-                            Recipients
-                        </x-ui.form.label>
-
-                        <x-ui.form.select
-                            id="recipient_filter_type"
-                            name="recipient_filter_type"
-                            x-model="recipientFilterType"
-                        >
-                            <option value="all">All contacts</option>
-                            <option value="tag">Contacts with tag</option>
-                            <option value="contact_ids">Selected contacts</option>
-                        </x-ui.form.select>
-
-                        <x-ui.form.error name="recipient_filter_type" />
-                    </div>
-
-                    <div x-show="recipientFilterType === 'tag'">
-                        <x-ui.form.label for="recipient_tag">
-                            Contact Tag
-                        </x-ui.form.label>
-
-                        <x-ui.form.input
-                            id="recipient_tag"
-                            name="recipient_tag"
-                            value="{{ old('recipient_tag') }}"
-                            placeholder="homebuyer"
-                        />
-
-                        <x-ui.form.error name="recipient_tag" />
-                    </div>
-
-                    <div x-show="recipientFilterType === 'contact_ids'">
-                        <x-ui.form.label>
-                            Selected Contacts
-                        </x-ui.form.label>
-
-                        <div class="mt-2">
-                            <x-crm.contact-picker
-                                :selected-contacts="$selectedRecipientContacts"
-                                input-name="contact_ids[]"
-                            />
-                        </div>
-                    </div>
-
-                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                        <div>
-                            <h3 class="text-sm font-semibold text-slate-900">
-                                Avoid Duplicate Sends
-                            </h3>
-
-                            <p class="mt-1 text-xs text-slate-600">
-                                Exclude contacts who were already scheduled or sent one of these previous broadcasts.
-                            </p>
-                        </div>
-
-                        <div class="mt-4">
-                            <x-ui.form.label for="exclude_broadcast_ids">
-                                Previous Broadcasts to Exclude
-                            </x-ui.form.label>
-
-                            <select
-                                id="exclude_broadcast_ids"
-                                name="exclude_broadcast_ids[]"
-                                multiple
-                                class="mt-1 block min-h-32 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-                            >
-                                @foreach($excludableBroadcasts as $excludableBroadcast)
-                                    <option
-                                        value="{{ $excludableBroadcast->id }}"
-                                        @selected(in_array($excludableBroadcast->id, $excludeBroadcastIds, true))
-                                    >
-                                        {{ $excludableBroadcast->name }}
-                                        — {{ strtoupper($excludableBroadcast->channel) }}
-                                        — {{ str_replace('_', ' ', $excludableBroadcast->status) }}
-                                    </option>
-                                @endforeach
-                            </select>
-
-                            <p class="mt-2 text-xs text-slate-500">
-                                Select one or more broadcasts. On desktop, hold Ctrl/Cmd to choose multiple.
-                            </p>
-
-                            <x-ui.form.error name="exclude_broadcast_ids" />
-                            <x-ui.form.error name="exclude_broadcast_ids.*" />
-                        </div>
-
-                        <div class="mt-4 space-y-2">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Exclude contacts with prior status
-                            </p>
-
-                            <label class="flex items-center gap-2 text-sm text-slate-700">
-                                <input
-                                    type="checkbox"
-                                    name="exclude_broadcast_statuses[]"
-                                    value="{{ \App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SCHEDULED }}"
-                                    @checked(in_array(\App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SCHEDULED, $excludeBroadcastStatuses, true))
-                                    class="rounded border-slate-300"
-                                >
-                                Scheduled
-                            </label>
-
-                            <label class="flex items-center gap-2 text-sm text-slate-700">
-                                <input
-                                    type="checkbox"
-                                    name="exclude_broadcast_statuses[]"
-                                    value="{{ \App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SENT }}"
-                                    @checked(in_array(\App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SENT, $excludeBroadcastStatuses, true))
-                                    class="rounded border-slate-300"
-                                >
-                                Sent
-                            </label>
-
-                            <x-ui.form.error name="exclude_broadcast_statuses" />
-                            <x-ui.form.error name="exclude_broadcast_statuses.*" />
-                        </div>
+                    <div class="border-t border-slate-200 pt-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">3. Review & send</p>
                     </div>
 
                     <div>
@@ -306,7 +198,16 @@
                 </form>
             </x-ui.card>
 
-            <x-ui.card class="space-y-5 border-amber-200 bg-amber-50/40">
+            @if(($permissionInvitationPreview['eligible_contacts_count'] ?? 0) > 0)
+            <details class="rounded-2xl border border-amber-200 bg-amber-50/40 p-5">
+                <summary class="cursor-pointer text-sm font-semibold text-amber-950">
+                    Some imported contacts can be asked for permission
+                </summary>
+                <p class="mt-2 text-sm text-amber-900/80">
+                    Use this only for imported contacts who do not already have consent on record and have not already received the one-time invitation.
+                </p>
+                <div class="mt-5">
+
                 <div>
                     <div class="inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
                         Imported Contacts
@@ -530,7 +431,9 @@
                         </x-ui.button>
                     </div>
                 </form>
-            </x-ui.card>
+                </div>
+            </details>
+            @endif
         </div>
 
         <div class="grid gap-6 xl:grid-cols-2">

@@ -8,13 +8,17 @@ use App\Modules\Broadcasts\Actions\ScheduleBroadcastAction;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Broadcasts\Requests\StoreBroadcastRequest;
+use App\Modules\Broadcasts\Requests\PreviewBroadcastAudienceRequest;
 use App\Modules\Broadcasts\Requests\UpdateBroadcastRequest;
 use App\Modules\Broadcasts\Services\BroadcastRecipientResolver;
+use App\Modules\Broadcasts\Services\BroadcastAudiencePreviewService;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Core\Services\Contacts\ContactFilterResolver;
+use App\Modules\Core\Support\Contacts\ContactFilterCriterionRegistry;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -24,7 +28,9 @@ class BroadcastController extends Controller
 {
     public function __construct(
         private readonly ContactFilterResolver $contactFilterResolver,
+        private readonly ContactFilterCriterionRegistry $contactFilterCriteria,
         private readonly BroadcastRecipientResolver $broadcastRecipientResolver,
+        private readonly BroadcastAudiencePreviewService $broadcastAudiencePreview,
         private readonly MessageChannelAvailability $messageChannelAvailability,
     ) {}
 
@@ -40,6 +46,7 @@ class BroadcastController extends Controller
             'heading' => 'Broadcasts',
             'broadcasts' => $broadcasts,
             'availableBroadcastChannels' => $this->availableRegularBroadcastChannels(),
+            'audienceCriteria' => $this->contactFilterCriteria->definitions(),
             'permissionInvitationPreview' => $this->newPermissionInvitationPreview($request),
             'importBatches' => $this->importBatches(),
             'selectedImportBatchIds' => $this->selectedImportBatchIds($request->session()->getOldInput('import_batch_ids', [])),
@@ -96,6 +103,13 @@ class BroadcastController extends Controller
                 : 'Broadcast draft saved.');
     }
 
+    public function previewAudience(PreviewBroadcastAudienceRequest $request): JsonResponse
+    {
+        return response()->json(
+            $this->broadcastAudiencePreview->preview($request->recipientFilter()),
+        );
+    }
+
     public function show(Broadcast $broadcast): View
     {
         $broadcast->loadCount([
@@ -142,6 +156,7 @@ class BroadcastController extends Controller
             'heading' => $broadcast->isPermissionInvitation() ? 'Edit Opt-In Invitation' : 'Edit Broadcast',
             'broadcast' => $broadcast,
             'availableBroadcastChannels' => $this->availableRegularBroadcastChannels($broadcast->channel),
+            'audienceCriteria' => $this->contactFilterCriteria->definitions(),
             'selectedRecipientContacts' => $this->selectedContactOptions(
                 session()->getOldInput('contact_ids', $broadcast->recipient_filter['contact_ids'] ?? []),
             ),

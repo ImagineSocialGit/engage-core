@@ -8,6 +8,7 @@
         $recipientFilter = $broadcast->recipient_filter ?? ['type' => 'all'];
         $recipientFilterType = old('recipient_filter_type', $recipientFilter['type'] ?? 'all');
         $recipientTag = old('recipient_tag', $recipientFilter['tags'][0] ?? '');
+        $recipientCriteria = old('recipient_criteria', $recipientFilter['criteria'] ?? []);
 
         $emailFieldVisibility = $broadcast->isPermissionInvitation()
             ? 'true'
@@ -122,6 +123,20 @@
                 @method('PATCH')
 
                 @if(! $broadcast->isPermissionInvitation())
+                    @include('crm.broadcasts.partials.audience-builder', [
+                        'audienceCriteria' => $audienceCriteria,
+                        'recipientFilterType' => $recipientFilterType,
+                        'recipientCriteria' => $recipientCriteria,
+                        'recipientTag' => $recipientTag,
+                        'selectedRecipientContacts' => $selectedRecipientContacts,
+                        'excludableBroadcasts' => $excludableBroadcasts,
+                        'excludeBroadcastIds' => $excludeBroadcastIds,
+                        'excludeBroadcastStatuses' => $excludeBroadcastStatuses,
+                    ])
+
+                    <div class="border-t border-slate-200 pt-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">2. Message</p>
+                    </div>
                     @if(count($availableBroadcastChannels) > 1)
                         <div>
                             <x-ui.form.label for="channel">
@@ -270,54 +285,9 @@
                         <x-ui.form.error name="import_batch_ids" />
                         <x-ui.form.error name="import_batch_ids.*" />
                     </div>
-                @else
-                    <div>
-                        <x-ui.form.label for="recipient_filter_type">
-                            Recipients
-                        </x-ui.form.label>
-
-                        <x-ui.form.select
-                            id="recipient_filter_type"
-                            name="recipient_filter_type"
-                            x-model="recipientFilterType"
-                        >
-                            <option value="all">All contacts</option>
-                            <option value="tag">Contacts with tag</option>
-                            <option value="contact_ids">Selected contacts</option>
-                        </x-ui.form.select>
-
-                        <x-ui.form.error name="recipient_filter_type" />
-                    </div>
-
-                    <div x-show="recipientFilterType === 'tag'">
-                        <x-ui.form.label for="recipient_tag">
-                            Contact Tag
-                        </x-ui.form.label>
-
-                        <x-ui.form.input
-                            id="recipient_tag"
-                            name="recipient_tag"
-                            value="{{ $recipientTag }}"
-                            placeholder="homebuyer"
-                        />
-
-                        <x-ui.form.error name="recipient_tag" />
-                    </div>
-
-                    <div x-show="recipientFilterType === 'contact_ids'">
-                        <x-ui.form.label>
-                            Selected Contacts
-                        </x-ui.form.label>
-
-                        <div class="mt-2">
-                            <x-crm.contact-picker
-                                :selected-contacts="$selectedRecipientContacts"
-                                input-name="contact_ids[]"
-                            />
-                        </div>
-                    </div>
                 @endif
 
+                @if($broadcast->isPermissionInvitation())
                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div>
                         <h3 class="text-sm font-semibold text-slate-900">
@@ -391,6 +361,14 @@
                         <x-ui.form.error name="exclude_broadcast_statuses.*" />
                     </div>
                 </div>
+
+                @endif
+
+                @if(! $broadcast->isPermissionInvitation())
+                    <div class="border-t border-slate-200 pt-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">3. Review & send</p>
+                    </div>
+                @endif
 
                 <div>
                     <x-ui.form.label for="send_at">

@@ -60,6 +60,7 @@ class StoreBroadcastRequest extends FormRequest
             typeField: 'recipient_filter_type',
             tagField: 'recipient_tag',
             idsField: 'contact_ids',
+            criteriaField: 'recipient_criteria',
         ));
     }
 
@@ -94,6 +95,7 @@ class StoreBroadcastRequest extends FormRequest
             typeField: 'recipient_filter_type',
             tagField: 'recipient_tag',
             idsField: 'contact_ids',
+            criteriaField: 'recipient_criteria',
         );
 
         $recipientFilter = $this->withRecipientExclusions($recipientFilter, $validated);

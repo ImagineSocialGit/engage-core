@@ -55,6 +55,11 @@ class BroadcastControllerTest extends TestCase
             ],
         ]);
 
+        Contact::factory()->create([
+            'source' => 'import',
+            'email' => 'eligible@example.test',
+        ]);
+
         $response = $this
             ->actingAs($user)
             ->get(route('crm.broadcasts.index'));
