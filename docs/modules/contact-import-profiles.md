@@ -98,13 +98,23 @@ default `email`. Shared-email co-borrower handling and domain-history reconcilia
 remain the responsibility of the existing import/domain handlers.
 ## Post-import behavior
 
-A profile may optionally declare server-owned `post_import` behavior. This is not
-submitted by the browser and is validated through the same profile registry used by
-`setup:validate`.
+A profile may optionally declare server-owned `post_import` behavior. Processor identity
+and business keys remain server-owned and are validated through the same profile registry
+used by `setup:validate`.
 
-Post-import behavior runs only after Core has persisted the Contact and
+A configured processor may optionally expose a bounded operator-input contract on the
+preview screen. Core renders only inputs declared by that already-configured processor
+and lets the processor validate/normalize submitted values. Browser input cannot add a
+new post-import processor or replace server-owned business identity such as a Campaign
+key.
+
+Row-level post-import behavior runs only after Core has persisted the Contact and
 `ContactImportOccurrence`, module-owned domain handlers have consumed the row, and
 operator-selected treatments have been applied.
+
+Processors may also implement the batch-finalization contract. Those finalizers run only
+after every CSV row has completed. Batch finalization is intended for behavior that must
+not become externally actionable while a large import is still partially processed.
 
 The mapping preview must show every configured post-import behavior before the
 operator submits the import. Profiles must never hide consent grants, Campaign
@@ -126,6 +136,12 @@ Current reusable processors are:
 - `campaign_enrollment`: requests enrollment in one configured Campaign through the
   normal Campaign action. Existing open enrollment remains idempotent and Campaign
   family/priority arbitration remains authoritative.
+- `campaign_launch_timing`: does **not** select a Campaign audience and does **not**
+  independently enroll a Contact. It expects the normal import treatment/lifecycle path
+  to create the configured Campaign enrollment, requires one batch-level `Start sending`
+  date/time from the operator, and applies that time to the still-unmaterialized first
+  MessageChain action only after the entire import batch has finished. Existing open
+  Campaign enrollments that predate the import are preserved.
 
 These processors do not make post-import orchestration transactional with Contact
 identity/domain ingestion. A blocked/unavailable Campaign or one unavailable channel
@@ -140,6 +156,9 @@ Example generic shape:
         'scope' => 'lead_nurture',
     ],
     'campaign_enrollment' => [
+        'campaign_key' => 'lead_nurture',
+    ],
+    'campaign_launch_timing' => [
         'campaign_key' => 'lead_nurture',
     ],
 ],

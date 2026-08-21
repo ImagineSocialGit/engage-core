@@ -203,6 +203,9 @@ class ContactController extends Controller
         $postImportSummaries = $importProfile !== null
             ? $postProcessorRegistry->summaries($importProfile->postImport)
             : [];
+        $postImportInputs = $importProfile !== null
+            ? $postProcessorRegistry->inputDefinitions($importProfile->postImport)
+            : [];
 
         if ($importProfile !== null) {
             $request->session()->put(
@@ -305,6 +308,7 @@ class ContactController extends Controller
             'importProfile' => $importProfile,
             'suggestedMapping' => $suggestedMapping,
             'postImportSummaries' => $postImportSummaries,
+            'postImportInputs' => $postImportInputs,
         ]);
     }
 
@@ -320,6 +324,7 @@ class ContactController extends Controller
             'csv_path' => ['required', 'string'],
             'mapping' => ['required', 'array'],
             'treatments' => ['nullable', 'array'],
+            'post_import_inputs' => ['nullable', 'array'],
         ];
 
         foreach ($contactImportRegistry->fieldKeys() as $field) {
@@ -366,7 +371,12 @@ class ContactController extends Controller
             ? $contactImportProfileRegistry->get($profileKey)
             : null;
         $profileDefaults = $importProfile?->defaults ?? [];
-        $postImportConfig = $importProfile?->postImport ?? [];
+        $postImportConfig = $postProcessorRegistry->withSubmittedInputs(
+            configured: $importProfile?->postImport ?? [],
+            submitted: is_array($validated['post_import_inputs'] ?? null)
+                ? $validated['post_import_inputs']
+                : [],
+        );
         $postImportSummaries = $postProcessorRegistry->summaries($postImportConfig);
 
         $allowedMappingFields = array_values(array_unique([
@@ -634,6 +644,11 @@ class ContactController extends Controller
             fclose($handle);
         }
 
+        $postImportFinalizationResults = $postProcessorRegistry->finalizeBatch(
+            batch: $importBatch,
+            configured: $postImportConfig,
+        );
+
         $treatmentMeta = $treatmentRegistry->batchMeta(
             stats: $treatmentStats,
             selections: $treatmentSelections,
@@ -641,6 +656,7 @@ class ContactController extends Controller
         $postImportMeta = $this->postImportBatchMeta(
             stats: $postImportStats,
             config: $postImportConfig,
+            finalizationResults: $postImportFinalizationResults,
         );
 
         $request->session()->forget($this->importProfileKeySessionKey($csvPath));
@@ -797,23 +813,31 @@ class ContactController extends Controller
     /**
      * @param array<string, array{applied_count: int, partial_count: int, skipped_count: int, blocked_count: int, failed_count: int}> $stats
      * @param array<string, array<string, mixed>> $config
+     * @param array<string, \App\Modules\Core\Data\Contacts\ContactImportPostProcessResult> $finalizationResults
      * @return array<string, mixed>
      */
-    private function postImportBatchMeta(array $stats, array $config): array
-    {
+    private function postImportBatchMeta(
+        array $stats,
+        array $config,
+        array $finalizationResults = [],
+    ): array {
         $processors = [];
         $reviewRequired = false;
 
         foreach ($stats as $processorKey => $counts) {
+            $finalization = $finalizationResults[$processorKey] ?? null;
+            $finalizationMeta = $finalization?->toMeta();
             $processorReviewRequired = $counts['partial_count'] > 0
                 || $counts['skipped_count'] > 0
                 || $counts['blocked_count'] > 0
-                || $counts['failed_count'] > 0;
+                || $counts['failed_count'] > 0
+                || ($finalization?->reviewRequired() ?? false);
             $reviewRequired = $reviewRequired || $processorReviewRequired;
 
             $processors[$processorKey] = [
                 'config' => $config[$processorKey] ?? [],
                 ...$counts,
+                'batch_finalization' => $finalizationMeta,
                 'review_required' => $processorReviewRequired,
             ];
         }

@@ -93,6 +93,7 @@
 │   │   │   │   ├── EnrollContactInCampaignAction.php
 │   │   │   │   ├── PauseCampaignEnrollmentAction.php
 │   │   │   │   ├── ResumeCampaignEnrollmentAction.php
+│   │   │   │   ├── ScheduleCampaignImportBatchInitialMessagesAction.php
 │   │   │   │   └── SyncCampaignPresetsAction.php
 │   │   │   ├── Automation
 │   │   │   │   ├── CampaignsAutomationPointAuthoringContributor.php
@@ -126,7 +127,8 @@
 │   │   │   ├── Exceptions
 │   │   │   │   └── CampaignUnavailableForEnrollmentException.php
 │   │   │   ├── Import
-│   │   │   │   └── CampaignEnrollmentContactImportPostProcessor.php
+│   │   │   │   ├── CampaignEnrollmentContactImportPostProcessor.php
+│   │   │   │   └── CampaignLaunchTimingContactImportPostProcessor.php
 │   │   │   ├── Listeners
 │   │   │   ├── Models
 │   │   │   │   ├── CampaignEnrollment.php
@@ -193,6 +195,8 @@
 │   │   │   ├── Contracts
 │   │   │   │   └── Contacts
 │   │   │   │       ├── ContactImportHandler.php
+│   │   │   │       ├── ContactImportPostProcessorBatchFinalizer.php
+│   │   │   │       ├── ContactImportPostProcessorInputProvider.php
 │   │   │   │       ├── ContactImportPostProcessor.php
 │   │   │   │       ├── ContactImportTreatmentTarget.php
 │   │   │   │       ├── ContactPanelProvider.php
@@ -1949,6 +1953,8 @@
 │       │   │   ├── index.blade.php
 │       │   │   ├── panels
 │       │   │   │   └── webinar-history.blade.php
+│       │   │   ├── partials
+│       │   │   │   └── post-import-inputs.blade.php
 │       │   │   └── show.blade.php
 │       │   ├── dashboard.blade.php
 │       │   ├── dashboard-tasks-print.blade.php
@@ -2083,6 +2089,8 @@
 │   │   ├── Campaigns
 │   │   │   ├── CampaignEnrollmentContactImportPostProcessorTest.php
 │   │   │   ├── CampaignEnrollmentLifecycleBridgeTest.php
+│   │   │   ├── CampaignLaunchTimingContactImportControllerTest.php
+│   │   │   ├── CampaignLaunchTimingContactImportPostProcessorTest.php
 │   │   │   ├── CampaignMessageChainBridgeTest.php
 │   │   │   ├── CampaignMessageChainPresetSyncTest.php
 │   │   │   ├── CampaignMessageChainRuntimeOwnershipTest.php
@@ -2094,7 +2102,8 @@
 │   │   │   ├── CompactCampaignPresetAuthoringTest.php
 │   │   │   ├── DeactivateCampaignCommandTest.php
 │   │   │   ├── EnrollCampaignAutomationActionHandlerTest.php
-│   │   │   └── EnrollContactInCampaignActionTest.php
+│   │   │   ├── EnrollContactInCampaignActionTest.php
+│   │   │   └── ScheduleCampaignImportBatchInitialMessagesActionTest.php
 │   │   ├── Clients
 │   │   │   ├── ArtisanTestEnvironmentBootstrapTest.php
 │   │   │   ├── ClientConfigFallbackTest.php
@@ -2120,6 +2129,7 @@
 │   │   │   ├── ContactImportBatchControllerTest.php
 │   │   │   ├── ContactImportHandlerContextIntegrationTest.php
 │   │   │   ├── ContactImportPostProcessingControllerTest.php
+│   │   │   ├── ContactImportPostProcessorExtensionContractTest.php
 │   │   │   ├── ContactImportPostProcessorRegistryTest.php
 │   │   │   ├── ContactImportProfileControllerTest.php
 │   │   │   ├── ContactImportProfileRegistryTest.php
@@ -2493,4 +2503,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-621 directories, 1873 files
+622 directories, 1882 files

@@ -6,6 +6,7 @@ use App\Console\Commands\SyncPresetsCommand;
 use App\Console\Commands\ValidateSetupCommand;
 use App\Modules\Core\Data\Contacts\ContactImportField;
 use App\Modules\Campaigns\Import\CampaignEnrollmentContactImportPostProcessor;
+use App\Modules\Campaigns\Import\CampaignLaunchTimingContactImportPostProcessor;
 use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Messaging\Import\MarketingPermissionContactImportPostProcessor;
@@ -229,9 +230,13 @@ class AppServiceProvider extends ServiceProvider
                 }
 
                 if (in_array('campaigns', $enabled, true)) {
-                    $registry->registerProcessor(
-                        CampaignEnrollmentContactImportPostProcessor::class,
-                    );
+                    $registry
+                        ->registerProcessor(
+                            CampaignEnrollmentContactImportPostProcessor::class,
+                        )
+                        ->registerProcessor(
+                            CampaignLaunchTimingContactImportPostProcessor::class,
+                        );
                 }
             },
         );

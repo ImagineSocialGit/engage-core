@@ -3,9 +3,13 @@
 namespace App\Modules\Core\Support\Contacts;
 
 use App\Modules\Core\Contracts\Contacts\ContactImportPostProcessor;
+use App\Modules\Core\Contracts\Contacts\ContactImportPostProcessorBatchFinalizer;
+use App\Modules\Core\Contracts\Contacts\ContactImportPostProcessorInputProvider;
 use App\Modules\Core\Data\Contacts\ContactImportContext;
 use App\Modules\Core\Data\Contacts\ContactImportPostProcessResult;
+use App\Modules\Core\Models\ContactImportBatch;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Throwable;
 
@@ -97,6 +101,121 @@ final class ContactImportPostProcessorRegistry
 
     /**
      * @param array<string, array<string, mixed>> $configured
+     * @return array<int, array{
+     *     key: string,
+     *     label: string,
+     *     inputs: array<int, array<string, mixed>>
+     * }>
+     */
+    public function inputDefinitions(array $configured): array
+    {
+        $configured = $this->normalizeConfig($configured);
+        $definitions = [];
+
+        foreach ($this->processors() as $processor) {
+            $config = $configured[$processor->key()] ?? null;
+
+            if (! is_array($config)
+                || ! $processor instanceof ContactImportPostProcessorInputProvider
+            ) {
+                continue;
+            }
+
+            $inputs = $processor->inputDefinitions($config);
+
+            if ($inputs === []) {
+                continue;
+            }
+
+            $definitions[] = [
+                'key' => $processor->key(),
+                'label' => $processor->label(),
+                'inputs' => $inputs,
+            ];
+        }
+
+        return $definitions;
+    }
+
+    /**
+     * Apply operator input only through processors configured server-side by
+     * the detected import profile. Unconfigured processor keys are rejected.
+     *
+     * @param array<string, array<string, mixed>> $configured
+     * @param array<string, mixed> $submitted
+     * @return array<string, array<string, mixed>>
+     */
+    public function withSubmittedInputs(
+        array $configured,
+        array $submitted,
+    ): array {
+        $configured = $this->normalizeConfig($configured);
+
+        if ($submitted !== [] && array_is_list($submitted)) {
+            throw ValidationException::withMessages([
+                'post_import_inputs' => 'Post-import inputs must be a keyed array.',
+            ]);
+        }
+
+        $normalizedSubmitted = [];
+
+        foreach ($submitted as $key => $value) {
+            if (! is_string($key) || trim($key) === '') {
+                throw ValidationException::withMessages([
+                    'post_import_inputs' => 'Post-import input keys must be non-empty strings.',
+                ]);
+            }
+
+            $normalizedSubmitted[$this->normalizeKey($key)] = $value;
+        }
+
+        foreach (array_keys($normalizedSubmitted) as $key) {
+            if (! array_key_exists($key, $configured)) {
+                throw ValidationException::withMessages([
+                    "post_import_inputs.{$key}" => 'This post-import behavior is not configured for the selected import profile.',
+                ]);
+            }
+        }
+
+        $processors = $this->processors()->keyBy(
+            fn (ContactImportPostProcessor $processor): string => $processor->key(),
+        );
+
+        foreach ($configured as $key => $config) {
+            $processor = $processors->get($key);
+            $processorSubmitted = $normalizedSubmitted[$key] ?? [];
+
+            if (! $processor instanceof ContactImportPostProcessorInputProvider) {
+                if ($processorSubmitted !== []) {
+                    throw ValidationException::withMessages([
+                        "post_import_inputs.{$key}" => 'This post-import behavior does not accept operator input.',
+                    ]);
+                }
+
+                continue;
+            }
+
+            if (! is_array($processorSubmitted)
+                || ($processorSubmitted !== [] && array_is_list($processorSubmitted))
+            ) {
+                throw ValidationException::withMessages([
+                    "post_import_inputs.{$key}" => 'Post-import behavior input must be a keyed array.',
+                ]);
+            }
+
+            $configured[$key] = $processor->normalizeConfig(
+                $processor->withSubmittedInputs(
+                    config: $config,
+                    submitted: $processorSubmitted,
+                ),
+            );
+        }
+
+        return $configured;
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $configured
      * @return array<int, array{key: string, label: string, summary: string}>
      */
     public function summaries(array $configured): array
@@ -149,6 +268,50 @@ final class ContactImportPostProcessorRegistry
 
                 $results[$processor->key()] = ContactImportPostProcessResult::failed(
                     reasonCode: 'post_import_processor_failed',
+                    message: $exception->getMessage(),
+                    meta: [
+                        'exception' => $exception::class,
+                    ],
+                );
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Batch finalizers run after all row processing has completed. A finalizer
+     * failure is reviewable and does not roll back durable Contact imports.
+     *
+     * @param array<string, array<string, mixed>> $configured
+     * @return array<string, ContactImportPostProcessResult>
+     */
+    public function finalizeBatch(
+        ContactImportBatch $batch,
+        array $configured,
+    ): array {
+        $configured = $this->normalizeConfig($configured);
+        $results = [];
+
+        foreach ($this->processors() as $processor) {
+            $config = $configured[$processor->key()] ?? null;
+
+            if (! is_array($config)
+                || ! $processor instanceof ContactImportPostProcessorBatchFinalizer
+            ) {
+                continue;
+            }
+
+            try {
+                $results[$processor->key()] = $processor->finalizeBatch(
+                    batch: $batch,
+                    config: $config,
+                );
+            } catch (Throwable $exception) {
+                report($exception);
+
+                $results[$processor->key()] = ContactImportPostProcessResult::failed(
+                    reasonCode: 'post_import_batch_finalizer_failed',
                     message: $exception->getMessage(),
                     meta: [
                         'exception' => $exception::class,

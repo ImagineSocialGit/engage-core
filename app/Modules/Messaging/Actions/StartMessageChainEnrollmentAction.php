@@ -33,11 +33,15 @@ class StartMessageChainEnrollmentAction
         ?string $surface = null,
         ?string $startStepKey = null,
         bool $eagerProcess = true,
+        Carbon|string|null $initialActionAt = null,
     ): MessageChainEnrollment {
         $dedupeKey = $this->dedupeKey($dedupeKey);
         $surface = $this->nullableSegment($surface, 96);
         $startStepKey = $this->nullableSegment($startStepKey, 128);
         $startedAt = ($startedAt ? Carbon::parse($startedAt) : now())->utc();
+        $initialActionAt = $initialActionAt !== null
+            ? Carbon::parse($initialActionAt)->utc()
+            : null;
 
         $result = DB::transaction(function () use (
             $messageChain,
@@ -48,6 +52,7 @@ class StartMessageChainEnrollmentAction
             $startedAt,
             $surface,
             $startStepKey,
+            $initialActionAt,
         ): array {
             $chain = MessageChain::query()
                 ->with('currentVersion.steps')
@@ -123,12 +128,14 @@ class StartMessageChainEnrollmentAction
             $enrollment->setRelation('currentMessageChainStep', $firstStep);
 
             if ($firstStep instanceof MessageChainStep) {
+                $resolvedNextActionAt = $this->timingResolver->resolve(
+                    step: $firstStep,
+                    context: $this->contextResolver->resolve($enrollment),
+                    baseAt: $startedAt,
+                );
+
                 $enrollment->forceFill([
-                    'next_action_at' => $this->timingResolver->resolve(
-                        step: $firstStep,
-                        context: $this->contextResolver->resolve($enrollment),
-                        baseAt: $startedAt,
-                    ),
+                    'next_action_at' => $initialActionAt ?? $resolvedNextActionAt,
                 ])->save();
             }
 

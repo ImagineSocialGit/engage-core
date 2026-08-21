@@ -8,15 +8,19 @@ use App\Modules\Campaigns\Exceptions\CampaignUnavailableForEnrollmentException;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Support\AutomationCapabilities\Contracts\AutomationActionHandler;
 use App\Support\AutomationCapabilities\Data\AutomationActionContext;
 use App\Support\AutomationCapabilities\Data\AutomationActionResult;
+use Illuminate\Support\Carbon;
 use InvalidArgumentException;
 use Throwable;
 
 class EnrollCampaignAutomationActionHandler implements AutomationActionHandler
 {
+    private const IMPORT_LAUNCH_HOLD_YEARS = 10;
+
     public function __construct(
         private readonly EnrollContactInCampaignAction $enrollContactInCampaign,
     ) {}
@@ -79,6 +83,8 @@ class EnrollCampaignAutomationActionHandler implements AutomationActionHandler
             return $this->alreadyEnrolledResult($existingEnrollment, $definition);
         }
 
+        $processingImportBatch = $this->processingImportBatch($contact);
+
         try {
             $enrollment = $this->enrollContactInCampaign->handle(
                 contact: $contact,
@@ -98,6 +104,11 @@ class EnrollCampaignAutomationActionHandler implements AutomationActionHandler
                     ),
                 exitConditions: $definition->exitConditions,
                 entryKey: $this->entryKey($context, $definition->campaignKey),
+                eagerProcess: $processingImportBatch === null,
+                initialActionAt: $this->importLaunchHoldAt(
+                    batch: $processingImportBatch,
+                    campaignKey: $definition->campaignKey,
+                ),
             );
         } catch (CampaignUnavailableForEnrollmentException $exception) {
             return AutomationActionResult::skipped(
@@ -163,6 +174,46 @@ class EnrollCampaignAutomationActionHandler implements AutomationActionHandler
             trim($context->executionKey),
             $campaignKey,
         ]);
+    }
+
+    private function processingImportBatch(Contact $contact): ?ContactImportBatch
+    {
+        if (! is_numeric($contact->contact_import_batch_id)
+            || (int) $contact->contact_import_batch_id < 1
+        ) {
+            return null;
+        }
+
+        return ContactImportBatch::query()
+            ->whereKey((int) $contact->contact_import_batch_id)
+            ->where('status', ContactImportBatch::STATUS_PROCESSING)
+            ->first();
+    }
+
+    private function importLaunchHoldAt(
+        ?ContactImportBatch $batch,
+        string $campaignKey,
+    ): ?Carbon {
+        if (! $batch instanceof ContactImportBatch) {
+            return null;
+        }
+
+        $batchMeta = is_array($batch->meta) ? $batch->meta : [];
+        $postImportConfig = is_array($batchMeta['post_import_config'] ?? null)
+            ? $batchMeta['post_import_config']
+            : [];
+        $launchTiming = is_array($postImportConfig['campaign_launch_timing'] ?? null)
+            ? $postImportConfig['campaign_launch_timing']
+            : [];
+        $configuredCampaignKey = $launchTiming['campaign_key'] ?? null;
+
+        if (! is_string($configuredCampaignKey)
+            || trim($configuredCampaignKey) !== trim($campaignKey)
+        ) {
+            return null;
+        }
+
+        return Carbon::now()->utc()->addYears(self::IMPORT_LAUNCH_HOLD_YEARS);
     }
 
     private function existingOpenEnrollment(

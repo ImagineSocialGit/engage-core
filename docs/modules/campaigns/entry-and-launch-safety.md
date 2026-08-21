@@ -28,9 +28,51 @@ Because Contact ID is part of the derived Campaign dedupe key, the same Contact 
 
 The Contact import occurrence remains the CampaignEnrollment provenance source. Project State therefore treats `ContactImportOccurrence` as a supported deferred polymorphic reference.
 
+## Batch first-message launch timing
+
+Some imports select lifecycle treatment that synchronously enters a Campaign through
+another producer such as FlowRoutes. Campaigns must not create a second competing entry
+path merely to control the first send time.
+
+For those profiles, `campaign_launch_timing` is a reconciliation/finalization behavior:
+
+1. Core applies the operator-selected treatment.
+2. The normal lifecycle producer opens the Campaign enrollment. While the Contact's
+   import batch is still processing, Campaign automation disables eager progression;
+   when this profile has launch timing configured, the first MessageChain action is
+   atomically created on a temporary far-future non-due hold.
+3. The row-level Campaign processor verifies that the open enrollment is new for this
+   import and still has an unmaterialized first MessageChain action.
+4. The processor does not change timing row-by-row.
+5. After every CSV row finishes, the Campaign batch finalizer selects only Campaign
+   enrollments for Contacts in this import whose enrollment started during this batch.
+6. In one transaction, it verifies that none has materialized a ScheduledMessage and
+   applies one operator-selected first-message timestamp to all linked active
+   MessageChainEnrollments.
+
+This makes the first wave visible atomically after batch completion. The temporary
+non-due hold also prevents the periodic Messaging due scanner from discovering an
+early row before finalization, even when the Campaign's authored first-step delay is
+immediate or the operator-selected launch time passes while the CSV is still importing.
+
+The selected value is **first-message timing**, not a rewrite of Campaign enrollment
+`started_at`. After the first wave becomes terminal, Messaging continues normal
+MessageChain timing from that runtime point.
+
+If the selected time has passed by the time a long import finishes, the finalizer makes
+the whole safe batch due at finalization time rather than releasing rows piecemeal.
+
+Existing open Campaign enrollments that predate the import are never retimed.
+
 ## Bounded progression fan-out
 
 Bulk Contact imports persist CampaignEnrollment + MessageChainEnrollment state synchronously but set `eagerProcess=false`.
+
+This protection applies both to the direct Campaign import post-processor and to
+Campaign enrollment reached through automation while the Contact's current
+`ContactImportBatch` is still `processing`. A status-treatment → FlowRoute → Campaign
+path therefore does not bypass the bulk-entry guard. Launch-timed imports additionally
+use the temporary non-due first-action hold described above until batch finalization.
 
 They do not enqueue one immediate progression job per imported row.
 
@@ -55,4 +97,12 @@ Direct single-contact starts and normal automation starts remain eager by defaul
 
 This contract adds no table and no column.
 
-It reuses the existing unique `campaign_enrollments.dedupe_key` field for explicit entry identity and the existing `start_context` field for the compact logical `entry_key`. No audience membership copies, raw queue history, or per-attempt click/reply evidence are added to Campaign metadata.
+It reuses the existing unique `campaign_enrollments.dedupe_key` field for explicit entry
+identity and the existing `start_context` field for the compact logical `entry_key`.
+
+Batch first-message timing stores one normalized timestamp in the existing
+`ContactImportBatch.meta.post_import` configuration/finalization summary. It does not
+copy that timestamp onto every Contact, CampaignEnrollment, or ScheduledMessage, and it
+does not create a second audience-membership table.
+
+No raw queue history or per-attempt click/reply evidence is added to Campaign metadata.

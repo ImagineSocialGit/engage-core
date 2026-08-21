@@ -6,7 +6,9 @@ use App\Modules\Campaigns\Automation\EnrollCampaignAutomationActionHandler;
 use App\Modules\Campaigns\Exceptions\CampaignUnavailableForEnrollmentException;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Messaging\Actions\PublishMessageChainVersionAction;
+use App\Modules\Messaging\Jobs\ProcessMessageChainEnrollmentJob;
 use App\Modules\Messaging\Models\MessageChain;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\MessageChainStep;
@@ -15,6 +17,7 @@ use App\Modules\Messaging\Models\MessageTemplateVersion;
 use App\Support\AutomationCapabilities\Data\AutomationActionContext;
 use App\Support\AutomationCapabilities\Data\AutomationActionResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -49,6 +52,46 @@ class EnrollCampaignAutomationActionHandlerTest extends TestCase
             $result->correlation['message_chain_enrollment_id'],
         );
     }
+
+    public function test_campaign_automation_holds_launch_timed_import_enrollment_and_defers_eager_progression(): void
+    {
+        Queue::fake();
+        Carbon::setTestNow('2026-08-21 12:00:00 UTC');
+
+        $campaign = $this->activeCampaignWithChain('automation_import_batch');
+        $batch = ContactImportBatch::factory()->create([
+            'status' => ContactImportBatch::STATUS_PROCESSING,
+            'imported_at' => now(),
+            'meta' => [
+                'post_import_config' => [
+                    'campaign_launch_timing' => [
+                        'campaign_key' => $campaign->key,
+                        'first_message_at' => '2026-08-21T14:00:00.000000Z',
+                    ],
+                ],
+            ],
+        ]);
+        $contact = Contact::factory()->create([
+            'contact_import_batch_id' => $batch->getKey(),
+        ]);
+
+        $result = app(EnrollCampaignAutomationActionHandler::class)->handle(
+            $this->context($campaign->key, $contact),
+        );
+
+        $this->assertSame(AutomationActionResult::STATUS_COMPLETED, $result->status);
+        $this->assertDatabaseCount('campaign_enrollments', 1);
+        $this->assertDatabaseCount('message_chain_enrollments', 1);
+
+        $chainEnrollment = MessageChainEnrollment::query()->sole();
+
+        $this->assertSame(
+            '2036-08-21T12:00:00.000000Z',
+            $chainEnrollment->next_action_at?->toISOString(),
+        );
+        Queue::assertNotPushed(ProcessMessageChainEnrollmentJob::class);
+    }
+
 
     public function test_terminal_chain_state_does_not_block_intentional_reenrollment_even_if_legacy_wrapper_status_is_stale(): void
     {

@@ -83,6 +83,10 @@
                     name="csv_path"
                     value="{{ $csvPath }}"
                 >
+                
+                @include('crm.contacts.partials.post-import-inputs', [
+                    'postImportInputs' => $postImportInputs,
+                ])
 
                 @foreach ($importSections as $section)
                     <div class="@if (! $loop->first) border-t border-slate-200 pt-6 @endif space-y-4">
