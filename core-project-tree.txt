@@ -449,6 +449,7 @@
 │   │   │   │   └── Sms
 │   │   │   │       ├── HandleInboundSmsWebhookAction.php
 │   │   │   │       ├── Inbound
+│   │   │   │       │   ├── GrantSmsConsentFromInboundMessageAction.php
 │   │   │   │       │   ├── RespondToSmsHelpInboundMessageAction.php
 │   │   │   │       │   └── RevokeSmsConsentFromInboundMessageAction.php
 │   │   │   │       └── ProcessInboundSmsMessageAction.php
@@ -1751,6 +1752,7 @@
 │   │   │   └── module_state.md
 │   │   ├── inbound-messaging
 │   │   │   ├── module_state.md
+│   │   │   ├── reply-outcomes-and-routing.md
 │   │   │   └── TODO.md
 │   │   ├── internal-notifications
 │   │   │   └── module_state.md
@@ -2144,6 +2146,7 @@
 │   │   │   ├── CompactFlowRoutePresetAuthoringTest.php
 │   │   │   ├── ContactStatusAutomationImpactResolverTest.php
 │   │   │   ├── ContactTagAutomationCapabilityTest.php
+│   │   │   ├── FlowRouteAutomationEventExecutionContextTest.php
 │   │   │   ├── FlowRouteAutomationEventPersistenceTest.php
 │   │   │   ├── FlowRouteBindingControllerTest.php
 │   │   │   ├── FlowRouteConditionBranchPointTest.php
@@ -2174,7 +2177,10 @@
 │   │   │   ├── InboundMessageAutomationOutboxTest.php
 │   │   │   ├── InboundNormalReplyAutomationEventTest.php
 │   │   │   ├── InboundReplyFoundationTest.php
+│   │   │   ├── InboundReplyOutcomeClassifierTest.php
+│   │   │   ├── InboundSmsReOptInTest.php
 │   │   │   ├── ProcessInboundSmsMessageActionTest.php
+│   │   │   ├── ResendInboundReplyEndToEndTest.php
 │   │   │   └── ResendReceivedEmailClientTest.php
 │   │   ├── Install
 │   │   │   ├── EngageInstallCommandTest.php
@@ -2479,4 +2485,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-620 directories, 1860 files
+620 directories, 1866 files

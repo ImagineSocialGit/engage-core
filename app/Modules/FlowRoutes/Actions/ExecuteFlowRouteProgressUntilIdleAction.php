@@ -18,9 +18,13 @@ class ExecuteFlowRouteProgressUntilIdleAction
         private readonly FlowRouteProgressMetaCanonicalizer $progressMetaCanonicalizer,
     ) {}
 
+    /**
+     * @param array<string, mixed> $executionMeta
+     */
     public function handle(
         ContactFlowRouteProgress $progress,
         string $source = 'inline',
+        array $executionMeta = [],
     ): PointExecutionResult {
         $budget = $this->immediateExecutionBudget();
         $attempts = 0;
@@ -28,7 +32,10 @@ class ExecuteFlowRouteProgressUntilIdleAction
         $continuationSequence = $this->continuationSequence($progress);
 
         do {
-            $result = $this->executeCurrentFlowRoutePoint->handle($progress);
+            $result = $this->executeCurrentFlowRoutePoint->handle(
+                progress: $progress,
+                executionMeta: $executionMeta,
+            );
             $progress->refresh();
             $attempts++;
         } while ($attempts < $budget && $result->shouldAdvance() && $progress->isActive());

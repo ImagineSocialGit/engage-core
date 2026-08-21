@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 class InboundMessage extends Model
 {
     public const CLASSIFICATION_CONSENT_REVOCATION = 'consent_revocation';
+    public const CLASSIFICATION_CONSENT_GRANT = 'consent_grant';
     public const CLASSIFICATION_HELP = 'help';
     public const CLASSIFICATION_NORMAL_REPLY = 'normal_reply';
     public const CLASSIFICATION_IGNORED = 'ignored';
@@ -59,6 +60,7 @@ class InboundMessage extends Model
     {
         return [
             self::CLASSIFICATION_CONSENT_REVOCATION,
+            self::CLASSIFICATION_CONSENT_GRANT,
             self::CLASSIFICATION_HELP,
             self::CLASSIFICATION_NORMAL_REPLY,
             self::CLASSIFICATION_IGNORED,

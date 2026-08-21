@@ -12,31 +12,37 @@ class InboundSmsMessageClassifier
             return InboundMessage::CLASSIFICATION_NORMAL_REPLY;
         }
 
-        if ($this->isStopKeyword($body)) {
+        if ($this->isConfiguredKeyword($body, 'stop_keywords')) {
             return InboundMessage::CLASSIFICATION_CONSENT_REVOCATION;
         }
 
-        if ($this->isHelpKeyword($body)) {
+        if ($this->isConfiguredKeyword($body, 'start_keywords')) {
+            return InboundMessage::CLASSIFICATION_CONSENT_GRANT;
+        }
+
+        if ($this->isConfiguredKeyword($body, 'help_keywords')) {
             return InboundMessage::CLASSIFICATION_HELP;
         }
 
         return InboundMessage::CLASSIFICATION_NORMAL_REPLY;
     }
 
-    private function isStopKeyword(string $body): bool
+    private function isConfiguredKeyword(string $body, string $configKey): bool
     {
-        return in_array(
-            strtolower($body),
-            config('messaging.sms.inbound.stop_keywords', []),
-            true,
-        );
-    }
+        $keywords = config("messaging.sms.inbound.{$configKey}", []);
 
-    private function isHelpKeyword(string $body): bool
-    {
+        if (! is_array($keywords)) {
+            return false;
+        }
+
         return in_array(
-            strtolower($body),
-            config('messaging.sms.inbound.help_keywords', []),
+            strtolower(trim($body)),
+            array_map(
+                static fn (mixed $keyword): string => is_string($keyword)
+                    ? strtolower(trim($keyword))
+                    : '',
+                $keywords,
+            ),
             true,
         );
     }

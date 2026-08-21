@@ -15,6 +15,24 @@ class InboundReplyIntentClassifier
             ? $profile['intents']
             : [];
 
+        $exactText = $this->exactText($normalizedText);
+
+        foreach ($intents as $intentKey => $definition) {
+            if (! is_string($intentKey) || ! is_array($definition)) {
+                continue;
+            }
+
+            $exact = is_array($definition['exact'] ?? null)
+                ? $definition['exact']
+                : [];
+
+            foreach ($exact as $candidate) {
+                if ($this->exactText($candidate) === $exactText && $exactText !== '') {
+                    return trim($intentKey) !== '' ? trim($intentKey) : null;
+                }
+            }
+        }
+
         foreach ($intents as $intentKey => $definition) {
             if (! is_string($intentKey) || ! is_array($definition)) {
                 continue;
@@ -32,6 +50,19 @@ class InboundReplyIntentClassifier
         }
 
         return null;
+    }
+
+    private function exactText(mixed $value): string
+    {
+        if (! is_string($value)) {
+            return '';
+        }
+
+        $value = mb_strtolower(trim($value));
+        $value = preg_replace('/\s+/u', ' ', $value) ?? $value;
+        $value = preg_replace('/^[\pP\pS\s]+|[\pP\pS\s]+$/u', '', $value) ?? $value;
+
+        return trim($value);
     }
 
     private function matches(string $text, mixed $keyword): bool

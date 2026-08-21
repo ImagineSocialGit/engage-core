@@ -209,6 +209,10 @@ return [
                     App\Modules\InboundMessaging\Actions\Sms\Inbound\RevokeSmsConsentFromInboundMessageAction::class,
                 ],
 
+                'consent_grant' => [
+                    App\Modules\InboundMessaging\Actions\Sms\Inbound\GrantSmsConsentFromInboundMessageAction::class,
+                ],
+
                 'help' => [
                     App\Modules\InboundMessaging\Actions\Sms\Inbound\RespondToSmsHelpInboundMessageAction::class,
                 ],

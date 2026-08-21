@@ -1,0 +1,94 @@
+# Inbound Reply Outcomes and Route Execution
+
+## Purpose
+
+InboundMessaging owns durable inbound capture, reply correlation, normalized reply intent, and SMS compliance handling.
+
+FlowRoutes consumes the neutral `inbound_message.normal_reply` automation event through the shared automation-event seam. Neither module imports the other.
+
+## Normal reply contract
+
+A correlated normal reply may expose these compact automation facts:
+
+```text
+inbound_message.id
+inbound_message.channel
+inbound_message.classification
+inbound_message.purpose
+inbound_message.scope
+inbound_message.scheduled_message_id
+inbound_message.reply_profile_key
+inbound_message.reply_intent_key
+inbound_message.correlation_method
+inbound_message.received_at
+```
+
+The inbound body remains on `inbound_messages`. It is not copied into the automation event.
+
+`reply_profile_key` identifies the conversation/business reply vocabulary attached to the outbound ScheduledMessage.
+
+`reply_intent_key` is a profile-owned normalized outcome such as `yes`, `later`, `no`, or another client/domain-defined intent.
+
+Reply profiles may use:
+
+- `exact`: short whole-reply phrases that must match before broader keywords;
+- `keywords`: bounded phrase matching inside a reply.
+
+Use `exact` for dangerous short outcomes such as `NO`; do not classify the word `no` as a broad keyword.
+
+## SMS compliance is separate from business reply intent
+
+SMS compliance keywords are classified before ordinary reply correlation:
+
+```text
+STOP family  -> consent_revocation
+START family -> consent_grant
+HELP family  -> help
+everything else -> normal_reply
+```
+
+`YES` is not a compliance re-opt-in keyword. It remains available to client reply profiles as a business intent.
+
+START only restores historical SMS consent domains whose latest revocation was a STOP revocation. It does not recreate permission after manual, preference, provider-unsubscribe, or other non-STOP revocations, and it does not invent a consent domain that the Contact never held.
+
+## FlowRoutes event execution
+
+For an automation-event-triggered Route, the complete event payload/meta graph is available only as transient point execution metadata:
+
+```text
+execution_meta.automation_event.payload...
+execution_meta.automation_event.meta...
+```
+
+Example reply conditions:
+
+```php
+[
+    'source' => 'execution_meta',
+    'path' => 'automation_event.payload.inbound_message.reply_profile_key',
+    'operator' => 'equals',
+    'value' => 'cold_lead_nurture',
+],
+[
+    'source' => 'execution_meta',
+    'path' => 'automation_event.payload.inbound_message.reply_intent_key',
+    'operator' => 'equals',
+    'value' => 'yes',
+],
+```
+
+The full event graph is not persisted to FlowRoutes progress, plan, or progress-item metadata. `automation_event_outbox_events` remains the durable owner of the event payload/meta.
+
+If immediate Route execution exhausts its bounded execution budget and continues asynchronously, transient event data is intentionally not carried into the continuation job. Routes that need reply profile/intent must branch on those values in the initial execution slice, then persist durable business consequences through normal Route actions such as status/tag/task/Campaign operations.
+
+## Attribution
+
+InboundMessaging does not copy Campaign IDs or Campaign state into inbound rows or automation events.
+
+Campaign provenance remains derivable through the correlated ScheduledMessage and Messaging MessageChain enrollment context.
+
+## Persistence/bloat boundary
+
+C5B intentionally removes SMS webhook source/IP/user-agent copies from `inbound_messages.meta` and removes duplicated provider/body evidence from STOP revocation metadata.
+
+Raw provider request evidence belongs to the canonical webhook receipt. Durable normalized facts belong to `inbound_messages`, consent/revocation records, and the compact automation event.

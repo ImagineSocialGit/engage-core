@@ -86,11 +86,7 @@ class HandleInboundSmsWebhookAction
                     ? ($correlated !== null ? 'heuristic' : 'none')
                     : null,
                 'received_at' => $payload->receivedAt,
-                'meta' => [
-                    'source' => $payload->source,
-                    'ip_address' => $payload->ipAddress,
-                    'user_agent' => $payload->userAgent,
-                ],
+                'meta' => null,
             ],
             sender: $sender,
         );

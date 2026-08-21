@@ -84,8 +84,6 @@ class RevokeSmsConsentFromInboundMessageAction implements InboundMessageHandler
             'scope' => $scope,
             'reason' => ConsentRevocation::REASON_STOP,
             'source' => $this->source($inboundMessage),
-            'ip_address' => data_get($inboundMessage->meta, 'ip_address'),
-            'user_agent' => data_get($inboundMessage->meta, 'user_agent'),
             'meta' => $this->revocationMeta($inboundMessage),
         ]);
     }
@@ -95,38 +93,21 @@ class RevokeSmsConsentFromInboundMessageAction implements InboundMessageHandler
         return [
             'reason_context' => 'inbound_stop_keyword',
             'inbound_message_id' => $inboundMessage->id,
-            'provider' => $inboundMessage->provider,
-            'provider_message_id' => $inboundMessage->provider_message_id,
-            'provider_event_id' => $inboundMessage->provider_event_id,
-            'provider_context_id' => $inboundMessage->provider_context_id,
-            'keyword' => $this->normalizedBody($inboundMessage),
-            'raw_body' => $inboundMessage->body,
         ];
     }
 
     private function source(InboundMessage $inboundMessage): string
     {
-        $source = data_get($inboundMessage->meta, 'source');
+        $provider = trim((string) $inboundMessage->provider);
 
-        return is_string($source) && trim($source) !== ''
-            ? $source
-            : $inboundMessage->provider.'_inbound_sms';
+        return $provider !== ''
+            ? $provider.'_inbound_sms'
+            : 'inbound_sms';
     }
 
     private function stopResponse(): ?string
     {
         return config('messaging.sms.inbound.stop_response');
-    }
-
-    private function normalizedBody(InboundMessage $inboundMessage): ?string
-    {
-        if (! is_string($inboundMessage->body)) {
-            return null;
-        }
-
-        $body = strtoupper(trim($inboundMessage->body));
-
-        return $body === '' ? null : $body;
     }
 
     private function logUnknownProviderContext(InboundMessage $inboundMessage, Contact $contact): void

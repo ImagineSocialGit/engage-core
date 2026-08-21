@@ -45,9 +45,28 @@ class StartFlowRoutesFromAutomationEventAction
                 $this->executeFlowRouteProgressUntilIdle->handle(
                     progress: $progress,
                     source: 'automation_event_start',
+                    executionMeta: $this->executionMeta($event),
                 );
             }
         }
+    }
+
+
+    /**
+     * Full automation-event data is intentionally transient execution context.
+     * FlowRoutes persists only FlowRouteExternalEvent::persistenceReference().
+     *
+     * @return array<string, mixed>
+     */
+    private function executionMeta(FlowRouteExternalEvent $event): array
+    {
+        return [
+            'automation_event' => [
+                ...$event->persistenceReference(),
+                'payload' => $event->payload,
+                'meta' => $event->meta,
+            ],
+        ];
     }
 
     private function startProgress(

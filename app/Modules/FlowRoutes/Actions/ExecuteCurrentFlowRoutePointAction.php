@@ -25,9 +25,14 @@ class ExecuteCurrentFlowRoutePointAction
         private readonly FlowRouteProgressMetaCanonicalizer $progressMetaCanonicalizer,
     ) {}
 
-    public function handle(ContactFlowRouteProgress $progress): PointExecutionResult
-    {
-        return DB::transaction(function () use ($progress) {
+    /**
+     * @param array<string, mixed> $executionMeta
+     */
+    public function handle(
+        ContactFlowRouteProgress $progress,
+        array $executionMeta = [],
+    ): PointExecutionResult {
+        return DB::transaction(function () use ($progress, $executionMeta) {
             $progress = ContactFlowRouteProgress::query()
                 ->lockForUpdate()
                 ->with([
@@ -131,7 +136,14 @@ class ExecuteCurrentFlowRoutePointAction
             }
 
             try {
-                $result = $handler->handle($this->executionContext($progress, $plan, $planItem, $progressItem, $flowRoutePoint));
+                $result = $handler->handle($this->executionContext(
+                    progress: $progress,
+                    plan: $plan,
+                    planItem: $planItem,
+                    progressItem: $progressItem,
+                    flowRoutePoint: $flowRoutePoint,
+                    executionMeta: $executionMeta,
+                ));
             } catch (Throwable $exception) {
                 $result = PointExecutionResult::failed(
                     reason: 'point_handler_exception',
@@ -217,23 +229,30 @@ class ExecuteCurrentFlowRoutePointAction
             ], true));
     }
 
+    /**
+     * @param array<string, mixed> $executionMeta
+     */
     private function executionContext(
         ContactFlowRouteProgress $progress,
         ContactFlowRoutePlan $plan,
         ContactFlowRoutePlanItem $planItem,
         ContactFlowRouteProgressItem $progressItem,
         FlowRoutePoint $flowRoutePoint,
+        array $executionMeta = [],
     ): PointExecutionContext {
         return new PointExecutionContext(
             progress: $progress,
             flowRoutePoint: $flowRoutePoint,
             definition: $planItem->definition_snapshot ?? [],
             settings: $planItem->settings_snapshot ?? [],
-            meta: [
-                'started_from_workflow_transition' => $progress->meta['started_from_workflow_transition'] ?? null,
-                'started_from_automation_event' => $progress->meta['started_from_automation_event'] ?? null,
-                'waiting' => $progress->waitingState(),
-            ],
+            meta: array_replace_recursive(
+                $executionMeta,
+                [
+                    'started_from_workflow_transition' => $progress->meta['started_from_workflow_transition'] ?? null,
+                    'started_from_automation_event' => $progress->meta['started_from_automation_event'] ?? null,
+                    'waiting' => $progress->waitingState(),
+                ],
+            ),
             plan: $plan,
             planItem: $planItem,
             progressItem: $progressItem,
