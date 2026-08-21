@@ -132,14 +132,26 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
             }
 
             foreach ($intents as $intentKey => $intent) {
-                $keywords = is_array($intent) ? ($intent['keywords'] ?? null) : null;
+                $exact = is_array($intent) ? ($intent['exact'] ?? []) : null;
+                $keywords = is_array($intent) ? ($intent['keywords'] ?? []) : null;
+
+                $invalidExact = ! is_array($exact)
+                    || collect($exact)->contains(
+                        fn (mixed $candidate): bool =>
+                            ! is_string($candidate) || trim($candidate) === '',
+                    );
+
+                $invalidKeywords = ! is_array($keywords)
+                    || collect($keywords)->contains(
+                        fn (mixed $keyword): bool =>
+                            ! is_string($keyword) || trim($keyword) === '',
+                    );
 
                 if (! is_string($intentKey) || trim($intentKey) === ''
-                    || ! is_array($keywords)
-                    || $keywords === []
-                    || collect($keywords)->contains(
-                        fn (mixed $keyword): bool => ! is_string($keyword) || trim($keyword) === '',
-                    )
+                    || ! is_array($intent)
+                    || $invalidExact
+                    || $invalidKeywords
+                    || ($exact === [] && $keywords === [])
                 ) {
                     yield $this->error(
                         code: 'messaging.reply_profile_intent_invalid',

@@ -2258,6 +2258,7 @@
 │   │   │   ├── MessagingSetupValidationContributorTest.php
 │   │   │   ├── ProviderSubmissionLimiterTest.php
 │   │   │   ├── QueueContractTest.php
+│   │   │   ├── ReplyProfileSetupValidationTest.php
 │   │   │   ├── ResolvedMessageDispatchBuilderTest.php
 │   │   │   ├── ResolvedMessageDispatchIntegrationTest.php
 │   │   │   ├── ResolvedMessageDispatchSchemaTest.php
@@ -2485,4 +2486,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-620 directories, 1866 files
+620 directories, 1867 files
