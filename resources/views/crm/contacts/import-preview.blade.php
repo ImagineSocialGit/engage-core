@@ -1,12 +1,22 @@
 <x-layouts.crm
     :title="'Map CSV Fields'"
     :heading="'Map CSV Fields'"
-    :subheading="'Review source fields, then choose how imported rows should be treated'"
+    :subheading="$importMode === 'update'
+        ? 'Update existing contacts from a CSV'
+        : 'Add contacts from a CSV'"
 >
     <div
         class="max-w-6xl space-y-6"
         x-data="{
+            showAdvancedFields: false,
+            primaryImportFieldKeys: @js($primaryImportFieldKeys),
             columnProfiles: @js($columnProfiles),
+            isPrimaryField(fieldKey) {
+                return this.primaryImportFieldKeys.includes(fieldKey);
+            },
+            sectionHasPrimary(fieldKeys) {
+                return fieldKeys.some((fieldKey) => this.isPrimaryField(fieldKey));
+            },
             valuesFor(column) {
                 return this.columnProfiles[column]?.values || [];
             },
@@ -71,6 +81,21 @@
                 @endif
             </div>
 
+            <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p class="text-sm font-semibold text-slate-900">
+                    Import mode:
+                    {{ $importMode === 'update' ? 'Update Contacts' : 'Add Contacts' }}
+                </p>
+
+                <p class="mt-1 text-xs leading-5 text-slate-600">
+                    @if ($importMode === 'update')
+                        Existing exact-email Contacts only. Missing Contacts are skipped. Profile defaults and automatic post-import launch actions are disabled.
+                    @else
+                        New Contacts may be created. Detected profile defaults and declared post-import actions remain available.
+                    @endif
+                </p>
+            </div>
+
             <form
                 method="POST"
                 action="{{ route('crm.contacts.import.process') }}"
@@ -88,8 +113,35 @@
                     'postImportInputs' => $postImportInputs,
                 ])
 
+                @if ($hasAdvancedImportFields)
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-6">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">
+                                Field mapping
+                            </p>
+
+                            <p class="mt-1 text-xs text-slate-500">
+                                Required and recognized fields are shown first. Additional module fields remain available when needed.
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="text-sm font-semibold text-slate-700 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-700"
+                            x-on:click="showAdvancedFields = ! showAdvancedFields"
+                        >
+                            <span x-text="showAdvancedFields ? 'Hide additional fields' : 'Show additional fields'">
+                                Show additional fields
+                            </span>
+                        </button>
+                    </div>
+                @endif
+
                 @foreach ($importSections as $section)
-                    <div class="@if (! $loop->first) border-t border-slate-200 pt-6 @endif space-y-4">
+                    <div
+                        x-show="showAdvancedFields || sectionHasPrimary(@js($section['fields']->pluck('key')->values()->all()))"
+                        class="@if (! $loop->first) border-t border-slate-200 pt-6 @endif space-y-4"
+                        >
                         <div>
                             <h3 class="text-base font-semibold tracking-tight">
                                 {{ $section['label'] }}
@@ -98,7 +150,7 @@
 
                         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                             @foreach ($section['fields'] as $field)
-                                <div>
+                                <div x-show="showAdvancedFields || isPrimaryField(@js($field->key))">
                                     <x-ui.form.label for="mapping_{{ $field->key }}">
                                         {{ $field->label }}
 

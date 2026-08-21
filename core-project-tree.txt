@@ -2128,6 +2128,7 @@
 │   │   │   ├── ContactFilterResolverTest.php
 │   │   │   ├── ContactImportBatchControllerTest.php
 │   │   │   ├── ContactImportHandlerContextIntegrationTest.php
+│   │   │   ├── ContactImportModeControllerTest.php
 │   │   │   ├── ContactImportPostProcessingControllerTest.php
 │   │   │   ├── ContactImportPostProcessorExtensionContractTest.php
 │   │   │   ├── ContactImportPostProcessorRegistryTest.php
@@ -2503,4 +2504,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-622 directories, 1882 files
+622 directories, 1883 files

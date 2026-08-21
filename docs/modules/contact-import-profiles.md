@@ -26,6 +26,30 @@ Profile defaults are server-side configuration and are not accepted from request
 The preview remains authoritative. Operators must be able to review and change all
 suggested CSV column mappings before import.
 
+## Add versus update imports
+
+The Contact import workspace has two explicit operating modes that share the same CSV
+parser, mapping registry, treatment registry, and module-owned domain handlers:
+
+- `add`: the normal audience/list import path. New Contacts may be created and existing
+  exact-email matches may be updated. Detected profile defaults and configured
+  post-import behavior are available.
+- `update`: enrichment of Contacts that already exist. Exact normalized email remains
+  the identity key; a row with no existing exact-email Contact is skipped rather than
+  created. Profile defaults and automatic profile post-import processors are disabled.
+  Explicit operator-selected treatment remains available.
+
+The selected mode is stored server-side with the staged CSV. The process request cannot
+switch an update import back into add mode by submitting another browser value.
+
+Update mode is intentionally appropriate for later domain enrichment such as mortgage
+history, relationship facts, or other module-owned fields. Module handlers still receive
+the mapped row and existing Contact context. Their normal idempotency and blank-value
+rules remain authoritative.
+
+The preview presents required and recognized fields first. Other registered fields remain
+available behind an additional-fields control so optional modules can contribute deep
+mapping capabilities without making every routine import look like a full platform schema.
 
 ## Import treatment is separate from profiles
 

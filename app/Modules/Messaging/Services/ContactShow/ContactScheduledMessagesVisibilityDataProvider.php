@@ -101,10 +101,7 @@ class ContactScheduledMessagesVisibilityDataProvider implements ContactShowDataP
      */
     private function meta(ScheduledMessage $message): array
     {
-        $meta = [
-            'Message ID' => '#'.$message->id,
-            'Queue' => $this->label($message->queue),
-        ];
+        $meta = [];
         $terminalResult = in_array($message->status, [
             ScheduledMessage::STATUS_SENT,
             ScheduledMessage::STATUS_SKIPPED,

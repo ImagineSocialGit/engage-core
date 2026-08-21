@@ -32,7 +32,6 @@ class ContactWorkflowVisibilityDataProvider implements ContactShowDataProvider
                         'subtitle' => 'Current status profile',
                         'status' => 'Current',
                         'meta' => [
-                            'Status Key' => $profile->contactStatus?->key,
                             'Assigned To' => $this->modelLabel($profile->assignedTo),
                             'Updated' => $this->date($profile->updated_at),
                         ],

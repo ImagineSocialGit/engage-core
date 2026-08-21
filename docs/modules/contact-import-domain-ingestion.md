@@ -16,6 +16,25 @@ Modules own durable facts derived from an imported row.
 
 Core must not interpret Mortgage, Relationships, Location, Campaigns, Messaging, or other module-specific fields.
 
+## Add and update execution modes
+
+Core exposes one importer with two explicit modes rather than two separate ingestion
+engines.
+
+`add` mode may create a new canonical Contact when the normalized email is not already
+present. Existing exact-email matches continue through the normal update path.
+
+`update` mode requires an existing exact-email Contact. Missing identities are skipped
+and counted for batch review; they are never silently created. Update mode does not apply
+server-owned import-profile defaults and does not run automatic profile post-import
+processors. This keeps enrichment imports from unexpectedly changing source defaults,
+grants, or Campaign launch state. Explicit operator treatment and module-owned mapped
+field ingestion remain available.
+
+Both modes still create normal `ContactImportBatch` / `ContactImportOccurrence` evidence
+for rows that resolve to a Contact. The batch records the import mode and, for update
+imports, the number of rows that could not find an existing Contact.
+
 ## Handler context
 
 `ContactImportHandler` receives one `ContactImportContext` containing:

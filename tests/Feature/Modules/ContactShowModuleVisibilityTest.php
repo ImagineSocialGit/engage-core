@@ -4,6 +4,7 @@ namespace Tests\Feature\Modules;
 
 use App\Http\Middleware\ForceStagingAccess;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -31,6 +32,23 @@ class ContactShowModuleVisibilityTest extends TestCase
             ->get('http://crm.'.config('app.root_domain').'/'.config('contacts.routes.plural').'/'.$contact->id)
             ->assertOk()
             ->assertDontSee('Webinar History');
+    }
+
+    public function test_contact_show_hides_empty_webinar_history_when_webinars_module_is_enabled(): void
+    {
+        config()->set('modules.enabled', [
+            'webinars',
+        ]);
+
+        $user = User::factory()->create();
+        $contact = Contact::factory()->create();
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/'.config('contacts.routes.plural').'/'.$contact->id)
+            ->assertOk()
+            ->assertDontSee('data-module-panel="webinars"', false);
     }
 
     public function test_contact_show_hides_tasks_when_tasks_module_is_disabled(): void
@@ -87,6 +105,7 @@ class ContactShowModuleVisibilityTest extends TestCase
 
         $user = User::factory()->create();
         $contact = Contact::factory()->create();
+        WebinarRegistration::factory()->for($contact)->create();
 
         $this->withoutMiddleware(ForceStagingAccess::class);
 

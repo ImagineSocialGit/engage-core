@@ -50,7 +50,7 @@ class ContactCampaignsVisibilityDataProvider implements ContactShowDataProvider
 
         return [
             'title' => $this->campaignName($enrollment),
-            'subtitle' => $enrollment->campaign_key,
+            'subtitle' => null,
             'status' => $this->label($chain?->status) ?? 'Unknown',
             'meta' => [
                 'Current Step' => $this->stepLabel($chain?->currentMessageChainStep),
@@ -69,7 +69,7 @@ class ContactCampaignsVisibilityDataProvider implements ContactShowDataProvider
     {
         $campaign = $enrollment->campaign;
 
-        foreach (['name', 'title', 'key'] as $attribute) {
+        foreach (['name', 'title'] as $attribute) {
             $value = $campaign->{$attribute} ?? null;
 
             if (is_string($value) && trim($value) !== '') {
@@ -77,7 +77,8 @@ class ContactCampaignsVisibilityDataProvider implements ContactShowDataProvider
             }
         }
 
-        return $enrollment->campaign_key ?: 'Campaign #'.$enrollment->campaign_id;
+        return $this->label($campaign?->key ?? $enrollment->campaign_key)
+            ?? 'Follow-up sequence';
     }
 
     private function stepLabel(?MessageChainStep $step): ?string

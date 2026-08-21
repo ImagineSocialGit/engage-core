@@ -29,12 +29,18 @@ class CreateOrUpdateContactAction
             'email' => $email,
         ]);
 
+        $source = $data['source'] ?? (
+            $contact->exists
+                ? $contact->source
+                : 'crm'
+        );
+
         $contact->fill([
             'first_name' => $data['first_name'] ?? $contact->first_name,
             'last_name' => $data['last_name'] ?? $contact->last_name,
             'name' => $data['name'] ?? $contact->name ?? $this->buildName($data, $email),
             'phone' => $data['phone'] ?? $contact->phone,
-            'source' => $data['source'] ?? $contact->source ?? 'crm',
+            'source' => $source,
             'subsource' => $data['subsource'] ?? $contact->subsource,
             'contact_import_batch_id' => $data['contact_import_batch_id'] ?? $contact->contact_import_batch_id,
             'last_contacted_at' => $data['last_contacted_at'] ?? $contact->last_contacted_at,

@@ -26,6 +26,9 @@ use Illuminate\View\View;
 
 class ContactController extends Controller
 {
+    private const IMPORT_MODE_ADD = 'add';
+    private const IMPORT_MODE_UPDATE = 'update';
+
     public function index(): View
     {
         $contactsQuery = Contact::query();
@@ -154,15 +157,25 @@ class ContactController extends Controller
         ContactImportPostProcessorRegistry $postProcessorRegistry,
     ): View|RedirectResponse {
         $validated = $request->validate([
+            'mode' => [
+                'nullable',
+                'string',
+                Rule::in([self::IMPORT_MODE_ADD, self::IMPORT_MODE_UPDATE]),
+            ],
             'csv' => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
         ]);
 
+        $importMode = $this->normalizeImportMode($validated['mode'] ?? null);
         $originalFilename = $validated['csv']->getClientOriginalName();
         $storedPath = $validated['csv']->store('imports', 'local');
 
         $request->session()->put(
             $this->importOriginalFilenameSessionKey($storedPath),
             $originalFilename,
+        );
+        $request->session()->put(
+            $this->importModeSessionKey($storedPath),
+            $importMode,
         );
 
         $handle = fopen(Storage::disk('local')->path($storedPath), 'r');
@@ -200,12 +213,20 @@ class ContactController extends Controller
         $suggestedMapping = $importProfile !== null
             ? $contactImportProfileRegistry->suggestedMapping($importProfile, $headers->all())
             : [];
-        $postImportSummaries = $importProfile !== null
+        $postImportSummaries = $importMode === self::IMPORT_MODE_ADD && $importProfile !== null
             ? $postProcessorRegistry->summaries($importProfile->postImport)
             : [];
-        $postImportInputs = $importProfile !== null
+        $postImportInputs = $importMode === self::IMPORT_MODE_ADD && $importProfile !== null
             ? $postProcessorRegistry->inputDefinitions($importProfile->postImport)
             : [];
+
+        $primaryImportFieldKeys = array_values(array_unique([
+            ...$contactImportRegistry->requiredFieldKeys(),
+            ...($importProfile !== null
+                ? array_keys($suggestedMapping)
+                : $contactImportRegistry->contactAttributeFields()->pluck('key')->all()),
+        ]));
+        $hasAdvancedImportFields = count($primaryImportFieldKeys) < count($contactImportRegistry->fieldKeys());
 
         if ($importProfile !== null) {
             $request->session()->put(
@@ -309,6 +330,9 @@ class ContactController extends Controller
             'suggestedMapping' => $suggestedMapping,
             'postImportSummaries' => $postImportSummaries,
             'postImportInputs' => $postImportInputs,
+            'importMode' => $importMode,
+            'primaryImportFieldKeys' => $primaryImportFieldKeys,
+            'hasAdvancedImportFields' => $hasAdvancedImportFields,
         ]);
     }
 
@@ -366,17 +390,24 @@ class ContactController extends Controller
             ->values()
             ->all();
 
+        $importMode = $this->normalizeImportMode(
+            $request->session()->get($this->importModeSessionKey($csvPath)),
+        );
         $profileKey = $request->session()->get($this->importProfileKeySessionKey($csvPath));
         $importProfile = is_string($profileKey) && trim($profileKey) !== ''
             ? $contactImportProfileRegistry->get($profileKey)
             : null;
-        $profileDefaults = $importProfile?->defaults ?? [];
-        $postImportConfig = $postProcessorRegistry->withSubmittedInputs(
-            configured: $importProfile?->postImport ?? [],
-            submitted: is_array($validated['post_import_inputs'] ?? null)
-                ? $validated['post_import_inputs']
-                : [],
-        );
+        $profileDefaults = $importMode === self::IMPORT_MODE_ADD
+            ? ($importProfile?->defaults ?? [])
+            : [];
+        $postImportConfig = $importMode === self::IMPORT_MODE_ADD
+            ? $postProcessorRegistry->withSubmittedInputs(
+                configured: $importProfile?->postImport ?? [],
+                submitted: is_array($validated['post_import_inputs'] ?? null)
+                    ? $validated['post_import_inputs']
+                    : [],
+            )
+            : [];
         $postImportSummaries = $postProcessorRegistry->summaries($postImportConfig);
 
         $allowedMappingFields = array_values(array_unique([
@@ -404,7 +435,8 @@ class ContactController extends Controller
         );
 
         $importBatch = ContactImportBatch::query()->create([
-            'name' => 'Contact import '.$importedAt->format('M j, Y g:i A'),
+            'name' => ($importMode === self::IMPORT_MODE_UPDATE ? 'Contact update import ' : 'Contact import ')
+                .$importedAt->format('M j, Y g:i A'),
             'source' => 'crm_csv',
             'original_filename' => is_string($originalFilename) && trim($originalFilename) !== ''
                 ? basename(trim($originalFilename))
@@ -416,6 +448,7 @@ class ContactController extends Controller
             'failed_count' => 0,
             'meta' => [
                 'csv_path' => $csvPath,
+                'import_mode' => $importMode,
                 'mapping' => $mapping,
                 'headers' => $headers,
                 'profile_key' => $importProfile?->key,
@@ -430,6 +463,7 @@ class ContactController extends Controller
         $updated = 0;
         $skipped = 0;
         $phoneWarnings = 0;
+        $updateNotFound = 0;
         $rowNumber = 1;
 
         try {
@@ -482,6 +516,17 @@ class ContactController extends Controller
                 }
 
                 $contactData['email'] = $email;
+
+                $existingContact = Contact::query()
+                    ->where('email', $email)
+                    ->first(['id', 'source', 'subsource', 'meta']);
+
+                if ($importMode === self::IMPORT_MODE_UPDATE && $existingContact === null) {
+                    $skipped++;
+                    $updateNotFound++;
+                    continue;
+                }
+
                 $this->recordTreatmentStats($treatmentStats, $treatmentResolution->targets);
 
                 if (array_key_exists('phone', $mapping)
@@ -489,10 +534,6 @@ class ContactController extends Controller
                 ) {
                     $phoneWarnings++;
                 }
-
-                $existingContact = Contact::query()
-                    ->where('email', $email)
-                    ->first(['id', 'source', 'subsource', 'meta']);
 
                 $wasExisting = $existingContact !== null;
 
@@ -523,6 +564,7 @@ class ContactController extends Controller
                     existingContact: $existingContact,
                     originalSource: $originalSource,
                     originalSubsource: $originalSubsource,
+                    fallbackToImport: $importMode === self::IMPORT_MODE_ADD,
                 );
 
                 $contact = $createOrUpdateContact->handle(
@@ -625,6 +667,7 @@ class ContactController extends Controller
                 'failed_count' => $skipped,
                 'meta' => array_replace_recursive($importBatch->meta ?? [], [
                     'failed_at' => now()->toISOString(),
+                    'update_not_found_count' => $updateNotFound,
                     'failure' => [
                         'message' => $exception->getMessage(),
                     ],
@@ -660,6 +703,7 @@ class ContactController extends Controller
         );
 
         $request->session()->forget($this->importProfileKeySessionKey($csvPath));
+        $request->session()->forget($this->importModeSessionKey($csvPath));
 
         $importBatch->forceFill([
             'status' => ContactImportBatch::STATUS_COMPLETED,
@@ -667,14 +711,22 @@ class ContactController extends Controller
             'successful_count' => $created + $updated,
             'failed_count' => $skipped,
             'meta' => array_replace_recursive($importBatch->meta ?? [], [
+                'update_not_found_count' => $updateNotFound,
                 'treatments' => $treatmentMeta,
                 'post_import' => $postImportMeta,
             ]),
         ])->save();
 
-        return redirect()
-            ->route('crm.contacts.index')
-            ->with('success', sprintf(
+        $successMessage = $importMode === self::IMPORT_MODE_UPDATE
+            ? sprintf(
+                'Update import complete. %d updated, %d not found, %d other skipped%s%s.',
+                $updated,
+                $updateNotFound,
+                max(0, $skipped - $updateNotFound),
+                $phoneWarnings > 0 ? ", {$phoneWarnings} phone values were ignored" : '',
+                $this->treatmentReviewRequired($treatmentMeta) ? ', treatment review needed for unmapped values' : '',
+            )
+            : sprintf(
                 'Import complete. %d created, %d updated, %d skipped%s%s%s.',
                 $created,
                 $updated,
@@ -682,19 +734,24 @@ class ContactController extends Controller
                 $phoneWarnings > 0 ? ", {$phoneWarnings} phone values were ignored" : '',
                 $this->treatmentReviewRequired($treatmentMeta) ? ', treatment review needed for unmapped values' : '',
                 $this->postImportReviewRequired($postImportMeta) ? ', post-import review needed' : '',
-            ));
+            );
+
+        return redirect()
+            ->route('crm.contacts.index')
+            ->with('success', $successMessage);
     }
 
     /**
      * Preserve an existing meaningful acquisition source across overlapping
      * imports while allowing a generic/blank import source to be enriched.
      *
-     * @return array{source: string, subsource: ?string}
+     * @return array{source: ?string, subsource: ?string}
      */
     private function contactImportSourceValues(
         ?Contact $existingContact,
         ?string $originalSource,
         ?string $originalSubsource,
+        bool $fallbackToImport = true,
     ): array {
         $currentSource = $this->nonEmptyString($existingContact?->source);
         $currentSubsource = $this->nonEmptyString($existingContact?->subsource);
@@ -716,7 +773,7 @@ class ContactController extends Controller
         }
 
         return [
-            'source' => $originalSource ?? $currentSource ?? 'import',
+            'source' => $originalSource ?? $currentSource ?? ($fallbackToImport ? 'import' : null),
             'subsource' => $originalSubsource ?? $currentSubsource,
         ];
     }
@@ -874,6 +931,27 @@ class ContactController extends Controller
     private function importProfileKeySessionKey(string $csvPath): string
     {
         return 'contact_imports.'.hash('sha256', $csvPath).'.profile_key';
+    }
+
+    private function importModeSessionKey(string $csvPath): string
+    {
+        return 'contact_imports.'.hash('sha256', $csvPath).'.mode';
+    }
+
+    private function normalizeImportMode(mixed $value): string
+    {
+        if (! is_string($value)) {
+            return self::IMPORT_MODE_ADD;
+        }
+
+        $value = strtolower(trim($value));
+
+        return in_array($value, [
+            self::IMPORT_MODE_ADD,
+            self::IMPORT_MODE_UPDATE,
+        ], true)
+            ? $value
+            : self::IMPORT_MODE_ADD;
     }
 
     private function mappedImportStatusValue(

@@ -22,6 +22,10 @@ class WebinarContactPanelProvider implements ContactPanelProvider
             ->limit(5)
             ->get();
 
+        if ($registrations->isEmpty()) {
+            return [];
+        }
+
         return [
             new ContactPanel(
                 key: 'webinar-history',
