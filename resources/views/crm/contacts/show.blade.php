@@ -1,8 +1,46 @@
 @php
-    $leadSingular = config('contacts.labels.singular');
-    $leadName = $contact->name ?: trim($contact->first_name.' '.$contact->last_name) ?: $contact->email ?: str($leadSingular)->title().' #'.$contact->id;
+    $contactSingular = config('contacts.labels.singular');
+    $contactName = $contact->name ?: trim($contact->first_name.' '.$contact->last_name) ?: $contact->email ?: str($contactSingular)->title().' #'.$contact->id;
     $currentStatus = module_enabled('workflow') ? $contact->workflowProfile?->contactStatus : null;
-    $defaultContactTaskDueAt = now(config('client.timezone', config('app.timezone')))->addDay()->setTime(9, 0)->format('Y-m-d\TH:i');
+
+    $businessContext = is_array($contactBusinessContext ?? null)
+        ? $contactBusinessContext
+        : ['primary' => null, 'relationships' => []];
+    $primaryBusinessContext = is_array($businessContext['primary'] ?? null)
+        ? $businessContext['primary']
+        : null;
+    $businessRelationships = collect($businessContext['relationships'] ?? [])
+        ->filter(fn ($relationship) => is_array($relationship))
+        ->values();
+    $businessLabel = filled($primaryBusinessContext['label'] ?? null)
+        ? $primaryBusinessContext['label']
+        : str($contactSingular)->title()->toString();
+    $usesRelationshipStage = ($primaryBusinessContext['progression_mode'] ?? null) === 'relationship_stage';
+    $showContactStatusProgression = module_enabled('workflow') && ! $usesRelationshipStage;
+    $hasProgression = $usesRelationshipStage || module_enabled('workflow');
+    $progressionType = $usesRelationshipStage ? 'Stage' : 'Status';
+    $progressionLabel = $usesRelationshipStage
+        ? ($primaryBusinessContext['stage_label'] ?? 'No stage')
+        : ($currentStatus?->name ?? 'No status');
+    $businessSource = filled($primaryBusinessContext['source'] ?? null)
+        ? $primaryBusinessContext['source']
+        : $contact->source;
+    $businessSubsource = filled($primaryBusinessContext['subsource'] ?? null)
+        ? $primaryBusinessContext['subsource']
+        : $contact->subsource;
+
+    $conversationItems = collect($conversationItems ?? [])
+        ->filter(fn ($item) => is_array($item))
+        ->values();
+    $latestInboundReply = is_array($latestInboundReply ?? null)
+        ? $latestInboundReply
+        : null;
+    $conversationTimeline = $latestInboundReply
+        ? $conversationItems->reject(fn (array $item) => ($item['id'] ?? null) === ($latestInboundReply['id'] ?? null))->take(7)->values()
+        : $conversationItems->take(8)->values();
+    $clientTimezone = config('client.timezone', config('app.timezone', 'UTC'));
+
+    $defaultContactTaskDueAt = now($clientTimezone)->addDay()->setTime(9, 0)->format('Y-m-d\TH:i');
     $openTasks = collect($tasks ?? [])
         ->filter(fn ($task) => $task->status === 'open' && ! $task->archived_at)
         ->sortBy(fn ($task) => sprintf(
@@ -23,9 +61,9 @@
 @endphp
 
 <x-layouts.crm
-    :title="$leadName"
-    :heading="$leadName"
-    subheading="Lead profile and next steps"
+    :title="$contactName"
+    :heading="$contactName"
+    subheading="Who they are, what they said, and what needs to happen next"
 >
     <div
         class="space-y-6"
@@ -48,22 +86,47 @@
         @endif
 
         <div class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
-            <x-ui.card class="{{ $contactPanelClass }}" data-module-panel="core">
+            <x-ui.card
+                class="{{ $contactPanelClass }}"
+                data-module-panel="core"
+                data-contact-business-context="{{ $primaryBusinessContext['key'] ?? 'contact' }}"
+                data-contact-progression="{{ $usesRelationshipStage ? 'relationship_stage' : ($showContactStatusProgression ? 'contact_status' : 'none') }}"
+            >
                 <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                     <div>
-                        <p class="text-sm font-medium capitalize text-slate-500">
-                            {{ $leadSingular }}
+                        <p class="text-sm font-medium text-slate-500">
+                            {{ $businessLabel }}
                         </p>
 
                         <h2 class="mt-1 break-words text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-                            {{ $leadName }}
+                            {{ $contactName }}
                         </h2>
                     </div>
 
-                    <div class="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
-                        {{ $currentStatus?->name ?? 'No status' }}
-                    </div>
+                    @if($hasProgression)
+                        <div class="rounded-2xl bg-slate-100 px-3 py-2 text-right text-slate-700">
+                            <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                                {{ $progressionType }}
+                            </p>
+                            <p class="mt-0.5 text-sm font-semibold">
+                                {{ $progressionLabel }}
+                            </p>
+                        </div>
+                    @endif
                 </div>
+
+                @if($businessRelationships->count() > 1)
+                    <div class="flex flex-wrap gap-2" aria-label="Business relationships">
+                        @foreach($businessRelationships as $relationship)
+                            <span class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                                {{ $relationship['label'] }}
+                                @if(filled($relationship['stage_label'] ?? null))
+                                    · {{ $relationship['stage_label'] }}
+                                @endif
+                            </span>
+                        @endforeach
+                    </div>
+                @endif
 
                 <div class="rounded-2xl border p-4 {{ $nextStepTone }}" data-module-panel="{{ module_enabled('tasks') ? 'tasks' : 'core' }}">
                     @if($nextTask)
@@ -114,7 +177,7 @@
                                     type="button"
                                     variant="outline"
                                     class="w-full sm:w-auto"
-                                    x-on:click="activityTab = 'notes'; $nextTick(() => document.getElementById('lead-activity')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))"
+                                    x-on:click="activityTab = 'notes'; $nextTick(() => document.getElementById('contact-activity')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))"
                                 >
                                     Add Note
                                 </x-ui.button>
@@ -153,7 +216,7 @@
                                     <button
                                         type="button"
                                         class="text-xs font-semibold text-slate-600 underline underline-offset-4 hover:text-slate-900"
-                                        x-on:click="activityTab = 'tasks'; $nextTick(() => document.getElementById('lead-activity')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))"
+                                        x-on:click="activityTab = 'tasks'; $nextTick(() => document.getElementById('contact-activity')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))"
                                     >
                                         View tasks
                                     </button>
@@ -172,7 +235,7 @@
                                 </h3>
 
                                 <p class="mt-1 text-sm text-slate-600">
-                                    This {{ $leadSingular }} has no open tasks. Review tracking or add a task if follow-up is needed.
+                                    This {{ str($businessLabel)->lower() }} has no open tasks. Add a task if follow-up is needed.
                                 </p>
                             </div>
 
@@ -190,7 +253,7 @@
                     @endif
                 </div>
 
-                <div class="grid gap-4 sm:grid-cols-2">
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div>
                         <p class="text-sm text-slate-500">Email</p>
                         <p class="break-words font-medium text-slate-900">{{ $contact->email ?: '—' }}</p>
@@ -200,13 +263,40 @@
                         <p class="text-sm text-slate-500">Phone</p>
                         <p class="font-medium text-slate-900">{{ $contact->phone ?: '—' }}</p>
                     </div>
+
+                    <div>
+                        <p class="text-sm text-slate-500">Source</p>
+                        <p class="font-medium text-slate-900">{{ $businessSource ?: '—' }}</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm text-slate-500">Subsource</p>
+                        <p class="font-medium text-slate-900">{{ $businessSubsource ?: '—' }}</p>
+                    </div>
                 </div>
 
-                @if(module_enabled('workflow'))
+                <div class="flex flex-wrap gap-2">
+                    @if(module_enabled('tasks'))
+                        <x-ui.button type="button" variant="secondary" x-on:click="taskModalOpen = true">
+                            Add Task
+                        </x-ui.button>
+                    @endif
+
+                    <x-ui.button
+                        type="button"
+                        variant="outline"
+                        x-on:click="activityTab = 'notes'; $nextTick(() => document.getElementById('contact-activity')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))"
+                    >
+                        Add Note
+                    </x-ui.button>
+                </div>
+
+                @if($showContactStatusProgression)
                     <form
                         method="POST"
                         action="{{ route('crm.contacts.status.update', $contact) }}"
                         class="rounded-2xl border border-slate-200 bg-white p-4"
+                        data-contact-status-form
                     >
                         @csrf
                         @method('PATCH')
@@ -244,27 +334,64 @@
                     </form>
                 @endif
 
-                @php
-                    $hasGenericImportTreatments = is_array(data_get($contact->meta, 'import.treatments'));
-                    $importStatusTreatmentState = $hasGenericImportTreatments
-                        ? data_get($contact->meta, 'import.treatments.contact_status.state')
-                        : data_get($contact->meta, 'import.status_mapping.state');
-                @endphp
+                @if(module_enabled('relationships') && $usesRelationshipStage && is_array($primaryBusinessContext) && ! empty($primaryBusinessContext['stage_options'] ?? []))
+                    <form
+                        method="POST"
+                        action="{{ route('crm.contacts.relationships.stage.update', [$contact, $primaryBusinessContext['id']]) }}"
+                        class="rounded-2xl border border-slate-200 bg-white p-4"
+                        data-module-panel="relationships"
+                        data-relationship-stage-form
+                    >
+                        @csrf
+                        @method('PATCH')
 
-                @if ($importStatusTreatmentState === 'unmapped')
-                    <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                        <p class="text-sm font-semibold text-amber-900">Imported status needs review</p>
-                        <p class="mt-1 text-sm text-amber-800">
-                            {{ data_get($contact->meta, 'import.original_status') ?: data_get($contact->meta, 'import.treatments.contact_status.source_value') ?: 'Unmapped imported status' }}
-                        </p>
-                    </div>
-                @elseif (data_get($contact->meta, 'import.original_status'))
-                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <p class="text-sm text-slate-500">Original imported status</p>
-                        <p class="font-medium text-slate-900">
-                            {{ data_get($contact->meta, 'import.original_status') }}
-                        </p>
-                    </div>
+                        <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                            <div>
+                                <x-ui.form.label for="stage_key">
+                                    Change {{ str($businessLabel)->lower() }} stage
+                                </x-ui.form.label>
+
+                                <x-ui.form.select id="stage_key" name="stage_key">
+                                    @foreach($primaryBusinessContext['stage_options'] as $stage)
+                                        <option value="{{ $stage['key'] }}" @selected(old('stage_key', $primaryBusinessContext['stage_key']) === $stage['key'])>
+                                            {{ $stage['label'] }}
+                                        </option>
+                                    @endforeach
+                                </x-ui.form.select>
+
+                                <x-ui.form.error name="stage_key" />
+                            </div>
+
+                            <x-ui.button type="submit" class="w-full sm:w-auto">
+                                Update Stage
+                            </x-ui.button>
+                        </div>
+                    </form>
+                @endif
+
+                @if($showContactStatusProgression)
+                    @php
+                        $hasGenericImportTreatments = is_array(data_get($contact->meta, 'import.treatments'));
+                        $importStatusTreatmentState = $hasGenericImportTreatments
+                            ? data_get($contact->meta, 'import.treatments.contact_status.state')
+                            : data_get($contact->meta, 'import.status_mapping.state');
+                    @endphp
+
+                    @if ($importStatusTreatmentState === 'unmapped')
+                        <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4" data-contact-status-import-evidence>
+                            <p class="text-sm font-semibold text-amber-900">Imported status needs review</p>
+                            <p class="mt-1 text-sm text-amber-800">
+                                {{ data_get($contact->meta, 'import.original_status') ?: data_get($contact->meta, 'import.treatments.contact_status.source_value') ?: 'Unmapped imported status' }}
+                            </p>
+                        </div>
+                    @elseif (data_get($contact->meta, 'import.original_status'))
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4" data-contact-status-import-evidence>
+                            <p class="text-sm text-slate-500">Original imported status</p>
+                            <p class="font-medium text-slate-900">
+                                {{ data_get($contact->meta, 'import.original_status') }}
+                            </p>
+                        </div>
+                    @endif
                 @endif
             </x-ui.card>
 
@@ -280,9 +407,119 @@
             @endif
         </div>
 
+        @if(module_enabled('inbound_messaging'))
+            <x-ui.card class="space-y-5" data-module-panel="inbound_messaging">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Conversation</p>
+                        <h3 class="mt-1 text-lg font-semibold tracking-tight text-slate-950">
+                            What they said recently
+                        </h3>
+                        <p class="mt-1 text-sm text-slate-500">
+                            Recent replies with the outbound messages around them.
+                        </p>
+                    </div>
+
+                    @if($conversationItems->isNotEmpty())
+                        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                            {{ $conversationItems->count() }} recent
+                        </span>
+                    @endif
+                </div>
+
+                @if($latestInboundReply)
+                    <div class="rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-indigo-700 ring-1 ring-indigo-200">
+                                    Latest reply
+                                </span>
+                                @if(filled($latestInboundReply['channel'] ?? null))
+                                    <span class="text-xs font-semibold uppercase text-slate-500">
+                                        {{ $latestInboundReply['channel'] }}
+                                    </span>
+                                @endif
+                            </div>
+
+                            @if($latestInboundReply['occurred_at'] ?? null)
+                                <span class="text-xs text-slate-500">
+                                    {{ $latestInboundReply['occurred_at']->copy()->setTimezone($clientTimezone)->format('M j, Y g:i A') }}
+                                </span>
+                            @endif
+                        </div>
+
+                        @if(filled($latestInboundReply['title'] ?? null))
+                            <p class="mt-3 text-sm font-semibold text-slate-900">
+                                {{ $latestInboundReply['title'] }}
+                            </p>
+                        @endif
+
+                        <p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
+                            {{ $latestInboundReply['body'] ?: '(No message body)' }}
+                        </p>
+
+                        @if(filled($latestInboundReply['intent'] ?? null))
+                            <p class="mt-3 text-xs font-semibold text-indigo-700">
+                                Reply signal: {{ $latestInboundReply['intent'] }}
+                            </p>
+                        @endif
+                    </div>
+                @else
+                    <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                        No inbound replies yet. When they reply, the message they answered will appear here with it.
+                    </div>
+                @endif
+
+                @if($conversationTimeline->isNotEmpty())
+                    <div class="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
+                        @foreach($conversationTimeline as $conversationItem)
+                            <div class="p-4">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span class="rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide {{ ($conversationItem['direction'] ?? null) === 'inbound' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600' }}">
+                                                {{ ($conversationItem['direction'] ?? null) === 'inbound' ? 'Inbound' : 'Outbound' }}
+                                            </span>
+                                            @if(filled($conversationItem['channel'] ?? null))
+                                                <span class="text-xs font-semibold uppercase text-slate-500">
+                                                    {{ $conversationItem['channel'] }}
+                                                </span>
+                                            @endif
+                                        </div>
+
+                                        <p class="mt-2 break-words text-sm font-semibold text-slate-900">
+                                            {{ $conversationItem['title'] ?? 'Message' }}
+                                        </p>
+
+                                        @if(filled($conversationItem['body'] ?? null))
+                                            <p class="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-600">
+                                                {{ $conversationItem['body'] }}
+                                            </p>
+                                        @endif
+
+                                        @if(filled($conversationItem['intent'] ?? null))
+                                            <p class="mt-2 text-xs font-semibold text-indigo-700">
+                                                Reply signal: {{ $conversationItem['intent'] }}
+                                            </p>
+                                        @endif
+                                    </div>
+
+                                    @if($conversationItem['occurred_at'] ?? null)
+                                        <span class="shrink-0 text-xs text-slate-500">
+                                            {{ $conversationItem['occurred_at']->copy()->setTimezone($clientTimezone)->format('M j, Y g:i A') }}
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </x-ui.card>
+        @endif
+
         <x-crm.contact-visibility :sections="$contactVisibilitySections" />
 
-        <div id="lead-activity" class="grid gap-6">
+        <div id="contact-activity" class="grid gap-6">
             <x-ui.card class="{{ $activityPanelClass }}" data-module-panel="{{ module_enabled('tasks') ? 'tasks' : 'core' }}">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -291,7 +528,7 @@
                         </h3>
 
                         <p class="text-sm text-slate-500">
-                            Capture what happened and manage manual follow-up tasks for this {{ $leadSingular }}.
+                            Capture what happened and manage the manual follow-up that still needs a person.
                         </p>
                     </div>
 
@@ -457,7 +694,7 @@
             @if(module_enabled('tasks'))
                 <x-crm.tasks.create-task-modal
                     :subject="$contact"
-                    subject-label="{{ $leadSingular }}"
+                    subject-label="{{ $businessLabel }}"
                     :assignee-options="$taskAssigneeOptions"
                     :current-assignee-key="$currentTaskAssigneeKey"
                     :default-due-at="$defaultContactTaskDueAt"
@@ -473,7 +710,7 @@
                     </h3>
 
                     <p class="text-sm text-slate-500">
-                        See upcoming/recent messages and whether this {{ $leadSingular }} can receive follow-up.
+                        Review delivery history and whether this contact can receive follow-up.
                     </p>
                 </div>
 

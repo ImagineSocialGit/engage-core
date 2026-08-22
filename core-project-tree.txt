@@ -492,6 +492,8 @@
 │   │   │   │   └── InboundMessagingModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
+│   │   │   │   ├── ContactShow
+│   │   │   │   │   └── ContactConversationShowDataProvider.php
 │   │   │   │   ├── Dashboard
 │   │   │   │   │   └── LeadRepliesDashboardPanelProvider.php
 │   │   │   │   ├── Email
@@ -818,6 +820,9 @@
 │   │   ├── Relationships
 │   │   │   ├── Actions
 │   │   │   │   └── UpsertContactRelationshipAction.php
+│   │   │   ├── Controllers
+│   │   │   │   └── CRM
+│   │   │   │       └── ContactRelationshipController.php
 │   │   │   ├── Import
 │   │   │   │   ├── ContactRelationshipImportHandler.php
 │   │   │   │   └── Treatments
@@ -831,6 +836,8 @@
 │   │   │   │   ├── Contacts
 │   │   │   │   │   └── Filters
 │   │   │   │   │       └── RelationshipContactFilterCriterion.php
+│   │   │   │   ├── ContactShow
+│   │   │   │   │   └── ContactRelationshipsShowDataProvider.php
 │   │   │   │   ├── RelationshipDefinitionRegistry.php
 │   │   │   │   └── RelationshipWorkspaceResolver.php
 │   │   │   └── Validation
@@ -2071,6 +2078,7 @@
 │   │   ├── core.php
 │   │   ├── flow-routes.php
 │   │   ├── messaging.php
+│   │   ├── relationships.php
 │   │   ├── reporting.php
 │   │   ├── scheduling.php
 │   │   ├── tasks.php
@@ -2236,6 +2244,7 @@
 │   │   │   ├── FormSubmissionVerificationTest.php
 │   │   │   └── PublishedFormRuntimeTest.php
 │   │   ├── InboundMessaging
+│   │   │   ├── ContactConversationShowDataProviderTest.php
 │   │   │   ├── HandleInboundEmailWebhookActionTest.php
 │   │   │   ├── InboundMessageAutomationOutboxTest.php
 │   │   │   ├── InboundNormalReplyAutomationEventTest.php
@@ -2397,6 +2406,7 @@
 │   │   │   └── WorkflowProjectStateRoundTripTest.php
 │   │   ├── Relationships
 │   │   │   ├── ContactRelationshipImportHandlerTest.php
+│   │   │   ├── ContactRelationshipWorkspaceTest.php
 │   │   │   ├── RelationshipContactFilterCriterionTest.php
 │   │   │   ├── RelationshipImportTreatmentTest.php
 │   │   │   ├── RelationshipLocationAreaBridgeTest.php
@@ -2556,4 +2566,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-633 directories, 1924 files
+637 directories, 1930 files

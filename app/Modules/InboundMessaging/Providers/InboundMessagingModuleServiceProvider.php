@@ -2,6 +2,7 @@
 
 namespace App\Modules\InboundMessaging\Providers;
 
+use App\Modules\InboundMessaging\Services\ContactShow\ContactConversationShowDataProvider;
 use App\Modules\InboundMessaging\Services\Dashboard\LeadRepliesDashboardPanelProvider;
 use App\Modules\InboundMessaging\Services\Email\EmailWebhookHandlerResolver;
 use App\Modules\InboundMessaging\Services\Sms\SmsWebhookHandlerResolver;
@@ -21,6 +22,10 @@ class InboundMessagingModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             LeadRepliesDashboardPanelProvider::class,
         ], DashboardPanelRegistry::providerTag());
+
+        $this->app->tag([
+            ContactConversationShowDataProvider::class,
+        ], 'core.contact_show_data_providers');
     }
 
     public function boot(): void

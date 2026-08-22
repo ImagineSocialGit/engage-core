@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
     require __DIR__.'/crm/core.php';
+    require __DIR__.'/crm/relationships.php';
     require __DIR__.'/crm/webinars.php';
     require __DIR__.'/crm/campaigns.php';
     require __DIR__.'/crm/messaging.php';

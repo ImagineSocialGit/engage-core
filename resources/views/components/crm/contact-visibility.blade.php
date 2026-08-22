@@ -12,13 +12,13 @@
         ],
         'Workflow' => [
             'title' => 'Current status',
-            'description' => 'Where this lead sits in the process.',
+            'description' => 'Where this contact sits in its current lifecycle.',
             'empty' => 'No current status is available.',
             'priority' => 20,
         ],
         'Routes' => [
             'title' => 'Automatic follow-ups',
-            'description' => 'Recent or active automated steps for this lead.',
+            'description' => 'Recent or active automated steps for this contact.',
             'empty' => 'No automatic follow-up is active right now.',
             'priority' => 30,
         ],
@@ -58,11 +58,11 @@
         <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
                 <h3 class="text-lg font-semibold tracking-tight">
-                    Lead tracking
+                    What’s already happening
                 </h3>
 
                 <p class="text-sm text-slate-500">
-                    A quick read on what is happening now, what already happened, and what may happen next.
+                    Manual work, automated follow-up, and outbound activity already in motion.
                 </p>
             </div>
         </div>

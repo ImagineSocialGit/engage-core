@@ -9,6 +9,7 @@ use App\Modules\Relationships\Import\ContactRelationshipImportHandler;
 use App\Modules\Relationships\Import\Treatments\RelationshipStageImportTreatmentTarget;
 use App\Modules\Relationships\Import\Treatments\RelationshipTypeImportTreatmentTarget;
 use App\Modules\Relationships\Services\Contacts\Filters\RelationshipContactFilterCriterion;
+use App\Modules\Relationships\Services\ContactShow\ContactRelationshipsShowDataProvider;
 use App\Modules\Relationships\Validation\RelationshipsSetupValidationContributor;
 use Illuminate\Support\ServiceProvider;
 
@@ -24,6 +25,10 @@ class RelationshipsModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             RelationshipContactFilterCriterion::class,
         ], 'core.contact_filter_criteria');
+
+        $this->app->tag([
+            ContactRelationshipsShowDataProvider::class,
+        ], 'core.contact_show_data_providers');
     }
 
     public function boot(
