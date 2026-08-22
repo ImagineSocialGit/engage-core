@@ -76,6 +76,26 @@ class WebinarMessageChainBindingResolver
     /**
      * @return Collection<int, WebinarSeriesMessageChainBinding|WebinarScheduleProfileChainBinding>
      */
+    public function effectiveBindingsForWebinar(Webinar $webinar): Collection
+    {
+        return $this->messageAreaRegistry
+            ->enabled()
+            ->filter(fn ($area): bool => $area->isTemplate())
+            ->map(fn ($area) => $this->resolveForWebinar(
+                webinar: $webinar,
+                messageAreaKey: $area->key,
+            ))
+            ->filter()
+            ->unique(fn ($binding): string => implode(':', [
+                $binding::class,
+                $binding->getKey(),
+            ]))
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, WebinarSeriesMessageChainBinding|WebinarScheduleProfileChainBinding>
+     */
     public function effectiveBindingsForSeries(WebinarSeries $series): Collection
     {
         return $this->messageAreaRegistry

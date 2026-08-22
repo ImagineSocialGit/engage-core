@@ -19,6 +19,7 @@ use App\Modules\Webinars\Requests\SyncWebinarSeriesRequest;
 use App\Modules\Webinars\Requests\UpdateWebinarSeriesProviderEventTypeRequest;
 use App\Modules\Webinars\Requests\UpdateWebinarSeriesScheduleProfileRequest;
 use App\Modules\Webinars\Services\WebinarMessageChainPresentationService;
+use App\Modules\Webinars\Services\WebinarScheduleProfileResolver;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\RedirectResponse;
@@ -38,6 +39,7 @@ class WebinarController extends Controller
     public function index(
         Request $request,
         WebinarMessageChainPresentationService $messageChainPresentation,
+        WebinarScheduleProfileResolver $scheduleProfileResolver,
     ): View {
 
         $series = WebinarSeries::query()
@@ -57,7 +59,10 @@ class WebinarController extends Controller
             ->get();
 
         $upcomingWebinars = Webinar::query()
-            ->with('webinarSeries')
+            ->with([
+                'webinarScheduleProfile',
+                'webinarSeries.webinarScheduleProfile',
+            ])
             ->withCount('registrations')
             ->where('ends_at', '>', now())
             ->matchingCurrentSeriesProvider()
@@ -75,6 +80,46 @@ class WebinarController extends Controller
                         ->forWebinar($webinar),
                 ]);
         }
+
+        $upcomingMessagePurposeReviews = $upcomingMessageReviews
+            ->map(fn (array $presentation): array =>
+                (int) ($presentation['message_count'] ?? 0) > 0
+                    ? ['transactional' => $presentation]
+                    : []
+            );
+
+        $upcomingMessageProfiles = $upcomingWebinars
+            ->mapWithKeys(function (Webinar $webinar) use ($scheduleProfileResolver): array {
+                $effectiveProfile = $scheduleProfileResolver
+                    ->resolveForWebinar($webinar);
+                $inheritedProfile = $scheduleProfileResolver
+                    ->resolveForSeries($webinar->webinarSeries);
+                $source = 'default';
+
+                if (
+                    $effectiveProfile !== null
+                    && $webinar->webinarScheduleProfile?->is($effectiveProfile)
+                ) {
+                    $source = 'occurrence';
+                } elseif (
+                    $effectiveProfile !== null
+                    && $webinar->webinarSeries?->webinarScheduleProfile?->is(
+                        $effectiveProfile,
+                    )
+                ) {
+                    $source = 'series';
+                }
+
+                return [
+                    (int) $webinar->getKey() => [
+                        'effective_profile_id' => $effectiveProfile?->getKey(),
+                        'effective_profile_name' => $effectiveProfile?->name,
+                        'inherited_profile_id' => $inheritedProfile?->getKey(),
+                        'inherited_profile_name' => $inheritedProfile?->name,
+                        'source' => $source,
+                    ],
+                ];
+            });
 
         $pendingPostEventReviews = collect();
 
@@ -167,6 +212,8 @@ class WebinarController extends Controller
             'scheduleProfiles' => $scheduleProfiles,
             'upcomingWebinars' => $upcomingWebinars,
             'upcomingMessageReviews' => $upcomingMessageReviews,
+            'upcomingMessagePurposeReviews' => $upcomingMessagePurposeReviews,
+            'upcomingMessageProfiles' => $upcomingMessageProfiles,
             'pendingPostEventReviews' => $pendingPostEventReviews,
             'registrationAttentionCount' => $registrationAttentionCount,
             'attentionCount' => $pendingPostEventReviews->count() + $registrationAttentionCount,
@@ -324,6 +371,23 @@ class WebinarController extends Controller
 
         return redirect()
             ->route('crm.webinar-series.index')
+            ->with('success', 'Webinar schedule profile updated.');
+    }
+
+    public function updateWebinarScheduleProfile(
+        UpdateWebinarSeriesScheduleProfileRequest $request,
+        Webinar $webinar,
+    ): RedirectResponse {
+        $webinar->forceFill([
+            'webinar_schedule_profile_id' => $request->validated(
+                'webinar_schedule_profile_id',
+            ),
+        ])->save();
+
+        return redirect()
+            ->route('crm.webinar-series.index', [
+                'messages' => $webinar->getKey(),
+            ])
             ->with('success', 'Webinar schedule profile updated.');
     }
 

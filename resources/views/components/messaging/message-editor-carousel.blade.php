@@ -189,29 +189,28 @@
                 x-on:touchstart.passive="touchStart($event)"
                 x-on:touchend.passive="touchEnd($event)"
             >
-                @if($messageCount > 1)
-                    <button
-                        type="button"
-                        aria-label="Previous message"
-                        title="Previous message"
-                        x-on:click.stop="navigate(-1)"
-                        class="absolute inset-y-0 left-0 z-20 flex w-11 items-center justify-center text-slate-400 transition hover:bg-slate-100/80 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 sm:w-16"
-                    >
-                        <span aria-hidden="true" class="text-3xl leading-none">‹</span>
-                    </button>
+                <div class="relative px-12 py-4 sm:px-20 sm:py-6">
+                    @if($messageCount > 1)
+                        <button
+                            type="button"
+                            aria-label="Previous message"
+                            title="Previous message"
+                            x-on:click.stop="navigate(-1)"
+                            class="absolute inset-y-4 left-0 z-20 flex w-11 items-center justify-center text-slate-400 transition hover:bg-slate-100/80 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 sm:inset-y-6 sm:w-16"
+                        >
+                            <span aria-hidden="true" class="text-3xl leading-none">‹</span>
+                        </button>
 
-                    <button
-                        type="button"
-                        aria-label="Next message"
-                        title="Next message"
-                        x-on:click.stop="navigate(1)"
-                        class="absolute inset-y-0 right-0 z-20 flex w-11 items-center justify-center text-slate-400 transition hover:bg-slate-100/80 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 sm:w-16"
-                    >
-                        <span aria-hidden="true" class="text-3xl leading-none">›</span>
-                    </button>
-                @endif
-
-                <div class="px-12 py-4 sm:px-20 sm:py-6">
+                        <button
+                            type="button"
+                            aria-label="Next message"
+                            title="Next message"
+                            x-on:click.stop="navigate(1)"
+                            class="absolute inset-y-4 right-0 z-20 flex w-11 items-center justify-center text-slate-400 transition hover:bg-slate-100/80 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 sm:inset-y-6 sm:w-16"
+                        >
+                            <span aria-hidden="true" class="text-3xl leading-none">›</span>
+                        </button>
+                    @endif
                     @foreach($messages as $messageIndex => $message)
                         @php
                             $messageId = (string) ($message['id'] ?? $messageIndex);

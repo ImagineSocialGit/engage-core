@@ -154,9 +154,11 @@
                             : null;
                         $isLive = $upcomingWebinar->starts_at?->lte(now()) && $upcomingWebinar->ends_at?->gt(now());
                         $registrationCount = (int) ($upcomingWebinar->registrations_count ?? 0);
-                        $messageReview = $upcomingMessageReviews[$upcomingWebinar->getKey()] ?? null;
-                        $hasMessageReview = is_array($messageReview)
-                            && (int) ($messageReview['message_count'] ?? 0) > 0;
+                        $messagePurposeReviews = $upcomingMessagePurposeReviews[$upcomingWebinar->getKey()] ?? [];
+                        $hasMessageReview = collect($messagePurposeReviews)->contains(
+                            fn ($review): bool => is_array($review)
+                                && (int) ($review['message_count'] ?? 0) > 0,
+                        );
                     @endphp
 
                     <article class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
@@ -220,13 +222,33 @@
 
 @foreach(($upcomingWebinars ?? collect()) as $upcomingWebinar)
     @php
-        $messageReview = $upcomingMessageReviews[$upcomingWebinar->getKey()] ?? null;
-        $hasMessageReview = is_array($messageReview)
-            && (int) ($messageReview['message_count'] ?? 0) > 0;
+        $messagePurposeReviews = $upcomingMessagePurposeReviews[$upcomingWebinar->getKey()] ?? [];
+        $messagePurposeReviews = collect($messagePurposeReviews)
+            ->filter(fn ($review): bool => is_array($review)
+                && (int) ($review['message_count'] ?? 0) > 0)
+            ->all();
+        $hasMessageReview = $messagePurposeReviews !== [];
+        $initialMessagePurpose = array_key_first($messagePurposeReviews) ?: 'transactional';
+        $totalMessageCount = collect($messagePurposeReviews)->sum(
+            fn (array $review): int => (int) ($review['message_count'] ?? 0),
+        );
+        $messageProfile = $upcomingMessageProfiles[$upcomingWebinar->getKey()] ?? [];
+        $effectiveProfileName = filled($messageProfile['effective_profile_name'] ?? null)
+            ? (string) $messageProfile['effective_profile_name']
+            : 'No active profile';
+        $inheritedProfileName = filled($messageProfile['inherited_profile_name'] ?? null)
+            ? (string) $messageProfile['inherited_profile_name']
+            : 'No active profile';
+        $profileSourceLabel = match ($messageProfile['source'] ?? 'default') {
+            'occurrence' => 'Occurrence override',
+            'series' => 'Series profile',
+            default => 'Default profile',
+        };
     @endphp
 
     @if($hasMessageReview)
         <div
+            x-data="{ activeMessagePurpose: @js($initialMessagePurpose) }"
             x-show="activeMessageWebinar === {{ $upcomingWebinar->getKey() }}"
             x-cloak
             x-on:keydown.escape.window="closeMessageReview()"
@@ -240,7 +262,7 @@
                 aria-label="{{ $upcomingWebinar->title }} messages"
                 class="max-h-[calc(100vh-2rem)] w-full max-w-6xl overflow-y-auto rounded-3xl bg-white shadow-2xl"
             >
-                <header class="sticky top-0 z-10 flex flex-col gap-3 border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:flex-row sm:items-start sm:justify-between sm:px-6">
+                <header class="sticky top-0 z-30 grid gap-4 border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,28rem)_auto] lg:items-start">
                     <div>
                         <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
                             Upcoming webinar messages
@@ -250,25 +272,108 @@
                         </h2>
                         <p class="mt-1 text-sm text-slate-600">
                             {{ $upcomingWebinar->starts_at?->copy()->setTimezone($upcomingWebinar->timezone)->format('M j, Y · g:i A') }}
-                            · {{ (int) ($messageReview['message_count'] ?? 0) }} {{ (int) ($messageReview['message_count'] ?? 0) === 1 ? 'message' : 'messages' }}
+                            · {{ $totalMessageCount }} {{ $totalMessageCount === 1 ? 'message' : 'messages' }}
                         </p>
                     </div>
+
+                    <form
+                        method="POST"
+                        action="{{ route('crm.webinars.schedule-profile.update', $upcomingWebinar) }}"
+                        data-webinar-message-profile-form
+                        class="rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                    >
+                        @csrf
+                        @method('PATCH')
+
+                        <label class="block text-[11px] font-extrabold uppercase tracking-[0.14em] text-slate-500">
+                            Webinar profile
+                        </label>
+
+                        <div class="mt-2 flex flex-col gap-2 sm:flex-row">
+                            <select
+                                name="webinar_schedule_profile_id"
+                                data-webinar-message-profile-select
+                                class="min-h-10 min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-0"
+                            >
+                                <option value="">
+                                    Use inherited — {{ $inheritedProfileName }}
+                                </option>
+                                @foreach(($scheduleProfiles ?? collect()) as $scheduleProfile)
+                                    <option
+                                        value="{{ $scheduleProfile->getKey() }}"
+                                        @selected((int) $upcomingWebinar->webinar_schedule_profile_id === (int) $scheduleProfile->getKey())
+                                    >
+                                        {{ $scheduleProfile->name }}{{ $scheduleProfile->is_default ? ' (default)' : '' }}
+                                    </option>
+                                @endforeach
+                            </select>
+
+                            <button
+                                type="submit"
+                                class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
+                            >
+                                Apply
+                            </button>
+                        </div>
+
+                        <p class="mt-2 text-xs text-slate-500">
+                            In use: <span class="font-bold text-slate-700">{{ $effectiveProfileName }}</span>
+                            · {{ $profileSourceLabel }}
+                        </p>
+                    </form>
 
                     <button
                         type="button"
                         x-on:click="closeMessageReview()"
-                        class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-extrabold text-slate-700 hover:bg-slate-50"
+                        class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-extrabold text-slate-700 hover:bg-slate-50 lg:justify-self-end"
                     >
                         Close
                     </button>
                 </header>
 
                 <div class="p-4 sm:p-6">
-                    <x-messaging.message-editor-carousel
-                        :presentation="$messageReview"
-                        :editable="true"
-                        :form-context="['webinar_id' => $upcomingWebinar->getKey()]"
-                    />
+                    @if(count($messagePurposeReviews) > 1)
+                        <div
+                            data-webinar-message-purpose-switcher
+                            class="mb-4 flex flex-wrap items-center justify-center gap-2"
+                        >
+                            @foreach($messagePurposeReviews as $purpose => $purposeReview)
+                                <button
+                                    type="button"
+                                    data-webinar-message-purpose="{{ $purpose }}"
+                                    x-on:click="activeMessagePurpose = @js($purpose)"
+                                    x-bind:class="activeMessagePurpose === @js($purpose)
+                                        ? 'bg-slate-950 text-white ring-slate-950'
+                                        : 'bg-white text-slate-700 ring-slate-200 hover:bg-slate-50'"
+                                    class="inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-sm font-extrabold ring-1 transition"
+                                >
+                                    <span>{{ \Illuminate\Support\Str::headline((string) $purpose) }}</span>
+                                    <span
+                                        x-bind:class="activeMessagePurpose === @js($purpose)
+                                            ? 'bg-white/15 text-white'
+                                            : 'bg-slate-100 text-slate-600'"
+                                        class="rounded-full px-2 py-0.5 text-xs"
+                                    >
+                                        {{ (int) ($purposeReview['message_count'] ?? 0) }}
+                                    </span>
+                                </button>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @foreach($messagePurposeReviews as $purpose => $purposeReview)
+                        <div
+                            x-show="activeMessagePurpose === @js($purpose)"
+                            x-cloak
+                            data-webinar-message-purpose-panel="{{ $purpose }}"
+                        >
+                            <x-messaging.message-editor-carousel
+                                :presentation="$purposeReview"
+                                :editable="true"
+                                :form-context="['webinar_id' => $upcomingWebinar->getKey()]"
+                            />
+                        </div>
+                    @endforeach
                 </div>
 
                 <footer class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">

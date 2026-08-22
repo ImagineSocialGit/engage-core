@@ -21,7 +21,9 @@ class UpdateWebinarSeriesScheduleProfileRequest extends FormRequest
             'webinar_schedule_profile_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('webinar_schedule_profiles', 'id')->where('is_active', true)->where('status', 'active'),
+                Rule::exists('webinar_schedule_profiles', 'id')
+                    ->where('is_active', true)
+                    ->where('status', 'active'),
             ],
         ];
     }

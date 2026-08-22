@@ -58,6 +58,9 @@ Route::middleware('module:webinars')->group(function () {
     Route::patch('/webinar-series/{series}/schedule-profile', [WebinarController::class, 'updateSeriesScheduleProfile'])
         ->name('crm.webinar-series.schedule-profile.update');
 
+    Route::patch('/webinars/{webinar}/schedule-profile', [WebinarController::class, 'updateWebinarScheduleProfile'])
+        ->name('crm.webinars.schedule-profile.update');
+
     Route::middleware('module:messaging')
         ->prefix('webinar-series/{series}/message-chains')
         ->name('crm.webinar-series.message-chains.')
