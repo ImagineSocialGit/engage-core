@@ -15,6 +15,7 @@ use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Services\MessageTemplateCatalogCarouselPresenter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,8 +24,10 @@ use InvalidArgumentException;
 
 class CampaignMessageTemplateController extends Controller
 {
-    public function index(Request $request): View
-    {
+    public function index(
+        Request $request,
+        MessageTemplateCatalogCarouselPresenter $carouselPresenter,
+    ): View {
         $campaigns = Campaign::query()
             ->with([
                 'steps' => fn ($query) => $query->active()->with([
@@ -47,11 +50,17 @@ class CampaignMessageTemplateController extends Controller
             ? $this->currentAssignmentsForCampaign($selectedCampaign)
             : collect();
 
+        $messageCarouselEntries = $selectedCampaign instanceof Campaign
+            ? $this->selectedTemplateEntriesForCampaign($selectedCampaign, $currentAssignments)
+            : collect();
+
         return view('crm.campaigns.message-templates.index', [
             'campaigns' => $campaigns,
             'selectedCampaign' => $selectedCampaign,
             'selectedStep' => $selectedStep,
             'currentAssignments' => $currentAssignments,
+            'messageCarousel' => $carouselPresenter->present($messageCarouselEntries),
+            'initialMessageId' => $this->initialMessageId($request, $selectedCampaign, $currentAssignments),
             'templateOptionsByVariant' => $selectedCampaign instanceof Campaign
                 ? $this->templateOptionsByVariant($selectedCampaign)
                 : collect(),
@@ -232,6 +241,102 @@ class CampaignMessageTemplateController extends Controller
         }
 
         return $campaign->steps->first();
+    }
+
+    /**
+     * @param Collection<string, MessageTemplatePresetAssignment> $assignments
+     * @return Collection<int, MessageTemplateCatalogEntry>
+     */
+    private function selectedTemplateEntriesForCampaign(
+        Campaign $campaign,
+        Collection $assignments,
+    ): Collection {
+        $entries = collect();
+
+        foreach ($campaign->steps as $step) {
+            if (! $step instanceof CampaignStep) {
+                continue;
+            }
+
+            foreach ($step->variants as $variant) {
+                if (! $variant instanceof CampaignStepVariant) {
+                    continue;
+                }
+
+                $assignment = $assignments->get($this->variantKey($step, $variant));
+                $preset = $assignment?->messageTemplatePreset;
+
+                if (! $preset) {
+                    continue;
+                }
+
+                $entry = $preset->catalogEntries->first(function (mixed $candidate) use ($campaign, $step, $variant): bool {
+                    if (! $candidate instanceof MessageTemplateCatalogEntry) {
+                        return false;
+                    }
+
+                    return $candidate->module_key === 'campaigns'
+                        && $candidate->usage_type === 'campaign_step'
+                        && data_get($candidate->meta, 'campaign_key') === $campaign->key
+                        && (int) data_get($candidate->meta, 'campaign_step') === (int) $step->step_number
+                        && data_get($candidate->meta, 'campaign_step_variant_key') === $variant->key;
+                });
+
+                if (! $entry instanceof MessageTemplateCatalogEntry) {
+                    $entry = $preset->catalogEntries->first(fn (mixed $candidate): bool =>
+                        $candidate instanceof MessageTemplateCatalogEntry
+                        && $candidate->module_key === 'campaigns'
+                    );
+                }
+
+                if ($entry instanceof MessageTemplateCatalogEntry) {
+                    $entry->setRelation('messageTemplatePreset', $preset);
+                    $entries->push($entry);
+                }
+            }
+        }
+
+        return $entries
+            ->unique(fn (MessageTemplateCatalogEntry $entry): int => (int) $entry->message_template_preset_id)
+            ->values();
+    }
+
+    /**
+     * @param Collection<string, MessageTemplatePresetAssignment> $assignments
+     */
+    private function initialMessageId(
+        Request $request,
+        ?Campaign $campaign,
+        Collection $assignments,
+    ): ?string {
+        if (! $campaign instanceof Campaign) {
+            return null;
+        }
+
+        $variantId = $request->query('variant');
+
+        if (! is_numeric($variantId) || (int) $variantId <= 0) {
+            return null;
+        }
+
+        foreach ($campaign->steps as $step) {
+            if (! $step instanceof CampaignStep) {
+                continue;
+            }
+
+            $variant = $step->variants->firstWhere('id', (int) $variantId);
+
+            if (! $variant instanceof CampaignStepVariant) {
+                continue;
+            }
+
+            $assignment = $assignments->get($this->variantKey($step, $variant));
+            $preset = $assignment?->messageTemplatePreset;
+
+            return $preset ? 'preset:'.$preset->getKey() : null;
+        }
+
+        return null;
     }
 
     /**

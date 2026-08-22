@@ -234,8 +234,11 @@ class MessageTemplatePresetController extends Controller
             ])->save();
         });
 
-        return redirect()
-            ->route('crm.messaging.message-templates.index', $this->redirectParams($messageTemplatePreset))
+        $redirect = $this->safeReturnPath($request);
+
+        return ($redirect !== null
+                ? redirect($redirect)
+                : redirect()->route('crm.messaging.message-templates.index', $this->redirectParams($messageTemplatePreset)))
             ->with('status', $overridePayload === []
                 ? 'Message override cleared. The message now inherits shared content again.'
                 : 'Message override published. Existing scheduled message versions were not changed.');
@@ -577,6 +580,34 @@ class MessageTemplatePresetController extends Controller
             },
             $ctas,
         )));
+    }
+
+    private function safeReturnPath(Request $request): ?string
+    {
+        $value = $request->input('return_to');
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        if ($value === ''
+            || ! str_starts_with($value, '/')
+            || str_starts_with($value, '//')
+            || str_contains($value, '\\')
+            || preg_match('/[\x00-\x1F\x7F]/', $value) === 1
+        ) {
+            return null;
+        }
+
+        $parts = parse_url($value);
+
+        if ($parts === false || isset($parts['scheme']) || isset($parts['host'])) {
+            return null;
+        }
+
+        return $value;
     }
 
     /** @return array<string,mixed> */

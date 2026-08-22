@@ -12,6 +12,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\MessageChain;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\MessageChainVersion;
+use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
@@ -26,7 +27,7 @@ class CampaignMessageTemplateControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_index_renders_campaign_step_variants_and_template_selection_without_copy_editing(): void
+    public function test_index_renders_campaign_template_selection_and_canonical_edit_carousel(): void
     {
         config()->set('modules.enabled', [
             'campaigns',
@@ -64,8 +65,56 @@ class CampaignMessageTemplateControllerTest extends TestCase
             ->assertSee('name="campaign_step_variant_id"', false)
             ->assertSee('name="message_template_preset_id"', false)
             ->assertSee(route('crm.messaging.message-templates.index', ['module' => 'campaigns']), false)
-            ->assertDontSee('name="subject"', false)
-            ->assertDontSee('name="body"', false);
+            ->assertSee('data-message-editor-carousel', false)
+            ->assertSee('data-message-editor-form', false)
+            ->assertSee('Published copy')
+            ->assertSee('Save &amp; publish', false)
+            ->assertSee('name="return_to"', false)
+            ->assertSee('Step 1', false);
+    }
+
+
+    public function test_campaign_carousel_edit_publishes_copy_and_returns_to_campaign_surface(): void
+    {
+        config()->set('modules.enabled', [
+            'campaigns',
+            'messaging',
+        ]);
+
+        $user = User::factory()->create();
+        [$campaign, $step, $emailVariant, $preset] = $this->campaignStepVariantWithTemplate();
+
+        MessageTemplatePresetAssignment::factory()
+            ->forPreset($preset)
+            ->forCampaignStepVariant($campaign->key, $step->step_number, $emailVariant->key, $emailVariant->source_config_path)
+            ->create([
+                'channel' => 'email',
+                'purpose' => 'marketing',
+                'scope' => 'webinar_nurture',
+                'message_type' => $preset->message_type,
+            ]);
+
+        $returnTo = '/campaigns/message-templates?campaign='.$campaign->getKey();
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->patch('http://crm.'.config('app.root_domain').'/message-templates/'.$preset->getKey(), [
+                '_editing_message_id' => 'preset:'.$preset->getKey(),
+                'return_to' => $returnTo,
+                'payload' => [
+                    'subject' => 'Updated Campaign subject',
+                    'body' => 'Updated Campaign body.',
+                ],
+            ])
+            ->assertRedirect('http://crm.'.config('app.root_domain').$returnTo);
+
+        $template = MessageTemplate::query()
+            ->where('key', $preset->key)
+            ->firstOrFail();
+
+        $this->assertSame('Updated Campaign subject', data_get($template->currentPayload(), 'subject'));
+        $this->assertSame('Updated Campaign body.', data_get($template->currentPayload(), 'body'));
     }
 
     public function test_it_updates_the_selected_template_for_a_campaign_step_variant(): void

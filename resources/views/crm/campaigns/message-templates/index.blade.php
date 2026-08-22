@@ -176,6 +176,30 @@
                                 </div>
                             </div>
                         </div>
+
+                        <div class="border-b border-slate-200 bg-slate-50/60 px-4 py-5 sm:px-6">
+                            <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                                <div>
+                                    <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">Message copy</p>
+                                    <h3 class="mt-1 text-lg font-extrabold tracking-tight text-slate-950">Review and edit the Campaign messages</h3>
+                                    <p class="mt-1 text-sm leading-6 text-slate-600">Use Email / SMS and the arrows to move through the currently selected templates. Edit publishes a new immutable Messaging version without rewriting already-scheduled messages.</p>
+                                </div>
+                            </div>
+
+                            <x-messaging.message-editor-carousel
+                                :presentation="$messageCarousel"
+                                :editable="true"
+                                empty-message="No selected Messaging templates are available for this Campaign yet."
+                                :initial-message-id="$initialMessageId"
+                                :form-context="['return_to' => request()->getRequestUri()]"
+                            />
+                        </div>
+
+                        <div class="border-b border-slate-200 px-4 py-4 sm:px-6">
+                            <h3 class="text-base font-extrabold text-slate-950">Template assignments</h3>
+                            <p class="mt-1 text-sm text-slate-500">Change which reusable Messaging template a Campaign delivery option uses. Copy editing stays in the carousel above.</p>
+                        </div>
+
                         <div class="divide-y divide-slate-100">
                             @foreach($selectedCampaign->steps as $step)
                                 <div id="step-{{ $step->id }}" class="p-4 sm:p-6 {{ $selectedStep && $selectedStep->is($step) ? 'bg-indigo-50/40' : '' }}">
