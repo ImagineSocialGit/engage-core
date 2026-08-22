@@ -2,6 +2,10 @@
 
 namespace App\Modules\Relationships\Providers;
 
+use App\Modules\Relationships\Automation\ChangeRelationshipStageAutomationActionHandler;
+use App\Modules\Relationships\Automation\RelationshipStageAutomationPointAuthoringContributor;
+use App\Modules\Relationships\Automation\RelationshipStageAutomationPointDefinitionContributor;
+use App\Modules\Relationships\Capabilities\RelationshipsAutomationCapabilityContributor;
 use App\Modules\Core\Data\Contacts\ContactImportField;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportTreatmentRegistry;
@@ -17,6 +21,22 @@ class RelationshipsModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->tag([
+            RelationshipsAutomationCapabilityContributor::class,
+        ], 'automation.capability_contributors');
+
+        $this->app->tag([
+            RelationshipStageAutomationPointDefinitionContributor::class,
+        ], 'automation.point_definition_contributors');
+
+        $this->app->tag([
+            RelationshipStageAutomationPointAuthoringContributor::class,
+        ], 'automation.point_authoring_contributors');
+
+        $this->app->tag([
+            ChangeRelationshipStageAutomationActionHandler::class,
+        ], 'automation.action_handlers');
+
         $this->app->tag(
             RelationshipsSetupValidationContributor::class,
             'setup.validation_contributors',

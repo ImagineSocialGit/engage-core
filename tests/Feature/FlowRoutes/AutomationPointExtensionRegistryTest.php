@@ -26,6 +26,8 @@ class AutomationPointExtensionRegistryTest extends TestCase
         $this->assertArrayHasKey('send_message', $definitions);
         $this->assertArrayHasKey('enroll_campaign', $definitions);
         $this->assertArrayHasKey('cancel_campaign', $definitions);
+        $this->assertArrayHasKey('pause_campaign', $definitions);
+        $this->assertArrayHasKey('resume_campaign', $definitions);
     }
 
     public function test_point_definition_registry_rejects_duplicate_point_types(): void
@@ -81,5 +83,7 @@ class AutomationPointExtensionRegistryTest extends TestCase
         $this->assertTrue($registry->has('messaging.dispatch_message'));
         $this->assertTrue($registry->has('campaigns.enroll_contact'));
         $this->assertTrue($registry->has('campaigns.cancel_enrollment'));
+        $this->assertTrue($registry->has('campaigns.pause_enrollment'));
+        $this->assertTrue($registry->has('campaigns.resume_enrollment'));
     }
 }

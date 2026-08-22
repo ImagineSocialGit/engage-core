@@ -34,5 +34,31 @@ class CampaignsAutomationCapabilityContributor implements AutomationCapabilityCo
             requiredModules: ['campaigns'],
             sourceVersion: '2026_07_phase_6c_3',
         );
+
+        yield new AutomationCapabilityDefinition(
+            key: 'campaigns.pause_enrollment',
+            moduleKey: 'campaigns',
+            capabilityType: AutomationCapabilityDefinition::TYPE_ACTION,
+            pointType: 'pause_campaign',
+            handlerKey: 'pause_campaign',
+            actionKey: 'campaigns.pause_enrollment',
+            name: 'Pause campaign enrollment',
+            description: 'Pause an existing Campaign enrollment and optionally skip its pending messages.',
+            requiredModules: ['campaigns'],
+            sourceVersion: '2026_08_reply_outcomes_c2',
+        );
+
+        yield new AutomationCapabilityDefinition(
+            key: 'campaigns.resume_enrollment',
+            moduleKey: 'campaigns',
+            capabilityType: AutomationCapabilityDefinition::TYPE_ACTION,
+            pointType: 'resume_campaign',
+            handlerKey: 'resume_campaign',
+            actionKey: 'campaigns.resume_enrollment',
+            name: 'Resume campaign enrollment',
+            description: 'Resume an existing paused Campaign enrollment through the public Campaigns lifecycle seam.',
+            requiredModules: ['campaigns'],
+            sourceVersion: '2026_08_reply_outcomes_c2',
+        );
     }
 }

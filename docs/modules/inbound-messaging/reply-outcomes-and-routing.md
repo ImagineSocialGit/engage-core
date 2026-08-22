@@ -93,6 +93,41 @@ C5B intentionally removes SMS webhook source/IP/user-agent copies from `inbound_
 
 Raw provider request evidence belongs to the canonical webhook receipt. Durable normalized facts belong to `inbound_messages`, consent/revocation records, and the compact automation event.
 
+## Reply-outcome business action capabilities
+
+Business consequences remain owned by the module that owns the durable state. FlowRoutes only orchestrates the neutral capability/action seams.
+
+Campaigns contributes:
+
+```text
+campaigns.enroll_contact
+campaigns.cancel_enrollment
+campaigns.pause_enrollment
+campaigns.resume_enrollment
+```
+
+Pause/resume delegate to the same Campaign enrollment lifecycle actions used outside FlowRoutes. A reply Route may therefore pause a Campaign enrollment that was started by an import, another Route, or another supported Campaign entry path. Pausing may skip pending already-scheduled messages while preserving the enrollment so it can later resume.
+
+Relationships contributes:
+
+```text
+relationships.change_stage
+```
+
+The relationship-stage action changes only an existing active Contact relationship. It does not create a missing relationship and does not reactivate an inactive relationship. That guard keeps business-role progression separate from Contact identity and prevents a Realtor reply Route from accidentally manufacturing relationship state. The target relationship type and stage must both exist, and the target stage must be active.
+
+For authoring, relationship stage targets may be presented as one combined choice such as `Realtor — Engaged Agent`; the persisted Point definition remains normalized:
+
+```php
+[
+    'relationship_key' => 'realtor',
+    'stage_key' => 'engaged_agent',
+    'on_missing_relationship' => 'skipped',
+]
+```
+
+These capabilities add no new durable reply-outcome table or copied event payload. Campaign state remains in Campaigns/Messaging, relationship state remains in Relationships, and FlowRoutes retains only its normal execution/correlation records.
+
 ## CRM Contact conversation replies
 
 The Contact workspace may answer a normal inbound message directly from the CRM.

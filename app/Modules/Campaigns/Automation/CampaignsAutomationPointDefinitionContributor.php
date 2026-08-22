@@ -4,6 +4,8 @@ namespace App\Modules\Campaigns\Automation;
 
 use App\Modules\Campaigns\Data\Automation\CancelCampaignAutomationDefinition;
 use App\Modules\Campaigns\Data\Automation\EnrollCampaignAutomationDefinition;
+use App\Modules\Campaigns\Data\Automation\PauseCampaignAutomationDefinition;
+use App\Modules\Campaigns\Data\Automation\ResumeCampaignAutomationDefinition;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Support\AutomationCapabilities\Contracts\AutomationPointDefinitionContributor;
 use App\Support\AutomationCapabilities\Data\AutomationPointDefinition;
@@ -43,24 +45,29 @@ class CampaignsAutomationPointDefinitionContributor implements AutomationPointDe
 
         yield new AutomationPointDefinition(
             pointType: 'cancel_campaign',
-            schema: ConfigSchema::object([
-                'campaign_key' => ConfigField::required(
-                    ConfigSchema::string(),
-                    referenceTarget: 'campaigns',
-                ),
-                'reason' => ConfigField::defaulted(
-                    ConfigSchema::string(),
-                    'flow_route_cancelled_campaign',
-                ),
-                'on_not_enrolled' => ConfigField::defaulted(
-                    ConfigSchema::string(
-                        allowedValues: CancelCampaignAutomationDefinition::ON_NOT_ENROLLED_OPTIONS,
-                    ),
-                    CancelCampaignAutomationDefinition::ON_NOT_ENROLLED_SKIPPED,
-                ),
-                'skip_pending_messages' => ConfigField::defaulted(ConfigSchema::boolean(), true),
-                'meta' => ConfigField::defaulted($open, []),
-            ]),
+            schema: $this->lifecycleSchema(
+                CancelCampaignAutomationDefinition::ON_NOT_ENROLLED_OPTIONS,
+                'flow_route_cancelled_campaign',
+                true,
+            ),
+        );
+
+        yield new AutomationPointDefinition(
+            pointType: 'pause_campaign',
+            schema: $this->lifecycleSchema(
+                PauseCampaignAutomationDefinition::ON_NOT_ENROLLED_OPTIONS,
+                'flow_route_paused_campaign',
+                true,
+            ),
+        );
+
+        yield new AutomationPointDefinition(
+            pointType: 'resume_campaign',
+            schema: $this->lifecycleSchema(
+                ResumeCampaignAutomationDefinition::ON_NOT_ENROLLED_OPTIONS,
+                'flow_route_resumed_campaign',
+                false,
+            ),
         );
     }
 
@@ -75,6 +82,8 @@ class CampaignsAutomationPointDefinitionContributor implements AutomationPointDe
         $parsed = match ($pointType) {
             'enroll_campaign' => EnrollCampaignAutomationDefinition::from($input),
             'cancel_campaign' => CancelCampaignAutomationDefinition::from($input),
+            'pause_campaign' => PauseCampaignAutomationDefinition::from($input),
+            'resume_campaign' => ResumeCampaignAutomationDefinition::from($input),
             default => null,
         };
 
@@ -112,6 +121,40 @@ class CampaignsAutomationPointDefinitionContributor implements AutomationPointDe
                 ],
             );
         }
+    }
+
+    /**
+     * @param array<int, string> $onNotEnrolledOptions
+     */
+    private function lifecycleSchema(
+        array $onNotEnrolledOptions,
+        string $defaultReason,
+        bool $withSkipPendingMessages,
+    ): ConfigSchema {
+        $fields = [
+            'campaign_key' => ConfigField::required(
+                ConfigSchema::string(),
+                referenceTarget: 'campaigns',
+            ),
+            'reason' => ConfigField::defaulted(
+                ConfigSchema::string(),
+                $defaultReason,
+            ),
+            'on_not_enrolled' => ConfigField::defaulted(
+                ConfigSchema::string(allowedValues: $onNotEnrolledOptions),
+                'skipped',
+            ),
+            'meta' => ConfigField::defaulted($this->openSchema(), []),
+        ];
+
+        if ($withSkipPendingMessages) {
+            $fields['skip_pending_messages'] = ConfigField::defaulted(
+                ConfigSchema::boolean(),
+                true,
+            );
+        }
+
+        return ConfigSchema::object($fields);
     }
 
     private function openSchema(): ConfigSchema

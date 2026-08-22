@@ -103,7 +103,9 @@
 │   │   │   │   ├── CampaignsAutomationPointAuthoringContributor.php
 │   │   │   │   ├── CampaignsAutomationPointDefinitionContributor.php
 │   │   │   │   ├── CancelCampaignAutomationActionHandler.php
-│   │   │   │   └── EnrollCampaignAutomationActionHandler.php
+│   │   │   │   ├── EnrollCampaignAutomationActionHandler.php
+│   │   │   │   ├── PauseCampaignAutomationActionHandler.php
+│   │   │   │   └── ResumeCampaignAutomationActionHandler.php
 │   │   │   ├── Capabilities
 │   │   │   │   └── CampaignsAutomationCapabilityContributor.php
 │   │   │   ├── ConfigContracts
@@ -122,7 +124,9 @@
 │   │   │   ├── Data
 │   │   │   │   ├── Automation
 │   │   │   │   │   ├── CancelCampaignAutomationDefinition.php
-│   │   │   │   │   └── EnrollCampaignAutomationDefinition.php
+│   │   │   │   │   ├── EnrollCampaignAutomationDefinition.php
+│   │   │   │   │   ├── PauseCampaignAutomationDefinition.php
+│   │   │   │   │   └── ResumeCampaignAutomationDefinition.php
 │   │   │   │   ├── CampaignEnrollmentArbitrationResult.php
 │   │   │   │   ├── CampaignPresetDefinition.php
 │   │   │   │   ├── CampaignPresetSyncResult.php
@@ -825,10 +829,20 @@
 │   │   │   └── Support
 │   │   ├── Relationships
 │   │   │   ├── Actions
+│   │   │   │   ├── ChangeContactRelationshipStageAction.php
 │   │   │   │   └── UpsertContactRelationshipAction.php
+│   │   │   ├── Automation
+│   │   │   │   ├── ChangeRelationshipStageAutomationActionHandler.php
+│   │   │   │   ├── RelationshipStageAutomationPointAuthoringContributor.php
+│   │   │   │   └── RelationshipStageAutomationPointDefinitionContributor.php
+│   │   │   ├── Capabilities
+│   │   │   │   └── RelationshipsAutomationCapabilityContributor.php
 │   │   │   ├── Controllers
 │   │   │   │   └── CRM
 │   │   │   │       └── ContactRelationshipController.php
+│   │   │   ├── Data
+│   │   │   │   └── Automation
+│   │   │   │       └── ChangeRelationshipStageAutomationDefinition.php
 │   │   │   ├── Import
 │   │   │   │   ├── ContactRelationshipImportHandler.php
 │   │   │   │   └── Treatments
@@ -2149,6 +2163,7 @@
 │   │   │   ├── CampaignEnrollmentLifecycleBridgeTest.php
 │   │   │   ├── CampaignLaunchTimingContactImportControllerTest.php
 │   │   │   ├── CampaignLaunchTimingContactImportPostProcessorTest.php
+│   │   │   ├── CampaignLifecycleAutomationCapabilityTest.php
 │   │   │   ├── CampaignMessageChainBridgeTest.php
 │   │   │   ├── CampaignMessageChainPresetSyncTest.php
 │   │   │   ├── CampaignMessageChainRuntimeOwnershipTest.php
@@ -2420,7 +2435,8 @@
 │   │   │   ├── RelationshipImportTreatmentTest.php
 │   │   │   ├── RelationshipLocationAreaBridgeTest.php
 │   │   │   ├── RelationshipLocationAreaImportHandlerTest.php
-│   │   │   └── RelationshipsFoundationTest.php
+│   │   │   ├── RelationshipsFoundationTest.php
+│   │   │   └── RelationshipStageAutomationCapabilityTest.php
 │   │   ├── Reporting
 │   │   │   ├── ReportingBrowserClientContractTest.php
 │   │   │   ├── ReportingDailyProjectionTest.php
@@ -2575,4 +2591,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-638 directories, 1938 files
+642 directories, 1950 files
