@@ -38,7 +38,7 @@ return [
     'modules' => [
         'core' => [
             'path' => 'database/migrations/modules/core',
-            'schema_version' => 2,
+            'schema_version' => 3,
             'migrations' => [
                 '2026_04_15_195800_create_contact_statuses_table.php',
                 '2026_04_15_195849_create_contact_import_batches_table.php',
@@ -47,6 +47,7 @@ return [
                 '2026_04_15_203549_create_notes_table.php',
                 '2026_07_13_120000_create_site_settings_table.php',
                 '2026_08_19_161800_create_contact_import_occurrences_table.php',
+                '2026_08_22_113500_add_birthday_to_contacts_table.php',
             ],
         ],
 
@@ -215,11 +216,12 @@ return [
 
         'campaigns' => [
             'path' => 'database/migrations/modules/campaigns',
-            'schema_version' => 2,
+            'schema_version' => 3,
             'migrations' => [
                 '2026_06_12_050337_create_campaigns_table.php',
                 '2026_06_12_050338_create_campaign_steps_table.php',
                 '2026_06_12_050339_create_campaign_enrollments_table.php',
+                '2026_08_22_113501_create_campaign_touch_date_tables.php',
             ],
         ],
 

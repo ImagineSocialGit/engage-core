@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 4,
+    'version' => 5,
     'tables' => [
         'campaigns' => [
             'mode' => 'upsert',
@@ -105,6 +105,96 @@ return [
             ],
             'references' => [
                 'campaign_step_id' => 'campaign_steps',
+            ],
+        ],
+
+
+        'campaign_touch_programs' => [
+            'mode' => 'upsert',
+            'identity' => [
+                'campaign_id',
+                'key',
+            ],
+            'preserve_id' => false,
+            'order_by' => ['campaign_id', 'id'],
+            'columns' => [
+                'id',
+                'campaign_id',
+                'key',
+                'name',
+                'audience_type',
+                'audience_key',
+                'recurrence',
+                'repeat_years',
+                'is_active',
+                'meta',
+                'created_at',
+                'updated_at',
+            ],
+            'json_columns' => ['meta'],
+            'references' => [
+                'campaign_id' => 'campaigns',
+            ],
+        ],
+
+        'campaign_touch_dates' => [
+            'mode' => 'upsert',
+            'identity' => [
+                'campaign_touch_program_id',
+                'key',
+            ],
+            'preserve_id' => false,
+            'order_by' => ['campaign_touch_program_id', 'sort_order', 'id'],
+            'columns' => [
+                'id',
+                'campaign_touch_program_id',
+                'key',
+                'name',
+                'source_type',
+                'source_key',
+                'month',
+                'day',
+                'offset_days',
+                'send_time',
+                'sort_order',
+                'is_active',
+                'meta',
+                'created_at',
+                'updated_at',
+            ],
+            'json_columns' => ['meta'],
+            'references' => [
+                'campaign_touch_program_id' => 'campaign_touch_programs',
+            ],
+        ],
+
+        'campaign_touch_variants' => [
+            'mode' => 'upsert',
+            'identity' => [
+                'campaign_touch_date_id',
+                'key',
+            ],
+            'preserve_id' => false,
+            'order_by' => ['campaign_touch_date_id', 'sort_order', 'id'],
+            'columns' => [
+                'id',
+                'campaign_touch_date_id',
+                'key',
+                'name',
+                'sort_order',
+                'channel',
+                'purpose',
+                'scope',
+                'message_template_preset_id',
+                'is_active',
+                'meta',
+                'created_at',
+                'updated_at',
+            ],
+            'json_columns' => ['meta'],
+            'references' => [
+                'campaign_touch_date_id' => 'campaign_touch_dates',
+                'message_template_preset_id' => 'message_template_presets',
             ],
         ],
 

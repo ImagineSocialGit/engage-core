@@ -149,7 +149,10 @@
 │   │   │   │   ├── CampaignEnrollment.php
 │   │   │   │   ├── Campaign.php
 │   │   │   │   ├── CampaignStep.php
-│   │   │   │   └── CampaignStepVariant.php
+│   │   │   │   ├── CampaignStepVariant.php
+│   │   │   │   ├── CampaignTouchDate.php
+│   │   │   │   ├── CampaignTouchProgram.php
+│   │   │   │   └── CampaignTouchVariant.php
 │   │   │   ├── Providers
 │   │   │   │   └── CampaignsModuleServiceProvider.php
 │   │   │   ├── Requests
@@ -1656,7 +1659,8 @@
 │   │   │   ├── campaigns
 │   │   │   │   ├── 2026_06_12_050337_create_campaigns_table.php
 │   │   │   │   ├── 2026_06_12_050338_create_campaign_steps_table.php
-│   │   │   │   └── 2026_06_12_050339_create_campaign_enrollments_table.php
+│   │   │   │   ├── 2026_06_12_050339_create_campaign_enrollments_table.php
+│   │   │   │   └── 2026_08_22_113501_create_campaign_touch_date_tables.php
 │   │   │   ├── commerce
 │   │   │   │   ├── 2026_07_02_000005_create_commerce_customers_table.php
 │   │   │   │   ├── 2026_07_02_000006_create_commerce_products_table.php
@@ -1670,7 +1674,8 @@
 │   │   │   │   ├── 2026_04_15_195851_create_contact_tags_table.php
 │   │   │   │   ├── 2026_04_15_203549_create_notes_table.php
 │   │   │   │   ├── 2026_07_13_120000_create_site_settings_table.php
-│   │   │   │   └── 2026_08_19_161800_create_contact_import_occurrences_table.php
+│   │   │   │   ├── 2026_08_19_161800_create_contact_import_occurrences_table.php
+│   │   │   │   └── 2026_08_22_113500_add_birthday_to_contacts_table.php
 │   │   │   ├── documents
 │   │   │   │   ├── 2026_07_02_000001_create_document_requirement_definitions_table.php
 │   │   │   │   ├── 2026_07_02_000002_create_document_requests_table.php
@@ -1810,6 +1815,7 @@
 │   │   │   ├── module_state.md
 │   │   │   └── TODO.md
 │   │   ├── campaigns
+│   │   │   ├── annual-touch-dates.md
 │   │   │   ├── entry-and-launch-safety.md
 │   │   │   ├── module_state.md
 │   │   │   └── TODO.md
@@ -2184,6 +2190,7 @@
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
 │   │   │   ├── CampaignSimulatorTest.php
 │   │   │   ├── CampaignsSetupValidationContributorTest.php
+│   │   │   ├── CampaignTouchDateFoundationTest.php
 │   │   │   ├── CampaignVariantPresetSyncSpecificityTest.php
 │   │   │   ├── CampaignWorkspaceControllerTest.php
 │   │   │   ├── CompactCampaignPresetAuthoringTest.php
@@ -2211,6 +2218,7 @@
 │   │   │   ├── CoreWebinarMessagingDefaultsTest.php
 │   │   │   └── WebinarRegistrationConsentContentConfigTest.php
 │   │   ├── Core
+│   │   │   ├── ContactBirthdayFoundationTest.php
 │   │   │   ├── ContactControllerTest.php
 │   │   │   ├── ContactFilterCriteriaTest.php
 │   │   │   ├── ContactFilterResolverTest.php
@@ -2607,4 +2615,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-644 directories, 1964 files
+644 directories, 1972 files

@@ -23,6 +23,7 @@ class Contact extends Model
         'name',
         'email',
         'phone',
+        'birthday',
         'source',
         'subsource',
         'contact_import_batch_id',
@@ -32,6 +33,7 @@ class Contact extends Model
     ];
 
     protected $casts = [
+        'birthday' => 'date',
         'last_contacted_at' => 'datetime',
         'last_activity_at' => 'datetime',
         'meta' => 'array',

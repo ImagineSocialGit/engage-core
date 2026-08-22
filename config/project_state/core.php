@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 2,
+    'version' => 3,
     'tables' => [
         'contact_statuses' => [
             'mode' => 'upsert',
@@ -60,6 +60,7 @@ return [
                 'name',
                 'email',
                 'phone',
+                'birthday',
                 'source',
                 'subsource',
                 'contact_import_batch_id',

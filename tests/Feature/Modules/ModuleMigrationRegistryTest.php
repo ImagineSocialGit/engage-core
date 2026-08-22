@@ -54,7 +54,7 @@ class ModuleMigrationRegistryTest extends TestCase
         ], $registry->requireModule('relationships')->migrationFiles);
 
         $this->assertSame(
-            2,
+            3,
             $registry->requireModule('campaigns')->schemaVersion,
         );
 
