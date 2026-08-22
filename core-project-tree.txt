@@ -465,6 +465,7 @@
 │   │   │   │   │   └── RecordInboundEmailAction.php
 │   │   │   │   ├── ProcessInboundMessageAction.php
 │   │   │   │   ├── RecordInboundMessageAction.php
+│   │   │   │   ├── SendContactConversationReplyAction.php
 │   │   │   │   └── Sms
 │   │   │   │       ├── HandleInboundSmsWebhookAction.php
 │   │   │   │       ├── Inbound
@@ -479,6 +480,8 @@
 │   │   │   │   └── Sms
 │   │   │   │       └── SmsWebhookHandler.php
 │   │   │   ├── Controllers
+│   │   │   │   ├── CRM
+│   │   │   │   │   └── ContactConversationReplyController.php
 │   │   │   │   └── Webhooks
 │   │   │   │       ├── EmailWebhookController.php
 │   │   │   │       └── SmsWebhookController.php
@@ -491,6 +494,7 @@
 │   │   │   ├── Providers
 │   │   │   │   └── InboundMessagingModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   │   └── StoreContactConversationReplyRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── ContactShow
 │   │   │   │   │   └── ContactConversationShowDataProvider.php
@@ -2077,6 +2081,7 @@
 │   │   ├── campaigns.php
 │   │   ├── core.php
 │   │   ├── flow-routes.php
+│   │   ├── inbound-messaging.php
 │   │   ├── messaging.php
 │   │   ├── relationships.php
 │   │   ├── reporting.php
@@ -2244,6 +2249,7 @@
 │   │   │   ├── FormSubmissionVerificationTest.php
 │   │   │   └── PublishedFormRuntimeTest.php
 │   │   ├── InboundMessaging
+│   │   │   ├── ContactConversationReplyControllerTest.php
 │   │   │   ├── ContactConversationShowDataProviderTest.php
 │   │   │   ├── HandleInboundEmailWebhookActionTest.php
 │   │   │   ├── InboundMessageAutomationOutboxTest.php
@@ -2566,4 +2572,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-637 directories, 1930 files
+638 directories, 1935 files

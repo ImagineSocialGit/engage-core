@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Modules\Core\Models\Contact;
 use App\Modules\InboundMessaging\Models\InboundMessage;
 use App\Modules\InboundMessaging\Services\ContactShow\ContactConversationShowDataProvider;
+use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -15,7 +16,7 @@ class ContactConversationShowDataProviderTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_contact_conversation_combines_normal_replies_with_recent_sent_context(): void
+    public function test_contact_conversation_combines_inbound_context_and_manual_crm_replies(): void
     {
         $contact = Contact::factory()->create([
             'email' => 'person@example.test',
@@ -37,7 +38,7 @@ class ContactConversationShowDataProviderTest extends TestCase
                 'send_at' => now()->subMinutes(10),
             ]);
 
-        InboundMessage::query()->create([
+        $inbound = InboundMessage::query()->create([
             'sender_type' => $contact->getMorphClass(),
             'sender_id' => $contact->getKey(),
             'client_key' => 'test-client',
@@ -61,30 +62,96 @@ class ContactConversationShowDataProviderTest extends TestCase
             'meta' => [],
         ]);
 
+        ScheduledMessage::factory()
+            ->forContact($contact)
+            ->email()
+            ->create([
+                'purpose' => 'marketing',
+                'scope' => 'mortgage_homebuyer_nurture',
+                'message_type' => 'conversation_reply',
+                'payload' => [
+                    'to' => 'person@example.test',
+                    'subject' => 'Re: Are you still thinking about buying?',
+                    'body' => 'Absolutely. I can call you tomorrow morning.',
+                ],
+                'send_at' => now()->subMinute(),
+                'status' => ScheduledMessage::STATUS_PENDING,
+            ]);
+
         $data = app(ContactConversationShowDataProvider::class)->dataFor($contact);
         $items = collect($data['conversationItems']);
 
-        $this->assertCount(2, $items);
-        $this->assertSame('inbound', $items[0]['direction']);
+        $this->assertCount(3, $items);
+        $this->assertSame('outbound', $items[0]['direction']);
         $this->assertSame(
-            'Yes, I am ready. Please call me tomorrow.',
+            'Absolutely. I can call you tomorrow morning.',
             $items[0]['body'],
         );
-        $this->assertSame('High Intent', $items[0]['intent']);
-        $this->assertSame('outbound', $items[1]['direction']);
+        $this->assertSame(ScheduledMessage::STATUS_PENDING, $items[0]['status']);
+        $this->assertSame('inbound', $items[1]['direction']);
+        $this->assertSame(
+            'Yes, I am ready. Please call me tomorrow.',
+            $items[1]['body'],
+        );
+        $this->assertSame('High Intent', $items[1]['intent']);
+        $this->assertSame('outbound', $items[2]['direction']);
         $this->assertSame(
             'Are you still thinking about buying?',
-            $items[1]['title'],
+            $items[2]['title'],
         );
-        $this->assertNull($items[1]['body']);
+        $this->assertNull($items[2]['body']);
         $this->assertSame(
-            $items[0]['id'],
+            'inbound-'.$inbound->getKey(),
             $data['latestInboundReply']['id'],
         );
     }
 
+    public function test_reply_context_uses_existing_messaging_permission_state(): void
+    {
+        $contact = Contact::factory()->create([
+            'phone' => '+15551234567',
+        ]);
 
-    public function test_registered_provider_surfaces_contact_conversation_on_contact_workspace(): void
+        MessageConsent::query()->create([
+            'contact_id' => $contact->getKey(),
+            'channel' => 'sms',
+            'purpose' => 'marketing',
+            'scope' => 'general',
+            'consented_at' => now(),
+            'source' => 'test',
+        ]);
+
+        $inbound = InboundMessage::query()->create([
+            'sender_type' => $contact->getMorphClass(),
+            'sender_id' => $contact->getKey(),
+            'client_key' => 'test-client',
+            'channel' => 'sms',
+            'provider' => 'telnyx',
+            'provider_event_id' => 'contact-conversation-reply-context',
+            'from_type' => 'phone',
+            'from_value' => '+15551234567',
+            'to_type' => 'phone',
+            'to_value' => '+15557654321',
+            'body' => 'Please call me tomorrow.',
+            'classification' => InboundMessage::CLASSIFICATION_NORMAL_REPLY,
+            'purpose' => 'marketing',
+            'scope' => 'general',
+            'received_at' => now(),
+            'meta' => [],
+        ]);
+
+        $data = app(ContactConversationShowDataProvider::class)->dataFor($contact);
+
+        $this->assertSame(
+            $inbound->getKey(),
+            data_get($data, 'conversationReply.inbound_message_id'),
+        );
+        $this->assertSame('sms', data_get($data, 'conversationReply.channel'));
+        $this->assertTrue(data_get($data, 'conversationReply.can_send'));
+        $this->assertNull(data_get($data, 'conversationReply.unavailable_reason'));
+    }
+
+    public function test_registered_provider_surfaces_conversation_as_contact_work_rail(): void
     {
         config()->set('modules.enabled', [
             'messaging',
@@ -118,8 +185,9 @@ class ContactConversationShowDataProviderTest extends TestCase
         $this->actingAs($user)
             ->get(route('crm.contacts.show', $contact))
             ->assertOk()
-            ->assertSee('data-module-panel="inbound_messaging"', false)
-            ->assertSee('Please call me tomorrow.');
+            ->assertSee('data-contact-conversation-rail', false)
+            ->assertSee('Please call me tomorrow.')
+            ->assertDontSee('What’s already happening');
     }
 
     public function test_non_reply_inbound_commands_do_not_pollute_contact_conversation(): void
@@ -149,5 +217,6 @@ class ContactConversationShowDataProviderTest extends TestCase
 
         $this->assertEquals([], $data['conversationItems']);
         $this->assertNull($data['latestInboundReply']);
+        $this->assertNull($data['conversationReply']);
     }
 }

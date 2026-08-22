@@ -92,3 +92,39 @@ Campaign provenance remains derivable through the correlated ScheduledMessage an
 C5B intentionally removes SMS webhook source/IP/user-agent copies from `inbound_messages.meta` and removes duplicated provider/body evidence from STOP revocation metadata.
 
 Raw provider request evidence belongs to the canonical webhook receipt. Durable normalized facts belong to `inbound_messages`, consent/revocation records, and the compact automation event.
+
+## CRM Contact conversation replies
+
+The Contact workspace may answer a normal inbound message directly from the CRM.
+
+Ownership remains split deliberately:
+
+```text
+InboundMessaging
+    validates the selected inbound reply belongs to the Contact
+    derives the existing channel / purpose / scope conversation context
+    presents the Contact conversation rail and reply composer
+
+Messaging
+    remains the outbound delivery authority
+    re-checks destination, consent, suppression, and recipient eligibility
+    persists the ScheduledMessage
+    queues provider delivery
+    generates the signed email Reply-To identity for later correlation
+```
+
+The operator reply uses the same channel as the inbound message. It does not invent a
+new consent domain or bypass MessageGate. If the inbound record cannot provide a
+purpose/scope context, or the current Messaging gate denies the send, the composer is
+not sendable.
+
+CRM replies are normal `ScheduledMessage` records with `message_type=conversation_reply`.
+They retain only compact operational provenance (`surface=crm_contact_conversation`) and
+reuse the existing ScheduledMessage dedupe key for form-submit idempotency. The inbound
+body is not copied into ScheduledMessage metadata.
+
+For email, the visible subject defaults to the correlated outbound subject with `Re:`.
+Provider-native `In-Reply-To` / `References` headers are not synthesized from a provider
+API id because that id is not guaranteed to be the RFC Message-ID. Later recipient
+replies still correlate through the normal signed Reply-To address generated for the new
+ScheduledMessage.

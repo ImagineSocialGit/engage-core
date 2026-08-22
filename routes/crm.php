@@ -8,6 +8,7 @@ Route::middleware('auth')->group(function () {
     require __DIR__.'/crm/webinars.php';
     require __DIR__.'/crm/campaigns.php';
     require __DIR__.'/crm/messaging.php';
+    require __DIR__.'/crm/inbound-messaging.php';
     require __DIR__.'/crm/reporting.php';
     require __DIR__.'/crm/flow-routes.php';
     require __DIR__.'/crm/broadcasts.php';
