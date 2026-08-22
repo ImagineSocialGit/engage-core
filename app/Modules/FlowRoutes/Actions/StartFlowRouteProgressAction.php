@@ -74,7 +74,7 @@ class StartFlowRouteProgressAction
     private function activeFlowRouteForTransition(ContactWorkflowStatusTransition $transition): ?FlowRoute
     {
         return $this->flowRouteTriggerBindingResolver
-            ->selectedFlowRouteForContactStatus($transition->toContactStatusId);
+            ->selectedFlowRouteForTransition($transition);
     }
 
     private function startingFlowRoutePoint(FlowRoute $flowRoute): ?FlowRoutePoint

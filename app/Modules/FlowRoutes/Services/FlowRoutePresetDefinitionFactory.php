@@ -4,7 +4,6 @@ namespace App\Modules\FlowRoutes\Services;
 
 use App\Modules\FlowRoutes\Data\Presets\FlowRoutePointPresetDefinition;
 use App\Modules\FlowRoutes\Data\Presets\FlowRoutePresetDefinition;
-use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Support\AutomationCapabilities\AutomationCapabilityRegistry;
 use App\Support\AutomationCapabilities\AutomationPointDefinitionRegistry;
@@ -16,6 +15,9 @@ class FlowRoutePresetDefinitionFactory
     private const ROUTE_FIELDS = [
         'contact_status_key',
         'event_key',
+        'from_contact_status_keys',
+        'transition_sources',
+        'transition_reasons',
         'name',
         'description',
         'version',
@@ -63,6 +65,7 @@ class FlowRoutePresetDefinitionFactory
         $key = $this->requiredKey($definitionKey, 'FlowRoute definition key');
         $contactStatusKey = $this->nullableString($data['contact_status_key'] ?? null);
         $eventKey = $this->nullableString($data['event_key'] ?? null);
+        $transition = $this->transitionQualifiers($data, $contactStatusKey, $eventKey, $key);
 
         if ($contactStatusKey !== null && $eventKey !== null) {
             throw new InvalidArgumentException(
@@ -160,6 +163,7 @@ class FlowRoutePresetDefinitionFactory
             meta: array_filter([
                 'category' => $this->nullableString($data['category'] ?? null),
                 'default_role' => $this->nullableString($data['role'] ?? null),
+                'transition' => $transition !== [] ? $transition : null,
             ], static fn (mixed $value): bool => $value !== null),
         );
     }
@@ -200,12 +204,6 @@ class FlowRoutePresetDefinitionFactory
             $data['type'] ?? null,
             "FlowRoute preset [{$routeKey}] point [{$pointKey}] type",
         );
-
-        if (! in_array($type, FlowRoutePointType::values(), true)) {
-            throw new InvalidArgumentException(
-                "Unsupported FlowRoutePoint type [{$type}] for preset route point [{$pointKey}]."
-            );
-        }
 
         $pointDefinition = $this->pointDefinitionRegistry->get($type);
 
@@ -393,6 +391,80 @@ class FlowRoutePresetDefinitionFactory
         }
 
         return $definition;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<string, array<int, string>>
+     */
+    private function transitionQualifiers(
+        array $data,
+        ?string $contactStatusKey,
+        ?string $eventKey,
+        string $routeKey,
+    ): array {
+        $fromStatusKeys = $this->stringListField(
+            data: $data,
+            field: 'from_contact_status_keys',
+            context: "FlowRoute preset [{$routeKey}]",
+        );
+        $sources = $this->stringListField(
+            data: $data,
+            field: 'transition_sources',
+            context: "FlowRoute preset [{$routeKey}]",
+        );
+        $reasons = $this->stringListField(
+            data: $data,
+            field: 'transition_reasons',
+            context: "FlowRoute preset [{$routeKey}]",
+        );
+
+        if (($fromStatusKeys !== [] || $sources !== [] || $reasons !== [])
+            && ($contactStatusKey === null || $eventKey !== null)
+        ) {
+            throw new InvalidArgumentException(
+                "FlowRoute preset [{$routeKey}] transition qualifiers require [contact_status_key]."
+            );
+        }
+
+        return array_filter([
+            'from_contact_status_keys' => $fromStatusKeys,
+            'sources' => $sources,
+            'reasons' => $reasons,
+        ], static fn (array $values): bool => $values !== []);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<int, string>
+     */
+    private function stringListField(array $data, string $field, string $context): array
+    {
+        if (! array_key_exists($field, $data) || $data[$field] === null) {
+            return [];
+        }
+
+        $value = $data[$field];
+
+        if (! is_array($value) || ! array_is_list($value)) {
+            throw new InvalidArgumentException(
+                "{$context} field [{$field}] must be a list of non-empty strings."
+            );
+        }
+
+        $normalized = [];
+
+        foreach ($value as $item) {
+            if (! is_string($item) || trim($item) === '') {
+                throw new InvalidArgumentException(
+                    "{$context} field [{$field}] must contain only non-empty strings."
+                );
+            }
+
+            $normalized[] = trim($item);
+        }
+
+        return array_values(array_unique($normalized));
     }
 
     /**

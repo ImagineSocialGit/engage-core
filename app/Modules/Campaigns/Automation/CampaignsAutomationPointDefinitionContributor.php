@@ -3,8 +3,10 @@
 namespace App\Modules\Campaigns\Automation;
 
 use App\Modules\Campaigns\Data\Automation\CancelCampaignAutomationDefinition;
+use App\Modules\Campaigns\Data\Automation\CancelCampaignFamilyAutomationDefinition;
 use App\Modules\Campaigns\Data\Automation\EnrollCampaignAutomationDefinition;
 use App\Modules\Campaigns\Data\Automation\PauseCampaignAutomationDefinition;
+use App\Modules\Campaigns\Data\Automation\PauseCampaignFamilyAutomationDefinition;
 use App\Modules\Campaigns\Data\Automation\ResumeCampaignAutomationDefinition;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Support\AutomationCapabilities\Contracts\AutomationPointDefinitionContributor;
@@ -45,7 +47,7 @@ class CampaignsAutomationPointDefinitionContributor implements AutomationPointDe
 
         yield new AutomationPointDefinition(
             pointType: 'cancel_campaign',
-            schema: $this->lifecycleSchema(
+            schema: $this->campaignLifecycleSchema(
                 CancelCampaignAutomationDefinition::ON_NOT_ENROLLED_OPTIONS,
                 'flow_route_cancelled_campaign',
                 true,
@@ -54,7 +56,7 @@ class CampaignsAutomationPointDefinitionContributor implements AutomationPointDe
 
         yield new AutomationPointDefinition(
             pointType: 'pause_campaign',
-            schema: $this->lifecycleSchema(
+            schema: $this->campaignLifecycleSchema(
                 PauseCampaignAutomationDefinition::ON_NOT_ENROLLED_OPTIONS,
                 'flow_route_paused_campaign',
                 true,
@@ -63,10 +65,26 @@ class CampaignsAutomationPointDefinitionContributor implements AutomationPointDe
 
         yield new AutomationPointDefinition(
             pointType: 'resume_campaign',
-            schema: $this->lifecycleSchema(
+            schema: $this->campaignLifecycleSchema(
                 ResumeCampaignAutomationDefinition::ON_NOT_ENROLLED_OPTIONS,
                 'flow_route_resumed_campaign',
                 false,
+            ),
+        );
+
+        yield new AutomationPointDefinition(
+            pointType: 'pause_campaign_family',
+            schema: $this->familyLifecycleSchema(
+                PauseCampaignFamilyAutomationDefinition::ON_NOT_ENROLLED_OPTIONS,
+                'flow_route_paused_campaign_family',
+            ),
+        );
+
+        yield new AutomationPointDefinition(
+            pointType: 'cancel_campaign_family',
+            schema: $this->familyLifecycleSchema(
+                CancelCampaignFamilyAutomationDefinition::ON_NOT_ENROLLED_OPTIONS,
+                'flow_route_cancelled_campaign_family',
             ),
         );
     }
@@ -84,6 +102,8 @@ class CampaignsAutomationPointDefinitionContributor implements AutomationPointDe
             'cancel_campaign' => CancelCampaignAutomationDefinition::from($input),
             'pause_campaign' => PauseCampaignAutomationDefinition::from($input),
             'resume_campaign' => ResumeCampaignAutomationDefinition::from($input),
+            'pause_campaign_family' => PauseCampaignFamilyAutomationDefinition::from($input),
+            'cancel_campaign_family' => CancelCampaignFamilyAutomationDefinition::from($input),
             default => null,
         };
 
@@ -106,10 +126,9 @@ class CampaignsAutomationPointDefinitionContributor implements AutomationPointDe
             return;
         }
 
-        if ($parsed->campaignKey !== null
-            && ! Campaign::query()
-                ->where('key', $parsed->campaignKey)
-                ->exists()
+        if (property_exists($parsed, 'campaignKey')
+            && $parsed->campaignKey !== null
+            && ! Campaign::query()->where('key', $parsed->campaignKey)->exists()
         ) {
             yield $context->error(
                 code: 'flow_routes.campaign_missing',
@@ -121,12 +140,27 @@ class CampaignsAutomationPointDefinitionContributor implements AutomationPointDe
                 ],
             );
         }
+
+        if (property_exists($parsed, 'familyKey')
+            && $parsed->familyKey !== null
+            && ! Campaign::query()->where('family_key', $parsed->familyKey)->exists()
+        ) {
+            yield $context->error(
+                code: 'flow_routes.campaign_family_missing',
+                message: "FlowRoute [{$context->containerKey}] point [{$context->pointKey}] references missing Campaign family [{$parsed->familyKey}].",
+                path: "{$context->path}.definition.family_key",
+                context: [
+                    'point_key' => $context->pointKey,
+                    'family_key' => $parsed->familyKey,
+                ],
+            );
+        }
     }
 
     /**
      * @param array<int, string> $onNotEnrolledOptions
      */
-    private function lifecycleSchema(
+    private function campaignLifecycleSchema(
         array $onNotEnrolledOptions,
         string $defaultReason,
         bool $withSkipPendingMessages,
@@ -155,6 +189,29 @@ class CampaignsAutomationPointDefinitionContributor implements AutomationPointDe
         }
 
         return ConfigSchema::object($fields);
+    }
+
+    /** @param array<int, string> $onNotEnrolledOptions */
+    private function familyLifecycleSchema(
+        array $onNotEnrolledOptions,
+        string $defaultReason,
+    ): ConfigSchema {
+        return ConfigSchema::object([
+            'family_key' => ConfigField::required(ConfigSchema::string()),
+            'reason' => ConfigField::defaulted(
+                ConfigSchema::string(),
+                $defaultReason,
+            ),
+            'on_not_enrolled' => ConfigField::defaulted(
+                ConfigSchema::string(allowedValues: $onNotEnrolledOptions),
+                'skipped',
+            ),
+            'skip_pending_messages' => ConfigField::defaulted(
+                ConfigSchema::boolean(),
+                true,
+            ),
+            'meta' => ConfigField::defaulted($this->openSchema(), []),
+        ]);
     }
 
     private function openSchema(): ConfigSchema

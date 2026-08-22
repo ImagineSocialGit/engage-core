@@ -26,6 +26,10 @@ class AdvanceContactFlowRouteProgressAction
             return $progress;
         }
 
+        if ($result?->completeFlowRoute) {
+            return $this->completeContactFlowRouteProgress->handle($progress, $result);
+        }
+
         $nextPlanItem = $this->requestedNextPlanItem($fromPlanItem, $result)
             ?? $this->configuredNextPlanItem($fromPlanItem, $fromFlowRoutePoint)
             ?? $this->nextSequentialPlanItem($fromPlanItem);

@@ -18,30 +18,29 @@ class PointExecutionResult
         self::STATUS_FAILED,
     ];
 
-    /**
-     * @param array<string, mixed> $meta
-     */
+    /** @param array<string, mixed> $meta */
     public function __construct(
         public readonly string $status,
         public readonly ?string $reason = null,
         public readonly array $meta = [],
+        public readonly bool $completeFlowRoute = false,
     ) {}
 
-    /**
-     * @param array<string, mixed> $meta
-     */
-    public static function completed(?string $reason = null, array $meta = []): self
-    {
+    /** @param array<string, mixed> $meta */
+    public static function completed(
+        ?string $reason = null,
+        array $meta = [],
+        bool $completeFlowRoute = false,
+    ): self {
         return new self(
             status: self::STATUS_COMPLETED,
             reason: $reason,
             meta: $meta,
+            completeFlowRoute: $completeFlowRoute,
         );
     }
 
-    /**
-     * @param array<string, mixed> $meta
-     */
+    /** @param array<string, mixed> $meta */
     public static function waiting(?string $reason = null, array $meta = []): self
     {
         return new self(
@@ -51,9 +50,7 @@ class PointExecutionResult
         );
     }
 
-    /**
-     * @param array<string, mixed> $meta
-     */
+    /** @param array<string, mixed> $meta */
     public static function blocked(?string $reason = null, array $meta = []): self
     {
         return new self(
@@ -63,9 +60,7 @@ class PointExecutionResult
         );
     }
 
-    /**
-     * @param array<string, mixed> $meta
-     */
+    /** @param array<string, mixed> $meta */
     public static function skipped(?string $reason = null, array $meta = []): self
     {
         return new self(
@@ -75,9 +70,7 @@ class PointExecutionResult
         );
     }
 
-    /**
-     * @param array<string, mixed> $meta
-     */
+    /** @param array<string, mixed> $meta */
     public static function failed(?string $reason = null, array $meta = []): self
     {
         return new self(
@@ -110,15 +103,19 @@ class PointExecutionResult
         return $this->status === self::STATUS_FAILED;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function toMetaPayload(): array
     {
-        return [
+        $payload = [
             'status' => $this->status,
             'reason' => $this->reason,
             'meta' => $this->meta,
         ];
+
+        if ($this->completeFlowRoute) {
+            $payload['complete_flow_route'] = true;
+        }
+
+        return $payload;
     }
 }

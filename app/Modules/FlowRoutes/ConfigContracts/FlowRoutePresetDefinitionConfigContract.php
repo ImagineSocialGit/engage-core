@@ -50,6 +50,15 @@ class FlowRoutePresetDefinitionConfigContract implements ConfigContract
                 ConfigSchema::string(nullable: true),
                 referenceTarget: 'automation_events',
             ),
+            'from_contact_status_keys' => ConfigField::optional(
+                ConfigSchema::listOf(ConfigSchema::string()),
+            ),
+            'transition_sources' => ConfigField::optional(
+                ConfigSchema::listOf(ConfigSchema::string()),
+            ),
+            'transition_reasons' => ConfigField::optional(
+                ConfigSchema::listOf(ConfigSchema::string()),
+            ),
             'name' => ConfigField::required(ConfigSchema::string()),
             'description' => ConfigField::optional(ConfigSchema::string(nullable: true)),
             'version' => ConfigField::defaulted(ConfigSchema::integer(), 1),

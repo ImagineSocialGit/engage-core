@@ -138,7 +138,11 @@ class BranchEvaluatePointHandler implements PointHandler
     private function noMatchResult(string $action, array $meta): PointExecutionResult
     {
         return match ($action) {
-            PointExecutionResult::STATUS_COMPLETED => PointExecutionResult::completed('branch_no_match', $meta),
+            PointExecutionResult::STATUS_COMPLETED => PointExecutionResult::completed(
+                reason: 'branch_no_match',
+                meta: $meta,
+                completeFlowRoute: true,
+            ),
             PointExecutionResult::STATUS_SKIPPED => PointExecutionResult::skipped('branch_no_match', $meta),
             PointExecutionResult::STATUS_FAILED => PointExecutionResult::failed('branch_no_match', $meta),
             default => PointExecutionResult::blocked('branch_no_match', $meta),

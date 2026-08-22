@@ -28,6 +28,8 @@ class AutomationPointExtensionRegistryTest extends TestCase
         $this->assertArrayHasKey('cancel_campaign', $definitions);
         $this->assertArrayHasKey('pause_campaign', $definitions);
         $this->assertArrayHasKey('resume_campaign', $definitions);
+        $this->assertArrayHasKey('pause_campaign_family', $definitions);
+        $this->assertArrayHasKey('cancel_campaign_family', $definitions);
     }
 
     public function test_point_definition_registry_rejects_duplicate_point_types(): void
@@ -85,5 +87,7 @@ class AutomationPointExtensionRegistryTest extends TestCase
         $this->assertTrue($registry->has('campaigns.cancel_enrollment'));
         $this->assertTrue($registry->has('campaigns.pause_enrollment'));
         $this->assertTrue($registry->has('campaigns.resume_enrollment'));
+        $this->assertTrue($registry->has('campaigns.pause_family_enrollments'));
+        $this->assertTrue($registry->has('campaigns.cancel_family_enrollments'));
     }
 }

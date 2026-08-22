@@ -4,9 +4,11 @@ namespace Tests\Feature\Campaigns;
 
 use App\Modules\Campaigns\Actions\ActivateCampaignAction;
 use App\Modules\Campaigns\Actions\CancelCampaignEnrollmentAction;
+use App\Modules\Campaigns\Actions\CancelCampaignFamilyEnrollmentsAction;
 use App\Modules\Campaigns\Actions\DeactivateCampaignAction;
 use App\Modules\Campaigns\Actions\EnrollContactInCampaignAction;
 use App\Modules\Campaigns\Actions\PauseCampaignEnrollmentAction;
+use App\Modules\Campaigns\Actions\PauseCampaignFamilyEnrollmentsAction;
 use App\Modules\Campaigns\Actions\ResumeCampaignEnrollmentAction;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
@@ -123,6 +125,50 @@ class CampaignEnrollmentLifecycleBridgeTest extends TestCase
                 $job->enrollmentId === $resumed->message_chain_enrollment_id
                 && $job->afterCommit === true,
         );
+    }
+
+    public function test_family_lifecycle_actions_target_only_the_selected_campaign_family(): void
+    {
+        Queue::fake();
+        Carbon::setTestNow('2026-08-18 12:00:00 UTC');
+
+        [$consumerCampaign, , $contact, $consumerEnrollment] = $this->campaignEnrollment('family-consumer');
+        $consumerCampaign->forceFill(['family_key' => 'consumer_nurture'])->save();
+
+        [$webinarCampaign] = $this->campaignWithChain('family-webinar');
+        $webinarCampaign->forceFill(['family_key' => 'webinar_nurture'])->save();
+        $webinarEnrollment = app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $webinarCampaign->key,
+        );
+
+        $paused = app(PauseCampaignFamilyEnrollmentsAction::class)->handle(
+            contact: $contact,
+            familyKey: 'consumer_nurture',
+            reason: 'human_reply',
+        );
+
+        $this->assertSame(1, $paused->count());
+        $this->assertSame($consumerEnrollment->getKey(), $paused->first()?->getKey());
+        $this->assertSame(MessageChainEnrollment::STATUS_PAUSED, $consumerEnrollment->refresh()->runtimeStatus());
+        $this->assertSame(MessageChainEnrollment::STATUS_ACTIVE, $webinarEnrollment->refresh()->runtimeStatus());
+
+        app(ResumeCampaignEnrollmentAction::class)->handle(
+            contact: $contact,
+            campaignKey: $consumerCampaign->key,
+            reason: 'resume_for_stop_test',
+        );
+
+        $cancelled = app(CancelCampaignFamilyEnrollmentsAction::class)->handle(
+            contact: $contact,
+            familyKey: 'consumer_nurture',
+            reason: 'status_advanced',
+        );
+
+        $this->assertSame(1, $cancelled->count());
+        $this->assertSame($consumerEnrollment->getKey(), $cancelled->first()?->getKey());
+        $this->assertSame(MessageChainEnrollment::STATUS_CANCELLED, $consumerEnrollment->refresh()->runtimeStatus());
+        $this->assertSame(MessageChainEnrollment::STATUS_ACTIVE, $webinarEnrollment->refresh()->runtimeStatus());
     }
 
     public function test_deactivation_cancels_linked_enrollments_and_reactivation_does_not_resurrect_them(): void

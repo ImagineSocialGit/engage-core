@@ -60,5 +60,31 @@ class CampaignsAutomationCapabilityContributor implements AutomationCapabilityCo
             requiredModules: ['campaigns'],
             sourceVersion: '2026_08_reply_outcomes_c2',
         );
+
+        yield new AutomationCapabilityDefinition(
+            key: 'campaigns.pause_family_enrollments',
+            moduleKey: 'campaigns',
+            capabilityType: AutomationCapabilityDefinition::TYPE_ACTION,
+            pointType: 'pause_campaign_family',
+            handlerKey: 'pause_campaign_family',
+            actionKey: 'campaigns.pause_family_enrollments',
+            name: 'Pause current campaign family',
+            description: 'Pause every open Campaign enrollment in a selected Campaign family for this contact.',
+            requiredModules: ['campaigns'],
+            sourceVersion: '2026_08_reply_outcomes_c3a',
+        );
+
+        yield new AutomationCapabilityDefinition(
+            key: 'campaigns.cancel_family_enrollments',
+            moduleKey: 'campaigns',
+            capabilityType: AutomationCapabilityDefinition::TYPE_ACTION,
+            pointType: 'cancel_campaign_family',
+            handlerKey: 'cancel_campaign_family',
+            actionKey: 'campaigns.cancel_family_enrollments',
+            name: 'Stop current campaign family',
+            description: 'Cancel every open Campaign enrollment in a selected Campaign family for this contact.',
+            requiredModules: ['campaigns'],
+            sourceVersion: '2026_08_reply_outcomes_c3a',
+        );
     }
 }

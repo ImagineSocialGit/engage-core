@@ -162,10 +162,83 @@ class FlowRoutePresentationResolver
     public function triggerSummary(FlowRoute $route): string
     {
         return match ($route->trigger_type) {
-            FlowRoute::TRIGGER_CONTACT_STATUS => 'When a '.config('contacts.labels.singular', 'contact').' moves to '.$this->statusName((string) $route->trigger_key).'.',
+            FlowRoute::TRIGGER_CONTACT_STATUS => $this->contactStatusTriggerSummary($route),
             FlowRoute::TRIGGER_AUTOMATION_EVENT => 'When '.$this->humanAutomationEvent((string) $route->trigger_key).'.',
             FlowRoute::TRIGGER_MANUAL => 'Started manually.',
             default => Str::headline((string) $route->trigger_type).'.',
+        };
+    }
+
+    private function contactStatusTriggerSummary(FlowRoute $route): string
+    {
+        $summary = 'When a '.config('contacts.labels.singular', 'contact').' moves to '
+            .$this->statusName((string) $route->trigger_key);
+        $transition = data_get($route->meta, 'definition.transition', []);
+
+        if (! is_array($transition)) {
+            return $summary.'.';
+        }
+
+        $fromStatusKeys = $this->stringList($transition['from_contact_status_keys'] ?? []);
+        $reasons = $this->stringList($transition['reasons'] ?? []);
+        $sources = $this->stringList($transition['sources'] ?? []);
+
+        if ($fromStatusKeys !== []) {
+            $summary .= ' from '.$this->humanList(array_map(
+                fn (string $statusKey): string => $this->statusName($statusKey),
+                $fromStatusKeys,
+            ));
+        }
+
+        if ($reasons !== []) {
+            $summary .= ' after '.$this->humanList(array_map(
+                fn (string $reason): string => Str::headline($reason),
+                $reasons,
+            ));
+        } elseif ($sources !== []) {
+            $summary .= ' through '.$this->humanList(array_map(
+                fn (string $source): string => $this->humanTransitionSource($source),
+                $sources,
+            ));
+        }
+
+        return $summary.'.';
+    }
+
+    /** @return array<int, string> */
+    private function stringList(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            fn (mixed $item): ?string => is_string($item) && trim($item) !== '' ? trim($item) : null,
+            $value,
+        )));
+    }
+
+    /** @param array<int, string> $values */
+    private function humanList(array $values): string
+    {
+        $values = array_values(array_filter($values, fn (string $value): bool => trim($value) !== ''));
+
+        return match (count($values)) {
+            0 => '',
+            1 => $values[0],
+            2 => $values[0].' or '.$values[1],
+            default => implode(', ', array_slice($values, 0, -1)).', or '.$values[array_key_last($values)],
+        };
+    }
+
+    private function humanTransitionSource(string $source): string
+    {
+        return match ($source) {
+            'flow_routes' => 'another automatic Route',
+            'crm' => 'a CRM update',
+            'import' => 'an import',
+            'workflow' => 'a workflow update',
+            default => Str::headline($source),
         };
     }
 

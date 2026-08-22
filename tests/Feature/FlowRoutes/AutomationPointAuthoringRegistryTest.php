@@ -34,6 +34,8 @@ class AutomationPointAuthoringRegistryTest extends TestCase
             'cancel_campaign',
             'pause_campaign',
             'resume_campaign',
+            'pause_campaign_family',
+            'cancel_campaign_family',
         ], $registry->registeredTypes());
     }
 

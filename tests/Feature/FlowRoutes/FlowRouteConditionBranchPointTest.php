@@ -322,6 +322,56 @@ class FlowRouteConditionBranchPointTest extends TestCase
         $this->assertSame($branchPoint->id, $progress->current_flow_route_point_id);
     }
 
+    public function test_branch_completed_on_no_match_ends_route_instead_of_falling_through(): void
+    {
+        $scenario = $this->scenario();
+
+        $branchPoint = $this->routePoint(
+            flowRoute: $scenario['flow_route'],
+            type: FlowRoutePointType::BranchEvaluate->value,
+            sortOrder: 10,
+            key: 'branch',
+            isStart: true,
+            definition: [
+                'branches' => [
+                    [
+                        'conditions' => [
+                            [
+                                'source' => 'contact',
+                                'path' => 'email',
+                                'operator' => 'equals',
+                                'value' => 'does-not-match@example.com',
+                            ],
+                        ],
+                        'target_flow_route_point_key' => 'next',
+                    ],
+                ],
+                'on_no_match' => PointExecutionResult::STATUS_COMPLETED,
+            ],
+        );
+
+        $this->routePoint(
+            flowRoute: $scenario['flow_route'],
+            type: FlowRoutePointType::Noop->value,
+            sortOrder: 20,
+            key: 'next',
+        );
+
+        $progress = $this->progress($scenario, $branchPoint);
+
+        $result = app(ExecuteCurrentFlowRoutePointAction::class)->handle($progress);
+
+        $this->assertSame(PointExecutionResult::STATUS_COMPLETED, $result->status);
+        $this->assertSame('branch_no_match', $result->reason);
+        $this->assertTrue($result->completeFlowRoute);
+
+        $progress->refresh();
+
+        $this->assertSame(ContactFlowRouteProgress::STATUS_COMPLETED, $progress->status);
+        $this->assertNull($progress->current_flow_route_point_id);
+        $this->assertNotNull($progress->completed_at);
+    }
+
     public function test_condition_point_can_check_current_contact_tags(): void
     {
         $scenario = $this->scenario();

@@ -5,8 +5,10 @@ namespace App\Modules\Campaigns\Providers;
 use App\Modules\Campaigns\Automation\CampaignsAutomationPointAuthoringContributor;
 use App\Modules\Campaigns\Automation\CampaignsAutomationPointDefinitionContributor;
 use App\Modules\Campaigns\Automation\CancelCampaignAutomationActionHandler;
+use App\Modules\Campaigns\Automation\CancelCampaignFamilyAutomationActionHandler;
 use App\Modules\Campaigns\Automation\EnrollCampaignAutomationActionHandler;
 use App\Modules\Campaigns\Automation\PauseCampaignAutomationActionHandler;
+use App\Modules\Campaigns\Automation\PauseCampaignFamilyAutomationActionHandler;
 use App\Modules\Campaigns\Automation\ResumeCampaignAutomationActionHandler;
 use App\Modules\Campaigns\Capabilities\CampaignsAutomationCapabilityContributor;
 use App\Modules\Campaigns\ConfigContracts\CampaignPresetConfigContractTargetProvider;
@@ -37,6 +39,8 @@ class CampaignsModuleServiceProvider extends ServiceProvider
             CancelCampaignAutomationActionHandler::class,
             PauseCampaignAutomationActionHandler::class,
             ResumeCampaignAutomationActionHandler::class,
+            PauseCampaignFamilyAutomationActionHandler::class,
+            CancelCampaignFamilyAutomationActionHandler::class,
         ], 'automation.action_handlers');
         $this->app->tag([CampaignsSetupValidationContributor::class], 'setup.validation_contributors');
         $this->app->tag([ContactCampaignsVisibilityDataProvider::class], 'core.contact_show_data_providers');

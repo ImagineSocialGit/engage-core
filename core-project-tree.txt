@@ -93,9 +93,11 @@
 │   │   │   ├── Actions
 │   │   │   │   ├── ActivateCampaignAction.php
 │   │   │   │   ├── CancelCampaignEnrollmentAction.php
+│   │   │   │   ├── CancelCampaignFamilyEnrollmentsAction.php
 │   │   │   │   ├── DeactivateCampaignAction.php
 │   │   │   │   ├── EnrollContactInCampaignAction.php
 │   │   │   │   ├── PauseCampaignEnrollmentAction.php
+│   │   │   │   ├── PauseCampaignFamilyEnrollmentsAction.php
 │   │   │   │   ├── ResumeCampaignEnrollmentAction.php
 │   │   │   │   ├── ScheduleCampaignImportBatchInitialMessagesAction.php
 │   │   │   │   └── SyncCampaignPresetsAction.php
@@ -103,8 +105,10 @@
 │   │   │   │   ├── CampaignsAutomationPointAuthoringContributor.php
 │   │   │   │   ├── CampaignsAutomationPointDefinitionContributor.php
 │   │   │   │   ├── CancelCampaignAutomationActionHandler.php
+│   │   │   │   ├── CancelCampaignFamilyAutomationActionHandler.php
 │   │   │   │   ├── EnrollCampaignAutomationActionHandler.php
 │   │   │   │   ├── PauseCampaignAutomationActionHandler.php
+│   │   │   │   ├── PauseCampaignFamilyAutomationActionHandler.php
 │   │   │   │   └── ResumeCampaignAutomationActionHandler.php
 │   │   │   ├── Capabilities
 │   │   │   │   └── CampaignsAutomationCapabilityContributor.php
@@ -124,8 +128,10 @@
 │   │   │   ├── Data
 │   │   │   │   ├── Automation
 │   │   │   │   │   ├── CancelCampaignAutomationDefinition.php
+│   │   │   │   │   ├── CancelCampaignFamilyAutomationDefinition.php
 │   │   │   │   │   ├── EnrollCampaignAutomationDefinition.php
 │   │   │   │   │   ├── PauseCampaignAutomationDefinition.php
+│   │   │   │   │   ├── PauseCampaignFamilyAutomationDefinition.php
 │   │   │   │   │   └── ResumeCampaignAutomationDefinition.php
 │   │   │   │   ├── CampaignEnrollmentArbitrationResult.php
 │   │   │   │   ├── CampaignPresetDefinition.php
@@ -2161,6 +2167,7 @@
 │   │   ├── Campaigns
 │   │   │   ├── CampaignEnrollmentContactImportPostProcessorTest.php
 │   │   │   ├── CampaignEnrollmentLifecycleBridgeTest.php
+│   │   │   ├── CampaignFamilyLifecycleAutomationCapabilityTest.php
 │   │   │   ├── CampaignLaunchTimingContactImportControllerTest.php
 │   │   │   ├── CampaignLaunchTimingContactImportPostProcessorTest.php
 │   │   │   ├── CampaignLifecycleAutomationCapabilityTest.php
@@ -2250,6 +2257,7 @@
 │   │   │   ├── FlowRouteProgressMetaCanonicalizerTest.php
 │   │   │   ├── FlowRoutesModelSchemaTest.php
 │   │   │   ├── FlowRoutesSetupValidationContributorTest.php
+│   │   │   ├── FlowRouteTransitionSelectionTest.php
 │   │   │   ├── FlowRouteTriggerBindingTest.php
 │   │   │   ├── HandleContactWorkflowStatusChangedTest.php
 │   │   │   └── SyncFlowRoutePresetsActionTest.php
@@ -2591,4 +2599,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-642 directories, 1950 files
+642 directories, 1958 files

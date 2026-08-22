@@ -15,6 +15,8 @@ class CampaignsAutomationPointAuthoringContributor implements AutomationPointAut
     private const POINT_CANCEL = 'cancel_campaign';
     private const POINT_PAUSE = 'pause_campaign';
     private const POINT_RESUME = 'resume_campaign';
+    private const POINT_PAUSE_FAMILY = 'pause_campaign_family';
+    private const POINT_CANCEL_FAMILY = 'cancel_campaign_family';
 
     public function definitions(): iterable
     {
@@ -37,11 +39,10 @@ class CampaignsAutomationPointAuthoringContributor implements AutomationPointAut
             pointType: self::POINT_CANCEL,
             moduleKey: 'campaigns',
             name: 'Stop Campaign',
-            description: 'Stop a Campaign that this Route started and optionally skip pending messages.',
-            tip: 'Use this when a later outcome means the Campaign started by this Route should stop permanently.',
+            description: 'Stop a specific Campaign that this Route started and optionally skip pending messages.',
+            tip: 'Use this when a later outcome means one known Campaign should stop permanently.',
             useCases: [
-                'Stop a nurture Campaign after conversion.',
-                'Stop pending follow-up when the Route reaches a final outcome.',
+                'Stop a Campaign started earlier in this Route.',
             ],
             typeLabel: 'Campaign',
             genericLabels: ['stop campaign'],
@@ -52,11 +53,10 @@ class CampaignsAutomationPointAuthoringContributor implements AutomationPointAut
             pointType: self::POINT_PAUSE,
             moduleKey: 'campaigns',
             name: 'Pause Campaign',
-            description: 'Temporarily pause an existing Campaign enrollment for this contact.',
-            tip: 'Use Pause when a human reply or temporary condition should stop nurture without ending the enrollment permanently.',
+            description: 'Temporarily pause a specific existing Campaign enrollment for this contact.',
+            tip: 'Use Pause when a known Campaign should stop temporarily without ending the enrollment.',
             useCases: [
-                'Pause nurture when a person replies.',
-                'Temporarily stop pending follow-up while a team member takes over.',
+                'Pause a known Campaign while a team member takes over.',
             ],
             typeLabel: 'Campaign',
             genericLabels: ['pause campaign'],
@@ -67,7 +67,7 @@ class CampaignsAutomationPointAuthoringContributor implements AutomationPointAut
             pointType: self::POINT_RESUME,
             moduleKey: 'campaigns',
             name: 'Resume Campaign',
-            description: 'Resume an existing paused Campaign enrollment for this contact.',
+            description: 'Resume a specific existing paused Campaign enrollment for this contact.',
             tip: 'Use Resume only when the Campaign should continue from its paused lifecycle position.',
             useCases: [
                 'Resume nurture after a temporary human-handled pause.',
@@ -75,6 +75,34 @@ class CampaignsAutomationPointAuthoringContributor implements AutomationPointAut
             typeLabel: 'Campaign',
             genericLabels: ['resume campaign'],
             generatedPrefixes: ['resume campaign:'],
+        );
+
+        yield new AutomationPointAuthoringDefinition(
+            pointType: self::POINT_PAUSE_FAMILY,
+            moduleKey: 'campaigns',
+            name: 'Pause Current Nurture',
+            description: 'Temporarily pause the contact’s open Campaign enrollment in a selected Campaign family.',
+            tip: 'Use this for reply handling so the Route does not need to know which specific nurture Campaign the contact entered.',
+            useCases: [
+                'Pause the current consumer nurture when the person replies.',
+            ],
+            typeLabel: 'Campaign',
+            genericLabels: ['pause current nurture'],
+            generatedPrefixes: ['pause current nurture:'],
+        );
+
+        yield new AutomationPointAuthoringDefinition(
+            pointType: self::POINT_CANCEL_FAMILY,
+            moduleKey: 'campaigns',
+            name: 'Stop Current Nurture',
+            description: 'Permanently stop the contact’s open Campaign enrollment in a selected Campaign family.',
+            tip: 'Use this for lifecycle cleanup so the Route does not need a list of every Campaign that could be running.',
+            useCases: [
+                'Stop the current consumer nurture after the contact becomes Engaged.',
+            ],
+            typeLabel: 'Campaign',
+            genericLabels: ['stop current nurture'],
+            generatedPrefixes: ['stop current nurture:'],
         );
     }
 
@@ -85,8 +113,18 @@ class CampaignsAutomationPointAuthoringContributor implements AutomationPointAut
             self::POINT_CANCEL,
             self::POINT_PAUSE,
             self::POINT_RESUME,
+            self::POINT_PAUSE_FAMILY,
+            self::POINT_CANCEL_FAMILY,
         ], true)) {
             return false;
+        }
+
+        if (in_array($pointType, [self::POINT_PAUSE_FAMILY, self::POINT_CANCEL_FAMILY], true)) {
+            return Campaign::query()
+                ->active()
+                ->whereNotNull('family_key')
+                ->where('family_key', '<>', '')
+                ->exists();
         }
 
         if (! Campaign::query()->active()->exists()) {
@@ -99,6 +137,29 @@ class CampaignsAutomationPointAuthoringContributor implements AutomationPointAut
 
     public function fields(string $pointType, array $definition, AutomationPointAuthoringContext $context): array
     {
+        if (in_array($pointType, [self::POINT_PAUSE_FAMILY, self::POINT_CANCEL_FAMILY], true)) {
+            return [
+                [
+                    'type' => 'select',
+                    'name' => 'family_key',
+                    'label' => 'Campaign family',
+                    'required' => true,
+                    'value' => (string) ($definition['family_key'] ?? ''),
+                    'placeholder' => 'Choose a Campaign family',
+                    'options' => $this->familyOptions(),
+                ],
+                [
+                    'type' => 'checkbox',
+                    'name' => 'skip_pending_messages',
+                    'label' => 'Skip pending Campaign messages',
+                    'value' => (bool) ($definition['skip_pending_messages'] ?? true),
+                    'help' => $pointType === self::POINT_PAUSE_FAMILY
+                        ? 'Recommended for human-reply pauses: prevent already-scheduled future messages from sending while nurture is paused.'
+                        : 'Recommended: prevent already-scheduled future messages from sending after nurture is stopped.',
+                ],
+            ];
+        }
+
         $fields = [[
             'type' => 'select',
             'name' => 'campaign_key',
@@ -134,6 +195,13 @@ class CampaignsAutomationPointAuthoringContributor implements AutomationPointAut
 
     public function rules(string $pointType, AutomationPointAuthoringContext $context): array
     {
+        if (in_array($pointType, [self::POINT_PAUSE_FAMILY, self::POINT_CANCEL_FAMILY], true)) {
+            return [
+                'family_key' => ['required', 'string', 'max:255'],
+                'skip_pending_messages' => ['nullable', 'boolean'],
+            ];
+        }
+
         $rules = [
             'campaign_key' => ['required', 'string', 'max:255'],
         ];
@@ -147,6 +215,19 @@ class CampaignsAutomationPointAuthoringContributor implements AutomationPointAut
 
     public function buildDefinition(string $pointType, array $input, AutomationPointAuthoringContext $context): array
     {
+        if (in_array($pointType, [self::POINT_PAUSE_FAMILY, self::POINT_CANCEL_FAMILY], true)) {
+            $familyKey = $this->activeFamily((string) ($input['family_key'] ?? ''));
+
+            return [
+                'family_key' => $familyKey,
+                'reason' => $pointType === self::POINT_PAUSE_FAMILY
+                    ? 'flow_route_paused_campaign_family'
+                    : 'flow_route_cancelled_campaign_family',
+                'on_not_enrolled' => 'skipped',
+                'skip_pending_messages' => (bool) ($input['skip_pending_messages'] ?? true),
+            ];
+        }
+
         $campaign = $this->activeCampaign((string) ($input['campaign_key'] ?? ''));
 
         return match ($pointType) {
@@ -190,18 +271,42 @@ class CampaignsAutomationPointAuthoringContributor implements AutomationPointAut
             return $customName;
         }
 
+        if ($pointType === self::POINT_PAUSE_FAMILY) {
+            return 'Pause Current Nurture';
+        }
+
+        if ($pointType === self::POINT_CANCEL_FAMILY) {
+            return 'Stop Current Nurture';
+        }
+
         return $this->verb($pointType).' Campaign: '
             .$this->campaignLabel((string) ($definition['campaign_key'] ?? ''));
     }
 
     public function summary(string $pointType, array $definition, AutomationPointAuthoringContext $context): string
     {
+        if ($pointType === self::POINT_PAUSE_FAMILY) {
+            return 'Pause current nurture.';
+        }
+
+        if ($pointType === self::POINT_CANCEL_FAMILY) {
+            return 'Stop current nurture.';
+        }
+
         return $this->verb($pointType).' Campaign: '
             .$this->campaignLabel((string) ($definition['campaign_key'] ?? '')).'.';
     }
 
     public function editorSummary(string $pointType, array $definition, AutomationPointAuthoringContext $context): string
     {
+        if ($pointType === self::POINT_PAUSE_FAMILY) {
+            return 'Pause current nurture';
+        }
+
+        if ($pointType === self::POINT_CANCEL_FAMILY) {
+            return 'Stop current nurture';
+        }
+
         return $this->verb($pointType).' '
             .$this->campaignLabel((string) ($definition['campaign_key'] ?? ''));
     }
@@ -217,6 +322,40 @@ class CampaignsAutomationPointAuthoringContributor implements AutomationPointAut
         }
 
         return $campaign;
+    }
+
+    private function activeFamily(string $key): string
+    {
+        $key = trim($key);
+
+        if ($key === '' || ! Campaign::query()->active()->where('family_key', $key)->exists()) {
+            throw ValidationException::withMessages([
+                'family_key' => 'Choose an active Campaign family.',
+            ]);
+        }
+
+        return $key;
+    }
+
+    /** @return array<int, array{value: string, label: string, description: string}> */
+    private function familyOptions(): array
+    {
+        return Campaign::query()
+            ->active()
+            ->whereNotNull('family_key')
+            ->where('family_key', '<>', '')
+            ->orderBy('family_key')
+            ->get(['family_key'])
+            ->pluck('family_key')
+            ->filter(fn (mixed $key): bool => is_string($key) && trim($key) !== '')
+            ->unique()
+            ->values()
+            ->map(fn (string $key): array => [
+                'value' => $key,
+                'label' => Str::headline($key),
+                'description' => 'The contact’s open Campaign enrollment in this family.',
+            ])
+            ->all();
     }
 
     private function campaignFieldLabel(string $pointType): string

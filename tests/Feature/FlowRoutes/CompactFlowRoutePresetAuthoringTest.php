@@ -90,6 +90,62 @@ class CompactFlowRoutePresetAuthoringTest extends TestCase
         $this->assertSame([], $enrollCampaign->definition['exit_conditions']);
     }
 
+    public function test_factory_accepts_module_contributed_point_types_and_transition_qualifiers(): void
+    {
+        $definition = app(FlowRoutePresetDefinitionFactory::class)->fromArray(
+            presetKey: 'test',
+            definitionKey: 'engaged_after_reply',
+            data: [
+                'contact_status_key' => 'engaged',
+                'from_contact_status_keys' => ['prospect_nurture'],
+                'transition_sources' => ['flow_routes'],
+                'transition_reasons' => ['inbound_reply_high_intent'],
+                'name' => 'Engaged After Reply',
+                'points' => [
+                    'stop_current_nurture' => [
+                        'type' => 'cancel_campaign_family',
+                        'definition' => [
+                            'family_key' => 'consumer_nurture',
+                        ],
+                    ],
+                ],
+            ],
+        );
+
+        $this->assertEquals([
+            'transition' => [
+                'from_contact_status_keys' => ['prospect_nurture'],
+                'sources' => ['flow_routes'],
+                'reasons' => ['inbound_reply_high_intent'],
+            ],
+        ], $definition->meta);
+        $this->assertSame('cancel_campaign_family', $definition->points[0]->type);
+        $this->assertSame(
+            'campaigns.cancel_family_enrollments',
+            $definition->points[0]->capabilityKey,
+        );
+        $this->assertSame('consumer_nurture', $definition->points[0]->definition['family_key']);
+    }
+
+    public function test_transition_qualifiers_require_a_contact_status_trigger(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('transition qualifiers require [contact_status_key]');
+
+        app(FlowRoutePresetDefinitionFactory::class)->fromArray(
+            presetKey: 'test',
+            definitionKey: 'invalid_event_route',
+            data: [
+                'event_key' => 'inbound_message.normal_reply',
+                'transition_sources' => ['flow_routes'],
+                'name' => 'Invalid Event Route',
+                'points' => [
+                    'start' => ['type' => 'noop'],
+                ],
+            ],
+        );
+    }
+
     public function test_route_without_contact_status_or_event_is_manual(): void
     {
         $definition = app(FlowRoutePresetDefinitionFactory::class)->fromArray(
