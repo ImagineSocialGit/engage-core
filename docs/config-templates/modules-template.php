@@ -7,6 +7,7 @@ use App\Modules\Core\Providers\CoreModuleServiceProvider;
 use App\Modules\Documents\Providers\DocumentsModuleServiceProvider;
 use App\Modules\Events\Providers\EventsModuleServiceProvider;
 use App\Modules\FlowRoutes\Providers\FlowRoutesModuleServiceProvider;
+use App\Modules\Forms\Presets\FormsPresetContributor;
 use App\Modules\Forms\Providers\FormsModuleServiceProvider;
 use App\Modules\InboundMessaging\Providers\InboundMessagingModuleServiceProvider;
 use App\Modules\InternalNotifications\Providers\InternalNotificationsModuleServiceProvider;
@@ -180,6 +181,9 @@ return [
         'forms' => [
             'name' => 'Forms',
             'depends_on' => ['core'],
+            'preset_contributors' => [
+                FormsPresetContributor::class,
+            ],
             'providers' => [
                 FormsModuleServiceProvider::class,
             ],

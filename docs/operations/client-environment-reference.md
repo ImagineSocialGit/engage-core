@@ -191,6 +191,45 @@ FORMS_EXTERNAL_INTAKE_CLIENT_RATE_LIMIT_PER_MINUTE
 
 Do not put those process-wide controls into every selected-client `.env` merely for symmetry.
 
+For the reusable Artist Sites intake, environment allowlisting is only one part of readiness. The selected Core client must also:
+
+```text
+- enable Forms in client config/modules.php;
+- explicitly select the Forms preset group `artist_updates` in the selected package;
+- when Messaging-backed marketing consent is used, configure the intended
+  channel + purpose domains for email/marketing and, when SMS consent remains
+  in the selected form contract, sms/marketing;
+- sync the selected preset so a public current `artist_updates` FormVersion exists.
+```
+
+The reusable Core preset begins with `settings.submission.verification.required=false` while still validating any supplied Turnstile evidence against provider `turnstile`, action `artist_updates`, hostname presence, and a 300-second age limit. This is a rollout state, not the desired permanent public posture.
+
+After the matching Artist Sites sender is proven end to end, use a selected-client config override at:
+
+```text
+client/{client-key}/config/presets/modules/forms/forms.php
+```
+
+to set only:
+
+```php
+'definitions' => [
+    'artist_updates' => [
+        'settings' => [
+            'submission' => [
+                'verification' => [
+                    'required' => true,
+                ],
+            ],
+        ],
+    ],
+],
+```
+
+Then run `php artisan presets:sync` and `php artisan setup:validate`. The sync publishes a new immutable FormVersion; it does not mutate the previously published version.
+
+The Artist Sites read-only probe may be run before destination cutover. Do not treat a successful GET probe as permission to switch live POST traffic until the Sites sender also matches the required submission fields, especially `email_marketing_consent` and any enabled SMS-consent field.
+
 ---
 
 # 4. Application locale and timezone

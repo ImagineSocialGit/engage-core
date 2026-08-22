@@ -30,11 +30,12 @@ return [
     |
     | 1. contact_statuses
     | 2. tasks
-    | 3. messaging template presets
-    | 4. webinar schedule profiles
-    | 5. campaigns
-    | 6. FlowRoute capabilities
-    | 7. flow_routes
+    | 3. forms
+    | 4. messaging template presets
+    | 5. webinar schedule profiles
+    | 6. campaigns
+    | 7. FlowRoute capabilities
+    | 8. flow_routes
     |
     | Campaigns must sync before FlowRoutes because FlowRoutes may reference
     | campaign_key values in enroll_campaign points.
@@ -53,6 +54,7 @@ return [
     |
     | config/presets/modules/core/contact-statuses.php
     | config/presets/modules/tasks/tasks.php
+    | config/presets/modules/forms/forms.php
     |
     | config/presets/modules/webinars/contact-statuses.php
     | config/presets/modules/webinars/tasks.php
@@ -86,6 +88,11 @@ return [
     | Installed contributors may expose preset definitions even when their runtime
     | module is disabled. Enabling a module must not silently activate every preset
     | it contributes.
+    |
+    | Forms follows the same rule. Core may expose the reusable `artist_updates`
+    | Forms group through the Forms contributor, but a selected client package must
+    | explicitly include `groups.forms = ['artist_updates']` before preset sync will
+    | materialize that FormDefinition/FormVersion.
     |
     | Group keys are composition-only and are not durable persisted ownership.
     | Durable preset ownership belongs to contributor identity plus stable
@@ -125,6 +132,7 @@ return [
                 'tasks' => [
                     'default',
                 ],
+                'forms' => [],
                 'campaigns' => [],
                 'flow_routes' => [],
             ],
@@ -140,6 +148,7 @@ return [
                 'tasks' => [
                     'default',
                 ],
+                'forms' => [],
                 'campaigns' => [],
                 'flow_routes' => [],
             ],
@@ -155,6 +164,7 @@ return [
                 'tasks' => [
                     'default',
                 ],
+                'forms' => [],
                 'campaigns' => [],
                 'flow_routes' => [],
             ],

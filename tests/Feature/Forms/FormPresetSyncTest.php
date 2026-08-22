@@ -36,7 +36,7 @@ class FormPresetSyncTest extends TestCase
         $this->assertSame(0, $first->versionsReused);
 
         $definition = FormDefinition::query()
-            ->where('key', 'artist_updates')
+            ->where('key', 'test_artist_updates')
             ->sole();
         $version = $definition->currentVersion()->sole();
 
@@ -83,7 +83,7 @@ class FormPresetSyncTest extends TestCase
             ->sole();
 
         $forms = config('presets.modules.client.forms');
-        $forms['definitions']['artist_updates']['settings']['success_message_key'] = 'fan_updates_saved';
+        $forms['definitions']['test_artist_updates']['settings']['success_message_key'] = 'fan_updates_saved';
         config()->set('presets.modules.client.forms', $forms);
 
         $result = $this->syncConfiguredForms();
@@ -95,7 +95,7 @@ class FormPresetSyncTest extends TestCase
         $this->assertDatabaseCount('form_versions', 2);
 
         $definition = FormDefinition::query()
-            ->where('key', 'artist_updates')
+            ->where('key', 'test_artist_updates')
             ->sole();
         $current = $definition->currentVersion()->sole();
 
@@ -115,7 +115,7 @@ class FormPresetSyncTest extends TestCase
         $this->configureFormPreset();
 
         $definition = FormDefinition::factory()->active()->create([
-            'key' => 'artist_updates',
+            'key' => 'test_artist_updates',
             'name' => 'Artist Updates',
             'description' => 'Reusable fan update intake.',
             'category' => FormDefinition::CATEGORY_INTAKE,
@@ -123,7 +123,7 @@ class FormPresetSyncTest extends TestCase
             'source' => 'preset',
         ]);
 
-        $configured = config('presets.modules.client.forms.definitions.artist_updates');
+        $configured = config('presets.modules.client.forms.definitions.test_artist_updates');
 
         $draft = FormVersion::factory()->create([
             'form_definition_id' => $definition->getKey(),
@@ -160,7 +160,7 @@ class FormPresetSyncTest extends TestCase
         $this->configureFormPreset();
 
         $forms = config('presets.modules.client.forms');
-        $forms['definitions']['artist_updates']['schema']['sections'][0]['fields'][] = [
+        $forms['definitions']['test_artist_updates']['schema']['sections'][0]['fields'][] = [
             'key' => 'email',
             'label' => 'Duplicate Email',
             'type' => 'email',
@@ -184,7 +184,7 @@ class FormPresetSyncTest extends TestCase
         $this->configureFormPreset();
 
         FormDefinition::factory()->create([
-            'key' => 'artist_updates',
+            'key' => 'test_artist_updates',
             'name' => 'Manual Artist Updates',
             'source' => 'manual',
         ]);
@@ -201,7 +201,7 @@ class FormPresetSyncTest extends TestCase
 
         $this->assertDatabaseCount('form_versions', 0);
         $this->assertDatabaseHas('form_definitions', [
-            'key' => 'artist_updates',
+            'key' => 'test_artist_updates',
             'name' => 'Manual Artist Updates',
             'source' => 'manual',
         ]);
@@ -218,7 +218,7 @@ class FormPresetSyncTest extends TestCase
             ->assertExitCode(0);
 
         $this->assertDatabaseHas('form_definitions', [
-            'key' => 'artist_updates',
+            'key' => 'test_artist_updates',
             'status' => FormDefinition::STATUS_ACTIVE,
             'source' => 'preset',
         ]);
@@ -257,12 +257,12 @@ class FormPresetSyncTest extends TestCase
         config()->set('presets.modules.client.forms', [
             'groups' => [
                 'artist_forms' => [
-                    'artist_updates',
+                    'test_artist_updates',
                 ],
             ],
             'definitions' => [
-                'artist_updates' => [
-                    'key' => 'artist_updates',
+                'test_artist_updates' => [
+                    'key' => 'test_artist_updates',
                     'name' => 'Artist Updates',
                     'description' => 'Reusable fan update intake.',
                     'category' => FormDefinition::CATEGORY_INTAKE,

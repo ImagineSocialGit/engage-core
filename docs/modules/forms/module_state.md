@@ -142,11 +142,19 @@ view status
 
 Forms participates in the shared preset-composition architecture through the `forms` preset domain.
 
-Client form contributions live under:
+Reusable Forms-owned contributions live under:
+
+```text
+presets.modules.forms.forms
+```
+
+Client-owned form contributions live under:
 
 ```text
 presets.modules.client.forms
 ```
+
+A selected client may also override a reusable Forms-owned definition through its matching nested client config path when the reusable contract intentionally exposes a client-specific policy seam.
 
 A preset package may optionally select Forms groups through:
 
@@ -638,6 +646,127 @@ A successful bridge grant uses the existing Messaging `GrantMessageConsentAction
 Interest/tag mappings remain separate from permission. Tags answer who should receive a relevant campaign or broadcast; Messaging consent answers whether that channel+purpose is authorized.
 
 Human verification and channel ownership remain distinct from this explicit consent action. A passed Turnstile attestation does not itself grant consent, and this bridge does not prove control of an email address or phone number.
+
+## Reusable `artist_updates` reference preset
+
+Forms now contributes a reusable `artist_updates` preset from:
+
+```text
+config/presets/modules/forms/forms.php
+```
+
+The Forms module registers `FormsPresetContributor`, but contribution availability is not runtime activation. A client must explicitly select the `artist_updates` Forms group in its selected preset package before `presets:sync` materializes the definition.
+
+That distinction is intentional:
+
+```text
+Forms module enabled
+    != artist_updates automatically published
+
+Forms contributor available
+    != artist_updates automatically published
+
+selected package includes groups.forms = ['artist_updates']
+    -> preset sync may publish the reusable FormDefinition/FormVersion
+```
+
+The reusable contract is a public intake with these field identities:
+
+```text
+first_name                  optional text
+last_name                   optional text
+email                       required email
+phone                       optional tel
+postal_code                 optional text
+interests                   optional multi-select
+email_marketing_consent     required checkbox + accepted rule
+sms_marketing_consent       optional checkbox
+```
+
+The current reusable interest tokens are:
+
+```text
+music
+tour
+vip
+merch
+```
+
+and the server-owned Contact tag mappings are:
+
+```text
+email_marketing_consent=true -> interest:general_updates
+music                        -> interest:music
+tour                         -> interest:tour
+vip                          -> interest:vip
+merch                        -> interest:merch
+```
+
+These tags are segmentation facts, not consent gates.
+
+The server-owned Contact mapping is:
+
+```text
+email      <- email
+first_name <- first_name
+last_name  <- last_name
+phone      <- phone
+source     = engage_sites
+subsource  = artist_updates
+```
+
+`postal_code` is intentionally not copied into generic Contact `meta`. Core currently has no first-class postal-code Contact attribute, so the value remains durable typed Forms evidence in `FormSubmissionValue`. If postal geography later becomes a durable/queryable CRM concern, add an intentional first-class Core capability instead of casually expanding Contact meta.
+
+The server-owned Messaging consent intents are channel + purpose only:
+
+```text
+email_marketing_consent=true -> email / marketing
+sms_marketing_consent=true   -> sms / marketing
+```
+
+There is no Forms-authored consent scope. Operational message scopes continue to identify the message family; Messaging resolves authorization through its configured channel + purpose consent domain. A client that selects this reusable form while Messaging is enabled must therefore deliberately configure the corresponding broad channel + purpose domains. Existing clients without that policy remain unchanged.
+
+The reusable verification policy is deliberately staged:
+
+```text
+required = false
+providers = [turnstile]
+max_age_seconds = 300
+action = artist_updates
+require_hostname = true
+```
+
+This means an initial server-to-server transport proof may omit verification evidence, while any supplied verification evidence must already satisfy the intended Turnstile provider/action/hostname/freshness contract.
+
+After the matching Artist Sites sender has been proven end to end, a selected client may promote the immutable next FormVersion to required verification with a narrow client override at:
+
+```text
+client/{client-key}/config/presets/modules/forms/forms.php
+```
+
+For example:
+
+```php
+<?php
+
+return [
+    'definitions' => [
+        'artist_updates' => [
+            'settings' => [
+                'submission' => [
+                    'verification' => [
+                        'required' => true,
+                    ],
+                ],
+            ],
+        ],
+    ],
+];
+```
+
+Client config merging is associative at those levels, so this override changes only `required`; the reusable provider/action/hostname/max-age policy remains intact. `presets:sync` then publishes a new immutable FormVersion rather than mutating the prior published version.
+
+The current Artist Sites adapter must not be switched to live Core submission merely because the read-only `artist_updates` probe succeeds. The live POST sender must first submit the required consent field(s) expected by the published schema. A GET probe proves authentication/allowlisting/published-contract reachability; it does not prove that the current public-site payload satisfies the submission contract.
 
 ## Definitions and versions
 

@@ -137,7 +137,22 @@ When applicable, review:
 - [ ] FlowRoute presets and trigger bindings.
 - [ ] Task templates.
 - [ ] Contact statuses.
+- [ ] Forms preset groups and server-owned submission mappings when Forms is enabled.
+- [ ] External Forms caller allowlist/HMAC environment when Engage Sites will call Core.
+- [ ] Channel + purpose consent domains when a selected FormVersion can grant Messaging consent.
 - [ ] Client key/token extensions.
+
+For an Artist Sites client using the reusable Core form, confirm before deployment:
+
+```text
+selected preset package includes groups.forms = ['artist_updates']
+FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS includes artist_updates
+email / marketing broad consent domain is configured when Messaging is enabled
+sms / marketing broad consent domain is configured if the selected artist_updates
+  contract retains sms_marketing_consent
+```
+
+Do not switch the public Artist Sites destination to Core yet. Package selection and Core readiness come first.
 
 Core rules that matter before deployment:
 
@@ -634,6 +649,7 @@ Current sync architecture may materialize, when selected/enabled:
 ```text
 ContactStatus definitions
 Task templates
+Forms definitions/immutable published versions
 Messaging template presets/assignments/catalog entries
 Webinar schedule profiles/items
 Campaigns/steps/variants
@@ -661,6 +677,68 @@ clean: proceed
 ```
 
 Do not auto-fix validation failures by broadening config contracts or adding unsupported config keys.
+
+### Artist Sites Forms staging integration gate when used
+
+Complete this after Core preset sync/setup validation and before the public Artist Sites newsletter destination is changed to `engage_core`.
+
+Core staging must first satisfy:
+
+```text
+[ ] Forms enabled for the selected client
+[ ] selected preset package includes forms group artist_updates
+[ ] public current artist_updates FormVersion exists
+[ ] external Forms intake enabled
+[ ] matching external client ID/secret configured
+[ ] allowed_forms includes artist_updates
+[ ] email/marketing channel + purpose domain configured when Messaging consent is used
+[ ] sms/marketing channel + purpose domain configured when the selected form retains SMS consent
+[ ] setup:validate has no Forms runtime errors
+```
+
+Keep the reusable `artist_updates` verification policy at `required=false` for the first transport proof. The reusable policy still validates any supplied Turnstile attestation against provider `turnstile`, action `artist_updates`, hostname presence, and a 300-second maximum age.
+
+From the matching Artist Sites staging environment, while Mailchimp may still be the live newsletter destination, run:
+
+```bash
+php artisan site:probe-core-form artist_updates
+```
+
+That read-only GET must prove the intended Core environment, HMAC client/secret pair, form allowlist, and current public schema before cutover.
+
+A successful probe is not a POST-readiness proof. Before changing `NEWSLETTER_DESTINATION=engage_core`, confirm the deployed Artist Sites sender submits the fields required by the current Core FormVersion. In particular, the reusable Core contract requires explicit accepted `email_marketing_consent`; a Sites build that still posts only `email` is not ready for cutover.
+
+Once the Sites sender matches the published contract:
+
+```text
+1. Ensure Artist Sites Turnstile is configured for action artist_updates.
+2. Change the staging Artist Sites destination to engage_core.
+3. Clear the Artist Sites cached configuration.
+4. Submit ONE controlled real public artist_updates form.
+5. Verify Core created/reused the intended Contact.
+6. Verify Core stored FormSubmission + pinned FormVersion + typed FormSubmissionValues.
+7. Verify expected interest:* Contact tags.
+8. Verify accepted email/SMS marketing fields produced channel + purpose Messaging consent only when those fields were explicitly true.
+9. Verify normalized Turnstile evidence is present when the Sites sender supplied it.
+10. Verify no raw Turnstile token/provider payload was persisted.
+11. Replay the same external UUID only as an explicit idempotency check; it must not duplicate the submission or consent grant.
+```
+
+Only after that controlled staging POST succeeds should the selected Core client promote verification to required with:
+
+```text
+client/{client-key}/config/presets/modules/forms/forms.php
+    definitions.artist_updates.settings.submission.verification.required = true
+```
+
+Then run:
+
+```bash
+php artisan presets:sync
+php artisan setup:validate
+```
+
+Confirm a new immutable current FormVersion was published, rerun the Artist Sites read-only probe, then perform one more controlled real submission and confirm the required-verification path succeeds.
 
 ## 22. Create the initial CRM user when required
 
@@ -879,6 +957,8 @@ Before production:
 [ ] SMS tested when enabled
 [ ] Provider webhooks tested when enabled
 [ ] Webinar registration/reminders/post-event path tested when enabled
+[ ] Artist Sites -> Core artist_updates probe and controlled POST verified when used
+[ ] Core artist_updates required-verification FormVersion verified after the controlled proof when used
 [ ] Routes/status/campaign outcomes verified when enabled
 [ ] No placeholder values remain
 ```
@@ -980,6 +1060,45 @@ php artisan setup:validate
 
 A brand-new environment already ran preset sync and setup validation inside `engage:install`; rerun these checks when configuration changed afterward or when you want an explicit final gate. Resolve errors before launch.
 
+### Artist Sites Forms production cutover when used
+
+Do not switch production Artist Sites intake merely because staging passed. Re-establish the environment pairing with production-specific secrets and endpoints.
+
+Before production cutover:
+
+```text
+[ ] production Core selected package includes artist_updates
+[ ] production current artist_updates FormVersion is the approved required-verification version
+[ ] production external Forms client ID/secret matches the production Artist Sites caller
+[ ] production allowlist includes artist_updates
+[ ] production broad channel + purpose consent domains match the approved client policy
+[ ] production setup:validate passes
+[ ] production Artist Sites still has its previous destination until the read-only probe passes
+```
+
+From production Artist Sites, run the read-only probe first:
+
+```bash
+php artisan site:probe-core-form artist_updates
+```
+
+Confirm it reports the intended production Core environment and current version. Then switch `NEWSLETTER_DESTINATION=engage_core`, clear Artist Sites cached configuration, and perform one production-safe controlled submission using an approved recipient.
+
+Verify the same durable Core evidence as staging before opening normal traffic:
+
+```text
+FormSubmission
+pinned FormVersion
+FormSubmissionValues
+Contact create/reuse behavior
+interest:* tags
+channel + purpose consent grants for explicit accepted fields only
+normalized verification evidence
+no raw Turnstile token/provider payload
+```
+
+Do not loosen Core verification or consent policy to make a mismatched Sites deployment pass. Roll the Sites destination back to its prior configured destination and correct the contract mismatch instead.
+
 ## 38. Restart Horizon through Supervisor
 
 Inspect and use the actual Supervisor program name rather than guessing it:
@@ -1053,6 +1172,8 @@ Run production-safe tests before real client traffic or a live event.
 [ ] Laravel Scheduler cron installed
 [ ] Effective Scheduler task list verified
 [ ] setup:validate passes
+[ ] Artist Sites read-only Core form probe passes when external Forms is used
+[ ] Controlled artist_updates POST evidence is verified before normal traffic when used
 ```
 
 ## 42. Messaging smoke test

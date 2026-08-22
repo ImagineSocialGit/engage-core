@@ -58,11 +58,15 @@ class FormConfigContractTest extends TestCase
         ]);
         config()->set('presets.modules.client.forms', [
             'groups' => [
-                'artist_forms' => ['artist_updates'],
+                'artist_forms' => ['test_artist_updates'],
                 'unused_forms' => ['unused_form'],
             ],
             'definitions' => [
-                'artist_updates' => $this->definition(),
+                'test_artist_updates' => [
+                    ...$this->definition(),
+                    'key' => 'test_artist_updates',
+                    'name' => 'Test Artist Updates',
+                ],
                 'unused_form' => [
                     ...$this->definition(),
                     'key' => 'unused_form',
@@ -82,7 +86,7 @@ class FormConfigContractTest extends TestCase
 
         $this->assertCount(1, $targets);
         $this->assertSame(
-            'presets.modules.client.forms.definitions.artist_updates',
+            'presets.modules.client.forms.definitions.test_artist_updates',
             $targets[0]->path,
         );
         $this->assertSame('forms.form_definition', $targets[0]->contractKey);
