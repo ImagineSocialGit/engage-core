@@ -20,6 +20,7 @@
 │   │   │   ├── Controller.php
 │   │   │   └── CRM
 │   │   │       ├── DashboardController.php
+│   │   │       ├── ProcessHighwayController.php
 │   │   │       └── ProjectStateController.php
 │   │   └── Middleware
 │   │       ├── EnsureModuleEnabled.php
@@ -847,8 +848,9 @@
 │   │   │   │   └── CRM
 │   │   │   │       └── ContactRelationshipController.php
 │   │   │   ├── Data
-│   │   │   │   └── Automation
-│   │   │   │       └── ChangeRelationshipStageAutomationDefinition.php
+│   │   │   │   ├── Automation
+│   │   │   │   │   └── ChangeRelationshipStageAutomationDefinition.php
+│   │   │   │   └── ChangeContactRelationshipStageResult.php
 │   │   │   ├── Import
 │   │   │   │   ├── ContactRelationshipImportHandler.php
 │   │   │   │   └── Treatments
@@ -1391,6 +1393,8 @@
 │       │   ├── PresetCompositionResolver.php
 │       │   ├── PresetContributionRegistry.php
 │       │   └── PresetPackageResolver.php
+│       ├── ProcessHighway
+│       │   └── ProcessHighwayReadService.php
 │       ├── ProjectState
 │       │   ├── ProjectStateContractRegistry.php
 │       │   ├── ProjectStateDeferredReferenceApplier.php
@@ -1879,6 +1883,7 @@
 │   │   │   └── README.md
 │   │   └── project-state-transfer-runbook.md
 │   ├── possible-scenarios.md
+│   ├── process-highway.md
 │   ├── product-principles.md
 │   ├── project-organization.md
 │   ├── project-state-extension-guide.md
@@ -2043,6 +2048,8 @@
 │       │   ├── messaging
 │       │   │   └── message-templates
 │       │   │       └── index.blade.php
+│       │   ├── process-highway
+│       │   │   └── index.blade.php
 │       │   ├── project-state
 │       │   │   └── index.blade.php
 │       │   ├── reporting
@@ -2223,6 +2230,7 @@
 │   │   │   ├── ContactStatusImportTreatmentTest.php
 │   │   │   ├── ContactTagAutomationTest.php
 │   │   │   ├── CoreSetupValidationContributorTest.php
+│   │   │   ├── ProcessHighwaySurfaceTest.php
 │   │   │   └── SyncContactStatusPresetsActionTest.php
 │   │   ├── CRM
 │   │   │   ├── DashboardControllerTest.php
@@ -2599,4 +2607,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-642 directories, 1958 files
+644 directories, 1964 files

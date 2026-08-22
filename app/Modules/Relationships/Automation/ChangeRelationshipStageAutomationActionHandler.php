@@ -47,18 +47,12 @@ class ChangeRelationshipStageAutomationActionHandler implements AutomationAction
             );
         }
 
-        $existing = ContactRelationship::query()
-            ->where('contact_id', $contact->getKey())
-            ->where('relationship_key', $definition->relationshipKey)
-            ->where('is_active', true)
-            ->first();
-        $previousStageKey = $existing?->stage_key;
-
         try {
-            $relationship = $this->changeStage->handle(
+            $change = $this->changeStage->handleGuarded(
                 contact: $contact,
                 relationshipKey: $definition->relationshipKey,
                 stageKey: $definition->stageKey,
+                fromStageKey: $definition->fromStageKey,
             );
         } catch (InvalidArgumentException $exception) {
             return AutomationActionResult::failed(
@@ -78,13 +72,28 @@ class ChangeRelationshipStageAutomationActionHandler implements AutomationAction
             );
         }
 
+        $relationship = $change->relationship;
+
         if (! $relationship instanceof ContactRelationship) {
             return $this->missingRelationshipResult($definition);
         }
 
-        $reason = $previousStageKey === $relationship->stage_key
-            ? 'relationship_stage_unchanged'
-            : 'relationship_stage_changed';
+        if (! $change->guardMatched) {
+            return AutomationActionResult::skipped(
+                reason: 'relationship_stage_guard_not_matched',
+                output: [
+                    'contact_relationship' => $this->relationshipOutput(
+                        relationship: $relationship,
+                        previousStageKey: $change->previousStageKey,
+                    ),
+                    'change_relationship_stage_definition' => $definition->toMetaPayload(),
+                ],
+            );
+        }
+
+        $reason = $change->changed
+            ? 'relationship_stage_changed'
+            : 'relationship_stage_unchanged';
 
         return AutomationActionResult::completed(
             reason: $reason,
@@ -96,14 +105,10 @@ class ChangeRelationshipStageAutomationActionHandler implements AutomationAction
                 'relationship_key' => $relationship->relationship_key,
             ],
             output: [
-                'contact_relationship' => [
-                    'id' => $relationship->getKey(),
-                    'contact_id' => $relationship->contact_id,
-                    'relationship_key' => $relationship->relationship_key,
-                    'previous_stage_key' => $previousStageKey,
-                    'stage_key' => $relationship->stage_key,
-                    'is_active' => $relationship->is_active,
-                ],
+                'contact_relationship' => $this->relationshipOutput(
+                    relationship: $relationship,
+                    previousStageKey: $change->previousStageKey,
+                ),
                 'change_relationship_stage_definition' => $definition->toMetaPayload(),
             ],
         );
@@ -134,5 +139,20 @@ class ChangeRelationshipStageAutomationActionHandler implements AutomationAction
                 output: $output,
             ),
         };
+    }
+
+    /** @return array<string, mixed> */
+    private function relationshipOutput(
+        ContactRelationship $relationship,
+        ?string $previousStageKey,
+    ): array {
+        return [
+            'id' => $relationship->getKey(),
+            'contact_id' => $relationship->contact_id,
+            'relationship_key' => $relationship->relationship_key,
+            'previous_stage_key' => $previousStageKey,
+            'stage_key' => $relationship->stage_key,
+            'is_active' => $relationship->is_active,
+        ];
     }
 }

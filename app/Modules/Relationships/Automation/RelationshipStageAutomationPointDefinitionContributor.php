@@ -23,6 +23,7 @@ class RelationshipStageAutomationPointDefinitionContributor implements Automatio
             schema: ConfigSchema::object([
                 'relationship_key' => ConfigField::required(ConfigSchema::string()),
                 'stage_key' => ConfigField::required(ConfigSchema::string()),
+                'from_stage_key' => ConfigField::optional(ConfigSchema::string()),
                 'on_missing_relationship' => ConfigField::defaulted(
                     ConfigSchema::string(
                         allowedValues: ChangeRelationshipStageAutomationDefinition::ON_MISSING_RELATIONSHIP_OPTIONS,
@@ -103,6 +104,40 @@ class RelationshipStageAutomationPointDefinitionContributor implements Automatio
                     'point_key' => $context->pointKey,
                     'relationship_key' => $parsed->relationshipKey,
                     'stage_key' => $parsed->stageKey,
+                ],
+            );
+        }
+
+        if ($parsed->fromStageKey === null) {
+            return;
+        }
+
+        $fromStage = $relationship['stages'][$parsed->fromStageKey] ?? null;
+
+        if (! is_array($fromStage)) {
+            yield $context->error(
+                code: 'flow_routes.relationship_from_stage_missing',
+                message: "FlowRoute [{$context->containerKey}] point [{$context->pointKey}] references missing current-stage guard [{$parsed->fromStageKey}] for Contact relationship [{$parsed->relationshipKey}].",
+                path: "{$context->path}.definition.from_stage_key",
+                context: [
+                    'point_key' => $context->pointKey,
+                    'relationship_key' => $parsed->relationshipKey,
+                    'from_stage_key' => $parsed->fromStageKey,
+                ],
+            );
+
+            return;
+        }
+
+        if (! (bool) ($fromStage['active'] ?? false)) {
+            yield $context->error(
+                code: 'flow_routes.relationship_from_stage_inactive',
+                message: "FlowRoute [{$context->containerKey}] point [{$context->pointKey}] references inactive current-stage guard [{$parsed->fromStageKey}] for Contact relationship [{$parsed->relationshipKey}].",
+                path: "{$context->path}.definition.from_stage_key",
+                context: [
+                    'point_key' => $context->pointKey,
+                    'relationship_key' => $parsed->relationshipKey,
+                    'from_stage_key' => $parsed->fromStageKey,
                 ],
             );
         }

@@ -23,7 +23,7 @@ class RelationshipStageAutomationPointAuthoringContributor implements Automation
             moduleKey: 'relationships',
             name: 'Change relationship stage',
             description: 'Move an existing active business relationship for this Contact to another configured stage.',
-            tip: 'This only changes an existing active relationship. It never creates or reactivates a relationship implicitly.',
+            tip: 'Optionally limit the change to one current stage so an already-advanced relationship is never moved backward accidentally.',
             useCases: [
                 'Move a Realtor from Target Agent to Engaged Agent after a positive reply.',
                 'Advance a collaborator relationship without changing the Contact sales lifecycle.',
@@ -45,25 +45,43 @@ class RelationshipStageAutomationPointAuthoringContributor implements Automation
         array $definition,
         AutomationPointAuthoringContext $context,
     ): array {
-        return [[
-            'type' => 'select',
-            'name' => 'relationship_stage_target',
-            'label' => 'Relationship stage',
-            'required' => true,
-            'value' => $this->targetValue(
-                (string) ($definition['relationship_key'] ?? ''),
-                (string) ($definition['stage_key'] ?? ''),
-            ),
-            'placeholder' => 'Choose a relationship stage',
-            'help' => 'Only configured active stages are shown. The Contact must already have that active relationship when this Point runs.',
-            'options' => $this->targetOptions(),
-        ]];
+        $relationshipKey = (string) ($definition['relationship_key'] ?? '');
+
+        return [
+            [
+                'type' => 'select',
+                'name' => 'relationship_stage_target',
+                'label' => 'Relationship stage',
+                'required' => true,
+                'value' => $this->targetValue(
+                    $relationshipKey,
+                    (string) ($definition['stage_key'] ?? ''),
+                ),
+                'placeholder' => 'Choose a relationship stage',
+                'help' => 'Only configured active stages are shown. The Contact must already have that active relationship when this Point runs.',
+                'options' => $this->targetOptions(),
+            ],
+            [
+                'type' => 'select',
+                'name' => 'relationship_stage_from',
+                'label' => 'Only when current stage is',
+                'required' => false,
+                'value' => $this->targetValue(
+                    $relationshipKey,
+                    (string) ($definition['from_stage_key'] ?? ''),
+                ),
+                'placeholder' => 'Any current stage',
+                'help' => 'Optional safeguard. If the relationship has already advanced to another stage, this Point is skipped without changing it.',
+                'options' => $this->targetOptions(),
+            ],
+        ];
     }
 
     public function rules(string $pointType, AutomationPointAuthoringContext $context): array
     {
         return [
             'relationship_stage_target' => ['required', 'string', 'max:511'],
+            'relationship_stage_from' => ['nullable', 'string', 'max:511'],
         ];
     }
 
@@ -73,7 +91,9 @@ class RelationshipStageAutomationPointAuthoringContributor implements Automation
         AutomationPointAuthoringContext $context,
     ): array {
         [$relationshipKey, $stageKey] = $this->parseTarget(
-            (string) ($input['relationship_stage_target'] ?? ''),
+            value: (string) ($input['relationship_stage_target'] ?? ''),
+            field: 'relationship_stage_target',
+            message: 'Choose a relationship stage.',
         );
 
         $relationship = $this->relationships->visible()[$relationshipKey] ?? null;
@@ -90,11 +110,23 @@ class RelationshipStageAutomationPointAuthoringContributor implements Automation
             ]);
         }
 
-        return [
+        $fromStageKey = $this->resolveFromStageKey(
+            relationshipKey: $relationshipKey,
+            relationship: $relationship,
+            value: (string) ($input['relationship_stage_from'] ?? ''),
+        );
+
+        $definition = [
             'relationship_key' => $relationshipKey,
             'stage_key' => $stageKey,
             'on_missing_relationship' => 'skipped',
         ];
+
+        if ($fromStageKey !== null) {
+            $definition['from_stage_key'] = $fromStageKey;
+        }
+
+        return $definition;
     }
 
     public function pointName(
@@ -110,7 +142,7 @@ class RelationshipStageAutomationPointAuthoringContributor implements Automation
             return $customName;
         }
 
-        return 'Change relationship stage: '.$this->targetLabel($definition);
+        return 'Change relationship stage: '.$this->targetLabel($definition).$this->guardLabel($definition);
     }
 
     public function summary(
@@ -118,7 +150,7 @@ class RelationshipStageAutomationPointAuthoringContributor implements Automation
         array $definition,
         AutomationPointAuthoringContext $context,
     ): string {
-        return 'Change relationship stage: '.$this->targetLabel($definition).'.';
+        return 'Change relationship stage: '.$this->targetLabel($definition).$this->guardLabel($definition).'.';
     }
 
     public function editorSummary(
@@ -126,7 +158,7 @@ class RelationshipStageAutomationPointAuthoringContributor implements Automation
         array $definition,
         AutomationPointAuthoringContext $context,
     ): string {
-        return 'Set '.$this->targetLabel($definition);
+        return 'Set '.$this->targetLabel($definition).$this->guardLabel($definition);
     }
 
     /** @return array<int, array{value: string, label: string, description: string}> */
@@ -161,7 +193,7 @@ class RelationshipStageAutomationPointAuthoringContributor implements Automation
     }
 
     /** @return array{0: string, 1: string} */
-    private function parseTarget(string $value): array
+    private function parseTarget(string $value, string $field, string $message): array
     {
         $parts = explode(self::TARGET_SEPARATOR, trim($value), 2);
 
@@ -170,11 +202,50 @@ class RelationshipStageAutomationPointAuthoringContributor implements Automation
             || trim($parts[1]) === ''
         ) {
             throw ValidationException::withMessages([
-                'relationship_stage_target' => 'Choose a relationship stage.',
+                $field => $message,
             ]);
         }
 
         return [trim($parts[0]), trim($parts[1])];
+    }
+
+    /**
+     * @param array<string, mixed> $relationship
+     */
+    private function resolveFromStageKey(
+        string $relationshipKey,
+        array $relationship,
+        string $value,
+    ): ?string {
+        $value = trim($value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        [$fromRelationshipKey, $fromStageKey] = $this->parseTarget(
+            value: $value,
+            field: 'relationship_stage_from',
+            message: 'Choose a current relationship stage.',
+        );
+
+        if ($fromRelationshipKey !== $relationshipKey) {
+            throw ValidationException::withMessages([
+                'relationship_stage_from' => 'The current-stage safeguard must use the same Contact relationship as the target stage.',
+            ]);
+        }
+
+        $fromStage = $relationship['stages'][$fromStageKey] ?? null;
+
+        if (! is_array($fromStage)
+            || ! (bool) ($fromStage['active'] ?? false)
+        ) {
+            throw ValidationException::withMessages([
+                'relationship_stage_from' => 'Choose an active current stage for the selected Contact relationship.',
+            ]);
+        }
+
+        return $fromStageKey;
     }
 
     /** @param array<string, mixed> $definition */
@@ -200,5 +271,28 @@ class RelationshipStageAutomationPointAuthoringContributor implements Automation
         return $relationshipKey !== ''
             ? $relationshipKey
             : ($stageKey !== '' ? $stageKey : 'selected relationship stage');
+    }
+
+    /** @param array<string, mixed> $definition */
+    private function guardLabel(array $definition): string
+    {
+        $relationshipKey = trim((string) ($definition['relationship_key'] ?? ''));
+        $fromStageKey = trim((string) ($definition['from_stage_key'] ?? ''));
+
+        if ($fromStageKey === '') {
+            return '';
+        }
+
+        $relationship = $relationshipKey !== ''
+            ? ($this->relationships->all()[$relationshipKey] ?? null)
+            : null;
+        $stage = is_array($relationship)
+            ? ($relationship['stages'][$fromStageKey] ?? null)
+            : null;
+        $label = is_array($stage)
+            ? (string) ($stage['label'] ?? $fromStageKey)
+            : $fromStageKey;
+
+        return ' only when current stage is '.$label;
     }
 }

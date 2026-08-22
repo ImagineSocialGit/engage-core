@@ -8,7 +8,6 @@ use App\Modules\Relationships\Automation\ChangeRelationshipStageAutomationAction
 use App\Modules\Relationships\Automation\RelationshipStageAutomationPointAuthoringContributor;
 use App\Modules\Relationships\Automation\RelationshipStageAutomationPointDefinitionContributor;
 use App\Modules\Relationships\Capabilities\RelationshipsAutomationCapabilityContributor;
-use App\Modules\Relationships\Models\ContactRelationship;
 use App\Support\AutomationCapabilities\Data\AutomationActionContext;
 use App\Support\AutomationCapabilities\Data\AutomationActionResult;
 use App\Support\AutomationCapabilities\Data\AutomationPointAuthoringContext;
@@ -50,6 +49,11 @@ class RelationshipStageAutomationCapabilityTest extends TestCase
                         'sort_order' => 20,
                         'active' => true,
                     ],
+                    'strategic_partner' => [
+                        'label' => 'Strategic Partner',
+                        'sort_order' => 30,
+                        'active' => true,
+                    ],
                     'legacy_agent' => [
                         'label' => 'Legacy Agent',
                         'sort_order' => 90,
@@ -75,10 +79,29 @@ class RelationshipStageAutomationCapabilityTest extends TestCase
         $this->assertTrue($authoring->available('change_relationship_stage', $context));
 
         $fields = $authoring->fields('change_relationship_stage', [], $context);
-        $options = collect($fields[0]['options']);
+        $targetOptions = collect($fields[0]['options']);
+        $guardOptions = collect($fields[1]['options']);
 
-        $this->assertNotNull($options->firstWhere('value', 'realtor::engaged_agent'));
-        $this->assertNull($options->firstWhere('value', 'realtor::legacy_agent'));
+        $this->assertSame('Only when current stage is', $fields[1]['label']);
+        $this->assertFalse($fields[1]['required']);
+        $this->assertNotNull($targetOptions->firstWhere('value', 'realtor::engaged_agent'));
+        $this->assertNotNull($guardOptions->firstWhere('value', 'realtor::target_agent'));
+        $this->assertNull($targetOptions->firstWhere('value', 'realtor::legacy_agent'));
+        $this->assertNull($guardOptions->firstWhere('value', 'realtor::legacy_agent'));
+
+        $this->assertEquals([
+            'relationship_key' => 'realtor',
+            'stage_key' => 'engaged_agent',
+            'on_missing_relationship' => 'skipped',
+            'from_stage_key' => 'target_agent',
+        ], $authoring->buildDefinition(
+            'change_relationship_stage',
+            [
+                'relationship_stage_target' => 'realtor::engaged_agent',
+                'relationship_stage_from' => 'realtor::target_agent',
+            ],
+            $context,
+        ));
 
         $this->assertEquals([
             'relationship_key' => 'realtor',
@@ -91,13 +114,72 @@ class RelationshipStageAutomationCapabilityTest extends TestCase
         ));
     }
 
-    public function test_handler_changes_only_an_existing_active_relationship(): void
+    public function test_guarded_handler_changes_target_agent_to_engaged_agent(): void
     {
         $contact = Contact::factory()->create();
         $relationship = app(UpsertContactRelationshipAction::class)->handle(
             contact: $contact,
             relationshipKey: 'realtor',
             stageKey: 'target_agent',
+            source: 'import',
+        );
+
+        $result = app(ChangeRelationshipStageAutomationActionHandler::class)->handle(
+            new AutomationActionContext(
+                input: [
+                    'relationship_key' => 'realtor',
+                    'stage_key' => 'engaged_agent',
+                    'from_stage_key' => 'target_agent',
+                ],
+                models: ['current_contact' => $contact],
+            ),
+        );
+
+        $this->assertSame(AutomationActionResult::STATUS_COMPLETED, $result->status);
+        $this->assertSame('relationship_stage_changed', $result->reason);
+        $this->assertSame('engaged_agent', $relationship->refresh()->stage_key);
+        $this->assertSame('target_agent', data_get($result->output, 'contact_relationship.previous_stage_key'));
+        $this->assertSame('import', $relationship->source);
+        $this->assertTrue($relationship->is_active);
+    }
+
+    public function test_guarded_handler_leaves_an_already_advanced_realtor_untouched(): void
+    {
+        $contact = Contact::factory()->create();
+        $relationship = app(UpsertContactRelationshipAction::class)->handle(
+            contact: $contact,
+            relationshipKey: 'realtor',
+            stageKey: 'strategic_partner',
+            source: 'import',
+        );
+
+        $result = app(ChangeRelationshipStageAutomationActionHandler::class)->handle(
+            new AutomationActionContext(
+                input: [
+                    'relationship_key' => 'realtor',
+                    'stage_key' => 'engaged_agent',
+                    'from_stage_key' => 'target_agent',
+                ],
+                models: ['current_contact' => $contact],
+            ),
+        );
+
+        $this->assertSame(AutomationActionResult::STATUS_SKIPPED, $result->status);
+        $this->assertSame('relationship_stage_guard_not_matched', $result->reason);
+        $this->assertSame('strategic_partner', $relationship->refresh()->stage_key);
+        $this->assertSame('strategic_partner', data_get($result->output, 'contact_relationship.previous_stage_key'));
+        $this->assertSame('strategic_partner', data_get($result->output, 'contact_relationship.stage_key'));
+        $this->assertSame('import', $relationship->source);
+        $this->assertTrue($relationship->is_active);
+    }
+
+    public function test_unconditional_handler_remains_backward_compatible(): void
+    {
+        $contact = Contact::factory()->create();
+        $relationship = app(UpsertContactRelationshipAction::class)->handle(
+            contact: $contact,
+            relationshipKey: 'realtor',
+            stageKey: 'strategic_partner',
             source: 'import',
         );
 
@@ -114,8 +196,6 @@ class RelationshipStageAutomationCapabilityTest extends TestCase
         $this->assertSame(AutomationActionResult::STATUS_COMPLETED, $result->status);
         $this->assertSame('relationship_stage_changed', $result->reason);
         $this->assertSame('engaged_agent', $relationship->refresh()->stage_key);
-        $this->assertSame('import', $relationship->source);
-        $this->assertTrue($relationship->is_active);
     }
 
     public function test_handler_skips_instead_of_creating_or_reactivating_missing_relationship(): void
@@ -127,6 +207,7 @@ class RelationshipStageAutomationCapabilityTest extends TestCase
                 input: [
                     'relationship_key' => 'realtor',
                     'stage_key' => 'engaged_agent',
+                    'from_stage_key' => 'target_agent',
                 ],
                 models: ['current_contact' => $contact],
             ),
@@ -150,6 +231,7 @@ class RelationshipStageAutomationCapabilityTest extends TestCase
                 input: [
                     'relationship_key' => 'realtor',
                     'stage_key' => 'engaged_agent',
+                    'from_stage_key' => 'target_agent',
                 ],
                 models: ['current_contact' => $contact],
             ),
@@ -184,5 +266,32 @@ class RelationshipStageAutomationCapabilityTest extends TestCase
 
         $this->assertCount(1, $findings);
         $this->assertSame('flow_routes.relationship_stage_inactive', $findings[0]->code);
+    }
+
+    public function test_point_validation_rejects_an_inactive_current_stage_guard(): void
+    {
+        $context = new AutomationPointValidationContext(
+            containerKey: 'realtor_reply',
+            pointKey: 'advance_realtor',
+            pointType: 'change_relationship_stage',
+            path: 'flow_route.points.advance_realtor',
+        );
+
+        $findings = iterator_to_array(
+            app(RelationshipStageAutomationPointDefinitionContributor::class)->validate(
+                pointType: 'change_relationship_stage',
+                definition: [
+                    'relationship_key' => 'realtor',
+                    'stage_key' => 'engaged_agent',
+                    'from_stage_key' => 'legacy_agent',
+                ],
+                settings: [],
+                context: $context,
+            ),
+            false,
+        );
+
+        $this->assertCount(1, $findings);
+        $this->assertSame('flow_routes.relationship_from_stage_inactive', $findings[0]->code);
     }
 }

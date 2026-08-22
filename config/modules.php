@@ -385,6 +385,11 @@ return [
                     'priority' => 20,
                     'class' => 'capitalize',
                 ],
+                [
+                    'label' => 'Process Highway',
+                    'route' => 'crm.process-highway.index',
+                    'priority' => 21,
+                ],
             ],
             'always_on' => true,
             'depends_on' => [],

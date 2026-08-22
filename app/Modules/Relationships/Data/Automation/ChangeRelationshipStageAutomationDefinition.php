@@ -19,6 +19,7 @@ class ChangeRelationshipStageAutomationDefinition
     public function __construct(
         public readonly ?string $relationshipKey,
         public readonly ?string $stageKey,
+        public readonly ?string $fromStageKey = null,
         public readonly string $onMissingRelationship = self::ON_MISSING_RELATIONSHIP_SKIPPED,
         public readonly ?string $invalidReason = null,
     ) {}
@@ -28,12 +29,14 @@ class ChangeRelationshipStageAutomationDefinition
     {
         $relationshipKey = self::nullableString($input['relationship_key'] ?? null);
         $stageKey = self::nullableString($input['stage_key'] ?? null);
+        $fromStageKey = self::nullableString($input['from_stage_key'] ?? null);
         $onMissing = self::nullableString($input['on_missing_relationship'] ?? null)
             ?? self::ON_MISSING_RELATIONSHIP_SKIPPED;
 
         return new self(
             relationshipKey: $relationshipKey,
             stageKey: $stageKey,
+            fromStageKey: $fromStageKey,
             onMissingRelationship: $onMissing,
             invalidReason: match (true) {
                 $relationshipKey === null => 'change_relationship_stage_missing_relationship_key',
@@ -55,6 +58,7 @@ class ChangeRelationshipStageAutomationDefinition
         return [
             'relationship_key' => $this->relationshipKey,
             'stage_key' => $this->stageKey,
+            'from_stage_key' => $this->fromStageKey,
             'on_missing_relationship' => $this->onMissingRelationship,
             'invalid_reason' => $this->invalidReason,
         ];

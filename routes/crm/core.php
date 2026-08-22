@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CRM\DashboardController;
 use App\Http\Controllers\CRM\ProjectStateController;
+use App\Http\Controllers\CRM\ProcessHighwayController;
 use App\Modules\Core\Controllers\ContactController;
 use App\Modules\Core\Controllers\ContactImportBatchController;
 use App\Modules\Core\Controllers\ContactLookupController;
@@ -12,6 +13,9 @@ Route::get('/', [DashboardController::class, 'index'])->name('crm.index');
 
 Route::post('/dashboard/acknowledgements', [DashboardController::class, 'acknowledge'])
     ->name('crm.dashboard.acknowledgements.store');
+
+Route::get('/process-highway', ProcessHighwayController::class)
+    ->name('crm.process-highway.index');
 
 
 Route::get('/project-state', [ProjectStateController::class, 'index'])
