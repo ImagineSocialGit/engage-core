@@ -113,18 +113,23 @@ Messaging
     generates the signed email Reply-To identity for later correlation
 ```
 
-The operator reply uses the same channel as the inbound message. It does not invent a
-new consent domain or bypass MessageGate. If the inbound record cannot provide a
-purpose/scope context, or the current Messaging gate denies the send, the composer is
-not sendable.
+The operator reply uses the same channel as the inbound message and never bypasses
+MessageGate. Purpose and scope are reused from the inbound/correlated ScheduledMessage
+when present. If scope is missing but Messaging explicitly maps the channel/purpose pair
+to a consent domain, that canonical domain key is used as the reply scope. If purpose or
+a safe scope/domain context still cannot be resolved, the composer is not sendable.
 
 CRM replies are normal `ScheduledMessage` records with `message_type=conversation_reply`.
 They retain only compact operational provenance (`surface=crm_contact_conversation`) and
 reuse the existing ScheduledMessage dedupe key for form-submit idempotency. The inbound
 body is not copied into ScheduledMessage metadata.
 
-For email, the visible subject defaults to the correlated outbound subject with `Re:`.
-Provider-native `In-Reply-To` / `References` headers are not synthesized from a provider
-API id because that id is not guaranteed to be the RFC Message-ID. Later recipient
-replies still correlate through the normal signed Reply-To address generated for the new
-ScheduledMessage.
+For email, InboundMessaging stores the received subject and RFC `Message-ID` as narrow
+first-class fields. The visible CRM reply subject prefers the received subject, falls back
+to the correlated outbound subject, and normalizes repeated reply prefixes to exactly one
+`Re:`. When an RFC Message-ID is available, the ScheduledMessage carries it once as
+canonical `in_reply_to` delivery data; EmailPayload/provider emission uses that value for
+both standard `In-Reply-To` and `References` headers unless a richer References chain is
+explicitly present. The
+new outbound ScheduledMessage still receives its own signed Engage Reply-To address so
+the recipient's next response correlates through the normal inbound path.

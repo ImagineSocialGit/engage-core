@@ -5,8 +5,10 @@ namespace App\Modules\InboundMessaging\Services\ContactShow;
 use App\Modules\Core\Contracts\Contacts\ContactShowDataProvider;
 use App\Modules\Core\Models\Contact;
 use App\Modules\InboundMessaging\Models\InboundMessage;
+use App\Modules\InboundMessaging\Services\Reply\EmailReplySubjectResolver;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Services\ConsentDomainRegistry;
 use App\Modules\Messaging\Services\MessageEligibilityGate;
 use BackedEnum;
 use Illuminate\Support\Str;
@@ -20,6 +22,8 @@ class ContactConversationShowDataProvider implements ContactShowDataProvider
 
     public function __construct(
         private readonly MessageEligibilityGate $messageEligibilityGate,
+        private readonly ConsentDomainRegistry $consentDomainRegistry,
+        private readonly EmailReplySubjectResolver $emailReplySubjectResolver,
     ) {}
 
     /**
@@ -98,15 +102,20 @@ class ContactConversationShowDataProvider implements ContactShowDataProvider
                 $this->label($correlated->message_type),
             ])))
             : null;
+        $channel = $this->enumValue($message->channel);
+        $subject = $channel === MessageChannel::Email->value
+            ? $this->nullableString($message->subject)
+            : null;
 
         return [
             'id' => 'inbound-'.$message->getKey(),
             'source_id' => (int) $message->getKey(),
             'direction' => 'inbound',
-            'channel' => $this->enumValue($message->channel),
-            'title' => $context !== null && $context !== ''
-                ? 'Reply to '.$context
-                : 'Inbound '.$this->label($this->enumValue($message->channel)),
+            'channel' => $channel,
+            'title' => $subject
+                ?? ($context !== null && $context !== ''
+                    ? 'Reply to '.$context
+                    : 'Inbound '.$this->label($channel)),
             'body' => $this->cleanText($message->body),
             'intent' => $this->label($message->reply_intent_key),
             'status' => null,
@@ -158,6 +167,17 @@ class ContactConversationShowDataProvider implements ContactShowDataProvider
             ?? $this->nullableString($correlated?->purpose);
         $scope = $this->nullableString($message->scope)
             ?? $this->nullableString($correlated?->scope);
+
+        if ($purpose !== null
+            && $scope === null
+            && in_array($channel, MessageChannel::values(), true)
+        ) {
+            $scope = $this->consentDomainRegistry->channelPurposeDomainFor(
+                channel: $channel,
+                purpose: $purpose,
+            );
+        }
+
         $destination = match ($channel) {
             MessageChannel::Email->value => $this->nullableString($contact->email),
             MessageChannel::Sms->value => $this->nullableString($contact->phone),
@@ -166,7 +186,9 @@ class ContactConversationShowDataProvider implements ContactShowDataProvider
 
         $unavailableReason = null;
 
-        if ($destination === null) {
+        if (! in_array($channel, MessageChannel::values(), true)) {
+            $unavailableReason = 'This inbound message does not have a supported reply channel.';
+        } elseif ($destination === null) {
             $unavailableReason = $channel === MessageChannel::Sms->value
                 ? 'Add a phone number before replying by SMS.'
                 : 'Add an email address before replying by email.';
@@ -190,21 +212,14 @@ class ContactConversationShowDataProvider implements ContactShowDataProvider
             'scope' => $scope,
             'destination' => $destination,
             'subject' => $channel === MessageChannel::Email->value
-                ? $this->replySubject($correlated)
+                ? $this->emailReplySubjectResolver->resolve(
+                    inboundMessage: $message,
+                    correlated: $correlated,
+                )
                 : null,
             'can_send' => $unavailableReason === null,
             'unavailable_reason' => $unavailableReason,
         ];
-    }
-
-    private function replySubject(?ScheduledMessage $correlated): string
-    {
-        $subject = $this->nullableString(data_get($correlated?->payload, 'subject'))
-            ?? 'Your message';
-
-        return preg_match('/^\s*re\s*:/i', $subject)
-            ? trim($subject)
-            : 'Re: '.trim($subject);
     }
 
     private function enumValue(mixed $value): ?string

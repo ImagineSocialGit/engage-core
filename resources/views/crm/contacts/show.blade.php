@@ -462,9 +462,7 @@
                                 </p>
                             @endif
 
-                            <p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
-                                {{ $latestInboundReply['body'] ?: '(No message body)' }}
-                            </p>
+                            <p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">{{ $latestInboundReply['body'] ?: '(No message body)' }}</p>
 
                             @if(filled($latestInboundReply['intent'] ?? null))
                                 <p class="mt-3 text-xs font-semibold text-indigo-700">
@@ -594,9 +592,7 @@
                                                 </p>
 
                                                 @if(filled($conversationItem['body'] ?? null))
-                                                    <p class="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-600">
-                                                        {{ $conversationItem['body'] }}
-                                                    </p>
+                                                    <p class="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-600">{{ $conversationItem['body'] }}</p>
                                                 @endif
 
                                                 @if(filled($conversationItem['intent'] ?? null))

@@ -46,10 +46,12 @@ class ContactConversationShowDataProviderTest extends TestCase
             'provider' => 'resend',
             'provider_event_id' => 'contact-conversation-reply-1',
             'provider_message_id' => 'provider-message-1',
+            'message_id' => '<provider-message-1@example.test>',
             'from_type' => 'email',
             'from_value' => 'person@example.test',
             'to_type' => 'email',
             'to_value' => 'team@example.test',
+            'subject' => 'Re: Are you still thinking about buying?',
             'body' => 'Yes, I am ready. Please call me tomorrow.',
             'classification' => InboundMessage::CLASSIFICATION_NORMAL_REPLY,
             'purpose' => 'marketing',
@@ -90,6 +92,10 @@ class ContactConversationShowDataProviderTest extends TestCase
         $this->assertSame(ScheduledMessage::STATUS_PENDING, $items[0]['status']);
         $this->assertSame('inbound', $items[1]['direction']);
         $this->assertSame(
+            'Re: Are you still thinking about buying?',
+            $items[1]['title'],
+        );
+        $this->assertSame(
             'Yes, I am ready. Please call me tomorrow.',
             $items[1]['body'],
         );
@@ -104,10 +110,22 @@ class ContactConversationShowDataProviderTest extends TestCase
             'inbound-'.$inbound->getKey(),
             $data['latestInboundReply']['id'],
         );
+        $this->assertSame(
+            'Re: Are you still thinking about buying?',
+            data_get($data, 'conversationReply.subject'),
+        );
     }
 
-    public function test_reply_context_uses_existing_messaging_permission_state(): void
+    public function test_reply_context_uses_existing_channel_purpose_permission_when_scope_is_missing(): void
     {
+        config()->set('messaging.consent.channel_purpose_domains.sms.marketing', 'marketing');
+        config()->set('messaging.consent_domains.marketing', [
+            'topic' => 'marketing communications',
+            'scopes' => [],
+            'scope_prefixes' => [],
+            'opt_in' => [],
+        ]);
+
         $contact = Contact::factory()->create([
             'phone' => '+15551234567',
         ]);
@@ -116,7 +134,7 @@ class ContactConversationShowDataProviderTest extends TestCase
             'contact_id' => $contact->getKey(),
             'channel' => 'sms',
             'purpose' => 'marketing',
-            'scope' => 'general',
+            'scope' => 'marketing',
             'consented_at' => now(),
             'source' => 'test',
         ]);
@@ -135,7 +153,7 @@ class ContactConversationShowDataProviderTest extends TestCase
             'body' => 'Please call me tomorrow.',
             'classification' => InboundMessage::CLASSIFICATION_NORMAL_REPLY,
             'purpose' => 'marketing',
-            'scope' => 'general',
+            'scope' => null,
             'received_at' => now(),
             'meta' => [],
         ]);
@@ -147,6 +165,7 @@ class ContactConversationShowDataProviderTest extends TestCase
             data_get($data, 'conversationReply.inbound_message_id'),
         );
         $this->assertSame('sms', data_get($data, 'conversationReply.channel'));
+        $this->assertSame('marketing', data_get($data, 'conversationReply.scope'));
         $this->assertTrue(data_get($data, 'conversationReply.can_send'));
         $this->assertNull(data_get($data, 'conversationReply.unavailable_reason'));
     }

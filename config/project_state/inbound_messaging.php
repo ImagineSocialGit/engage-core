@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 2,
+    'version' => 3,
     'tables' => [
         'inbound_messages' => [
             'mode' => 'insert_empty',
@@ -17,10 +17,12 @@ return [
                 'provider_event_id',
                 'provider_message_id',
                 'provider_context_id',
+                'message_id',
                 'from_type',
                 'from_value',
                 'to_type',
                 'to_value',
+                'subject',
                 'body',
                 'classification',
                 'purpose',

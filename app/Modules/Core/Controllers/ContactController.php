@@ -196,10 +196,7 @@ class ContactController extends Controller
                 ->withInput();
         }
 
-        $headers = collect($headers)
-            ->map(fn ($header) => trim((string) $header))
-            ->filter()
-            ->values();
+        $headers = collect($this->normalizeCsvHeaders($headers));
 
         if ($headers->isEmpty()) {
             fclose($handle);
@@ -386,11 +383,7 @@ class ContactController extends Controller
             ]);
         }
 
-        $headers = collect($headers)
-            ->map(fn ($header) => trim((string) $header))
-            ->filter()
-            ->values()
-            ->all();
+        $headers = $this->normalizeCsvHeaders($headers);
 
         $importMode = $this->normalizeImportMode(
             $request->session()->get($this->importModeSessionKey($csvPath)),
@@ -924,6 +917,28 @@ class ContactController extends Controller
         $value = trim($value);
 
         return $value !== '' ? $value : null;
+    }
+
+
+    /**
+     * @param array<int, mixed> $headers
+     * @return array<int, string>
+     */
+    private function normalizeCsvHeaders(array $headers): array
+    {
+        return collect($headers)
+            ->map(function (mixed $header, int $index): string {
+                $header = (string) $header;
+
+                if ($index === 0) {
+                    $header = preg_replace('/^\xEF\xBB\xBF/', '', $header) ?? $header;
+                }
+
+                return trim($header);
+            })
+            ->filter(fn (string $header): bool => $header !== '')
+            ->values()
+            ->all();
     }
 
     private function importOriginalFilenameSessionKey(string $csvPath): string

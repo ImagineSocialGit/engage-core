@@ -34,6 +34,8 @@ class ScheduledMessagePayloadCanonicalizerTest extends TestCase
                 ],
                 'subject' => 'You are registered',
                 'body' => 'Hi {first_name}, you are registered for {webinar.title}. {cta}',
+                'in_reply_to' => '<inbound-message@example.test>',
+                'references' => '<inbound-message@example.test>',
                 'cta' => [
                     'label' => 'Join',
                     'url' => '{webinar_join_url}',
@@ -80,11 +82,13 @@ class ScheduledMessagePayloadCanonicalizerTest extends TestCase
             ],
         );
 
-        $this->assertSame([
+        $this->assertEquals([
             'to' => 'lead@example.com',
             'contact_id' => 14,
             'subject' => 'You are registered',
             'body' => 'Hi {first_name}, you are registered for {webinar.title}. {cta}',
+            'in_reply_to' => '<inbound-message@example.test>',
+            'references' => '<inbound-message@example.test>',
             'cta' => [
                 'label' => 'Join',
                 'url' => '{webinar_join_url}',

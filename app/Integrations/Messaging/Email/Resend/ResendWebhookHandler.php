@@ -67,6 +67,12 @@ class ResendWebhookHandler implements EmailWebhookHandler
                         toAddresses: $to,
                         text: is_string($received['text'] ?? null) ? $received['text'] : null,
                         html: is_string($received['html'] ?? null) ? $received['html'] : null,
+                        subject: is_string($received['subject'] ?? null)
+                            ? $received['subject']
+                            : $payload->data('subject'),
+                        messageId: is_string($received['message_id'] ?? null)
+                            ? $received['message_id']
+                            : $payload->data('message_id'),
                         receivedAt: $received['created_at']
                             ?? $payload->data('created_at')
                             ?? now(),

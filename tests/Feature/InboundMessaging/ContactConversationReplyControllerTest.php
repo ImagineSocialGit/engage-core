@@ -84,6 +84,11 @@ class ContactConversationReplyControllerTest extends TestCase
         $this->assertSame('test_reply_profile', $reply->reply_profile_key);
         $this->assertSame('Re: Checking in', data_get($reply->payload, 'subject'));
         $this->assertSame(
+            $inbound->message_id,
+            data_get($reply->payload, 'in_reply_to'),
+        );
+        $this->assertArrayNotHasKey('references', $reply->payload);
+        $this->assertSame(
             'Yes — I can call you tomorrow morning.',
             data_get($reply->payload, 'body'),
         );
@@ -131,6 +136,77 @@ class ContactConversationReplyControllerTest extends TestCase
             'I can call you tomorrow at 10.',
             data_get($reply->payload, 'message'),
         );
+    }
+
+    public function test_reply_uses_explicit_channel_purpose_domain_when_inbound_scope_is_missing(): void
+    {
+        config()->set('messaging.consent.channel_purpose_domains.sms.marketing', 'marketing');
+        config()->set('messaging.consent_domains.marketing', [
+            'topic' => 'marketing communications',
+            'scopes' => [],
+            'scope_prefixes' => [],
+            'opt_in' => [],
+        ]);
+
+        $user = User::factory()->create();
+        $contact = Contact::factory()->create([
+            'phone' => '+15551234567',
+        ]);
+        $this->grant($contact, 'sms', 'marketing', 'marketing');
+        $inbound = $this->inboundReply(
+            contact: $contact,
+            source: null,
+            channel: 'sms',
+            purpose: 'marketing',
+            scope: null,
+        );
+
+        $this->actingAs($user)
+            ->post(route('crm.contacts.conversation.reply.store', [$contact, $inbound]), [
+                'reply_body' => 'I can help with that.',
+                'reply_request_key' => 'reply-domain-fallback',
+            ])
+            ->assertRedirect(route('crm.contacts.show', $contact).'#contact-conversation');
+
+        $reply = ScheduledMessage::query()
+            ->where('message_type', 'conversation_reply')
+            ->sole();
+
+        $this->assertSame('marketing', $reply->purpose);
+        $this->assertSame('marketing', $reply->scope);
+    }
+
+    public function test_email_reply_subject_collapses_repeated_reply_prefixes(): void
+    {
+        $user = User::factory()->create();
+        $contact = Contact::factory()->create([
+            'email' => 'person@example.test',
+        ]);
+        $this->grant($contact, 'email', 'marketing', 'general');
+
+        $inbound = $this->inboundReply(
+            contact: $contact,
+            source: null,
+            channel: 'email',
+            purpose: 'marketing',
+            scope: 'general',
+        );
+        $inbound->forceFill([
+            'subject' => 'Re: Re: Checking in',
+        ])->save();
+
+        $this->actingAs($user)
+            ->post(route('crm.contacts.conversation.reply.store', [$contact, $inbound]), [
+                'reply_body' => 'Thanks for the update.',
+                'reply_request_key' => 'reply-subject-normalization',
+            ])
+            ->assertRedirect(route('crm.contacts.show', $contact).'#contact-conversation');
+
+        $reply = ScheduledMessage::query()
+            ->where('message_type', 'conversation_reply')
+            ->sole();
+
+        $this->assertSame('Re: Checking in', data_get($reply->payload, 'subject'));
     }
 
     public function test_same_reply_request_key_is_idempotent(): void
@@ -258,10 +334,16 @@ class ContactConversationReplyControllerTest extends TestCase
             'provider' => $channel === 'email' ? 'resend' : 'telnyx',
             'provider_event_id' => 'reply-event-'.uniqid(),
             'provider_message_id' => 'reply-message-'.uniqid(),
+            'message_id' => $channel === 'email'
+                ? '<reply-'.uniqid().'@example.test>'
+                : null,
             'from_type' => $channel === 'email' ? 'email' : 'phone',
             'from_value' => $channel === 'email' ? $contact->email : $contact->phone,
             'to_type' => $channel === 'email' ? 'email' : 'phone',
             'to_value' => $channel === 'email' ? 'reply@example.test' : '+15550000000',
+            'subject' => $channel === 'email'
+                ? 'Re: '.(data_get($source?->payload, 'subject') ?? 'Your message')
+                : null,
             'body' => 'Please contact me.',
             'classification' => InboundMessage::CLASSIFICATION_NORMAL_REPLY,
             'purpose' => $purpose ?? $source?->purpose,

@@ -33,6 +33,8 @@ class RecordInboundEmailAction
         array $toAddresses,
         ?string $text,
         ?string $html,
+        ?string $subject = null,
+        ?string $messageId = null,
         Carbon|string|null $receivedAt = null,
     ): InboundMessage {
         if (blank($providerEventId) && blank($providerMessageId)) {
@@ -64,10 +66,12 @@ class RecordInboundEmailAction
                 'provider_event_id' => $providerEventId,
                 'provider_message_id' => $providerMessageId,
                 'provider_context_id' => null,
+                'message_id' => $this->messageId($messageId),
                 'from_type' => 'email',
                 'from_value' => $fromAddress,
                 'to_type' => 'email',
                 'to_value' => $this->preferredToAddress($toAddresses, $correlated),
+                'subject' => $this->subject($subject),
                 'body' => $body,
                 'classification' => InboundMessage::CLASSIFICATION_NORMAL_REPLY,
                 'purpose' => $correlated?->purpose,
@@ -129,6 +133,38 @@ class RecordInboundEmailAction
         return filter_var($value, FILTER_VALIDATE_EMAIL) !== false
             ? $value
             : null;
+    }
+
+    private function subject(?string $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $value = preg_replace('/[\r\n]+/u', ' ', trim($value)) ?? trim($value);
+        $value = trim(preg_replace('/\s+/u', ' ', $value) ?? $value);
+
+        return $value !== ''
+            ? mb_substr($value, 0, 998)
+            : null;
+    }
+
+    private function messageId(?string $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        if ($value === ''
+            || mb_strlen($value) > 998
+            || preg_match('/[\r\n]/', $value) === 1
+        ) {
+            return null;
+        }
+
+        return $value;
     }
 
     private function body(?string $text, ?string $html): ?string

@@ -10,7 +10,7 @@ The approved target stores one raw provider receipt and one normalized inbound b
 
 ## Reply correlation foundation
 
-Normal replies may carry narrow first-class correlation evidence back to the originating `ScheduledMessage`. Email correlation may be exact through a signed per-message Reply-To identity; SMS correlation is explicitly heuristic and bounded to recent sent deliveries for the same Contact/destination. `reply_intent_key` is deterministic/config-driven classification evidence, not an automatic business outcome.
+Normal replies may carry narrow first-class correlation evidence back to the originating `ScheduledMessage`. Email correlation may be exact through a signed per-message Reply-To identity; SMS correlation is explicitly heuristic and bounded to recent sent deliveries for the same Contact/destination. Received email `subject` and RFC `message_id` are first-class normalized fields so CRM replies can preserve the visible subject and emit standard `In-Reply-To` / `References` threading headers while continuing to use a newly signed Engage Reply-To identity for the next inbound correlation hop. `reply_intent_key` is deterministic/config-driven classification evidence, not an automatic business outcome.
 
 The neutral `inbound_message.normal_reply` event exposes compact correlation/profile/intent identity for optional automation consumers. InternalNotifications remains free to notify a human even when no automation route exists. Domain-specific labels, tags, statuses, tasks, acknowledgements, and other consequences remain configuration/owning-module behavior rather than InboundMessaging features.
 
@@ -87,12 +87,14 @@ provider
 provider_event_id nullable
 provider_message_id nullable
 provider_context_id nullable
+message_id nullable
 provider_event_key nullable unique
 provider_message_key nullable unique
 from_type nullable
 from_value nullable
 to_type nullable
 to_value nullable
+subject nullable
 body nullable
 classification
 purpose nullable
@@ -109,6 +111,8 @@ Rules:
 - provider hash keys enforce normalized idempotency directly on the business record;
 - the webhook receipt FK connects normalized state to the one raw ingestion record;
 - provider event/message IDs remain first-class for support and reconciliation;
+- email `message_id` is the RFC Message-ID used for standards-based reply threading, not the provider API resource ID;
+- email `subject` is normalized display/reply context and remains nullable for non-email channels and legacy rows;
 - sender remains a generic morph;
 - body is normalized inbound content, not a raw provider envelope.
 

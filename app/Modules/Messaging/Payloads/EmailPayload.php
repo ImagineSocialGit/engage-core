@@ -4,6 +4,7 @@ namespace App\Modules\Messaging\Payloads;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Contracts\Email\EmailMessage;
+use App\Modules\Messaging\Contracts\Email\ThreadedEmailMessage;
 use App\Modules\Messaging\Support\CtaTrackingLinkGenerator;
 use App\Modules\Messaging\Support\EmailConsentRevocationLinkGenerator;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\View;
 use InvalidArgumentException;
 use Stringable;
 
-class EmailPayload implements EmailMessage
+class EmailPayload implements EmailMessage, ThreadedEmailMessage
 {
     private const DEFAULT_VIEW = 'email';
 
@@ -37,6 +38,8 @@ class EmailPayload implements EmailMessage
         public readonly ?string $transactionalOptOutUrl = null,
         public readonly ?string $sourceIp = null,
         public readonly array $meta = [],
+        public readonly ?string $inReplyTo = null,
+        public readonly ?string $references = null,
     ) {}
 
     public static function fromArray(array $payload): self
@@ -93,6 +96,10 @@ class EmailPayload implements EmailMessage
                     ?? $payload['request_ip']
                     ?? null
             ),
+
+            inReplyTo: self::nullableHeaderString($payload['in_reply_to'] ?? null),
+
+            references: self::nullableHeaderString($payload['references'] ?? null),
 
             meta: is_array($payload['meta'] ?? null)
                 ? $payload['meta']
@@ -255,6 +262,16 @@ class EmailPayload implements EmailMessage
         return $this->messageType;
     }
 
+    public function inReplyTo(): ?string
+    {
+        return $this->inReplyTo;
+    }
+
+    public function references(): ?string
+    {
+        return $this->references ?? $this->inReplyTo;
+    }
+
     private function fromAddress(): string
     {
         $address = $this->fromConfigValue('address');
@@ -313,6 +330,8 @@ class EmailPayload implements EmailMessage
             'footer' => $this->footer ?? $this->configValue('footer'),
             'unsubscribe_url' => $this->marketingUnsubscribeUrl(),
             'transactional_opt_out_url' => $this->transactionalOptOutUrl(),
+            'in_reply_to' => $this->inReplyTo,
+            'references' => $this->references(),
             'tokens' => $this->tokens,
         ];
     }
@@ -579,5 +598,17 @@ class EmailPayload implements EmailMessage
         return is_string($value) && trim($value) !== ''
             ? trim($value)
             : null;
+    }
+
+    private static function nullableHeaderString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = preg_replace('/[\r\n]+/u', ' ', trim($value)) ?? trim($value);
+        $value = trim(preg_replace('/\s+/u', ' ', $value) ?? $value);
+
+        return $value !== '' ? $value : null;
     }
 }

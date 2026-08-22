@@ -137,6 +137,17 @@ values at import time. Where a module later needs static validation of one of it
 own profile defaults, that module should contribute the validation without moving
 the business rule into Core.
 
+## CSV header normalization
+
+Core normalizes the staged CSV header row once and uses that same normalized header set
+for preview and processing. A leading UTF-8 BOM on the first header is removed before
+profile alias matching, operator mapping, row combination, and import-batch provenance
+are evaluated. This keeps common spreadsheet-exported UTF-8 CSV files from producing a
+preview mapping that differs from the row keys used during processing.
+
+Other header text is preserved apart from surrounding whitespace. Core does not silently
+rename arbitrary columns or apply fuzzy header matching outside configured profile aliases.
+
 ## Excel files
 
 Engage Core intentionally does not support XLS/XLSX runtime parsing. Convert workbook

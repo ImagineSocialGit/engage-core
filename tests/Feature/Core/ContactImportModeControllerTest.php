@@ -129,6 +129,72 @@ class ContactImportModeControllerTest extends TestCase
         $this->assertEquals([], data_get($batch->meta, 'post_import_config'));
     }
 
+    public function test_import_normalizes_utf8_bom_on_first_header_before_mapping_and_processing(): void
+    {
+        Storage::fake('local');
+
+        Config::set('contact_imports.profiles', [
+            'bom_contacts' => [
+                'label' => 'BOM Contacts',
+                'filename_contains' => ['bom contacts'],
+                'aliases' => [
+                    'first_name' => ['First Name'],
+                    'last_name' => ['Last Name'],
+                    'email' => ['Email'],
+                ],
+            ],
+        ]);
+
+        $user = User::factory()->create();
+        $csv = UploadedFile::fake()->createWithContent(
+            'BOM Contacts.csv',
+            "\xEF\xBB\xBFFirst Name,Last Name,Email\nJane,Doe,jane@example.test\n",
+        );
+
+        $preview = $this
+            ->actingAs($user)
+            ->post(route('crm.contacts.import.preview'), [
+                'mode' => 'add',
+                'csv' => $csv,
+            ]);
+
+        $preview->assertOk();
+        $this->assertSame(
+            ['First Name', 'Last Name', 'Email'],
+            $preview->viewData('headers')->all(),
+        );
+        $this->assertEquals([
+            'first_name' => 'First Name',
+            'last_name' => 'Last Name',
+            'email' => 'Email',
+        ], $preview->viewData('suggestedMapping'));
+
+        $this
+            ->actingAs($user)
+            ->post(route('crm.contacts.import.process'), [
+                'csv_path' => $preview->viewData('csvPath'),
+                'mapping' => [
+                    'first_name' => 'First Name',
+                    'last_name' => 'Last Name',
+                    'email' => 'Email',
+                ],
+            ])
+            ->assertRedirect(route('crm.contacts.index'));
+
+        $contact = Contact::query()
+            ->where('email', 'jane@example.test')
+            ->sole();
+
+        $this->assertSame('Jane', $contact->first_name);
+        $this->assertSame('Doe', $contact->last_name);
+
+        $batch = ContactImportBatch::query()->sole();
+        $this->assertSame(
+            ['First Name', 'Last Name', 'Email'],
+            data_get($batch->meta, 'headers'),
+        );
+    }
+
     public function test_profile_preview_marks_only_required_and_recognized_fields_as_primary(): void
     {
         Storage::fake('local');

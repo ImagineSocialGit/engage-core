@@ -341,6 +341,16 @@ class ScheduledMessagePayloadCanonicalizer
                 ?? $payload['request_ip']
                 ?? null,
         );
+        $this->copyNullableString(
+            $canonical,
+            'in_reply_to',
+            $payload['in_reply_to'] ?? null,
+        );
+        $this->copyNullableString(
+            $canonical,
+            'references',
+            $payload['references'] ?? null,
+        );
     }
 
     /**
@@ -513,6 +523,8 @@ class ScheduledMessagePayloadCanonicalizer
             'footer',
             'unsubscribe_url',
             'transactional_opt_out_url',
+            'in_reply_to',
+            'references',
             'source_ip',
             'request_ip',
             'notification_type',

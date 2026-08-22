@@ -63,6 +63,7 @@ class ResendInboundReplyEndToEndTest extends TestCase
                 'from' => 'Reply Person <reply@example.com>',
                 'to' => [$replyTo],
                 'subject' => 'Re: Checking in',
+                'message_id' => '<received-email-1@example.test>',
                 'text' => "YES!\n\nOn Wed, Someone wrote:\n> old content",
                 'html' => null,
                 'created_at' => now()->toISOString(),
@@ -74,6 +75,8 @@ class ResendInboundReplyEndToEndTest extends TestCase
             'created_at' => now()->toISOString(),
             'data' => [
                 'email_id' => 'received_email_1',
+                'message_id' => '<received-email-1@example.test>',
+                'subject' => 'Re: Checking in',
             ],
         ];
         $eventId = 'evt_received_email_1';
@@ -87,6 +90,8 @@ class ResendInboundReplyEndToEndTest extends TestCase
         $this->assertSame($contact->getKey(), $inbound->sender_id);
         $this->assertSame(InboundMessage::CLASSIFICATION_NORMAL_REPLY, $inbound->classification);
         $this->assertSame($scheduled->getKey(), $inbound->correlated_scheduled_message_id);
+        $this->assertSame('Re: Checking in', $inbound->subject);
+        $this->assertSame('<received-email-1@example.test>', $inbound->message_id);
         $this->assertSame('exact', $inbound->reply_correlation_method);
         $this->assertSame('yes', $inbound->reply_intent_key);
 

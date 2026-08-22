@@ -505,6 +505,7 @@
 │   │   │   │   │   └── EmailWebhookPayload.php
 │   │   │   │   ├── InboundMessageRouter.php
 │   │   │   │   ├── Reply
+│   │   │   │   │   ├── EmailReplySubjectResolver.php
 │   │   │   │   │   ├── InboundEmailReplyCorrelator.php
 │   │   │   │   │   ├── InboundReplyIntentClassifier.php
 │   │   │   │   │   ├── InboundReplyTextNormalizer.php
@@ -617,7 +618,8 @@
 │   │   │   ├── Contracts
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailMessage.php
-│   │   │   │   │   └── EmailProvider.php
+│   │   │   │   │   ├── EmailProvider.php
+│   │   │   │   │   └── ThreadedEmailMessage.php
 │   │   │   │   ├── MessageChainExecutionContextProvider.php
 │   │   │   │   ├── MessageRecipientGate.php
 │   │   │   │   ├── MessageRecipientPayloadProvider.php
@@ -1670,7 +1672,8 @@
 │   │   │   │   └── 2026_04_15_195883_create_form_submission_values_table.php
 │   │   │   ├── inbound_messaging
 │   │   │   │   ├── 2026_05_19_154535_create_inbound_messages_table.php
-│   │   │   │   └── 2026_07_19_031500_create_inbound_message_receipts_table.php
+│   │   │   │   ├── 2026_07_19_031500_create_inbound_message_receipts_table.php
+│   │   │   │   └── 2026_08_22_061500_add_email_threading_fields_to_inbound_messages_table.php
 │   │   │   ├── internal_notifications
 │   │   │   │   ├── 2026_04_10_173406_create_team_members_table.php
 │   │   │   │   └── 2026_04_11_174215_create_team_member_notification_preferences_table.php
@@ -2572,4 +2575,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-638 directories, 1935 files
+638 directories, 1938 files

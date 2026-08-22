@@ -33,6 +33,30 @@ class EmailPayloadTest extends TestCase
         );
     }
 
+    public function test_it_carries_email_threading_headers_as_canonical_payload_data(): void
+    {
+        $payload = EmailPayload::fromArray([
+            'to' => 'test@example.com',
+            'purpose' => 'marketing',
+            'scope' => 'marketing',
+            'message_type' => 'conversation_reply',
+            'subject' => 'Re: Checking in',
+            'body' => 'Thanks for replying.',
+            'in_reply_to' => '<incoming-1@example.test>',
+        ]);
+
+        $this->assertSame('<incoming-1@example.test>', $payload->inReplyTo());
+        $this->assertSame('<incoming-1@example.test>', $payload->references());
+        $this->assertSame(
+            '<incoming-1@example.test>',
+            data_get($payload->devPayload(), 'in_reply_to'),
+        );
+        $this->assertSame(
+            '<incoming-1@example.test>',
+            data_get($payload->devPayload(), 'references'),
+        );
+    }
+
     public function test_it_requires_destination_email(): void
     {
         $this->expectException(InvalidArgumentException::class);

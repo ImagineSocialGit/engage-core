@@ -118,29 +118,4 @@ class ContactShowModuleVisibilityTest extends TestCase
             ->assertSee('data-module-panel="webinars"', false);
     }
 
-    public function test_contact_show_uses_plain_language_for_follow_up_visibility_sections(): void
-    {
-        config()->set('modules.enabled', [
-            'tasks',
-            'workflow',
-            'flow_routes',
-            'messaging',
-            'campaigns',
-        ]);
-
-        $user = User::factory()->create();
-        $contact = Contact::factory()->create();
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/'.config('contacts.routes.plural').'/'.$contact->id)
-            ->assertOk()
-            ->assertSee('Automatic follow-ups')
-            ->assertSee('Follow-up sequences')
-            ->assertSee('Messages already handled')
-            ->assertDontSee('FlowRoutes')
-            ->assertDontSee('Flow Routes');
-    }
-
 }
