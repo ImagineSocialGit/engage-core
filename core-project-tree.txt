@@ -97,8 +97,10 @@
 │   │   │   │   ├── CancelCampaignFamilyEnrollmentsAction.php
 │   │   │   │   ├── DeactivateCampaignAction.php
 │   │   │   │   ├── EnrollContactInCampaignAction.php
+│   │   │   │   ├── EvaluateCampaignEligibilityAction.php
 │   │   │   │   ├── PauseCampaignEnrollmentAction.php
 │   │   │   │   ├── PauseCampaignFamilyEnrollmentsAction.php
+│   │   │   │   ├── ProcessDueCampaignTouchDatesAction.php
 │   │   │   │   ├── ResumeCampaignEnrollmentAction.php
 │   │   │   │   ├── ScheduleCampaignImportBatchInitialMessagesAction.php
 │   │   │   │   └── SyncCampaignPresetsAction.php
@@ -123,6 +125,7 @@
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   │   └── CRM
+│   │   │   │       ├── CampaignAnnualTouchController.php
 │   │   │   │       ├── CampaignController.php
 │   │   │   │       ├── CampaignMessageTemplateController.php
 │   │   │   │       └── CampaignSimulatorController.php
@@ -134,6 +137,8 @@
 │   │   │   │   │   ├── PauseCampaignAutomationDefinition.php
 │   │   │   │   │   ├── PauseCampaignFamilyAutomationDefinition.php
 │   │   │   │   │   └── ResumeCampaignAutomationDefinition.php
+│   │   │   │   ├── CampaignEligibilityEvaluationResult.php
+│   │   │   │   ├── CampaignEligibilityPresetDefinition.php
 │   │   │   │   ├── CampaignEnrollmentArbitrationResult.php
 │   │   │   │   ├── CampaignPresetDefinition.php
 │   │   │   │   ├── CampaignPresetSyncResult.php
@@ -144,13 +149,17 @@
 │   │   │   ├── Import
 │   │   │   │   ├── CampaignEnrollmentContactImportPostProcessor.php
 │   │   │   │   └── CampaignLaunchTimingContactImportPostProcessor.php
+│   │   │   ├── Jobs
+│   │   │   │   └── ProcessDueCampaignTouchDatesJob.php
 │   │   │   ├── Listeners
 │   │   │   ├── Models
+│   │   │   │   ├── CampaignEligibilityState.php
 │   │   │   │   ├── CampaignEnrollment.php
 │   │   │   │   ├── Campaign.php
 │   │   │   │   ├── CampaignStep.php
 │   │   │   │   ├── CampaignStepVariant.php
 │   │   │   │   ├── CampaignTouchDate.php
+│   │   │   │   ├── CampaignTouchDispatch.php
 │   │   │   │   ├── CampaignTouchProgram.php
 │   │   │   │   └── CampaignTouchVariant.php
 │   │   │   ├── Providers
@@ -158,6 +167,7 @@
 │   │   │   ├── Requests
 │   │   │   │   └── UpdateCampaignStepMessageTemplateRequest.php
 │   │   │   ├── Services
+│   │   │   │   ├── CampaignEligibilityEvaluator.php
 │   │   │   │   ├── CampaignEnrollmentArbitrator.php
 │   │   │   │   ├── CampaignMessageChainDefinitionBuilder.php
 │   │   │   │   ├── CampaignMessageChainExecutionContextProvider.php
@@ -1660,7 +1670,9 @@
 │   │   │   │   ├── 2026_06_12_050337_create_campaigns_table.php
 │   │   │   │   ├── 2026_06_12_050338_create_campaign_steps_table.php
 │   │   │   │   ├── 2026_06_12_050339_create_campaign_enrollments_table.php
-│   │   │   │   └── 2026_08_22_113501_create_campaign_touch_date_tables.php
+│   │   │   │   ├── 2026_08_22_113501_create_campaign_touch_date_tables.php
+│   │   │   │   ├── 2026_08_22_114000_add_campaign_touch_runtime.php
+│   │   │   │   └── 2026_08_23_203900_add_campaign_eligibility_foundation.php
 │   │   │   ├── commerce
 │   │   │   │   ├── 2026_07_02_000005_create_commerce_customers_table.php
 │   │   │   │   ├── 2026_07_02_000006_create_commerce_products_table.php
@@ -1816,6 +1828,7 @@
 │   │   │   └── TODO.md
 │   │   ├── campaigns
 │   │   │   ├── annual-touch-dates.md
+│   │   │   ├── eligibility.md
 │   │   │   ├── entry-and-launch-safety.md
 │   │   │   ├── module_state.md
 │   │   │   └── TODO.md
@@ -2021,6 +2034,8 @@
 │       │   │   │   └── reusable-message-picker.blade.php
 │       │   │   └── show.blade.php
 │       │   ├── campaigns
+│       │   │   ├── annual-touches
+│       │   │   │   └── index.blade.php
 │       │   │   ├── edit.blade.php
 │       │   │   ├── index.blade.php
 │       │   │   ├── message-templates
@@ -2143,6 +2158,7 @@
 │   ├── make-automation-dependency-cone-dump.sh
 │   ├── make-crm-dependency-cone-dump.sh
 │   ├── make-module-dependency-cone-dump.sh
+│   ├── make-process-highway-dependency-cone-dump.sh
 │   ├── make-project-state-dependency-cone-dump.sh
 │   ├── make-setup-validation-config-contracts-dependency-cone-dump.sh
 │   ├── make-system-deployment-context-dump.sh
@@ -2178,6 +2194,9 @@
 │   │   │   ├── MarkBroadcastRecipientTerminalStatusTest.php
 │   │   │   └── ScheduleBroadcastActionTest.php
 │   │   ├── Campaigns
+│   │   │   ├── CampaignAnnualTouchAuthoringTest.php
+│   │   │   ├── CampaignAnnualTouchRuntimeTest.php
+│   │   │   ├── CampaignEligibilityFoundationTest.php
 │   │   │   ├── CampaignEnrollmentContactImportPostProcessorTest.php
 │   │   │   ├── CampaignEnrollmentLifecycleBridgeTest.php
 │   │   │   ├── CampaignFamilyLifecycleAutomationCapabilityTest.php
@@ -2409,6 +2428,7 @@
 │   │   │   └── TestingSurfaceBackgroundIsolationTest.php
 │   │   ├── Modules
 │   │   │   ├── ContactShowModuleVisibilityTest.php
+│   │   │   ├── MigrationContractSourceOfTruthTest.php
 │   │   │   ├── ModuleDependencyBoundaryTest.php
 │   │   │   ├── ModuleManagerTest.php
 │   │   │   ├── ModuleMigrationCommandBehaviorTest.php
@@ -2615,4 +2635,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-644 directories, 1972 files
+646 directories, 1990 files

@@ -19,6 +19,7 @@ class CampaignTouchProgram extends Model
         'audience_key',
         'recurrence',
         'repeat_years',
+        'starts_on',
         'is_active',
         'meta',
     ];
@@ -28,6 +29,7 @@ class CampaignTouchProgram extends Model
         return [
             'campaign_id' => 'integer',
             'repeat_years' => 'integer',
+            'starts_on' => 'date',
             'is_active' => 'boolean',
             'meta' => 'array',
         ];

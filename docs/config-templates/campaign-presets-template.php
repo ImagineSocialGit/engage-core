@@ -23,6 +23,12 @@ return [
     | - steps are a sequential list; list position derives step_number
     | - variants are a keyed map; map key derives the variant key
     | - variant map order derives sort_order in increments of 10
+    | - the Campaign key is the canonical Campaign identity
+    | - Campaign purpose/scope are Messaging context, not Campaign identity
+    | - optional eligibility stores stable business criteria; criterion types are
+    |   ANDed and values inside one criterion are ORed
+    | - enrollment mode defaults to manual so existing presets remain inert until
+    |   automatic eligibility is intentionally configured
     | - Campaign purpose, scope, and source_version cascade to children
     | - campaign_step_due is the fixed dispatch key for every step and variant
     | - Campaign variant_strategy cascades unless a step explicitly overrides it

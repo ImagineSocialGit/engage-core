@@ -124,6 +124,33 @@ class CampaignPresetDefinitionConfigContract implements ConfigContract
             ),
         ]);
 
+        $eligibility = ConfigSchema::object([
+            'mode' => ConfigField::defaulted(
+                ConfigSchema::string(
+                    allowedValues: Campaign::ENROLLMENT_MODES,
+                ),
+                Campaign::ENROLLMENT_MODE_MANUAL,
+            ),
+            'criteria' => ConfigField::defaulted(
+                ConfigSchema::mapOf(
+                    ConfigSchema::listOf(ConfigSchema::string()),
+                ),
+                [],
+            ),
+            'reentry' => ConfigField::defaulted(
+                ConfigSchema::string(
+                    allowedValues: Campaign::REENTRY_POLICIES,
+                ),
+                Campaign::REENTRY_NEVER,
+            ),
+            'when_ineligible' => ConfigField::defaulted(
+                ConfigSchema::string(
+                    allowedValues: Campaign::INELIGIBLE_BEHAVIORS,
+                ),
+                Campaign::INELIGIBLE_CONTINUE,
+            ),
+        ]);
+
         return ConfigSchema::object([
             'name' => ConfigField::required(ConfigSchema::string()),
             'description' => ConfigField::optional(
@@ -137,6 +164,10 @@ class CampaignPresetDefinitionConfigContract implements ConfigContract
             'priority' => ConfigField::defaulted(
                 ConfigSchema::integer(),
                 0,
+            ),
+            'eligibility' => ConfigField::defaulted(
+                $eligibility,
+                [],
             ),
             'status' => ConfigField::defaulted(
                 ConfigSchema::string(
@@ -175,6 +206,14 @@ class CampaignPresetDefinitionConfigContract implements ConfigContract
             'name' => 'Follow Up',
             'purpose' => 'marketing',
             'scope' => 'nurture',
+            'eligibility' => [
+                'mode' => Campaign::ENROLLMENT_MODE_AUTOMATIC,
+                'criteria' => [
+                    'status' => ['prospect_nurture'],
+                ],
+                'reentry' => Campaign::REENTRY_NEVER,
+                'when_ineligible' => Campaign::INELIGIBLE_CANCEL,
+            ],
             'steps' => [
                 [
                     'criteria' => [

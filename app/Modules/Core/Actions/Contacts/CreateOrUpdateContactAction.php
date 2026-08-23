@@ -40,6 +40,7 @@ class CreateOrUpdateContactAction
             'last_name' => $data['last_name'] ?? $contact->last_name,
             'name' => $data['name'] ?? $contact->name ?? $this->buildName($data, $email),
             'phone' => $data['phone'] ?? $contact->phone,
+            'birthday' => $data['birthday'] ?? $contact->birthday,
             'source' => $source,
             'subsource' => $data['subsource'] ?? $contact->subsource,
             'contact_import_batch_id' => $data['contact_import_batch_id'] ?? $contact->contact_import_batch_id,

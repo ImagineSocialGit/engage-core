@@ -111,6 +111,14 @@ class CoreModuleServiceProvider extends ServiceProvider
                 ),
 
                 ContactImportField::make(
+                    key: 'birthday',
+                    label: 'Birthday',
+                    contactAttribute: 'birthday',
+                    description: 'Birthday date used by recurring annual Campaign touches.',
+                    sort: 55,
+                ),
+
+                ContactImportField::make(
                     key: 'source',
                     label: 'Source',
                     contactAttribute: 'source',

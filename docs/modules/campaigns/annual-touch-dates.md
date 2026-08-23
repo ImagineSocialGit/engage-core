@@ -1,37 +1,112 @@
 # Campaign annual touch dates
 
-Campaigns owns recurring annual touch-date configuration because these are nurture/re-engagement moments, not appointments or calendar availability.
+Campaigns owns recurring annual touch behavior.
 
-This foundation is configuration-only. It does not schedule or send messages yet.
+This capability is intentionally separate from ordinary relative Campaign steps.
+It is for durable calendar touches such as birthdays, loan anniversaries, client
+anniversaries, and holidays.
 
-## Stored shape
+## Ownership
 
-A Campaign may have one or more touch programs. A program currently supports:
+Campaigns owns:
 
-- an audience selector (`audience_type` + `audience_key`), initially intended for Contact Status such as `past_client`;
-- annual recurrence;
-- a finite repeat window such as 10 years;
-- multiple ordered touch dates.
+- which Campaign the annual touch program belongs to;
+- the qualifying audience;
+- when the annual date occurs;
+- how many years it repeats;
+- which Email/SMS variants participate;
+- occurrence idempotency.
 
-A touch date may resolve from:
+Messaging continues to own reusable message copy, consent/suppression policy,
+recipient destination validation, scheduling, and provider delivery.
 
-- a Core Contact field, initially `birthday`;
-- a fixed month/day such as December 25;
-- a future registered date source contributed by another module, such as a loan anniversary, without making Campaigns depend on that module.
+The framework scheduler is used to wake Campaigns. This does not create a
+dependency on the Scheduling module.
 
-Each touch date may have multiple channel variants. The variant stores channel/purpose/scope and an optional logical `message_template_preset_id`. Messaging remains the owner of reusable email/SMS copy and delivery.
+## Current runtime
 
-## Intended first authoring surface
+The runtime scanner is `ProcessDueCampaignTouchDatesJob`, registered every minute
+by `CampaignsModuleServiceProvider`.
 
-The first UI can stay small:
+For each active annual program it:
 
-1. `Have recurring annual touch-base dates`
-2. choose Contact Status (for example, Past Client)
-3. choose the number of years
-4. add repeater rows for Birthday, fixed dates, or registered date sources
-5. choose send time
-6. add Email and/or SMS and select the Messaging template for each channel
+1. confirms the parent Campaign is active;
+2. resolves today's eligible annual date in the client timezone;
+3. resolves the audience through Core's contact-filter registry;
+4. excludes any contact/variant/year occurrence already recorded;
+5. hands the selected template to `DispatchMessageAction`;
+6. records the occurrence in `campaign_touch_dispatches`.
 
-## Deferred runtime
+Messaging remains the delivery authority. A message denied by Messaging's
+planning gate is recorded as skipped for that annual occurrence and is not
+retried later in the same year.
 
-Do not add annual scanning, due-date calculation, scheduling jobs, or message dispatch in this foundation batch. Runtime should be added separately so leap-day behavior, timezone rules, status eligibility at send time, dedupe/idempotency, consent, and campaign cancellation semantics can be specified and tested explicitly.
+## Supported date sources
+
+### Contact field
+
+Current first-class source:
+
+- `birthday`
+
+Birthdays on February 29 are treated as due on February 28 in non-leap years.
+
+### Fixed annual date
+
+A touch can provide `month` and `day`, such as December 25.
+
+### Registered date source
+
+`registered_date_source` remains reserved for a future module-contributed date
+registry. The runtime currently ignores it rather than importing another
+module's model or table.
+
+## Audience
+
+The current program audience type is `contact_status`.
+
+Campaigns asks Core's generic `ContactFilterResolver` for criterion `status`.
+When Workflow contributes that criterion, a value such as `past_client`
+resolves normally. If no enabled module contributes the criterion, the filter
+fails closed and no contacts are selected.
+
+Campaigns therefore does not depend on Workflow.
+
+## Repeat window
+
+`starts_on` may explicitly anchor a touch program. If it is null, the program's
+creation date is used.
+
+`repeat_years = 10` means annual occurrences are eligible from the start date
+until, but not including, the date ten years later.
+
+Past dates are not backfilled.
+
+## Idempotency
+
+`campaign_touch_dispatches` uniquely identifies:
+
+- Campaign touch variant;
+- Contact;
+- occurrence year.
+
+The same logical occurrence also receives a stable Messaging occurrence key.
+Scheduler retries therefore do not intentionally produce duplicate sends.
+
+The dispatch table is runtime state and is declared `insert_empty` in Project
+State, matching other runtime execution records.
+
+## Authoring direction
+
+The intended Campaign UI remains intentionally small:
+
+- Have recurring annual touch-base dates
+- Audience / Contact Status
+- Repeat for X years
+- Repeater rows:
+  - Birthday
+  - fixed annual date
+  - future registered date source
+- Email/SMS template selections per row
+
+The runtime and schema do not require that UI to exist.

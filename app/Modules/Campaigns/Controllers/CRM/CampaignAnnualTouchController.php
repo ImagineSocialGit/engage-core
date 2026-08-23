@@ -1,0 +1,357 @@
+<?php
+
+namespace App\Modules\Campaigns\Controllers\CRM;
+
+use App\Http\Controllers\Controller;
+use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Campaigns\Models\CampaignTouchDate;
+use App\Modules\Campaigns\Models\CampaignTouchProgram;
+use App\Modules\Campaigns\Models\CampaignTouchVariant;
+use App\Modules\Core\Models\ContactStatus;
+use App\Modules\Messaging\Models\MessageTemplatePreset;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+
+class CampaignAnnualTouchController extends Controller
+{
+    public function index(Request $request): View
+    {
+        $programs = CampaignTouchProgram::query()
+            ->with([
+                'campaign',
+                'touchDates.variants.messageTemplatePreset',
+            ])
+            ->orderByDesc('is_active')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+
+        $editingProgram = null;
+        $editingProgramId = $request->integer('edit');
+
+        if ($editingProgramId > 0) {
+            $editingProgram = $programs->firstWhere('id', $editingProgramId);
+        }
+
+        $templates = MessageTemplatePreset::query()
+            ->active()
+            ->where('purpose', 'marketing')
+            ->whereIn('channel', ['email', 'sms'])
+            ->orderBy('channel')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('channel');
+
+        return view('crm.campaigns.annual-touches.index', [
+            'programs' => $programs,
+            'editingProgram' => $editingProgram,
+            'campaigns' => Campaign::query()
+                ->where('status', '!=', Campaign::STATUS_ARCHIVED)
+                ->orderBy('name')
+                ->get(),
+            'contactStatuses' => ContactStatus::query()
+                ->active()
+                ->ordered()
+                ->get(),
+            'emailTemplates' => $templates->get('email', collect())->values(),
+            'smsTemplates' => $templates->get('sms', collect())->values(),
+        ]);
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $validated = $this->validated($request);
+
+        $program = DB::transaction(function () use ($validated): CampaignTouchProgram {
+            $program = CampaignTouchProgram::query()->create([
+                'campaign_id' => (int) $validated['campaign_id'],
+                'key' => $this->newProgramKey((int) $validated['campaign_id']),
+                'name' => 'Annual touch-base dates',
+                'audience_type' => CampaignTouchProgram::AUDIENCE_CONTACT_STATUS,
+                'audience_key' => $validated['audience_key'],
+                'recurrence' => CampaignTouchProgram::RECURRENCE_ANNUAL,
+                'repeat_years' => (int) $validated['repeat_years'],
+                'starts_on' => $validated['starts_on'] ?? null,
+                'is_active' => (bool) ($validated['is_active'] ?? false),
+            ]);
+
+            $this->syncTouches($program, $validated['touches']);
+
+            return $program;
+        }, 3);
+
+        return redirect()
+            ->route('crm.campaigns.annual-touches.index', ['edit' => $program->getKey()])
+            ->with('status', 'Recurring annual touch-base dates saved.');
+    }
+
+    public function update(
+        Request $request,
+        CampaignTouchProgram $campaignTouchProgram,
+    ): RedirectResponse {
+        $validated = $this->validated($request, $campaignTouchProgram);
+
+        DB::transaction(function () use ($campaignTouchProgram, $validated): void {
+            $campaignTouchProgram->forceFill([
+                'audience_type' => CampaignTouchProgram::AUDIENCE_CONTACT_STATUS,
+                'audience_key' => $validated['audience_key'],
+                'recurrence' => CampaignTouchProgram::RECURRENCE_ANNUAL,
+                'repeat_years' => (int) $validated['repeat_years'],
+                'starts_on' => $validated['starts_on'] ?? null,
+                'is_active' => (bool) ($validated['is_active'] ?? false),
+            ])->save();
+
+            $this->syncTouches($campaignTouchProgram, $validated['touches']);
+        }, 3);
+
+        return redirect()
+            ->route('crm.campaigns.annual-touches.index', ['edit' => $campaignTouchProgram->getKey()])
+            ->with('status', 'Recurring annual touch-base dates updated.');
+    }
+
+    public function destroy(CampaignTouchProgram $campaignTouchProgram): RedirectResponse
+    {
+        $campaignTouchProgram->forceFill(['is_active' => false])->save();
+
+        return redirect()
+            ->route('crm.campaigns.annual-touches.index')
+            ->with('status', 'Annual touch-base program turned off. Its history was preserved.');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validated(
+        Request $request,
+        ?CampaignTouchProgram $program = null,
+    ): array {
+        $rules = [
+            'campaign_id' => [
+                Rule::requiredIf($program === null),
+                'nullable',
+                'integer',
+                Rule::exists('campaigns', 'id')->where(
+                    fn ($query) => $query->where('status', '!=', Campaign::STATUS_ARCHIVED),
+                ),
+            ],
+            'audience_key' => [
+                'required',
+                'string',
+                'max:120',
+                Rule::exists('contact_statuses', 'key')->where(
+                    fn ($query) => $query->where('is_active', true),
+                ),
+            ],
+            'repeat_years' => ['required', 'integer', 'min:1', 'max:50'],
+            'starts_on' => ['nullable', 'date'],
+            'is_active' => ['nullable', 'boolean'],
+            'touches' => ['required', 'array', 'min:1', 'max:50'],
+            'touches.*.id' => ['nullable', 'integer'],
+            'touches.*.name' => ['required', 'string', 'max:191'],
+            'touches.*.source_type' => ['required', Rule::in(['birthday', 'fixed_date'])],
+            'touches.*.month' => ['nullable', 'integer', 'between:1,12'],
+            'touches.*.day' => ['nullable', 'integer', 'between:1,31'],
+            'touches.*.send_time' => ['required', 'date_format:H:i'],
+            'touches.*.email_template_preset_id' => ['nullable', 'integer'],
+            'touches.*.sms_template_preset_id' => ['nullable', 'integer'],
+        ];
+
+        $validated = $request->validate($rules);
+
+        if ($program instanceof CampaignTouchProgram) {
+            $validated['campaign_id'] = (int) $program->campaign_id;
+        }
+
+        foreach ($validated['touches'] as $index => $touch) {
+            $field = 'touches.'.$index;
+
+            if (($touch['source_type'] ?? null) === 'fixed_date') {
+                $month = (int) ($touch['month'] ?? 0);
+                $day = (int) ($touch['day'] ?? 0);
+
+                try {
+                    Carbon::createSafe(2000, $month, $day);
+                } catch (\Throwable) {
+                    throw ValidationException::withMessages([
+                        $field.'.day' => 'Choose a valid annual month and day.',
+                    ]);
+                }
+            }
+
+            $emailId = $this->nullableId($touch['email_template_preset_id'] ?? null);
+            $smsId = $this->nullableId($touch['sms_template_preset_id'] ?? null);
+
+            if ($emailId === null && $smsId === null) {
+                throw ValidationException::withMessages([
+                    $field.'.email_template_preset_id' => 'Choose an email template, an SMS template, or both.',
+                ]);
+            }
+
+            if ($emailId !== null) {
+                $this->assertTemplate($emailId, 'email', $field.'.email_template_preset_id');
+            }
+
+            if ($smsId !== null) {
+                $this->assertTemplate($smsId, 'sms', $field.'.sms_template_preset_id');
+            }
+        }
+
+        return $validated;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $touches
+     */
+    private function syncTouches(CampaignTouchProgram $program, array $touches): void
+    {
+        $program->loadMissing('touchDates.variants');
+        $existingDates = $program->touchDates->keyBy('id');
+        $keptDateIds = [];
+
+        foreach (array_values($touches) as $index => $touch) {
+            $dateId = $this->nullableId($touch['id'] ?? null);
+            $date = $dateId !== null ? $existingDates->get($dateId) : null;
+
+            if (! $date instanceof CampaignTouchDate) {
+                $date = new CampaignTouchDate([
+                    'campaign_touch_program_id' => $program->getKey(),
+                    'key' => $this->newTouchKey($program, (string) $touch['name'], $index),
+                ]);
+            }
+
+            $isBirthday = $touch['source_type'] === 'birthday';
+
+            $date->forceFill([
+                'campaign_touch_program_id' => $program->getKey(),
+                'name' => trim((string) $touch['name']),
+                'source_type' => $isBirthday
+                    ? CampaignTouchDate::SOURCE_CONTACT_FIELD
+                    : CampaignTouchDate::SOURCE_FIXED_DATE,
+                'source_key' => $isBirthday ? 'birthday' : null,
+                'month' => $isBirthday ? null : (int) $touch['month'],
+                'day' => $isBirthday ? null : (int) $touch['day'],
+                'offset_days' => 0,
+                'send_time' => $touch['send_time'].':00',
+                'sort_order' => ($index + 1) * 10,
+                'is_active' => true,
+            ])->save();
+
+            $keptDateIds[] = (int) $date->getKey();
+            $this->syncVariant($date, 'email', $touch['email_template_preset_id'] ?? null, 10);
+            $this->syncVariant($date, 'sms', $touch['sms_template_preset_id'] ?? null, 20);
+        }
+
+        $program->touchDates()
+            ->whereNotIn('id', $keptDateIds)
+            ->update(['is_active' => false]);
+
+        CampaignTouchVariant::query()
+            ->whereHas('touchDate', fn ($query) => $query
+                ->where('campaign_touch_program_id', $program->getKey())
+                ->where('is_active', false))
+            ->update(['is_active' => false]);
+    }
+
+    private function syncVariant(
+        CampaignTouchDate $date,
+        string $channel,
+        mixed $presetId,
+        int $sortOrder,
+    ): void {
+        $variant = CampaignTouchVariant::query()
+            ->where('campaign_touch_date_id', $date->getKey())
+            ->where('key', $channel)
+            ->first();
+        $presetId = $this->nullableId($presetId);
+
+        if ($presetId === null) {
+            $variant?->forceFill(['is_active' => false])->save();
+
+            return;
+        }
+
+        $preset = $this->assertTemplate($presetId, $channel, $channel.'_template_preset_id');
+
+        if (! $variant instanceof CampaignTouchVariant) {
+            $variant = new CampaignTouchVariant([
+                'campaign_touch_date_id' => $date->getKey(),
+                'key' => $channel,
+            ]);
+        }
+
+        $variant->forceFill([
+            'campaign_touch_date_id' => $date->getKey(),
+            'name' => strtoupper($channel).' annual touch',
+            'sort_order' => $sortOrder,
+            'channel' => $channel,
+            'purpose' => (string) $preset->purpose,
+            'scope' => (string) $preset->scope,
+            'message_template_preset_id' => $preset->getKey(),
+            'is_active' => true,
+        ])->save();
+    }
+
+    private function assertTemplate(int $id, string $channel, string $field): MessageTemplatePreset
+    {
+        $preset = MessageTemplatePreset::query()
+            ->active()
+            ->whereKey($id)
+            ->where('channel', $channel)
+            ->where('purpose', 'marketing')
+            ->first();
+
+        if (! $preset instanceof MessageTemplatePreset) {
+            throw ValidationException::withMessages([
+                $field => 'Choose an active marketing '.$channel.' template.',
+            ]);
+        }
+
+        return $preset;
+    }
+
+    private function nullableId(mixed $value): ?int
+    {
+        if (! is_numeric($value) || (int) $value < 1) {
+            return null;
+        }
+
+        return (int) $value;
+    }
+
+    private function newProgramKey(int $campaignId): string
+    {
+        do {
+            $key = 'annual_touch_'.$campaignId.'_'.Str::lower(Str::random(8));
+        } while (CampaignTouchProgram::query()
+            ->where('campaign_id', $campaignId)
+            ->where('key', $key)
+            ->exists());
+
+        return $key;
+    }
+
+    private function newTouchKey(
+        CampaignTouchProgram $program,
+        string $name,
+        int $index,
+    ): string {
+        $base = Str::slug($name, '_');
+        $base = $base !== '' ? $base : 'annual_touch_'.($index + 1);
+        $candidate = Str::limit($base, 100, '');
+        $suffix = 1;
+
+        while ($program->touchDates()->where('key', $candidate)->exists()) {
+            $suffix++;
+            $candidate = Str::limit($base, 92, '').'_'.$suffix;
+        }
+
+        return $candidate;
+    }
+}

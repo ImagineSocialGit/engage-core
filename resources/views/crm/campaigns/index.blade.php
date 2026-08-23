@@ -48,6 +48,19 @@
             </div>
         </section>
 
+        <section class="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
+            <div class="min-w-0">
+                <div class="text-sm font-bold text-rose-950">Recurring annual touch-base dates</div>
+                <p class="mt-1 break-words text-sm text-rose-800">Set birthday and fixed annual Email/SMS touches for a Campaign audience, repeating for a defined number of years.</p>
+            </div>
+            <a
+                href="{{ route('crm.campaigns.annual-touches.index') }}"
+                class="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-rose-900 px-5 text-sm font-bold text-white hover:bg-rose-800 sm:mt-0 sm:w-auto"
+            >
+                Annual touch-base dates
+            </a>
+        </section>
+
         @if(app()->environment('local'))
             <section class="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
                 <div>

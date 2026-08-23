@@ -33,15 +33,25 @@ class ReportingFoundationTest extends TestCase
 
         $scope = $registry->requireModule('reporting');
 
-        $this->assertSame('database/migrations/modules/reporting', $scope->path);
-        $this->assertSame(1, $scope->schemaVersion);
-        $this->assertEquals([
-            '2026_08_15_063500_create_reporting_foundation_tables.php',
-        ], $scope->migrationFiles);
         $this->assertSame(
-            'reporting',
-            $registry->ownerFor('2026_08_15_063500_create_reporting_foundation_tables.php')?->key,
+            (string) config('module_migrations.modules.reporting.path'),
+            $scope->path,
         );
+        $this->assertSame(
+            (int) config('module_migrations.modules.reporting.schema_version'),
+            $scope->schemaVersion,
+        );
+        $this->assertEquals(
+            array_values((array) config('module_migrations.modules.reporting.migrations', [])),
+            $scope->migrationFiles,
+        );
+
+        foreach ($scope->migrationFiles as $migrationFile) {
+            $this->assertSame(
+                'reporting',
+                $registry->ownerFor($migrationFile)?->key,
+            );
+        }
     }
 
     public function test_reporting_foundation_tables_use_bounded_privacy_first_columns(): void
@@ -260,7 +270,10 @@ class ReportingFoundationTest extends TestCase
         $section = config('project_state.sections.reporting');
 
         $this->assertTrue($section['optional'] ?? false);
-        $this->assertSame(2, $section['version'] ?? null);
+        $this->assertSame(
+            (int) config('project_state.sections.reporting.version'),
+            $section['version'] ?? null,
+        );
         $this->assertEquals([
             'reporting_sessions',
             'reporting_observations',

@@ -5,6 +5,7 @@ namespace Tests\Feature\Modules;
 use App\Support\Modules\Migrations\ModuleInstallation;
 use App\Support\Modules\Migrations\ModuleInstallationRepository;
 use App\Support\Modules\Migrations\ModuleMigrationPlanner;
+use App\Support\Modules\Migrations\ModuleMigrationRegistry;
 use App\Support\Modules\Migrations\ModuleMigrationStatus;
 use App\Support\Modules\Migrations\ModuleMigrationStatusInspector;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -92,11 +93,16 @@ class ModuleMigrationPlanningAndStatusTest extends TestCase
     public function test_status_inspector_separates_migration_currency_from_ledger_tracking(): void
     {
         $inspector = app(ModuleMigrationStatusInspector::class);
+        $expectedMigrationCount = count(
+            app(ModuleMigrationRegistry::class)
+                ->requireModule('scheduling')
+                ->migrationFiles,
+        );
         $status = $inspector->inspectModule('scheduling');
 
         $this->assertSame(ModuleMigrationStatus::MIGRATIONS_CURRENT, $status->migrationState);
-        $this->assertSame(10, $status->expectedMigrationCount);
-        $this->assertSame(10, $status->ranMigrationCount);
+        $this->assertSame($expectedMigrationCount, $status->expectedMigrationCount);
+        $this->assertSame($expectedMigrationCount, $status->ranMigrationCount);
         $this->assertEquals([], $status->pendingMigrationFiles);
         $this->assertSame(ModuleMigrationStatus::LEDGER_UNTRACKED, $status->ledgerStatus);
         $this->assertSame(ModuleMigrationStatus::CONTRACT_UNTRACKED, $status->contractState);
@@ -127,6 +133,12 @@ class ModuleMigrationPlanningAndStatusTest extends TestCase
 
     public function test_status_inspector_reports_pending_manifest_migrations(): void
     {
+        $expectedMigrationCount = count(
+            app(ModuleMigrationRegistry::class)
+                ->requireModule('scheduling')
+                ->migrationFiles,
+        );
+
         DB::table('migrations')
             ->where(
                 'migration',
@@ -138,10 +150,14 @@ class ModuleMigrationPlanningAndStatusTest extends TestCase
             ->inspectModule('scheduling');
 
         $this->assertSame(ModuleMigrationStatus::MIGRATIONS_PARTIAL, $status->migrationState);
-        $this->assertSame(9, $status->ranMigrationCount);
+        $this->assertSame($expectedMigrationCount, $status->expectedMigrationCount);
         $this->assertEquals([
             '2026_08_03_190000_create_scheduling_resource_occupancy_tables.php',
         ], $status->pendingMigrationFiles);
+        $this->assertSame(
+            $expectedMigrationCount - count($status->pendingMigrationFiles),
+            $status->ranMigrationCount,
+        );
         $this->assertFalse($status->current());
     }
 

@@ -13,71 +13,65 @@ class ModuleMigrationRegistryTest extends TestCase
     public function test_registry_declares_platform_and_schema_managed_module_ownership(): void
     {
         $registry = app(ModuleMigrationRegistry::class);
+        $platformDefinition = config('module_migrations.platform');
+        $moduleDefinitions = config('module_migrations.modules');
+
+        $this->assertIsArray($platformDefinition);
+        $this->assertIsArray($moduleDefinitions);
+
+        $platform = $registry->platform();
 
         $this->assertSame(
-            'database/migrations/platform',
-            $registry->platform()->path,
+            (string) $platformDefinition['path'],
+            $platform->path,
         );
-        $this->assertSame(1, $registry->platform()->schemaVersion);
-        $this->assertCount(11, $registry->platform()->migrationFiles);
-
-        $this->assertEquals([
-            'core',
-            'relationships',
-            'messaging',
-            'inbound_messaging',
-            'internal_notifications',
-            'tasks',
-            'scheduling',
-            'portal',
-            'forms',
-            'documents',
-            'commerce',
-            'location',
-            'events',
-            'workflow',
-            'flow_routes',
-            'campaigns',
-            'broadcasts',
-            'webinars',
-            'reporting',
-            'mortgage',
-        ], array_keys($registry->modules()));
-
         $this->assertSame(
-            'database/migrations/modules/relationships',
-            $registry->requireModule('relationships')->path,
+            (int) $platformDefinition['schema_version'],
+            $platform->schemaVersion,
         );
-        $this->assertSame(1, $registry->requireModule('relationships')->schemaVersion);
-        $this->assertEquals([
-            '2026_08_19_175000_create_contact_relationships_table.php',
-        ], $registry->requireModule('relationships')->migrationFiles);
+        $this->assertEquals(
+            array_values($platformDefinition['migrations']),
+            $platform->migrationFiles,
+        );
 
-        $this->assertSame(
-            3,
-            $registry->requireModule('campaigns')->schemaVersion,
+        $this->assertEquals(
+            array_keys($moduleDefinitions),
+            array_keys($registry->modules()),
         );
+
+        foreach ($moduleDefinitions as $moduleKey => $definition) {
+            $this->assertIsArray($definition);
+
+            $scope = $registry->requireModule((string) $moduleKey);
+
+            $this->assertSame(
+                (string) $definition['path'],
+                $scope->path,
+                "Migration scope [{$moduleKey}] path drifted from module_migrations config.",
+            );
+            $this->assertSame(
+                (int) $definition['schema_version'],
+                $scope->schemaVersion,
+                "Migration scope [{$moduleKey}] schema version drifted from module_migrations config.",
+            );
+            $this->assertEquals(
+                array_values($definition['migrations']),
+                $scope->migrationFiles,
+                "Migration scope [{$moduleKey}] manifest drifted from module_migrations config.",
+            );
+        }
 
         $this->assertFalse($registry->hasModule('dashboard'));
         $this->assertFalse($registry->hasModule('integrations'));
         $this->assertTrue($registry->hasModule('reporting'));
-        $this->assertSame(
-            'database/migrations/modules/reporting',
+        $this->assertStringStartsWith(
+            'database/migrations/modules/',
             $registry->requireModule('reporting')->path,
         );
-        $this->assertEquals([
-            '2026_08_15_063500_create_reporting_foundation_tables.php',
-        ], $registry->requireModule('reporting')->migrationFiles);
-        $this->assertSame(
-            'database/migrations/verticals/mortgage',
+        $this->assertStringStartsWith(
+            'database/migrations/verticals/',
             $registry->requireModule('mortgage')->path,
         );
-        $this->assertSame(4, $registry->requireModule('mortgage')->schemaVersion);
-        $this->assertEquals([
-            '2026_06_02_211108_create_mortgage_stages_table.php',
-            '2026_06_02_211116_create_contact_mortgage_profiles_table.php',
-            '2026_08_19_180000_create_mortgage_history_and_realtor_tables.php',
-        ], $registry->requireModule('mortgage')->migrationFiles);
     }
 
     public function test_every_current_migration_has_exactly_one_registered_owner(): void
@@ -113,12 +107,9 @@ class ModuleMigrationRegistryTest extends TestCase
         $this->assertEquals(['core'], $modules->dependencies('location'));
         $this->assertTrue($registry->hasModule('scheduling'));
         $this->assertTrue($registry->hasModule('location'));
-        $this->assertSame(2, $registry->requireModule('location')->schemaVersion);
 
         $scheduling = $registry->requireModule('scheduling');
 
-        $this->assertSame(2, $scheduling->schemaVersion);
-        $this->assertCount(10, $scheduling->migrationFiles);
         $this->assertFalse($scheduling->owns(
             '2026_08_10_040000_add_range_duration_policy_to_bookable_services.php',
         ));

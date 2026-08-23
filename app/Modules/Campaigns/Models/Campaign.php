@@ -23,6 +23,29 @@ class Campaign extends Model
     public const STATUS_INACTIVE = 'inactive';
     public const STATUS_ARCHIVED = 'archived';
 
+    public const ENROLLMENT_MODE_MANUAL = 'manual';
+    public const ENROLLMENT_MODE_AUTOMATIC = 'automatic';
+    public const ENROLLMENT_MODES = [
+        self::ENROLLMENT_MODE_MANUAL,
+        self::ENROLLMENT_MODE_AUTOMATIC,
+    ];
+
+    public const REENTRY_NEVER = 'never';
+    public const REENTRY_WHEN_ELIGIBLE_AGAIN = 'when_eligible_again';
+    public const REENTRY_POLICIES = [
+        self::REENTRY_NEVER,
+        self::REENTRY_WHEN_ELIGIBLE_AGAIN,
+    ];
+
+    public const INELIGIBLE_CONTINUE = 'continue';
+    public const INELIGIBLE_PAUSE = 'pause';
+    public const INELIGIBLE_CANCEL = 'cancel';
+    public const INELIGIBLE_BEHAVIORS = [
+        self::INELIGIBLE_CONTINUE,
+        self::INELIGIBLE_PAUSE,
+        self::INELIGIBLE_CANCEL,
+    ];
+
     protected $fillable = [
         'key',
         'name',
@@ -30,6 +53,10 @@ class Campaign extends Model
         'message_chain_id',
         'family_key',
         'priority',
+        'eligibility_filter',
+        'enrollment_mode',
+        'reentry_policy',
+        'ineligible_behavior',
         'channel',
         'purpose',
         'scope',
@@ -44,7 +71,8 @@ class Campaign extends Model
     {
         return [
             'message_chain_id' => 'integer',
-        'priority' => 'integer',
+            'priority' => 'integer',
+            'eligibility_filter' => 'array',
             'is_customized' => 'boolean',
             'customized_at' => 'datetime',
             'meta' => 'array',
@@ -74,6 +102,22 @@ class Campaign extends Model
     public function enrollments(): HasMany
     {
         return $this->hasMany(CampaignEnrollment::class);
+    }
+
+    public function eligibilityStates(): HasMany
+    {
+        return $this->hasMany(CampaignEligibilityState::class);
+    }
+
+    public function hasEligibilityCriteria(): bool
+    {
+        return is_array($this->eligibility_filter)
+            && $this->eligibility_filter !== [];
+    }
+
+    public function usesAutomaticEnrollment(): bool
+    {
+        return $this->enrollment_mode === self::ENROLLMENT_MODE_AUTOMATIC;
     }
 
     public function scopeActive(Builder $query): Builder

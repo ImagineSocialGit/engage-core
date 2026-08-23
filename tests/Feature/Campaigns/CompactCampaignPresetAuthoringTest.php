@@ -31,6 +31,13 @@ class CompactCampaignPresetAuthoringTest extends TestCase
         $this->assertSame('webinar_nurture', $definition->scope);
         $this->assertSame('consumer_nurture', $definition->familyKey);
         $this->assertSame(15, $definition->priority);
+        $this->assertSame(Campaign::ENROLLMENT_MODE_AUTOMATIC, $definition->eligibility->mode);
+        $this->assertEquals([
+            'status' => ['prospect_nurture'],
+            'tag' => ['VA'],
+        ], $definition->eligibility->criteria);
+        $this->assertSame(Campaign::REENTRY_NEVER, $definition->eligibility->reentryPolicy);
+        $this->assertSame(Campaign::INELIGIBLE_CANCEL, $definition->eligibility->whenIneligible);
         $this->assertSame('campaign_step_due', $definition->dispatchKey);
         $this->assertSame('send_all_eligible', $definition->variantStrategy);
         $this->assertSame('7', $definition->sourceVersion);
@@ -109,6 +116,13 @@ class CompactCampaignPresetAuthoringTest extends TestCase
         $this->assertSame('webinar_nurture', $campaign->scope);
         $this->assertSame('consumer_nurture', $campaign->family_key);
         $this->assertSame(15, $campaign->priority);
+        $this->assertSame(Campaign::ENROLLMENT_MODE_AUTOMATIC, $campaign->enrollment_mode);
+        $this->assertEquals([
+            'status' => ['prospect_nurture'],
+            'tag' => ['VA'],
+        ], $campaign->eligibility_filter);
+        $this->assertSame(Campaign::REENTRY_NEVER, $campaign->reentry_policy);
+        $this->assertSame(Campaign::INELIGIBLE_CANCEL, $campaign->ineligible_behavior);
 
         $steps = CampaignStep::query()
             ->where('campaign_id', $campaign->id)
@@ -148,6 +162,37 @@ class CompactCampaignPresetAuthoringTest extends TestCase
             definition: $definition,
             messageFragment: 'priority must be an integer',
             label: 'priority string',
+        );
+    }
+
+    public function test_eligibility_defaults_to_manual_and_fail_closed_policy(): void
+    {
+        $data = $this->compactDefinition();
+        unset($data['eligibility']);
+
+        $definition = CampaignPresetDefinition::fromArray(
+            data: $data,
+            definitionKey: 'manual_campaign',
+        );
+
+        $this->assertSame(Campaign::ENROLLMENT_MODE_MANUAL, $definition->eligibility->mode);
+        $this->assertEquals([], $definition->eligibility->criteria);
+        $this->assertSame(Campaign::REENTRY_NEVER, $definition->eligibility->reentryPolicy);
+        $this->assertSame(Campaign::INELIGIBLE_CONTINUE, $definition->eligibility->whenIneligible);
+    }
+
+    public function test_automatic_eligibility_requires_at_least_one_criterion(): void
+    {
+        $data = $this->compactDefinition();
+        $data['eligibility'] = [
+            'mode' => 'automatic',
+            'criteria' => [],
+        ];
+
+        $this->assertDefinitionInvalid(
+            definition: $data,
+            messageFragment: 'requires at least one criterion',
+            label: 'automatic eligibility without criteria',
         );
     }
 
@@ -264,6 +309,15 @@ class CompactCampaignPresetAuthoringTest extends TestCase
             'scope' => 'webinar_nurture',
             'family_key' => 'Consumer-Nurture',
             'priority' => 15,
+            'eligibility' => [
+                'mode' => 'automatic',
+                'criteria' => [
+                    'status' => ['prospect_nurture'],
+                    'tag' => ['VA'],
+                ],
+                'reentry' => 'never',
+                'when_ineligible' => 'cancel',
+            ],
             'variant_strategy' => 'send_all_eligible',
             'source_version' => 7,
             'steps' => [

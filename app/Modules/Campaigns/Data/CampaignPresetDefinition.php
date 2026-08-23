@@ -22,6 +22,7 @@ class CampaignPresetDefinition
         public readonly string $scope,
         public readonly ?string $familyKey,
         public readonly int $priority,
+        public readonly CampaignEligibilityPresetDefinition $eligibility,
         public readonly string $status,
         public readonly string $dispatchKey,
         public readonly string $variantStrategy,
@@ -53,6 +54,9 @@ class CampaignPresetDefinition
         $familyKey = self::nullableString($data['family_key'] ?? null);
         $familyKey = $familyKey !== null ? self::normalizeSegment($familyKey) : null;
         $priority = self::priority($data['priority'] ?? 0);
+        $eligibility = CampaignEligibilityPresetDefinition::fromArray(
+            $data['eligibility'] ?? null,
+        );
         $dispatchKey = 'campaign_step_due';
         $variantStrategy = self::variantStrategy(
             $data['variant_strategy'] ?? 'first_available',
@@ -103,6 +107,7 @@ class CampaignPresetDefinition
             scope: $scope,
             familyKey: $familyKey,
             priority: $priority,
+            eligibility: $eligibility,
             status: self::campaignStatus($data['status'] ?? null),
             dispatchKey: $dispatchKey,
             variantStrategy: $variantStrategy,

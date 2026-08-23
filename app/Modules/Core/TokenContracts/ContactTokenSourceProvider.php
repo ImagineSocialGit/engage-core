@@ -17,6 +17,7 @@ class ContactTokenSourceProvider implements TokenSourceProvider
             'name' => ['Full name', ['name'], true],
             'email' => ['Email address', ['email'], true],
             'phone' => ['Phone number', ['phone'], true],
+            'birthday' => ['Birthday', ['birthday'], true],
             'source' => ['Contact source', [], true],
             'subsource' => ['Contact subsource', [], true],
             'created_at' => ['Created date', [], false],

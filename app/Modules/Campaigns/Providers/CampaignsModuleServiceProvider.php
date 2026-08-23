@@ -15,11 +15,13 @@ use App\Modules\Campaigns\ConfigContracts\CampaignPresetConfigContractTargetProv
 use App\Modules\Campaigns\ConfigContracts\CampaignPresetDefinitionConfigContract;
 use App\Modules\Campaigns\Console\Commands\DeactivateCampaignCommand;
 use App\Modules\Campaigns\Console\Commands\SyncCampaignPresetsCommand;
+use App\Modules\Campaigns\Jobs\ProcessDueCampaignTouchDatesJob;
 use App\Modules\Campaigns\Services\CampaignMessageChainExecutionContextProvider;
 use App\Modules\Campaigns\Services\ContactShow\ContactCampaignsVisibilityDataProvider;
 use App\Modules\Campaigns\TokenContracts\CampaignTokenContextProvider;
 use App\Modules\Campaigns\TokenContracts\CampaignTokenSourceProvider;
 use App\Modules\Campaigns\Validation\CampaignsSetupValidationContributor;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider;
 
 class CampaignsModuleServiceProvider extends ServiceProvider
@@ -48,6 +50,16 @@ class CampaignsModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->callAfterResolving(
+            Schedule::class,
+            function (Schedule $schedule): void {
+                $schedule
+                    ->job(new ProcessDueCampaignTouchDatesJob())
+                    ->everyMinute()
+                    ->withoutOverlapping();
+            },
+        );
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 DeactivateCampaignCommand::class,

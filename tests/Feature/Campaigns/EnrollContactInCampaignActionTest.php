@@ -91,6 +91,27 @@ class EnrollContactInCampaignActionTest extends TestCase
         $this->assertSame($chain->getKey(), $campaign->message_chain_id);
     }
 
+    public function test_campaign_key_is_authoritative_even_when_legacy_message_segments_do_not_match(): void
+    {
+        Queue::fake();
+
+        [$campaign] = $this->campaignWithChain('canonical_identity');
+        $contact = Contact::factory()->create();
+
+        $enrollment = app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $campaign->key,
+            channel: 'sms',
+            purpose: 'transactional',
+            scope: 'some_other_scope',
+            eagerProcess: false,
+        );
+
+        $this->assertSame((int) $campaign->getKey(), (int) $enrollment->campaign_id);
+        $this->assertSame('canonical_identity', $enrollment->campaign_key);
+        $this->assertDatabaseCount('campaign_enrollments', 1);
+    }
+
     public function test_non_empty_enrollment_exit_conditions_are_rejected_instead_of_silently_ignored(): void
     {
         Queue::fake();

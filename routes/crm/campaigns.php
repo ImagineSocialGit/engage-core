@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Campaigns\Controllers\CRM\CampaignAnnualTouchController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignMessageTemplateController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignSimulatorController;
@@ -12,6 +13,19 @@ Route::middleware('module:campaigns')
     ->group(function () {
         Route::get('/', [CampaignController::class, 'index'])
             ->name('index');
+
+        Route::prefix('annual-touches')
+            ->name('annual-touches.')
+            ->group(function (): void {
+                Route::get('/', [CampaignAnnualTouchController::class, 'index'])
+                    ->name('index');
+                Route::post('/', [CampaignAnnualTouchController::class, 'store'])
+                    ->name('store');
+                Route::put('/{campaignTouchProgram}', [CampaignAnnualTouchController::class, 'update'])
+                    ->name('update');
+                Route::delete('/{campaignTouchProgram}', [CampaignAnnualTouchController::class, 'destroy'])
+                    ->name('destroy');
+            });
 
         if (app(TestingToolGuard::class)->routesMayRegister()) {
             Route::prefix('testing/simulator')

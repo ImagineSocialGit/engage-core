@@ -5,6 +5,7 @@ namespace App\Modules\Campaigns\Models;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CampaignTouchVariant extends Model
 {
@@ -43,5 +44,13 @@ class CampaignTouchVariant extends Model
     public function messageTemplatePreset(): BelongsTo
     {
         return $this->belongsTo(MessageTemplatePreset::class);
+    }
+
+    public function dispatches(): HasMany
+    {
+        return $this->hasMany(
+            CampaignTouchDispatch::class,
+            'campaign_touch_variant_id',
+        );
     }
 }

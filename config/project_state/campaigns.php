@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 5,
+    'version' => 7,
     'tables' => [
         'campaigns' => [
             'mode' => 'upsert',
@@ -20,6 +20,10 @@ return [
                 'status',
                 'family_key',
                 'priority',
+                'eligibility_filter',
+                'enrollment_mode',
+                'reentry_policy',
+                'ineligible_behavior',
                 'source_version',
                 'is_customized',
                 'customized_at',
@@ -27,7 +31,7 @@ return [
                 'created_at',
                 'updated_at',
             ],
-            'json_columns' => ['meta'],
+            'json_columns' => ['eligibility_filter', 'meta'],
             'references' => [
                 'message_chain_id' => 'message_chains',
             ],
@@ -126,6 +130,7 @@ return [
                 'audience_key',
                 'recurrence',
                 'repeat_years',
+                'starts_on',
                 'is_active',
                 'meta',
                 'created_at',
@@ -195,6 +200,54 @@ return [
             'references' => [
                 'campaign_touch_date_id' => 'campaign_touch_dates',
                 'message_template_preset_id' => 'message_template_presets',
+            ],
+        ],
+
+        'campaign_touch_dispatches' => [
+            'mode' => 'insert_empty',
+            'preserve_id' => true,
+            'order_by' => ['id'],
+            'columns' => [
+                'id',
+                'campaign_touch_variant_id',
+                'contact_id',
+                'occurrence_year',
+                'due_at',
+                'scheduled_message_id',
+                'status',
+                'reason',
+                'meta',
+                'created_at',
+                'updated_at',
+            ],
+            'json_columns' => ['meta'],
+            'references' => [
+                'campaign_touch_variant_id' => 'campaign_touch_variants',
+                'contact_id' => 'contacts',
+                'scheduled_message_id' => 'scheduled_messages',
+            ],
+        ],
+
+
+        'campaign_eligibility_states' => [
+            'mode' => 'insert_empty',
+            'preserve_id' => true,
+            'order_by' => ['id'],
+            'columns' => [
+                'id',
+                'campaign_id',
+                'contact_id',
+                'is_eligible',
+                'eligibility_cycle',
+                'became_eligible_at',
+                'became_ineligible_at',
+                'last_evaluated_at',
+                'created_at',
+                'updated_at',
+            ],
+            'references' => [
+                'campaign_id' => 'campaigns',
+                'contact_id' => 'contacts',
             ],
         ],
 

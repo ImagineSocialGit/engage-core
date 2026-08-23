@@ -25,10 +25,11 @@ class EnrollContactInCampaignAction
     ) {}
 
     /**
-     * Legacy caller arguments remain in the public signature while preset/FlowRoute
-     * definitions finish moving to direct MessageChain authoring. MessageChainVersion
-     * owns progression and exit behavior. Non-empty enrollment exitConditions are
-     * rejected instead of being silently ignored; dispatchKey is compatibility-only.
+     * Campaign key is the canonical Campaign identity. Legacy channel/purpose/scope
+     * arguments remain in the public signature for caller compatibility but no longer
+     * participate in Campaign resolution. MessageChainVersion owns progression and exit
+     * behavior. Non-empty enrollment exitConditions are rejected instead of being
+     * silently ignored; dispatchKey is compatibility-only.
      *
      * @param array<string, mixed> $payload
      * @param array<string, mixed>|null $meta
@@ -66,19 +67,11 @@ class EnrollContactInCampaignAction
             $payload,
             $meta,
             $startContext,
-            $channel,
-            $purpose,
-            $scope,
             $entryKey,
             $eagerProcess,
             $initialActionAt,
         ): CampaignEnrollment {
-            $candidate = $this->resolveCampaign(
-                campaignKey: $campaignKey,
-                channel: $channel,
-                purpose: $purpose,
-                scope: $scope,
-            );
+            $candidate = $this->resolveCampaign($campaignKey);
 
             if ($entryKey !== null) {
                 $existingEntry = $this->existingEntry(
@@ -169,27 +162,13 @@ class EnrollContactInCampaignAction
         }, 3);
     }
 
-    private function resolveCampaign(
-        string $campaignKey,
-        ?string $channel = null,
-        ?string $purpose = null,
-        ?string $scope = null,
-    ): Campaign {
-        $query = Campaign::query()->where('key', $campaignKey);
+    private function resolveCampaign(string $campaignKey): Campaign
+    {
+        $campaignKey = trim($campaignKey);
 
-        if ($channel !== null) {
-            $query->where('channel', $this->normalizeSegment($channel));
-        }
-
-        if ($purpose !== null) {
-            $query->where('purpose', $this->normalizeSegment($purpose));
-        }
-
-        if ($scope !== null) {
-            $query->where('scope', $this->normalizeSegment($scope));
-        }
-
-        $campaign = $query->first();
+        $campaign = Campaign::query()
+            ->where('key', $campaignKey)
+            ->first();
 
         if (! $campaign instanceof Campaign) {
             throw CampaignUnavailableForEnrollmentException::missing($campaignKey);
@@ -342,8 +321,4 @@ class EnrollContactInCampaignAction
         return $entryKey;
     }
 
-    private function normalizeSegment(string $value): string
-    {
-        return str_replace('-', '_', strtolower(trim($value)));
-    }
 }

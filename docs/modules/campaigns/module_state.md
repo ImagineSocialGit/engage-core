@@ -14,6 +14,36 @@ Campaigns references Messaging runtime state instead of maintaining a second cha
 
 Campaign preset sync still converts the current compact Campaign step/variant authoring definition into a Messaging-owned MessageChain and immutable published MessageChainVersion, then stores the selected chain on `campaigns.message_chain_id`. That conversion is now only a temporary authoring bridge. `campaign_steps` and `campaign_step_variants` are not runtime progression state.
 
+
+## Campaign identity and eligibility foundation
+
+`campaigns.key` is the canonical Campaign machine identity. Legacy
+channel/purpose/scope arguments may remain on public enrollment calls for
+compatibility, but they do not select which Campaign is being enrolled.
+
+Campaigns now owns first-class eligibility policy:
+
+- `eligibility_filter`
+- `enrollment_mode`
+- `reentry_policy`
+- `ineligible_behavior`
+
+and derived per-Contact state in `campaign_eligibility_states`.
+
+Eligibility reuses Core's contributed Contact-filter criterion registry rather
+than creating a Campaign-specific rule engine or a dependency on Workflow or
+Relationships. Stored criteria use stable semantic values; the current Workflow
+status criterion's numeric runtime values are translated from stable
+ContactStatus keys at the Campaign/Core boundary.
+
+This foundation only evaluates and records eligibility transitions. Automatic
+enrollment, false-eligibility lifecycle behavior, event-driven reevaluation,
+periodic reconciliation, and Process Highway presentation are separate follow-up
+runtime/surface batches.
+
+See `docs/modules/campaigns/eligibility.md`.
+
+
 New Campaign enrollment creates a compact CampaignEnrollment wrapper, starts the selected immutable MessageChainVersion through Messaging, and stores `campaign_enrollments.message_chain_enrollment_id`. Explicit cancellation, Campaign deactivation, and enrollment pause/resume all delegate to Messaging-owned MessageChainEnrollment lifecycle actions. Campaign workspace/contact visibility and automation result metadata read progression/lifecycle facts from the linked MessageChainEnrollment. The old Campaign step scheduler, terminal-result progression listener, and duplicate CampaignEnrollment runtime columns have been removed.
 
 Messaging also owns dependency-aware MessageChain execution, pending-message skipping, bounded bulk delivery, and provider submission pacing.

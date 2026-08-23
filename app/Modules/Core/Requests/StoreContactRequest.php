@@ -20,6 +20,7 @@ class StoreContactRequest extends FormRequest
             'name' => ['nullable', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:255'],
+            'birthday' => ['nullable', 'date'],
             'source' => ['nullable', 'string', 'max:255'],
             'subsource' => ['nullable', 'string', 'max:255'],
         ];
