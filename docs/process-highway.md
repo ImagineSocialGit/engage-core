@@ -246,12 +246,14 @@ Status qualifier node
     safe navigation: Campaign editor
 ```
 
-Batch 6B only follows `link` targets using `GET`. Inline mutation targets remain present as capability metadata for Batch 6C but are never rendered as ordinary navigation URLs.
+The Highway follows `link` targets using `GET`. Inline mutation targets remain capability metadata and are never rendered as ordinary navigation URLs.
 
 Campaign eligibility nodes and edges therefore include both:
 
 - the bounded inline capability target;
-- the Campaign editor link.
+- the exact Campaign Start editor link.
+
+Campaign journey nodes link directly to the Campaign message-review modal. Campaign completion nodes link to Campaign Review. These are owner-editor handoffs; Process Highway does not host or submit the Campaign forms.
 
 More complex Flow Route changes continue to link to the exact Route or Point editor.
 
@@ -306,7 +308,7 @@ Route sequencing and branch edges remain FlowRoutes-owned. A cross-module Point 
 
 Flow Routes are intentionally not the center of Process Highway. A Highway with only Campaign eligibility remains complete and useful when FlowRoutes is disabled.
 
-## Batch 6B surface
+## Business-map surface
 
 The graph-native surface renders:
 
@@ -330,14 +332,33 @@ It includes:
 
 The primary information hierarchy is business meaning first and implementation ownership second. The surface does not group by Campaigns versus Flow Routes.
 
-## Batch 6B non-goals
+## Campaign actionability handoff
+
+Batch 6C1 keeps Process Highway as a map and makes its Campaign destinations genuinely actionable:
+
+```text
+Campaign eligibility or ineligible behavior
+    -> Campaign Setup / Start
+
+Campaign message journey
+    -> Campaign Setup / Messages modal
+
+Campaign completion or lifecycle review
+    -> Campaign Setup / Review
+```
+
+Campaign Setup remains Campaign-owned. It hosts the Campaign eligibility authoring service, Campaign lifecycle actions, and the reusable Messaging-owned message editor carousel. Saving message copy continues to publish through Messaging's authoritative immutable-template action.
+
+The Campaign schedule popup in 6C1 is a payload-free read projection only. Campaign message editing preserves the existing template-edit seam. Pinned-message review and schedule mutation remain deferred until the selected Messaging-owned `MessageChainVersion` can be edited through copy-on-write publication in Batch 6C2.
+
+## Current non-goals
 
 Batch 6B does not:
 
 - execute automation;
 - persist a second business-process definition;
 - add a graphical Flow Route editor;
-- submit inline mutation capabilities;
+- submit mutations from Process Highway;
 - change Campaign or FlowRoute runtime behavior;
 - change client presets or configuration;
 - change Messaging consent/scope behavior;
@@ -345,11 +366,12 @@ Batch 6B does not:
 
 ## Remaining refactor roadmap
 
-1. Batch 6C — bounded actionability
-   - preserve exact owner-editor links for all complex changes;
-   - wire only genuinely bounded owner-declared inline actions;
-   - Campaign eligibility is the first candidate;
-   - do not turn Highway into a workflow editor.
+1. Batch 6C2 — versioned Campaign message/schedule authoring
+   - derive the editable schedule from the selected Messaging-owned immutable MessageChain version;
+   - make Campaign-context message edits publish a replacement chain version that pins the new template version;
+   - add/remove/reorder steps and edit human-readable timing without payload fields;
+   - publish a new immutable chain version for future enrollments;
+   - keep existing enrollments pinned to their starting version.
 2. Batch 6D — Slam Dunk acceptance and polish
    - cold-lead Status + Old Lead convergence;
    - Past Client process;

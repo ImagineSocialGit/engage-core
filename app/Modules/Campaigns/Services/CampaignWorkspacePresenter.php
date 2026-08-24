@@ -9,6 +9,7 @@ use App\Modules\Campaigns\Models\CampaignStepVariant;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class CampaignWorkspacePresenter
 {
@@ -21,6 +22,14 @@ class CampaignWorkspacePresenter
      *     message_step_count: int,
      *     message_count: int,
      *     channels: array<int, string>,
+     *     schedule_steps: array<int, array{
+     *         id: int,
+     *         step_number: int,
+     *         name: string,
+     *         timing: string,
+     *         channels: array<int, string>,
+     *         message_count: int
+     *     }>,
      *     builder_stages: array<int, array{key: string, state: string, editable: bool}>
      * }
      */
@@ -64,12 +73,115 @@ class CampaignWorkspacePresenter
             'message_step_count' => $messageStepCount,
             'message_count' => $messageCount,
             'channels' => $channels,
+            'schedule_steps' => $this->scheduleSteps($steps),
             'builder_stages' => $this->builderStages(
                 campaign: $campaign,
                 messageStepCount: $messageStepCount,
                 messageCount: $messageCount,
             ),
         ];
+    }
+
+    /**
+     * @param Collection<int, CampaignStep> $steps
+     * @return array<int, array{
+     *     id: int,
+     *     step_number: int,
+     *     name: string,
+     *     timing: string,
+     *     channels: array<int, string>,
+     *     message_count: int
+     * }>
+     */
+    private function scheduleSteps(Collection $steps): array
+    {
+        return $steps
+            ->map(function (CampaignStep $step): array {
+                $channels = $step->variants
+                    ->pluck('channel')
+                    ->filter(fn (mixed $channel): bool => is_string($channel) && trim($channel) !== '')
+                    ->map(fn (string $channel): string => $this->normalizeSegment($channel))
+                    ->unique()
+                    ->sort()
+                    ->values()
+                    ->all();
+
+                return [
+                    'id' => (int) $step->getKey(),
+                    'step_number' => (int) $step->step_number,
+                    'name' => trim((string) $step->name) !== ''
+                        ? (string) $step->name
+                        : 'Message '.(int) $step->step_number,
+                    'timing' => $this->timingLabel($step),
+                    'channels' => $channels,
+                    'message_count' => $step->variants->count(),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function timingLabel(CampaignStep $step): string
+    {
+        $criteria = is_array($step->criteria) ? $step->criteria : [];
+        $timing = data_get($criteria, 'timing');
+
+        if (! is_array($timing)) {
+            $timing = data_get($criteria, 'schedule');
+        }
+
+        if (! is_array($timing) || $timing === []) {
+            return (int) $step->step_number === 1
+                ? 'Immediately after the Campaign starts'
+                : 'Immediately after the previous step finishes';
+        }
+
+        $type = $this->normalizeSegment((string) ($timing['type'] ?? 'immediate'));
+
+        if ($type === 'immediate') {
+            return (int) $step->step_number === 1
+                ? 'Immediately after the Campaign starts'
+                : 'Immediately after the previous step finishes';
+        }
+
+        $duration = $this->durationLabel($timing);
+
+        if ($type === 'delay') {
+            $anchor = (int) $step->step_number === 1
+                ? 'the Campaign starts'
+                : 'the previous step finishes';
+
+            return $duration !== null
+                ? $duration.' after '.$anchor
+                : 'After '.$anchor;
+        }
+
+        if ($type === 'anchored') {
+            $anchor = trim((string) ($timing['anchor_key'] ?? 'the configured event'));
+            $anchor = $anchor !== '' ? Str::headline($anchor) : 'the configured event';
+
+            return $duration !== null
+                ? $duration.' after '.$anchor
+                : 'When '.$anchor.' occurs';
+        }
+
+        return Str::headline($type);
+    }
+
+    /** @param array<string, mixed> $timing */
+    private function durationLabel(array $timing): ?string
+    {
+        foreach (['days' => 'day', 'hours' => 'hour', 'minutes' => 'minute', 'seconds' => 'second'] as $field => $unit) {
+            if (! is_numeric($timing[$field] ?? null)) {
+                continue;
+            }
+
+            $value = max(0, (int) $timing[$field]);
+
+            return $value.' '.Str::plural($unit, $value);
+        }
+
+        return null;
     }
 
     /**
@@ -102,7 +214,7 @@ class CampaignWorkspacePresenter
             [
                 'key' => 'review',
                 'state' => $campaign->isActive() ? 'active' : 'inactive',
-                'editable' => false,
+                'editable' => true,
             ],
         ];
     }

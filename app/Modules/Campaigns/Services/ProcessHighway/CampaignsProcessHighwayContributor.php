@@ -54,18 +54,50 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
         $conditions = $this->conditions($campaign, $statusNames);
         $processKey = ProcessHighwaySemanticKey::campaign((string) $campaign->key);
         $linkTarget = $this->campaignLinkTarget($campaign);
+        $startLinkTarget = $this->campaignPanelTarget(
+            campaign: $campaign,
+            panel: 'start',
+            label: 'Edit Campaign Start',
+            resourceType: 'campaign_eligibility',
+        );
+        $messagesLinkTarget = $this->campaignPanelTarget(
+            campaign: $campaign,
+            panel: 'messages',
+            label: 'Review Campaign Messages',
+            resourceType: 'campaign_messages',
+        );
+        $reviewLinkTarget = $this->campaignPanelTarget(
+            campaign: $campaign,
+            panel: 'review',
+            label: 'Review Campaign',
+            resourceType: 'campaign_lifecycle',
+        );
         $inlineTarget = $this->campaignEligibilityTarget($campaign);
         $campaignAuthority = new ProcessHighwayAuthority(
             ownerKey: 'campaigns',
-            editTargets: [$linkTarget, $inlineTarget],
+            editTargets: [
+                $linkTarget,
+                $startLinkTarget,
+                $messagesLinkTarget,
+                $reviewLinkTarget,
+                $inlineTarget,
+            ],
         );
         $inlineAuthority = new ProcessHighwayAuthority(
             ownerKey: 'campaigns',
-            editTargets: [$inlineTarget, $linkTarget],
+            editTargets: [$inlineTarget, $startLinkTarget, $linkTarget],
         );
-        $linkAuthority = new ProcessHighwayAuthority(
+        $startAuthority = new ProcessHighwayAuthority(
             ownerKey: 'campaigns',
-            editTargets: [$linkTarget],
+            editTargets: [$startLinkTarget, $linkTarget],
+        );
+        $journeyAuthority = new ProcessHighwayAuthority(
+            ownerKey: 'campaigns',
+            editTargets: [$messagesLinkTarget, $linkTarget],
+        );
+        $reviewAuthority = new ProcessHighwayAuthority(
+            ownerKey: 'campaigns',
+            editTargets: [$reviewLinkTarget, $linkTarget],
         );
         $nodes = [];
         $edges = [];
@@ -148,7 +180,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
                         role: ProcessHighwayNode::ROLE_QUALIFIER,
                         authority: new ProcessHighwayAuthority(
                             ownerKey: $factOwner,
-                            editTargets: [$inlineTarget, $linkTarget],
+                            editTargets: [$inlineTarget, $startLinkTarget, $linkTarget],
                         ),
                         sortOrder: 10 + $conditionIndex,
                         referenceOnly: true,
@@ -228,7 +260,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
                 key: $manualEntryKey,
                 label: 'Explicit Campaign enrollment',
                 role: ProcessHighwayNode::ROLE_TRIGGER,
-                authority: $linkAuthority,
+                authority: $startAuthority,
                 detail: 'Someone or another process deliberately enrolls the contact.',
                 sortOrder: 10,
             );
@@ -238,7 +270,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
                 fromNodeKey: $manualEntryKey,
                 toNodeKey: $processKey,
                 role: ProcessHighwayEdge::ROLE_STARTS,
-                authority: $linkAuthority,
+                authority: $startAuthority,
                 label: 'Enroll',
                 sortOrder: $edgeOrder++,
             );
@@ -249,7 +281,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
             key: $journeyKey,
             label: 'Message journey',
             role: ProcessHighwayNode::ROLE_ACTION,
-            authority: $linkAuthority,
+            authority: $journeyAuthority,
             detail: $this->journeyDetail($workspace),
             sortOrder: 150,
             attributes: [
@@ -263,7 +295,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
             fromNodeKey: $processKey,
             toNodeKey: $journeyKey,
             role: ProcessHighwayEdge::ROLE_CONTINUES,
-            authority: $linkAuthority,
+            authority: $journeyAuthority,
             label: 'Run journey',
             sortOrder: $edgeOrder++,
         );
@@ -273,7 +305,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
             key: $completeKey,
             label: 'Journey completed',
             role: ProcessHighwayNode::ROLE_EXIT,
-            authority: $linkAuthority,
+            authority: $reviewAuthority,
             sortOrder: 300,
         );
         $exitNodeKeys[] = $completeKey;
@@ -282,7 +314,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
             fromNodeKey: $journeyKey,
             toNodeKey: $completeKey,
             role: ProcessHighwayEdge::ROLE_EXITS,
-            authority: $linkAuthority,
+            authority: $reviewAuthority,
             label: 'When the journey finishes',
             sortOrder: $edgeOrder++,
         );
@@ -656,6 +688,28 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
             resourceType: 'campaign',
             resourceKey: (string) $campaign->key,
             resourceId: (int) $campaign->getKey(),
+        );
+    }
+
+    private function campaignPanelTarget(
+        Campaign $campaign,
+        string $panel,
+        string $label,
+        string $resourceType,
+    ): ProcessHighwayEditTarget {
+        return ProcessHighwayEditTarget::link(
+            ownerKey: 'campaigns',
+            label: $label,
+            url: route('crm.campaigns.edit', [
+                'campaign' => $campaign,
+                'panel' => $panel,
+            ]),
+            resourceType: $resourceType,
+            resourceKey: (string) $campaign->key,
+            resourceId: (int) $campaign->getKey(),
+            containerType: 'campaign',
+            containerKey: (string) $campaign->key,
+            containerId: (int) $campaign->getKey(),
         );
     }
 

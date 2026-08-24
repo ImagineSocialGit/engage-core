@@ -9,6 +9,7 @@ use App\Modules\Campaigns\Actions\UpdateCampaignEligibilityAction;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Requests\CampaignEligibilityAuthoringRequest;
 use App\Modules\Campaigns\Services\CampaignEligibilityAuthoringService;
+use App\Modules\Campaigns\Services\CampaignMessageReviewPresenter;
 use App\Modules\Campaigns\Services\CampaignWorkspacePresenter;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
 use Illuminate\Contracts\View\View;
@@ -19,6 +20,13 @@ use InvalidArgumentException;
 
 class CampaignController extends Controller
 {
+    private const EDIT_PANELS = [
+        'start',
+        'schedule',
+        'messages',
+        'review',
+    ];
+
     public function index(): View
     {
         $campaigns = Campaign::query()
@@ -56,14 +64,21 @@ class CampaignController extends Controller
     }
 
     public function edit(
+        Request $request,
         Campaign $campaign,
         CampaignWorkspacePresenter $workspacePresenter,
         CampaignEligibilityAuthoringService $eligibilityAuthoring,
+        CampaignMessageReviewPresenter $messageReviewPresenter,
     ): View {
         return view('crm.campaigns.edit', [
             'campaign' => $campaign,
             'workspace' => $workspacePresenter->forCampaign($campaign),
             'eligibility' => $eligibilityAuthoring->forCampaign($campaign),
+            'messageReview' => $messageReviewPresenter->forCampaign(
+                campaign: $campaign,
+                initialMessageId: $this->initialMessageId($request),
+            ),
+            'initialPanel' => $this->initialPanel($request),
         ]);
     }
 
@@ -103,7 +118,10 @@ class CampaignController extends Controller
 
         return redirect()
             ->route('crm.campaigns.edit', $campaign)
-            ->with('status', 'Campaign Start settings saved.');
+            ->with([
+                'status' => 'Campaign Start settings saved.',
+                'campaign_panel' => 'start',
+            ]);
     }
 
     public function activate(
@@ -118,13 +136,11 @@ class CampaignController extends Controller
                 source: 'crm_campaign_workspace',
             );
         } catch (InvalidArgumentException $exception) {
-            return redirect()
-                ->route('crm.campaigns.show', $campaign)
+            return $this->workspaceRedirect($request, $campaign)
                 ->with('error', $exception->getMessage());
         }
 
-        return redirect()
-            ->route('crm.campaigns.show', $campaign)
+        return $this->workspaceRedirect($request, $campaign)
             ->with(
                 'status',
                 $result['status_changed']
@@ -144,12 +160,70 @@ class CampaignController extends Controller
             source: 'crm_campaign_workspace',
         );
 
-        return redirect()
-            ->route('crm.campaigns.show', $campaign)
+        return $this->workspaceRedirect($request, $campaign)
             ->with('status', sprintf(
                 'Campaign turned off. %d enrollment(s) cancelled and %d pending message(s) skipped.',
                 $result['enrollments_cancelled'],
                 $result['scheduled_messages_skipped'],
             ));
+    }
+
+    private function initialPanel(Request $request): ?string
+    {
+        $panel = $request->query('panel');
+
+        if (! is_string($panel) || ! in_array($panel, self::EDIT_PANELS, true)) {
+            $panel = $request->session()->get('campaign_panel');
+        }
+
+        return is_string($panel) && in_array($panel, self::EDIT_PANELS, true)
+            ? $panel
+            : null;
+    }
+
+    private function initialMessageId(Request $request): ?string
+    {
+        $messageId = $request->query('message');
+
+        return is_string($messageId) && trim($messageId) !== ''
+            ? trim($messageId)
+            : null;
+    }
+
+    private function workspaceRedirect(
+        Request $request,
+        Campaign $campaign,
+    ): RedirectResponse {
+        $returnTo = $this->safeReturnPath($request->input('return_to'));
+
+        return $returnTo !== null
+            ? redirect($returnTo)
+            : redirect()->route('crm.campaigns.show', $campaign);
+    }
+
+    private function safeReturnPath(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        if ($value === ''
+            || ! str_starts_with($value, '/')
+            || str_starts_with($value, '//')
+            || str_contains($value, '\\')
+            || preg_match('/[\x00-\x1F\x7F]/', $value) === 1
+        ) {
+            return null;
+        }
+
+        $parts = parse_url($value);
+
+        if ($parts === false || isset($parts['scheme']) || isset($parts['host'])) {
+            return null;
+        }
+
+        return $value;
     }
 }

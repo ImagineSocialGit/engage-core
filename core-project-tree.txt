@@ -187,6 +187,7 @@
 │   │   │   │   ├── CampaignMessageChainDefinitionBuilder.php
 │   │   │   │   ├── CampaignMessageChainExecutionContextProvider.php
 │   │   │   │   ├── CampaignMessageDefinitionResolver.php
+│   │   │   │   ├── CampaignMessageReviewPresenter.php
 │   │   │   │   ├── CampaignSimulationService.php
 │   │   │   │   ├── CampaignWorkspacePresenter.php
 │   │   │   │   ├── ContactShow
@@ -2260,6 +2261,7 @@
 │   │   │   ├── CampaignMessageChainRuntimeOwnershipTest.php
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
 │   │   │   ├── CampaignProcessHighwayContributorTest.php
+│   │   │   ├── CampaignSetupActionabilityTest.php
 │   │   │   ├── CampaignSimulatorTest.php
 │   │   │   ├── CampaignsSetupValidationContributorTest.php
 │   │   │   ├── CampaignTouchDateFoundationTest.php
@@ -2695,4 +2697,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-656 directories, 2040 files
+656 directories, 2042 files

@@ -97,8 +97,24 @@ class CampaignProcessHighwayContributorTest extends TestCase
 
         $this->assertNotNull($statusNavigationTarget);
         $this->assertSame(
-            route('crm.campaigns.edit', $campaign),
+            route('crm.campaigns.edit', [
+                'campaign' => $campaign,
+                'panel' => 'start',
+            ]),
             $statusNavigationTarget['url'],
+        );
+
+        $journeyNode = $nodes[$processKey.':journey'];
+        $journeyNavigationTarget = collect($journeyNode['authority']['edit_targets'])
+            ->firstWhere('mode', 'link');
+
+        $this->assertNotNull($journeyNavigationTarget);
+        $this->assertSame(
+            route('crm.campaigns.edit', [
+                'campaign' => $campaign,
+                'panel' => 'messages',
+            ]),
+            $journeyNavigationTarget['url'],
         );
 
         $edges = collect($graph['edges'])
