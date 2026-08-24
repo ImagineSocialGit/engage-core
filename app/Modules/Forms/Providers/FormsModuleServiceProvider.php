@@ -4,6 +4,7 @@ namespace App\Modules\Forms\Providers;
 
 use App\Modules\Forms\ConfigContracts\FormDefinitionConfigContract;
 use App\Modules\Forms\ConfigContracts\FormDefinitionConfigContractTargetProvider;
+use App\Modules\Forms\Console\Commands\IssueExternalFormIntakeSecretCommand;
 use App\Modules\Forms\Validation\FormsSetupValidationContributor;
 use Illuminate\Support\ServiceProvider;
 
@@ -29,6 +30,10 @@ class FormsModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        //
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                IssueExternalFormIntakeSecretCommand::class,
+            ]);
+        }
     }
 }

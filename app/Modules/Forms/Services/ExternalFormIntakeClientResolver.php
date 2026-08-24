@@ -9,23 +9,31 @@ final class ExternalFormIntakeClientResolver
 {
     private const ID_PATTERN = '/^[a-z][a-z0-9_.-]*$/';
 
+    public function __construct(
+        private readonly ExternalFormIntakeSecretPolicy $secrets,
+    ) {
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function configuredClientIds(): array
+    {
+        return array_map(
+            fn (mixed $clientId): string => $this->validatedClientId($clientId),
+            array_keys($this->configuredClients()),
+        );
+    }
+
     /**
      * @return array<string, ExternalFormIntakeClient>
      */
     public function all(): array
     {
-        $configured = config('forms.external_intake.clients', []);
-
-        if (! is_array($configured) || $configured === []) {
-            throw new InvalidArgumentException(
-                'External Forms intake requires at least one configured client.',
-            );
-        }
-
         $clients = [];
         $providers = [];
 
-        foreach ($configured as $clientId => $settings) {
+        foreach ($this->configuredClients() as $clientId => $settings) {
             $client = $this->client($clientId, $settings);
 
             if (isset($providers[$client->provider])) {
@@ -49,16 +57,25 @@ final class ExternalFormIntakeClientResolver
         return $this->all()[$clientId] ?? null;
     }
 
-    private function client(mixed $clientId, mixed $settings): ExternalFormIntakeClient
+    /**
+     * @return array<array-key, mixed>
+     */
+    private function configuredClients(): array
     {
-        if (! is_string($clientId)
-            || preg_match(self::ID_PATTERN, $clientId) !== 1
-            || strlen($clientId) > 128
-        ) {
+        $configured = config('forms.external_intake.clients', []);
+
+        if (! is_array($configured) || $configured === []) {
             throw new InvalidArgumentException(
-                'External Forms intake client IDs must begin with a lowercase letter and contain only lowercase letters, numbers, dots, underscores, or hyphens.',
+                'External Forms intake requires at least one configured client.',
             );
         }
+
+        return $configured;
+    }
+
+    private function client(mixed $clientId, mixed $settings): ExternalFormIntakeClient
+    {
+        $clientId = $this->validatedClientId($clientId);
 
         if (! is_array($settings)) {
             throw new InvalidArgumentException(
@@ -79,14 +96,10 @@ final class ExternalFormIntakeClientResolver
             ));
         }
 
-        $secret = $settings['secret'] ?? null;
-
-        if (! is_string($secret) || strlen($secret) < 32 || strlen($secret) > 4096) {
-            throw new InvalidArgumentException(
-                "External Forms intake client [{$clientId}] secret must contain between 32 and 4096 bytes.",
-            );
-        }
-
+        $secret = $this->secrets->validatedSecret(
+            $settings['secret'] ?? null,
+            $clientId,
+        );
         $source = $this->identity(
             $settings['source'] ?? null,
             "External Forms intake client [{$clientId}] source",
@@ -130,6 +143,20 @@ final class ExternalFormIntakeClientResolver
             provider: strtolower($provider),
             allowedForms: $normalizedForms,
         );
+    }
+
+    private function validatedClientId(mixed $clientId): string
+    {
+        if (! is_string($clientId)
+            || preg_match(self::ID_PATTERN, $clientId) !== 1
+            || strlen($clientId) > 128
+        ) {
+            throw new InvalidArgumentException(
+                'External Forms intake client IDs must begin with a lowercase letter and contain only lowercase letters, numbers, dots, underscores, or hyphens.',
+            );
+        }
+
+        return $clientId;
     }
 
     private function identity(mixed $value, string $label): string

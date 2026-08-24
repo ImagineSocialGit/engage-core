@@ -469,6 +469,9 @@
 │   │   │   ├── ConfigContracts
 │   │   │   │   ├── FormDefinitionConfigContract.php
 │   │   │   │   └── FormDefinitionConfigContractTargetProvider.php
+│   │   │   ├── Console
+│   │   │   │   └── Commands
+│   │   │   │       └── IssueExternalFormIntakeSecretCommand.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   │   └── External
@@ -503,6 +506,7 @@
 │   │   │   ├── Requests
 │   │   │   ├── Services
 │   │   │   │   ├── ExternalFormIntakeClientResolver.php
+│   │   │   │   ├── ExternalFormIntakeSecretPolicy.php
 │   │   │   │   ├── FormSchemaNormalizer.php
 │   │   │   │   ├── FormSubmissionConsentIntentResolver.php
 │   │   │   │   ├── FormSubmissionContactMapper.php
@@ -2376,6 +2380,7 @@
 │   │   │   ├── FormSubmissionConsentIntentResolverTest.php
 │   │   │   ├── FormSubmissionMessagingConsentBridgeTest.php
 │   │   │   ├── FormSubmissionVerificationTest.php
+│   │   │   ├── IssueExternalFormIntakeSecretCommandTest.php
 │   │   │   └── PublishedFormRuntimeTest.php
 │   │   ├── InboundMessaging
 │   │   │   ├── ContactConversationReplyControllerTest.php
@@ -2705,4 +2710,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-656 directories, 2050 files
+658 directories, 2053 files
