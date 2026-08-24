@@ -491,6 +491,11 @@ return [
             'ui' => [
                 'tone' => 'teal',
             ],
+            'nav' => [
+                'label' => 'Forms',
+                'route' => 'crm.forms.index',
+                'priority' => 35,
+            ],
             'depends_on' => ['core'],
             'preset_contributors' => [
                 FormsPresetContributor::class,

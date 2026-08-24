@@ -475,6 +475,8 @@
 │   │   │   │       └── IssueExternalFormIntakeSecretCommand.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
+│   │   │   │   ├── CRM
+│   │   │   │   │   └── FormsController.php
 │   │   │   │   └── External
 │   │   │   │       ├── ExternalFormIntakeController.php
 │   │   │   │       └── ExternalPublishedFormController.php
@@ -507,8 +509,10 @@
 │   │   │   ├── Requests
 │   │   │   ├── Services
 │   │   │   │   ├── ExternalFormIntakeClientResolver.php
+│   │   │   │   ├── ExternalFormIntakeDomainPolicy.php
 │   │   │   │   ├── ExternalFormIntakeSecretPolicy.php
 │   │   │   │   ├── FormSchemaNormalizer.php
+│   │   │   │   ├── FormsSurfaceReadService.php
 │   │   │   │   ├── FormSubmissionConsentIntentResolver.php
 │   │   │   │   ├── FormSubmissionContactMapper.php
 │   │   │   │   ├── FormSubmissionValidator.php
@@ -2126,6 +2130,8 @@
 │       │   │       ├── editor-modal.blade.php
 │       │   │       ├── navigation.blade.php
 │       │   │       └── point-fields.blade.php
+│       │   ├── forms
+│       │   │   └── index.blade.php
 │       │   ├── messaging
 │       │   │   └── message-templates
 │       │   │       └── index.blade.php
@@ -2192,6 +2198,7 @@
 │   │   ├── campaigns.php
 │   │   ├── core.php
 │   │   ├── flow-routes.php
+│   │   ├── forms.php
 │   │   ├── inbound-messaging.php
 │   │   ├── messaging.php
 │   │   ├── relationships.php
@@ -2373,12 +2380,14 @@
 │   │   ├── Forms
 │   │   │   ├── ArtistUpdatesPresetTest.php
 │   │   │   ├── CreateFormSubmissionActionTest.php
+│   │   │   ├── ExternalFormIntakeDomainPolicyTest.php
 │   │   │   ├── ExternalFormIntakeTest.php
 │   │   │   ├── ExternalPublishedFormTest.php
 │   │   │   ├── FormConfigContractTest.php
 │   │   │   ├── FormPresetSyncTest.php
 │   │   │   ├── FormsFoundationTest.php
 │   │   │   ├── FormsSetupValidationContributorTest.php
+│   │   │   ├── FormsSurfaceTest.php
 │   │   │   ├── FormSubmissionConsentIntentResolverTest.php
 │   │   │   ├── FormSubmissionMessagingConsentBridgeTest.php
 │   │   │   ├── FormSubmissionVerificationTest.php
@@ -2712,4 +2721,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-658 directories, 2055 files
+660 directories, 2062 files

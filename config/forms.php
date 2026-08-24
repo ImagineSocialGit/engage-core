@@ -5,6 +5,14 @@ $allowedForms = array_values(array_filter(array_map(
     'trim',
     explode(',', (string) env('FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS', '')),
 )));
+$configuredDomains = env('FORMS_EXTERNAL_INTAKE_DOMAINS');
+$domainList = is_string($configuredDomains) && trim($configuredDomains) !== ''
+    ? $configuredDomains
+    : (string) env('ROOT_DOMAIN', '');
+$domains = array_values(array_filter(array_map(
+    'trim',
+    explode(',', $domainList),
+)));
 
 $clients = $clientId === '' ? [] : [
     $clientId => [
@@ -12,6 +20,7 @@ $clients = $clientId === '' ? [] : [
         'source' => env('FORMS_EXTERNAL_INTAKE_SOURCE', $clientId),
         'provider' => env('FORMS_EXTERNAL_INTAKE_PROVIDER', $clientId),
         'allowed_forms' => $allowedForms,
+        'domains' => $domains,
     ],
 ];
 

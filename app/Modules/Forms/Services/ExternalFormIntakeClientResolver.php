@@ -11,8 +11,8 @@ final class ExternalFormIntakeClientResolver
 
     public function __construct(
         private readonly ExternalFormIntakeSecretPolicy $secrets,
-    ) {
-    }
+        private readonly ExternalFormIntakeDomainPolicy $domains,
+    ) {}
 
     /**
      * @return array<int, string>
@@ -85,7 +85,7 @@ final class ExternalFormIntakeClientResolver
 
         $unknown = array_diff(
             array_keys($settings),
-            ['secret', 'source', 'provider', 'allowed_forms'],
+            ['secret', 'source', 'provider', 'allowed_forms', 'domains'],
         );
 
         if ($unknown !== []) {
@@ -142,6 +142,10 @@ final class ExternalFormIntakeClientResolver
             source: $source,
             provider: strtolower($provider),
             allowedForms: $normalizedForms,
+            domains: $this->domains->normalize(
+                $settings['domains'] ?? [],
+                $clientId,
+            ),
         );
     }
 

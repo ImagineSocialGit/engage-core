@@ -168,6 +168,7 @@ FORMS_EXTERNAL_INTAKE_CLIENT_SECRET=
 FORMS_EXTERNAL_INTAKE_SOURCE=engage_sites
 FORMS_EXTERNAL_INTAKE_PROVIDER=engage_sites
 FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS=artist_updates
+FORMS_EXTERNAL_INTAKE_DOMAINS=example.com,forms.example.com
 ```
 
 These values configure the signed application-to-application boundary used by both:

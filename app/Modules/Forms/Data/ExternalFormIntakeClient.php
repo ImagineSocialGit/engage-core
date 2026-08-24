@@ -6,6 +6,7 @@ final readonly class ExternalFormIntakeClient
 {
     /**
      * @param  array<int, string>  $allowedForms
+     * @param  array<int, string>  $domains
      */
     public function __construct(
         public string $id,
@@ -13,6 +14,7 @@ final readonly class ExternalFormIntakeClient
         public string $source,
         public string $provider,
         public array $allowedForms,
+        public array $domains = [],
     ) {}
 
     public function allowsForm(string $formKey): bool

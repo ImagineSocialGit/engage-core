@@ -70,6 +70,7 @@ final class ClientEnvironmentLoader
         'FORMS_EXTERNAL_INTAKE_SOURCE',
         'FORMS_EXTERNAL_INTAKE_PROVIDER',
         'FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS',
+        'FORMS_EXTERNAL_INTAKE_DOMAINS',
 
         'SMS_ENABLED',
         'SMS_PROVIDER',
