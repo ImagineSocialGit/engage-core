@@ -6,17 +6,24 @@ use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Services\CampaignWorkspacePresenter;
 use App\Modules\Core\Models\ContactStatus;
 use App\Support\ProcessHighway\Contracts\ProcessHighwayContributor;
+use App\Support\ProcessHighway\Data\ProcessHighwayAuthority;
+use App\Support\ProcessHighway\Data\ProcessHighwayContribution;
+use App\Support\ProcessHighway\Data\ProcessHighwayEdge;
+use App\Support\ProcessHighway\Data\ProcessHighwayEditTarget;
+use App\Support\ProcessHighway\Data\ProcessHighwayLane;
+use App\Support\ProcessHighway\Data\ProcessHighwayNode;
+use App\Support\ProcessHighway\ProcessHighwaySemanticKey;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
-class CampaignsProcessHighwayContributor implements ProcessHighwayContributor
+final class CampaignsProcessHighwayContributor implements ProcessHighwayContributor
 {
     public function __construct(
         private readonly CampaignWorkspacePresenter $workspacePresenter,
     ) {}
 
-    /** @return iterable<int, array<string, mixed>> */
-    public function processes(): iterable
+    /** @return iterable<int, ProcessHighwayContribution> */
+    public function contributions(): iterable
     {
         if (! $this->available()) {
             return [];
@@ -28,56 +35,349 @@ class CampaignsProcessHighwayContributor implements ProcessHighwayContributor
             ->where('status', '!=', Campaign::STATUS_ARCHIVED)
             ->orderBy('name')
             ->get()
-            ->map(function (Campaign $campaign) use ($statusNames): array {
-                $workspace = $this->workspacePresenter->forCampaign($campaign);
-                $conditions = $this->conditions($campaign, $statusNames);
-
-                return [
-                    'source_key' => 'campaigns',
-                    'source_label' => 'Campaign',
-                    'key' => (string) $campaign->key,
-                    'name' => (string) $campaign->name,
-                    'description' => trim((string) ($campaign->description ?? '')),
-                    'category' => 'campaigns',
-                    'category_label' => 'Campaigns',
-                    'category_priority' => 15,
-                    'sort_order' => 100,
-                    'state' => $campaign->isActive() ? 'active' : 'off',
-                    'state_label' => $campaign->isActive() ? 'Active' : 'Off',
-                    'starts_when' => $this->startsWhen($campaign, $conditions),
-                    'steps' => [
-                        [
-                            'name' => 'Message journey',
-                            'detail' => $this->journeyDetail($workspace),
-                        ],
-                    ],
-                    'outcomes' => $this->outcomes($campaign),
-                    'details' => $this->details(
-                        campaign: $campaign,
-                        conditions: $conditions,
-                        workspace: $workspace,
-                    ),
-                    'attributes' => [
-                        'campaign_id' => (int) $campaign->getKey(),
-                        'enrollment_mode' => (string) $campaign->enrollment_mode,
-                        'reentry_policy' => (string) $campaign->reentry_policy,
-                        'ineligible_behavior' => (string) $campaign->ineligible_behavior,
-                        'eligibility_filter' => is_array($campaign->eligibility_filter)
-                            ? $campaign->eligibility_filter
-                            : [],
-                        'eligibility_conditions' => $conditions,
-                        'active_enrollment_count' => (int) $workspace['active_enrollment_count'],
-                        'pending_message_count' => (int) $workspace['pending_message_count'],
-                        'message_step_count' => (int) $workspace['message_step_count'],
-                        'message_count' => (int) $workspace['message_count'],
-                        'channels' => $workspace['channels'],
-                    ],
-                    'edit_url' => route('crm.campaigns.edit', $campaign),
-                    'edit_label' => 'Edit Campaign',
-                ];
-            })
+            ->map(fn (Campaign $campaign): ProcessHighwayContribution => $this->campaign(
+                campaign: $campaign,
+                statusNames: $statusNames,
+            ))
             ->values()
             ->all();
+    }
+
+    /**
+     * @param array<string, string> $statusNames
+     */
+    private function campaign(
+        Campaign $campaign,
+        array $statusNames,
+    ): ProcessHighwayContribution {
+        $workspace = $this->workspacePresenter->forCampaign($campaign);
+        $conditions = $this->conditions($campaign, $statusNames);
+        $processKey = ProcessHighwaySemanticKey::campaign((string) $campaign->key);
+        $linkTarget = $this->campaignLinkTarget($campaign);
+        $inlineTarget = $this->campaignEligibilityTarget($campaign);
+        $campaignAuthority = new ProcessHighwayAuthority(
+            ownerKey: 'campaigns',
+            editTargets: [$linkTarget, $inlineTarget],
+        );
+        $inlineAuthority = new ProcessHighwayAuthority(
+            ownerKey: 'campaigns',
+            editTargets: [$inlineTarget],
+        );
+        $linkAuthority = new ProcessHighwayAuthority(
+            ownerKey: 'campaigns',
+            editTargets: [$linkTarget],
+        );
+        $nodes = [];
+        $edges = [];
+        $entryNodeKeys = [];
+        $exitNodeKeys = [];
+        $edgeOrder = 10;
+
+        $nodes[] = new ProcessHighwayNode(
+            key: $processKey,
+            label: (string) $campaign->name,
+            role: ProcessHighwayNode::ROLE_PROCESS,
+            authority: $campaignAuthority,
+            description: trim((string) ($campaign->description ?? '')) ?: null,
+            state: $campaign->isActive() ? 'active' : 'off',
+            stateLabel: $campaign->isActive() ? 'Active' : 'Off',
+            sortOrder: 100,
+            attributes: [
+                'campaign_id' => (int) $campaign->getKey(),
+                'campaign_key' => (string) $campaign->key,
+            ],
+        );
+
+        if ($campaign->usesAutomaticEnrollment()) {
+            $eligibilityGatewayKey = $processKey.':eligibility';
+
+            $nodes[] = new ProcessHighwayNode(
+                key: $eligibilityGatewayKey,
+                label: $conditions === []
+                    ? 'Automatic eligibility needs conditions'
+                    : 'All eligibility conditions match',
+                role: ProcessHighwayNode::ROLE_GATEWAY,
+                authority: $inlineAuthority,
+                detail: $conditions === []
+                    ? 'No automatic eligibility conditions are configured.'
+                    : 'Different condition types use AND; values inside one type use OR.',
+                state: $conditions === [] ? 'needs_configuration' : 'configured',
+                stateLabel: $conditions === [] ? 'Needs configuration' : 'Configured',
+                sortOrder: 50,
+                attributes: [
+                    'operator' => 'and',
+                    'criterion_keys' => array_column($conditions, 'key'),
+                ],
+            );
+
+            if ($conditions === []) {
+                $missingKey = $processKey.':eligibility:missing';
+                $nodes[] = new ProcessHighwayNode(
+                    key: $missingKey,
+                    label: 'No eligibility conditions',
+                    role: ProcessHighwayNode::ROLE_QUALIFIER,
+                    authority: $inlineAuthority,
+                    state: 'needs_configuration',
+                    stateLabel: 'Needs configuration',
+                    sortOrder: 10,
+                );
+                $entryNodeKeys[] = $missingKey;
+                $edges[] = new ProcessHighwayEdge(
+                    key: $processKey.':edge:missing-eligibility',
+                    fromNodeKey: $missingKey,
+                    toNodeKey: $eligibilityGatewayKey,
+                    role: ProcessHighwayEdge::ROLE_REQUIRES,
+                    authority: $inlineAuthority,
+                    label: 'Configure before this can start',
+                    sortOrder: $edgeOrder++,
+                );
+            }
+
+            foreach ($conditions as $conditionIndex => $condition) {
+                $conditionTargets = [];
+
+                foreach ($condition['values'] as $valueIndex => $value) {
+                    $factKey = ProcessHighwaySemanticKey::criterion(
+                        $condition['key'],
+                        $value,
+                    );
+                    $factOwner = $this->criterionOwner($condition['key']);
+                    $nodes[] = new ProcessHighwayNode(
+                        key: $factKey,
+                        label: $condition['label'].': '.$condition['value_labels'][$valueIndex],
+                        role: ProcessHighwayNode::ROLE_QUALIFIER,
+                        authority: new ProcessHighwayAuthority(
+                            ownerKey: $factOwner,
+                            editTargets: [$inlineTarget],
+                        ),
+                        sortOrder: 10 + $conditionIndex,
+                        referenceOnly: true,
+                        attributes: [
+                            'criterion_key' => $condition['key'],
+                            'value' => $value,
+                            'value_label' => $condition['value_labels'][$valueIndex],
+                        ],
+                    );
+                    $entryNodeKeys[] = $factKey;
+                    $conditionTargets[] = $factKey;
+                }
+
+                if (count($conditionTargets) > 1) {
+                    $criterionGatewayKey = $processKey.':criterion:'.rawurlencode($condition['key']);
+                    $nodes[] = new ProcessHighwayNode(
+                        key: $criterionGatewayKey,
+                        label: $condition['label'].': any selected value',
+                        role: ProcessHighwayNode::ROLE_GATEWAY,
+                        authority: $inlineAuthority,
+                        detail: implode(' or ', $condition['value_labels']),
+                        sortOrder: 30 + $conditionIndex,
+                        attributes: [
+                            'criterion_key' => $condition['key'],
+                            'operator' => 'or',
+                        ],
+                    );
+
+                    foreach ($conditionTargets as $targetIndex => $targetKey) {
+                        $edges[] = new ProcessHighwayEdge(
+                            key: $processKey.':edge:criterion:'.rawurlencode($condition['key']).':'.$targetIndex,
+                            fromNodeKey: $targetKey,
+                            toNodeKey: $criterionGatewayKey,
+                            role: ProcessHighwayEdge::ROLE_BRANCH,
+                            authority: $inlineAuthority,
+                            label: 'Any match',
+                            sortOrder: $edgeOrder++,
+                            attributes: [
+                                'operator' => 'or',
+                                'criterion_key' => $condition['key'],
+                            ],
+                        );
+                    }
+
+                    $conditionTargets = [$criterionGatewayKey];
+                }
+
+                foreach ($conditionTargets as $targetKey) {
+                    $edges[] = new ProcessHighwayEdge(
+                        key: $processKey.':edge:requires:'.rawurlencode($condition['key']),
+                        fromNodeKey: $targetKey,
+                        toNodeKey: $eligibilityGatewayKey,
+                        role: ProcessHighwayEdge::ROLE_REQUIRES,
+                        authority: $inlineAuthority,
+                        label: 'Required',
+                        sortOrder: $edgeOrder++,
+                        attributes: [
+                            'operator' => 'and',
+                            'criterion_key' => $condition['key'],
+                        ],
+                    );
+                }
+            }
+
+            $edges[] = new ProcessHighwayEdge(
+                key: $processKey.':edge:eligible-start',
+                fromNodeKey: $eligibilityGatewayKey,
+                toNodeKey: $processKey,
+                role: ProcessHighwayEdge::ROLE_STARTS,
+                authority: $inlineAuthority,
+                label: 'Not eligible → eligible',
+                sortOrder: $edgeOrder++,
+            );
+        } else {
+            $manualEntryKey = $processKey.':entry:manual';
+            $nodes[] = new ProcessHighwayNode(
+                key: $manualEntryKey,
+                label: 'Explicit Campaign enrollment',
+                role: ProcessHighwayNode::ROLE_TRIGGER,
+                authority: $linkAuthority,
+                detail: 'Someone or another process deliberately enrolls the contact.',
+                sortOrder: 10,
+            );
+            $entryNodeKeys[] = $manualEntryKey;
+            $edges[] = new ProcessHighwayEdge(
+                key: $processKey.':edge:manual-start',
+                fromNodeKey: $manualEntryKey,
+                toNodeKey: $processKey,
+                role: ProcessHighwayEdge::ROLE_STARTS,
+                authority: $linkAuthority,
+                label: 'Enroll',
+                sortOrder: $edgeOrder++,
+            );
+        }
+
+        $journeyKey = $processKey.':journey';
+        $nodes[] = new ProcessHighwayNode(
+            key: $journeyKey,
+            label: 'Message journey',
+            role: ProcessHighwayNode::ROLE_ACTION,
+            authority: $linkAuthority,
+            detail: $this->journeyDetail($workspace),
+            sortOrder: 150,
+            attributes: [
+                'message_step_count' => (int) ($workspace['message_step_count'] ?? 0),
+                'message_count' => (int) ($workspace['message_count'] ?? 0),
+                'channels' => $workspace['channels'] ?? [],
+            ],
+        );
+        $edges[] = new ProcessHighwayEdge(
+            key: $processKey.':edge:journey',
+            fromNodeKey: $processKey,
+            toNodeKey: $journeyKey,
+            role: ProcessHighwayEdge::ROLE_CONTINUES,
+            authority: $linkAuthority,
+            label: 'Run journey',
+            sortOrder: $edgeOrder++,
+        );
+
+        $completeKey = $processKey.':exit:completed';
+        $nodes[] = new ProcessHighwayNode(
+            key: $completeKey,
+            label: 'Journey completed',
+            role: ProcessHighwayNode::ROLE_EXIT,
+            authority: $linkAuthority,
+            sortOrder: 300,
+        );
+        $exitNodeKeys[] = $completeKey;
+        $edges[] = new ProcessHighwayEdge(
+            key: $processKey.':edge:completed',
+            fromNodeKey: $journeyKey,
+            toNodeKey: $completeKey,
+            role: ProcessHighwayEdge::ROLE_EXITS,
+            authority: $linkAuthority,
+            label: 'When the journey finishes',
+            sortOrder: $edgeOrder++,
+        );
+
+        if ($campaign->usesAutomaticEnrollment()) {
+            $ineligibleKey = $processKey.':consequence:ineligible';
+            $nodes[] = new ProcessHighwayNode(
+                key: $ineligibleKey,
+                label: $this->ineligibleLabel($campaign),
+                role: ProcessHighwayNode::ROLE_CONSEQUENCE,
+                authority: $inlineAuthority,
+                sortOrder: 250,
+                attributes: [
+                    'when_ineligible' => (string) $campaign->ineligible_behavior,
+                ],
+            );
+            $exitNodeKeys[] = $ineligibleKey;
+            $edges[] = new ProcessHighwayEdge(
+                key: $processKey.':edge:ineligible',
+                fromNodeKey: $journeyKey,
+                toNodeKey: $ineligibleKey,
+                role: ProcessHighwayEdge::ROLE_BRANCH,
+                authority: $inlineAuthority,
+                label: 'If eligibility ends',
+                sortOrder: $edgeOrder++,
+            );
+
+            if ($campaign->reentry_policy === Campaign::REENTRY_WHEN_ELIGIBLE_AGAIN) {
+                $reentryKey = $processKey.':consequence:eligible-again';
+                $nodes[] = new ProcessHighwayNode(
+                    key: $reentryKey,
+                    label: 'May re-enter in a new eligible cycle',
+                    role: ProcessHighwayNode::ROLE_CONSEQUENCE,
+                    authority: $inlineAuthority,
+                    sortOrder: 275,
+                    attributes: [
+                        'reentry_policy' => Campaign::REENTRY_WHEN_ELIGIBLE_AGAIN,
+                    ],
+                );
+                $exitNodeKeys[] = $reentryKey;
+                $edges[] = new ProcessHighwayEdge(
+                    key: $processKey.':edge:eligible-again',
+                    fromNodeKey: $ineligibleKey,
+                    toNodeKey: $reentryKey,
+                    role: ProcessHighwayEdge::ROLE_BRANCH,
+                    authority: $inlineAuthority,
+                    label: 'Becomes eligible again',
+                    sortOrder: $edgeOrder++,
+                );
+                $edges[] = new ProcessHighwayEdge(
+                    key: $processKey.':edge:reenter',
+                    fromNodeKey: $reentryKey,
+                    toNodeKey: $processKey.':eligibility',
+                    role: ProcessHighwayEdge::ROLE_STARTS,
+                    authority: $inlineAuthority,
+                    label: 'Start a new eligible cycle',
+                    sortOrder: $edgeOrder++,
+                );
+            }
+        }
+
+        return new ProcessHighwayContribution(
+            sourceKey: 'campaigns',
+            key: $processKey,
+            name: (string) $campaign->name,
+            description: trim((string) ($campaign->description ?? '')),
+            subjectKey: 'contacts',
+            lane: $this->lane($conditions),
+            processNodeKey: $processKey,
+            authority: $campaignAuthority,
+            nodes: $nodes,
+            edges: $edges,
+            entryNodeKeys: array_values(array_unique($entryNodeKeys)),
+            exitNodeKeys: array_values(array_unique($exitNodeKeys)),
+            state: $campaign->isActive() ? 'active' : 'off',
+            stateLabel: $campaign->isActive() ? 'Active' : 'Off',
+            entrySummary: $this->startsWhen($campaign, $conditions),
+            details: $this->details($campaign, $conditions, $workspace),
+            attributes: [
+                'campaign_id' => (int) $campaign->getKey(),
+                'campaign_key' => (string) $campaign->key,
+                'enrollment_mode' => (string) $campaign->enrollment_mode,
+                'reentry_policy' => (string) $campaign->reentry_policy,
+                'ineligible_behavior' => (string) $campaign->ineligible_behavior,
+                'eligibility_filter' => is_array($campaign->eligibility_filter)
+                    ? $campaign->eligibility_filter
+                    : [],
+                'eligibility_conditions' => $conditions,
+                'active_enrollment_count' => (int) ($workspace['active_enrollment_count'] ?? 0),
+                'pending_message_count' => (int) ($workspace['pending_message_count'] ?? 0),
+                'message_step_count' => (int) ($workspace['message_step_count'] ?? 0),
+                'message_count' => (int) ($workspace['message_count'] ?? 0),
+                'channels' => $workspace['channels'] ?? [],
+            ],
+        );
     }
 
     private function available(): bool
@@ -152,14 +452,35 @@ class CampaignsProcessHighwayContributor implements ProcessHighwayContributor
         return $conditions;
     }
 
-    /**
-     * @param array<int, array{
-     *     key: string,
-     *     label: string,
-     *     values: array<int, string>,
-     *     value_labels: array<int, string>
-     * }> $conditions
-     */
+    /** @param array<int, array<string, mixed>> $conditions */
+    private function lane(array $conditions): ProcessHighwayLane
+    {
+        $relationship = collect($conditions)->firstWhere('key', 'relationship');
+
+        if (! is_array($relationship)) {
+            return ProcessHighwayLane::standard();
+        }
+
+        $relationshipKeys = collect($relationship['values'] ?? [])
+            ->filter(fn (mixed $value): bool => is_string($value))
+            ->map(fn (string $value): string => explode(':', $value, 2)[0])
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($relationshipKeys->count() !== 1) {
+            return ProcessHighwayLane::relationship();
+        }
+
+        $key = (string) $relationshipKeys->first();
+
+        return ProcessHighwayLane::relationship(
+            relationshipKey: $key,
+            relationshipLabel: Str::headline($key),
+        );
+    }
+
+    /** @param array<int, array<string, mixed>> $conditions */
     private function startsWhen(Campaign $campaign, array $conditions): string
     {
         if (! $campaign->usesAutomaticEnrollment()) {
@@ -173,22 +494,14 @@ class CampaignsProcessHighwayContributor implements ProcessHighwayContributor
         return 'A contact becomes eligible: '.$this->conditionSummary($conditions).'.';
     }
 
-    /**
-     * @param array<int, array{
-     *     key: string,
-     *     label: string,
-     *     values: array<int, string>,
-     *     value_labels: array<int, string>
-     * }> $conditions
-     */
+    /** @param array<int, array<string, mixed>> $conditions */
     private function conditionSummary(array $conditions): string
     {
         return implode(' and ', array_map(
             function (array $condition): string {
                 $verb = $condition['key'] === 'tag' ? 'has' : 'is';
-                $values = implode(' or ', $condition['value_labels']);
 
-                return $condition['label'].' '.$verb.' '.$values;
+                return $condition['label'].' '.$verb.' '.implode(' or ', $condition['value_labels']);
             },
             $conditions,
         ));
@@ -219,38 +532,17 @@ class CampaignsProcessHighwayContributor implements ProcessHighwayContributor
         return implode(' · ', $parts);
     }
 
-    /** @return array<int, string> */
-    private function outcomes(Campaign $campaign): array
+    private function ineligibleLabel(Campaign $campaign): string
     {
-        if (! $campaign->usesAutomaticEnrollment()) {
-            return [
-                'Explicit enrollment starts the journey',
-            ];
-        }
-
-        $outcomes = [
-            'Enroll when eligible',
-            match ($campaign->ineligible_behavior) {
-                Campaign::INELIGIBLE_PAUSE => 'Pause if eligibility ends',
-                Campaign::INELIGIBLE_CANCEL => 'Stop if eligibility ends',
-                default => 'Keep running if eligibility ends',
-            },
-        ];
-
-        if ($campaign->reentry_policy === Campaign::REENTRY_WHEN_ELIGIBLE_AGAIN) {
-            $outcomes[] = 'May re-enter after a new eligible cycle';
-        }
-
-        return $outcomes;
+        return match ($campaign->ineligible_behavior) {
+            Campaign::INELIGIBLE_PAUSE => 'Pause if eligibility ends',
+            Campaign::INELIGIBLE_CANCEL => 'Stop if eligibility ends',
+            default => 'Keep running if eligibility ends',
+        };
     }
 
     /**
-     * @param array<int, array{
-     *     key: string,
-     *     label: string,
-     *     values: array<int, string>,
-     *     value_labels: array<int, string>
-     * }> $conditions
+     * @param array<int, array<string, mixed>> $conditions
      * @param array<string, mixed> $workspace
      * @return array<int, array{label: string, value: string}>
      */
@@ -259,14 +551,12 @@ class CampaignsProcessHighwayContributor implements ProcessHighwayContributor
         array $conditions,
         array $workspace,
     ): array {
-        $details = [
-            [
-                'label' => 'Enrollment',
-                'value' => $campaign->usesAutomaticEnrollment()
-                    ? 'Automatic when eligible'
-                    : 'Manual only',
-            ],
-        ];
+        $details = [[
+            'label' => 'Enrollment',
+            'value' => $campaign->usesAutomaticEnrollment()
+                ? 'Automatic when eligible'
+                : 'Manual only',
+        ]];
 
         if ($conditions !== []) {
             $details[] = [
@@ -281,7 +571,6 @@ class CampaignsProcessHighwayContributor implements ProcessHighwayContributor
                 ? 'When eligible again'
                 : 'Never',
         ];
-
         $details[] = [
             'label' => 'If eligibility ends',
             'value' => match ($campaign->ineligible_behavior) {
@@ -290,13 +579,23 @@ class CampaignsProcessHighwayContributor implements ProcessHighwayContributor
                 default => 'Keep the campaign running',
             },
         ];
-
         $details[] = [
             'label' => 'Active enrollments',
             'value' => number_format((int) ($workspace['active_enrollment_count'] ?? 0)),
         ];
 
         return $details;
+    }
+
+    private function criterionOwner(string $key): string
+    {
+        return match ($key) {
+            'status' => 'workflow',
+            'relationship' => 'relationships',
+            'webinar_outcome' => 'webinars',
+            'tag', 'source', 'subsource' => 'core',
+            default => 'campaigns',
+        };
     }
 
     private function criterionLabel(string $key): string
@@ -346,5 +645,34 @@ class CampaignsProcessHighwayContributor implements ProcessHighwayContributor
         }
 
         return $value;
+    }
+
+    private function campaignLinkTarget(Campaign $campaign): ProcessHighwayEditTarget
+    {
+        return ProcessHighwayEditTarget::link(
+            ownerKey: 'campaigns',
+            label: 'Edit Campaign',
+            url: route('crm.campaigns.edit', $campaign),
+            resourceType: 'campaign',
+            resourceKey: (string) $campaign->key,
+            resourceId: (int) $campaign->getKey(),
+        );
+    }
+
+    private function campaignEligibilityTarget(Campaign $campaign): ProcessHighwayEditTarget
+    {
+        return ProcessHighwayEditTarget::inline(
+            ownerKey: 'campaigns',
+            label: 'Edit Campaign Start',
+            url: route('crm.campaigns.eligibility.update', $campaign),
+            method: 'PATCH',
+            capability: 'campaigns.eligibility.update',
+            resourceType: 'campaign_eligibility',
+            resourceKey: (string) $campaign->key,
+            resourceId: (int) $campaign->getKey(),
+            containerType: 'campaign',
+            containerKey: (string) $campaign->key,
+            containerId: (int) $campaign->getKey(),
+        );
     }
 }

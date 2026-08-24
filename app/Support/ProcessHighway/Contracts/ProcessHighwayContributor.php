@@ -2,16 +2,19 @@
 
 namespace App\Support\ProcessHighway\Contracts;
 
+use App\Support\ProcessHighway\Data\ProcessHighwayContribution;
+
 interface ProcessHighwayContributor
 {
     /**
-     * Return read-only process descriptions owned by the contributing module.
+     * Return module-owned business graph fragments.
      *
-     * Each process may contain presentation fields in addition to the common
-     * identity/grouping fields. Process Highway composes these descriptions;
-     * it does not persist or mutate them.
+     * Contributors describe their own persisted definitions and may reference
+     * stable semantic nodes owned by other modules. Process Highway composes
+     * those fragments; it never queries or mutates a contributor's source of
+     * truth.
      *
-     * @return iterable<int, array<string, mixed>>
+     * @return iterable<int, ProcessHighwayContribution>
      */
-    public function processes(): iterable;
+    public function contributions(): iterable;
 }

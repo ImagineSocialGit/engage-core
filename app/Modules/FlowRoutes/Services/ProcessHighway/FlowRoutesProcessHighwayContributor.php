@@ -2,326 +2,875 @@
 
 namespace App\Modules\FlowRoutes\Services\ProcessHighway;
 
+use App\Modules\FlowRoutes\Models\FlowRoute;
+use App\Modules\FlowRoutes\Models\FlowRoutePoint;
+use App\Modules\FlowRoutes\Services\FlowRoutePresentationResolver;
 use App\Support\ProcessHighway\Contracts\ProcessHighwayContributor;
+use App\Support\ProcessHighway\Data\ProcessHighwayAuthority;
+use App\Support\ProcessHighway\Data\ProcessHighwayContribution;
+use App\Support\ProcessHighway\Data\ProcessHighwayEdge;
+use App\Support\ProcessHighway\Data\ProcessHighwayEditTarget;
+use App\Support\ProcessHighway\Data\ProcessHighwayLane;
+use App\Support\ProcessHighway\Data\ProcessHighwayNode;
+use App\Support\ProcessHighway\ProcessHighwaySemanticKey;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 
-class FlowRoutesProcessHighwayContributor implements ProcessHighwayContributor
+final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContributor
 {
-    /** @return iterable<int, array<string, mixed>> */
-    public function processes(): iterable
+    public function __construct(
+        private readonly FlowRoutePresentationResolver $presentation,
+    ) {}
+
+    /** @return iterable<int, ProcessHighwayContribution> */
+    public function contributions(): iterable
     {
         if (! $this->available()) {
             return [];
         }
 
-        $routes = DB::table('flow_routes')
-            ->where('is_current_version', true)
-            ->where('is_active', true)
+        return FlowRoute::query()
+            ->active()
+            ->with([
+                'activeFlowRoutePoints.capability',
+                'activeTriggerBindings',
+            ])
             ->orderBy('name')
-            ->get();
-
-        if ($routes->isEmpty()) {
-            return [];
-        }
-
-        $routeIds = $routes
-            ->pluck('id')
-            ->map(fn (mixed $id): int => (int) $id)
-            ->all();
-
-        $points = DB::table('flow_route_points')
-            ->whereIn('flow_route_id', $routeIds)
-            ->where('is_active', true)
-            ->orderBy('flow_route_id')
-            ->orderBy('sort_order')
             ->get()
-            ->groupBy(fn (object $point): int => (int) $point->flow_route_id);
-
-        $statusNames = $this->statusNames();
-
-        return $routes
-            ->map(function (object $route) use ($points, $statusNames): array {
-                $routePoints = $points->get((int) $route->id, collect());
-                $meta = $this->jsonArray($route->meta ?? null);
-                $definitionMeta = is_array($meta['definition'] ?? null)
-                    ? $meta['definition']
-                    : [];
-                $category = $this->categoryKey($definitionMeta['category'] ?? null);
-
-                return [
-                    'source_key' => 'flow_routes',
-                    'source_label' => 'Flow Route',
-                    'key' => (string) $route->key,
-                    'name' => (string) $route->name,
-                    'description' => trim((string) ($route->description ?? '')),
-                    'category' => $category,
-                    'category_label' => $this->categoryLabel($category),
-                    'category_priority' => $this->categoryPriority($category),
-                    'sort_order' => 100,
-                    'state' => 'active',
-                    'state_label' => 'Active',
-                    'starts_when' => $this->triggerSummary($route, $meta, $statusNames),
-                    'steps' => $routePoints
-                        ->map(fn (object $point): array => $this->presentPoint($point, $statusNames))
-                        ->values()
-                        ->all(),
-                    'outcomes' => $this->outcomes($routePoints, $statusNames),
-                    'details' => [],
-                    'attributes' => [
-                        'flow_route_id' => (int) $route->id,
-                        'trigger_type' => (string) ($route->trigger_type ?? ''),
-                        'trigger_key' => (string) ($route->trigger_key ?? ''),
-                    ],
-                    'edit_url' => route('crm.flow-routes.show', [
-                        'flowRoute' => (int) $route->id,
-                    ]),
-                    'edit_label' => 'Edit Route',
-                ];
-            })
+            ->map(fn (FlowRoute $route): ProcessHighwayContribution => $this->route($route))
             ->values()
             ->all();
+    }
+
+    private function route(FlowRoute $route): ProcessHighwayContribution
+    {
+        $routePresentation = $this->presentation->route($route);
+        $points = $route->activeFlowRoutePoints
+            ->sortBy('sort_order')
+            ->values();
+        $presentedPoints = collect(
+            $this->presentation->presentedPoints($route, $points),
+        )->keyBy('key');
+        $processKey = ProcessHighwaySemanticKey::flowRoute((string) $route->key);
+        $routeTarget = $this->routeTarget($route);
+        $routeAuthority = new ProcessHighwayAuthority(
+            ownerKey: 'flow_routes',
+            editTargets: [$routeTarget],
+        );
+        $nodes = [];
+        $edges = [];
+        $edgeOrder = 10;
+        $exitNodeKeys = [];
+
+        $this->putNode($nodes, new ProcessHighwayNode(
+            key: $processKey,
+            label: (string) $route->name,
+            role: ProcessHighwayNode::ROLE_PROCESS,
+            authority: $routeAuthority,
+            description: trim((string) ($route->description ?? '')) ?: null,
+            state: 'active',
+            stateLabel: 'Active',
+            sortOrder: 100,
+            attributes: [
+                'flow_route_id' => (int) $route->getKey(),
+                'flow_route_key' => (string) $route->key,
+            ],
+        ));
+
+        [$triggerNode, $triggerSummary] = $this->triggerNode(
+            route: $route,
+            routePresentation: $routePresentation,
+            routeTarget: $routeTarget,
+        );
+        $this->putNode($nodes, $triggerNode);
+        $edges[] = new ProcessHighwayEdge(
+            key: $processKey.':edge:trigger',
+            fromNodeKey: $triggerNode->key,
+            toNodeKey: $processKey,
+            role: ProcessHighwayEdge::ROLE_STARTS,
+            authority: $routeAuthority,
+            label: 'Starts Route',
+            sortOrder: $edgeOrder++,
+        );
+
+        $completedExitKey = $processKey.':exit:completed';
+        $this->putNode($nodes, new ProcessHighwayNode(
+            key: $completedExitKey,
+            label: 'Route completed',
+            role: ProcessHighwayNode::ROLE_EXIT,
+            authority: $routeAuthority,
+            sortOrder: 400,
+        ));
+        $exitNodeKeys[] = $completedExitKey;
+
+        $pointsById = $points->keyBy(
+            fn (FlowRoutePoint $point): int => (int) $point->getKey(),
+        );
+        $pointsByKey = $points->keyBy(
+            fn (FlowRoutePoint $point): string => (string) $point->key,
+        );
+
+        foreach ($points as $pointIndex => $point) {
+            $presented = $presentedPoints->get((string) $point->key, []);
+            $moduleKey = is_string($presented['module_key'] ?? null)
+                ? $presented['module_key']
+                : 'flow_routes';
+            $pointTarget = $this->pointTarget($route, $point, $moduleKey);
+            $pointAuthority = new ProcessHighwayAuthority(
+                ownerKey: $moduleKey,
+                editTargets: [$pointTarget],
+            );
+            $pointKey = ProcessHighwaySemanticKey::flowRoutePoint(
+                (string) $route->key,
+                (string) $point->key,
+            );
+            $pointType = (string) $point->type;
+            $pointLabel = $this->pointLabel($point, $presented);
+            $pointDetail = is_string($presented['summary'] ?? null)
+                ? trim($presented['summary'])
+                : null;
+
+            $this->putNode($nodes, new ProcessHighwayNode(
+                key: $pointKey,
+                label: $pointLabel,
+                role: in_array($pointType, ['branch_evaluate', 'condition'], true)
+                    ? ProcessHighwayNode::ROLE_GATEWAY
+                    : ProcessHighwayNode::ROLE_ACTION,
+                authority: $pointAuthority,
+                description: trim((string) ($point->description ?? '')) ?: null,
+                detail: $pointDetail !== '' ? $pointDetail : null,
+                sortOrder: 150 + $pointIndex,
+                attributes: [
+                    'flow_route_id' => (int) $route->getKey(),
+                    'flow_route_key' => (string) $route->key,
+                    'flow_route_point_id' => (int) $point->getKey(),
+                    'flow_route_point_key' => (string) $point->key,
+                    'point_type' => $pointType,
+                ],
+            ));
+
+            $this->addPointConsequence(
+                route: $route,
+                point: $point,
+                pointNodeKey: $pointKey,
+                pointAuthority: $pointAuthority,
+                pointTarget: $pointTarget,
+                nodes: $nodes,
+                edges: $edges,
+                edgeOrder: $edgeOrder,
+            );
+        }
+
+        $startPoints = $points
+            ->filter(fn (FlowRoutePoint $point): bool => (bool) $point->is_start)
+            ->values();
+
+        if ($startPoints->isEmpty() && $points->isNotEmpty()) {
+            $startPoints = collect([$points->first()]);
+        }
+
+        if ($startPoints->isEmpty()) {
+            $edges[] = new ProcessHighwayEdge(
+                key: $processKey.':edge:no-points',
+                fromNodeKey: $processKey,
+                toNodeKey: $completedExitKey,
+                role: ProcessHighwayEdge::ROLE_EXITS,
+                authority: $routeAuthority,
+                label: 'No active Points',
+                sortOrder: $edgeOrder++,
+            );
+        } else {
+            foreach ($startPoints as $startIndex => $startPoint) {
+                $edges[] = new ProcessHighwayEdge(
+                    key: $processKey.':edge:start:'.$startIndex,
+                    fromNodeKey: $processKey,
+                    toNodeKey: ProcessHighwaySemanticKey::flowRoutePoint(
+                        (string) $route->key,
+                        (string) $startPoint->key,
+                    ),
+                    role: ProcessHighwayEdge::ROLE_CONTINUES,
+                    authority: $routeAuthority,
+                    label: 'First Point',
+                    sortOrder: $edgeOrder++,
+                );
+            }
+        }
+
+        foreach ($points as $point) {
+            $pointKey = ProcessHighwaySemanticKey::flowRoutePoint(
+                (string) $route->key,
+                (string) $point->key,
+            );
+            $definition = $this->definition($point);
+
+            if ((string) $point->type === 'branch_evaluate') {
+                $this->addBranchEdges(
+                    route: $route,
+                    point: $point,
+                    pointNodeKey: $pointKey,
+                    definition: $definition,
+                    pointsByKey: $pointsByKey,
+                    routeAuthority: $routeAuthority,
+                    routeTarget: $routeTarget,
+                    completedExitKey: $completedExitKey,
+                    nodes: $nodes,
+                    edges: $edges,
+                    exitNodeKeys: $exitNodeKeys,
+                    edgeOrder: $edgeOrder,
+                );
+
+                continue;
+            }
+
+            $nextPoint = $point->next_flow_route_point_id !== null
+                ? $pointsById->get((int) $point->next_flow_route_point_id)
+                : null;
+            $nextNodeKey = $nextPoint instanceof FlowRoutePoint
+                ? ProcessHighwaySemanticKey::flowRoutePoint(
+                    (string) $route->key,
+                    (string) $nextPoint->key,
+                )
+                : $completedExitKey;
+
+            $edges[] = new ProcessHighwayEdge(
+                key: $processKey.':edge:next:'.rawurlencode((string) $point->key),
+                fromNodeKey: $pointKey,
+                toNodeKey: $nextNodeKey,
+                role: $nextPoint instanceof FlowRoutePoint
+                    ? ProcessHighwayEdge::ROLE_CONTINUES
+                    : ProcessHighwayEdge::ROLE_EXITS,
+                authority: $routeAuthority,
+                label: $nextPoint instanceof FlowRoutePoint ? 'Then' : 'Complete',
+                sortOrder: $edgeOrder++,
+            );
+        }
+
+        return new ProcessHighwayContribution(
+            sourceKey: 'flow_routes',
+            key: $processKey,
+            name: (string) $route->name,
+            description: trim((string) ($route->description ?? '')),
+            subjectKey: 'contacts',
+            lane: $this->lane($points),
+            processNodeKey: $processKey,
+            authority: $routeAuthority,
+            nodes: array_values($nodes),
+            edges: $edges,
+            entryNodeKeys: [$triggerNode->key],
+            exitNodeKeys: array_values(array_unique($exitNodeKeys)),
+            state: 'active',
+            stateLabel: 'Active',
+            entrySummary: $triggerSummary,
+            attributes: [
+                'flow_route_id' => (int) $route->getKey(),
+                'flow_route_key' => (string) $route->key,
+                'trigger_type' => (string) ($route->trigger_type ?? ''),
+                'trigger_key' => (string) ($route->trigger_key ?? ''),
+                'category' => (string) data_get($route->meta, 'definition.category', 'other'),
+                'role' => (string) data_get($route->meta, 'definition.role', ''),
+                'point_count' => $points->count(),
+            ],
+        );
     }
 
     private function available(): bool
     {
-        return $this->moduleEnabled()
+        return in_array('flow_routes', config('modules.enabled', []), true)
             && Schema::hasTable('flow_routes')
             && Schema::hasTable('flow_route_points');
     }
 
-    private function moduleEnabled(): bool
-    {
-        return in_array('flow_routes', config('modules.enabled', []), true);
-    }
-
-    /** @return array<string, string> */
-    private function statusNames(): array
-    {
-        if (! Schema::hasTable('contact_statuses')) {
-            return [];
-        }
-
-        return DB::table('contact_statuses')
-            ->pluck('name', 'key')
-            ->mapWithKeys(fn (mixed $name, mixed $key): array => [
-                (string) $key => (string) $name,
-            ])
-            ->all();
-    }
-
-    /** @param array<string, string> $statusNames */
-    private function triggerSummary(object $route, array $meta, array $statusNames): string
-    {
-        $triggerType = (string) ($route->trigger_type ?? 'manual');
+    /**
+     * @param array<string, mixed> $routePresentation
+     * @return array{0: ProcessHighwayNode, 1: string}
+     */
+    private function triggerNode(
+        FlowRoute $route,
+        array $routePresentation,
+        ProcessHighwayEditTarget $routeTarget,
+    ): array {
+        $triggerType = (string) ($route->trigger_type ?? FlowRoute::TRIGGER_MANUAL);
         $triggerKey = trim((string) ($route->trigger_key ?? ''));
+        $summary = trim((string) ($routePresentation['trigger_summary'] ?? ''));
 
-        if ($triggerType === 'contact_status') {
-            $destination = $this->statusName($triggerKey, $statusNames);
-            $transition = data_get($meta, 'definition.transition', []);
-            $fromKeys = is_array($transition)
-                ? array_values(array_filter(
-                    $transition['from_contact_status_keys'] ?? [],
-                    'is_string',
-                ))
-                : [];
+        if ($triggerType === FlowRoute::TRIGGER_CONTACT_STATUS) {
+            $statusLabel = Str::headline($triggerKey);
+            $statusPrefix = 'When a '.config('contacts.labels.singular', 'contact').' moves to ';
 
-            if ($fromKeys !== []) {
-                $from = implode(' or ', array_map(
-                    fn (string $key): string => $this->statusName($key, $statusNames),
-                    $fromKeys,
-                ));
-
-                return "A contact moves from {$from} to {$destination}.";
+            if (str_starts_with($summary, $statusPrefix)) {
+                $statusLabel = Str::before(Str::after($summary, $statusPrefix), '.');
+                $statusLabel = Str::before($statusLabel, ' from ');
+                $statusLabel = Str::before($statusLabel, ' after ');
+                $statusLabel = Str::before($statusLabel, ' through ');
             }
 
-            return "A contact becomes {$destination}.";
+            return [
+                new ProcessHighwayNode(
+                    key: ProcessHighwaySemanticKey::status($triggerKey),
+                    label: 'Status: '.$statusLabel,
+                    role: ProcessHighwayNode::ROLE_QUALIFIER,
+                    authority: new ProcessHighwayAuthority(
+                        ownerKey: 'workflow',
+                        editTargets: [$routeTarget],
+                    ),
+                    detail: $summary !== '' ? $summary : null,
+                    sortOrder: 10,
+                    referenceOnly: true,
+                    attributes: [
+                        'criterion_key' => 'status',
+                        'value' => $triggerKey,
+                    ],
+                ),
+                $summary !== '' ? $summary : "A contact becomes {$statusLabel}.",
+            ];
         }
 
-        if ($triggerType === 'automation_event') {
-            return match ($triggerKey) {
-                'inbound_message.normal_reply' => 'A contact replies to a message.',
-                default => $triggerKey !== ''
-                    ? 'The '.Str::lower(Str::headline(str_replace('.', ' ', $triggerKey))).' event happens.'
-                    : 'An automation event happens.',
-            };
+        if ($triggerType === FlowRoute::TRIGGER_AUTOMATION_EVENT) {
+            $ownerKey = $this->automationEventOwner($triggerKey);
+
+            return [
+                new ProcessHighwayNode(
+                    key: ProcessHighwaySemanticKey::automationEvent($triggerKey),
+                    label: $this->automationEventLabel($triggerKey),
+                    role: ProcessHighwayNode::ROLE_TRIGGER,
+                    authority: new ProcessHighwayAuthority(
+                        ownerKey: $ownerKey,
+                        editTargets: [$routeTarget],
+                    ),
+                    detail: $summary !== '' ? $summary : null,
+                    sortOrder: 10,
+                    referenceOnly: true,
+                    attributes: [
+                        'event_key' => $triggerKey,
+                    ],
+                ),
+                $summary !== '' ? $summary : 'The configured automation event happens.',
+            ];
         }
 
-        return 'Someone starts this process manually.';
-    }
-
-    /** @param array<string, string> $statusNames */
-    private function presentPoint(object $point, array $statusNames): array
-    {
-        $definition = $this->jsonArray($point->definition ?? null);
-        $name = trim((string) ($point->name ?? ''));
-        $type = (string) ($point->type ?? '');
+        $manualKey = ProcessHighwaySemanticKey::flowRoute((string) $route->key).':entry:manual';
 
         return [
-            'name' => $name !== '' ? $name : Str::headline($type),
-            'detail' => $this->pointDetail($type, $definition, $statusNames),
+            new ProcessHighwayNode(
+                key: $manualKey,
+                label: 'Manual start',
+                role: ProcessHighwayNode::ROLE_TRIGGER,
+                authority: new ProcessHighwayAuthority(
+                    ownerKey: 'flow_routes',
+                    editTargets: [$routeTarget],
+                ),
+                sortOrder: 10,
+            ),
+            $summary !== '' ? $summary : 'Someone starts this Route manually.',
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $presented
+     */
+    private function pointLabel(FlowRoutePoint $point, array $presented): string
+    {
+        foreach ([$presented['label'] ?? null, $presented['type_label'] ?? null] as $candidate) {
+            if (is_string($candidate) && trim($candidate) !== '') {
+                return trim($candidate);
+            }
+        }
+
+        $name = trim((string) ($point->name ?? ''));
+
+        return $name !== '' ? $name : Str::headline((string) $point->type);
+    }
+
+    /**
+     * @param array<string, ProcessHighwayNode> $nodes
+     * @param array<int, ProcessHighwayEdge> $edges
+     */
+    private function addPointConsequence(
+        FlowRoute $route,
+        FlowRoutePoint $point,
+        string $pointNodeKey,
+        ProcessHighwayAuthority $pointAuthority,
+        ProcessHighwayEditTarget $pointTarget,
+        array &$nodes,
+        array &$edges,
+        int &$edgeOrder,
+    ): void {
+        $definition = $this->definition($point);
+        $type = (string) $point->type;
+        $targetNode = null;
+        $edgeLabel = null;
+        $edgeRole = ProcessHighwayEdge::ROLE_CONSEQUENCE;
+
+        if ($type === 'change_status' && $this->string($definition['contact_status_key'] ?? null) !== null) {
+            $statusKey = $this->string($definition['contact_status_key']) ?? '';
+            $targetNode = new ProcessHighwayNode(
+                key: ProcessHighwaySemanticKey::status($statusKey),
+                label: 'Status: '.Str::headline($statusKey),
+                role: ProcessHighwayNode::ROLE_QUALIFIER,
+                authority: new ProcessHighwayAuthority('workflow', [$pointTarget]),
+                sortOrder: 300,
+                referenceOnly: true,
+                attributes: [
+                    'criterion_key' => 'status',
+                    'value' => $statusKey,
+                ],
+            );
+            $edgeLabel = 'Changes status to';
+        } elseif (
+            in_array($type, ['add_contact_tag', 'remove_contact_tag'], true)
+            && $this->string($definition['tag'] ?? null) !== null
+        ) {
+            $tag = $this->string($definition['tag']) ?? '';
+            $present = $type === 'add_contact_tag';
+            $targetNode = new ProcessHighwayNode(
+                key: ProcessHighwaySemanticKey::tag($tag, $present),
+                label: ($present ? 'Tag: ' : 'Tag removed: ').$tag,
+                role: ProcessHighwayNode::ROLE_QUALIFIER,
+                authority: new ProcessHighwayAuthority('core', [$pointTarget]),
+                sortOrder: 300,
+                referenceOnly: true,
+                attributes: [
+                    'criterion_key' => 'tag',
+                    'value' => $tag,
+                    'present' => $present,
+                ],
+            );
+            $edgeLabel = $present ? 'Adds' : 'Removes';
+        } elseif (
+            $type === 'change_relationship_stage'
+            && $this->string($definition['relationship_key'] ?? null) !== null
+            && $this->string($definition['stage_key'] ?? null) !== null
+        ) {
+            $relationshipKey = $this->string($definition['relationship_key']) ?? '';
+            $stageKey = $this->string($definition['stage_key']) ?? '';
+            $targetNode = new ProcessHighwayNode(
+                key: ProcessHighwaySemanticKey::relationship($relationshipKey, $stageKey),
+                label: Str::headline($relationshipKey).' → '.Str::headline($stageKey),
+                role: ProcessHighwayNode::ROLE_QUALIFIER,
+                authority: new ProcessHighwayAuthority('relationships', [$pointTarget]),
+                sortOrder: 300,
+                referenceOnly: true,
+                attributes: [
+                    'criterion_key' => 'relationship',
+                    'relationship_key' => $relationshipKey,
+                    'stage_key' => $stageKey,
+                ],
+            );
+            $edgeLabel = 'Changes relationship stage to';
+        } elseif (
+            $type === 'enroll_campaign'
+            && $this->string($definition['campaign_key'] ?? null) !== null
+        ) {
+            $campaignKey = $this->string($definition['campaign_key']) ?? '';
+            $targetNode = new ProcessHighwayNode(
+                key: ProcessHighwaySemanticKey::campaign($campaignKey),
+                label: 'Campaign: '.Str::headline($campaignKey),
+                role: ProcessHighwayNode::ROLE_PROCESS,
+                authority: new ProcessHighwayAuthority('campaigns', [$pointTarget]),
+                sortOrder: 300,
+                referenceOnly: true,
+                attributes: [
+                    'campaign_key' => $campaignKey,
+                ],
+            );
+            $edgeLabel = 'Starts Campaign';
+            $edgeRole = ProcessHighwayEdge::ROLE_EXITS_TO;
+        } elseif (
+            $type === 'cancel_campaign'
+            && $this->string($definition['campaign_key'] ?? null) !== null
+        ) {
+            $campaignKey = $this->string($definition['campaign_key']) ?? '';
+            $targetNode = new ProcessHighwayNode(
+                key: ProcessHighwaySemanticKey::campaignState($campaignKey, 'cancelled'),
+                label: 'Campaign stopped: '.Str::headline($campaignKey),
+                role: ProcessHighwayNode::ROLE_CONSEQUENCE,
+                authority: new ProcessHighwayAuthority('campaigns', [$pointTarget]),
+                sortOrder: 300,
+                referenceOnly: true,
+                attributes: [
+                    'campaign_key' => $campaignKey,
+                    'campaign_state' => 'cancelled',
+                ],
+            );
+            $edgeLabel = 'Stops Campaign';
+        } elseif (
+            in_array($type, ['cancel_campaign_family', 'pause_campaign_family'], true)
+            && $this->string($definition['family_key'] ?? null) !== null
+        ) {
+            $familyKey = $this->string($definition['family_key']) ?? '';
+            $state = $type === 'pause_campaign_family' ? 'paused' : 'cancelled';
+            $targetNode = new ProcessHighwayNode(
+                key: ProcessHighwaySemanticKey::campaignFamilyState($familyKey, $state),
+                label: Str::headline($familyKey).' family '.($state === 'paused' ? 'paused' : 'stopped'),
+                role: ProcessHighwayNode::ROLE_CONSEQUENCE,
+                authority: new ProcessHighwayAuthority('campaigns', [$pointTarget]),
+                sortOrder: 300,
+                referenceOnly: true,
+                attributes: [
+                    'family_key' => $familyKey,
+                    'family_state' => $state,
+                ],
+            );
+            $edgeLabel = $state === 'paused' ? 'Pauses Campaign family' : 'Stops Campaign family';
+        }
+
+        if (! $targetNode instanceof ProcessHighwayNode || $edgeLabel === null) {
+            return;
+        }
+
+        $this->putNode($nodes, $targetNode);
+        $edges[] = new ProcessHighwayEdge(
+            key: ProcessHighwaySemanticKey::flowRoute((string) $route->key)
+                .':edge:consequence:'.rawurlencode((string) $point->key).':'.rawurlencode($type),
+            fromNodeKey: $pointNodeKey,
+            toNodeKey: $targetNode->key,
+            role: $edgeRole,
+            authority: $pointAuthority,
+            label: $edgeLabel,
+            sortOrder: $edgeOrder++,
+            attributes: [
+                'point_type' => $type,
+            ],
+        );
     }
 
     /**
      * @param array<string, mixed> $definition
-     * @param array<string, string> $statusNames
+     * @param Collection<string, FlowRoutePoint> $pointsByKey
+     * @param array<string, ProcessHighwayNode> $nodes
+     * @param array<int, ProcessHighwayEdge> $edges
+     * @param array<int, string> $exitNodeKeys
      */
-    private function pointDetail(
-        string $type,
+    private function addBranchEdges(
+        FlowRoute $route,
+        FlowRoutePoint $point,
+        string $pointNodeKey,
         array $definition,
-        array $statusNames,
-    ): ?string {
-        return match ($type) {
-            'enroll_campaign' => $this->detail('Campaign', $definition['campaign_key'] ?? null),
-            'cancel_campaign' => $this->detail('Campaign', $definition['campaign_key'] ?? null),
-            'cancel_campaign_family',
-            'pause_campaign_family' => $this->detail('Nurture family', $definition['family_key'] ?? null),
-            'create_task' => $this->detail('Task', $definition['task_template_key'] ?? null),
-            'add_contact_tag',
-            'remove_contact_tag' => $this->detail('Tag', $definition['tag'] ?? null),
-            'change_status' => isset($definition['contact_status_key'])
-                && is_string($definition['contact_status_key'])
-                    ? 'Status: '.$this->statusName($definition['contact_status_key'], $statusNames)
-                    : null,
-            'change_relationship_stage' => $this->relationshipStageDetail($definition),
-            'send_message' => $this->messageDetail($definition),
-            default => null,
+        Collection $pointsByKey,
+        ProcessHighwayAuthority $routeAuthority,
+        ProcessHighwayEditTarget $routeTarget,
+        string $completedExitKey,
+        array &$nodes,
+        array &$edges,
+        array &$exitNodeKeys,
+        int &$edgeOrder,
+    ): void {
+        $processKey = ProcessHighwaySemanticKey::flowRoute((string) $route->key);
+        $branches = is_array($definition['branches'] ?? null)
+            ? array_values(array_filter($definition['branches'], 'is_array'))
+            : [];
+
+        foreach ($branches as $branchIndex => $branch) {
+            $targetPointKey = $this->string($branch['target_flow_route_point_key'] ?? null);
+            $targetPoint = $targetPointKey !== null
+                ? $pointsByKey->get($targetPointKey)
+                : null;
+
+            if ($targetPoint instanceof FlowRoutePoint) {
+                $targetNodeKey = ProcessHighwaySemanticKey::flowRoutePoint(
+                    (string) $route->key,
+                    (string) $targetPoint->key,
+                );
+            } else {
+                $targetNodeKey = $processKey.':exit:missing-branch-target:'.$branchIndex;
+                $this->putNode($nodes, new ProcessHighwayNode(
+                    key: $targetNodeKey,
+                    label: $targetPointKey === null
+                        ? 'Branch target is not configured'
+                        : 'Missing branch target: '.Str::headline($targetPointKey),
+                    role: ProcessHighwayNode::ROLE_EXIT,
+                    authority: new ProcessHighwayAuthority('flow_routes', [$routeTarget]),
+                    state: 'blocked',
+                    stateLabel: 'Blocked',
+                    sortOrder: 390,
+                ));
+                $exitNodeKeys[] = $targetNodeKey;
+            }
+
+            $edges[] = new ProcessHighwayEdge(
+                key: $processKey.':edge:branch:'.rawurlencode((string) $point->key).':'.$branchIndex,
+                fromNodeKey: $pointNodeKey,
+                toNodeKey: $targetNodeKey,
+                role: $targetPoint instanceof FlowRoutePoint
+                    ? ProcessHighwayEdge::ROLE_BRANCH
+                    : ProcessHighwayEdge::ROLE_EXITS,
+                authority: $routeAuthority,
+                label: $this->branchLabel($branch, $branchIndex),
+                sortOrder: $edgeOrder++,
+                attributes: [
+                    'branch_index' => $branchIndex,
+                    'conditions' => $branch['conditions'] ?? [],
+                    'mode' => $branch['mode'] ?? 'all',
+                ],
+            );
+        }
+
+        $defaultTargetKey = $this->string(
+            $definition['default_target_flow_route_point_key'] ?? null,
+        );
+        $defaultTarget = $defaultTargetKey !== null
+            ? $pointsByKey->get($defaultTargetKey)
+            : null;
+
+        if ($defaultTarget instanceof FlowRoutePoint) {
+            $edges[] = new ProcessHighwayEdge(
+                key: $processKey.':edge:branch-default:'.rawurlencode((string) $point->key),
+                fromNodeKey: $pointNodeKey,
+                toNodeKey: ProcessHighwaySemanticKey::flowRoutePoint(
+                    (string) $route->key,
+                    (string) $defaultTarget->key,
+                ),
+                role: ProcessHighwayEdge::ROLE_BRANCH,
+                authority: $routeAuthority,
+                label: 'Otherwise',
+                sortOrder: $edgeOrder++,
+                attributes: [
+                    'default' => true,
+                ],
+            );
+
+            return;
+        }
+
+        $onNoMatch = $this->string($definition['on_no_match'] ?? null) ?? 'completed';
+        $noMatchExitKey = $onNoMatch === 'completed'
+            ? $completedExitKey
+            : $processKey.':exit:branch-no-match:'.rawurlencode((string) $point->key);
+
+        if ($noMatchExitKey !== $completedExitKey) {
+            $this->putNode($nodes, new ProcessHighwayNode(
+                key: $noMatchExitKey,
+                label: 'No branch matched — '.Str::headline($onNoMatch),
+                role: ProcessHighwayNode::ROLE_EXIT,
+                authority: new ProcessHighwayAuthority('flow_routes', [$routeTarget]),
+                state: $onNoMatch,
+                stateLabel: Str::headline($onNoMatch),
+                sortOrder: 390,
+            ));
+            $exitNodeKeys[] = $noMatchExitKey;
+        }
+
+        $edges[] = new ProcessHighwayEdge(
+            key: $processKey.':edge:branch-no-match:'.rawurlencode((string) $point->key),
+            fromNodeKey: $pointNodeKey,
+            toNodeKey: $noMatchExitKey,
+            role: ProcessHighwayEdge::ROLE_EXITS,
+            authority: $routeAuthority,
+            label: 'No branch matched',
+            sortOrder: $edgeOrder++,
+            attributes: [
+                'on_no_match' => $onNoMatch,
+            ],
+        );
+    }
+
+    /** @param array<string, mixed> $branch */
+    private function branchLabel(array $branch, int $index): string
+    {
+        $conditions = is_array($branch['conditions'] ?? null)
+            ? array_values(array_filter($branch['conditions'], 'is_array'))
+            : [];
+        $labels = array_values(array_filter(array_map(
+            fn (array $condition): ?string => $this->conditionLabel($condition),
+            $conditions,
+        )));
+
+        if ($labels === []) {
+            return 'Branch '.($index + 1);
+        }
+
+        $join = ($branch['mode'] ?? 'all') === 'any' ? ' or ' : ' and ';
+
+        return implode($join, $labels);
+    }
+
+    /** @param array<string, mixed> $condition */
+    private function conditionLabel(array $condition): ?string
+    {
+        $path = $this->string($condition['path'] ?? null);
+        $source = $this->string($condition['source'] ?? null);
+        $operator = $this->string($condition['operator'] ?? null) ?? 'equals';
+        $values = is_array($condition['values'] ?? null)
+            ? array_values(array_filter(array_map(
+                fn (mixed $value): ?string => is_scalar($value) ? (string) $value : null,
+                $condition['values'],
+            )))
+            : [];
+
+        if ($values === [] && is_scalar($condition['value'] ?? null)) {
+            $values[] = (string) $condition['value'];
+        }
+
+        $field = match (true) {
+            $path !== null && str_ends_with($path, 'reply_profile_key') => 'Reply profile',
+            $path !== null && str_ends_with($path, 'reply_intent_key') => 'Reply intent',
+            $path !== null && str_ends_with($path, 'channel') => 'Channel',
+            $source === 'contact_status' => 'Status',
+            $source === 'contact_relationship' => 'Relationship',
+            $path !== null => Str::headline(Str::afterLast($path, '.')),
+            $source !== null => Str::headline($source),
+            default => 'Condition',
+        };
+
+        $valueLabel = implode(' or ', array_map(
+            fn (string $value): string => $field === 'Channel'
+                ? strtoupper($value)
+                : Str::headline($value),
+            $values,
+        ));
+
+        if ($valueLabel === '') {
+            return $field.' '.Str::lower(Str::headline($operator));
+        }
+
+        return $field.' '.match ($operator) {
+            'not_equals', 'not_equal' => 'is not ',
+            'in' => 'is ',
+            'not_in' => 'is not ',
+            default => 'is ',
+        }.$valueLabel;
+    }
+
+    private function automationEventOwner(string $eventKey): string
+    {
+        return match (Str::before($eventKey, '.')) {
+            'inbound_message' => 'inbound_messaging',
+            'webinar' => 'webinars',
+            'task' => 'tasks',
+            'permission_invitation' => 'messaging',
+            default => 'flow_routes',
         };
     }
 
-    /**
-     * @param Collection<int, object> $points
-     * @param array<string, string> $statusNames
-     * @return array<int, string>
-     */
-    private function outcomes(Collection $points, array $statusNames): array
+    private function automationEventLabel(string $eventKey): string
     {
-        $outcomeTypes = [
-            'enroll_campaign',
-            'cancel_campaign',
-            'cancel_campaign_family',
-            'pause_campaign_family',
-            'create_task',
-            'add_contact_tag',
-            'remove_contact_tag',
-            'change_status',
-            'change_relationship_stage',
-            'send_message',
-        ];
+        return match ($eventKey) {
+            'inbound_message.normal_reply' => 'Contact replies to a message',
+            'webinar.attended' => 'Contact attends a webinar',
+            'webinar.missed' => 'Contact misses a webinar',
+            'webinar.registered' => 'Contact registers for a webinar',
+            'webinar.cancelled' => 'Contact cancels a webinar registration',
+            'task.completed' => 'Task is completed',
+            'permission_invitation.accepted' => 'Communication preferences are confirmed',
+            default => Str::headline(str_replace('.', ' ', $eventKey)),
+        };
+    }
 
-        return $points
-            ->filter(fn (object $point): bool => in_array(
-                (string) $point->type,
-                $outcomeTypes,
-                true,
-            ))
-            ->map(function (object $point) use ($statusNames): string {
-                $presented = $this->presentPoint($point, $statusNames);
+    /** @param Collection<int, FlowRoutePoint> $points */
+    private function lane(Collection $points): ProcessHighwayLane
+    {
+        $relationshipKeys = $points
+            ->map(function (FlowRoutePoint $point): ?string {
+                $definition = $this->definition($point);
 
-                return $presented['name'];
+                return $this->string($definition['relationship_key'] ?? null);
             })
+            ->filter()
             ->unique()
-            ->values()
-            ->all();
-    }
+            ->values();
 
-    /** @param array<string, mixed> $definition */
-    private function relationshipStageDetail(array $definition): ?string
-    {
-        $relationship = $definition['relationship_key'] ?? null;
-        $from = $definition['from_stage_key'] ?? null;
-        $to = $definition['stage_key'] ?? null;
-
-        if (! is_string($to) || trim($to) === '') {
-            return null;
+        if ($relationshipKeys->isEmpty()) {
+            return ProcessHighwayLane::standard();
         }
 
-        $prefix = is_string($relationship) && trim($relationship) !== ''
-            ? Str::headline($relationship).': '
-            : '';
-
-        if (is_string($from) && trim($from) !== '') {
-            return $prefix.Str::headline($from).' → '.Str::headline($to);
+        if ($relationshipKeys->count() !== 1) {
+            return ProcessHighwayLane::relationship();
         }
 
-        return $prefix.Str::headline($to);
+        $relationshipKey = (string) $relationshipKeys->first();
+
+        return ProcessHighwayLane::relationship(
+            relationshipKey: $relationshipKey,
+            relationshipLabel: Str::headline($relationshipKey),
+        );
     }
 
-    /** @param array<string, mixed> $definition */
-    private function messageDetail(array $definition): ?string
+    /** @param array<string, ProcessHighwayNode> $nodes */
+    private function putNode(array &$nodes, ProcessHighwayNode $node): void
     {
-        $parts = array_values(array_filter([
-            isset($definition['channel']) && is_string($definition['channel'])
-                ? Str::upper($definition['channel'])
-                : null,
-            isset($definition['scope']) && is_string($definition['scope'])
-                ? Str::headline($definition['scope'])
-                : null,
-        ]));
+        $existing = $nodes[$node->key] ?? null;
 
-        return $parts === [] ? null : implode(' · ', $parts);
-    }
+        if (! $existing instanceof ProcessHighwayNode) {
+            $nodes[$node->key] = $node;
 
-    private function detail(string $label, mixed $value): ?string
-    {
-        if (! is_string($value) || trim($value) === '') {
-            return null;
+            return;
         }
 
-        return $label.': '.Str::headline($value);
+        if (
+            $existing->role !== $node->role
+            || $existing->authority->ownerKey !== $node->authority->ownerKey
+        ) {
+            throw new InvalidArgumentException(sprintf(
+                'Flow Route [%s] produced conflicting appearances for semantic node [%s].',
+                $node->attributes['flow_route_key'] ?? 'unknown',
+                $node->key,
+            ));
+        }
+
+        $nodes[$node->key] = new ProcessHighwayNode(
+            key: $existing->key,
+            label: $existing->label,
+            role: $existing->role,
+            authority: $existing->authority->merge($node->authority),
+            description: $existing->description ?? $node->description,
+            detail: $existing->detail ?? $node->detail,
+            state: $existing->state,
+            stateLabel: $existing->stateLabel,
+            sortOrder: min($existing->sortOrder, $node->sortOrder),
+            referenceOnly: $existing->referenceOnly && $node->referenceOnly,
+            attributes: array_replace_recursive($existing->attributes, $node->attributes),
+        );
     }
 
-    /** @param array<string, string> $statusNames */
-    private function statusName(string $key, array $statusNames): string
+    private function routeTarget(FlowRoute $route): ProcessHighwayEditTarget
     {
-        return $statusNames[$key] ?? Str::headline($key);
+        return ProcessHighwayEditTarget::link(
+            ownerKey: 'flow_routes',
+            label: 'Edit Route',
+            url: route('crm.flow-routes.show', $route),
+            resourceType: 'flow_route',
+            resourceKey: (string) $route->key,
+            resourceId: (int) $route->getKey(),
+        );
     }
 
-    private function categoryKey(mixed $category): string
-    {
-        return is_string($category) && trim($category) !== ''
-            ? trim($category)
-            : 'other';
-    }
-
-    private function categoryLabel(string $category): string
-    {
-        return match ($category) {
-            'consumer_lifecycle' => 'Lifecycle',
-            'consumer_reply' => 'Consumer replies',
-            'realtor_reply' => 'Realtor replies',
-            'reply_acknowledgement' => 'Reply acknowledgements',
-            default => Str::headline($category),
-        };
-    }
-
-    private function categoryPriority(string $category): int
-    {
-        return match ($category) {
-            'consumer_lifecycle' => 10,
-            'consumer_reply' => 20,
-            'realtor_reply' => 30,
-            'reply_acknowledgement' => 40,
-            default => 100,
-        };
+    private function pointTarget(
+        FlowRoute $route,
+        FlowRoutePoint $point,
+        string $ownerKey,
+    ): ProcessHighwayEditTarget {
+        return ProcessHighwayEditTarget::link(
+            ownerKey: $ownerKey,
+            label: 'Edit Route Point',
+            url: route('crm.flow-routes.show', $route),
+            resourceType: 'flow_route_point',
+            resourceKey: (string) $route->key.':'.(string) $point->key,
+            resourceId: (int) $point->getKey(),
+            containerType: 'flow_route',
+            containerKey: (string) $route->key,
+            containerId: (int) $route->getKey(),
+        );
     }
 
     /** @return array<string, mixed> */
-    private function jsonArray(mixed $value): array
+    private function definition(FlowRoutePoint $point): array
     {
-        if (is_array($value)) {
-            return $value;
+        $settings = is_array($point->settings) ? $point->settings : [];
+        $definition = is_array($point->definition) ? $point->definition : [];
+
+        return array_replace_recursive($settings, $definition);
+    }
+
+    private function string(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
         }
 
-        if (! is_string($value) || trim($value) === '') {
-            return [];
-        }
+        $value = trim($value);
 
-        $decoded = json_decode($value, true);
-
-        return is_array($decoded) ? $decoded : [];
+        return $value !== '' ? $value : null;
     }
 }

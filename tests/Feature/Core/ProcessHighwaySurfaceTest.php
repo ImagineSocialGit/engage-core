@@ -3,6 +3,7 @@
 namespace Tests\Feature\Core;
 
 use App\Support\ProcessHighway\ProcessHighwayReadService;
+use App\Support\ProcessHighway\ProcessHighwaySemanticKey;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -24,16 +25,24 @@ class ProcessHighwaySurfaceTest extends TestCase
 
         $highway = $response->viewData('highway');
 
+        $this->assertSame(1, $highway['schema_version']);
+        $this->assertSame(0, $highway['subject_count']);
+        $this->assertSame(0, $highway['lane_count']);
         $this->assertSame(0, $highway['process_count']);
+        $this->assertSame(0, $highway['node_count']);
+        $this->assertSame(0, $highway['edge_count']);
         $this->assertSame(0, $highway['source_count']);
+        $this->assertCount(0, $highway['subjects']);
         $this->assertCount(0, $highway['groups']);
     }
 
-    public function test_flow_routes_are_composed_through_the_highway_contributor_contract(): void
+    public function test_flow_routes_contribute_owned_nodes_edges_and_exact_edit_targets(): void
     {
         config()->set('modules.enabled', array_values(array_unique([
             ...config('modules.enabled', []),
             'flow_routes',
+            'workflow',
+            'tasks',
         ])));
 
         $statusId = DB::table('contact_statuses')->insertGetId([
@@ -67,7 +76,7 @@ class ProcessHighwaySurfaceTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        DB::table('flow_route_points')->insert([
+        $pointId = DB::table('flow_route_points')->insertGetId([
             'flow_route_id' => $routeId,
             'key' => 'create_follow_up',
             'type' => 'create_task',
@@ -86,18 +95,54 @@ class ProcessHighwaySurfaceTest extends TestCase
         ]);
 
         $highway = app(ProcessHighwayReadService::class)->read();
-
-        $process = collect($highway['groups'])
-            ->flatMap(fn (array $group) => $group['processes'])
-            ->firstWhere('key', 'process_highway_test_route');
+        $processKey = ProcessHighwaySemanticKey::flowRoute('process_highway_test_route');
+        $process = collect($highway['processes'])->firstWhere('key', $processKey);
 
         $this->assertNotNull($process);
         $this->assertSame('flow_routes', $process['source_key']);
-        $this->assertSame('consumer_lifecycle', $process['category']);
+        $this->assertSame('contacts', $process['subject_key']);
+        $this->assertSame('contacts:standard', $process['lane_key']);
         $this->assertSame('active', $process['state']);
         $this->assertSame('contact_status', $process['attributes']['trigger_type']);
         $this->assertSame('engaged', $process['attributes']['trigger_key']);
-        $this->assertCount(1, $process['steps']);
+
+        $nodes = collect($highway['nodes'])->keyBy('key');
+        $statusNode = $nodes[ProcessHighwaySemanticKey::status('engaged')];
+        $pointNode = $nodes[
+            ProcessHighwaySemanticKey::flowRoutePoint(
+                'process_highway_test_route',
+                'create_follow_up',
+            )
+        ];
+
+        $this->assertSame('workflow', $statusNode['authority']['owner_key']);
+        $this->assertSame('amber', $statusNode['authority']['tone']);
+        $this->assertSame('tasks', $pointNode['authority']['owner_key']);
+        $this->assertSame('emerald', $pointNode['authority']['tone']);
+        $this->assertSame(
+            $pointId,
+            $pointNode['authority']['edit_targets'][0]['resource']['id'],
+        );
+        $this->assertSame(
+            $routeId,
+            $pointNode['authority']['edit_targets'][0]['container']['id'],
+        );
+
+        $processEdges = collect($highway['edges'])
+            ->where('process_key', $processKey);
+
+        $this->assertTrue($processEdges->contains(
+            fn (array $edge): bool => $edge['from_node_key'] === $processKey
+                && $edge['to_node_key'] === $pointNode['key'],
+        ));
+        $this->assertTrue($processEdges->contains(
+            fn (array $edge): bool => $edge['from_node_key'] === $pointNode['key']
+                && $edge['role'] === 'exits',
+        ));
+
+        $this->actingAs($this->createUser())
+            ->get(route('crm.process-highway.index'))
+            ->assertOk();
     }
 
     private function createUser(): \App\Models\User

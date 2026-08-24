@@ -1439,7 +1439,16 @@
 │       ├── ProcessHighway
 │       │   ├── Contracts
 │       │   │   └── ProcessHighwayContributor.php
-│       │   └── ProcessHighwayReadService.php
+│       │   ├── Data
+│       │   │   ├── ProcessHighwayAuthority.php
+│       │   │   ├── ProcessHighwayContribution.php
+│       │   │   ├── ProcessHighwayEdge.php
+│       │   │   ├── ProcessHighwayEditTarget.php
+│       │   │   ├── ProcessHighwayLane.php
+│       │   │   └── ProcessHighwayNode.php
+│       │   ├── ProcessHighwayGraphComposer.php
+│       │   ├── ProcessHighwayReadService.php
+│       │   └── ProcessHighwaySemanticKey.php
 │       ├── ProjectState
 │       │   ├── ProjectStateContractRegistry.php
 │       │   ├── ProjectStateDeferredReferenceApplier.php
@@ -2301,6 +2310,7 @@
 │   │   │   ├── ContactStatusImportTreatmentTest.php
 │   │   │   ├── ContactTagAutomationTest.php
 │   │   │   ├── CoreSetupValidationContributorTest.php
+│   │   │   ├── ProcessHighwayGraphContractTest.php
 │   │   │   ├── ProcessHighwaySurfaceTest.php
 │   │   │   └── SyncContactStatusPresetsActionTest.php
 │   │   ├── CRM
@@ -2334,6 +2344,7 @@
 │   │   │   ├── FlowRoutePointExecutionFoundationTest.php
 │   │   │   ├── FlowRoutePointPlacementPolicyTest.php
 │   │   │   ├── FlowRoutePresetStaleRetirementTest.php
+│   │   │   ├── FlowRouteProcessHighwayContributorTest.php
 │   │   │   ├── FlowRouteProgressMetaCanonicalizerTest.php
 │   │   │   ├── FlowRoutesModelSchemaTest.php
 │   │   │   ├── FlowRoutesSetupValidationContributorTest.php
@@ -2682,4 +2693,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-655 directories, 2028 files
+656 directories, 2038 files
