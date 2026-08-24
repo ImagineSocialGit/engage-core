@@ -21,6 +21,7 @@ use App\Modules\FlowRoutes\PointHandlers\WaitPointHandler;
 use App\Modules\FlowRoutes\Services\ContactShow\ContactRoutesVisibilityDataProvider;
 use App\Modules\FlowRoutes\Services\FlowRouteConditionEvaluatorRegistry;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
+use App\Modules\FlowRoutes\Services\ProcessHighway\FlowRoutesProcessHighwayContributor;
 use App\Modules\FlowRoutes\Validation\FlowRoutesSetupValidationContributor;
 use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
 use App\Support\AutomationCapabilities\AutomationPointAuthoringRegistry;
@@ -93,6 +94,10 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             ContactRoutesVisibilityDataProvider::class,
         ], 'core.contact_show_data_providers');
+
+        $this->app->tag([
+            FlowRoutesProcessHighwayContributor::class,
+        ], 'process_highway.contributors');
     }
 
     public function boot(): void

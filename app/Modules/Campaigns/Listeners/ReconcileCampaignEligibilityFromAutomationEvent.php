@@ -13,7 +13,6 @@ use App\Support\AutomationEvents\Services\AutomationEventConsumer;
 final class ReconcileCampaignEligibilityFromAutomationEvent
 {
     private const CONSUMER = 'campaigns.eligibility_reconciliation';
-    private const WORKFLOW_STATUS_CHANGED = 'workflow.contact_status_changed';
 
     public function __construct(
         private readonly AutomationEventConsumer $automationEventConsumer,
@@ -25,13 +24,14 @@ final class ReconcileCampaignEligibilityFromAutomationEvent
     public function handle(AutomationEventRecorded $recorded): void
     {
         $event = $recorded->event;
+        $criterionKeys = $this->criterionKeys($event);
 
-        if ($event->eventKey !== self::WORKFLOW_STATUS_CHANGED || $event->contactId === null) {
+        if ($event->contactId === null || $criterionKeys === []) {
             return;
         }
 
         if (! $event->hasDurableIdentity()) {
-            $this->reconcile($event);
+            $this->reconcile($event, $criterionKeys);
 
             return;
         }
@@ -39,19 +39,41 @@ final class ReconcileCampaignEligibilityFromAutomationEvent
         $this->automationEventConsumer->consume(
             eventId: (string) $event->eventId,
             consumer: self::CONSUMER,
-            effect: fn (): mixed => $this->reconcile($event),
+            effect: fn (): mixed => $this->reconcile($event, $criterionKeys),
         );
     }
 
-    private function reconcile(AutomationEventData $event): void
+    /**
+     * Campaigns consumes neutral durable event keys. It does not import
+     * Workflow or Webinars classes merely to learn that one of their durable
+     * Contact facts may have changed.
+     *
+     * @return array<int, string>
+     */
+    private function criterionKeys(AutomationEventData $event): array
     {
+        return match ($event->eventKey) {
+            'workflow.contact_status_changed' => ['status'],
+            'webinar.attended',
+            'webinar.missed' => ['webinar_outcome'],
+            default => [],
+        };
+    }
+
+    /**
+     * @param array<int, string> $criterionKeys
+     */
+    private function reconcile(
+        AutomationEventData $event,
+        array $criterionKeys,
+    ): void {
         $contact = Contact::query()->find($event->contactId);
 
         if (! $contact instanceof Contact || ! $this->guard->mayEvaluate($contact)) {
             return;
         }
 
-        foreach ($this->dependencies->forCriterionKeys(['status']) as $campaign) {
+        foreach ($this->dependencies->forCriterionKeys($criterionKeys) as $campaign) {
             $this->applyEligibility->handle(
                 campaign: $campaign,
                 contact: $contact,

@@ -9,9 +9,10 @@ use App\Modules\Webinars\ConfigContracts\WebinarScheduleProfileConfigContract;
 use App\Modules\Webinars\ConfigContracts\WebinarsConfigContractTargetProvider;
 use App\Modules\Webinars\Console\Commands\ImportWebinarRegistrationsCommand;
 use App\Modules\Webinars\Console\Commands\SyncWebinarScheduleProfilesCommand;
+use App\Modules\Webinars\EventDefinitions\WebinarBehaviorEventDefinitionContributor;
 use App\Modules\Webinars\Jobs\RecoverWebinarRegistrationFinalizationsJob;
 use App\Modules\Webinars\ReadModels\WebinarFunnelFactContributor;
-use App\Modules\Webinars\EventDefinitions\WebinarBehaviorEventDefinitionContributor;
+use App\Modules\Webinars\Services\Contacts\Filters\WebinarOutcomeContactFilterCriterion;
 use App\Modules\Webinars\Services\ContactPanels\WebinarContactPanelProvider;
 use App\Modules\Webinars\Services\Dashboard\WebinarActivityDashboardPanelProvider;
 use App\Modules\Webinars\Services\WebinarMessageChainExecutionContextProvider;
@@ -21,8 +22,8 @@ use App\Modules\Webinars\TokenContracts\WebinarTokenSourceProvider;
 use App\Modules\Webinars\Validation\WebinarMessageChainSetupValidationContributor;
 use App\Modules\Webinars\Validation\WebinarsSetupValidationContributor;
 use App\Support\Dashboard\DashboardPanelRegistry;
-use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -78,6 +79,11 @@ class WebinarsModuleServiceProvider extends ServiceProvider
         $this->app->tag(
             WebinarFunnelFactContributor::class,
             'reporting.projection_fact_contributors',
+        );
+
+        $this->app->tag(
+            WebinarOutcomeContactFilterCriterion::class,
+            'core.contact_filter_criteria',
         );
     }
 

@@ -18,32 +18,25 @@
                         </h2>
 
                         <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-                            Process Highway is read-only. It summarizes the processes Core already knows about and leaves editing with the feature that owns each process.
+                            Process Highway is read-only. Each enabled feature contributes the process information it owns, and editing stays with that feature.
                         </p>
                     </div>
 
                     @if(($highway['process_count'] ?? 0) > 0)
                         <div class="shrink-0 rounded-2xl bg-slate-50 px-4 py-3 text-center ring-1 ring-slate-200">
                             <div class="text-2xl font-semibold text-slate-950">{{ $highway['process_count'] }}</div>
-                            <div class="text-xs font-medium text-slate-500">active processes</div>
+                            <div class="text-xs font-medium text-slate-500">configured processes</div>
                         </div>
                     @endif
                 </div>
             </div>
         </section>
 
-        @if(! ($highway['source_available'] ?? false))
+        @if(($highway['process_count'] ?? 0) === 0)
             <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                <h2 class="text-lg font-semibold text-slate-950">No process routes are enabled</h2>
+                <h2 class="text-lg font-semibold text-slate-950">No configured processes yet</h2>
                 <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                    Process Highway still works without automation modules. When Routes are enabled and configured, their process map will appear here automatically.
-                </p>
-            </section>
-        @elseif(($highway['process_count'] ?? 0) === 0)
-            <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                <h2 class="text-lg font-semibold text-slate-950">No active processes yet</h2>
-                <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                    There are no current active Routes to summarize.
+                    Process Highway stays available even when optional process features are disabled. Enabled contributors will appear here automatically.
                 </p>
             </section>
         @else
@@ -65,7 +58,20 @@
                             <article class="p-5 sm:p-8">
                                 <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                     <div class="min-w-0 flex-1">
-                                        <h3 class="text-lg font-semibold text-slate-950">{{ $process['name'] }}</h3>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                                                {{ $process['source_label'] }}
+                                            </span>
+                                            <span @class([
+                                                'rounded-full px-2.5 py-1 text-xs font-bold',
+                                                'bg-emerald-100 text-emerald-800' => $process['state'] === 'active',
+                                                'bg-slate-100 text-slate-600' => $process['state'] !== 'active',
+                                            ])>
+                                                {{ $process['state_label'] }}
+                                            </span>
+                                        </div>
+
+                                        <h3 class="mt-3 text-lg font-semibold text-slate-950">{{ $process['name'] }}</h3>
 
                                         @if($process['description'])
                                             <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
@@ -79,10 +85,25 @@
                                             href="{{ $process['edit_url'] }}"
                                             class="inline-flex shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                                         >
-                                            Edit Route
+                                            {{ $process['edit_label'] }}
                                         </a>
                                     @endif
                                 </div>
+
+                                @if($process['details'] !== [])
+                                    <dl class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                                        @foreach($process['details'] as $detail)
+                                            <div class="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                                <dt class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                                                    {{ $detail['label'] }}
+                                                </dt>
+                                                <dd class="mt-1 break-words text-sm font-semibold leading-5 text-slate-900">
+                                                    {{ $detail['value'] }}
+                                                </dd>
+                                            </div>
+                                        @endforeach
+                                    </dl>
+                                @endif
 
                                 <div class="mt-5 grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
                                     <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">

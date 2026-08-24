@@ -18,6 +18,7 @@ final class CampaignEligibilityAuthoringService
         'source',
         'subsource',
         'tag',
+        'webinar_outcome',
     ];
 
     public function __construct(

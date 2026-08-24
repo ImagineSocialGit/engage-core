@@ -21,6 +21,7 @@ use App\Modules\Campaigns\Listeners\ReconcileCampaignEligibilityFromAutomationEv
 use App\Modules\Campaigns\Listeners\ReconcileCampaignEligibilityFromContactFilterFactsChanged;
 use App\Modules\Campaigns\Services\CampaignMessageChainExecutionContextProvider;
 use App\Modules\Campaigns\Services\ContactShow\ContactCampaignsVisibilityDataProvider;
+use App\Modules\Campaigns\Services\ProcessHighway\CampaignsProcessHighwayContributor;
 use App\Modules\Campaigns\TokenContracts\CampaignTokenContextProvider;
 use App\Modules\Campaigns\TokenContracts\CampaignTokenSourceProvider;
 use App\Modules\Campaigns\Validation\CampaignsSetupValidationContributor;
@@ -52,6 +53,7 @@ class CampaignsModuleServiceProvider extends ServiceProvider
         ], 'automation.action_handlers');
         $this->app->tag([CampaignsSetupValidationContributor::class], 'setup.validation_contributors');
         $this->app->tag([ContactCampaignsVisibilityDataProvider::class], 'core.contact_show_data_providers');
+        $this->app->tag([CampaignsProcessHighwayContributor::class], 'process_highway.contributors');
     }
 
     public function boot(): void

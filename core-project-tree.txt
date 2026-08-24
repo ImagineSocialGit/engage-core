@@ -188,8 +188,10 @@
 │   │   │   │   ├── CampaignMessageDefinitionResolver.php
 │   │   │   │   ├── CampaignSimulationService.php
 │   │   │   │   ├── CampaignWorkspacePresenter.php
-│   │   │   │   └── ContactShow
-│   │   │   │       └── ContactCampaignsVisibilityDataProvider.php
+│   │   │   │   ├── ContactShow
+│   │   │   │   │   └── ContactCampaignsVisibilityDataProvider.php
+│   │   │   │   └── ProcessHighway
+│   │   │   │       └── CampaignsProcessHighwayContributor.php
 │   │   │   ├── Support
 │   │   │   ├── TokenContracts
 │   │   │   │   ├── CampaignTokenContextProvider.php
@@ -448,7 +450,9 @@
 │   │   │   │   ├── FlowRoutePresetDefinitionFactory.php
 │   │   │   │   ├── FlowRouteProgressMetaCanonicalizer.php
 │   │   │   │   ├── FlowRouteTriggerBindingResolver.php
-│   │   │   │   └── PointHandlerRegistry.php
+│   │   │   │   ├── PointHandlerRegistry.php
+│   │   │   │   └── ProcessHighway
+│   │   │   │       └── FlowRoutesProcessHighwayContributor.php
 │   │   │   ├── Support
 │   │   │   └── Validation
 │   │   │       └── FlowRoutesSetupValidationContributor.php
@@ -1244,6 +1248,9 @@
 │   │   │   ├── Services
 │   │   │   │   ├── ContactPanels
 │   │   │   │   │   └── WebinarContactPanelProvider.php
+│   │   │   │   ├── Contacts
+│   │   │   │   │   └── Filters
+│   │   │   │   │       └── WebinarOutcomeContactFilterCriterion.php
 │   │   │   │   ├── Dashboard
 │   │   │   │   │   └── WebinarActivityDashboardPanelProvider.php
 │   │   │   │   ├── WebinarMessageAreaRegistry.php
@@ -1429,6 +1436,8 @@
 │       │   ├── PresetContributionRegistry.php
 │       │   └── PresetPackageResolver.php
 │       ├── ProcessHighway
+│       │   ├── Contracts
+│       │   │   └── ProcessHighwayContributor.php
 │       │   └── ProcessHighwayReadService.php
 │       ├── ProjectState
 │       │   ├── ProjectStateContractRegistry.php
@@ -1856,7 +1865,8 @@
 │   │   │   ├── eligibility-runtime.md
 │   │   │   ├── entry-and-launch-safety.md
 │   │   │   ├── module_state.md
-│   │   │   └── TODO.md
+│   │   │   ├── TODO.md
+│   │   │   └── webinar-outcome-eligibility.md
 │   │   ├── commerce
 │   │   │   └── module_state.md
 │   │   ├── contact-import-domain-ingestion.md
@@ -2236,6 +2246,7 @@
 │   │   │   ├── CampaignMessageChainPresetSyncTest.php
 │   │   │   ├── CampaignMessageChainRuntimeOwnershipTest.php
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
+│   │   │   ├── CampaignProcessHighwayContributorTest.php
 │   │   │   ├── CampaignSimulatorTest.php
 │   │   │   ├── CampaignsSetupValidationContributorTest.php
 │   │   │   ├── CampaignTouchDateFoundationTest.php
@@ -2618,6 +2629,7 @@
 │   │   │   ├── WebinarMessageTemplateSetConfigTest.php
 │   │   │   ├── WebinarOccurrenceReplacementControllerTest.php
 │   │   │   ├── WebinarOccurrenceReplacementTest.php
+│   │   │   ├── WebinarOutcomeContactFilterCriterionTest.php
 │   │   │   ├── WebinarPostRegistrationQuestionTest.php
 │   │   │   ├── WebinarProviderEventTypeFoundationTest.php
 │   │   │   ├── WebinarProviderPreSubmissionFailureTest.php
@@ -2666,4 +2678,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-650 directories, 2017 files
+655 directories, 2024 files
