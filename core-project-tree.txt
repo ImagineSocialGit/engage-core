@@ -93,6 +93,7 @@
 │   │   ├── Campaigns
 │   │   │   ├── Actions
 │   │   │   │   ├── ActivateCampaignAction.php
+│   │   │   │   ├── ApplyAutomaticCampaignEligibilityAction.php
 │   │   │   │   ├── CancelCampaignEnrollmentAction.php
 │   │   │   │   ├── CancelCampaignFamilyEnrollmentsAction.php
 │   │   │   │   ├── DeactivateCampaignAction.php
@@ -101,6 +102,9 @@
 │   │   │   │   ├── PauseCampaignEnrollmentAction.php
 │   │   │   │   ├── PauseCampaignFamilyEnrollmentsAction.php
 │   │   │   │   ├── ProcessDueCampaignTouchDatesAction.php
+│   │   │   │   ├── ReconcileAutomaticCampaignEligibilityAction.php
+│   │   │   │   ├── ReconcileCampaignEligibilityAction.php
+│   │   │   │   ├── ReconcileContactCampaignEligibilityAction.php
 │   │   │   │   ├── ResumeCampaignEnrollmentAction.php
 │   │   │   │   ├── ScheduleCampaignImportBatchInitialMessagesAction.php
 │   │   │   │   └── SyncCampaignPresetsAction.php
@@ -138,6 +142,7 @@
 │   │   │   │   │   ├── PauseCampaignFamilyAutomationDefinition.php
 │   │   │   │   │   └── ResumeCampaignAutomationDefinition.php
 │   │   │   │   ├── CampaignEligibilityEvaluationResult.php
+│   │   │   │   ├── CampaignEligibilityLifecycleResult.php
 │   │   │   │   ├── CampaignEligibilityPresetDefinition.php
 │   │   │   │   ├── CampaignEnrollmentArbitrationResult.php
 │   │   │   │   ├── CampaignPresetDefinition.php
@@ -150,8 +155,12 @@
 │   │   │   │   ├── CampaignEnrollmentContactImportPostProcessor.php
 │   │   │   │   └── CampaignLaunchTimingContactImportPostProcessor.php
 │   │   │   ├── Jobs
-│   │   │   │   └── ProcessDueCampaignTouchDatesJob.php
+│   │   │   │   ├── ProcessDueCampaignTouchDatesJob.php
+│   │   │   │   ├── ReconcileAutomaticCampaignEligibilityJob.php
+│   │   │   │   └── ReconcileContactCampaignEligibilityJob.php
 │   │   │   ├── Listeners
+│   │   │   │   ├── ReconcileCampaignEligibilityFromAutomationEvent.php
+│   │   │   │   └── ReconcileCampaignEligibilityFromContactFilterFactsChanged.php
 │   │   │   ├── Models
 │   │   │   │   ├── CampaignEligibilityState.php
 │   │   │   │   ├── CampaignEnrollment.php
@@ -167,7 +176,9 @@
 │   │   │   ├── Requests
 │   │   │   │   └── UpdateCampaignStepMessageTemplateRequest.php
 │   │   │   ├── Services
+│   │   │   │   ├── CampaignEligibilityDependencyResolver.php
 │   │   │   │   ├── CampaignEligibilityEvaluator.php
+│   │   │   │   ├── CampaignEligibilityReevaluationGuard.php
 │   │   │   │   ├── CampaignEnrollmentArbitrator.php
 │   │   │   │   ├── CampaignMessageChainDefinitionBuilder.php
 │   │   │   │   ├── CampaignMessageChainExecutionContextProvider.php
@@ -202,6 +213,7 @@
 │   │   │   ├── Actions
 │   │   │   │   ├── Contacts
 │   │   │   │   │   ├── CreateOrUpdateContactAction.php
+│   │   │   │   │   ├── RecordContactFilterFactsChangedAction.php
 │   │   │   │   │   ├── ResolveContactByEmailAction.php
 │   │   │   │   │   ├── ResolveContactStatusAction.php
 │   │   │   │   │   └── UpdateContactStatusAction.php
@@ -249,6 +261,8 @@
 │   │   │   │       └── ContactPanel.php
 │   │   │   ├── Enums
 │   │   │   │   └── TagType.php
+│   │   │   ├── Events
+│   │   │   │   └── ContactFilterFactsChanged.php
 │   │   │   ├── Import
 │   │   │   │   └── Treatments
 │   │   │   │       ├── ContactStatusImportTreatmentTarget.php
@@ -261,6 +275,9 @@
 │   │   │   │   ├── ContactTag.php
 │   │   │   │   ├── Note.php
 │   │   │   │   └── SiteSetting.php
+│   │   │   ├── Observers
+│   │   │   │   ├── ContactEligibilityFactObserver.php
+│   │   │   │   └── ContactTagEligibilityFactObserver.php
 │   │   │   ├── Presets
 │   │   │   │   └── CorePresetContributor.php
 │   │   │   ├── Providers
@@ -871,6 +888,8 @@
 │   │   │   │       └── RelationshipTypeImportTreatmentTarget.php
 │   │   │   ├── Models
 │   │   │   │   └── ContactRelationship.php
+│   │   │   ├── Observers
+│   │   │   │   └── ContactRelationshipEligibilityFactObserver.php
 │   │   │   ├── Providers
 │   │   │   │   └── RelationshipsModuleServiceProvider.php
 │   │   │   ├── Services
@@ -1829,6 +1848,8 @@
 │   │   ├── campaigns
 │   │   │   ├── annual-touch-dates.md
 │   │   │   ├── eligibility.md
+│   │   │   ├── eligibility-reevaluation.md
+│   │   │   ├── eligibility-runtime.md
 │   │   │   ├── entry-and-launch-safety.md
 │   │   │   ├── module_state.md
 │   │   │   └── TODO.md
@@ -1909,6 +1930,7 @@
 │   ├── testing-tools.md
 │   ├── TODO.md
 │   └── ui-ux-guide.md
+├── mkdir
 ├── ops
 │   └── observability
 │       ├── logrotate
@@ -2196,7 +2218,9 @@
 │   │   ├── Campaigns
 │   │   │   ├── CampaignAnnualTouchAuthoringTest.php
 │   │   │   ├── CampaignAnnualTouchRuntimeTest.php
+│   │   │   ├── CampaignEligibilityFactReevaluationTest.php
 │   │   │   ├── CampaignEligibilityFoundationTest.php
+│   │   │   ├── CampaignEligibilityLifecycleRuntimeTest.php
 │   │   │   ├── CampaignEnrollmentContactImportPostProcessorTest.php
 │   │   │   ├── CampaignEnrollmentLifecycleBridgeTest.php
 │   │   │   ├── CampaignFamilyLifecycleAutomationCapabilityTest.php
@@ -2240,6 +2264,7 @@
 │   │   │   ├── ContactBirthdayFoundationTest.php
 │   │   │   ├── ContactControllerTest.php
 │   │   │   ├── ContactFilterCriteriaTest.php
+│   │   │   ├── ContactFilterFactsChangedOutboxTest.php
 │   │   │   ├── ContactFilterResolverTest.php
 │   │   │   ├── ContactImportBatchControllerTest.php
 │   │   │   ├── ContactImportHandlerContextIntegrationTest.php
@@ -2476,6 +2501,7 @@
 │   │   │   ├── ContactRelationshipImportHandlerTest.php
 │   │   │   ├── ContactRelationshipWorkspaceTest.php
 │   │   │   ├── RelationshipContactFilterCriterionTest.php
+│   │   │   ├── RelationshipEligibilityFactOutboxTest.php
 │   │   │   ├── RelationshipImportTreatmentTest.php
 │   │   │   ├── RelationshipLocationAreaBridgeTest.php
 │   │   │   ├── RelationshipLocationAreaImportHandlerTest.php
@@ -2635,4 +2661,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-646 directories, 1990 files
+650 directories, 2012 files

@@ -66,7 +66,9 @@ class WorkflowStatusAutomationOutboxTest extends TestCase
             ->andThrow(new RuntimeException('Simulated workflow outbox failure.'));
         app()->instance(AutomationEventOutbox::class, $outbox);
 
-        $contact = Contact::factory()->create();
+        $contact = Contact::withoutEvents(
+            fn () => Contact::factory()->create(),
+        );
         $originalLastActivityAt = $contact->last_activity_at;
         $status = $this->contactStatus('rolled_back_status', 'Rolled Back Status');
 

@@ -13,6 +13,10 @@ use App\Modules\Core\Console\Commands\SyncContactStatusPresetsCommand;
 use App\Modules\Core\Data\Contacts\ContactImportField;
 use App\Modules\Core\Import\Treatments\ContactStatusImportTreatmentTarget;
 use App\Modules\Core\Import\Treatments\ContactTagsImportTreatmentTarget;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Models\ContactTag;
+use App\Modules\Core\Observers\ContactEligibilityFactObserver;
+use App\Modules\Core\Observers\ContactTagEligibilityFactObserver;
 use App\Modules\Core\Services\Contacts\Filters\ImportBatchContactFilterCriterion;
 use App\Modules\Core\Services\Contacts\Filters\SourceContactFilterCriterion;
 use App\Modules\Core\Services\Contacts\Filters\SubsourceContactFilterCriterion;
@@ -184,6 +188,9 @@ class CoreModuleServiceProvider extends ServiceProvider
 
     public function boot(ContactImportTreatmentRegistry $treatments): void
     {
+        Contact::observe(ContactEligibilityFactObserver::class);
+        ContactTag::observe(ContactTagEligibilityFactObserver::class);
+
         $treatments
             ->registerTarget(ContactStatusImportTreatmentTarget::class)
             ->registerTarget(ContactTagsImportTreatmentTarget::class);

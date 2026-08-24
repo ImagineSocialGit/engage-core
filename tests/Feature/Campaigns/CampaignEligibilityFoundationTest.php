@@ -92,10 +92,10 @@ class CampaignEligibilityFoundationTest extends TestCase
             '2026-08-23 20:00:00 UTC',
         );
 
-        ContactTag::query()->create([
+        ContactTag::withoutEvents(fn () => ContactTag::query()->create([
             'contact_id' => $contact->getKey(),
             'tag' => 'VIP',
-        ]);
+        ]));
 
         $second = app(EvaluateCampaignEligibilityAction::class)->handle(
             $campaign,
@@ -103,10 +103,10 @@ class CampaignEligibilityFoundationTest extends TestCase
             '2026-08-23 20:01:00 UTC',
         );
 
-        ContactTag::query()
+        ContactTag::withoutEvents(fn () => ContactTag::query()
             ->where('contact_id', $contact->getKey())
             ->where('tag', 'VIP')
-            ->delete();
+            ->delete());
 
         $third = app(EvaluateCampaignEligibilityAction::class)->handle(
             $campaign,
@@ -114,10 +114,10 @@ class CampaignEligibilityFoundationTest extends TestCase
             '2026-08-23 20:02:00 UTC',
         );
 
-        ContactTag::query()->create([
+        ContactTag::withoutEvents(fn () => ContactTag::query()->create([
             'contact_id' => $contact->getKey(),
             'tag' => 'VIP',
-        ]);
+        ]));
 
         $fourth = app(EvaluateCampaignEligibilityAction::class)->handle(
             $campaign,
