@@ -15,11 +15,14 @@ class CampaignWorkspacePresenter
     public const BUILDER_STAGE_KEYS = ['start', 'schedule', 'messages', 'review'];
 
     /**
-     * CampaignStep/CampaignStepVariant remain the temporary authoring projection for
-     * the current Campaign editor. Enrollment/progression reads are authoritative
-     * from Messaging MessageChainEnrollment/ScheduledMessage state.
-     *
-     * @return array<string, mixed>
+     * @return array{
+     *     active_enrollment_count: int,
+     *     pending_message_count: int,
+     *     message_step_count: int,
+     *     message_count: int,
+     *     channels: array<int, string>,
+     *     builder_stages: array<int, array{key: string, state: string, editable: bool}>
+     * }
      */
     public function forCampaign(Campaign $campaign): array
     {
@@ -37,14 +40,20 @@ class CampaignWorkspacePresenter
 
         /** @var Collection<int, CampaignStep> $steps */
         $steps = $campaign->steps->values();
+
         /** @var Collection<int, CampaignStepVariant> $variants */
-        $variants = $steps->flatMap(fn (CampaignStep $step): Collection => $step->variants)->values();
+        $variants = $steps
+            ->flatMap(fn (CampaignStep $step): Collection => $step->variants)
+            ->values();
 
         $channels = $variants
             ->pluck('channel')
             ->filter(fn (mixed $channel): bool => is_string($channel) && trim($channel) !== '')
             ->map(fn (string $channel): string => $this->normalizeSegment($channel))
-            ->unique()->sort()->values()->all();
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
 
         $messageStepCount = $steps->count();
         $messageCount = $variants->count();
@@ -55,18 +64,46 @@ class CampaignWorkspacePresenter
             'message_step_count' => $messageStepCount,
             'message_count' => $messageCount,
             'channels' => $channels,
-            'builder_stages' => $this->builderStages($campaign, $messageStepCount, $messageCount),
+            'builder_stages' => $this->builderStages(
+                campaign: $campaign,
+                messageStepCount: $messageStepCount,
+                messageCount: $messageCount,
+            ),
         ];
     }
 
-    /** @return array<int, array{key: string, state: string, editable: bool}> */
-    private function builderStages(Campaign $campaign, int $messageStepCount, int $messageCount): array
-    {
+    /**
+     * @return array<int, array{key: string, state: string, editable: bool}>
+     */
+    private function builderStages(
+        Campaign $campaign,
+        int $messageStepCount,
+        int $messageCount,
+    ): array {
         return [
-            ['key' => 'start', 'state' => 'not_managed', 'editable' => false],
-            ['key' => 'schedule', 'state' => $messageStepCount > 0 ? 'configured' : 'empty', 'editable' => false],
-            ['key' => 'messages', 'state' => $messageCount > 0 ? 'configured' : 'empty', 'editable' => true],
-            ['key' => 'review', 'state' => $campaign->isActive() ? 'active' : 'inactive', 'editable' => false],
+            [
+                'key' => 'start',
+                'state' => $campaign->usesAutomaticEnrollment()
+                    && ! $campaign->hasEligibilityCriteria()
+                        ? 'empty'
+                        : 'configured',
+                'editable' => true,
+            ],
+            [
+                'key' => 'schedule',
+                'state' => $messageStepCount > 0 ? 'configured' : 'empty',
+                'editable' => false,
+            ],
+            [
+                'key' => 'messages',
+                'state' => $messageCount > 0 ? 'configured' : 'empty',
+                'editable' => true,
+            ],
+            [
+                'key' => 'review',
+                'state' => $campaign->isActive() ? 'active' : 'inactive',
+                'editable' => false,
+            ],
         ];
     }
 
@@ -74,10 +111,13 @@ class CampaignWorkspacePresenter
     {
         return CampaignEnrollment::query()
             ->where('campaign_id', $campaign->getKey())
-            ->whereHas('messageChainEnrollment', fn ($query) => $query->whereIn('status', [
-                MessageChainEnrollment::STATUS_ACTIVE,
-                MessageChainEnrollment::STATUS_PAUSED,
-            ]))
+            ->whereHas(
+                'messageChainEnrollment',
+                fn ($query) => $query->whereIn('status', [
+                    MessageChainEnrollment::STATUS_ACTIVE,
+                    MessageChainEnrollment::STATUS_PAUSED,
+                ]),
+            )
             ->count();
     }
 
@@ -85,12 +125,11 @@ class CampaignWorkspacePresenter
     {
         return ScheduledMessage::query()
             ->where('status', ScheduledMessage::STATUS_PENDING)
-            ->whereHas(
-                'messageChainEnrollment',
-                fn ($query) => $query
-                    ->where('origin_type', $campaign->getMorphClass())
-                    ->where('origin_id', $campaign->getKey()),
-            )
+            ->where(function ($query) use ($campaign): void {
+                $query
+                    ->where('meta->campaign_id', $campaign->getKey())
+                    ->orWhere('meta->campaign_key', $campaign->key);
+            })
             ->count();
     }
 

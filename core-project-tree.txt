@@ -107,7 +107,8 @@
 │   │   │   │   ├── ReconcileContactCampaignEligibilityAction.php
 │   │   │   │   ├── ResumeCampaignEnrollmentAction.php
 │   │   │   │   ├── ScheduleCampaignImportBatchInitialMessagesAction.php
-│   │   │   │   └── SyncCampaignPresetsAction.php
+│   │   │   │   ├── SyncCampaignPresetsAction.php
+│   │   │   │   └── UpdateCampaignEligibilityAction.php
 │   │   │   ├── Automation
 │   │   │   │   ├── CampaignsAutomationPointAuthoringContributor.php
 │   │   │   │   ├── CampaignsAutomationPointDefinitionContributor.php
@@ -174,8 +175,10 @@
 │   │   │   ├── Providers
 │   │   │   │   └── CampaignsModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   │   ├── CampaignEligibilityAuthoringRequest.php
 │   │   │   │   └── UpdateCampaignStepMessageTemplateRequest.php
 │   │   │   ├── Services
+│   │   │   │   ├── CampaignEligibilityAuthoringService.php
 │   │   │   │   ├── CampaignEligibilityDependencyResolver.php
 │   │   │   │   ├── CampaignEligibilityEvaluator.php
 │   │   │   │   ├── CampaignEligibilityReevaluationGuard.php
@@ -1847,6 +1850,7 @@
 │   │   │   └── TODO.md
 │   │   ├── campaigns
 │   │   │   ├── annual-touch-dates.md
+│   │   │   ├── eligibility-authoring.md
 │   │   │   ├── eligibility.md
 │   │   │   ├── eligibility-reevaluation.md
 │   │   │   ├── eligibility-runtime.md
@@ -2218,6 +2222,7 @@
 │   │   ├── Campaigns
 │   │   │   ├── CampaignAnnualTouchAuthoringTest.php
 │   │   │   ├── CampaignAnnualTouchRuntimeTest.php
+│   │   │   ├── CampaignEligibilityAuthoringTest.php
 │   │   │   ├── CampaignEligibilityFactReevaluationTest.php
 │   │   │   ├── CampaignEligibilityFoundationTest.php
 │   │   │   ├── CampaignEligibilityLifecycleRuntimeTest.php
@@ -2661,4 +2666,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-650 directories, 2012 files
+650 directories, 2017 files

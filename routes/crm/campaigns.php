@@ -65,6 +65,12 @@ Route::middleware('module:campaigns')
         Route::get('/{campaign}/edit', [CampaignController::class, 'edit'])
             ->name('edit');
 
+        Route::post('/{campaign}/eligibility/preview', [CampaignController::class, 'previewEligibility'])
+            ->name('eligibility.preview');
+
+        Route::patch('/{campaign}/eligibility', [CampaignController::class, 'updateEligibility'])
+            ->name('eligibility.update');
+
         Route::patch('/{campaign}/deactivate', [CampaignController::class, 'deactivate'])
             ->name('deactivate');
 
