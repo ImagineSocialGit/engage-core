@@ -61,7 +61,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
         );
         $inlineAuthority = new ProcessHighwayAuthority(
             ownerKey: 'campaigns',
-            editTargets: [$inlineTarget],
+            editTargets: [$inlineTarget, $linkTarget],
         );
         $linkAuthority = new ProcessHighwayAuthority(
             ownerKey: 'campaigns',
@@ -148,7 +148,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
                         role: ProcessHighwayNode::ROLE_QUALIFIER,
                         authority: new ProcessHighwayAuthority(
                             ownerKey: $factOwner,
-                            editTargets: [$inlineTarget],
+                            editTargets: [$inlineTarget, $linkTarget],
                         ),
                         sortOrder: 10 + $conditionIndex,
                         referenceOnly: true,
@@ -351,7 +351,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
             description: trim((string) ($campaign->description ?? '')),
             subjectKey: 'contacts',
             lane: $this->lane($conditions),
-            processNodeKey: $processKey,
+            mechanismNodeKey: $processKey,
             authority: $campaignAuthority,
             nodes: $nodes,
             edges: $edges,

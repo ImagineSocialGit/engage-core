@@ -254,7 +254,7 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
             description: trim((string) ($route->description ?? '')),
             subjectKey: 'contacts',
             lane: $this->lane($points),
-            processNodeKey: $processKey,
+            mechanismNodeKey: $processKey,
             authority: $routeAuthority,
             nodes: array_values($nodes),
             edges: $edges,

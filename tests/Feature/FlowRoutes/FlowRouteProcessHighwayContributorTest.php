@@ -112,7 +112,23 @@ class FlowRouteProcessHighwayContributorTest extends TestCase
         $statusFactKey = ProcessHighwaySemanticKey::status('engaged');
         $nodes = collect($graph['nodes'])->keyBy('key');
         $edges = collect($graph['edges'])
-            ->where('process_key', $processKey);
+            ->where('segment_key', $processKey);
+
+        $this->assertSame(2, $graph['schema_version']);
+        $this->assertSame(1, $graph['highway_count']);
+        $this->assertSame(1, $graph['segment_count']);
+
+        $businessHighway = $graph['highways'][0];
+        $this->assertSame([$processKey], $businessHighway['segment_keys']);
+        $this->assertSame(
+            [ProcessHighwaySemanticKey::automationEvent('inbound_message.normal_reply')],
+            $businessHighway['entry_node_keys'],
+        );
+        $this->assertSame(['status' => ['engaged']], $businessHighway['qualifiers']);
+        $this->assertSame(
+            route('crm.flow-routes.show', $routeId),
+            $businessHighway['segments'][0]['navigation_target']['url'],
+        );
 
         $this->assertSame(
             'inbound_messaging',

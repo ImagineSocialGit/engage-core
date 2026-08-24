@@ -1447,6 +1447,7 @@
 │       │   │   ├── ProcessHighwayLane.php
 │       │   │   └── ProcessHighwayNode.php
 │       │   ├── ProcessHighwayGraphComposer.php
+│       │   ├── ProcessHighwayMapBuilder.php
 │       │   ├── ProcessHighwayReadService.php
 │       │   └── ProcessHighwaySemanticKey.php
 │       ├── ProjectState
@@ -2311,6 +2312,7 @@
 │   │   │   ├── ContactTagAutomationTest.php
 │   │   │   ├── CoreSetupValidationContributorTest.php
 │   │   │   ├── ProcessHighwayGraphContractTest.php
+│   │   │   ├── ProcessHighwayMapBuilderTest.php
 │   │   │   ├── ProcessHighwaySurfaceTest.php
 │   │   │   └── SyncContactStatusPresetsActionTest.php
 │   │   ├── CRM
@@ -2693,4 +2695,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-656 directories, 2038 files
+656 directories, 2040 files

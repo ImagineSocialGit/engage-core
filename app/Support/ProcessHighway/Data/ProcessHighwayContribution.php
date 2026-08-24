@@ -19,7 +19,7 @@ final readonly class ProcessHighwayContribution
         public string $description,
         public string $subjectKey,
         public ProcessHighwayLane $lane,
-        public string $processNodeKey,
+        public string $mechanismNodeKey,
         public ProcessHighwayAuthority $authority,
         public array $nodes,
         public array $edges,
@@ -43,7 +43,7 @@ final readonly class ProcessHighwayContribution
             'description' => $this->description,
             'subject_key' => $this->subjectKey,
             'lane_key' => $this->lane->key,
-            'process_node_key' => $this->processNodeKey,
+            'mechanism_node_key' => $this->mechanismNodeKey,
             'node_keys' => array_values(array_map(
                 fn (ProcessHighwayNode $node): string => $node->key,
                 $this->nodes,

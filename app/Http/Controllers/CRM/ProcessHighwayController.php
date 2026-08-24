@@ -15,7 +15,7 @@ class ProcessHighwayController extends Controller
         return view('crm.process-highway.index', [
             'title' => 'Process Highway',
             'heading' => 'Process Highway',
-            'subheading' => 'A simple view of what starts each process, what Core does next, and where the process can lead.',
+            'subheading' => 'See how contact facts, follow-up programs, and automations connect across each business process.',
             'highway' => $highway,
         ]);
     }

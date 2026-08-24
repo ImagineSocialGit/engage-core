@@ -15,6 +15,10 @@ use InvalidArgumentException;
 
 final class ProcessHighwayGraphComposer
 {
+    public function __construct(
+        private readonly ProcessHighwayMapBuilder $mapBuilder,
+    ) {}
+
     /**
      * @param iterable<ProcessHighwayContributor> $contributors
      * @return array<string, mixed>
@@ -65,8 +69,8 @@ final class ProcessHighwayGraphComposer
             $right->key,
         ]);
 
-        $processes = [];
-        $processKeys = [];
+        $segments = [];
+        $segmentKeys = [];
         $nodes = [];
         $nodeMembership = [];
         $edges = [];
@@ -74,14 +78,14 @@ final class ProcessHighwayGraphComposer
         $lanes = [];
 
         foreach ($contributions as $contribution) {
-            if (isset($processKeys[$contribution->key])) {
+            if (isset($segmentKeys[$contribution->key])) {
                 throw new InvalidArgumentException(
-                    "Duplicate Process Highway process key [{$contribution->key}].",
+                    "Duplicate Process Highway segment key [{$contribution->key}].",
                 );
             }
 
-            $processKeys[$contribution->key] = true;
-            $processes[] = $contribution->toArray();
+            $segmentKeys[$contribution->key] = true;
+            $segments[] = $contribution->toArray();
             $this->mergeLane($lanes, $contribution->lane, $contribution->key);
 
             foreach ($contribution->nodes as $node) {
@@ -124,7 +128,7 @@ final class ProcessHighwayGraphComposer
             ->map(function (ProcessHighwayNode $node) use ($nodeMembership): array {
                 return [
                     ...$node->toArray(),
-                    'process_keys' => array_values(array_unique(
+                    'segment_keys' => array_values(array_unique(
                         $nodeMembership[$node->key] ?? [],
                     )),
                 ];
@@ -140,32 +144,39 @@ final class ProcessHighwayGraphComposer
             ->map(function (ProcessHighwayEdge $edge) use ($edgeMembership): array {
                 return [
                     ...$edge->toArray(),
-                    'process_key' => $edgeMembership[$edge->key],
+                    'segment_key' => $edgeMembership[$edge->key],
                 ];
             })
             ->values()
             ->all();
 
         $subjects = $this->subjects($lanes);
-        $legacyGroups = $this->legacyGroups($contributions);
+        $map = $this->mapBuilder->build(
+            segments: $segments,
+            nodes: $serializedNodes,
+            edges: $serializedEdges,
+            subjects: $subjects,
+        );
 
         return [
-            'schema_version' => 1,
+            'schema_version' => 2,
             'subject_count' => count($subjects),
             'lane_count' => count($lanes),
-            'process_count' => count($processes),
+            'highway_count' => $map['highway_count'],
+            'segment_count' => count($segments),
             'node_count' => count($serializedNodes),
             'edge_count' => count($serializedEdges),
-            'source_count' => collect($processes)
+            'source_count' => collect($segments)
                 ->pluck('source_key')
                 ->filter()
                 ->unique()
                 ->count(),
-            'subjects' => $subjects,
-            'processes' => $processes,
+            'subjects' => $map['subjects'],
+            'highways' => $map['highways'],
+            'qualifier_filters' => $map['qualifier_filters'],
+            'segments' => $segments,
             'nodes' => $serializedNodes,
             'edges' => $serializedEdges,
-            'groups' => $legacyGroups,
         ];
     }
 
@@ -175,10 +186,10 @@ final class ProcessHighwayGraphComposer
     ): void {
         foreach ([
             'source key' => $contribution->sourceKey,
-            'process key' => $contribution->key,
+            'segment key' => $contribution->key,
             'name' => $contribution->name,
             'subject key' => $contribution->subjectKey,
-            'process node key' => $contribution->processNodeKey,
+            'mechanism node key' => $contribution->mechanismNodeKey,
         ] as $field => $value) {
             if (trim($value) === '') {
                 throw new InvalidArgumentException(
@@ -189,7 +200,7 @@ final class ProcessHighwayGraphComposer
 
         if ($contribution->lane->subjectKey !== $contribution->subjectKey) {
             throw new InvalidArgumentException(sprintf(
-                'Process Highway process [%s] lane subject [%s] does not match process subject [%s].',
+                'Process Highway segment [%s] lane subject [%s] does not match segment subject [%s].',
                 $contribution->key,
                 $contribution->lane->subjectKey,
                 $contribution->subjectKey,
@@ -201,7 +212,7 @@ final class ProcessHighwayGraphComposer
             ProcessHighwayLane::SCOPE_RELATIONSHIP,
         ], true)) {
             throw new InvalidArgumentException(
-                "Process Highway process [{$contribution->key}] has invalid lane scope [{$contribution->lane->scope}].",
+                "Process Highway segment [{$contribution->key}] has invalid lane scope [{$contribution->lane->scope}].",
             );
         }
 
@@ -214,20 +225,26 @@ final class ProcessHighwayGraphComposer
             );
         }
 
-        $this->validateAuthority($contribution->authority, "process [{$contribution->key}]");
+        $this->validateAuthority($contribution->authority, "segment [{$contribution->key}]");
+
+        if (! $this->hasNavigationTarget($contribution->authority)) {
+            throw new InvalidArgumentException(
+                "Process Highway segment [{$contribution->key}] must declare an authoritative GET navigation target.",
+            );
+        }
 
         $nodeKeys = [];
 
         foreach ($contribution->nodes as $node) {
             if (! $node instanceof ProcessHighwayNode) {
                 throw new InvalidArgumentException(
-                    "Process Highway process [{$contribution->key}] contains a non-node value.",
+                    "Process Highway segment [{$contribution->key}] contains a non-node value.",
                 );
             }
 
             if (trim($node->key) === '' || trim($node->label) === '') {
                 throw new InvalidArgumentException(
-                    "Process Highway process [{$contribution->key}] contains a node with an empty key or label.",
+                    "Process Highway segment [{$contribution->key}] contains a node with an empty key or label.",
                 );
             }
 
@@ -239,7 +256,7 @@ final class ProcessHighwayGraphComposer
 
             if (isset($nodeKeys[$node->key])) {
                 throw new InvalidArgumentException(
-                    "Process Highway process [{$contribution->key}] contains duplicate node [{$node->key}].",
+                    "Process Highway segment [{$contribution->key}] contains duplicate node [{$node->key}].",
                 );
             }
 
@@ -247,9 +264,9 @@ final class ProcessHighwayGraphComposer
             $this->validateAuthority($node->authority, "node [{$node->key}]");
         }
 
-        if (! isset($nodeKeys[$contribution->processNodeKey])) {
+        if (! isset($nodeKeys[$contribution->mechanismNodeKey])) {
             throw new InvalidArgumentException(
-                "Process Highway process [{$contribution->key}] is missing process node [{$contribution->processNodeKey}].",
+                "Process Highway segment [{$contribution->key}] is missing mechanism node [{$contribution->mechanismNodeKey}].",
             );
         }
 
@@ -259,14 +276,14 @@ final class ProcessHighwayGraphComposer
         ] as $role => $keys) {
             if ($keys === []) {
                 throw new InvalidArgumentException(
-                    "Process Highway process [{$contribution->key}] must declare at least one {$role} node.",
+                    "Process Highway segment [{$contribution->key}] must declare at least one {$role} node.",
                 );
             }
 
             foreach ($keys as $key) {
                 if (! isset($nodeKeys[$key])) {
                     throw new InvalidArgumentException(
-                        "Process Highway process [{$contribution->key}] references missing {$role} node [{$key}].",
+                        "Process Highway segment [{$contribution->key}] references missing {$role} node [{$key}].",
                     );
                 }
             }
@@ -277,7 +294,7 @@ final class ProcessHighwayGraphComposer
         foreach ($contribution->edges as $edge) {
             if (! $edge instanceof ProcessHighwayEdge) {
                 throw new InvalidArgumentException(
-                    "Process Highway process [{$contribution->key}] contains a non-edge value.",
+                    "Process Highway segment [{$contribution->key}] contains a non-edge value.",
                 );
             }
 
@@ -289,14 +306,14 @@ final class ProcessHighwayGraphComposer
 
             if (isset($edgeKeys[$edge->key])) {
                 throw new InvalidArgumentException(
-                    "Process Highway process [{$contribution->key}] contains duplicate edge [{$edge->key}].",
+                    "Process Highway segment [{$contribution->key}] contains duplicate edge [{$edge->key}].",
                 );
             }
 
             foreach ([$edge->fromNodeKey, $edge->toNodeKey] as $nodeKey) {
                 if (! isset($nodeKeys[$nodeKey])) {
                     throw new InvalidArgumentException(sprintf(
-                        'Process Highway process [%s] edge [%s] must include endpoint node [%s] in its fragment.',
+                        'Process Highway segment [%s] edge [%s] must include endpoint node [%s] in its fragment.',
                         $contribution->key,
                         $edge->key,
                         $nodeKey,
@@ -379,18 +396,33 @@ final class ProcessHighwayGraphComposer
         }
     }
 
+    private function hasNavigationTarget(ProcessHighwayAuthority $authority): bool
+    {
+        foreach ($authority->editTargets as $target) {
+            if (
+                $target instanceof ProcessHighwayEditTarget
+                && $target->mode === ProcessHighwayEditTarget::MODE_LINK
+                && $target->method === 'GET'
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * @param array<string, array<string, mixed>> $lanes
      */
     private function mergeLane(
         array &$lanes,
         ProcessHighwayLane $lane,
-        string $processKey,
+        string $segmentKey,
     ): void {
         if (! isset($lanes[$lane->key])) {
             $lanes[$lane->key] = [
                 ...$lane->toArray(),
-                'process_keys' => [],
+                'segment_keys' => [],
             ];
         } elseif (
             $lanes[$lane->key]['subject_key'] !== $lane->subjectKey
@@ -402,7 +434,7 @@ final class ProcessHighwayGraphComposer
             );
         }
 
-        $lanes[$lane->key]['process_keys'][] = $processKey;
+        $lanes[$lane->key]['segment_keys'][] = $segmentKey;
     }
 
     private function mergeNode(
@@ -481,86 +513,4 @@ final class ProcessHighwayGraphComposer
             ->all();
     }
 
-    /**
-     * Compatibility projection for the existing Batch 4 Blade surface.
-     * Batch 6B will render the graph fields directly and remove this adapter.
-     *
-     * @param array<int, ProcessHighwayContribution> $contributions
-     * @return Collection<int, array<string, mixed>>
-     */
-    private function legacyGroups(array $contributions): Collection
-    {
-        return collect($contributions)
-            ->groupBy(fn (ProcessHighwayContribution $process): string => $process->lane->key)
-            ->map(function (Collection $items, string $laneKey): array {
-                /** @var ProcessHighwayContribution $first */
-                $first = $items->first();
-
-                return [
-                    'key' => $laneKey,
-                    'label' => $first->lane->label,
-                    'priority' => $first->lane->sortOrder,
-                    'processes' => $items
-                        ->map(fn (ProcessHighwayContribution $process): array => $this->legacyProcess($process))
-                        ->values(),
-                ];
-            })
-            ->sortBy('priority')
-            ->values();
-    }
-
-    /** @return array<string, mixed> */
-    private function legacyProcess(ProcessHighwayContribution $process): array
-    {
-        $nodes = collect($process->nodes)->keyBy('key');
-        $entryLabels = collect($process->entryNodeKeys)
-            ->map(fn (string $key): ?string => $nodes->get($key)?->label)
-            ->filter()
-            ->values();
-        $steps = collect($process->nodes)
-            ->filter(fn (ProcessHighwayNode $node): bool => $node->key !== $process->processNodeKey)
-            ->filter(fn (ProcessHighwayNode $node): bool => in_array($node->role, [
-                ProcessHighwayNode::ROLE_GATEWAY,
-                ProcessHighwayNode::ROLE_ACTION,
-                ProcessHighwayNode::ROLE_CONSEQUENCE,
-            ], true))
-            ->map(fn (ProcessHighwayNode $node): array => [
-                'name' => $node->label,
-                'detail' => $node->detail,
-            ])
-            ->values()
-            ->all();
-        $outcomes = collect($process->exitNodeKeys)
-            ->map(fn (string $key): ?string => $nodes->get($key)?->label)
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-        $authority = $process->authority->toArray();
-        $primaryEdit = $authority['edit_targets'][0] ?? null;
-
-        return [
-            'source_key' => $process->sourceKey,
-            'source_label' => $authority['owner_label'],
-            'key' => $process->key,
-            'name' => $process->name,
-            'description' => $process->description,
-            'category' => $process->lane->key,
-            'category_label' => $process->lane->label,
-            'category_priority' => $process->lane->sortOrder,
-            'sort_order' => $process->sortOrder,
-            'state' => $process->state,
-            'state_label' => $process->stateLabel,
-            'starts_when' => $process->entrySummary
-                ?? ($entryLabels->isNotEmpty()
-                    ? $entryLabels->implode(' and ')
-                    : 'The owning feature starts this process.'),
-            'steps' => $steps,
-            'outcomes' => $outcomes,
-            'details' => $process->details,
-            'attributes' => $process->attributes,
-            'edit_url' => is_array($primaryEdit) ? $primaryEdit['url'] : null,
-            'edit_label' => is_array($primaryEdit) ? $primaryEdit['label'] : 'Open',
-        ];
-    }
 }

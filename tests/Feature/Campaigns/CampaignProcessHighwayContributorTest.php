@@ -49,28 +49,29 @@ class CampaignProcessHighwayContributorTest extends TestCase
             app(CampaignsProcessHighwayContributor::class),
         ]);
         $processKey = ProcessHighwaySemanticKey::campaign('past_client_nurture_test');
-        $process = collect($graph['processes'])->firstWhere('key', $processKey);
+        $segment = collect($graph['segments'])->firstWhere('key', $processKey);
 
-        $this->assertNotNull($process);
-        $this->assertSame('campaigns', $process['source_key']);
-        $this->assertSame('contacts:standard', $process['lane_key']);
-        $this->assertSame('active', $process['state']);
+        $this->assertNotNull($segment);
+        $this->assertSame('campaigns', $segment['source_key']);
+        $this->assertSame('contacts:standard', $segment['lane_key']);
+        $this->assertSame('active', $segment['state']);
+        $this->assertSame($processKey, $segment['mechanism_node_key']);
         $this->assertSame(
             Campaign::ENROLLMENT_MODE_AUTOMATIC,
-            $process['attributes']['enrollment_mode'],
+            $segment['attributes']['enrollment_mode'],
         );
         $this->assertSame(
             Campaign::REENTRY_WHEN_ELIGIBLE_AGAIN,
-            $process['attributes']['reentry_policy'],
+            $segment['attributes']['reentry_policy'],
         );
         $this->assertSame(
             Campaign::INELIGIBLE_CANCEL,
-            $process['attributes']['ineligible_behavior'],
+            $segment['attributes']['ineligible_behavior'],
         );
         $this->assertEquals([
             'status' => ['past_contact'],
             'tag' => ['VIP'],
-        ], $process['attributes']['eligibility_filter']);
+        ], $segment['attributes']['eligibility_filter']);
 
         $nodes = collect($graph['nodes'])->keyBy('key');
         $statusNode = $nodes[ProcessHighwaySemanticKey::status('past_contact')];
@@ -91,15 +92,35 @@ class CampaignProcessHighwayContributorTest extends TestCase
             'campaigns.eligibility.update',
             $statusNode['authority']['edit_targets'][0]['capability'],
         );
+        $statusNavigationTarget = collect($statusNode['authority']['edit_targets'])
+            ->firstWhere('mode', 'link');
+
+        $this->assertNotNull($statusNavigationTarget);
+        $this->assertSame(
+            route('crm.campaigns.edit', $campaign),
+            $statusNavigationTarget['url'],
+        );
 
         $edges = collect($graph['edges'])
-            ->where('process_key', $processKey);
+            ->where('segment_key', $processKey);
         $eligibilityGatewayKey = $processKey.':eligibility';
 
         $this->assertTrue($edges->contains(
             fn (array $edge): bool => $edge['from_node_key'] === ProcessHighwaySemanticKey::status('past_contact')
                 && $edge['to_node_key'] === $eligibilityGatewayKey
                 && $edge['role'] === 'requires',
+        ));
+
+        $this->assertSame(1, $graph['highway_count']);
+        $businessHighway = $graph['highways'][0];
+        $this->assertSame('contacts:standard', $businessHighway['lane_key']);
+        $this->assertEquals([
+            'status' => ['past_contact'],
+            'tag' => ['VIP'],
+        ], $businessHighway['qualifiers']);
+        $this->assertCount(2, $businessHighway['entry_nodes']);
+        $this->assertTrue(collect($businessHighway['entry_nodes'])->every(
+            fn (array $node): bool => is_array($node['navigation_target']),
         ));
         $this->assertTrue($edges->contains(
             fn (array $edge): bool => $edge['from_node_key'] === ProcessHighwaySemanticKey::tag('VIP')
@@ -146,21 +167,21 @@ class CampaignProcessHighwayContributorTest extends TestCase
             app(CampaignsProcessHighwayContributor::class),
         ]);
         $processKey = ProcessHighwaySemanticKey::campaign('manual_targeted_campaign');
-        $process = collect($graph['processes'])->firstWhere('key', $processKey);
+        $segment = collect($graph['segments'])->firstWhere('key', $processKey);
 
-        $this->assertNotNull($process);
-        $this->assertSame('off', $process['state']);
+        $this->assertNotNull($segment);
+        $this->assertSame('off', $segment['state']);
         $this->assertSame(
             Campaign::ENROLLMENT_MODE_MANUAL,
-            $process['attributes']['enrollment_mode'],
+            $segment['attributes']['enrollment_mode'],
         );
         $this->assertEquals(
             ['tag' => ['VIP']],
-            $process['attributes']['eligibility_filter'],
+            $segment['attributes']['eligibility_filter'],
         );
         $this->assertEquals(
             [$processKey.':entry:manual'],
-            $process['entry_node_keys'],
+            $segment['entry_node_keys'],
         );
 
         $nodes = collect($graph['nodes'])->keyBy('key');
@@ -197,14 +218,14 @@ class CampaignProcessHighwayContributorTest extends TestCase
             app(CampaignsProcessHighwayContributor::class),
         ]);
         $processKey = ProcessHighwaySemanticKey::campaign('realtor_relationship_nurture');
-        $process = collect($graph['processes'])->firstWhere('key', $processKey);
+        $segment = collect($graph['segments'])->firstWhere('key', $processKey);
         $relationshipNode = collect($graph['nodes'])->firstWhere(
             'key',
             ProcessHighwaySemanticKey::relationship('realtor', 'target_agent'),
         );
 
-        $this->assertNotNull($process);
-        $this->assertSame('contacts:relationship:realtor', $process['lane_key']);
+        $this->assertNotNull($segment);
+        $this->assertSame('contacts:relationship:realtor', $segment['lane_key']);
         $this->assertNotNull($relationshipNode);
         $this->assertSame('relationships', $relationshipNode['authority']['owner_key']);
         $this->assertSame('cyan', $relationshipNode['authority']['tone']);
@@ -218,5 +239,10 @@ class CampaignProcessHighwayContributorTest extends TestCase
         $this->assertNotNull($lane);
         $this->assertSame('relationship', $lane['scope']);
         $this->assertSame('realtor', $lane['relationship_key']);
+        $this->assertSame(1, $lane['highway_count']);
+        $this->assertSame(
+            'contacts:relationship:realtor',
+            $graph['highways'][0]['lane_key'],
+        );
     }
 }

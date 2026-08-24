@@ -41,7 +41,7 @@ class ProcessHighwayGraphContractTest extends TestCase
             description: 'Fixture campaign process.',
             subjectKey: 'contacts',
             lane: ProcessHighwayLane::standard(),
-            processNodeKey: $campaignKey,
+            mechanismNodeKey: $campaignKey,
             authority: new ProcessHighwayAuthority('campaigns', [$campaignEdit]),
             nodes: [
                 new ProcessHighwayNode(
@@ -93,7 +93,7 @@ class ProcessHighwayGraphContractTest extends TestCase
             description: 'Fixture route process.',
             subjectKey: 'contacts',
             lane: ProcessHighwayLane::standard(),
-            processNodeKey: $routeKey,
+            mechanismNodeKey: $routeKey,
             authority: new ProcessHighwayAuthority('flow_routes', [$routeEdit]),
             nodes: [
                 new ProcessHighwayNode(
@@ -141,19 +141,35 @@ class ProcessHighwayGraphContractTest extends TestCase
             $this->contributor([$route]),
         ]);
 
-        $this->assertSame(1, $graph['schema_version']);
+        $this->assertSame(2, $graph['schema_version']);
         $this->assertSame(1, $graph['subject_count']);
         $this->assertSame(1, $graph['lane_count']);
-        $this->assertSame(2, $graph['process_count']);
+        $this->assertSame(1, $graph['highway_count']);
+        $this->assertSame(2, $graph['segment_count']);
         $this->assertSame(2, $graph['source_count']);
+        $this->assertArrayNotHasKey('processes', $graph);
+        $this->assertArrayNotHasKey('groups', $graph);
 
         $subject = $graph['subjects'][0];
         $this->assertSame('contacts', $subject['key']);
         $this->assertSame('contacts:standard', $subject['lanes'][0]['key']);
         $this->assertEqualsCanonicalizing(
             [$campaignKey, $routeKey],
-            $subject['lanes'][0]['process_keys'],
+            $subject['lanes'][0]['segment_keys'],
         );
+        $this->assertCount(1, $subject['lanes'][0]['highway_keys']);
+
+        $highway = $graph['highways'][0];
+        $this->assertSame('contacts', $highway['subject_key']);
+        $this->assertSame('contacts:standard', $highway['lane_key']);
+        $this->assertEqualsCanonicalizing(
+            [$campaignKey, $routeKey],
+            $highway['segment_keys'],
+        );
+        $this->assertSame(2, $highway['source_count']);
+        $this->assertCount(2, $highway['segments']);
+        $this->assertSame([$statusKey], $highway['entry_node_keys']);
+        $this->assertSame([$routeExitKey], $highway['exit_node_keys']);
 
         $nodes = collect($graph['nodes'])->keyBy('key');
         $status = $nodes[$statusKey];
@@ -164,7 +180,7 @@ class ProcessHighwayGraphContractTest extends TestCase
         $this->assertCount(2, $status['authority']['edit_targets']);
         $this->assertEqualsCanonicalizing(
             [$campaignKey, $routeKey],
-            $status['process_keys'],
+            $status['segment_keys'],
         );
 
         $this->assertFalse($composedRoute['reference_only']);
@@ -185,6 +201,10 @@ class ProcessHighwayGraphContractTest extends TestCase
             'rose',
             $edges[$campaignKey.':edge:route']['authority']['tone'],
         );
+        $this->assertSame(
+            $campaignKey,
+            $edges[$campaignKey.':edge:route']['segment_key'],
+        );
     }
 
     public function test_every_visible_graph_element_requires_an_authoritative_edit_target(): void
@@ -198,7 +218,7 @@ class ProcessHighwayGraphContractTest extends TestCase
             description: '',
             subjectKey: 'contacts',
             lane: ProcessHighwayLane::standard(),
-            processNodeKey: $processKey,
+            mechanismNodeKey: $processKey,
             authority: $authority,
             nodes: [
                 new ProcessHighwayNode(
@@ -215,6 +235,49 @@ class ProcessHighwayGraphContractTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('must declare at least one authoritative edit target');
+
+        app(ProcessHighwayGraphComposer::class)->compose([
+            $this->contributor([$contribution]),
+        ]);
+    }
+
+    public function test_every_segment_requires_a_safe_get_navigation_target(): void
+    {
+        $segmentKey = ProcessHighwaySemanticKey::campaign('inline_only');
+        $inlineTarget = ProcessHighwayEditTarget::inline(
+            ownerKey: 'campaigns',
+            label: 'Update inline',
+            url: '/campaigns/1/eligibility',
+            method: 'PATCH',
+            capability: 'campaigns.eligibility.update',
+            resourceType: 'campaign_eligibility',
+            resourceKey: 'inline_only',
+        );
+        $authority = new ProcessHighwayAuthority('campaigns', [$inlineTarget]);
+        $contribution = new ProcessHighwayContribution(
+            sourceKey: 'campaigns',
+            key: $segmentKey,
+            name: 'Inline only',
+            description: '',
+            subjectKey: 'contacts',
+            lane: ProcessHighwayLane::standard(),
+            mechanismNodeKey: $segmentKey,
+            authority: $authority,
+            nodes: [
+                new ProcessHighwayNode(
+                    key: $segmentKey,
+                    label: 'Inline only',
+                    role: ProcessHighwayNode::ROLE_PROCESS,
+                    authority: $authority,
+                ),
+            ],
+            edges: [],
+            entryNodeKeys: [$segmentKey],
+            exitNodeKeys: [$segmentKey],
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('must declare an authoritative GET navigation target');
 
         app(ProcessHighwayGraphComposer::class)->compose([
             $this->contributor([$contribution]),

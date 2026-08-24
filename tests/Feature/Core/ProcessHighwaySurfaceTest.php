@@ -25,15 +25,18 @@ class ProcessHighwaySurfaceTest extends TestCase
 
         $highway = $response->viewData('highway');
 
-        $this->assertSame(1, $highway['schema_version']);
+        $this->assertSame(2, $highway['schema_version']);
         $this->assertSame(0, $highway['subject_count']);
         $this->assertSame(0, $highway['lane_count']);
-        $this->assertSame(0, $highway['process_count']);
+        $this->assertSame(0, $highway['highway_count']);
+        $this->assertSame(0, $highway['segment_count']);
         $this->assertSame(0, $highway['node_count']);
         $this->assertSame(0, $highway['edge_count']);
         $this->assertSame(0, $highway['source_count']);
         $this->assertCount(0, $highway['subjects']);
-        $this->assertCount(0, $highway['groups']);
+        $this->assertCount(0, $highway['highways']);
+        $this->assertCount(0, $highway['segments']);
+        $this->assertCount(0, $highway['qualifier_filters']);
     }
 
     public function test_flow_routes_contribute_owned_nodes_edges_and_exact_edit_targets(): void
@@ -96,15 +99,26 @@ class ProcessHighwaySurfaceTest extends TestCase
 
         $highway = app(ProcessHighwayReadService::class)->read();
         $processKey = ProcessHighwaySemanticKey::flowRoute('process_highway_test_route');
-        $process = collect($highway['processes'])->firstWhere('key', $processKey);
+        $segment = collect($highway['segments'])->firstWhere('key', $processKey);
 
-        $this->assertNotNull($process);
-        $this->assertSame('flow_routes', $process['source_key']);
-        $this->assertSame('contacts', $process['subject_key']);
-        $this->assertSame('contacts:standard', $process['lane_key']);
-        $this->assertSame('active', $process['state']);
-        $this->assertSame('contact_status', $process['attributes']['trigger_type']);
-        $this->assertSame('engaged', $process['attributes']['trigger_key']);
+        $this->assertNotNull($segment);
+        $this->assertSame('flow_routes', $segment['source_key']);
+        $this->assertSame('contacts', $segment['subject_key']);
+        $this->assertSame('contacts:standard', $segment['lane_key']);
+        $this->assertSame('active', $segment['state']);
+        $this->assertSame('contact_status', $segment['attributes']['trigger_type']);
+        $this->assertSame('engaged', $segment['attributes']['trigger_key']);
+        $this->assertSame($processKey, $segment['mechanism_node_key']);
+
+        $this->assertSame(1, $highway['highway_count']);
+        $businessHighway = $highway['highways'][0];
+        $this->assertSame('contacts:standard', $businessHighway['lane_key']);
+        $this->assertSame([$processKey], $businessHighway['segment_keys']);
+        $this->assertSame(['status' => ['engaged']], $businessHighway['qualifiers']);
+        $this->assertSame(
+            route('crm.flow-routes.show', $routeId),
+            $businessHighway['segments'][0]['navigation_target']['url'],
+        );
 
         $nodes = collect($highway['nodes'])->keyBy('key');
         $statusNode = $nodes[ProcessHighwaySemanticKey::status('engaged')];
@@ -128,21 +142,23 @@ class ProcessHighwaySurfaceTest extends TestCase
             $pointNode['authority']['edit_targets'][0]['container']['id'],
         );
 
-        $processEdges = collect($highway['edges'])
-            ->where('process_key', $processKey);
+        $segmentEdges = collect($highway['edges'])
+            ->where('segment_key', $processKey);
 
-        $this->assertTrue($processEdges->contains(
+        $this->assertTrue($segmentEdges->contains(
             fn (array $edge): bool => $edge['from_node_key'] === $processKey
                 && $edge['to_node_key'] === $pointNode['key'],
         ));
-        $this->assertTrue($processEdges->contains(
+        $this->assertTrue($segmentEdges->contains(
             fn (array $edge): bool => $edge['from_node_key'] === $pointNode['key']
                 && $edge['role'] === 'exits',
         ));
 
         $this->actingAs($this->createUser())
             ->get(route('crm.process-highway.index'))
-            ->assertOk();
+            ->assertOk()
+            ->assertSee('data-process-highway', false)
+            ->assertSee('data-business-highway', false);
     }
 
     private function createUser(): \App\Models\User
