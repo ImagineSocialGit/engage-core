@@ -5,17 +5,26 @@ namespace App\Modules\Campaigns\Controllers\CRM;
 use App\Http\Controllers\Controller;
 use App\Modules\Campaigns\Actions\ActivateCampaignAction;
 use App\Modules\Campaigns\Actions\DeactivateCampaignAction;
+use App\Modules\Campaigns\Actions\PublishCampaignMessageChainVersionAction;
 use App\Modules\Campaigns\Actions\UpdateCampaignEligibilityAction;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Requests\CampaignEligibilityAuthoringRequest;
+use App\Modules\Campaigns\Requests\UpdateCampaignMessageRequest;
+use App\Modules\Campaigns\Requests\UpdateCampaignScheduleRequest;
 use App\Modules\Campaigns\Services\CampaignEligibilityAuthoringService;
 use App\Modules\Campaigns\Services\CampaignMessageReviewPresenter;
+use App\Modules\Campaigns\Services\CampaignScheduleAuthoringPresenter;
 use App\Modules\Campaigns\Services\CampaignWorkspacePresenter;
+use App\Models\User;
+use App\Modules\Messaging\Actions\PublishMessageTemplatePresetOverrideAction;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
+use App\Modules\Messaging\Models\MessageChainStepVariant;
+use App\Modules\Messaging\Models\MessageTemplatePreset;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class CampaignController extends Controller
@@ -69,17 +78,97 @@ class CampaignController extends Controller
         CampaignWorkspacePresenter $workspacePresenter,
         CampaignEligibilityAuthoringService $eligibilityAuthoring,
         CampaignMessageReviewPresenter $messageReviewPresenter,
+        CampaignScheduleAuthoringPresenter $schedulePresenter,
     ): View {
+        $scheduleAuthoring = $schedulePresenter->forCampaign($campaign);
+
         return view('crm.campaigns.edit', [
             'campaign' => $campaign,
-            'workspace' => $workspacePresenter->forCampaign($campaign),
+            'workspace' => $workspacePresenter->forCampaign(
+                campaign: $campaign,
+                schedule: $scheduleAuthoring,
+            ),
             'eligibility' => $eligibilityAuthoring->forCampaign($campaign),
             'messageReview' => $messageReviewPresenter->forCampaign(
                 campaign: $campaign,
                 initialMessageId: $this->initialMessageId($request),
             ),
+            'scheduleAuthoring' => $scheduleAuthoring,
             'initialPanel' => $this->initialPanel($request),
         ]);
+    }
+
+    public function updateSchedule(
+        UpdateCampaignScheduleRequest $request,
+        Campaign $campaign,
+        PublishCampaignMessageChainVersionAction $publishCampaignVersion,
+    ): RedirectResponse {
+        $actor = $request->user();
+        $published = $publishCampaignVersion->replaceSchedule(
+            campaign: $campaign,
+            expectedVersionId: $request->expectedVersionId(),
+            submittedSteps: $request->scheduleSteps(),
+            newStep: $request->newStep(),
+            createdBy: $actor instanceof User ? $actor : null,
+        );
+
+        return redirect()
+            ->route('crm.campaigns.edit', [
+                'campaign' => $campaign,
+                'panel' => 'schedule',
+            ])
+            ->with('status', 'Campaign schedule version '.$published->version.' published for future enrollments.');
+    }
+
+    public function updateMessage(
+        UpdateCampaignMessageRequest $request,
+        Campaign $campaign,
+        MessageChainStepVariant $messageChainStepVariant,
+        MessageTemplatePreset $messageTemplatePreset,
+        PublishMessageTemplatePresetOverrideAction $publishTemplateOverride,
+        PublishCampaignMessageChainVersionAction $publishCampaignVersion,
+    ): RedirectResponse {
+        $actor = $request->user();
+        $messageChainStepVariant->loadMissing(
+            'messageTemplateVersion.messageTemplate',
+        );
+
+        abort_unless(
+            $messageChainStepVariant->messageTemplateVersion?->messageTemplate?->key
+                === $messageTemplatePreset->key,
+            404,
+        );
+
+        DB::transaction(function () use (
+            $request,
+            $campaign,
+            $messageChainStepVariant,
+            $messageTemplatePreset,
+            $publishTemplateOverride,
+            $publishCampaignVersion,
+            $actor,
+        ): void {
+            $templatePublication = $publishTemplateOverride->handle(
+                preset: $messageTemplatePreset,
+                submittedPayload: $request->safePayload(),
+                createdBy: $actor instanceof User ? $actor : null,
+            );
+
+            $publishCampaignVersion->replaceVariantTemplate(
+                campaign: $campaign,
+                expectedVersionId: $request->expectedVersionId(),
+                messageChainStepVariantId: (int) $messageChainStepVariant->getKey(),
+                replacement: $templatePublication->version,
+                createdBy: $actor instanceof User ? $actor : null,
+            );
+        }, 3);
+
+        return redirect()
+            ->route('crm.campaigns.edit', [
+                'campaign' => $campaign,
+                'panel' => 'messages',
+            ])
+            ->with('status', 'Message and Campaign schedule versions published for future enrollments.');
     }
 
     public function previewEligibility(

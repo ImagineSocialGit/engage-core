@@ -3,8 +3,10 @@
 namespace App\Modules\Campaigns\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Modules\Campaigns\Actions\ActivateCampaignAction;
 use App\Modules\Campaigns\Actions\DeactivateCampaignAction;
+use App\Modules\Campaigns\Actions\PublishCampaignMessageChainVersionAction;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Models\CampaignStep;
@@ -13,13 +15,16 @@ use App\Modules\Campaigns\Requests\UpdateCampaignStepMessageTemplateRequest;
 use App\Modules\Messaging\Actions\AssignMessageTemplatePresetAction;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
+use App\Modules\Messaging\Models\MessageTemplateVersion;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
+use App\Modules\Messaging\Models\MessageChainVersion;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\MessageTemplateCatalogCarouselPresenter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class CampaignMessageTemplateController extends Controller
@@ -77,34 +82,66 @@ class CampaignMessageTemplateController extends Controller
         UpdateCampaignStepMessageTemplateRequest $request,
         CampaignStep $campaignStep,
         AssignMessageTemplatePresetAction $assignTemplatePreset,
+        PublishCampaignMessageChainVersionAction $publishCampaignVersion,
     ): RedirectResponse {
         $campaignStep->loadMissing('campaign');
 
         $variant = $request->campaignStepVariant();
         $preset = $request->messageTemplatePreset();
 
-        $assignTemplatePreset->handle(
-            preset: $preset,
-            channel: $variant->channel,
-            purpose: $variant->purpose,
-            scope: $variant->scope,
-            surface: 'campaigns',
-            messageType: $preset->message_type,
-            campaignKey: $campaignStep->campaign?->key,
-            campaignStep: (int) $campaignStep->step_number,
-            campaignStepVariantKey: $variant->key,
-            meta: [
-                'source' => 'crm_campaign_message_template_assignment',
-                'campaign' => [
-                    'campaign_id' => $campaignStep->campaign_id,
-                    'campaign_key' => $campaignStep->campaign?->key,
-                    'campaign_step_id' => $campaignStep->id,
-                    'campaign_step' => (int) $campaignStep->step_number,
-                    'campaign_step_variant_id' => $variant->id,
-                    'campaign_step_variant_key' => $variant->key,
+        DB::transaction(function () use (
+            $request,
+            $campaignStep,
+            $variant,
+            $preset,
+            $assignTemplatePreset,
+            $publishCampaignVersion,
+        ): void {
+            $assignTemplatePreset->handle(
+                preset: $preset,
+                channel: $variant->channel,
+                purpose: $variant->purpose,
+                scope: $variant->scope,
+                surface: 'campaigns',
+                messageType: $preset->message_type,
+                campaignKey: $campaignStep->campaign?->key,
+                campaignStep: (int) $campaignStep->step_number,
+                campaignStepVariantKey: $variant->key,
+                meta: [
+                    'source' => 'crm_campaign_message_template_assignment',
+                    'campaign' => [
+                        'campaign_id' => $campaignStep->campaign_id,
+                        'campaign_key' => $campaignStep->campaign?->key,
+                        'campaign_step_id' => $campaignStep->id,
+                        'campaign_step' => (int) $campaignStep->step_number,
+                        'campaign_step_variant_id' => $variant->id,
+                        'campaign_step_variant_key' => $variant->key,
+                    ],
                 ],
-            ],
-        );
+            );
+
+            $campaign = $campaignStep->campaign;
+            $campaign?->loadMissing('messageChain.currentVersion');
+            $currentVersion = $campaign?->messageChain?->currentVersion;
+            $preset->loadMissing('canonicalTemplate.currentVersion');
+            $templateVersion = $preset->canonicalTemplate?->currentVersion;
+
+            if ($campaign instanceof Campaign
+                && $currentVersion instanceof MessageChainVersion
+                && $templateVersion instanceof MessageTemplateVersion
+            ) {
+                $publishCampaignVersion->replaceVariantTemplateByKey(
+                    campaign: $campaign,
+                    expectedVersionId: (int) $currentVersion->getKey(),
+                    stepKey: 'step_'.(int) $campaignStep->step_number,
+                    variantKey: str_replace('-', '_', strtolower(trim((string) $variant->key))),
+                    replacement: $templateVersion,
+                    createdBy: $request->user() instanceof User
+                        ? $request->user()
+                        : null,
+                );
+            }
+        }, 3);
 
         return redirect()
             ->route('crm.campaigns.message-templates.index', array_filter([

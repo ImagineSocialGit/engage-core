@@ -71,6 +71,12 @@ Route::middleware('module:campaigns')
         Route::patch('/{campaign}/eligibility', [CampaignController::class, 'updateEligibility'])
             ->name('eligibility.update');
 
+        Route::patch('/{campaign}/schedule', [CampaignController::class, 'updateSchedule'])
+            ->name('schedule.update');
+
+        Route::patch('/{campaign}/messages/{messageChainStepVariant}/{messageTemplatePreset}', [CampaignController::class, 'updateMessage'])
+            ->name('messages.update');
+
         Route::patch('/{campaign}/deactivate', [CampaignController::class, 'deactivate'])
             ->name('deactivate');
 

@@ -5,8 +5,11 @@ namespace App\Modules\Campaigns\Services;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Campaigns\Models\CampaignStepVariant;
+use App\Modules\Messaging\Models\MessageChain;
+use App\Modules\Messaging\Models\MessageChainVersion;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
+use App\Modules\Messaging\Services\MessageChainVersionCarouselPresenter;
 use App\Modules\Messaging\Services\MessageTemplateCatalogCarouselPresenter;
 use Illuminate\Support\Collection;
 
@@ -14,19 +17,42 @@ final class CampaignMessageReviewPresenter
 {
     public function __construct(
         private readonly MessageTemplateCatalogCarouselPresenter $carouselPresenter,
+        private readonly MessageChainVersionCarouselPresenter $chainCarouselPresenter,
     ) {}
 
     /**
      * @return array{
      *     presentation: array<string, mixed>,
      *     message_count: int,
-     *     initial_message_id: string|null
+     *     initial_message_id: string|null,
+     *     message_chain_version_id: int|null,
+     *     version: int|null
      * }
      */
     public function forCampaign(
         Campaign $campaign,
         ?string $initialMessageId = null,
     ): array {
+        $currentVersion = $this->currentVersion($campaign);
+
+        if ($currentVersion instanceof MessageChainVersion) {
+            $presentation = $this->campaignPresentation(
+                campaign: $campaign,
+                version: $currentVersion,
+            );
+
+            return [
+                'presentation' => $presentation,
+                'message_count' => (int) ($presentation['message_count'] ?? 0),
+                'initial_message_id' => $this->availableInitialMessageId(
+                    presentation: $presentation,
+                    requested: $initialMessageId,
+                ),
+                'message_chain_version_id' => (int) $currentVersion->getKey(),
+                'version' => (int) $currentVersion->version,
+            ];
+        }
+
         $campaign->loadMissing([
             'steps' => fn ($query) => $query
                 ->active()
@@ -50,7 +76,64 @@ final class CampaignMessageReviewPresenter
                 presentation: $presentation,
                 requested: $initialMessageId,
             ),
+            'message_chain_version_id' => null,
+            'version' => null,
         ];
+    }
+
+    private function currentVersion(Campaign $campaign): ?MessageChainVersion
+    {
+        $campaign->loadMissing('messageChain.currentVersion.steps.variants');
+        $chain = $campaign->messageChain;
+
+        if (! $chain instanceof MessageChain) {
+            return null;
+        }
+
+        $version = $chain->currentVersion;
+
+        return $version instanceof MessageChainVersion && $version->isPublished()
+            ? $version
+            : null;
+    }
+
+    /** @return array<string, mixed> */
+    private function campaignPresentation(
+        Campaign $campaign,
+        MessageChainVersion $version,
+    ): array {
+        $presentation = $this->chainCarouselPresenter->present($version);
+        $channels = is_array($presentation['channels'] ?? null)
+            ? $presentation['channels']
+            : [];
+
+        foreach ($channels as $channelKey => $channel) {
+            $messages = is_array($channel['messages'] ?? null)
+                ? $channel['messages']
+                : [];
+
+            foreach ($messages as $messageIndex => $message) {
+                $variantId = (int) ($message['message_chain_step_variant_id'] ?? 0);
+                $presetId = (int) ($message['preset_id'] ?? 0);
+
+                $message['area_label'] = 'Campaign schedule';
+                $message['update_action'] = $variantId > 0 && $presetId > 0
+                    ? route('crm.campaigns.messages.update', [
+                        'campaign' => $campaign,
+                        'messageChainStepVariant' => $variantId,
+                        'messageTemplatePreset' => $presetId,
+                    ])
+                    : '';
+                $messages[$messageIndex] = $message;
+            }
+
+            $channel['messages'] = $messages;
+            $channels[$channelKey] = $channel;
+        }
+
+        $presentation['channels'] = $channels;
+
+        return $presentation;
     }
 
     /** @return Collection<string, MessageTemplatePresetAssignment> */

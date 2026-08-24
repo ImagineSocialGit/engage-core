@@ -13,15 +13,36 @@
         ? $messageReview['presentation']
         : [];
     $messageReviewCount = (int) ($messageReview['message_count'] ?? 0);
-    $scheduleSteps = is_array($workspace['schedule_steps'] ?? null)
-        ? array_values($workspace['schedule_steps'])
+    $scheduleEditable = (bool) ($scheduleAuthoring['editable'] ?? false);
+    $scheduleSteps = $scheduleEditable
+        ? (is_array($scheduleAuthoring['steps'] ?? null)
+            ? array_values($scheduleAuthoring['steps'])
+            : [])
+        : (is_array($workspace['schedule_steps'] ?? null)
+            ? array_values($workspace['schedule_steps'])
+            : []);
+    $scheduleMessageOptions = is_array($scheduleAuthoring['message_options'] ?? null)
+        ? array_values($scheduleAuthoring['message_options'])
         : [];
+    $messageChainVersionId = (int) ($messageReview['message_chain_version_id'] ?? 0);
     $startHasErrors = collect($errors->keys())->contains(
         fn (string $key): bool => in_array($key, [
             'enrollment_mode',
             'reentry_policy',
             'ineligible_behavior',
         ], true) || str_starts_with($key, 'eligibility_criteria'),
+    );
+    $failedCampaignEditor = old('campaign_editor');
+    $scheduleHasErrors = $failedCampaignEditor === 'schedule' && collect($errors->keys())->contains(
+        fn (string $key): bool => $key === 'message_chain_version_id'
+            || $key === 'steps'
+            || str_starts_with($key, 'steps.')
+            || str_starts_with($key, 'new_step.'),
+    );
+    $messageHasErrors = $failedCampaignEditor === 'messages' && collect($errors->keys())->contains(
+        fn (string $key): bool => $key === 'payload'
+            || str_starts_with($key, 'payload.')
+            || $key === '_editing_message_id',
     );
     $messageReturnPath = route('crm.campaigns.edit', [
         'campaign' => $campaign,
@@ -43,7 +64,7 @@
         class="min-w-0 space-y-6"
         data-campaign-setup
         x-data="{
-            activeModal: @js(in_array($initialPanel, ['schedule', 'messages'], true) ? $initialPanel : null),
+            activeModal: @js($scheduleHasErrors ? 'schedule' : ($messageHasErrors ? 'messages' : (in_array($initialPanel, ['schedule', 'messages'], true) ? $initialPanel : null))),
             startOpen: @js($initialPanel === 'start' || $startHasErrors),
             openStart() {
                 this.startOpen = true;
@@ -122,7 +143,7 @@
                             <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">2 · Schedule</p>
                             <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">Current schedule</h3>
                         </div>
-                        <span class="w-fit shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">View</span>
+                        <span class="w-fit shrink-0 rounded-full px-3 py-1 text-xs font-bold {{ $scheduleEditable ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600' }}">{{ $scheduleEditable ? 'Editable' : 'View' }}</span>
                     </div>
                     <p class="mt-3 break-words text-sm leading-6 text-slate-600">
                         {{ $workspace['message_step_count'] }} active message {{ \Illuminate\Support\Str::plural('step', $workspace['message_step_count']) }} currently define the campaign timeline.
@@ -142,7 +163,7 @@
                         x-on:click="openModal('schedule')"
                         class="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 sm:w-auto"
                     >
-                        View current schedule
+                        {{ $scheduleEditable ? 'Review and edit schedule' : 'View current schedule' }}
                     </button>
                 </section>
 
@@ -426,7 +447,11 @@
                         :editable="true"
                         empty-message="No selected Messaging templates are available for this Campaign yet."
                         :initial-message-id="$messageReview['initial_message_id'] ?? null"
-                        :form-context="['return_to' => $messageReturnPath]"
+                        :form-context="[
+                            'return_to' => $messageReturnPath,
+                            'message_chain_version_id' => $messageChainVersionId,
+                            'campaign_editor' => 'messages',
+                        ]"
                     />
                 </div>
 
@@ -455,67 +480,206 @@
                 role="dialog"
                 aria-modal="true"
                 aria-label="Campaign schedule"
-                x-data="{ index: 0, count: @js(count($scheduleSteps)), navigate(delta) { if (this.count > 1) this.index = (this.index + delta + this.count) % this.count; } }"
+                x-data="{
+                    index: 0,
+                    count: @js(count($scheduleSteps)),
+                    addStep: @js((bool) old('new_step.add', false)),
+                    navigate(delta) {
+                        if (this.count > 1) this.index = (this.index + delta + this.count) % this.count;
+                    },
+                }"
                 class="max-h-[calc(100vh-2rem)] w-full max-w-4xl overflow-y-auto rounded-3xl bg-white shadow-2xl"
             >
                 <header class="sticky top-0 z-30 flex flex-col gap-4 border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:flex-row sm:items-start sm:justify-between sm:px-6">
                     <div>
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-rose-700">Current schedule</p>
                         <h2 class="mt-1 text-xl font-semibold text-slate-950">{{ $campaign->name }}</h2>
-                        <p class="mt-1 text-sm text-slate-600">Timing and order only. Message copy is reviewed separately.</p>
+                        <p class="mt-1 text-sm text-slate-600">Order and timing only. Message copy stays in the Messages carousel.</p>
                     </div>
                     <button type="button" x-on:click="closeModal()" class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">Close</button>
                 </header>
 
-                <div class="p-4 sm:p-6">
-                    @if($scheduleSteps === [])
-                        <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
-                            <p class="font-bold text-slate-900">No active schedule steps are configured.</p>
-                        </div>
-                    @else
-                        <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                            <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
-                                <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Message schedule</span>
-                                <span class="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200"><span x-text="index + 1"></span> of {{ count($scheduleSteps) }}</span>
+                @if($scheduleEditable)
+                    <form
+                        method="POST"
+                        action="{{ route('crm.campaigns.schedule.update', $campaign) }}"
+                        data-campaign-schedule-form
+                    >
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="campaign_editor" value="schedule">
+                        <input type="hidden" name="message_chain_version_id" value="{{ $scheduleAuthoring['message_chain_version_id'] }}">
+
+                        <div class="space-y-5 p-4 sm:p-6">
+                            @if($scheduleHasErrors)
+                                <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                                    {{ $errors->first() }}
+                                </div>
+                            @endif
+
+                            <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                                <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
+                                    <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Published schedule v{{ $scheduleAuthoring['version'] }}</span>
+                                    <span class="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200"><span x-text="index + 1"></span> of {{ count($scheduleSteps) }}</span>
+                                </div>
+
+                                <div class="relative px-12 py-5 sm:px-20 sm:py-8">
+                                    @if(count($scheduleSteps) > 1)
+                                        <button type="button" aria-label="Previous schedule step" x-on:click="navigate(-1)" class="absolute inset-y-5 left-0 flex w-11 items-center justify-center text-3xl text-slate-400 hover:bg-slate-100 hover:text-slate-950 sm:inset-y-8 sm:w-16">‹</button>
+                                        <button type="button" aria-label="Next schedule step" x-on:click="navigate(1)" class="absolute inset-y-5 right-0 flex w-11 items-center justify-center text-3xl text-slate-400 hover:bg-slate-100 hover:text-slate-950 sm:inset-y-8 sm:w-16">›</button>
+                                    @endif
+
+                                    @foreach($scheduleSteps as $scheduleIndex => $step)
+                                        @php
+                                            $submittedTimingType = old('steps.'.$scheduleIndex.'.timing_type', $step['timing_type']);
+                                        @endphp
+                                        <article
+                                            x-show="index === {{ $scheduleIndex }}"
+                                            x-cloak
+                                            x-data="{ timingType: @js($submittedTimingType) }"
+                                            data-campaign-schedule-step="{{ $step['step_number'] }}"
+                                            class="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+                                        >
+                                            <input type="hidden" name="steps[{{ $scheduleIndex }}][key]" value="{{ $step['key'] }}">
+
+                                            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                                <div class="flex min-w-0 items-start gap-3">
+                                                    <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">{{ $step['step_number'] }}</span>
+                                                    <div class="min-w-0">
+                                                        <p class="text-sm font-semibold text-slate-700">{{ $step['timing'] }}</p>
+                                                        <div class="mt-3 flex flex-wrap gap-2">
+                                                            @foreach($step['channels'] as $channel)
+                                                                <span class="rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-800 ring-1 ring-inset ring-rose-200">{{ strtoupper($channel) }}</span>
+                                                            @endforeach
+                                                            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{{ $step['message_count'] }} {{ \Illuminate\Support\Str::plural('message', $step['message_count']) }}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <label class="flex items-center gap-2 text-xs font-bold text-red-700">
+                                                    <input type="checkbox" name="steps[{{ $scheduleIndex }}][remove]" value="1" @checked(old('steps.'.$scheduleIndex.'.remove')) class="rounded border-slate-300 text-red-600 focus:ring-red-600">
+                                                    Remove step
+                                                </label>
+                                            </div>
+
+                                            <div class="mt-5 grid gap-4 sm:grid-cols-[1fr_7rem]">
+                                                <label class="block">
+                                                    <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Step name</span>
+                                                    <input name="steps[{{ $scheduleIndex }}][name]" value="{{ old('steps.'.$scheduleIndex.'.name', $step['name']) }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 text-sm font-semibold text-slate-900">
+                                                </label>
+                                                <label class="block">
+                                                    <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Position</span>
+                                                    <input type="number" min="1" name="steps[{{ $scheduleIndex }}][position]" value="{{ old('steps.'.$scheduleIndex.'.position', $step['position']) }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 text-sm font-semibold text-slate-900">
+                                                </label>
+                                            </div>
+
+                                            @if($step['timing_editable'])
+                                                <div class="mt-4 grid gap-4 sm:grid-cols-3">
+                                                    <label class="block">
+                                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Timing</span>
+                                                        <select name="steps[{{ $scheduleIndex }}][timing_type]" x-model="timingType" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 text-sm font-semibold text-slate-900">
+                                                            <option value="immediate">Immediately</option>
+                                                            <option value="delay">Wait</option>
+                                                        </select>
+                                                    </label>
+                                                    <label x-show="timingType === 'delay'" class="block">
+                                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Wait</span>
+                                                        <input type="number" min="0" name="steps[{{ $scheduleIndex }}][delay_value]" value="{{ old('steps.'.$scheduleIndex.'.delay_value', $step['delay_value']) }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 text-sm font-semibold text-slate-900">
+                                                    </label>
+                                                    <label x-show="timingType === 'delay'" class="block">
+                                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Unit</span>
+                                                        <select name="steps[{{ $scheduleIndex }}][delay_unit]" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 text-sm font-semibold text-slate-900">
+                                                            @foreach(['seconds' => 'Seconds', 'minutes' => 'Minutes', 'hours' => 'Hours', 'days' => 'Days'] as $value => $label)
+                                                                <option value="{{ $value }}" @selected(old('steps.'.$scheduleIndex.'.delay_unit', $step['delay_unit']) === $value)>{{ $label }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    </label>
+                                                </div>
+                                            @else
+                                                <input type="hidden" name="steps[{{ $scheduleIndex }}][timing_type]" value="preserve">
+                                                <p class="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-xs font-semibold leading-5 text-amber-900">This event-anchored timing is preserved here. Its event contract remains owned by the mechanism that created it.</p>
+                                            @endif
+                                        </article>
+                                    @endforeach
+                                </div>
                             </div>
 
-                            <div class="relative px-12 py-5 sm:px-20 sm:py-8">
-                                @if(count($scheduleSteps) > 1)
-                                    <button type="button" aria-label="Previous schedule step" x-on:click="navigate(-1)" class="absolute inset-y-5 left-0 flex w-11 items-center justify-center text-3xl text-slate-400 hover:bg-slate-100 hover:text-slate-950 sm:inset-y-8 sm:w-16">‹</button>
-                                    <button type="button" aria-label="Next schedule step" x-on:click="navigate(1)" class="absolute inset-y-5 right-0 flex w-11 items-center justify-center text-3xl text-slate-400 hover:bg-slate-100 hover:text-slate-950 sm:inset-y-8 sm:w-16">›</button>
-                                @endif
+                            <section class="rounded-3xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                                <label class="flex items-center gap-3 text-sm font-bold text-slate-900">
+                                    <input type="checkbox" name="new_step[add]" value="1" x-model="addStep" class="rounded border-slate-300 text-rose-700 focus:ring-rose-600">
+                                    Add another scheduled message
+                                </label>
 
-                                @foreach($scheduleSteps as $scheduleIndex => $step)
-                                    <article
-                                        x-show="index === {{ $scheduleIndex }}"
-                                        x-cloak
-                                        data-campaign-schedule-step="{{ $step['step_number'] }}"
-                                        class="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
-                                    >
-                                        <div class="flex items-start gap-4">
-                                            <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">{{ $step['step_number'] }}</span>
-                                            <div class="min-w-0">
-                                                <h3 class="break-words text-lg font-semibold text-slate-950">{{ $step['name'] }}</h3>
-                                                <p class="mt-2 text-sm font-semibold leading-6 text-slate-700">{{ $step['timing'] }}</p>
-                                                <div class="mt-4 flex flex-wrap gap-2">
-                                                    @foreach($step['channels'] as $channel)
-                                                        <span class="rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-800 ring-1 ring-inset ring-rose-200">{{ strtoupper($channel) }}</span>
-                                                    @endforeach
-                                                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{{ $step['message_count'] }} {{ \Illuminate\Support\Str::plural('message', $step['message_count']) }}</span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                <div x-show="addStep" x-cloak class="mt-4 grid gap-4 sm:grid-cols-2">
+                                    <label class="block sm:col-span-2">
+                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Published message</span>
+                                        <select name="new_step[message_template_preset_id]" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
+                                            <option value="">Choose a message</option>
+                                            @foreach($scheduleMessageOptions as $option)
+                                                <option value="{{ $option['id'] }}" @selected((int) old('new_step.message_template_preset_id') === (int) $option['id'])>{{ $option['label'] }} · {{ strtoupper($option['channel']) }}</option>
+                                            @endforeach
+                                        </select>
+                                        @error('new_step.message_template_preset_id')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                                    </label>
+                                    <label class="block">
+                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Step name</span>
+                                        <input name="new_step[name]" value="{{ old('new_step.name') }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
+                                    </label>
+                                    <label class="block">
+                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Position</span>
+                                        <input type="number" min="1" name="new_step[position]" value="{{ old('new_step.position', count($scheduleSteps) + 1) }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
+                                    </label>
+                                    <label class="block">
+                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Timing</span>
+                                        <select name="new_step[timing_type]" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
+                                            <option value="delay" @selected(old('new_step.timing_type', 'delay') === 'delay')>Wait</option>
+                                            <option value="immediate" @selected(old('new_step.timing_type') === 'immediate')>Immediately</option>
+                                        </select>
+                                    </label>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <label class="block">
+                                            <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Wait</span>
+                                            <input type="number" min="0" name="new_step[delay_value]" value="{{ old('new_step.delay_value', 1) }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
+                                        </label>
+                                        <label class="block">
+                                            <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Unit</span>
+                                            <select name="new_step[delay_unit]" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
+                                                @foreach(['minutes' => 'Minutes', 'hours' => 'Hours', 'days' => 'Days'] as $value => $label)
+                                                    <option value="{{ $value }}" @selected(old('new_step.delay_unit', 'days') === $value)>{{ $label }}</option>
+                                                @endforeach
+                                            </select>
+                                        </label>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+
+                        <footer class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                            <p class="text-xs leading-5 text-slate-500">Saving publishes a new immutable schedule for future enrollments. Current participants keep their existing version.</p>
+                            <div class="flex flex-col gap-2 sm:flex-row">
+                                <button type="button" x-on:click="activeModal = 'messages'" @disabled($messageReviewCount < 1) class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Review message copy</button>
+                                <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800">Publish schedule changes</button>
+                            </div>
+                        </footer>
+                    </form>
+                @else
+                    <div class="p-4 sm:p-6">
+                        @if($scheduleSteps === [])
+                            <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
+                                <p class="font-bold text-slate-900">No published message schedule is available.</p>
+                            </div>
+                        @else
+                            <div class="space-y-3">
+                                @foreach($scheduleSteps as $step)
+                                    <article data-campaign-schedule-step="{{ $step['step_number'] }}" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                                        <h3 class="text-lg font-semibold text-slate-950">{{ $step['name'] }}</h3>
+                                        <p class="mt-2 text-sm font-semibold text-slate-700">{{ $step['timing'] }}</p>
                                     </article>
                                 @endforeach
                             </div>
-                        </div>
-                    @endif
-                </div>
-
-                <footer class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                    <p class="text-xs leading-5 text-slate-500">The schedule view never exposes message payload or implementation metadata.</p>
-                    <button type="button" x-on:click="activeModal = 'messages'" @disabled($messageReviewCount < 1) class="inline-flex min-h-10 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 sm:w-auto">Review message copy</button>
-                </footer>
+                        @endif
+                    </div>
+                    <footer class="border-t border-slate-200 bg-slate-50 px-4 py-4 text-xs leading-5 text-slate-500 sm:px-6">Publish a Messaging MessageChain for this Campaign before editing its schedule.</footer>
+                @endif
             </div>
         </div>
     </div>

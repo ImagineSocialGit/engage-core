@@ -15,6 +15,10 @@ class CampaignWorkspacePresenter
 {
     public const BUILDER_STAGE_KEYS = ['start', 'schedule', 'messages', 'review'];
 
+    public function __construct(
+        private readonly CampaignScheduleAuthoringPresenter $schedulePresenter,
+    ) {}
+
     /**
      * @return array{
      *     active_enrollment_count: int,
@@ -22,6 +26,8 @@ class CampaignWorkspacePresenter
      *     message_step_count: int,
      *     message_count: int,
      *     channels: array<int, string>,
+     *     message_chain_version_id: int|null,
+     *     message_chain_version: int|null,
      *     schedule_steps: array<int, array{
      *         id: int,
      *         step_number: int,
@@ -33,8 +39,40 @@ class CampaignWorkspacePresenter
      *     builder_stages: array<int, array{key: string, state: string, editable: bool}>
      * }
      */
-    public function forCampaign(Campaign $campaign): array
+    /** @param array<string, mixed>|null $schedule */
+    public function forCampaign(Campaign $campaign, ?array $schedule = null): array
     {
+        $schedule ??= $this->schedulePresenter->forCampaign($campaign);
+
+        if ($schedule['editable']) {
+            $scheduleSteps = $schedule['steps'];
+            $channels = collect($scheduleSteps)
+                ->flatMap(fn (array $step): array => $step['channels'])
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+            $messageStepCount = count($scheduleSteps);
+            $messageCount = (int) collect($scheduleSteps)->sum('message_count');
+
+            return [
+                'active_enrollment_count' => $this->activeEnrollmentCount($campaign),
+                'pending_message_count' => $this->pendingScheduledMessageCount($campaign),
+                'message_step_count' => $messageStepCount,
+                'message_count' => $messageCount,
+                'channels' => $channels,
+                'message_chain_version_id' => $schedule['message_chain_version_id'],
+                'message_chain_version' => $schedule['version'],
+                'schedule_steps' => $scheduleSteps,
+                'builder_stages' => $this->builderStages(
+                    campaign: $campaign,
+                    messageStepCount: $messageStepCount,
+                    messageCount: $messageCount,
+                    scheduleEditable: true,
+                ),
+            ];
+        }
+
         $campaign->loadMissing([
             'steps' => fn ($query) => $query
                 ->active()
@@ -73,11 +111,14 @@ class CampaignWorkspacePresenter
             'message_step_count' => $messageStepCount,
             'message_count' => $messageCount,
             'channels' => $channels,
+            'message_chain_version_id' => null,
+            'message_chain_version' => null,
             'schedule_steps' => $this->scheduleSteps($steps),
             'builder_stages' => $this->builderStages(
                 campaign: $campaign,
                 messageStepCount: $messageStepCount,
                 messageCount: $messageCount,
+                scheduleEditable: false,
             ),
         ];
     }
@@ -191,6 +232,7 @@ class CampaignWorkspacePresenter
         Campaign $campaign,
         int $messageStepCount,
         int $messageCount,
+        bool $scheduleEditable,
     ): array {
         return [
             [
@@ -204,7 +246,7 @@ class CampaignWorkspacePresenter
             [
                 'key' => 'schedule',
                 'state' => $messageStepCount > 0 ? 'configured' : 'empty',
-                'editable' => false,
+                'editable' => $scheduleEditable,
             ],
             [
                 'key' => 'messages',

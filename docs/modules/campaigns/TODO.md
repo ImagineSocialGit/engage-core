@@ -7,7 +7,7 @@ Work these in order. Keep Campaigns independent from FlowRoutes, Webinars, Forms
 - [ ] Migrate Campaign Builder/preset authoring to direct Messaging MessageChain definitions, then remove the temporary `campaign_steps` / `campaign_step_variants` authoring projection.
 - [x] Keep Campaign message-copy editing inside Campaign Setup while publishing through Messaging's reusable immutable-template action.
 - [x] Add a payload-free schedule popup that can become the direct MessageChain schedule editor without changing the Campaign Setup navigation contract.
-- [ ] Make Campaign-context message and schedule edits publish copy-on-write MessageChain versions for future enrollments while existing enrollments remain pinned.
+- [x] Make Campaign-context message and schedule edits publish copy-on-write MessageChain versions for future enrollments while existing enrollments remain pinned.
 
 ## 2. Campaign lifecycle and launch safety
 
@@ -29,12 +29,12 @@ Work these in order. Keep Campaigns independent from FlowRoutes, Webinars, Forms
 - [ ] Add `Copy an existing campaign` as the recommended new-Campaign path; copies must be independent and use Messaging copy-on-write/immutable MessageChain and MessageTemplate version semantics.
 - [ ] Add create-from-scratch mode using the same Builder stages, with guidance that it is best suited to short/simple campaigns.
 - [x] Build the `What starts this campaign?` step from client/module-available shared Contact-filter criteria rather than hardcoded producer-module imports.
-- [ ] Finish the human-readable schedule editor; allow add/remove/reorder/timing changes without exposing raw timing/config fields.
+- [x] Finish the human-readable schedule editor; allow add/remove/reorder/timing changes without exposing raw timing/config fields.
 - [x] Build guided message review/editing in a Campaign Setup modal while Messaging remains owner of reusable copy/template versions.
 - [ ] Add campaign-wide message search across subjects, email bodies, and SMS copy with match counts and jump-to-message behavior; start with search/highlight rather than blind replace-all.
 - [ ] Add duplicate/add-before/add-after message conveniences where they reduce editing time.
 - [ ] Complete final review with clear start rule, schedule, message count/channels, exit behavior, audience implications, and live-change warnings. Activation/deactivation is now available in Campaign Setup.
-- [ ] Add draft/publish safety for schedule changes so active enrollments remain pinned to the immutable version they started with.
+- [x] Add optimistic version checks and copy-on-write publication so active enrollments remain pinned to the immutable version they started with.
 - [x] Keep technical specs such as dispatch keys, payload classes, purpose/scope, config paths, message types, and strategy internals behind advanced setup/details.
 
 ## 4. UX cleanup while the Builder lands

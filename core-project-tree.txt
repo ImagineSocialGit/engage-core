@@ -102,6 +102,7 @@
 │   │   │   │   ├── PauseCampaignEnrollmentAction.php
 │   │   │   │   ├── PauseCampaignFamilyEnrollmentsAction.php
 │   │   │   │   ├── ProcessDueCampaignTouchDatesAction.php
+│   │   │   │   ├── PublishCampaignMessageChainVersionAction.php
 │   │   │   │   ├── ReconcileAutomaticCampaignEligibilityAction.php
 │   │   │   │   ├── ReconcileCampaignEligibilityAction.php
 │   │   │   │   ├── ReconcileContactCampaignEligibilityAction.php
@@ -176,6 +177,8 @@
 │   │   │   │   └── CampaignsModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   │   ├── CampaignEligibilityAuthoringRequest.php
+│   │   │   │   ├── UpdateCampaignMessageRequest.php
+│   │   │   │   ├── UpdateCampaignScheduleRequest.php
 │   │   │   │   └── UpdateCampaignStepMessageTemplateRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── CampaignEligibilityAuthoringService.php
@@ -188,6 +191,7 @@
 │   │   │   │   ├── CampaignMessageChainExecutionContextProvider.php
 │   │   │   │   ├── CampaignMessageDefinitionResolver.php
 │   │   │   │   ├── CampaignMessageReviewPresenter.php
+│   │   │   │   ├── CampaignScheduleAuthoringPresenter.php
 │   │   │   │   ├── CampaignSimulationService.php
 │   │   │   │   ├── CampaignWorkspacePresenter.php
 │   │   │   │   ├── ContactShow
@@ -637,6 +641,7 @@
 │   │   │   │   ├── PauseMessageChainEnrollmentAction.php
 │   │   │   │   ├── ProcessMessageChainEnrollmentAction.php
 │   │   │   │   ├── PublishMessageChainVersionAction.php
+│   │   │   │   ├── PublishMessageTemplatePresetOverrideAction.php
 │   │   │   │   ├── PublishMessageTemplateVersionAction.php
 │   │   │   │   ├── RecordMessageConsentAction.php
 │   │   │   │   ├── RecordScheduledMessageCtaEngagementAction.php
@@ -698,6 +703,7 @@
 │   │   │   │   ├── Email
 │   │   │   │   │   └── EmailHygieneResult.php
 │   │   │   │   ├── MessageData.php
+│   │   │   │   ├── MessageTemplatePresetPublicationResult.php
 │   │   │   │   └── ResolvedMessageDispatch.php
 │   │   │   ├── Enums
 │   │   │   │   ├── MessageChannel.php
@@ -781,6 +787,7 @@
 │   │   │   │   ├── MessageChainExecutionContextResolver.php
 │   │   │   │   ├── MessageChainPresentationService.php
 │   │   │   │   ├── MessageChainTimingResolver.php
+│   │   │   │   ├── MessageChainVersionCarouselPresenter.php
 │   │   │   │   ├── MessageChannelAvailability.php
 │   │   │   │   ├── MessageConfigValidator.php
 │   │   │   │   ├── MessageDedupeKeyBuilder.php
@@ -2256,6 +2263,7 @@
 │   │   │   ├── CampaignLaunchTimingContactImportControllerTest.php
 │   │   │   ├── CampaignLaunchTimingContactImportPostProcessorTest.php
 │   │   │   ├── CampaignLifecycleAutomationCapabilityTest.php
+│   │   │   ├── CampaignMessageChainAuthoringTest.php
 │   │   │   ├── CampaignMessageChainBridgeTest.php
 │   │   │   ├── CampaignMessageChainPresetSyncTest.php
 │   │   │   ├── CampaignMessageChainRuntimeOwnershipTest.php
@@ -2697,4 +2705,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-656 directories, 2042 files
+656 directories, 2050 files

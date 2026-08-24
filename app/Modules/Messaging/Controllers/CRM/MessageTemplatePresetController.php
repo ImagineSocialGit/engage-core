@@ -4,6 +4,7 @@ namespace App\Modules\Messaging\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Modules\Messaging\Actions\PublishMessageTemplatePresetOverrideAction;
 use App\Modules\Messaging\Actions\PublishMessageTemplateVersionAction;
 use App\Modules\Messaging\Actions\UpsertMessageTemplateCompositionLayerAction;
 use App\Modules\Messaging\Models\MessageTemplate;
@@ -17,7 +18,6 @@ use App\Modules\Messaging\Requests\UpdateMessageTemplatePresetRequest;
 use App\Modules\Messaging\Services\MessageTemplateCompositionEditorPresenter;
 use App\Modules\Messaging\Services\MessageTemplateCatalogCarouselPresenter;
 use App\Modules\Messaging\Services\MessageTemplateCompositionImpactResolver;
-use App\Modules\Messaging\Services\MessageTemplateCompositionIdentityResolver;
 use App\Modules\Messaging\Services\MessageTemplateCompositionResolver;
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
 use App\Modules\Messaging\Services\MessageTemplateUsageResolver;
@@ -138,108 +138,21 @@ class MessageTemplatePresetController extends Controller
     public function update(
         UpdateMessageTemplatePresetRequest $request,
         MessageTemplatePreset $messageTemplatePreset,
-        MessageTemplateTokenValidator $messageTemplateTokenValidator,
-        MessageTemplateCompositionResolver $compositionResolver,
-        MessageTemplateCompositionIdentityResolver $compositionIdentityResolver,
-        UpsertMessageTemplateCompositionLayerAction $upsertCompositionLayer,
-        PublishMessageTemplateVersionAction $publishMessageTemplateVersion,
+        PublishMessageTemplatePresetOverrideAction $publishOverride,
     ): RedirectResponse {
-        $messageTemplate = MessageTemplate::query()->firstOrCreate(
-            ['key' => $messageTemplatePreset->key],
-            [
-                'name' => $messageTemplatePreset->name,
-                'description' => $messageTemplatePreset->description,
-                'channel' => $messageTemplatePreset->channel,
-                'status' => $messageTemplatePreset->isActive()
-                    ? MessageTemplate::STATUS_ACTIVE
-                    : MessageTemplate::STATUS_INACTIVE,
-                'composition_family_key' => $compositionIdentityResolver->familyKey(
-                    scope: (string) $messageTemplatePreset->scope,
-                    sourceMessageType: (string) $messageTemplatePreset->message_type,
-                    campaignTemplate: false,
-                ),
-                'source' => $messageTemplatePreset->source,
-                'source_version' => is_int($messageTemplatePreset->source_version)
-                    ? (string) $messageTemplatePreset->source_version
-                    : null,
-            ],
-        );
-        $sourcePayload = is_array($messageTemplatePreset->payload)
-            ? $messageTemplatePreset->payload
-            : [];
-        $submittedPayload = $request->safePayload();
-        $baselinePayload = $compositionResolver->resolveWithoutMessageOverride(
-            $messageTemplate,
-            $sourcePayload,
-        );
-
-        $submittedPayload = $this->preserveTrackingKeys(
-            baseline: $messageTemplate->currentPayload(),
-            submitted: $submittedPayload,
-        );
-        $submittedPayload = $this->preserveTrackingKeys(
-            baseline: $baselinePayload,
-            submitted: $submittedPayload,
-        );
-
-        $overridePayload = $this->payloadDelta($baselinePayload, $submittedPayload);
         $actor = $request->user();
-
-        DB::transaction(function () use (
-            $messageTemplate,
-            $messageTemplatePreset,
-            $messageTemplateTokenValidator,
-            $upsertCompositionLayer,
-            $publishMessageTemplateVersion,
-            $sourcePayload,
-            $overridePayload,
-            $actor,
-        ): void {
-            $existingOverride = MessageTemplateCompositionLayer::query()
-                ->where('scope_type', MessageTemplateCompositionLayer::SCOPE_MESSAGE)
-                ->where('message_template_id', $messageTemplate->getKey())
-                ->first();
-
-            if ($overridePayload === []) {
-                $existingOverride?->delete();
-
-                $messageTemplate->forceFill([
-                    'is_customized' => false,
-                    'customized_at' => null,
-                ])->save();
-            } else {
-                $override = $upsertCompositionLayer->handle(
-                    scopeType: MessageTemplateCompositionLayer::SCOPE_MESSAGE,
-                    channel: (string) $messageTemplate->channel,
-                    payload: $overridePayload,
-                    messageTemplate: $messageTemplate,
-                    source: 'crm',
-                    isCustomized: true,
-                );
-
-                $messageTemplate->forceFill([
-                    'is_customized' => true,
-                    'customized_at' => $override->customized_at ?? now(),
-                ])->save();
-            }
-
-            $version = $publishMessageTemplateVersion->handle(
-                messageTemplate: $messageTemplate,
-                payload: $sourcePayload,
-                createdBy: $actor instanceof User ? $actor : null,
-            );
-
-            $messageTemplatePreset->forceFill([
-                'tokens' => $messageTemplateTokenValidator->tokensFromPayload($version->payload()),
-            ])->save();
-        });
+        $result = $publishOverride->handle(
+            preset: $messageTemplatePreset,
+            submittedPayload: $request->safePayload(),
+            createdBy: $actor instanceof User ? $actor : null,
+        );
 
         $redirect = $this->safeReturnPath($request);
 
         return ($redirect !== null
                 ? redirect($redirect)
                 : redirect()->route('crm.messaging.message-templates.index', $this->redirectParams($messageTemplatePreset)))
-            ->with('status', $overridePayload === []
+            ->with('status', $result->overrideCleared
                 ? 'Message override cleared. The message now inherits shared content again.'
                 : 'Message override published. Existing scheduled message versions were not changed.');
     }
@@ -466,77 +379,6 @@ class MessageTemplatePresetController extends Controller
         return $firstEntry?->messageTemplatePreset instanceof MessageTemplatePreset
             ? $firstEntry->messageTemplatePreset
             : null;
-    }
-
-    /**
-     * @param array<string,mixed> $baseline
-     * @param array<string,mixed> $submitted
-     * @return array<string,mixed>
-     */
-    private function payloadDelta(array $baseline, array $submitted): array
-    {
-        $delta = [];
-
-        foreach ($submitted as $key => $value) {
-            if (! array_key_exists($key, $baseline) || $baseline[$key] !== $value) {
-                $delta[$key] = $value;
-            }
-        }
-
-        return $delta;
-    }
-
-    /**
-     * tracking_key is immutable structural identity for a link, not operator-facing
-     * copy. Preserve it when CRM editing changes the label or destination.
-     *
-     * @param array<string,mixed> $baseline
-     * @param array<string,mixed> $submitted
-     * @return array<string,mixed>
-     */
-    private function preserveTrackingKeys(array $baseline, array $submitted): array
-    {
-        foreach (['cta', 'secondary_link'] as $key) {
-            $baselineLink = $baseline[$key] ?? null;
-            $submittedLink = $submitted[$key] ?? null;
-
-            if (! is_array($baselineLink)
-                || ! is_array($submittedLink)
-                || ! is_string($baselineLink['tracking_key'] ?? null)
-                || trim($baselineLink['tracking_key']) === ''
-            ) {
-                continue;
-            }
-
-            $submitted[$key]['tracking_key'] = trim($baselineLink['tracking_key']);
-        }
-
-        $baselineCtas = $baseline['ctas'] ?? null;
-        $submittedCtas = $submitted['ctas'] ?? null;
-
-        if (is_array($baselineCtas)
-            && array_is_list($baselineCtas)
-            && is_array($submittedCtas)
-            && array_is_list($submittedCtas)
-        ) {
-            foreach ($submittedCtas as $index => $submittedCta) {
-                $baselineCta = $baselineCtas[$index] ?? null;
-
-                if (! is_array($submittedCta)
-                    || ! is_array($baselineCta)
-                    || ! is_string($baselineCta['tracking_key'] ?? null)
-                    || trim($baselineCta['tracking_key']) === ''
-                ) {
-                    continue;
-                }
-
-                $submitted['ctas'][$index]['tracking_key'] = trim(
-                    $baselineCta['tracking_key'],
-                );
-            }
-        }
-
-        return $submitted;
     }
 
     /** @return array<string,mixed> */
