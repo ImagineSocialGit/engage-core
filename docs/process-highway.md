@@ -76,7 +76,7 @@ Flow Route segment
     High-intent reply -> inspect facts -> branch -> create task -> change status -> completion
 ```
 
-Batch 6B exposes those contributions as:
+The graph read model exposes those contributions as:
 
 ```text
 segments[]
@@ -193,6 +193,7 @@ core:contact_tag:present:Old%20Lead
 relationships:relationship:realtor:stage:engaged_agent
 webinars:series:va-homebuyer-game-plan:outcome:attended
 automation:event:inbound_message.normal_reply
+inbound_messaging:reply_profile:cold_lead_nurture
 campaigns:campaign:cold_lead_nurture
 flow_routes:route:cold_lead_high_intent_reply_routing
 ```
@@ -218,6 +219,8 @@ For every business highway, the read model exposes:
 - qualifier values used for Status, Tag, Relationship, Webinar Outcome, Source, and future filters;
 - searchable business text;
 - safe authoritative navigation targets.
+
+An entry candidate is a top-level ramp only when it has no incoming edge inside the connected highway. A scoped reply can therefore start a Flow Route without being misrepresented as a second top-level entrance when the Campaign message journey already leads into that reply.
 
 An exit candidate is terminal only when it has no outgoing edge inside the connected highway. If a Campaign segment exits directly into a Route mechanism, that Route is part of the center road and only the actual downstream completion remains in the terminal-outcome column.
 
@@ -269,11 +272,14 @@ Automatic Campaigns expose:
 - `not eligible -> eligible` entry;
 - Campaign mechanism identity;
 - message-journey action;
+- reply-profile handoff nodes declared by the current immutable MessageChainVersion;
 - completion;
 - configured ineligible behavior;
 - re-entry cycle when allowed.
 
 Manual Campaigns expose explicit enrollment as their entry. Saved targeting criteria do not falsely appear as an automatic start.
+
+Campaign reply-profile discovery reads the Campaign-selected published MessageChainVersion first. Legacy Campaign message-template assignments remain a compatibility fallback only. The resolver never reads message payloads and does not make Campaigns responsible for inbound reply execution.
 
 Criterion fact ownership is preserved:
 
@@ -304,6 +310,10 @@ Each Route exposes:
 - links into a Campaign mechanism when a Point starts that Campaign;
 - exact Route and Point edit identities.
 
+For `inbound_message.normal_reply`, a Route whose branch conditions positively scope `reply_profile_key` uses those reply-profile semantic nodes as its visible trigger. It does not use the global inbound-reply event as its composition identity. This prevents unrelated reply Routes from collapsing into one highway and lets the Route attach after the Campaign message journey that emits the same profile.
+
+Unscoped automation-event Routes continue to expose the ordinary automation-event trigger. A Flow Route with multiple positive reply-profile values deliberately represents one orchestration mechanism shared by those business entrances.
+
 Route sequencing and branch edges remain FlowRoutes-owned. A cross-module Point uses the action owner's wayfinding tone while its edit target identifies the exact Point inside the Route container.
 
 Flow Routes are intentionally not the center of Process Highway. A Highway with only Campaign eligibility remains complete and useful when FlowRoutes is disabled.
@@ -330,11 +340,11 @@ It includes:
 - responsive horizontal/vertical map treatment;
 - no-result and optional-module empty states.
 
-The primary information hierarchy is business meaning first and implementation ownership second. The surface does not group by Campaigns versus Flow Routes.
+The primary information hierarchy is business meaning first and implementation ownership second. The surface does not group by Campaigns versus Flow Routes. Inside one connected highway, eligibility-driven Campaign mechanisms sort before scoped reply orchestration, and reply acknowledgements follow the main orchestration. The ordering is presentation metadata only and does not change runtime execution.
 
-## Campaign actionability handoff
+## Campaign actionability and immutable authoring
 
-Batch 6C1 keeps Process Highway as a map and makes its Campaign destinations genuinely actionable:
+Process Highway remains a map while its Campaign destinations are genuinely actionable:
 
 ```text
 Campaign eligibility or ineligible behavior
@@ -347,13 +357,13 @@ Campaign completion or lifecycle review
     -> Campaign Setup / Review
 ```
 
-Campaign Setup remains Campaign-owned. It hosts the Campaign eligibility authoring service, Campaign lifecycle actions, and the reusable Messaging-owned message editor carousel. Saving message copy continues to publish through Messaging's authoritative immutable-template action.
+Campaign Setup remains Campaign-owned. It hosts the Campaign eligibility authoring service, Campaign lifecycle actions, and the reusable Messaging-owned message editor carousel. Saving message copy publishes a new immutable MessageTemplateVersion and a replacement Campaign-selected MessageChainVersion.
 
-The Campaign schedule popup in 6C1 is a payload-free read projection only. Campaign message editing preserves the existing template-edit seam. Pinned-message review and schedule mutation remain deferred until the selected Messaging-owned `MessageChainVersion` can be edited through copy-on-write publication in Batch 6C2.
+The Current Schedule popup edits human labels, ordering, and timing without exposing payloads. Schedule changes publish a replacement immutable MessageChainVersion for future enrollments. Existing enrollments and scheduled messages keep their original pins.
 
-## Current non-goals
+## Non-goals
 
-Batch 6B does not:
+Process Highway does not:
 
 - execute automation;
 - persist a second business-process definition;
@@ -364,25 +374,24 @@ Batch 6B does not:
 - change Messaging consent/scope behavior;
 - add a migration, queue, or job.
 
+## Batch 6D acceptance cases
+
+The focused business-map contract proves:
+
+- Prospect – Nurture plus Old Lead converges into the cold-lead Campaign;
+- Past Client remains its own eligibility-driven Campaign process;
+- VA attended and missed durable outcomes enter their respective Campaigns and converge only where a shared reply mechanism is intentional;
+- scoped reply Routes attach after the Campaign message journey instead of appearing as generic top-level reply highways;
+- Campaign-only processes remain complete without a Flow Route;
+- Realtor reply orchestration stays in the Realtor relationship lane;
+- disabling optional process modules leaves the Highway surface available;
+- visible mechanisms retain their authoritative owner navigation.
+
 ## Remaining refactor roadmap
 
-1. Batch 6C2 — versioned Campaign message/schedule authoring
-   - derive the editable schedule from the selected Messaging-owned immutable MessageChain version;
-   - make Campaign-context message edits publish a replacement chain version that pins the new template version;
-   - add/remove/reorder steps and edit human-readable timing without payload fields;
-   - publish a new immutable chain version for future enrollments;
-   - keep existing enrollments pinned to their starting version.
-2. Batch 6D — Slam Dunk acceptance and polish
-   - cold-lead Status + Old Lead convergence;
-   - Past Client process;
-   - VA attended/missed durable-outcome entry;
-   - reply orchestration at the correct point in the highway;
-   - processes that do not use Flow Routes;
-   - relationship/Realtor separation;
-   - optional-module degradation;
-   - final visual-density and business-language pass.
-3. Messaging scope/consent cleanup
+1. Dev visual acceptance and bounded follow-up fixes after the full-site refresh.
+2. Messaging scope/consent cleanup
    - channel + purpose becomes the hard marketing-permission boundary;
    - scope becomes compatibility/context metadata.
-4. Preset/bootstrap hardening and portable stable-key Campaign JSON.
-5. Final acceptance and Slam Dunk go-live.
+3. Preset/bootstrap hardening and portable stable-key Campaign JSON.
+4. Final acceptance and Slam Dunk go-live.

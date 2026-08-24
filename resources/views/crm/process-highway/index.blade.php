@@ -35,6 +35,14 @@
         'consequence' => 'Outcome',
         'exit' => 'Exit',
     ];
+    $mechanismLabels = [
+        'campaigns' => 'Eligibility-driven messaging',
+        'flow_routes' => 'Procedural orchestration',
+    ];
+    $mechanismExplanations = [
+        'campaigns' => 'Campaigns continuously decide who qualifies for this messaging program.',
+        'flow_routes' => 'Flow Routes execute an ordered sequence when branching or multi-step coordination matters.',
+    ];
 @endphp
 
 <x-layouts.crm
@@ -120,6 +128,24 @@
                             </div>
                         </dl>
                     @endif
+                </div>
+
+                <div class="mt-6 grid gap-3 md:grid-cols-3">
+                    <div class="rounded-2xl bg-slate-50 px-4 py-4 ring-1 ring-slate-200">
+                        <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Process Highway</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-900">The map and visibility layer</p>
+                        <p class="mt-1 text-xs leading-5 text-slate-600">It explains the process without executing or owning it.</p>
+                    </div>
+                    <div class="rounded-2xl px-4 py-4 ring-1 {{ module_tone('campaigns', 'panel') }}">
+                        <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Campaigns</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-900">Eligibility-driven communication</p>
+                        <p class="mt-1 text-xs leading-5 text-slate-600">Contacts matching durable facts enter the messaging program directly.</p>
+                    </div>
+                    <div class="rounded-2xl px-4 py-4 ring-1 {{ module_tone('flow_routes', 'panel') }}">
+                        <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Flow Routes</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-900">Procedural orchestration</p>
+                        <p class="mt-1 text-xs leading-5 text-slate-600">Routes appear only where ordering, branching, or coordination is configured.</p>
+                    </div>
                 </div>
             </div>
         </section>
@@ -252,9 +278,9 @@
                                 </div>
 
                                 <div class="flex flex-wrap gap-2">
-                                    @foreach($businessHighway['source_labels'] as $sourceLabel)
-                                        <span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
-                                            {{ $sourceLabel }}
+                                    @foreach($businessHighway['source_keys'] as $sourceKey)
+                                        <span class="rounded-full px-2.5 py-1 text-xs font-semibold ring-1 {{ module_tone($sourceKey, 'badge') }}">
+                                            {{ \Illuminate\Support\Str::headline($sourceKey) }}
                                         </span>
                                     @endforeach
                                 </div>
@@ -294,15 +320,23 @@
                                     </svg>
                                 </div>
 
-                                <section aria-label="Configured mechanisms">
-                                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">What happens automatically</p>
-                                    <div class="mt-3 grid gap-4 2xl:grid-cols-2">
+                                <section aria-label="Business mechanisms">
+                                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">What happens, in order</p>
+                                    <div class="mt-3 space-y-4">
                                         @foreach($businessHighway['segments'] as $segment)
                                             @php($segmentTarget = $segment['navigation_target'])
-                                            <article class="flex min-w-0 flex-col rounded-2xl p-4 ring-1 sm:p-5 {{ module_tone($segment['source_key'], 'panel') }}">
+                                            <article
+                                                x-data="{ expanded: false }"
+                                                data-process-highway-segment="{{ $segment['key'] }}"
+                                                data-process-highway-owner="{{ $segment['source_key'] }}"
+                                                class="flex min-w-0 flex-col rounded-2xl p-4 ring-1 sm:p-5 {{ module_tone($segment['source_key'], 'panel') }}"
+                                            >
                                                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                                     <div class="min-w-0">
                                                         <div class="flex flex-wrap items-center gap-2">
+                                                            <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-950 text-xs font-bold text-white">
+                                                                {{ $loop->iteration }}
+                                                            </span>
                                                             <span class="rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ module_tone($segment['source_key'], 'badge') }}">
                                                                 {{ $segment['authority']['owner_label'] }}
                                                             </span>
@@ -316,9 +350,17 @@
                                                             </span>
                                                         </div>
 
-                                                        <h3 class="mt-3 text-base font-semibold leading-6 text-slate-950">{{ $segment['name'] }}</h3>
+                                                        <p class="mt-3 text-[0.68rem] font-bold uppercase tracking-[0.12em] text-slate-500">
+                                                            {{ $mechanismLabels[$segment['source_key']] ?? 'Owned process mechanism' }}
+                                                        </p>
+
+                                                        <h3 class="mt-1 text-base font-semibold leading-6 text-slate-950">{{ $segment['name'] }}</h3>
                                                         @if($segment['description'])
                                                             <p class="mt-1 text-sm leading-5 text-slate-600">{{ $segment['description'] }}</p>
+                                                        @endif
+
+                                                        @if(isset($mechanismExplanations[$segment['source_key']]))
+                                                            <p class="mt-2 text-xs leading-5 text-slate-500">{{ $mechanismExplanations[$segment['source_key']] }}</p>
                                                         @endif
                                                     </div>
 
@@ -340,7 +382,13 @@
                                                 <ol class="mt-4 space-y-0">
                                                     @forelse($segment['journey_nodes'] as $node)
                                                         @php($target = $node['navigation_target'])
-                                                        <li class="relative flex gap-3 pb-4 last:pb-0">
+                                                        <li
+                                                            @if($loop->iteration > 4)
+                                                                x-cloak
+                                                                x-show="expanded"
+                                                            @endif
+                                                            class="relative flex gap-3 pb-4 last:pb-0"
+                                                        >
                                                             @if(! $loop->last)
                                                                 <span class="absolute bottom-0 left-[0.6875rem] top-6 w-px bg-slate-300" aria-hidden="true"></span>
                                                             @endif
@@ -370,6 +418,17 @@
                                                         </li>
                                                     @endforelse
                                                 </ol>
+
+                                                @if(count($segment['journey_nodes']) > 4)
+                                                    <button
+                                                        type="button"
+                                                        x-on:click="expanded = ! expanded"
+                                                        class="mt-1 self-start text-xs font-semibold text-slate-700 underline decoration-slate-300 underline-offset-4 transition hover:text-slate-950"
+                                                    >
+                                                        <span x-show="! expanded">Show {{ count($segment['journey_nodes']) - 4 }} more steps</span>
+                                                        <span x-cloak x-show="expanded">Show fewer steps</span>
+                                                    </button>
+                                                @endif
 
                                                 @if($segment['branch_edges'] !== [])
                                                     <div class="mt-4 border-t border-black/5 pt-4">

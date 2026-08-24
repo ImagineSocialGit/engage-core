@@ -53,6 +53,7 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
         $presentedPoints = collect(
             $this->presentation->presentedPoints($route, $points),
         )->keyBy('key');
+        $replyProfileKeys = $this->replyProfileKeys($points);
         $processKey = ProcessHighwaySemanticKey::flowRoute((string) $route->key);
         $routeTarget = $this->routeTarget($route);
         $routeAuthority = new ProcessHighwayAuthority(
@@ -79,21 +80,25 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
             ],
         ));
 
-        [$triggerNode, $triggerSummary] = $this->triggerNode(
+        [$triggerNodes, $triggerSummary] = $this->triggerNodes(
             route: $route,
             routePresentation: $routePresentation,
             routeTarget: $routeTarget,
+            replyProfileKeys: $replyProfileKeys,
         );
-        $this->putNode($nodes, $triggerNode);
-        $edges[] = new ProcessHighwayEdge(
-            key: $processKey.':edge:trigger',
-            fromNodeKey: $triggerNode->key,
-            toNodeKey: $processKey,
-            role: ProcessHighwayEdge::ROLE_STARTS,
-            authority: $routeAuthority,
-            label: 'Starts Route',
-            sortOrder: $edgeOrder++,
-        );
+
+        foreach ($triggerNodes as $triggerIndex => $triggerNode) {
+            $this->putNode($nodes, $triggerNode);
+            $edges[] = new ProcessHighwayEdge(
+                key: $processKey.':edge:trigger:'.$triggerIndex,
+                fromNodeKey: $triggerNode->key,
+                toNodeKey: $processKey,
+                role: ProcessHighwayEdge::ROLE_STARTS,
+                authority: $routeAuthority,
+                label: 'Starts Route',
+                sortOrder: $edgeOrder++,
+            );
+        }
 
         $completedExitKey = $processKey.':exit:completed';
         $this->putNode($nodes, new ProcessHighwayNode(
@@ -258,12 +263,17 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
             authority: $routeAuthority,
             nodes: array_values($nodes),
             edges: $edges,
-            entryNodeKeys: [$triggerNode->key],
+            entryNodeKeys: array_map(
+                fn (ProcessHighwayNode $triggerNode): string => $triggerNode->key,
+                $triggerNodes,
+            ),
             exitNodeKeys: array_values(array_unique($exitNodeKeys)),
             state: 'active',
             stateLabel: 'Active',
             entrySummary: $triggerSummary,
+            sortOrder: $this->sortOrder($route, $replyProfileKeys),
             attributes: [
+                'mechanism_role' => 'procedural_orchestration',
                 'flow_route_id' => (int) $route->getKey(),
                 'flow_route_key' => (string) $route->key,
                 'trigger_type' => (string) ($route->trigger_type ?? ''),
@@ -271,6 +281,7 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
                 'category' => (string) data_get($route->meta, 'definition.category', 'other'),
                 'role' => (string) data_get($route->meta, 'definition.role', ''),
                 'point_count' => $points->count(),
+                'reply_profile_keys' => $replyProfileKeys,
             ],
         );
     }
@@ -284,16 +295,50 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
 
     /**
      * @param array<string, mixed> $routePresentation
-     * @return array{0: ProcessHighwayNode, 1: string}
+     * @param array<int, string> $replyProfileKeys
+     * @return array{0: array<int, ProcessHighwayNode>, 1: string}
      */
-    private function triggerNode(
+    private function triggerNodes(
         FlowRoute $route,
         array $routePresentation,
         ProcessHighwayEditTarget $routeTarget,
+        array $replyProfileKeys,
     ): array {
         $triggerType = (string) ($route->trigger_type ?? FlowRoute::TRIGGER_MANUAL);
         $triggerKey = trim((string) ($route->trigger_key ?? ''));
         $summary = trim((string) ($routePresentation['trigger_summary'] ?? ''));
+
+        if (
+            $triggerType === FlowRoute::TRIGGER_AUTOMATION_EVENT
+            && $triggerKey === 'inbound_message.normal_reply'
+            && $replyProfileKeys !== []
+        ) {
+            return [
+                array_map(
+                    fn (string $replyProfileKey): ProcessHighwayNode => new ProcessHighwayNode(
+                        key: ProcessHighwaySemanticKey::replyProfile($replyProfileKey),
+                        label: $this->replyProfileLabel($replyProfileKey),
+                        role: ProcessHighwayNode::ROLE_TRIGGER,
+                        authority: new ProcessHighwayAuthority(
+                            ownerKey: 'inbound_messaging',
+                            editTargets: [$routeTarget],
+                        ),
+                        detail: $summary !== '' ? $summary : null,
+                        sortOrder: 10,
+                        referenceOnly: true,
+                        attributes: [
+                            'event_key' => $triggerKey,
+                            'reply_profile_key' => $replyProfileKey,
+                        ],
+                    ),
+                    $replyProfileKeys,
+                ),
+                'A contact replies through '.implode(' or ', array_map(
+                    fn (string $replyProfileKey): string => Str::headline($replyProfileKey),
+                    $replyProfileKeys,
+                )).'.',
+            ];
+        }
 
         if ($triggerType === FlowRoute::TRIGGER_CONTACT_STATUS) {
             $statusLabel = Str::headline($triggerKey);
@@ -306,7 +351,7 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
                 $statusLabel = Str::before($statusLabel, ' through ');
             }
 
-            return [
+            return [[
                 new ProcessHighwayNode(
                     key: ProcessHighwaySemanticKey::status($triggerKey),
                     label: 'Status: '.$statusLabel,
@@ -323,14 +368,13 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
                         'value' => $triggerKey,
                     ],
                 ),
-                $summary !== '' ? $summary : "A contact becomes {$statusLabel}.",
-            ];
+            ], $summary !== '' ? $summary : "A contact becomes {$statusLabel}."];
         }
 
         if ($triggerType === FlowRoute::TRIGGER_AUTOMATION_EVENT) {
             $ownerKey = $this->automationEventOwner($triggerKey);
 
-            return [
+            return [[
                 new ProcessHighwayNode(
                     key: ProcessHighwaySemanticKey::automationEvent($triggerKey),
                     label: $this->automationEventLabel($triggerKey),
@@ -346,13 +390,12 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
                         'event_key' => $triggerKey,
                     ],
                 ),
-                $summary !== '' ? $summary : 'The configured automation event happens.',
-            ];
+            ], $summary !== '' ? $summary : 'The configured automation event happens.'];
         }
 
         $manualKey = ProcessHighwaySemanticKey::flowRoute((string) $route->key).':entry:manual';
 
-        return [
+        return [[
             new ProcessHighwayNode(
                 key: $manualKey,
                 label: 'Manual start',
@@ -363,8 +406,7 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
                 ),
                 sortOrder: 10,
             ),
-            $summary !== '' ? $summary : 'Someone starts this Route manually.',
-        ];
+        ], $summary !== '' ? $summary : 'Someone starts this Route manually.'];
     }
 
     /**
@@ -731,6 +773,66 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
             'not_in' => 'is not ',
             default => 'is ',
         }.$valueLabel;
+    }
+
+    /**
+     * @param Collection<int, FlowRoutePoint> $points
+     * @return array<int, string>
+     */
+    private function replyProfileKeys(Collection $points): array
+    {
+        return $points
+            ->flatMap(function (FlowRoutePoint $point): array {
+                $definition = $this->definition($point);
+                $branches = is_array($definition['branches'] ?? null)
+                    ? array_values(array_filter($definition['branches'], 'is_array'))
+                    : [];
+
+                return collect($branches)
+                    ->flatMap(fn (array $branch): array => is_array($branch['conditions'] ?? null)
+                        ? array_values(array_filter($branch['conditions'], 'is_array'))
+                        : [])
+                    ->filter(function (array $condition): bool {
+                        $path = $this->string($condition['path'] ?? null);
+                        $operator = $this->string($condition['operator'] ?? null) ?? 'equals';
+
+                        return $path !== null
+                            && str_ends_with($path, 'reply_profile_key')
+                            && in_array($operator, ['equals', 'equal', 'in'], true);
+                    })
+                    ->flatMap(function (array $condition): array {
+                        $values = is_array($condition['values'] ?? null)
+                            ? $condition['values']
+                            : [$condition['value'] ?? null];
+
+                        return array_values(array_filter(array_map(
+                            fn (mixed $value): ?string => $this->string($value),
+                            $values,
+                        )));
+                    })
+                    ->all();
+            })
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    /** @param array<int, string> $replyProfileKeys */
+    private function sortOrder(FlowRoute $route, array $replyProfileKeys): int
+    {
+        if ($replyProfileKeys === []) {
+            return 100;
+        }
+
+        return data_get($route->meta, 'definition.category') === 'reply_acknowledgement'
+            ? 240
+            : 200;
+    }
+
+    private function replyProfileLabel(string $replyProfileKey): string
+    {
+        return 'Reply to '.Str::headline($replyProfileKey).' messages';
     }
 
     private function automationEventOwner(string $eventKey): string

@@ -63,6 +63,11 @@ final class ProcessHighwaySemanticKey
         return 'automation:event:'.self::segment($eventKey);
     }
 
+    public static function replyProfile(string $replyProfileKey): string
+    {
+        return 'inbound_messaging:reply_profile:'.self::segment($replyProfileKey);
+    }
+
     public static function criterion(string $criterionKey, string $value): string
     {
         return match ($criterionKey) {

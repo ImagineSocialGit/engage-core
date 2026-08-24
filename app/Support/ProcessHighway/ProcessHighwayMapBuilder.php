@@ -204,7 +204,7 @@ final class ProcessHighwayMapBuilder
             })
             ->values();
         $componentEdgesByKey = $edges->keyBy('key');
-        $entryNodeKeys = $segments
+        $candidateEntryKeys = $segments
             ->flatMap(fn (array $segment): array => $segment['entry_node_keys'] ?? [])
             ->filter(fn (mixed $key): bool => is_string($key) && $componentNodesByKey->has($key))
             ->unique()
@@ -218,6 +218,18 @@ final class ProcessHighwayMapBuilder
             ->pluck('from_node_key')
             ->filter(fn (mixed $key): bool => is_string($key))
             ->unique();
+        $incomingNodeKeys = $edges
+            ->pluck('to_node_key')
+            ->filter(fn (mixed $key): bool => is_string($key))
+            ->unique();
+        $entryNodeKeys = $candidateEntryKeys
+            ->reject(fn (string $key): bool => $incomingNodeKeys->contains($key))
+            ->values();
+
+        if ($entryNodeKeys->isEmpty()) {
+            $entryNodeKeys = $candidateEntryKeys;
+        }
+
         $terminalExitKeys = $candidateExitKeys
             ->reject(fn (string $key): bool => $outgoingNodeKeys->contains($key))
             ->values();

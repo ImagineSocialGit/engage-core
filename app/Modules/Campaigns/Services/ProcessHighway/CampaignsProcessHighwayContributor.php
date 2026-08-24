@@ -20,6 +20,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
 {
     public function __construct(
         private readonly CampaignWorkspacePresenter $workspacePresenter,
+        private readonly CampaignReplyProfileResolver $replyProfileResolver,
     ) {}
 
     /** @return iterable<int, ProcessHighwayContribution> */
@@ -51,6 +52,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
         array $statusNames,
     ): ProcessHighwayContribution {
         $workspace = $this->workspacePresenter->forCampaign($campaign);
+        $replyProfileKeys = $this->replyProfileResolver->resolve($campaign);
         $conditions = $this->conditions($campaign, $statusNames);
         $processKey = ProcessHighwaySemanticKey::campaign((string) $campaign->key);
         $linkTarget = $this->campaignLinkTarget($campaign);
@@ -300,6 +302,40 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
             sortOrder: $edgeOrder++,
         );
 
+        foreach ($replyProfileKeys as $replyProfileIndex => $replyProfileKey) {
+            $replyNodeKey = ProcessHighwaySemanticKey::replyProfile($replyProfileKey);
+            $replyAuthority = new ProcessHighwayAuthority(
+                ownerKey: 'inbound_messaging',
+                editTargets: [$messagesLinkTarget, $linkTarget],
+            );
+
+            $nodes[] = new ProcessHighwayNode(
+                key: $replyNodeKey,
+                label: $this->replyProfileLabel($replyProfileKey),
+                role: ProcessHighwayNode::ROLE_TRIGGER,
+                authority: $replyAuthority,
+                detail: 'A reply to this Campaign carries the configured business reply profile.',
+                sortOrder: 225 + $replyProfileIndex,
+                referenceOnly: true,
+                attributes: [
+                    'event_key' => 'inbound_message.normal_reply',
+                    'reply_profile_key' => $replyProfileKey,
+                ],
+            );
+            $edges[] = new ProcessHighwayEdge(
+                key: $processKey.':edge:reply-profile:'.rawurlencode($replyProfileKey),
+                fromNodeKey: $journeyKey,
+                toNodeKey: $replyNodeKey,
+                role: ProcessHighwayEdge::ROLE_BRANCH,
+                authority: $journeyAuthority,
+                label: 'If the contact replies',
+                sortOrder: $edgeOrder++,
+                attributes: [
+                    'reply_profile_key' => $replyProfileKey,
+                ],
+            );
+        }
+
         $completeKey = $processKey.':exit:completed';
         $nodes[] = new ProcessHighwayNode(
             key: $completeKey,
@@ -392,8 +428,10 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
             state: $campaign->isActive() ? 'active' : 'off',
             stateLabel: $campaign->isActive() ? 'Active' : 'Off',
             entrySummary: $this->startsWhen($campaign, $conditions),
+            sortOrder: 100,
             details: $this->details($campaign, $conditions, $workspace),
             attributes: [
+                'mechanism_role' => 'eligibility_program',
                 'campaign_id' => (int) $campaign->getKey(),
                 'campaign_key' => (string) $campaign->key,
                 'enrollment_mode' => (string) $campaign->enrollment_mode,
@@ -408,6 +446,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
                 'message_step_count' => (int) ($workspace['message_step_count'] ?? 0),
                 'message_count' => (int) ($workspace['message_count'] ?? 0),
                 'channels' => $workspace['channels'] ?? [],
+                'reply_profile_keys' => $replyProfileKeys,
             ],
         );
     }
@@ -571,6 +610,11 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
             Campaign::INELIGIBLE_CANCEL => 'Stop if eligibility ends',
             default => 'Keep running if eligibility ends',
         };
+    }
+
+    private function replyProfileLabel(string $replyProfileKey): string
+    {
+        return 'Reply to '.Str::headline($replyProfileKey).' messages';
     }
 
     /**
