@@ -5,6 +5,7 @@ namespace App\Modules\Campaigns\Actions;
 use App\Modules\Campaigns\Data\CampaignEligibilityLifecycleResult;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Services\CampaignEligibilityReevaluationGuard;
+use App\Modules\Campaigns\Services\CampaignEligibilityReconciliationPlanner;
 use App\Modules\Core\Models\Contact;
 use Illuminate\Support\Carbon;
 
@@ -13,6 +14,7 @@ final class ReconcileContactCampaignEligibilityAction
     public function __construct(
         private readonly ApplyAutomaticCampaignEligibilityAction $applyEligibility,
         private readonly CampaignEligibilityReevaluationGuard $guard,
+        private readonly CampaignEligibilityReconciliationPlanner $planner,
     ) {}
 
     /**
@@ -26,11 +28,14 @@ final class ReconcileContactCampaignEligibilityAction
             return [];
         }
 
-        $campaigns = Campaign::query()
-            ->active()
-            ->where('enrollment_mode', Campaign::ENROLLMENT_MODE_AUTOMATIC)
-            ->orderBy('id')
-            ->get();
+        $campaigns = $this->planner->orderForContact(
+            contact: $contact,
+            campaigns: Campaign::query()
+                ->active()
+                ->where('enrollment_mode', Campaign::ENROLLMENT_MODE_AUTOMATIC)
+                ->orderBy('id')
+                ->get(),
+        );
 
         $results = [];
 

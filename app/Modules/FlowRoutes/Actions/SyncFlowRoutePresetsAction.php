@@ -54,7 +54,89 @@ class SyncFlowRoutePresetsAction
             $this->syncFlowRoutePreset($definition, $result, $force);
         }
 
+        $this->retireStalePresetRoutes(
+            resolved: $resolved,
+            result: $result,
+            force: $force,
+        );
+
         return $result;
+    }
+
+    private function retireStalePresetRoutes(
+        ResolvedPresetDomain $resolved,
+        FlowRoutePresetSyncResult $result,
+        bool $force,
+    ): void {
+        $currentKeys = array_values(array_unique(array_map(
+            fn (mixed $key): string => trim((string) $key),
+            $resolved->definitionKeys,
+        )));
+
+        $staleRoutes = FlowRoute::query()
+            ->currentVersion()
+            ->where('meta->preset->client_preset_key', $resolved->presetKey)
+            ->when(
+                $currentKeys !== [],
+                fn ($query) => $query->whereNotIn('key', $currentKeys),
+            )
+            ->orderBy('id')
+            ->get();
+
+        foreach ($staleRoutes as $flowRoute) {
+            if ($flowRoute->is_customized && ! $force) {
+                $result->recordSkipped('flow_routes');
+                $result->warn(
+                    "Customized stale FlowRoute [{$flowRoute->key}] was preserved because force was not requested."
+                );
+
+                continue;
+            }
+
+            if ($flowRoute->contactFlowRouteProgress()->runnable()->exists()) {
+                DB::transaction(function () use ($flowRoute, $result): void {
+                    $this->deactivateTriggerBindings($flowRoute, $result);
+                });
+
+                $result->recordSkipped('flow_routes');
+                $result->warn(
+                    "Stale FlowRoute [{$flowRoute->key}] still has runnable progress. New trigger bindings were retired, but the Route remains active so existing progress can finish."
+                );
+
+                continue;
+            }
+
+            if (! $flowRoute->is_active) {
+                $this->deactivateTriggerBindings($flowRoute, $result);
+
+                continue;
+            }
+
+            DB::transaction(function () use ($flowRoute, $result): void {
+                $flowRoute->forceFill([
+                    'is_active' => false,
+                ])->save();
+
+                $result->recordUpdated('flow_routes');
+                $this->deactivateTriggerBindings($flowRoute, $result);
+            });
+        }
+    }
+
+    private function deactivateTriggerBindings(
+        FlowRoute $flowRoute,
+        FlowRoutePresetSyncResult $result,
+    ): void {
+        $flowRoute->triggerBindings()
+            ->where('is_active', true)
+            ->get()
+            ->each(function (FlowRouteTriggerBinding $binding) use ($result): void {
+                $binding->forceFill([
+                    'is_active' => false,
+                ])->save();
+
+                $result->recordUpdated('flow_route_trigger_bindings');
+            });
     }
 
     private function syncFlowRoutePreset(

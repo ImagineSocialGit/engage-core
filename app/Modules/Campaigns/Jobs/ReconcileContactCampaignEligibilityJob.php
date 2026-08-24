@@ -5,6 +5,7 @@ namespace App\Modules\Campaigns\Jobs;
 use App\Modules\Campaigns\Actions\ApplyAutomaticCampaignEligibilityAction;
 use App\Modules\Campaigns\Services\CampaignEligibilityDependencyResolver;
 use App\Modules\Campaigns\Services\CampaignEligibilityReevaluationGuard;
+use App\Modules\Campaigns\Services\CampaignEligibilityReconciliationPlanner;
 use App\Modules\Core\Models\Contact;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -36,6 +37,7 @@ final class ReconcileContactCampaignEligibilityJob implements ShouldQueue
     public function handle(
         CampaignEligibilityDependencyResolver $dependencies,
         CampaignEligibilityReevaluationGuard $guard,
+        CampaignEligibilityReconciliationPlanner $planner,
         ApplyAutomaticCampaignEligibilityAction $applyEligibility,
     ): void {
         $contact = Contact::query()->find($this->contactId);
@@ -44,7 +46,12 @@ final class ReconcileContactCampaignEligibilityJob implements ShouldQueue
             return;
         }
 
-        foreach ($dependencies->forCriterionKeys($this->criterionKeys) as $campaign) {
+        $campaigns = $planner->orderForContact(
+            contact: $contact,
+            campaigns: $dependencies->forCriterionKeys($this->criterionKeys),
+        );
+
+        foreach ($campaigns as $campaign) {
             $applyEligibility->handle(
                 campaign: $campaign,
                 contact: $contact,

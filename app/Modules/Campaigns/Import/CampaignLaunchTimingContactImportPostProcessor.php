@@ -2,8 +2,11 @@
 
 namespace App\Modules\Campaigns\Import;
 
+use App\Modules\Campaigns\Actions\ApplyAutomaticCampaignEligibilityAction;
 use App\Modules\Campaigns\Actions\ScheduleCampaignImportBatchInitialMessagesAction;
+use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Campaigns\Services\CampaignEligibilityReconciliationPlanner;
 use App\Modules\Core\Contracts\Contacts\ContactImportPostProcessor;
 use App\Modules\Core\Contracts\Contacts\ContactImportPostProcessorBatchFinalizer;
 use App\Modules\Core\Contracts\Contacts\ContactImportPostProcessorInputProvider;
@@ -25,6 +28,8 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
 
     public function __construct(
         private readonly ScheduleCampaignImportBatchInitialMessagesAction $scheduleBatch,
+        private readonly ApplyAutomaticCampaignEligibilityAction $applyAutomaticEligibility,
+        private readonly CampaignEligibilityReconciliationPlanner $reconciliationPlanner,
     ) {}
 
     public function key(): string
@@ -90,7 +95,7 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
     {
         $config = $this->normalizeConfig($config);
 
-        return "Keep Campaign [{$config['campaign_key']}] on normal lifecycle routing, then apply the selected first-message time after the whole import batch finishes.";
+        return "Resolve Campaign [{$config['campaign_key']}] through its normal enrollment policy, then apply the selected first-message time after the whole import batch finishes.";
     }
 
     public function inputDefinitions(array $config): array
@@ -103,7 +108,7 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
             'label' => 'Start sending',
             'type' => 'datetime-local',
             'required' => true,
-            'description' => "Choose when the first email/SMS touch for Campaign [{$config['campaign_key']}] should become due. Time is shown in {$timezone}. The batch is fully imported before this timing is applied.",
+            'description' => "Choose when the first email/SMS touch for Campaign [{$config['campaign_key']}] should become due. Time is shown in {$timezone}. Automatic eligibility is resolved per Contact, and the whole batch is fully imported before launch timing is applied.",
         ]];
     }
 
@@ -166,6 +171,11 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
     ): ContactImportPostProcessResult {
         $config = $this->requiredRuntimeConfig($config);
 
+        $this->prepareAutomaticEnrollment(
+            context: $context,
+            campaignKey: $config['campaign_key'],
+        );
+
         $enrollment = CampaignEnrollment::query()
             ->with('messageChainEnrollment')
             ->where('contact_id', $context->contact->getKey())
@@ -184,7 +194,7 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
         if (! $enrollment instanceof CampaignEnrollment) {
             return ContactImportPostProcessResult::blocked(
                 reasonCode: 'campaign_launch_enrollment_missing',
-                message: "Campaign [{$config['campaign_key']}] was not opened by the normal import treatment/lifecycle route.",
+                message: "Campaign [{$config['campaign_key']}] was not opened by the Contact's current Campaign enrollment policy.",
                 meta: [
                     'campaign_key' => $config['campaign_key'],
                 ],
@@ -277,6 +287,32 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
                 $result['enrollment_count'],
             ),
         );
+    }
+
+    private function prepareAutomaticEnrollment(
+        ContactImportContext $context,
+        string $campaignKey,
+    ): void {
+        $campaign = Campaign::query()
+            ->where('key', $campaignKey)
+            ->first();
+
+        if (! $campaign instanceof Campaign || ! $campaign->usesAutomaticEnrollment()) {
+            return;
+        }
+
+        $campaigns = $this->reconciliationPlanner->targetWithOpenFamilyCampaigns(
+            contact: $context->contact,
+            target: $campaign,
+        );
+
+        foreach ($campaigns as $candidate) {
+            $this->applyAutomaticEligibility->handle(
+                campaign: $candidate,
+                contact: $context->contact,
+                eagerProcess: false,
+            );
+        }
     }
 
     /**

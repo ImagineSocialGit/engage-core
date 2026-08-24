@@ -5,6 +5,7 @@ namespace App\Modules\Campaigns\Listeners;
 use App\Modules\Campaigns\Actions\ApplyAutomaticCampaignEligibilityAction;
 use App\Modules\Campaigns\Services\CampaignEligibilityDependencyResolver;
 use App\Modules\Campaigns\Services\CampaignEligibilityReevaluationGuard;
+use App\Modules\Campaigns\Services\CampaignEligibilityReconciliationPlanner;
 use App\Modules\Core\Models\Contact;
 use App\Support\AutomationEvents\Data\AutomationEventData;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
@@ -18,6 +19,7 @@ final class ReconcileCampaignEligibilityFromAutomationEvent
         private readonly AutomationEventConsumer $automationEventConsumer,
         private readonly CampaignEligibilityDependencyResolver $dependencies,
         private readonly CampaignEligibilityReevaluationGuard $guard,
+        private readonly CampaignEligibilityReconciliationPlanner $planner,
         private readonly ApplyAutomaticCampaignEligibilityAction $applyEligibility,
     ) {}
 
@@ -73,7 +75,12 @@ final class ReconcileCampaignEligibilityFromAutomationEvent
             return;
         }
 
-        foreach ($this->dependencies->forCriterionKeys($criterionKeys) as $campaign) {
+        $campaigns = $this->planner->orderForContact(
+            contact: $contact,
+            campaigns: $this->dependencies->forCriterionKeys($criterionKeys),
+        );
+
+        foreach ($campaigns as $campaign) {
             $this->applyEligibility->handle(
                 campaign: $campaign,
                 contact: $contact,

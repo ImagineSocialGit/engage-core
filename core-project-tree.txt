@@ -181,6 +181,7 @@
 │   │   │   │   ├── CampaignEligibilityAuthoringService.php
 │   │   │   │   ├── CampaignEligibilityDependencyResolver.php
 │   │   │   │   ├── CampaignEligibilityEvaluator.php
+│   │   │   │   ├── CampaignEligibilityReconciliationPlanner.php
 │   │   │   │   ├── CampaignEligibilityReevaluationGuard.php
 │   │   │   │   ├── CampaignEnrollmentArbitrator.php
 │   │   │   │   ├── CampaignMessageChainDefinitionBuilder.php
@@ -2232,8 +2233,10 @@
 │   │   ├── Campaigns
 │   │   │   ├── CampaignAnnualTouchAuthoringTest.php
 │   │   │   ├── CampaignAnnualTouchRuntimeTest.php
+│   │   │   ├── CampaignAutomaticEligibilityImportLaunchTest.php
 │   │   │   ├── CampaignEligibilityAuthoringTest.php
 │   │   │   ├── CampaignEligibilityFactReevaluationTest.php
+│   │   │   ├── CampaignEligibilityFamilyReconciliationTest.php
 │   │   │   ├── CampaignEligibilityFoundationTest.php
 │   │   │   ├── CampaignEligibilityLifecycleRuntimeTest.php
 │   │   │   ├── CampaignEnrollmentContactImportPostProcessorTest.php
@@ -2330,6 +2333,7 @@
 │   │   │   ├── FlowRouteIndexAuthoringLinkTest.php
 │   │   │   ├── FlowRoutePointExecutionFoundationTest.php
 │   │   │   ├── FlowRoutePointPlacementPolicyTest.php
+│   │   │   ├── FlowRoutePresetStaleRetirementTest.php
 │   │   │   ├── FlowRouteProgressMetaCanonicalizerTest.php
 │   │   │   ├── FlowRoutesModelSchemaTest.php
 │   │   │   ├── FlowRoutesSetupValidationContributorTest.php
@@ -2678,4 +2682,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-655 directories, 2024 files
+655 directories, 2028 files

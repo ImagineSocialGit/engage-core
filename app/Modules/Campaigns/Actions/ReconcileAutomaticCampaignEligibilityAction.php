@@ -4,6 +4,7 @@ namespace App\Modules\Campaigns\Actions;
 
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Services\CampaignEligibilityReevaluationGuard;
+use App\Modules\Campaigns\Services\CampaignEligibilityReconciliationPlanner;
 use App\Modules\Core\Models\Contact;
 use Illuminate\Support\Carbon;
 use InvalidArgumentException;
@@ -16,6 +17,7 @@ final class ReconcileAutomaticCampaignEligibilityAction
     public function __construct(
         private readonly ApplyAutomaticCampaignEligibilityAction $applyEligibility,
         private readonly CampaignEligibilityReevaluationGuard $guard,
+        private readonly CampaignEligibilityReconciliationPlanner $planner,
     ) {}
 
     /**
@@ -70,7 +72,12 @@ final class ReconcileAutomaticCampaignEligibilityAction
 
                         $summary['contacts_processed']++;
 
-                        foreach ($campaigns as $campaign) {
+                        $orderedCampaigns = $this->planner->orderForContact(
+                            contact: $contact,
+                            campaigns: $campaigns,
+                        );
+
+                        foreach ($orderedCampaigns as $campaign) {
                             $result = $this->applyEligibility->handle(
                                 campaign: $campaign,
                                 contact: $contact,
