@@ -1,8 +1,26 @@
 <?php
 
 return [
-    'version' => 4,
+    'version' => 5,
     'tables' => [
+        'inbound_email_routes' => [
+            'mode' => 'upsert',
+            'identity' => ['key'],
+            'preserve_id' => false,
+            'order_by' => ['key'],
+            'columns' => [
+                'id',
+                'key',
+                'local_part',
+                'label',
+                'source',
+                'context_key',
+                'is_active',
+                'created_at',
+                'updated_at',
+            ],
+        ],
+
         'inbound_reply_profiles' => [
             'mode' => 'upsert',
             'identity' => ['key'],
@@ -104,6 +122,9 @@ return [
                 'correlated_scheduled_message_id',
                 'reply_intent_key',
                 'reply_correlation_method',
+                'inbound_email_route_key',
+                'inbound_email_route_source',
+                'inbound_email_route_context',
                 'received_at',
                 'processed_at',
                 'meta',

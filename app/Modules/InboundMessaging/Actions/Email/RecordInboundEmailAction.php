@@ -5,7 +5,9 @@ namespace App\Modules\InboundMessaging\Actions\Email;
 use App\Modules\Core\Models\Contact;
 use App\Modules\InboundMessaging\Actions\ProcessInboundMessageAction;
 use App\Modules\InboundMessaging\Actions\RecordInboundMessageAction;
+use App\Modules\InboundMessaging\Data\Email\ResolvedInboundEmailRoute;
 use App\Modules\InboundMessaging\Models\InboundMessage;
+use App\Modules\InboundMessaging\Services\Email\InboundEmailRouteResolver;
 use App\Modules\InboundMessaging\Services\Reply\InboundEmailReplyCorrelator;
 use App\Modules\InboundMessaging\Services\Reply\InboundReplyIntentClassifier;
 use App\Modules\InboundMessaging\Services\Reply\InboundReplyTextNormalizer;
@@ -20,6 +22,7 @@ class RecordInboundEmailAction
         private readonly RecordInboundMessageAction $recordInboundMessageAction,
         private readonly ProcessInboundMessageAction $processInboundMessageAction,
         private readonly InboundEmailReplyCorrelator $replyCorrelator,
+        private readonly InboundEmailRouteResolver $emailRouteResolver,
         private readonly InboundReplyTextNormalizer $replyTextNormalizer,
         private readonly InboundReplyIntentClassifier $replyIntentClassifier,
     ) {}
@@ -52,6 +55,10 @@ class RecordInboundEmailAction
         $correlated = $sender instanceof Contact
             ? $this->replyCorrelator->correlate($sender, $toAddresses)
             : null;
+        $resolvedRoute = $correlated instanceof ScheduledMessage
+            ? null
+            : $this->emailRouteResolver->resolve($toAddresses);
+        $route = $resolvedRoute?->route;
         $body = $this->body($text, $html);
         $normalized = $this->replyTextNormalizer->normalize($body);
         $intent = $this->replyIntentClassifier->classify(
@@ -70,7 +77,11 @@ class RecordInboundEmailAction
                 'from_type' => 'email',
                 'from_value' => $fromAddress,
                 'to_type' => 'email',
-                'to_value' => $this->preferredToAddress($toAddresses, $correlated),
+                'to_value' => $this->preferredToAddress(
+                    $toAddresses,
+                    $correlated,
+                    $resolvedRoute,
+                ),
                 'subject' => $this->subject($subject),
                 'body' => $body,
                 'classification' => InboundMessage::CLASSIFICATION_NORMAL_REPLY,
@@ -81,6 +92,9 @@ class RecordInboundEmailAction
                 'reply_correlation_method' => $correlated instanceof ScheduledMessage
                     ? 'exact'
                     : 'none',
+                'inbound_email_route_key' => $route?->key,
+                'inbound_email_route_source' => $route?->source,
+                'inbound_email_route_context' => $route?->context_key,
                 'received_at' => $receivedAt ? Carbon::parse($receivedAt) : now(),
                 'meta' => null,
             ],
@@ -103,14 +117,21 @@ class RecordInboundEmailAction
             ->first();
     }
 
-    private function preferredToAddress(array $addresses, ?ScheduledMessage $correlated): ?string
-    {
+    private function preferredToAddress(
+        array $addresses,
+        ?ScheduledMessage $correlated,
+        ?ResolvedInboundEmailRoute $resolvedRoute,
+    ): ?string {
         if ($correlated instanceof ScheduledMessage) {
             foreach ($addresses as $address) {
                 if (str_contains($address, 'reply+')) {
                     return $address;
                 }
             }
+        }
+
+        if ($resolvedRoute instanceof ResolvedInboundEmailRoute) {
+            return $resolvedRoute->address;
         }
 
         return $addresses[0] ?? null;

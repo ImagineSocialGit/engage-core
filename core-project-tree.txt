@@ -564,9 +564,12 @@
 │   │   │   │       ├── EmailWebhookController.php
 │   │   │   │       └── SmsWebhookController.php
 │   │   │   ├── Data
+│   │   │   │   └── Email
+│   │   │   │       └── ResolvedInboundEmailRoute.php
 │   │   │   ├── Events
 │   │   │   │   └── InboundMessageReceived.php
 │   │   │   ├── Models
+│   │   │   │   ├── InboundEmailRoute.php
 │   │   │   │   ├── InboundMessage.php
 │   │   │   │   ├── InboundMessageReceipt.php
 │   │   │   │   ├── InboundReplyIntent.php
@@ -584,7 +587,8 @@
 │   │   │   │   │   └── LeadRepliesDashboardPanelProvider.php
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailWebhookHandlerResolver.php
-│   │   │   │   │   └── EmailWebhookPayload.php
+│   │   │   │   │   ├── EmailWebhookPayload.php
+│   │   │   │   │   └── InboundEmailRouteResolver.php
 │   │   │   │   ├── InboundMessageRouter.php
 │   │   │   │   ├── Reply
 │   │   │   │   │   ├── EmailReplySubjectResolver.php
@@ -1829,7 +1833,8 @@
 │   │   │   │   ├── 2026_05_19_154535_create_inbound_messages_table.php
 │   │   │   │   ├── 2026_07_19_031500_create_inbound_message_receipts_table.php
 │   │   │   │   ├── 2026_08_22_061500_add_email_threading_fields_to_inbound_messages_table.php
-│   │   │   │   └── 2026_08_24_220000_create_inbound_reply_profile_tables.php
+│   │   │   │   ├── 2026_08_24_220000_create_inbound_reply_profile_tables.php
+│   │   │   │   └── 2026_08_25_120000_create_inbound_email_routes_and_add_route_evidence.php
 │   │   │   ├── internal_notifications
 │   │   │   │   ├── 2026_04_10_173406_create_team_members_table.php
 │   │   │   │   └── 2026_04_11_174215_create_team_member_notification_preferences_table.php
@@ -2469,6 +2474,8 @@
 │   │   │   ├── ContactConversationReplyControllerTest.php
 │   │   │   ├── ContactConversationShowDataProviderTest.php
 │   │   │   ├── HandleInboundEmailWebhookActionTest.php
+│   │   │   ├── InboundEmailRouteResolutionTest.php
+│   │   │   ├── InboundEmailRouteSetupValidationTest.php
 │   │   │   ├── InboundMessageAutomationOutboxTest.php
 │   │   │   ├── InboundNormalReplyAutomationEventTest.php
 │   │   │   ├── InboundReplyFoundationTest.php
@@ -2616,6 +2623,7 @@
 │   │   │   ├── CampaignsBroadcastsProjectStateRoundTripTest.php
 │   │   │   ├── CoreContactImportProvenanceProjectStateTest.php
 │   │   │   ├── FlowRoutesProjectStateRoundTripTest.php
+│   │   │   ├── InboundEmailRouteProjectStateRoundTripTest.php
 │   │   │   ├── InboundMessagingProjectStateRoundTripTest.php
 │   │   │   ├── InboundReplyProfileProjectStateRoundTripTest.php
 │   │   │   ├── InternalNotificationsProjectStateRoundTripTest.php
@@ -2802,4 +2810,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-679 directories, 2124 files
+680 directories, 2131 files

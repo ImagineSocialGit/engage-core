@@ -2,7 +2,9 @@
 
 namespace App\Modules\InboundMessaging\Validation;
 
+use App\Modules\InboundMessaging\Models\InboundEmailRoute;
 use App\Modules\InboundMessaging\Models\InboundReplyProfile;
+use App\Modules\InboundMessaging\Services\Email\InboundEmailRouteResolver;
 use App\Modules\InboundMessaging\Services\ReplyProfiles\ReplyProfileDefinitionNormalizer;
 use App\Support\ReplyHandling\Data\ReplyProfileDependency;
 use App\Support\ReplyHandling\ReplyProfileDependencyRegistry;
@@ -16,10 +18,13 @@ final class InboundMessagingSetupValidationContributor implements SetupValidatio
     public function __construct(
         private readonly ReplyProfileDefinitionNormalizer $normalizer,
         private readonly ReplyProfileDependencyRegistry $dependencies,
+        private readonly InboundEmailRouteResolver $emailRouteResolver,
     ) {}
 
     public function findings(): iterable
     {
+        yield from $this->emailRouteFindings();
+
         try {
             $configured = $this->normalizer->configured();
         } catch (Throwable $exception) {
@@ -99,6 +104,53 @@ final class InboundMessagingSetupValidationContributor implements SetupValidatio
                 yield $this->dependencyError(
                     $dependency,
                     "references unavailable intent [{$dependency->intentKey}] on reply profile [{$dependency->profileKey}]",
+                );
+            }
+        }
+    }
+
+    private function emailRouteFindings(): iterable
+    {
+        if (! Schema::hasTable('inbound_email_routes')) {
+            return;
+        }
+
+        $routes = InboundEmailRoute::query()
+            ->active()
+            ->orderBy('key')
+            ->get();
+
+        if ($routes->isEmpty()) {
+            return;
+        }
+
+        if ($this->emailRouteResolver->configuredDomain() === null) {
+            yield $this->error(
+                code: 'inbound_messaging.email_routes.inbound_domain_missing',
+                message: 'Active inbound email routes require a valid INBOUND_EMAIL_DOMAIN.',
+                source: 'messaging.email.inbound_domain',
+                path: 'messaging.email.inbound_domain',
+            );
+        }
+
+        foreach ($routes as $route) {
+            if ($this->emailRouteResolver->normalizeLocalPart($route->local_part) === null) {
+                yield $this->error(
+                    code: 'inbound_messaging.email_routes.local_part_invalid',
+                    message: "Inbound email route [{$route->key}] has invalid local-part [{$route->local_part}].",
+                    source: 'inbound_email_routes',
+                    path: "inbound_email_routes.{$route->key}.local_part",
+                    context: ['route_key' => $route->key],
+                );
+            }
+
+            if (! is_string($route->source) || trim($route->source) === '') {
+                yield $this->error(
+                    code: 'inbound_messaging.email_routes.source_missing',
+                    message: "Inbound email route [{$route->key}] requires a source.",
+                    source: 'inbound_email_routes',
+                    path: "inbound_email_routes.{$route->key}.source",
+                    context: ['route_key' => $route->key],
                 );
             }
         }

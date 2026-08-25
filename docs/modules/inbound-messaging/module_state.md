@@ -12,6 +12,23 @@ The approved target stores one raw provider receipt and one normalized inbound b
 
 Normal replies may carry narrow first-class correlation evidence back to the originating `ScheduledMessage`. Email correlation may be exact through a signed per-message Reply-To identity; SMS correlation is explicitly heuristic and bounded to recent sent deliveries for the same Contact/destination. Received email `subject` and RFC `message_id` are first-class normalized fields so CRM replies can preserve the visible subject and emit standard `In-Reply-To` / `References` threading headers while continuing to use a newly signed Engage Reply-To identity for the next inbound correlation hop. `reply_intent_key` is deterministic classification evidence, not an automatic business outcome.
 
+## Inbound email route authority
+
+InboundMessaging also owns durable semantic mailbox routes for inbound email that does not correlate to an Engage-originated ScheduledMessage. The database table `inbound_email_routes` is runtime authority. `INBOUND_EMAIL_DOMAIN` remains deployment/DNS infrastructure; route rows own only the local-part and business context.
+
+Example:
+
+```text
+arive+application@{INBOUND_EMAIL_DOMAIN}
+    key = arive_application
+    source = arive
+    context = application
+```
+
+Signed Engage Reply-To correlation always wins. Only a non-correlated recipient address is considered for semantic route resolution. When a route resolves, the normalized inbound row snapshots the stable route key/source/context in narrow first-class columns so historical evidence does not depend on a later route edit or deletion.
+
+A resolved route emits the compact neutral `inbound_email.route_received` automation event. It may have no Contact yet; provider/domain integration code may use the route context to parse the normalized inbound message and establish Contact/business state later. The event never copies the inbound body or raw provider payload.
+
 ## Reply Handling authority
 
 InboundMessaging owns the durable reply vocabulary used to classify ordinary correlated replies:
@@ -47,7 +64,8 @@ InboundMessaging owns:
 - purpose/scope resolution;
 - inbound handler routing;
 - `InboundMessageReceived`;
-- neutral `inbound_message.normal_reply` automation events.
+- neutral `inbound_message.normal_reply` automation events;
+- semantic inbound-email route persistence/resolution and neutral `inbound_email.route_received` automation events;
 - reply-profile, reply-intent, and reply-rule persistence and authoring.
 
 InboundMessaging may depend on:
@@ -121,6 +139,9 @@ body nullable
 classification
 purpose nullable
 scope nullable
+inbound_email_route_key nullable
+inbound_email_route_source nullable
+inbound_email_route_context nullable
 received_at nullable
 processed_at nullable
 timestamps

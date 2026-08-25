@@ -17,6 +17,7 @@ use LogicException;
 class RecordInboundMessageAction
 {
     public const NORMAL_REPLY_AUTOMATION_EVENT_KEY = 'inbound_message.normal_reply';
+    public const ROUTED_EMAIL_AUTOMATION_EVENT_KEY = 'inbound_email.route_received';
 
     public function __construct(
         private readonly AutomationEventOutbox $automationEventOutbox,
@@ -108,6 +109,12 @@ class RecordInboundMessageAction
             'reply_intent_key' => $data['reply_intent_key'] ?? null,
             'reply_correlation_method' =>
                 $data['reply_correlation_method'] ?? null,
+            'inbound_email_route_key' =>
+                $data['inbound_email_route_key'] ?? null,
+            'inbound_email_route_source' =>
+                $data['inbound_email_route_source'] ?? null,
+            'inbound_email_route_context' =>
+                $data['inbound_email_route_context'] ?? null,
             'received_at' => $data['received_at'] ?? null,
             'processed_at' => $data['processed_at'] ?? null,
             'meta' => $data['meta'] ?? null,
@@ -122,6 +129,11 @@ class RecordInboundMessageAction
         $receipt->forceFill([
             'inbound_message_id' => $inboundMessage->getKey(),
         ])->save();
+
+        $this->recordRoutedEmailAutomationEvent(
+            inboundMessage: $inboundMessage,
+            sender: $sender,
+        );
 
         $this->recordNormalReplyAutomationEvent(
             inboundMessage: $inboundMessage,
@@ -358,6 +370,55 @@ class RecordInboundMessageAction
         return $value !== '' ? $value : null;
     }
 
+    private function recordRoutedEmailAutomationEvent(
+        InboundMessage $inboundMessage,
+        ?Model $sender,
+    ): void {
+        if ($this->value($inboundMessage->channel) !== 'email'
+            || $this->nullableString($inboundMessage->inbound_email_route_key) === null
+        ) {
+            return;
+        }
+
+        $contactId = $sender instanceof Contact
+            ? (int) $sender->getKey()
+            : null;
+
+        $this->automationEventOutbox->record(
+            event: AutomationEventData::forSubject(
+                eventKey: self::ROUTED_EMAIL_AUTOMATION_EVENT_KEY,
+                subject: $inboundMessage,
+                contactId: $contactId,
+                occurredAt: $inboundMessage->received_at,
+                payload: [
+                    'inbound_message' => [
+                        'id' => $inboundMessage->getKey(),
+                        'channel' => $this->value($inboundMessage->channel),
+                        'classification' => $inboundMessage->classification,
+                        'purpose' => $this->value($inboundMessage->purpose),
+                        'scope' => $inboundMessage->scope,
+                        'inbound_email_route_key' =>
+                            $inboundMessage->inbound_email_route_key,
+                        'inbound_email_route_source' =>
+                            $inboundMessage->inbound_email_route_source,
+                        'inbound_email_route_context' =>
+                            $inboundMessage->inbound_email_route_context,
+                        'received_at' => $inboundMessage->received_at?->toISOString(),
+                    ],
+                ],
+                meta: [
+                    'source_module' => 'inbound_messaging',
+                    'source' => 'inbound_email_route',
+                ],
+            ),
+            idempotencyKey: implode(':', [
+                'inbound_messaging',
+                self::ROUTED_EMAIL_AUTOMATION_EVENT_KEY,
+                $inboundMessage->getKey(),
+            ]),
+        );
+    }
+
     private function recordNormalReplyAutomationEvent(
         InboundMessage $inboundMessage,
         ?Model $sender,
@@ -388,6 +449,12 @@ class RecordInboundMessageAction
                         'reply_intent_key' => $inboundMessage->reply_intent_key,
                         'correlation_method' =>
                             $inboundMessage->reply_correlation_method,
+                        'inbound_email_route_key' =>
+                            $inboundMessage->inbound_email_route_key,
+                        'inbound_email_route_source' =>
+                            $inboundMessage->inbound_email_route_source,
+                        'inbound_email_route_context' =>
+                            $inboundMessage->inbound_email_route_context,
                         'received_at' => $inboundMessage->received_at?->toISOString(),
                     ],
                 ],

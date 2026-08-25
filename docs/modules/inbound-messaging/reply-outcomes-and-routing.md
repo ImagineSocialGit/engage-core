@@ -44,6 +44,29 @@ Messaging contributes dependencies from published message journeys, retained pre
 
 Campaigns and Flow Routes keep only stable profile/intent keys. They do not own or copy the recognition vocabulary. Changing the profile attached to a Campaign message publishes a new immutable Campaign message-chain version for future enrollments; editing the profile vocabulary changes only future reply classification. Process Highway reply nodes deep-link to Reply Handling for the profile and keep the Campaign/Route editor as secondary context.
 
+## Semantic inbound email routes
+
+External systems may target durable semantic aliases under the configured inbound domain without pretending those messages are replies to Engage-originated mail. `INBOUND_EMAIL_DOMAIN` remains environment/DNS configuration; `inbound_email_routes` owns the runtime route rows.
+
+Example:
+
+```text
+arive+application@replies.example.com -> arive_application / arive / application
+arive+approval@replies.example.com    -> arive_approval / arive / approval
+```
+
+Resolution order is deliberate:
+
+```text
+1. exact signed Engage Reply-To correlation
+2. semantic inbound email route lookup
+3. ordinary uncorrelated inbound email
+```
+
+A resolved route is snapshotted on the `InboundMessage` as `inbound_email_route_key`, `inbound_email_route_source`, and `inbound_email_route_context`. The neutral `inbound_email.route_received` automation event exposes those same compact values and may have a null Contact ID. This lets a provider/domain adapter consume the route first, then resolve or create business identity without making InboundMessaging depend on that external system.
+
+The inbound body remains canonical on `inbound_messages`; it is not copied into the route automation event.
+
 ## SMS compliance is separate from business reply intent
 
 SMS compliance keywords are classified before ordinary reply correlation:
