@@ -23,6 +23,8 @@
         ? $style['hero']
         : [];
 
+    $titleLead = $page['hero']['title_lead'] ?? null;
+
     $urgencyStats = is_array($page['urgency_stats'] ?? null)
         ? $page['urgency_stats']
         : [];
@@ -306,7 +308,7 @@
             <div class="{{ $primaryCtaStyle['wrapper'] ?? 'mt-10 flex flex-col gap-4 text-left' }}">
                 @if($webinarTitle['enabled'] ?? false)
                     <span class="{{ $webinarTitleStyle['contact'] ?? 'text-xl text-white/85' }}">
-                        Seminar Details for the
+                        {{$titleLead ?? 'Seminar Details for the'}}
                     </span>
 
                     <h1 class="{{ $webinarTitleStyle['title'] ?? 'text-4xl font-semibold text-white' }}">
