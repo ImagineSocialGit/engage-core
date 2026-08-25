@@ -113,7 +113,7 @@ class ReportingWorkspaceTest extends TestCase
             ->assertSee('No measured pre-registration loss is visible yet')
             ->assertSee('All 1 likely-human landing sessions reached a correlated registration in this period.')
             ->assertSee('The primary funnel uses 1 likely-human landing sessions out of 3 observed landing sessions after bounded traffic-classification calibration.')
-            ->assertSee('2 observed landing sessions remain unknown and are intentionally excluded from conversion.')
+            ->assertSee('2 observed landing sessions remain unresolved and are excluded from conversion.')
             ->assertSee('No ad-platform report is attached to this view yet');
     }
 

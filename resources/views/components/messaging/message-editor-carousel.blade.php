@@ -281,6 +281,21 @@
                             $canAssignReplyHandling = $editable
                                 && $replyHandlingUpdateAction !== ''
                                 && $replyHandlingVersionId > 0;
+                            $replyHandlingUsages = is_array($message['reply_handling_usages'] ?? null)
+                                ? array_values(array_filter(
+                                    $message['reply_handling_usages'],
+                                    fn (mixed $usage): bool => is_array($usage),
+                                ))
+                                : [];
+                            $replyOutcomeDependencies = $replyHandling !== null
+                                && is_array($replyHandling['dependencies'] ?? null)
+                                    ? array_values(array_filter(
+                                        $replyHandling['dependencies'],
+                                        fn (mixed $dependency): bool =>
+                                            is_array($dependency)
+                                            && ($dependency['module_key'] ?? null) !== 'messaging',
+                                    ))
+                                    : [];
                         @endphp
 
                         <article
@@ -407,7 +422,7 @@
                                     Exact published preview. Dynamic tokens stay visible here and resolve when the message is prepared for a recipient.
                                 </p>
 
-                                @if($canAssignReplyHandling || $replyHandling !== null)
+                                @if($canAssignReplyHandling || $replyHandling !== null || $replyHandlingUsages !== [])
                                     <section data-message-reply-handling class="mt-6 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 sm:p-5">
                                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                             <div>
@@ -418,6 +433,8 @@
                                                     @if(filled($replyHandling['description'] ?? null))
                                                         <p class="mt-1 text-sm leading-6 text-slate-600">{{ $replyHandling['description'] }}</p>
                                                     @endif
+                                                @elseif($replyHandlingUsages !== [])
+                                                    <p class="mt-1 text-sm font-semibold text-slate-800">Reply handling varies by where this reusable message is used.</p>
                                                 @else
                                                     <p class="mt-1 text-sm font-semibold text-slate-800">No special reply handling is attached to this message.</p>
                                                 @endif
@@ -461,14 +478,27 @@
 
                                                 <div class="rounded-xl bg-white p-3 ring-1 ring-indigo-100">
                                                     <p class="text-xs font-extrabold uppercase tracking-wide text-slate-500">What happens</p>
-                                                    @if(($replyHandling['dependencies'] ?? []) !== [])
+                                                    @if($replyOutcomeDependencies !== [])
                                                         <div class="mt-2 space-y-2">
-                                                            @foreach($replyHandling['dependencies'] as $dependency)
+                                                            @foreach($replyOutcomeDependencies as $dependency)
                                                                 <div class="text-sm leading-5">
-                                                                    <span class="font-bold text-slate-900">{{ $dependency['label'] }}</span>
-                                                                    @if(filled($dependency['detail'] ?? null))
-                                                                        <span class="block text-xs text-slate-600">{{ $dependency['detail'] }}</span>
-                                                                    @endif
+                                                                    <div class="flex items-start justify-between gap-3">
+                                                                        <div class="min-w-0">
+                                                                            <span class="font-bold text-slate-900">{{ $dependency['label'] }}</span>
+                                                                            @if(filled($dependency['detail'] ?? null))
+                                                                                <span class="block text-xs text-slate-600">{{ $dependency['detail'] }}</span>
+                                                                            @endif
+                                                                        </div>
+                                                                        @if(is_string($dependency['url'] ?? null) && trim($dependency['url']) !== '')
+                                                                            <a
+                                                                                data-message-reply-dependency-link
+                                                                                href="{{ $dependency['url'] }}"
+                                                                                class="shrink-0 text-xs font-extrabold text-indigo-800 underline decoration-indigo-300 underline-offset-4 hover:text-indigo-950"
+                                                                            >
+                                                                                Edit
+                                                                            </a>
+                                                                        @endif
+                                                                    </div>
                                                                 </div>
                                                             @endforeach
                                                         </div>
@@ -476,6 +506,106 @@
                                                         <p class="mt-2 text-sm leading-5 text-slate-600">The reply is classified for reporting, but no follow-up automation currently uses it.</p>
                                                     @endif
                                                 </div>
+                                            </div>
+                                        @endif
+
+                                        @if($replyHandlingUsages !== [])
+                                            <div data-message-reply-handling-usages class="mt-4 border-t border-indigo-200 pt-4">
+                                                <p class="text-xs font-extrabold uppercase tracking-wide text-slate-500">Where this reply handling applies</p>
+
+                                                @if($replyHandling !== null)
+                                                    <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                                                        @foreach($replyHandlingUsages as $usage)
+                                                            <div data-message-reply-handling-usage class="rounded-xl bg-white px-3 py-3 ring-1 ring-indigo-100">
+                                                                <p class="text-sm font-bold text-slate-900">{{ $usage['context_label'] ?? $usage['module_label'] ?? 'Message usage' }}</p>
+                                                                <p class="mt-0.5 text-xs text-slate-600">{{ $usage['item_label'] ?? '' }}</p>
+                                                                @if(filled($usage['detail'] ?? null))
+                                                                    <p class="mt-1 text-xs text-slate-500">{{ $usage['detail'] }}</p>
+                                                                @endif
+                                                                @if(is_string($usage['owner_url'] ?? null) && trim($usage['owner_url']) !== '')
+                                                                    <a
+                                                                        data-message-reply-usage-link
+                                                                        href="{{ $usage['owner_url'] }}"
+                                                                        class="mt-2 inline-flex text-xs font-extrabold text-indigo-800 underline decoration-indigo-300 underline-offset-4 hover:text-indigo-950"
+                                                                    >
+                                                                        Manage this usage
+                                                                    </a>
+                                                                @endif
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                @else
+                                                    <div class="mt-2 grid gap-3 md:grid-cols-2">
+                                                        @foreach($replyHandlingUsages as $usage)
+                                                            @php
+                                                                $usageReplyHandling = is_array($usage['reply_handling'] ?? null)
+                                                                    ? $usage['reply_handling']
+                                                                    : null;
+                                                                $usageDependencies = $usageReplyHandling !== null
+                                                                    && is_array($usageReplyHandling['dependencies'] ?? null)
+                                                                        ? array_values(array_filter(
+                                                                            $usageReplyHandling['dependencies'],
+                                                                            fn (mixed $dependency): bool =>
+                                                                                is_array($dependency)
+                                                                                && ($dependency['module_key'] ?? null) !== 'messaging',
+                                                                        ))
+                                                                        : [];
+                                                            @endphp
+
+                                                            <article
+                                                                data-message-reply-handling-usage
+                                                                data-message-reply-profile="{{ $usage['reply_profile_key'] ?? '' }}"
+                                                                class="rounded-xl bg-white p-3 ring-1 ring-indigo-100"
+                                                            >
+                                                                <p class="text-xs font-extrabold uppercase tracking-wide text-slate-500">{{ $usage['context_label'] ?? $usage['module_label'] ?? 'Message usage' }}</p>
+                                                                <p class="mt-1 text-sm font-black text-slate-950">
+                                                                    {{ $usageReplyHandling['label'] ?? ($usage['reply_profile_key'] ?? 'Unavailable reply profile') }}
+                                                                </p>
+                                                                @if(filled($usage['item_label'] ?? null))
+                                                                    <p class="mt-1 text-xs text-slate-600">{{ $usage['item_label'] }}</p>
+                                                                @endif
+
+                                                                @if($usageReplyHandling !== null)
+                                                                    <div class="mt-3 space-y-2">
+                                                                        @foreach(($usageReplyHandling['intents'] ?? []) as $intent)
+                                                                            @continue(! ($intent['active'] ?? false))
+                                                                            <div class="text-xs leading-5 text-slate-600">
+                                                                                <span class="font-bold text-slate-900">{{ $intent['label'] }}</span>
+                                                                                <span class="block">{{ implode(', ', array_values(array_unique(array_merge($intent['exact'] ?? [], $intent['keywords'] ?? [])))) }}</span>
+                                                                            </div>
+                                                                        @endforeach
+                                                                    </div>
+
+                                                                    @if($usageDependencies !== [])
+                                                                        <div class="mt-3 space-y-2 border-t border-indigo-100 pt-3">
+                                                                            @foreach($usageDependencies as $dependency)
+                                                                                <div class="flex items-start justify-between gap-3 text-xs leading-5">
+                                                                                    <div>
+                                                                                        <span class="font-bold text-slate-900">{{ $dependency['label'] }}</span>
+                                                                                        @if(filled($dependency['detail'] ?? null))
+                                                                                            <span class="block text-slate-600">{{ $dependency['detail'] }}</span>
+                                                                                        @endif
+                                                                                    </div>
+                                                                                    @if(is_string($dependency['url'] ?? null) && trim($dependency['url']) !== '')
+                                                                                        <a data-message-reply-dependency-link href="{{ $dependency['url'] }}" class="shrink-0 font-extrabold text-indigo-800 underline decoration-indigo-300 underline-offset-4 hover:text-indigo-950">Edit</a>
+                                                                                    @endif
+                                                                                </div>
+                                                                            @endforeach
+                                                                        </div>
+                                                                    @endif
+
+                                                                    @if(is_string($usageReplyHandling['details_url'] ?? null) && trim($usageReplyHandling['details_url']) !== '')
+                                                                        <a href="{{ $usageReplyHandling['details_url'] }}" class="mt-3 inline-flex text-xs font-extrabold text-indigo-800 underline decoration-indigo-300 underline-offset-4 hover:text-indigo-950">Open reply handling</a>
+                                                                    @endif
+                                                                @endif
+
+                                                                @if(is_string($usage['owner_url'] ?? null) && trim($usage['owner_url']) !== '')
+                                                                    <a data-message-reply-usage-link href="{{ $usage['owner_url'] }}" class="mt-3 ml-3 inline-flex text-xs font-extrabold text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950">Manage usage</a>
+                                                                @endif
+                                                            </article>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
                                             </div>
                                         @endif
 

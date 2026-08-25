@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 class MessageTemplateUsageResolver
 {
     /**
-     * @return Collection<int, array{module_label: string, context_label: string, item_label: string, detail: string|null, url: string|null}>
+     * @return Collection<int, array{assignment_id: int, module_label: string, context_label: string, item_label: string, detail: string|null, url: string|null, reply_profile_key: string|null}>
      */
     public function forPreset(MessageTemplatePreset $preset): Collection
     {
@@ -31,7 +31,7 @@ class MessageTemplateUsageResolver
     }
 
     /**
-     * @return array{module_label: string, context_label: string, item_label: string, detail: string|null, url: string|null}
+     * @return array{assignment_id: int, module_label: string, context_label: string, item_label: string, detail: string|null, url: string|null, reply_profile_key: string|null}
      */
     private function usageRow(MessageTemplatePreset $preset, MessageTemplatePresetAssignment $assignment): array
     {
@@ -46,11 +46,13 @@ class MessageTemplateUsageResolver
             ?? $this->fallbackItemLabel($assignment, $preset);
 
         return [
+            'assignment_id' => (int) $assignment->getKey(),
             'module_label' => $moduleLabel,
             'context_label' => $groupLabel,
             'item_label' => $itemLabel,
             'detail' => $this->detail($assignment),
             'url' => $this->url($assignment),
+            'reply_profile_key' => $this->replyProfileKey($assignment),
         ];
     }
 
@@ -156,6 +158,17 @@ class MessageTemplateUsageResolver
         }
 
         return null;
+    }
+
+    private function replyProfileKey(MessageTemplatePresetAssignment $assignment): ?string
+    {
+        if (! is_string($assignment->reply_profile_key)) {
+            return null;
+        }
+
+        $profileKey = trim($assignment->reply_profile_key);
+
+        return $profileKey !== '' ? $profileKey : null;
     }
 
     private function detail(MessageTemplatePresetAssignment $assignment): ?string
