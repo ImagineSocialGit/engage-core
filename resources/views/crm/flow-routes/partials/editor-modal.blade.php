@@ -5,12 +5,13 @@
     $capabilities = $editor['capabilities'];
 @endphp
 
+<template x-teleport="body">
 <div
     x-cloak
     style="display: none;"
     x-show="openRouteEditor === {{ $flowRoute->getKey() }}"
     x-transition.opacity
-    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 sm:p-6"
+    class="fixed inset-0 z-50 flex min-h-screen items-center justify-center bg-slate-950/55 p-3 sm:p-6"
     role="dialog"
     aria-modal="true"
     aria-labelledby="route-editor-title-{{ $flowRoute->getKey() }}"
@@ -92,7 +93,20 @@
                 </div>
             @endif
 
-            <section>
+            <section class="rounded-2xl border border-orange-200 bg-orange-50/70 p-4 sm:p-5">
+                <p class="text-xs font-bold uppercase tracking-[0.16em] text-orange-800">Runs when</p>
+                <p class="mt-2 text-sm font-semibold leading-6 text-slate-950">
+                    {{ $routePresentation['trigger_summary'] }}
+                </p>
+
+                @foreach(($routePresentation['entry_condition_summaries'] ?? []) as $entryConditionSummary)
+                    <p class="mt-1 text-sm leading-6 text-slate-700">
+                        {{ $entryConditionSummary }}
+                    </p>
+                @endforeach
+            </section>
+
+            <section class="mt-7">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                         <h3 class="text-lg font-semibold tracking-tight text-slate-950">Route flow</h3>
@@ -190,11 +204,54 @@
                                                 @foreach($presented['decision_paths'] as $path)
                                                     <div class="rounded-xl bg-white/85 px-3 py-2 text-xs leading-5 ring-1 ring-black/10">
                                                         <span class="block font-semibold text-slate-800">{{ $path['condition'] }}</span>
-                                                        <span class="mt-0.5 block text-slate-600">Continue at: {{ $path['destination'] }}</span>
+                                                        <span class="mt-0.5 block text-slate-600">
+                                                            @if(($path['destination_key'] ?? null) === null)
+                                                                End this Route
+                                                            @else
+                                                                Continue at: {{ $path['destination'] }}
+                                                            @endif
+                                                        </span>
                                                     </div>
                                                 @endforeach
                                             </div>
                                         @endif
+
+                                        @foreach(($presented['resources'] ?? []) as $resource)
+                                            <div class="mt-3 rounded-xl bg-white/85 p-3 text-xs leading-5 ring-1 ring-black/10">
+                                                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                                    <div class="min-w-0">
+                                                        <p class="font-semibold text-slate-900">{{ $resource['title'] ?? '' }}</p>
+                                                        @if(filled($resource['subtitle'] ?? null))
+                                                            <p class="mt-0.5 font-medium text-slate-700">{{ $resource['subtitle'] }}</p>
+                                                        @endif
+                                                        @if(filled($resource['body'] ?? null))
+                                                            <p class="mt-1 text-slate-600">{{ $resource['body'] }}</p>
+                                                        @endif
+                                                    </div>
+
+                                                    @if(filled($resource['action_url'] ?? null))
+                                                        <a
+                                                            href="{{ $resource['action_url'] }}"
+                                                            @if(($resource['action_target'] ?? null) === '_blank') target="_blank" rel="noopener" @endif
+                                                            class="inline-flex w-full shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 font-semibold text-slate-900 shadow-sm hover:bg-slate-50 sm:w-auto"
+                                                        >
+                                                            {{ $resource['action_label'] ?? 'Open' }}
+                                                        </a>
+                                                    @endif
+                                                </div>
+
+                                                @if(is_array($resource['details'] ?? null) && $resource['details'] !== [])
+                                                    <dl class="mt-3 grid gap-2 border-t border-slate-200 pt-3 sm:grid-cols-2">
+                                                        @foreach($resource['details'] as $detailLabel => $detailValue)
+                                                            <div>
+                                                                <dt class="font-semibold uppercase tracking-wide text-slate-500">{{ $detailLabel }}</dt>
+                                                                <dd class="mt-0.5 font-medium text-slate-800">{{ $detailValue }}</dd>
+                                                            </div>
+                                                        @endforeach
+                                                    </dl>
+                                                @endif
+                                            </div>
+                                        @endforeach
                                     </div>
                                 </div>
 
@@ -423,3 +480,4 @@
         </div>
     </div>
 </div>
+</template>

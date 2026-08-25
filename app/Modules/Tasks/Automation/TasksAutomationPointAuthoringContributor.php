@@ -3,6 +3,7 @@
 namespace App\Modules\Tasks\Automation;
 
 use App\Modules\Tasks\Models\TaskTemplate;
+use App\Modules\Tasks\Services\TaskTemplatePresentationResolver;
 use App\Support\AutomationCapabilities\Contracts\AutomationPointAuthoringContributor;
 use App\Support\AutomationCapabilities\Data\AutomationPointAuthoringContext;
 use App\Support\AutomationCapabilities\Data\AutomationPointAuthoringDefinition;
@@ -11,6 +12,10 @@ use Illuminate\Validation\ValidationException;
 
 class TasksAutomationPointAuthoringContributor implements AutomationPointAuthoringContributor
 {
+    public function __construct(
+        private readonly TaskTemplatePresentationResolver $presentation,
+    ) {}
+
     public function definitions(): iterable
     {
         yield new AutomationPointAuthoringDefinition(
@@ -36,7 +41,33 @@ class TasksAutomationPointAuthoringContributor implements AutomationPointAuthori
 
     public function fields(string $pointType, array $definition, AutomationPointAuthoringContext $context): array
     {
+        $templateKey = trim((string) ($definition['task_template_key'] ?? ''));
+        $template = $templateKey !== ''
+            ? TaskTemplate::query()->where('key', $templateKey)->first()
+            : null;
+        $fields = [];
+
+        if ($template instanceof TaskTemplate) {
+            $presented = $this->presentation->present($template);
+            $fields[] = [
+                'type' => 'resource',
+                'title' => $presented['name'],
+                'subtitle' => $presented['title'],
+                'body' => $presented['task_description'] ?: $presented['description'],
+                'details' => [
+                    'Priority' => $presented['priority'],
+                    'Due' => $presented['due'],
+                    'Assigned to' => $presented['assignment'],
+                    'Responsible party' => $presented['responsible_party'],
+                ],
+                'action_url' => $presented['edit_url'],
+                'action_label' => 'View or edit Task Template',
+                'action_target' => '_blank',
+            ];
+        }
+
         return [
+            ...$fields,
             [
                 'type' => 'notice',
                 'title' => 'This creates a Task automatically',

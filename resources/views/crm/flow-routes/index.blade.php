@@ -21,6 +21,7 @@
                 window.history.replaceState({}, '', url);
             },
         }"
+        x-effect="document.body.classList.toggle('overflow-hidden', openRouteEditor !== null)"
     >
         @include('crm.flow-routes.partials.navigation')
 
@@ -122,6 +123,7 @@
                             $route['name'],
                             $route['description'],
                             $route['trigger_summary'],
+                            ...$route['entry_condition_summaries'],
                             ...$route['summary_points'],
                         ]));
                     @endphp
@@ -153,6 +155,12 @@
                                 <p class="mt-3 text-sm font-semibold text-slate-900">
                                     {{ $route['trigger_summary'] }}
                                 </p>
+
+                                @foreach(($route['entry_condition_summaries'] ?? []) as $entryConditionSummary)
+                                    <p class="mt-1 text-sm leading-6 text-slate-700">
+                                        {{ $entryConditionSummary }}
+                                    </p>
+                                @endforeach
 
                                 @if(count($route['presented_points']) > 0)
                                     <details class="group mt-5">
@@ -187,7 +195,13 @@
                                                                 @foreach($point['decision_paths'] as $path)
                                                                     <span class="rounded-lg bg-white/85 px-2.5 py-2 text-xs leading-5 ring-1 ring-black/10">
                                                                         <span class="block font-semibold text-slate-800">{{ $path['condition'] }}</span>
-                                                                        <span class="block text-slate-600">Continue at: {{ $path['destination'] }}</span>
+                                                                        <span class="block text-slate-600">
+                                                                            @if(($path['destination_key'] ?? null) === null)
+                                                                                End this Route
+                                                                            @else
+                                                                                Continue at: {{ $path['destination'] }}
+                                                                            @endif
+                                                                        </span>
                                                                     </span>
                                                                 @endforeach
                                                             </span>

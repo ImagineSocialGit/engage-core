@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CRM\DashboardController;
 use App\Modules\Tasks\Controllers\TaskController;
+use App\Modules\Tasks\Controllers\TaskTemplateController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('module:tasks')
@@ -19,6 +20,15 @@ Route::middleware('module:tasks')
 
         Route::post('/', [TaskController::class, 'store'])
             ->name('store');
+
+        Route::get('/templates', [TaskTemplateController::class, 'index'])
+            ->name('templates.index');
+
+        Route::get('/templates/{taskTemplate}/edit', [TaskTemplateController::class, 'edit'])
+            ->name('templates.edit');
+
+        Route::patch('/templates/{taskTemplate}', [TaskTemplateController::class, 'update'])
+            ->name('templates.update');
 
         Route::get('/{task}', [TaskController::class, 'show'])
             ->name('show');

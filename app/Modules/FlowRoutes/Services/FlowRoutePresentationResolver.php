@@ -41,6 +41,7 @@ class FlowRoutePresentationResolver
                 : 'route';
         $group = $this->groupForRoute($route);
         $summaryPoints = $this->routeSummaryPoints($route, $points);
+        $entryConditions = $this->entryConditions($route);
 
         return [
             'id' => (int) $route->getKey(),
@@ -58,6 +59,9 @@ class FlowRoutePresentationResolver
             'trigger_type' => (string) $route->trigger_type,
             'trigger_key' => (string) ($route->trigger_key ?? ''),
             'trigger_summary' => $this->triggerSummary($route),
+            'entry_condition_summaries' => $entryConditions !== []
+                ? [$this->entryConditionSummary($entryConditions)]
+                : [],
             'assignment_count' => $activeBindings->count(),
             'assignment_summary' => $this->assignmentSummary($activeBindings),
             'assignment_query' => $this->assignmentQuery($route),
@@ -98,6 +102,13 @@ class FlowRoutePresentationResolver
             ->values()
             ->map(function (FlowRoutePoint $point) use ($route): array {
                 $summaries = $this->pointSummaries($point, $route);
+                $fields = $this->authoring->has((string) $point->type)
+                    ? $this->authoring->fields(
+                        (string) $point->type,
+                        is_array($point->definition) ? $point->definition : [],
+                        $this->authoringContext($route, $point),
+                    )
+                    : [];
 
                 return [
                     'key' => (string) $point->key,
@@ -110,13 +121,12 @@ class FlowRoutePresentationResolver
                     'decision_paths' => $point->type === FlowRoutePointType::BranchEvaluate->value
                         ? $this->decisionPaths($point, $route)
                         : [],
-                    'fields' => $this->authoring->has((string) $point->type)
-                        ? $this->authoring->fields(
-                            (string) $point->type,
-                            is_array($point->definition) ? $point->definition : [],
-                            $this->authoringContext($route, $point),
-                        )
-                        : [],
+                    'resources' => array_values(array_filter(
+                        $fields,
+                        fn (mixed $field): bool => is_array($field)
+                            && ($field['type'] ?? null) === 'resource',
+                    )),
+                    'fields' => $fields,
                 ];
             })
             ->all();
@@ -175,6 +185,30 @@ class FlowRoutePresentationResolver
             FlowRoute::TRIGGER_MANUAL => 'Started manually.',
             default => Str::headline((string) $route->trigger_type).'.',
         };
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function entryConditions(FlowRoute $route): array
+    {
+        $conditions = data_get($route->meta, 'definition.entry_conditions', []);
+
+        if (! is_array($conditions)) {
+            return [];
+        }
+
+        return array_values(array_filter($conditions, 'is_array'));
+    }
+
+    /** @param array<int, array<string, mixed>> $conditions */
+    private function entryConditionSummary(array $conditions): string
+    {
+        $summary = $this->decisionConditionSummary($conditions);
+
+        if (str_starts_with($summary, 'If ')) {
+            $summary = Str::ucfirst(Str::after($summary, 'If '));
+        }
+
+        return rtrim($summary, '.').'.';
     }
 
     private function contactStatusTriggerSummary(FlowRoute $route): string
@@ -355,6 +389,14 @@ class FlowRoutePresentationResolver
     {
         $path = collect($this->decisionPaths($point, $route))->firstWhere('kind', 'match');
         $condition = is_array($path) ? trim((string) ($path['condition'] ?? '')) : '';
+        $destination = is_array($path) ? trim((string) ($path['destination'] ?? '')) : '';
+
+        if (str_starts_with($condition, 'If the contact status is ')
+            && $destination !== ''
+            && $destination !== 'End this Route'
+        ) {
+            return $destination.' only when '.Str::lower(Str::after($condition, 'If ')).'.';
+        }
 
         if (str_starts_with($condition, 'If ')) {
             $condition = Str::lower(Str::after($condition, 'If '));

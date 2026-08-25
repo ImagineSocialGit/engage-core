@@ -21,6 +21,10 @@
 |
 | A Route is manual when neither contact_status_key nor event_key is present.
 | Define at most one of those trigger keys.
+| Automation-event Routes may define entry_conditions against transient
+| execution_meta. Every condition must match before Route progress is created.
+| Entry criteria explain which event instance starts the Route; Points explain
+| what the Route does after it starts.
 |
 | Keep module-owned executable values inside each Point's definition object.
 | Point-definition schemas and semantic reference checks come from the module
@@ -40,6 +44,14 @@ return [
     'definitions' => [
         'webinar_attended_follow_up' => [
             'event_key' => 'webinar.attended',
+            'entry_conditions' => [
+                [
+                    'source' => 'execution_meta',
+                    'path' => 'automation_event.payload.webinar.series_key',
+                    'operator' => 'equals',
+                    'value' => 'homebuyer_game_plan',
+                ],
+            ],
             'name' => 'Webinar Attended Follow-Up',
             'description' => 'Enroll webinar attendees in the configured follow-up Campaign.',
             'source_version' => '2026_07_example_1',

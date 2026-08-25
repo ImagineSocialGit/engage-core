@@ -652,11 +652,18 @@ The current implementation preserves event-wait behavior without retaining a str
 
 ## Task template UI
 
-A client/operator task template UI is only needed if clients/operators need to manage templates themselves.
+Tasks owns the authoritative client/operator Task Template workspace. The Tasks index links to the
+template list; each template has an edit surface for its reusable title, purpose, instructions,
+priority, due timing, responsible-party meaning, and active state. Assignment strategy remains
+visible even when the current bounded editor does not change it.
 
-Before building a polished template builder, prove the schema, public action/service shape, TaskLink model, and dedicated Task workspace.
+Saving a preset-backed Task Template marks it customized and records `customized_at`. Ordinary
+preset sync therefore preserves the operator's changes; replacing them requires an explicit force
+sync. The workspace edits reusable definitions, never existing live Tasks.
 
-The current implementation includes Task index/show surfaces. A polished TaskTemplate builder remains deferred until real operator demand justifies it.
+Other modules may present a selected Task Template and deep-link to this workspace. In particular,
+the Tasks-owned FlowRoutes authoring contribution exposes the selected template's material details
+inside Route context. FlowRoutes must not become a competing Task Template authority.
 
 ### Task action interaction direction
 

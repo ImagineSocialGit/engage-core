@@ -34,7 +34,46 @@
                 x-cloak
             @endif
         >
-            @if($type === 'notice')
+            @if($type === 'resource')
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-900">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0">
+                            @if(filled($field['title'] ?? null))
+                                <p class="font-semibold">{{ $field['title'] }}</p>
+                            @endif
+
+                            @if(filled($field['subtitle'] ?? null))
+                                <p class="mt-1 text-sm font-medium text-slate-800">{{ $field['subtitle'] }}</p>
+                            @endif
+
+                            @if(filled($field['body'] ?? null))
+                                <p class="mt-2 text-sm leading-6 text-slate-600">{{ $field['body'] }}</p>
+                            @endif
+                        </div>
+
+                        @if(filled($field['action_url'] ?? null))
+                            <a
+                                href="{{ $field['action_url'] }}"
+                                @if(($field['action_target'] ?? null) === '_blank') target="_blank" rel="noopener" @endif
+                                class="inline-flex w-full shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-100 sm:w-auto"
+                            >
+                                {{ $field['action_label'] ?? 'Open' }}
+                            </a>
+                        @endif
+                    </div>
+
+                    @if(is_array($field['details'] ?? null) && $field['details'] !== [])
+                        <dl class="mt-4 grid gap-2 border-t border-slate-200 pt-4 sm:grid-cols-2">
+                            @foreach($field['details'] as $detailLabel => $detailValue)
+                                <div>
+                                    <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $detailLabel }}</dt>
+                                    <dd class="mt-1 font-medium text-slate-900">{{ $detailValue }}</dd>
+                                </div>
+                            @endforeach
+                        </dl>
+                    @endif
+                </div>
+            @elseif($type === 'notice')
                 <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
                     @if(filled($field['title'] ?? null))
                         <p class="font-semibold">{{ $field['title'] }}</p>

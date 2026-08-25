@@ -32,6 +32,22 @@ class FlowRoutePresetDefinitionConfigContract implements ConfigContract
     {
         $open = $this->openSchema();
         $pointOptions = [];
+        $entryCondition = ConfigSchema::object([
+            'source' => ConfigField::required(ConfigSchema::string(
+                allowedValues: ['execution_meta'],
+            )),
+            'path' => ConfigField::required(ConfigSchema::string()),
+            'operator' => ConfigField::defaulted(
+                ConfigSchema::string(allowedValues: ['equals', 'in']),
+                'equals',
+            ),
+            'value' => ConfigField::optional(ConfigSchema::mixed()),
+            'values' => ConfigField::optional(
+                ConfigSchema::listOf(ConfigSchema::mixed()),
+            ),
+        ], atMostOne: [
+            ['value', 'values'],
+        ]);
 
         foreach ($this->pointDefinitions->definitions() as $pointType => $definition) {
             $pointOptions[] = $this->pointSchema(
@@ -49,6 +65,9 @@ class FlowRoutePresetDefinitionConfigContract implements ConfigContract
             'event_key' => ConfigField::optional(
                 ConfigSchema::string(nullable: true),
                 referenceTarget: 'automation_events',
+            ),
+            'entry_conditions' => ConfigField::optional(
+                ConfigSchema::listOf($entryCondition),
             ),
             'from_contact_status_keys' => ConfigField::optional(
                 ConfigSchema::listOf(ConfigSchema::string()),

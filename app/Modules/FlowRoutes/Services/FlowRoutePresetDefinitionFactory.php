@@ -15,6 +15,7 @@ class FlowRoutePresetDefinitionFactory
     private const ROUTE_FIELDS = [
         'contact_status_key',
         'event_key',
+        'entry_conditions',
         'from_contact_status_keys',
         'transition_sources',
         'transition_reasons',
@@ -65,6 +66,7 @@ class FlowRoutePresetDefinitionFactory
         $key = $this->requiredKey($definitionKey, 'FlowRoute definition key');
         $contactStatusKey = $this->nullableString($data['contact_status_key'] ?? null);
         $eventKey = $this->nullableString($data['event_key'] ?? null);
+        $entryConditions = $this->entryConditions($data, $eventKey, $key);
         $transition = $this->transitionQualifiers($data, $contactStatusKey, $eventKey, $key);
 
         if ($contactStatusKey !== null && $eventKey !== null) {
@@ -163,6 +165,7 @@ class FlowRoutePresetDefinitionFactory
             meta: array_filter([
                 'category' => $this->nullableString($data['category'] ?? null),
                 'default_role' => $this->nullableString($data['role'] ?? null),
+                'entry_conditions' => $entryConditions !== [] ? $entryConditions : null,
                 'transition' => $transition !== [] ? $transition : null,
             ], static fn (mixed $value): bool => $value !== null),
         );
@@ -432,6 +435,120 @@ class FlowRoutePresetDefinitionFactory
             'sources' => $sources,
             'reasons' => $reasons,
         ], static fn (array $values): bool => $values !== []);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<int, array<string, mixed>>
+     */
+    private function entryConditions(
+        array $data,
+        ?string $eventKey,
+        string $routeKey,
+    ): array {
+        if (! array_key_exists('entry_conditions', $data)) {
+            return [];
+        }
+
+        $conditions = $data['entry_conditions'];
+
+        if ($eventKey === null) {
+            throw new InvalidArgumentException(
+                "FlowRoute preset [{$routeKey}] entry_conditions require [event_key]."
+            );
+        }
+
+        if (! is_array($conditions) || ! array_is_list($conditions)) {
+            throw new InvalidArgumentException(
+                "FlowRoute preset [{$routeKey}] entry_conditions must be a list."
+            );
+        }
+
+        $normalized = [];
+
+        foreach ($conditions as $index => $condition) {
+            $context = "FlowRoute preset [{$routeKey}] entry condition [{$index}]";
+
+            if (! is_array($condition) || array_is_list($condition)) {
+                throw new InvalidArgumentException("{$context} must be an object.");
+            }
+
+            $this->rejectUnknownFields(
+                data: $condition,
+                allowedFields: ['source', 'path', 'operator', 'value', 'values'],
+                context: $context,
+            );
+
+            $source = $this->requiredString($condition['source'] ?? null, "{$context} source");
+            $path = $this->requiredString($condition['path'] ?? null, "{$context} path");
+            $operator = $this->nullableString($condition['operator'] ?? null) ?? 'equals';
+
+            if ($source !== 'execution_meta') {
+                throw new InvalidArgumentException(
+                    "{$context} source must be [execution_meta]."
+                );
+            }
+
+            if (! str_starts_with($path, 'automation_event.')) {
+                throw new InvalidArgumentException(
+                    "{$context} path must begin with [automation_event.]."
+                );
+            }
+
+            if (! in_array($operator, ['equals', 'in'], true)) {
+                throw new InvalidArgumentException(
+                    "{$context} operator must be [equals] or [in]."
+                );
+            }
+
+            if ($operator === 'equals') {
+                $value = $condition['value'] ?? null;
+
+                if (! is_scalar($value) || trim((string) $value) === '') {
+                    throw new InvalidArgumentException(
+                        "{$context} equals operator requires a non-empty scalar value."
+                    );
+                }
+
+                $normalized[] = [
+                    'source' => $source,
+                    'path' => $path,
+                    'operator' => $operator,
+                    'value' => is_string($value) ? trim($value) : $value,
+                ];
+
+                continue;
+            }
+
+            $values = $condition['values'] ?? null;
+
+            if (! is_array($values) || ! array_is_list($values) || $values === []) {
+                throw new InvalidArgumentException(
+                    "{$context} in operator requires a non-empty values list."
+                );
+            }
+
+            $normalizedValues = [];
+
+            foreach ($values as $value) {
+                if (! is_scalar($value) || trim((string) $value) === '') {
+                    throw new InvalidArgumentException(
+                        "{$context} values must contain only non-empty scalars."
+                    );
+                }
+
+                $normalizedValues[] = is_string($value) ? trim($value) : $value;
+            }
+
+            $normalized[] = [
+                'source' => $source,
+                'path' => $path,
+                'operator' => $operator,
+                'values' => array_values(array_unique($normalizedValues, SORT_REGULAR)),
+            ];
+        }
+
+        return $normalized;
     }
 
     /**

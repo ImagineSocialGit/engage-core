@@ -177,6 +177,7 @@
 │   │   │   │   └── CampaignsModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   │   ├── CampaignEligibilityAuthoringRequest.php
+│   │   │   │   ├── UpdateCampaignMessageReplyHandlingRequest.php
 │   │   │   │   ├── UpdateCampaignMessageRequest.php
 │   │   │   │   ├── UpdateCampaignScheduleRequest.php
 │   │   │   │   └── UpdateCampaignStepMessageTemplateRequest.php
@@ -453,6 +454,7 @@
 │   │   │   │   ├── ContactStatusAutomationImpactResolver.php
 │   │   │   │   ├── FlowRouteConditionEvaluatorRegistry.php
 │   │   │   │   ├── FlowRouteEditorCatalog.php
+│   │   │   │   ├── FlowRouteEntryCriteriaEvaluator.php
 │   │   │   │   ├── FlowRoutePointAuthoringService.php
 │   │   │   │   ├── FlowRoutePointPlacementPolicy.php
 │   │   │   │   ├── FlowRoutePresentationResolver.php
@@ -591,6 +593,7 @@
 │   │   │   │   │   ├── InboundReplyTextNormalizer.php
 │   │   │   │   │   └── InboundSmsReplyCorrelator.php
 │   │   │   │   ├── ReplyProfiles
+│   │   │   │   │   ├── InboundReplyProfilePresentationProvider.php
 │   │   │   │   │   ├── ReplyProfileDefinitionNormalizer.php
 │   │   │   │   │   └── ReplyProfileWorkspace.php
 │   │   │   │   └── Sms
@@ -1107,7 +1110,8 @@
 │   │   │   │   ├── TaskLinkPresenterContract.php
 │   │   │   │   └── TaskNotificationSchedulerContract.php
 │   │   │   ├── Controllers
-│   │   │   │   └── TaskController.php
+│   │   │   │   ├── TaskController.php
+│   │   │   │   └── TaskTemplateController.php
 │   │   │   ├── Data
 │   │   │   │   ├── Automation
 │   │   │   │   │   └── CreateTaskAutomationDefinition.php
@@ -1130,7 +1134,8 @@
 │   │   │   ├── Providers
 │   │   │   │   └── TasksModuleServiceProvider.php
 │   │   │   ├── Requests
-│   │   │   │   └── StoreTaskRequest.php
+│   │   │   │   ├── StoreTaskRequest.php
+│   │   │   │   └── UpdateTaskTemplateRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── ContactShow
 │   │   │   │   │   ├── ContactTasksShowDataProvider.php
@@ -1145,7 +1150,8 @@
 │   │   │   │   ├── TaskAssignmentStrategyResolver.php
 │   │   │   │   ├── TaskContactLinkResolver.php
 │   │   │   │   ├── TaskLinkPresentationResolver.php
-│   │   │   │   └── TaskNotificationScheduler.php
+│   │   │   │   ├── TaskNotificationScheduler.php
+│   │   │   │   └── TaskTemplatePresentationResolver.php
 │   │   │   ├── Support
 │   │   │   └── Validation
 │   │   │       └── TasksSetupValidationContributor.php
@@ -1514,10 +1520,13 @@
 │       │   └── QueueContract.php
 │       ├── ReplyHandling
 │       │   ├── Contracts
-│       │   │   └── ReplyProfileDependencyContributor.php
+│       │   │   ├── ReplyProfileDependencyContributor.php
+│       │   │   └── ReplyProfilePresentationProvider.php
 │       │   ├── Data
-│       │   │   └── ReplyProfileDependency.php
-│       │   └── ReplyProfileDependencyRegistry.php
+│       │   │   ├── ReplyProfileDependency.php
+│       │   │   └── ReplyProfilePresentation.php
+│       │   ├── ReplyProfileDependencyRegistry.php
+│       │   └── ReplyProfilePresentationRegistry.php
 │       ├── Reporting
 │       │   ├── Contracts
 │       │   │   ├── ReportingEventDefinitionContributor.php
@@ -2196,7 +2205,10 @@
 │       │   │   └── show.blade.php
 │       │   ├── tasks
 │       │   │   ├── index.blade.php
-│       │   │   └── show.blade.php
+│       │   │   ├── show.blade.php
+│       │   │   └── templates
+│       │   │       ├── edit.blade.php
+│       │   │       └── index.blade.php
 │       │   └── webinars
 │       │       ├── index.blade.php
 │       │       ├── message-chains
@@ -2321,6 +2333,7 @@
 │   │   │   ├── CampaignMessageChainBridgeTest.php
 │   │   │   ├── CampaignMessageChainPresetSyncTest.php
 │   │   │   ├── CampaignMessageChainRuntimeOwnershipTest.php
+│   │   │   ├── CampaignMessageReplyHandlingTest.php
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
 │   │   │   ├── CampaignProcessHighwayContributorTest.php
 │   │   │   ├── CampaignSetupActionabilityTest.php
@@ -2408,7 +2421,9 @@
 │   │   │   ├── FlowRouteBindingControllerTest.php
 │   │   │   ├── FlowRouteConditionBranchPointTest.php
 │   │   │   ├── FlowRouteControllerTest.php
+│   │   │   ├── FlowRouteDecisionAuthoringTest.php
 │   │   │   ├── FlowRouteEditorControllerTest.php
+│   │   │   ├── FlowRouteEntryCriteriaTest.php
 │   │   │   ├── FlowRouteImmediateExecutionContinuationTest.php
 │   │   │   ├── FlowRouteIndexAuthoringLinkTest.php
 │   │   │   ├── FlowRoutePointExecutionFoundationTest.php
@@ -2451,6 +2466,7 @@
 │   │   │   ├── InboundReplyProfileWorkspaceTest.php
 │   │   │   ├── InboundSmsReOptInTest.php
 │   │   │   ├── ProcessInboundSmsMessageActionTest.php
+│   │   │   ├── ReplyProfileContextualUpdateTest.php
 │   │   │   ├── ReplyProfileDependencyContributorTest.php
 │   │   │   ├── ResendInboundReplyEndToEndTest.php
 │   │   │   └── ResendReceivedEmailClientTest.php
@@ -2677,6 +2693,7 @@
 │   │   │   ├── TaskNotificationAndDigestBehaviorTest.php
 │   │   │   ├── TaskPresetSyncOwnershipTest.php
 │   │   │   ├── TasksSetupValidationContributorTest.php
+│   │   │   ├── TaskTemplateWorkspaceTest.php
 │   │   │   └── TaskWorkspaceTest.php
 │   │   ├── Users
 │   │   │   └── CrmUserCommandsTest.php
@@ -2771,4 +2788,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-674 directories, 2098 files
+675 directories, 2114 files

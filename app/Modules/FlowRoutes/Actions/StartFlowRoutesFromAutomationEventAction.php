@@ -6,6 +6,7 @@ use App\Modules\FlowRoutes\Data\Events\FlowRouteExternalEvent;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
+use App\Modules\FlowRoutes\Services\FlowRouteEntryCriteriaEvaluator;
 use App\Modules\FlowRoutes\Services\FlowRouteTriggerBindingResolver;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,7 @@ class StartFlowRoutesFromAutomationEventAction
         private readonly ExecuteFlowRouteProgressUntilIdleAction $executeFlowRouteProgressUntilIdle,
         private readonly FlowRouteTriggerBindingResolver $flowRouteTriggerBindingResolver,
         private readonly CreateContactFlowRoutePlanAction $createContactFlowRoutePlan,
+        private readonly FlowRouteEntryCriteriaEvaluator $entryCriteriaEvaluator,
     ) {}
 
     public function handle(FlowRouteExternalEvent $event): void
@@ -31,9 +33,14 @@ class StartFlowRoutesFromAutomationEventAction
                 contextType: $event->subjectType,
                 contextId: $event->subjectId,
             );
+        $executionMeta = $this->executionMeta($event);
 
         foreach ($flowRoutes as $flowRoute) {
             if (! $flowRoute instanceof FlowRoute) {
+                continue;
+            }
+
+            if (! $this->entryCriteriaEvaluator->matches($flowRoute, $executionMeta)) {
                 continue;
             }
 
@@ -45,7 +52,7 @@ class StartFlowRoutesFromAutomationEventAction
                 $this->executeFlowRouteProgressUntilIdle->handle(
                     progress: $progress,
                     source: 'automation_event_start',
-                    executionMeta: $this->executionMeta($event),
+                    executionMeta: $executionMeta,
                 );
             }
         }

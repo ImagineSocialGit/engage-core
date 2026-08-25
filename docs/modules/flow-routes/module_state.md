@@ -17,6 +17,24 @@ Route source_version -> Point source_version
 A top-level `contact_status_key` creates a contact-status trigger. A top-level `event_key` creates
 an automation-event trigger. Omitting both creates a manual Route. They are mutually exclusive.
 
+An automation-event Route may also declare top-level `entry_conditions`. These are all-match
+criteria over the transient automation-event execution context. They answer whether this Route
+should start for this particular event; they are not executable Points and are not persisted as
+an audit trail when they do not match. The initial condition vocabulary is deliberately narrow:
+`execution_meta` paths under `automation_event.*` with `equals` or `in` operators.
+
+```text
+event trigger binding matches
+    -> evaluate every Route entry condition in memory
+    -> mismatch: do not create progress or a plan
+    -> match: create progress and execute the first Point
+```
+
+Use entry conditions for route-level facts such as reply profile, reply intent, and inbound
+channel. Use a `Decision` Point only when a running Route genuinely needs to branch later in its
+procedure. Do not add a first technical Decision merely to reject events that should never have
+started the Route.
+
 The removed verbose route fields `key`, `trigger`, and `meta` are invalid. The removed Point fields
 `key`, `capability_key`, `sort_order`, `is_start`, `next_point_key`, `settings`, `source_version`,
 and `meta` are also invalid. There is no compatibility authoring path for those fields.
@@ -245,9 +263,10 @@ Expected automation-event-triggered direction:
 1. Producer module records its own domain state.
 2. Producer module emits `AutomationEventRecorded`.
 3. FlowRoutes maps that event to `FlowRouteExternalEvent`.
-4. FlowRoutes starts matching active routes whose preset trigger is the automation event.
-5. FlowRoutes also resumes any existing progress waiting at matching `event_wait` points.
-6. FlowRoutes executes route points through DB-owned definitions.
+4. FlowRoutes evaluates matching active Routes' entry criteria against transient event context.
+5. FlowRoutes starts only the Routes whose entry criteria match.
+6. FlowRoutes also resumes any existing progress waiting at matching `event_wait` points.
+7. FlowRoutes executes Route Points through DB-owned definitions.
 
 Examples:
 
@@ -595,6 +614,7 @@ Current implemented Manage Routes behavior:
 list multi-step Routes
 show assigned vs not assigned state
 show business-language trigger and consequence summaries
+show Route-level entry criteria separately as `Runs when`
 expand/collapse Route flow
 open Route editing in a modal without leaving the index
 edit existing Points in a modal
@@ -631,6 +651,10 @@ Create a Task automatically
     does not create a one-time Task now
     does not expose a title-only freeform automation path
 ```
+
+The contributor also exposes the selected Task Template as a Tasks-owned resource: operators can
+review its instructions, priority, timing, assignment, and responsibility from Route context and
+open the authoritative Tasks editor. FlowRoutes must not duplicate Task Template editing.
 
 The editor should apply the same consequence-first posture to other automatic actions: explain repeated execution, skipped/no-op behavior, availability constraints, and the condition that allows a wait to resume.
 
@@ -686,7 +710,6 @@ duplicate a Route
 activate/deactivate a Route
 change a Route trigger
 clone a Point from another Route
-task assignment/default authoring inside create-task Point UX
 business-day/business-hour wait authoring
 simple future point eligibility / route-continuation rules
 contextual Automation Opportunity suggestion UX

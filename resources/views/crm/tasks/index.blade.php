@@ -48,13 +48,22 @@
                     </p>
                 </div>
 
-                <x-ui.button
-                    type="button"
-                    class="w-full sm:w-auto"
-                    x-on:click="taskModalOpen = true"
-                >
-                    Add Task
-                </x-ui.button>
+                <div class="grid w-full gap-2 sm:w-auto sm:grid-cols-2">
+                    <a
+                        href="{{ route('crm.tasks.templates.index') }}"
+                        class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                    >
+                        Task Templates
+                    </a>
+
+                    <x-ui.button
+                        type="button"
+                        class="w-full sm:w-auto"
+                        x-on:click="taskModalOpen = true"
+                    >
+                        Add Task
+                    </x-ui.button>
+                </div>
             </div>
         </section>
 
