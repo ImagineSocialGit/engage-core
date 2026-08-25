@@ -6,10 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignTouchDate;
 use App\Modules\Campaigns\Models\CampaignTouchProgram;
+use App\Modules\Campaigns\Actions\ProcessDueCampaignTouchDatesAction;
 use App\Modules\Campaigns\Models\CampaignTouchVariant;
+use App\Modules\Campaigns\Requests\CreateCampaignAnnualTouchMessageTemplateRequest;
 use App\Modules\Core\Models\ContactStatus;
+use App\Modules\Messaging\Actions\CreateReusableMessageTemplateAction;
+use App\Modules\Messaging\Data\ReusableMessageTemplateAuthoringContext;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
+use App\Modules\Messaging\Services\ReusableMessageTemplateCatalog;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -17,9 +23,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 class CampaignAnnualTouchController extends Controller
 {
+    public function __construct(
+        private readonly ReusableMessageTemplateCatalog $reusableTemplates,
+    ) {}
+
     public function index(Request $request): View
     {
         $programs = CampaignTouchProgram::query()
@@ -39,14 +50,7 @@ class CampaignAnnualTouchController extends Controller
             $editingProgram = $programs->firstWhere('id', $editingProgramId);
         }
 
-        $templates = MessageTemplatePreset::query()
-            ->active()
-            ->where('purpose', 'marketing')
-            ->whereIn('channel', ['email', 'sms'])
-            ->orderBy('channel')
-            ->orderBy('name')
-            ->orderBy('id')
-            ->get()
+        $templates = $this->annualTouchTemplatesForIndex($editingProgram)
             ->groupBy('channel');
 
         return view('crm.campaigns.annual-touches.index', [
@@ -63,6 +67,46 @@ class CampaignAnnualTouchController extends Controller
             'emailTemplates' => $templates->get('email', collect())->values(),
             'smsTemplates' => $templates->get('sms', collect())->values(),
         ]);
+    }
+
+    public function storeMessageTemplate(
+        CreateCampaignAnnualTouchMessageTemplateRequest $request,
+        CreateReusableMessageTemplateAction $createReusableMessageTemplate,
+    ): JsonResponse {
+        $campaign = Campaign::query()
+            ->whereKey($request->campaignId())
+            ->where('status', '!=', Campaign::STATUS_ARCHIVED)
+            ->firstOrFail();
+
+        if ((string) $campaign->purpose !== 'marketing') {
+            throw ValidationException::withMessages([
+                'campaign_id' => 'Annual-touch messages require a marketing Campaign.',
+            ]);
+        }
+
+        try {
+            $preset = $createReusableMessageTemplate->handle(
+                name: $request->templateName(),
+                channel: $request->channel(),
+                payload: $request->payload(),
+                context: $this->annualTouchAuthoringContext(
+                    campaign: $campaign,
+                    channel: $request->channel(),
+                    payloadClass: $request->payloadClass(),
+                ),
+                createdBy: $request->user(),
+            );
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'message_template' => $exception->getMessage(),
+            ]);
+        }
+
+        return response()->json([
+            'id' => (int) $preset->getKey(),
+            'name' => (string) $preset->name,
+            'channel' => (string) $preset->channel,
+        ], 201);
     }
 
     public function store(Request $request): RedirectResponse
@@ -195,11 +239,11 @@ class CampaignAnnualTouchController extends Controller
             }
 
             if ($emailId !== null) {
-                $this->assertTemplate($emailId, 'email', $field.'.email_template_preset_id');
+                $this->assertTemplate($emailId, 'email', $field.'.email_template_preset_id', $program);
             }
 
             if ($smsId !== null) {
-                $this->assertTemplate($smsId, 'sms', $field.'.sms_template_preset_id');
+                $this->assertTemplate($smsId, 'sms', $field.'.sms_template_preset_id', $program);
             }
         }
 
@@ -244,8 +288,8 @@ class CampaignAnnualTouchController extends Controller
             ])->save();
 
             $keptDateIds[] = (int) $date->getKey();
-            $this->syncVariant($date, 'email', $touch['email_template_preset_id'] ?? null, 10);
-            $this->syncVariant($date, 'sms', $touch['sms_template_preset_id'] ?? null, 20);
+            $this->syncVariant($date, 'email', $touch['email_template_preset_id'] ?? null, 10, $program);
+            $this->syncVariant($date, 'sms', $touch['sms_template_preset_id'] ?? null, 20, $program);
         }
 
         $program->touchDates()
@@ -264,6 +308,7 @@ class CampaignAnnualTouchController extends Controller
         string $channel,
         mixed $presetId,
         int $sortOrder,
+        CampaignTouchProgram $program,
     ): void {
         $variant = CampaignTouchVariant::query()
             ->where('campaign_touch_date_id', $date->getKey())
@@ -277,7 +322,7 @@ class CampaignAnnualTouchController extends Controller
             return;
         }
 
-        $preset = $this->assertTemplate($presetId, $channel, $channel.'_template_preset_id');
+        $preset = $this->assertTemplate($presetId, $channel, $channel.'_template_preset_id', $program);
 
         if (! $variant instanceof CampaignTouchVariant) {
             $variant = new CampaignTouchVariant([
@@ -298,22 +343,125 @@ class CampaignAnnualTouchController extends Controller
         ])->save();
     }
 
-    private function assertTemplate(int $id, string $channel, string $field): MessageTemplatePreset
-    {
-        $preset = MessageTemplatePreset::query()
-            ->active()
-            ->whereKey($id)
-            ->where('channel', $channel)
-            ->where('purpose', 'marketing')
-            ->first();
+    private function assertTemplate(
+        int $id,
+        string $channel,
+        string $field,
+        ?CampaignTouchProgram $program = null,
+    ): MessageTemplatePreset {
+        $preset = $this->reusableTemplates
+            ->presets([$channel], 'marketing', 'campaign_annual_touch')
+            ->firstWhere('id', $id);
 
-        if (! $preset instanceof MessageTemplatePreset) {
-            throw ValidationException::withMessages([
-                $field => 'Choose an active marketing '.$channel.' template.',
-            ]);
+        if ($preset instanceof MessageTemplatePreset) {
+            return $preset;
         }
 
-        return $preset;
+        if ($program instanceof CampaignTouchProgram
+            && $this->programAlreadyUsesTemplate($program, $id, $channel)
+        ) {
+            $legacyPreset = MessageTemplatePreset::query()
+                ->active()
+                ->whereKey($id)
+                ->where('channel', $channel)
+                ->where('purpose', 'marketing')
+                ->first();
+
+            if ($legacyPreset instanceof MessageTemplatePreset) {
+                return $legacyPreset;
+            }
+        }
+
+        throw ValidationException::withMessages([
+            $field => 'Choose a saved reusable marketing '.$channel.' template.',
+        ]);
+    }
+
+    /** @return \Illuminate\Support\Collection<int, MessageTemplatePreset> */
+    private function annualTouchTemplatesForIndex(
+        ?CampaignTouchProgram $editingProgram,
+    ): \Illuminate\Support\Collection {
+        $templates = $this->reusableTemplates->presets(['email', 'sms'], 'marketing', 'campaign_annual_touch');
+
+        if (! $editingProgram instanceof CampaignTouchProgram) {
+            return $templates;
+        }
+
+        $editingProgram->loadMissing('touchDates.variants');
+        $currentIds = $editingProgram->touchDates
+            ->flatMap(fn (CampaignTouchDate $date) => $date->variants)
+            ->filter(fn (mixed $variant): bool => $variant instanceof CampaignTouchVariant && $variant->is_active)
+            ->pluck('message_template_preset_id')
+            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($currentIds->isEmpty()) {
+            return $templates;
+        }
+
+        $grandfathered = MessageTemplatePreset::query()
+            ->active()
+            ->whereIn('id', $currentIds->all())
+            ->where('purpose', 'marketing')
+            ->whereIn('channel', ['email', 'sms'])
+            ->orderBy('channel')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+
+        return $templates
+            ->concat($grandfathered)
+            ->unique(fn (MessageTemplatePreset $preset): int => (int) $preset->getKey())
+            ->sortBy(fn (MessageTemplatePreset $preset): array => [
+                (string) $preset->channel,
+                mb_strtolower((string) $preset->name),
+                (int) $preset->getKey(),
+            ])
+            ->values();
+    }
+
+    private function programAlreadyUsesTemplate(
+        CampaignTouchProgram $program,
+        int $presetId,
+        string $channel,
+    ): bool {
+        return CampaignTouchVariant::query()
+            ->where('message_template_preset_id', $presetId)
+            ->where('channel', $channel)
+            ->where('is_active', true)
+            ->whereHas('touchDate', fn ($query) => $query
+                ->where('campaign_touch_program_id', $program->getKey()))
+            ->exists();
+    }
+
+    private function annualTouchAuthoringContext(
+        Campaign $campaign,
+        string $channel,
+        string $payloadClass,
+    ): ReusableMessageTemplateAuthoringContext {
+        $channelLabel = $channel === 'sms' ? 'SMS' : 'Email';
+
+        return new ReusableMessageTemplateAuthoringContext(
+            contextKey: 'campaign_annual_touch',
+            purpose: 'marketing',
+            scope: (string) $campaign->scope,
+            dispatchKey: ProcessDueCampaignTouchDatesAction::DISPATCH_KEY,
+            messageType: 'campaign_annual_touch',
+            payloadClass: $payloadClass,
+            queue: 'marketing',
+            moduleKey: 'campaigns',
+            moduleLabel: 'Campaigns',
+            surface: 'campaigns',
+            groupKey: 'campaign:'.$campaign->key.':annual_touches:'.$channel,
+            groupLabel: $campaign->name.' — Annual Touches — '.$channelLabel,
+            usageType: 'campaign_annual_touch',
+            selectionContexts: ['campaign_annual_touch'],
+            description: 'Reusable CRM-authored annual-touch message for '.$campaign->name.'.',
+            contextType: $campaign->getMorphClass(),
+            contextId: (int) $campaign->getKey(),
+        );
     }
 
     private function nullableId(mixed $value): ?int

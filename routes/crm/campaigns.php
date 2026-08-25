@@ -21,6 +21,8 @@ Route::middleware('module:campaigns')
                     ->name('index');
                 Route::post('/', [CampaignAnnualTouchController::class, 'store'])
                     ->name('store');
+                Route::post('/message-templates', [CampaignAnnualTouchController::class, 'storeMessageTemplate'])
+                    ->name('message-templates.store');
                 Route::put('/{campaignTouchProgram}', [CampaignAnnualTouchController::class, 'update'])
                     ->name('update');
                 Route::delete('/{campaignTouchProgram}', [CampaignAnnualTouchController::class, 'destroy'])

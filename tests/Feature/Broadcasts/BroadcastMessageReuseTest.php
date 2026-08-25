@@ -61,6 +61,13 @@ class BroadcastMessageReuseTest extends TestCase
         $this->assertSame(CreateReusableMessageTemplateAction::SOURCE, $preset->source);
         $this->assertSame('VA Realtor Myth — Reusable', $preset->name);
         $this->assertSame('broadcasts', $catalogEntry->module_key);
+        $this->assertSame('broadcasts', $catalogEntry->surface);
+        $this->assertSame('broadcast_reuse', $catalogEntry->usage_type);
+        $this->assertSame('broadcasts', data_get($catalogEntry->meta, 'authoring.context_key'));
+        $this->assertEquals(
+            ['broadcasts', 'campaign_annual_touch'],
+            data_get($catalogEntry->meta, 'authoring.selection_contexts'),
+        );
         $this->assertEquals($broadcast->payload, $template->currentPayload());
 
         $this

@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Actions;
 
 use App\Models\User;
+use App\Modules\Messaging\Data\ReusableMessageTemplateAuthoringContext;
 use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
@@ -14,12 +15,6 @@ use InvalidArgumentException;
 class CreateReusableMessageTemplateAction
 {
     public const SOURCE = 'crm_reusable';
-    public const SURFACE = 'broadcasts';
-    public const MODULE_KEY = 'broadcasts';
-    public const MODULE_LABEL = 'Broadcasts';
-    public const GROUP_KEY_PREFIX = 'saved_broadcast_messages';
-    public const GROUP_LABEL = 'Saved Broadcast Messages';
-    public const USAGE_TYPE = 'broadcast_reuse';
 
     public function __construct(
         private readonly PublishMessageTemplateVersionAction $publishMessageTemplateVersion,
@@ -27,31 +22,22 @@ class CreateReusableMessageTemplateAction
     ) {}
 
     /**
+     * The calling surface owns the business context. Messaging owns validation,
+     * persistence, version publication, and catalog registration.
+     *
      * @param array<string, mixed> $payload
      */
     public function handle(
         string $name,
         string $channel,
-        string $purpose,
-        string $scope,
-        string $dispatchKey,
-        ?string $messageType,
-        string $payloadClass,
-        ?string $queue,
         array $payload,
+        ReusableMessageTemplateAuthoringContext $context,
         ?User $createdBy = null,
     ): MessageTemplatePreset {
         $name = trim($name);
-        $channel = trim($channel);
-        $purpose = trim($purpose);
-        $scope = trim($scope);
-        $dispatchKey = trim($dispatchKey);
-        $messageType = is_string($messageType) && trim($messageType) !== ''
-            ? trim($messageType)
-            : null;
-        $payloadClass = trim($payloadClass);
-        $queue = is_string($queue) && trim($queue) !== '' ? trim($queue) : null;
+        $channel = strtolower(trim($channel));
         $payload = $this->normalizedPayload($channel, $payload);
+        $contextData = $this->normalizedContext($context);
 
         if ($name === '') {
             throw new InvalidArgumentException('Reusable message template name is required.');
@@ -61,24 +47,13 @@ class CreateReusableMessageTemplateAction
             throw new InvalidArgumentException('Reusable message template name may not exceed 191 characters.');
         }
 
-        foreach ([
-            'purpose' => $purpose,
-            'scope' => $scope,
-            'dispatch key' => $dispatchKey,
-            'payload class' => $payloadClass,
-        ] as $label => $value) {
-            if ($value === '') {
-                throw new InvalidArgumentException("Reusable message template {$label} is required.");
-            }
-        }
-
         $issues = $this->messageTemplateTokenValidator->validatePayload(
             payload: $payload,
-            dispatchKeys: [$dispatchKey],
+            dispatchKeys: [$contextData['dispatch_key']],
             channel: $channel,
-            purpose: $purpose,
-            scope: $scope,
-            surface: self::SURFACE,
+            purpose: $contextData['purpose'],
+            scope: $contextData['scope'],
+            surface: $contextData['surface'],
             path: 'payload',
         );
 
@@ -96,29 +71,26 @@ class CreateReusableMessageTemplateAction
         return DB::transaction(function () use (
             $name,
             $channel,
-            $purpose,
-            $scope,
-            $dispatchKey,
-            $messageType,
-            $payloadClass,
-            $queue,
             $payload,
+            $contextData,
             $createdBy,
         ): MessageTemplatePreset {
-            $key = 'crm_broadcast_'.Str::lower((string) Str::uuid());
+            $key = 'crm_message_'.Str::lower((string) Str::uuid());
             $now = now();
+            $description = $contextData['description']
+                ?? 'Reusable CRM-authored message.';
 
             $preset = MessageTemplatePreset::query()->create([
                 'key' => $key,
                 'name' => $name,
-                'description' => 'Reusable CRM-authored Broadcast message.',
+                'description' => $description,
                 'channel' => $channel,
-                'purpose' => $purpose,
-                'scope' => $scope,
-                'message_type' => $messageType,
-                'payload_class' => $payloadClass,
-                'queue' => $queue,
-                'dispatch_keys' => [$dispatchKey],
+                'purpose' => $contextData['purpose'],
+                'scope' => $contextData['scope'],
+                'message_type' => $contextData['message_type'],
+                'payload_class' => $contextData['payload_class'],
+                'queue' => $contextData['queue'],
+                'dispatch_keys' => [$contextData['dispatch_key']],
                 'payload' => $payload,
                 'tokens' => $this->messageTemplateTokenValidator->tokensFromPayload($payload),
                 'status' => MessageTemplatePreset::STATUS_ACTIVE,
@@ -129,13 +101,13 @@ class CreateReusableMessageTemplateAction
                 'is_customized' => true,
                 'customized_at' => $now,
                 'last_synced_at' => null,
-                'meta' => null,
+                'meta' => $contextData['preset_meta'] !== [] ? $contextData['preset_meta'] : null,
             ]);
 
             $template = MessageTemplate::query()->create([
                 'key' => $key,
                 'name' => $name,
-                'description' => 'Reusable CRM-authored Broadcast message.',
+                'description' => $description,
                 'channel' => $channel,
                 'status' => MessageTemplate::STATUS_ACTIVE,
                 'composition_context_key' => null,
@@ -156,23 +128,23 @@ class CreateReusableMessageTemplateAction
             MessageTemplateCatalogEntry::query()->create([
                 'message_template_preset_id' => $preset->getKey(),
                 'channel' => $channel,
-                'purpose' => $purpose,
-                'scope' => $scope,
-                'module_key' => self::MODULE_KEY,
-                'module_label' => self::MODULE_LABEL,
-                'surface' => self::SURFACE,
-                'group_key' => self::groupKey($channel),
-                'group_label' => self::groupLabel($channel),
+                'purpose' => $contextData['purpose'],
+                'scope' => $contextData['scope'],
+                'module_key' => $contextData['module_key'],
+                'module_label' => $contextData['module_label'],
+                'surface' => $contextData['surface'],
+                'group_key' => $contextData['group_key'],
+                'group_label' => $contextData['group_label'],
                 'item_key' => $key,
                 'item_label' => $name,
-                'item_order' => 1000,
-                'usage_type' => self::USAGE_TYPE,
+                'item_order' => $contextData['item_order'],
+                'usage_type' => $contextData['usage_type'],
                 'source' => self::SOURCE,
                 'source_config_path' => null,
-                'context_type' => null,
-                'context_id' => null,
+                'context_type' => $contextData['context_type'],
+                'context_id' => $contextData['context_id'],
                 'is_active' => true,
-                'meta' => null,
+                'meta' => $contextData['catalog_meta'] !== [] ? $contextData['catalog_meta'] : null,
             ]);
 
             return $preset->load([
@@ -182,23 +154,109 @@ class CreateReusableMessageTemplateAction
         }, 3);
     }
 
+    /**
+     * @return array{
+     *     context_key: string,
+     *     purpose: string,
+     *     scope: string,
+     *     dispatch_key: string,
+     *     message_type: string|null,
+     *     payload_class: string,
+     *     queue: string|null,
+     *     module_key: string,
+     *     module_label: string,
+     *     surface: string,
+     *     group_key: string,
+     *     group_label: string,
+     *     usage_type: string,
+     *     description: string|null,
+     *     item_order: int,
+     *     context_type: string|null,
+     *     context_id: int|null,
+     *     preset_meta: array<string, mixed>,
+     *     catalog_meta: array<string, mixed>
+     * }
+     */
+    private function normalizedContext(
+        ReusableMessageTemplateAuthoringContext $context,
+    ): array {
+        $required = [
+            'context key' => $context->contextKey,
+            'purpose' => $context->purpose,
+            'scope' => $context->scope,
+            'dispatch key' => $context->dispatchKey,
+            'payload class' => $context->payloadClass,
+            'module key' => $context->moduleKey,
+            'module label' => $context->moduleLabel,
+            'surface' => $context->surface,
+            'group key' => $context->groupKey,
+            'group label' => $context->groupLabel,
+            'usage type' => $context->usageType,
+        ];
 
-    public static function groupKey(string $channel): string
-    {
-        $channel = strtolower(trim($channel));
+        foreach ($required as $label => $value) {
+            if (trim($value) === '') {
+                throw new InvalidArgumentException("Reusable message template {$label} is required.");
+            }
+        }
 
-        return self::GROUP_KEY_PREFIX.'_'.$channel;
-    }
+        $contextType = is_string($context->contextType) && trim($context->contextType) !== ''
+            ? trim($context->contextType)
+            : null;
+        $contextId = $context->contextId !== null && $context->contextId > 0
+            ? $context->contextId
+            : null;
 
-    public static function groupLabel(string $channel): string
-    {
-        $channel = strtolower(trim($channel));
+        if (($contextType === null) !== ($contextId === null)) {
+            throw new InvalidArgumentException('Reusable message template context type and context id must be supplied together.');
+        }
 
-        return self::GROUP_LABEL.' — '.match ($channel) {
-            'email' => 'Email',
-            'sms' => 'SMS',
-            default => strtoupper($channel),
-        };
+        $contextKey = trim($context->contextKey);
+        $selectionContexts = array_values(array_unique(array_filter(array_map(
+            static fn (mixed $value): ?string => is_string($value) && trim($value) !== ''
+                ? trim($value)
+                : null,
+            $context->selectionContexts,
+        ))));
+
+        if (! in_array($contextKey, $selectionContexts, true)) {
+            $selectionContexts[] = $contextKey;
+        }
+
+        $authoringMeta = [
+            'authoring' => [
+                'context_key' => $contextKey,
+                'selection_contexts' => $selectionContexts,
+            ],
+        ];
+
+        return [
+            'context_key' => $contextKey,
+            'purpose' => trim($context->purpose),
+            'scope' => trim($context->scope),
+            'dispatch_key' => trim($context->dispatchKey),
+            'message_type' => is_string($context->messageType) && trim($context->messageType) !== ''
+                ? trim($context->messageType)
+                : null,
+            'payload_class' => trim($context->payloadClass),
+            'queue' => is_string($context->queue) && trim($context->queue) !== ''
+                ? trim($context->queue)
+                : null,
+            'module_key' => trim($context->moduleKey),
+            'module_label' => trim($context->moduleLabel),
+            'surface' => trim($context->surface),
+            'group_key' => trim($context->groupKey),
+            'group_label' => trim($context->groupLabel),
+            'usage_type' => trim($context->usageType),
+            'description' => is_string($context->description) && trim($context->description) !== ''
+                ? trim($context->description)
+                : null,
+            'item_order' => max(0, $context->itemOrder),
+            'context_type' => $contextType,
+            'context_id' => $contextId,
+            'preset_meta' => array_replace_recursive($context->presetMeta, $authoringMeta),
+            'catalog_meta' => array_replace_recursive($context->catalogMeta, $authoringMeta),
+        ];
     }
 
     /**

@@ -19,6 +19,7 @@ use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Core\Services\Contacts\ContactFilterResolver;
 use App\Modules\Core\Support\Contacts\ContactFilterCriterionRegistry;
 use App\Modules\Messaging\Actions\CreateReusableMessageTemplateAction;
+use App\Modules\Messaging\Data\ReusableMessageTemplateAuthoringContext;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\ReusableMessageTemplateCatalog;
 use Illuminate\Database\Eloquent\Collection;
@@ -53,7 +54,9 @@ class BroadcastController extends Controller
             'broadcasts' => $broadcasts,
             'availableBroadcastChannels' => $this->availableRegularBroadcastChannels(),
             'reusableMessageTemplates' => $this->reusableMessageTemplates->definitions(
-                $this->availableRegularBroadcastChannels(),
+                channels: $this->availableRegularBroadcastChannels(),
+                purpose: 'marketing',
+                selectionContext: 'broadcasts',
             ),
             'audienceCriteria' => $this->contactFilterCriteria->definitions(),
             'permissionInvitationPreview' => $this->newPermissionInvitationPreview($request),
@@ -134,13 +137,8 @@ class BroadcastController extends Controller
             $createReusableMessageTemplate->handle(
                 name: $request->templateName(),
                 channel: (string) $broadcast->channel,
-                purpose: (string) $broadcast->purpose,
-                scope: (string) $broadcast->scope,
-                dispatchKey: (string) $broadcast->dispatch_key,
-                messageType: is_string($broadcast->message_type) ? $broadcast->message_type : null,
-                payloadClass: (string) $broadcast->payload_class,
-                queue: is_string($broadcast->queue) ? $broadcast->queue : null,
                 payload: is_array($broadcast->payload) ? $broadcast->payload : [],
+                context: $this->reusableMessageTemplateContext($broadcast),
                 createdBy: $request->user(),
             );
         } catch (InvalidArgumentException $exception) {
@@ -222,7 +220,9 @@ class BroadcastController extends Controller
             'broadcast' => $broadcast,
             'availableBroadcastChannels' => $this->availableRegularBroadcastChannels($broadcast->channel),
             'reusableMessageTemplates' => $this->reusableMessageTemplates->definitions(
-                $this->availableRegularBroadcastChannels($broadcast->channel),
+                channels: $this->availableRegularBroadcastChannels($broadcast->channel),
+                purpose: 'marketing',
+                selectionContext: 'broadcasts',
             ),
             'audienceCriteria' => $this->contactFilterCriteria->definitions(),
             'selectedRecipientContacts' => $this->selectedContactOptions(
@@ -473,6 +473,31 @@ class BroadcastController extends Controller
                 'type' => 'import_batch',
                 'import_batch_ids' => $importBatchIds,
             ];
+    }
+
+
+    private function reusableMessageTemplateContext(
+        Broadcast $broadcast,
+    ): ReusableMessageTemplateAuthoringContext {
+        $channel = (string) $broadcast->channel;
+
+        return new ReusableMessageTemplateAuthoringContext(
+            contextKey: 'broadcasts',
+            purpose: (string) $broadcast->purpose,
+            scope: (string) $broadcast->scope,
+            dispatchKey: (string) $broadcast->dispatch_key,
+            messageType: is_string($broadcast->message_type) ? $broadcast->message_type : null,
+            payloadClass: (string) $broadcast->payload_class,
+            queue: is_string($broadcast->queue) ? $broadcast->queue : null,
+            moduleKey: 'broadcasts',
+            moduleLabel: 'Broadcasts',
+            surface: 'broadcasts',
+            groupKey: 'saved_broadcast_messages_'.strtolower($channel),
+            groupLabel: 'Saved Broadcast Messages — '.($channel === 'sms' ? 'SMS' : 'Email'),
+            usageType: 'broadcast_reuse',
+            selectionContexts: ['broadcasts', 'campaign_annual_touch'],
+            description: 'Reusable CRM-authored Broadcast message.',
+        );
     }
 
     /**

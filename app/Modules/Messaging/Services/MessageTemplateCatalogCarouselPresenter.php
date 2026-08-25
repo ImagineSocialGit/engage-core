@@ -16,6 +16,7 @@ class MessageTemplateCatalogCarouselPresenter
     public function __construct(
         private readonly MessageTemplateUsageResolver $usageResolver,
         private readonly ReplyProfilePresentationRegistry $replyProfiles,
+        private readonly MessageTemplateDisplayLabelResolver $displayLabels,
     ) {}
 
     /**
@@ -91,7 +92,7 @@ class MessageTemplateCatalogCarouselPresenter
             $channels[$channel]['messages'][] = array_replace([
                 'id' => 'preset:'.$preset->getKey(),
                 'preset_id' => (int) $preset->getKey(),
-                'step_name' => $entry->item_label ?: $preset->name,
+                'step_name' => $this->displayLabels->label($entry, $payload),
                 'template_name' => $preset->name,
                 'template_key' => $preset->key,
                 'template_version' => $version?->version,

@@ -109,4 +109,26 @@ The intended Campaign UI remains intentionally small:
   - future registered date source
 - Email/SMS template selections per row
 
+Annual-touch authoring intentionally selects only Messaging-owned saved reusable
+marketing messages. It does not expose the full active template catalog. Campaign
+step messages, Webinar lifecycle reminders/confirmations, reply acknowledgements,
+and other owner-specific templates are excluded from new annual-touch selection.
+
+The Annual Touches workspace can also create an Email or SMS message inline. The operator
+provides the message name and copy; Campaigns supplies the selected Campaign's server-owned
+annual-touch context to Messaging. New templates therefore receive the correct marketing
+purpose, Campaign scope, `campaign_touch_due` dispatch context, payload class, queue,
+Campaign catalog grouping, and annual-touch selection eligibility automatically. The new
+template is returned to the open editor and selected without discarding unsaved annual-touch
+rows.
+
+The shared creation primitive is intentionally not Annual-Touch-specific. Other authoring
+surfaces may later supply their own context to the same Messaging action without schema,
+client-config, or preset-sync changes.
+
+If an older annual-touch program already references a now-ineligible active marketing
+template, the editor may continue to show and preserve that existing selection so a
+normal edit does not strand historical configuration. New selections must use the
+safe reusable catalog.
+
 The runtime and schema do not require that UI to exist.

@@ -11,6 +11,10 @@ use Illuminate\Support\Str;
 
 class MessageTemplateUsageResolver
 {
+    public function __construct(
+        private readonly MessageTemplateDisplayLabelResolver $displayLabels,
+    ) {}
+
     /**
      * @return Collection<int, array{assignment_id: int, module_label: string, context_label: string, item_label: string, detail: string|null, url: string|null, reply_profile_key: string|null}>
      */
@@ -41,9 +45,10 @@ class MessageTemplateUsageResolver
         $groupLabel = $catalogEntry?->group_label
             ?? data_get($assignment->meta, 'catalog.group_label')
             ?? $this->fallbackGroupLabel($assignment, $preset);
-        $itemLabel = $catalogEntry?->item_label
-            ?? data_get($assignment->meta, 'catalog.item_label')
-            ?? $this->fallbackItemLabel($assignment, $preset);
+        $itemLabel = $catalogEntry instanceof MessageTemplateCatalogEntry
+            ? $this->displayLabels->label($catalogEntry)
+            : (data_get($assignment->meta, 'catalog.item_label')
+                ?? $this->fallbackItemLabel($assignment, $preset));
 
         return [
             'assignment_id' => (int) $assignment->getKey(),

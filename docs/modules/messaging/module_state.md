@@ -1233,6 +1233,57 @@ Warnings represent dormant, unused, unavailable, or surprising-but-safe setup.
 
 Do not persist validation findings unless an operator workflow later proves historical acknowledgement or audit state is required.
 
+
+## Message library discovery and display labels
+
+The CRM Message Templates workspace presents human-facing meaning first and keeps
+runtime coordinates as technical metadata.
+
+Presentation rules:
+
+- catalog order and immutable template identity remain authoritative for runtime;
+- labels such as `Step 7 Email` or `Reminder 5 Email` are treated as technical
+  coordinates, not useful operator-facing names;
+- a meaningful catalog label is preferred when one already exists;
+- known reminder timing encoded in message identity may be rendered as a semantic
+  label such as `10-Minute Reminder`;
+- otherwise Email subject copy is the preferred label for technical catalog rows;
+- SMS may fall back to a short excerpt of its message copy;
+- technical keys/names remain available in the details surface for debugging.
+
+The library search covers family/context labels, resolved human message labels,
+subjects, message copy, and technical identity. Normal filtering is business-facing:
+Channel and Context are primary filters; Purpose remains an advanced filter.
+
+Reusable selection consumers should not query every active MessageTemplatePreset.
+`ReusableMessageTemplateCatalog` is the Messaging-owned safe-selection seam for
+operator-authored standalone reusable messages. Lifecycle-owned Campaign steps,
+Webinar reminders, reply acknowledgements, and similar definitions are not generic
+selection candidates merely because they are active templates.
+
+### Contextual reusable-message creation
+
+`CreateReusableMessageTemplateAction` is the Messaging-owned persistence and versioning
+primitive for CRM-authored reusable messages. It does not decide why the message exists.
+The calling surface supplies a `ReusableMessageTemplateAuthoringContext` containing the
+server-owned purpose, scope, dispatch context, payload class, queue, catalog ownership,
+grouping, usage type, and allowed selection contexts. The operator supplies only the
+human-facing name and channel payload.
+
+This keeps creation contextual without coupling Messaging to consuming modules:
+
+```text
+Broadcasts -> Broadcast authoring context -> Messaging create action
+Campaign Annual Touches -> annual-touch authoring context -> Messaging create action
+Flow Routes (future UI wiring) -> Route authoring context -> Messaging create action
+```
+
+Authoring context is persisted in existing preset/catalog metadata. It is not a new schema
+contract and does not require preset sync. Contextual selectors may ask
+`ReusableMessageTemplateCatalog` for a specific selection context so a template created
+for one surface does not automatically leak into an incompatible picker. Legacy saved
+Broadcast messages remain selectable in Broadcasts and Annual Touches for compatibility.
+
 ## Completed refactor boundary and remaining work
 
 The 15A/15B implementation sequence is complete for the core Messaging persistence contract:

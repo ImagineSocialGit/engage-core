@@ -56,11 +56,22 @@
                     </div>
 
                     <form method="GET" action="{{ route('crm.messaging.message-templates.index') }}" class="border-b border-slate-200 bg-slate-50 p-4 sm:p-5">
-                        <div class="space-y-3">
+                        <div>
+                            <label for="q" class="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-500">Search</label>
+                            <input
+                                id="q"
+                                name="q"
+                                type="search"
+                                value="{{ $filters['q'] }}"
+                                placeholder="Search names, subjects, copy, or families"
+                                class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm"
+                            >
+                        </div>
+
+                        <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                             @foreach([
                                 ['key' => 'channel', 'label' => 'Channel', 'options' => $filterOptions['channels'], 'all' => 'All channels'],
-                                ['key' => 'purpose', 'label' => 'Purpose', 'options' => $filterOptions['purposes'], 'all' => 'All purposes'],
-                                ['key' => 'module', 'label' => 'Area', 'options' => $filterOptions['modules'], 'all' => 'All areas'],
+                                ['key' => 'module', 'label' => 'Context', 'options' => $filterOptions['modules'], 'all' => 'All contexts'],
                             ] as $filter)
                                 <div>
                                     <label for="{{ $filter['key'] }}" class="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-500">{{ $filter['label'] }}</label>
@@ -74,9 +85,22 @@
                             @endforeach
                         </div>
 
+                        <details class="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2" @if($filters['purpose']) open @endif>
+                            <summary class="cursor-pointer text-xs font-extrabold uppercase tracking-wide text-slate-500">Advanced filters</summary>
+                            <div class="mt-3">
+                                <label for="purpose" class="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-500">Purpose</label>
+                                <select id="purpose" name="purpose" class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm">
+                                    <option value="">All purposes</option>
+                                    @foreach($filterOptions['purposes'] as $option)
+                                        <option value="{{ $option['value'] }}" @selected($filters['purpose'] === $option['value'])>{{ $option['label'] }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </details>
+
                         <div class="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-                            <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-extrabold text-white">Filter</button>
-                            @if($filters['channel'] || $filters['purpose'] || $filters['module'])
+                            <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-extrabold text-white">Search &amp; filter</button>
+                            @if($filters['q'] || $filters['channel'] || $filters['purpose'] || $filters['module'])
                                 <a href="{{ route('crm.messaging.message-templates.index') }}" class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-extrabold text-slate-700">Clear</a>
                             @endif
                         </div>
@@ -88,6 +112,7 @@
                                 $firstEntry = $group['entries']->first();
                                 $firstPreset = $firstEntry?->messageTemplatePreset;
                                 $groupUrl = route('crm.messaging.message-templates.index', array_filter([
+                                    'q' => $filters['q'],
                                     'channel' => $filters['channel'],
                                     'purpose' => $filters['purpose'],
                                     'module' => $filters['module'],
@@ -110,7 +135,7 @@
                                 </div>
                             </a>
                         @empty
-                            <div class="p-6 text-center text-sm text-slate-500">No message families match these filters.</div>
+                            <div class="p-6 text-center text-sm text-slate-500">No message families match this search and filter combination.</div>
                         @endforelse
                     </div>
                 </section>

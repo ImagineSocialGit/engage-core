@@ -16,6 +16,7 @@ use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Requests\UpdateMessageTemplateCompositionLayerRequest;
 use App\Modules\Messaging\Requests\UpdateMessageTemplatePresetRequest;
 use App\Modules\Messaging\Services\MessageTemplateCompositionEditorPresenter;
+use App\Modules\Messaging\Services\MessageTemplateDisplayLabelResolver;
 use App\Modules\Messaging\Services\MessageTemplateCatalogCarouselPresenter;
 use App\Modules\Messaging\Services\MessageTemplateCompositionImpactResolver;
 use App\Modules\Messaging\Services\MessageTemplateCompositionResolver;
@@ -38,6 +39,7 @@ class MessageTemplatePresetController extends Controller
         MessageTemplateTokenValidator $messageTemplateTokenValidator,
         MessageTemplateCompositionEditorPresenter $compositionPresenter,
         MessageTemplateCatalogCarouselPresenter $catalogCarouselPresenter,
+        MessageTemplateDisplayLabelResolver $displayLabels,
     ): View {
         $catalogEntries = MessageTemplateCatalogEntry::query()
             ->active()
@@ -45,6 +47,7 @@ class MessageTemplatePresetController extends Controller
             ->with([
                 'messageTemplatePreset' => fn ($query) => $query
                     ->active()
+                    ->with('canonicalTemplate.currentVersion')
                     ->withCount(['assignments as active_assignments_count' => fn ($query) => $query->active()]),
             ])
             ->orderBy('channel')
@@ -65,7 +68,7 @@ class MessageTemplatePresetController extends Controller
 
         $filterOptions = $this->filterOptions($catalogEntries);
         $filters = $this->filters($request, $filterOptions);
-        $filteredCatalogEntries = $this->filteredCatalogEntries($catalogEntries, $filters);
+        $filteredCatalogEntries = $this->filteredCatalogEntries($catalogEntries, $filters, $displayLabels);
         $catalogGroups = $this->catalogGroups($filteredCatalogEntries);
         $selectedGroup = $this->selectedGroup($request, $catalogGroups);
         $selectedGroupEntries = $selectedGroup['entries'] ?? collect();
@@ -277,11 +280,15 @@ class MessageTemplatePresetController extends Controller
 
     /**
      * @param array{channels: array<int, array{value: string, label: string}>, purposes: array<int, array{value: string, label: string}>, modules: array<int, array{value: string, label: string}>} $filterOptions
-     * @return array{channel: string|null, purpose: string|null, module: string|null}
+     * @return array{q: string|null, channel: string|null, purpose: string|null, module: string|null}
      */
     private function filters(Request $request, array $filterOptions): array
     {
+        $search = $request->query('q');
+        $search = is_string($search) ? trim($search) : '';
+
         return [
+            'q' => $search !== '' ? mb_substr($search, 0, 120) : null,
             'channel' => $this->validFilterValue($request->query('channel'), $filterOptions['channels']),
             'purpose' => $this->validFilterValue($request->query('purpose'), $filterOptions['purposes']),
             'module' => $this->validFilterValue($request->query('module'), $filterOptions['modules']),
@@ -302,15 +309,40 @@ class MessageTemplatePresetController extends Controller
 
     /**
      * @param Collection<int, MessageTemplateCatalogEntry> $catalogEntries
-     * @param array{channel: string|null, purpose: string|null, module: string|null} $filters
+     * @param array{q: string|null, channel: string|null, purpose: string|null, module: string|null} $filters
      * @return Collection<int, MessageTemplateCatalogEntry>
      */
-    private function filteredCatalogEntries(Collection $catalogEntries, array $filters): Collection
-    {
+    private function filteredCatalogEntries(
+        Collection $catalogEntries,
+        array $filters,
+        MessageTemplateDisplayLabelResolver $displayLabels,
+    ): Collection {
         return $catalogEntries
             ->when($filters['channel'], fn (Collection $entries, string $channel) => $entries->where('channel', $channel))
             ->when($filters['purpose'], fn (Collection $entries, string $purpose) => $entries->where('purpose', $purpose))
             ->when($filters['module'], fn (Collection $entries, string $module) => $entries->where('module_key', $module))
+            ->when($filters['q'], function (Collection $entries, string $search) use ($displayLabels): Collection {
+                $needle = mb_strtolower($search);
+
+                return $entries->filter(function (MessageTemplateCatalogEntry $entry) use ($displayLabels, $needle): bool {
+                    $preset = $entry->messageTemplatePreset;
+                    $payload = $displayLabels->payload($preset);
+                    $haystack = implode(' ', array_filter([
+                        $entry->group_label,
+                        $entry->module_label,
+                        $entry->item_label,
+                        $entry->item_key,
+                        $displayLabels->label($entry, $payload),
+                        $preset?->name,
+                        $preset?->message_type,
+                        $payload['subject'] ?? null,
+                        $payload['body'] ?? null,
+                        $payload['message'] ?? null,
+                    ], static fn (mixed $value): bool => is_string($value) && trim($value) !== ''));
+
+                    return str_contains(mb_strtolower($haystack), $needle);
+                });
+            })
             ->values();
     }
 

@@ -114,6 +114,10 @@ class MessageTemplatePresetControllerTest extends TestCase
             'payload_class' => EmailPayload::class,
             'queue' => 'marketing',
             'dispatch_keys' => ['campaign_step_due'],
+            'payload' => [
+                'subject' => 'Now let’s talk about YOUR VA loan',
+                'body' => 'Campaign message body.',
+            ],
         ]);
 
         MessageTemplateCatalogEntry::factory()
@@ -144,6 +148,10 @@ class MessageTemplatePresetControllerTest extends TestCase
             'payload_class' => EmailPayload::class,
             'queue' => 'marketing',
             'dispatch_keys' => ['campaign_step_due'],
+            'payload' => [
+                'subject' => 'What to do next after the webinar',
+                'body' => 'Neighbor campaign message body.',
+            ],
         ]);
 
         MessageTemplateCatalogEntry::factory()
@@ -187,13 +195,106 @@ class MessageTemplatePresetControllerTest extends TestCase
             ->assertOk()
             ->assertSee($preset->name)
             ->assertSee('Webinar Attended Nurture')
-            ->assertSee('Step 2 Email')
-            ->assertSee('Step 3 Email')
+            ->assertViewHas('messageLibrary', function (mixed $library): bool {
+                $labels = collect(is_array($library) ? ($library['channels'] ?? []) : [])
+                    ->flatMap(fn (array $channel): array => $channel['messages'] ?? [])
+                    ->pluck('step_name')
+                    ->values()
+                    ->all();
+
+                return $labels === [
+                    'Now let’s talk about YOUR VA loan',
+                    'What to do next after the webinar',
+                ];
+            })
             ->assertSee(route('crm.campaigns.message-templates.index', [
                 'campaign' => 'webinar_attended_nurture',
                 'step' => 2,
             ]))
             ->assertDontSee('name="message_template_preset_id"', false);
+    }
+
+    public function test_library_search_uses_human_message_labels_and_business_facing_usage_filter(): void
+    {
+        config()->set('modules.enabled', ['messaging']);
+        $user = User::factory()->create();
+
+        $campaignPreset = MessageTemplatePreset::factory()->create([
+            'name' => 'Cold Lead Nurture — Step 7 Email',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'mortgage_homebuyer_nurture',
+            'message_type' => 'cold_lead_nurture_step_7',
+            'payload_class' => EmailPayload::class,
+            'payload' => [
+                'subject' => 'Don’t Google your way through a mortgage.',
+                'body' => 'Campaign body.',
+            ],
+        ]);
+
+        MessageTemplateCatalogEntry::factory()->forPreset($campaignPreset)->create([
+            'module_key' => 'campaigns',
+            'module_label' => 'Campaigns',
+            'surface' => 'campaigns',
+            'group_key' => 'campaign:cold_lead_nurture',
+            'group_label' => 'Cold Lead Nurture',
+            'item_key' => 'campaign.cold_lead_nurture.step.7.email',
+            'item_label' => 'Step 7 Email',
+            'item_order' => 7,
+            'usage_type' => 'campaign_step',
+        ]);
+
+        $webinarPreset = MessageTemplatePreset::factory()->create([
+            'name' => 'Homebuyer Game Plan — Reminder 5 Email',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'reminder_10_minute',
+            'payload_class' => EmailPayload::class,
+            'payload' => [
+                'subject' => 'Starting Soon — 10 Minutes',
+                'body' => 'Webinar reminder body.',
+            ],
+        ]);
+
+        MessageTemplateCatalogEntry::factory()->forPreset($webinarPreset)->create([
+            'module_key' => 'webinars',
+            'module_label' => 'Webinars',
+            'surface' => 'webinar_registrations',
+            'group_key' => 'webinars:homebuyer_game_plan:reminders',
+            'group_label' => 'Homebuyer Game Plan — Webinar Reminders',
+            'item_key' => 'webinar.reminder_10_minute.email',
+            'item_label' => 'Reminder 5 Email',
+            'item_order' => 5,
+            'usage_type' => 'webinar_reminder',
+        ]);
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/message-templates?q=10-minute')
+            ->assertOk()
+            ->assertSee('10-Minute Reminder')
+            ->assertSee('Homebuyer Game Plan — Webinar Reminders')
+            ->assertDontSee('Cold Lead Nurture')
+            ->assertViewHas('messageLibrary', fn (mixed $library): bool =>
+                collect(is_array($library) ? ($library['channels'] ?? []) : [])
+                    ->flatMap(fn (array $channel): array => $channel['messages'] ?? [])
+                    ->pluck('step_name')
+                    ->contains('10-Minute Reminder')
+            );
+
+        $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/message-templates?q=mortgage&module=campaigns')
+            ->assertOk()
+            ->assertSee('Don’t Google your way through a mortgage.')
+            ->assertSee('Context')
+            ->assertViewHas('messageLibrary', fn (mixed $library): bool =>
+                collect(is_array($library) ? ($library['channels'] ?? []) : [])
+                    ->flatMap(fn (array $channel): array => $channel['messages'] ?? [])
+                    ->pluck('step_name')
+                    ->contains('Don’t Google your way through a mortgage.')
+            );
     }
 
     public function test_it_updates_email_template_safe_copy_fields(): void

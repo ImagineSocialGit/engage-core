@@ -52,6 +52,21 @@
                 ]];
             }
         }
+
+        $emailTemplateOptions = $emailTemplates
+            ->map(fn ($template) => [
+                'id' => (string) $template->getKey(),
+                'name' => (string) $template->name,
+            ])
+            ->values()
+            ->all();
+        $smsTemplateOptions = $smsTemplates
+            ->map(fn ($template) => [
+                'id' => (string) $template->getKey(),
+                'name' => (string) $template->name,
+            ])
+            ->values()
+            ->all();
     @endphp
 
     <div class="min-w-0 space-y-6">
@@ -109,6 +124,20 @@
                 class="mt-6 space-y-6"
                 x-data="{
                     rows: @js(array_values($initialTouches)),
+                    selectedCampaignId: @js((string) $defaultCampaignId),
+                    emailTemplates: @js($emailTemplateOptions),
+                    smsTemplates: @js($smsTemplateOptions),
+                    templateCreator: {
+                        open: false,
+                        saving: false,
+                        error: '',
+                        channel: 'email',
+                        rowIndex: 0,
+                        name: '',
+                        subject: '',
+                        body: '',
+                        message: '',
+                    },
                     addRow() {
                         this.rows.push({
                             id: null,
@@ -123,6 +152,78 @@
                     },
                     removeRow(index) {
                         this.rows.splice(index, 1);
+                    },
+                    openTemplateCreator(channel, index) {
+                        this.templateCreator = {
+                            open: true,
+                            saving: false,
+                            error: this.selectedCampaignId ? '' : 'Choose a Campaign first so the message gets the correct annual-touch context.',
+                            channel,
+                            rowIndex: index,
+                            name: this.rows[index]?.name ?? '',
+                            subject: '',
+                            body: '',
+                            message: '',
+                        };
+                    },
+                    closeTemplateCreator() {
+                        if (! this.templateCreator.saving) {
+                            this.templateCreator.open = false;
+                        }
+                    },
+                    async createTemplate() {
+                        if (! this.selectedCampaignId) {
+                            this.templateCreator.error = 'Choose a Campaign first so the message gets the correct annual-touch context.';
+                            return;
+                        }
+
+                        this.templateCreator.saving = true;
+                        this.templateCreator.error = '';
+
+                        try {
+                            const response = await fetch(@js(route('crm.campaigns.annual-touches.message-templates.store')), {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': @js(csrf_token()),
+                                },
+                                body: JSON.stringify({
+                                    campaign_id: this.selectedCampaignId,
+                                    channel: this.templateCreator.channel,
+                                    name: this.templateCreator.name,
+                                    subject: this.templateCreator.subject,
+                                    body: this.templateCreator.body,
+                                    message: this.templateCreator.message,
+                                }),
+                            });
+
+                            const result = await response.json().catch(() => ({}));
+
+                            if (! response.ok) {
+                                const validationMessages = Object.values(result.errors ?? {}).flat();
+                                this.templateCreator.error = validationMessages[0] ?? result.message ?? 'The message template could not be created.';
+                                return;
+                            }
+
+                            const option = { id: String(result.id), name: result.name };
+
+                            if (result.channel === 'sms') {
+                                this.smsTemplates.push(option);
+                                this.smsTemplates.sort((a, b) => a.name.localeCompare(b.name));
+                                this.rows[this.templateCreator.rowIndex].sms_template_preset_id = option.id;
+                            } else {
+                                this.emailTemplates.push(option);
+                                this.emailTemplates.sort((a, b) => a.name.localeCompare(b.name));
+                                this.rows[this.templateCreator.rowIndex].email_template_preset_id = option.id;
+                            }
+
+                            this.templateCreator.open = false;
+                        } catch (error) {
+                            this.templateCreator.error = 'The message template could not be created. Try again.';
+                        } finally {
+                            this.templateCreator.saving = false;
+                        }
                     },
                 }"
             >
@@ -141,6 +242,7 @@
                         @else
                             <select
                                 name="campaign_id"
+                                x-model="selectedCampaignId"
                                 required
                                 class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900"
                             >
@@ -307,32 +409,54 @@
                                 </div>
                             </div>
 
+                            <div class="mt-4 rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-xs leading-5 text-slate-600">
+                                Only saved reusable marketing messages appear here. Campaign steps, webinar reminders, reply acknowledgements, and other lifecycle-owned messages are intentionally excluded.
+                            </div>
+
                             <div class="mt-4 grid min-w-0 gap-4 lg:grid-cols-2">
                                 <div class="min-w-0">
-                                    <label class="text-xs font-bold uppercase tracking-wide text-slate-600">Email</label>
+                                    <div class="flex items-center justify-between gap-3">
+                                        <label class="text-xs font-bold uppercase tracking-wide text-slate-600">Saved email message</label>
+                                        <button
+                                            type="button"
+                                            @click="openTemplateCreator('email', index)"
+                                            class="text-xs font-bold text-rose-700 hover:text-rose-900"
+                                        >
+                                            + Add new message
+                                        </button>
+                                    </div>
                                     <select
                                         :name="`touches[${index}][email_template_preset_id]`"
                                         x-model="row.email_template_preset_id"
                                         class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900"
                                     >
                                         <option value="">No email</option>
-                                        @foreach($emailTemplates as $template)
-                                            <option value="{{ $template->getKey() }}">{{ $template->name }} · {{ $template->scope }}</option>
-                                        @endforeach
+                                        <template x-for="template in emailTemplates" :key="`email-${template.id}`">
+                                            <option :value="template.id" x-text="template.name"></option>
+                                        </template>
                                     </select>
                                 </div>
 
                                 <div class="min-w-0">
-                                    <label class="text-xs font-bold uppercase tracking-wide text-slate-600">SMS</label>
+                                    <div class="flex items-center justify-between gap-3">
+                                        <label class="text-xs font-bold uppercase tracking-wide text-slate-600">Saved SMS message</label>
+                                        <button
+                                            type="button"
+                                            @click="openTemplateCreator('sms', index)"
+                                            class="text-xs font-bold text-rose-700 hover:text-rose-900"
+                                        >
+                                            + Add new message
+                                        </button>
+                                    </div>
                                     <select
                                         :name="`touches[${index}][sms_template_preset_id]`"
                                         x-model="row.sms_template_preset_id"
                                         class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900"
                                     >
                                         <option value="">No SMS</option>
-                                        @foreach($smsTemplates as $template)
-                                            <option value="{{ $template->getKey() }}">{{ $template->name }} · {{ $template->scope }}</option>
-                                        @endforeach
+                                        <template x-for="template in smsTemplates" :key="`sms-${template.id}`">
+                                            <option :value="template.id" x-text="template.name"></option>
+                                        </template>
                                     </select>
                                 </div>
                             </div>
@@ -340,9 +464,68 @@
                     </template>
                 </div>
 
+                <div
+                    x-show="templateCreator.open"
+                    x-cloak
+                    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4"
+                    @keydown.escape.window="closeTemplateCreator()"
+                >
+                    <div
+                        class="w-full max-w-2xl rounded-3xl bg-white p-5 shadow-2xl sm:p-7"
+                        @click.outside="closeTemplateCreator()"
+                    >
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-[0.16em] text-rose-700">Annual Touch message</p>
+                                <h3 class="mt-2 text-xl font-semibold text-slate-950" x-text="templateCreator.channel === 'sms' ? 'Create SMS message' : 'Create email message'"></h3>
+                                <p class="mt-2 text-sm leading-6 text-slate-600">
+                                    Messaging fills in the annual-touch purpose, scope, dispatch context, catalog grouping, and token rules from the selected Campaign.
+                                </p>
+                            </div>
+                            <button type="button" @click="closeTemplateCreator()" class="text-sm font-bold text-slate-500 hover:text-slate-900">Close</button>
+                        </div>
+
+                        <div x-show="templateCreator.error" x-text="templateCreator.error" class="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800"></div>
+
+                        <div class="mt-5 space-y-4">
+                            <div>
+                                <label class="text-sm font-bold text-slate-900">Message name</label>
+                                <input type="text" x-model="templateCreator.name" maxlength="191" class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm text-slate-900" placeholder="Birthday greeting">
+                            </div>
+
+                            <template x-if="templateCreator.channel === 'email'">
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="text-sm font-bold text-slate-900">Subject</label>
+                                        <input type="text" x-model="templateCreator.subject" maxlength="255" class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm text-slate-900">
+                                    </div>
+                                    <div>
+                                        <label class="text-sm font-bold text-slate-900">Body</label>
+                                        <textarea x-model="templateCreator.body" rows="9" class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900"></textarea>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <template x-if="templateCreator.channel === 'sms'">
+                                <div>
+                                    <label class="text-sm font-bold text-slate-900">Message</label>
+                                    <textarea x-model="templateCreator.message" rows="6" maxlength="1600" class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900"></textarea>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div class="mt-6 flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
+                            <button type="button" @click="closeTemplateCreator()" class="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 px-5 text-sm font-bold text-slate-800 hover:bg-slate-50">Cancel</button>
+                            <button type="button" @click="createTemplate()" :disabled="templateCreator.saving" class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
+                                <span x-text="templateCreator.saving ? 'Creating…' : 'Create and use message'"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
                     <p class="text-xs leading-5 text-slate-500">
-                        Need different copy? Create or edit the reusable message in Messaging, then select it here.
+                        Choose a saved reusable message or create one here. New messages automatically receive the selected Campaign's annual-touch context and are selected in this row after creation.
                     </p>
                     <button
                         type="submit"
