@@ -223,6 +223,18 @@
             @error('booking')
                 <p class="error">{{ $message }}</p>
             @enderror
+            @error('verification')
+                <p class="error">{{ $message }}</p>
+            @enderror
+            @error('channel')
+                <p class="error">{{ $message }}</p>
+            @enderror
+            @error('destination')
+                <p class="error">{{ $message }}</p>
+            @enderror
+            @error('code')
+                <p class="error">{{ $message }}</p>
+            @enderror
 
             @if($offerSummary['status'] === 'active')
                 <p
@@ -234,14 +246,149 @@
                     Selection available for {{ max(1, (int) ceil($offerSummary['remaining_seconds'] / 60)) }} more minute(s).
                 </p>
 
-                <form
-                    method="POST"
-                    action="{{ route('scheduling.public.offers.hold', ['offerId' => $offerSummary['offer_id']], false) }}"
-                >
-                    @csrf
-                    <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', (string) \Illuminate\Support\Str::uuid()) }}">
-                    <button type="submit">Continue with this time</button>
-                </form>
+                @if($destinationVerification['required'])
+                    @if($destinationVerification['verified'])
+                        <div class="notice" data-destination-verification="verified">
+                            <strong>Destination verified</strong>
+                            @if($destinationVerification['masked_destination'])
+                                <br>{{ $destinationVerification['masked_destination'] }}
+                            @endif
+                        </div>
+
+                        <form
+                            method="POST"
+                            action="{{ route('scheduling.public.offers.hold', ['offerId' => $offerSummary['offer_id']], false) }}"
+                        >
+                            @csrf
+                            <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', (string) \Illuminate\Support\Str::uuid()) }}">
+                            <button type="submit">Continue with this time</button>
+                        </form>
+                    @elseif($destinationVerification['challenge_active'])
+                        <div class="notice" data-destination-verification="challenge">
+                            <strong>Verification code sent</strong>
+                            @if($destinationVerification['masked_destination'])
+                                <br>{{ $destinationVerification['masked_destination'] }}
+                            @endif
+                        </div>
+
+                        <form
+                            class="booking-form"
+                            method="POST"
+                            action="{{ route('scheduling.public.offers.verification.verify', ['offerId' => $offerSummary['offer_id']], false) }}"
+                        >
+                            @csrf
+                            <label class="booking-field" for="verification_code">
+                                Verification code
+                                <input
+                                    id="verification_code"
+                                    name="code"
+                                    type="text"
+                                    inputmode="numeric"
+                                    autocomplete="one-time-code"
+                                    maxlength="{{ min(8, max(4, (int) config('scheduling.public.destination_verification.code_digits', 6))) }}"
+                                    required
+                                >
+                            </label>
+                            <div class="actions">
+                                <button type="submit">Verify destination</button>
+                            </div>
+                        </form>
+
+                        <form
+                            method="POST"
+                            action="{{ route('scheduling.public.offers.verification.resend', ['offerId' => $offerSummary['offer_id']], false) }}"
+                        >
+                            @csrf
+                            <button type="submit">Resend code</button>
+                        </form>
+
+                        <details>
+                            <summary>Use a different destination</summary>
+                            <form
+                                class="booking-form"
+                                method="POST"
+                                action="{{ route('scheduling.public.offers.verification.issue', ['offerId' => $offerSummary['offer_id']], false) }}"
+                            >
+                                @csrf
+                                @if(count($destinationVerification['available_channels']) === 1)
+                                    <input type="hidden" name="channel" value="{{ $destinationVerification['available_channels'][0] }}">
+                                @else
+                                    <label class="booking-field" for="verification_channel_change">
+                                        Delivery method
+                                        <select id="verification_channel_change" name="channel" required>
+                                            @foreach($destinationVerification['available_channels'] as $channel)
+                                                <option value="{{ $channel }}" @selected(old('channel') === $channel)>
+                                                    {{ $channel === 'sms' ? 'Text message' : 'Email' }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </label>
+                                @endif
+                                <label class="booking-field" for="verification_destination_change">
+                                    {{ count($destinationVerification['available_channels']) === 1 && $destinationVerification['available_channels'][0] === 'sms' ? 'Phone number' : 'Email or phone number' }}
+                                    <input
+                                        id="verification_destination_change"
+                                        name="destination"
+                                        type="text"
+                                        value="{{ old('destination') }}"
+                                        autocomplete="{{ count($destinationVerification['available_channels']) === 1 && $destinationVerification['available_channels'][0] === 'sms' ? 'tel' : 'email' }}"
+                                        required
+                                    >
+                                </label>
+                                <div class="actions">
+                                    <button type="submit">Send new code</button>
+                                </div>
+                            </form>
+                        </details>
+                    @else
+                        <div data-destination-verification="required">
+                            <form
+                                class="booking-form"
+                                method="POST"
+                                action="{{ route('scheduling.public.offers.verification.issue', ['offerId' => $offerSummary['offer_id']], false) }}"
+                            >
+                                @csrf
+                                @if(count($destinationVerification['available_channels']) === 1)
+                                    <input type="hidden" name="channel" value="{{ $destinationVerification['available_channels'][0] }}">
+                                @else
+                                    <label class="booking-field" for="verification_channel">
+                                        Delivery method
+                                        <select id="verification_channel" name="channel" required>
+                                            @foreach($destinationVerification['available_channels'] as $channel)
+                                                <option value="{{ $channel }}" @selected(old('channel') === $channel)>
+                                                    {{ $channel === 'sms' ? 'Text message' : 'Email' }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </label>
+                                @endif
+                                <label class="booking-field" for="verification_destination">
+                                    {{ count($destinationVerification['available_channels']) === 1 && $destinationVerification['available_channels'][0] === 'sms' ? 'Phone number' : 'Email or phone number' }}
+                                    <input
+                                        id="verification_destination"
+                                        name="destination"
+                                        type="text"
+                                        value="{{ old('destination') }}"
+                                        autocomplete="{{ count($destinationVerification['available_channels']) === 1 && $destinationVerification['available_channels'][0] === 'sms' ? 'tel' : 'email' }}"
+                                        required
+                                    >
+                                </label>
+                                <div class="actions">
+                                    <button type="submit">Send verification code</button>
+                                </div>
+                            </form>
+                        </div>
+                    @endif
+                @else
+                    <form
+                        method="POST"
+                        action="{{ route('scheduling.public.offers.hold', ['offerId' => $offerSummary['offer_id']], false) }}"
+                    >
+                        @csrf
+                        <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', (string) \Illuminate\Support\Str::uuid()) }}">
+                        <button type="submit">Continue with this time</button>
+                    </form>
+                @endif
             @else
                 <a
                     class="button-link"

@@ -34,6 +34,21 @@ Route::get('/offers/{offerId}', [PublicBookingController::class, 'reviewOffer'])
     ->middleware("throttle:{$reviewLimit},1")
     ->name('scheduling.public.offers.show');
 
+Route::post('/offers/{offerId}/verification', [PublicBookingController::class, 'issueDestinationVerification'])
+    ->whereUuid('offerId')
+    ->middleware("throttle:{$reservationLimit},1")
+    ->name('scheduling.public.offers.verification.issue');
+
+Route::post('/offers/{offerId}/verification/verify', [PublicBookingController::class, 'verifyDestination'])
+    ->whereUuid('offerId')
+    ->middleware("throttle:{$reservationLimit},1")
+    ->name('scheduling.public.offers.verification.verify');
+
+Route::post('/offers/{offerId}/verification/resend', [PublicBookingController::class, 'resendDestinationVerification'])
+    ->whereUuid('offerId')
+    ->middleware("throttle:{$reservationLimit},1")
+    ->name('scheduling.public.offers.verification.resend');
+
 Route::post('/offers/{offerId}/hold', [PublicBookingController::class, 'hold'])
     ->whereUuid('offerId')
     ->middleware("throttle:{$reservationLimit},1")

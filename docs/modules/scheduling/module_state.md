@@ -100,7 +100,7 @@ The implemented flow begins with appointment type because the selected service d
 2. provide only the details required for that type
 3. view authoritative availability
 4. select one short-lived non-blocking slot offer
-5. Phase 4B.4: verify one reachable email or SMS destination when Messaging can deliver
+5. verify one reachable email or SMS destination when Messaging can deliver
 6. revalidate service, location, slot, and capacity
 7. create the capacity-consuming hold
 8. review and complete the booking
@@ -129,7 +129,9 @@ Phase 4B.4 owns the actual Messaging-backed verification behavior. The non-block
 
 Delivery crosses a neutral app-level `DestinationVerificationTransport` contract. When both Scheduling and Messaging are enabled, `AppServiceProvider` binds the Messaging bridge and registers a recipient gate that permits only transactional `scheduling_public_booking` verification messages for active ordinary public offers. When Messaging is disabled or has no deliverable verification channel, the neutral unavailable transport exposes no channels and Scheduling remains usable. This verification path does not query, grant, revoke, or otherwise mutate marketing consent.
 
-22E2B is still required to expose the visitor verification routes/UI and to make the real public offer-to-hold transition require and consume a valid server-owned proof before capacity is reserved.
+22E2B completes that boundary. The public offer review surface exposes issue, verify, and resend transitions only when at least one eligible verification channel is currently deliverable. The browser submits the requested channel/destination and later the one-time code, but never receives the challenge ID or proof token as booking authority. Laravel session state keeps the challenge/proof handle under the opaque offer identity, and `CreatePublicBookingHoldRequest` explicitly prohibits caller-authored challenge IDs, proof tokens, `verified` flags, and other verification authority.
+
+`CreatePublicBookingHoldAction` independently checks whether verification is currently required, validates the server-owned proof against the locked ordinary public offer and current booking session, consumes that proof exactly once, and only then delegates to `CreateBookingHoldAction`. The real hold action remains authoritative for current service/public status, location commitment, host assignment, resources, capacity, exact interval, and travel fit. A proof therefore cannot reserve capacity by itself or bypass a race that makes the slot unavailable. An idempotent replay of an already-created hold remains replayable after the original proof has been consumed. When no eligible verification transport exists, the direct offer-to-hold path remains available.
 
 ## Responsibility
 
@@ -822,7 +824,7 @@ The public booking surface is appointment-type-first and progressive:
 2. provide only prerequisites required by that service
 3. view or choose against authoritative server-evaluated availability
 4. select one short-lived non-blocking BookableSlotOffer
-5. later Phase 4B.4 may verify one reachable transactional destination
+5. verify one reachable transactional destination when an eligible transport exists
 6. revalidate the selected offer and current booking rules
 7. create the real capacity-consuming BookingHold
 8. review and complete the booking
@@ -847,9 +849,9 @@ Fixed-duration services post only the selected server-issued UTC `starts_at` val
 
 `IssuePublicBookingSlotOfferAction` reruns exact current availability and then issues one opaque `BookableSlotOffer`. For customer-site work, the offer snapshots the canonical location used by travel-aware availability. The offer does **not** create a `BookingHold`, consume host/service capacity, create resource occupancy, or extend its expiration merely because the visitor reviews it. This is the intentional pre-verification selection state required by the progressive flow.
 
-The offer review page is capability-addressed by opaque `offer_id` and exposes only visitor-safe service/time/location presentation plus authoritative expiration. It does not expose host identity, capacity, availability provenance, normalized location payloads, or resource state. Phase 4B.4 will insert Messaging-backed destination verification at this boundary when an eligible transactional delivery channel exists; Scheduling remains usable without Messaging and no verification state is trusted from the browser.
+The offer review page is capability-addressed by opaque `offer_id` and exposes only visitor-safe service/time/location presentation plus authoritative expiration. It does not expose host identity, capacity, availability provenance, normalized location payloads, resource state, challenge IDs, or proof tokens. When an eligible transactional verification channel exists, the page requires one reachable email or SMS destination to be verified before the hold transition appears. Challenge/proof authority remains in server-owned cache/session state and is bound to the offer plus current booking session. When no eligible verification channel exists, Scheduling remains independently usable and shows the direct hold path.
 
-Creating the real hold is a separate POST to the offer capability. `CreatePublicBookingHoldRequest` accepts only a UUID `idempotency_key`. `CreatePublicBookingHoldAction` verifies that the offer is an ordinary public-booking offer, then delegates to `CreateBookingHoldAction`, which re-locks and revalidates the service, host assignment, offered location commitment, travel fit, capacity, resources, and exact interval before consuming the offer and creating occupancy. A race that made the selected interval unavailable after offer issuance therefore fails without creating a hold.
+Creating the real hold is a separate POST to the offer capability. `CreatePublicBookingHoldRequest` accepts only a UUID `idempotency_key` and explicitly prohibits browser-authored verification state. `CreatePublicBookingHoldAction` verifies that the offer is an ordinary public-booking offer. If at least one eligible destination-verification channel is currently available, it also requires a valid server-owned proof bound to that offer and booking session and consumes the proof exactly once before delegating to `CreateBookingHoldAction`. `CreateBookingHoldAction` then re-locks and revalidates the service, host assignment, offered location commitment, travel fit, capacity, resources, and exact interval before consuming the offer and creating occupancy. A race that made the selected interval unavailable after offer issuance or after destination verification therefore fails without creating a hold.
 
 Public hold idempotency is now scoped to the opaque offer plus replay key. Repeating the same offer and key returns the original hold. Reusing a key for another offer is rejected. An expired or already-consumed offer cannot create another hold.
 
@@ -1130,15 +1132,15 @@ Scheduling owns appointment communication timing and intent. Messaging owns temp
 
 Push notification support belongs to Messaging as another delivery channel. Scheduling must not hard-code email and SMS as the only possible channels.
 
-### Planned public identity verification
+### Public destination verification
 
-Public booking should require control of one reachable transactional destination before creating a capacity-consuming hold whenever Messaging can actually deliver through an eligible channel.
+Public booking requires control of one reachable transactional destination before creating a capacity-consuming hold whenever the neutral destination-verification transport currently exposes at least one eligible channel.
 
 "Messaging can deliver" means the channel is runtime supported, provider enabled, valid for the submitted destination, and eligible for the public-booking verification purpose. Merely enabling the Messaging module is not enough. When both email and SMS are eligible, the visitor may choose one; verification of both channels is not required. When no eligible channel is deliverable, Scheduling remains independently usable and continues to rely on its ordinary throttles and server-authoritative booking checks.
 
 Verification is transactional security activity. It must not grant marketing consent, revoke consent, or imply permission for later marketing communication.
 
-The verification contract must include:
+The implemented verification contract includes:
 
 ```text
 short-lived single-use challenge
@@ -1150,7 +1152,7 @@ expiration and invalidation after success
 server-owned verified state
 ```
 
-Sending a challenge must not create an Appointment, Contact, or capacity-consuming BookingHold. The preferred flow may issue a short-lived non-blocking slot offer first, verify one destination, then revalidate all trusted booking inputs before creating the hold. A browser-authored `verified` field is never accepted as evidence.
+Sending a challenge does not create an Appointment, Contact, or capacity-consuming `BookingHold`. The public flow first issues a short-lived non-blocking slot offer, verifies one destination when required, consumes the offer/session-bound proof, then revalidates all trusted booking inputs before creating the hold. A browser-authored `verified` field, challenge ID, or proof token is never accepted as evidence.
 
 Scheduling may create follow-up work through Tasks public actions. It must not write Tasks internals directly.
 
@@ -1273,8 +1275,8 @@ Phase 4B.2C — COMPLETE: add Scheduling-owned provider-neutral travel-time reso
 Phase 4B.2D1 — COMPLETE: add first-class fixed/range service-duration policy, module schema v2, explicit range interval validation, check-in/check-out boundary availability, full-stay hold/capacity/resource occupancy, direct range creation, and range-preserving reschedule runtime
 Phase 4B.2D2 — COMPLETE: expose closed CRM range-service authoring plus public/internal check-in/check-out input, strict service-timezone wall-time resolution, and range-specific reschedule presentation; fixed-location PetServices stays do not require Location, and PetServices continues to own pet/compliance/feeding/medication meaning
 Phase 4B.3 — COMPLETE: restructure public booking around appointment-type-first progressive prerequisites, require canonical customer-site location before travel-aware fixed-slot availability, issue a short-lived non-blocking location-bound offer before the real hold, and preserve fixed/range server authority without exposing host/capacity/provenance state
-Phase 4B.4 — Messaging-backed email/SMS verification before capacity hold
-SCHEDULING_APP_URL setup validation
+Phase 4B.4 — COMPLETE: add optional Messaging-backed email/SMS destination verification after non-blocking offer selection and before the capacity hold, with server-owned challenge/proof state, single-use offer/session-bound proof enforcement, no marketing-consent side effects, and a graceful no-Messaging path
+Scheduling Project State transfer support
 calendar views
 provider connection and synchronization persistence
 external free/busy adapters

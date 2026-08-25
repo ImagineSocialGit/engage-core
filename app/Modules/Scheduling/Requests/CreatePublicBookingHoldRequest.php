@@ -48,6 +48,11 @@ class CreatePublicBookingHoldRequest extends FormRequest
             'confidence' => ['prohibited'],
             'provider' => ['prohibited'],
             'verification_state' => ['prohibited'],
+            'verification_proof' => ['prohibited'],
+            'verification_proof_token' => ['prohibited'],
+            'proof_token' => ['prohibited'],
+            'challenge_id' => ['prohibited'],
+            'verification_code' => ['prohibited'],
             'verified' => ['prohibited'],
         ];
     }

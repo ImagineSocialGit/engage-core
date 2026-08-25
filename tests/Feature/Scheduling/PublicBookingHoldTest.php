@@ -576,6 +576,14 @@ class PublicBookingHoldTest extends TestCase
             ...config('modules.enabled', []),
             'scheduling',
         ]);
+        config()->set(
+            'messaging.channel_availability.email.surfaces.scheduling_public_booking',
+            false,
+        );
+        config()->set(
+            'messaging.channel_availability.sms.surfaces.scheduling_public_booking',
+            false,
+        );
         config()->set('scheduling.public', [
             'enabled' => true,
             'url' => rtrim($url, '/'),

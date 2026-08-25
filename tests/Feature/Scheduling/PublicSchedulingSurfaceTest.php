@@ -41,6 +41,9 @@ class PublicSchedulingSurfaceTest extends TestCase
         $this->assertTrue(Route::has('scheduling.public.services.prepare'));
         $this->assertTrue(Route::has('scheduling.public.services.offers.store'));
         $this->assertTrue(Route::has('scheduling.public.offers.show'));
+        $this->assertTrue(Route::has('scheduling.public.offers.verification.issue'));
+        $this->assertTrue(Route::has('scheduling.public.offers.verification.verify'));
+        $this->assertTrue(Route::has('scheduling.public.offers.verification.resend'));
         $this->assertTrue(Route::has('scheduling.public.offers.hold'));
         $this->assertTrue(Route::has('scheduling.public.holds.show'));
         $this->assertTrue(Route::has('scheduling.public.holds.complete'));

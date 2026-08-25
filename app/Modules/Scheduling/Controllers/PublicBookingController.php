@@ -16,8 +16,12 @@ use App\Modules\Scheduling\Models\BookableSlotOffer;
 use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Requests\CompletePublicBookingRequest;
 use App\Modules\Scheduling\Requests\CreatePublicBookingHoldRequest;
+use App\Modules\Scheduling\Requests\IssuePublicBookingDestinationVerificationRequest;
 use App\Modules\Scheduling\Requests\IssuePublicBookingSlotOfferRequest;
+use App\Modules\Scheduling\Requests\VerifyPublicBookingDestinationVerificationRequest;
 use App\Modules\Scheduling\Requests\PreparePublicBookingRequest;
+use App\Modules\Scheduling\Requests\ResendPublicBookingDestinationVerificationRequest;
+use App\Modules\Scheduling\Services\PublicBookingDestinationVerificationService;
 use App\Modules\Scheduling\Services\SchedulingLocationSnapshotResolver;
 use Carbon\CarbonImmutable;
 use DomainException;
@@ -190,11 +194,16 @@ class PublicBookingController extends Controller
         );
     }
 
-    public function reviewOffer(string $offerId): View|RedirectResponse
-    {
+    public function reviewOffer(
+        Request $request,
+        string $offerId,
+        PublicBookingDestinationVerificationService $destinationVerification,
+    ): View|RedirectResponse {
         $offer = $this->publicOffer($offerId);
 
         if ($offer->bookingHold instanceof BookingHold) {
+            $this->forgetDestinationVerificationState($request, $offer);
+
             return redirect()->route(
                 'scheduling.public.holds.show',
                 ['holdId' => $offer->bookingHold->hold_id],
@@ -207,7 +216,146 @@ class PublicBookingController extends Controller
 
         return view('scheduling.public.index', $this->pageData([
             'offerSummary' => $this->offerSummary($offer, $service),
+            'destinationVerification' => $this->destinationVerificationSummary(
+                request: $request,
+                offer: $offer,
+                verification: $destinationVerification,
+            ),
         ]));
+    }
+
+    public function issueDestinationVerification(
+        IssuePublicBookingDestinationVerificationRequest $request,
+        string $offerId,
+        PublicBookingDestinationVerificationService $destinationVerification,
+    ): RedirectResponse {
+        $offer = $this->publicOffer($offerId);
+
+        try {
+            $challenge = $destinationVerification->issue(
+                offer: $offer,
+                sessionId: $this->bookingSessionId($request),
+                channel: $request->channel(),
+                destination: $request->destination(),
+                sourceIp: $request->ip(),
+            );
+        } catch (DomainException|InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'destination' => $exception->getMessage(),
+            ]);
+        }
+
+        $request->session()->put(
+            $this->destinationVerificationSessionKey($offer),
+            [
+                'challenge_id' => $challenge->challengeId,
+                'channel' => $challenge->channel,
+                'masked_destination' => $challenge->maskedDestination,
+                'challenge_expires_at' => $challenge->expiresAt->toISOString(),
+                'resend_available_at' => $challenge->resendAvailableAt->toISOString(),
+            ],
+        );
+
+        return redirect()->route(
+            'scheduling.public.offers.show',
+            ['offerId' => $offer->offer_id],
+        );
+    }
+
+    public function verifyDestination(
+        VerifyPublicBookingDestinationVerificationRequest $request,
+        string $offerId,
+        PublicBookingDestinationVerificationService $destinationVerification,
+    ): RedirectResponse {
+        $offer = $this->publicOffer($offerId);
+        $state = $this->storedDestinationVerificationState($request, $offer);
+        $challengeId = is_string($state['challenge_id'] ?? null)
+            ? trim($state['challenge_id'])
+            : '';
+
+        if ($challengeId === '') {
+            throw ValidationException::withMessages([
+                'code' => 'Request a new verification code before continuing.',
+            ]);
+        }
+
+        try {
+            $proof = $destinationVerification->verify(
+                offer: $offer,
+                sessionId: $this->bookingSessionId($request),
+                challengeId: $challengeId,
+                code: $request->code(),
+            );
+        } catch (DomainException|InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'code' => $exception->getMessage(),
+            ]);
+        }
+
+        $request->session()->put(
+            $this->destinationVerificationSessionKey($offer),
+            [
+                'proof_token' => $proof->token,
+                'verified_channel' => $proof->channel,
+                'masked_destination' => is_string($state['masked_destination'] ?? null)
+                    ? $state['masked_destination']
+                    : null,
+                'verified_at' => $proof->verifiedAt->toISOString(),
+                'proof_expires_at' => $proof->expiresAt->toISOString(),
+            ],
+        );
+
+        return redirect()->route(
+            'scheduling.public.offers.show',
+            ['offerId' => $offer->offer_id],
+        );
+    }
+
+    public function resendDestinationVerification(
+        ResendPublicBookingDestinationVerificationRequest $request,
+        string $offerId,
+        PublicBookingDestinationVerificationService $destinationVerification,
+    ): RedirectResponse {
+        $offer = $this->publicOffer($offerId);
+        $state = $this->storedDestinationVerificationState($request, $offer);
+        $challengeId = is_string($state['challenge_id'] ?? null)
+            ? trim($state['challenge_id'])
+            : '';
+
+        if ($challengeId === '') {
+            throw ValidationException::withMessages([
+                'verification' => 'Request a new verification code before trying to resend it.',
+            ]);
+        }
+
+        try {
+            $challenge = $destinationVerification->resend(
+                offer: $offer,
+                sessionId: $this->bookingSessionId($request),
+                challengeId: $challengeId,
+                sourceIp: $request->ip(),
+            );
+        } catch (DomainException|InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'verification' => $exception->getMessage(),
+            ]);
+        }
+
+        $request->session()->put(
+            $this->destinationVerificationSessionKey($offer),
+            [
+                'challenge_id' => $challenge->challengeId,
+                'channel' => $challenge->channel,
+                'masked_destination' => $challenge->maskedDestination,
+                'challenge_expires_at' => $challenge->expiresAt->toISOString(),
+                'resend_available_at' => $challenge->resendAvailableAt->toISOString(),
+            ],
+        );
+
+        return redirect()->route(
+            'scheduling.public.offers.show',
+            ['offerId' => $offer->offer_id],
+        );
     }
 
     public function hold(
@@ -216,17 +364,25 @@ class PublicBookingController extends Controller
         CreatePublicBookingHoldAction $createPublicBookingHold,
     ): RedirectResponse {
         $offer = $this->publicOffer($offerId);
+        $state = $this->storedDestinationVerificationState($request, $offer);
+        $proofToken = is_string($state['proof_token'] ?? null)
+            ? trim($state['proof_token'])
+            : null;
 
         try {
             $hold = $createPublicBookingHold->handle(
                 offerId: $offer->offer_id,
                 idempotencyKey: $request->idempotencyKey(),
+                sessionId: $this->bookingSessionId($request),
+                verificationProofToken: $proofToken,
             );
-        } catch (DomainException $exception) {
+        } catch (DomainException|InvalidArgumentException $exception) {
             throw ValidationException::withMessages([
                 'booking' => $exception->getMessage(),
             ]);
         }
+
+        $this->forgetDestinationVerificationState($request, $offer);
 
         return redirect()->route(
             'scheduling.public.holds.show',
@@ -290,6 +446,16 @@ class PublicBookingController extends Controller
             'preparedLocation' => null,
             'requiresCustomerSitePreparation' => false,
             'offerSummary' => null,
+            'destinationVerification' => [
+                'required' => false,
+                'available_channels' => [],
+                'verified' => false,
+                'verified_channel' => null,
+                'masked_destination' => null,
+                'challenge_active' => false,
+                'challenge_expires_at' => null,
+                'resend_available_at' => null,
+            ],
             'holdSummary' => null,
         ], $overrides);
     }
@@ -454,6 +620,127 @@ class PublicBookingController extends Controller
             'postal_code' => $address['postal_code'] ?? null,
             'country' => $address['country'] ?? 'US',
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function destinationVerificationSummary(
+        Request $request,
+        BookableSlotOffer $offer,
+        PublicBookingDestinationVerificationService $verification,
+    ): array {
+        $channels = $verification->availableChannels();
+        $state = $this->storedDestinationVerificationState($request, $offer);
+        $proofToken = is_string($state['proof_token'] ?? null)
+            ? trim($state['proof_token'])
+            : '';
+        $verified = $proofToken !== ''
+            && $verification->hasValidProof(
+                offer: $offer,
+                sessionId: $this->bookingSessionId($request),
+                proofToken: $proofToken,
+            );
+
+        if (! $verified && $proofToken !== '') {
+            $state = [];
+            $request->session()->forget(
+                $this->destinationVerificationSessionKey($offer),
+            );
+        }
+
+        $challengeActive = false;
+        $challengeExpiresAt = null;
+        $resendAvailableAt = null;
+
+        if (! $verified && is_string($state['challenge_id'] ?? null)) {
+            try {
+                $challengeExpiresAt = CarbonImmutable::parse(
+                    (string) ($state['challenge_expires_at'] ?? ''),
+                    'UTC',
+                )->utc();
+                $resendAvailableAt = CarbonImmutable::parse(
+                    (string) ($state['resend_available_at'] ?? ''),
+                    'UTC',
+                )->utc();
+                $challengeActive = $challengeExpiresAt->isFuture()
+                    && $offer->isActiveAt();
+            } catch (Throwable) {
+                $challengeActive = false;
+            }
+
+            if (! $challengeActive) {
+                $state = [];
+                $request->session()->forget(
+                    $this->destinationVerificationSessionKey($offer),
+                );
+            }
+        }
+
+        return [
+            'required' => $channels !== [],
+            'available_channels' => $channels,
+            'verified' => $verified,
+            'verified_channel' => $verified
+                && is_string($state['verified_channel'] ?? null)
+                    ? $state['verified_channel']
+                    : null,
+            'masked_destination' => is_string($state['masked_destination'] ?? null)
+                ? $state['masked_destination']
+                : null,
+            'challenge_active' => $challengeActive,
+            'challenge_expires_at' => $challengeActive
+                ? $challengeExpiresAt?->toISOString()
+                : null,
+            'resend_available_at' => $challengeActive
+                ? $resendAvailableAt?->toISOString()
+                : null,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function storedDestinationVerificationState(
+        Request $request,
+        BookableSlotOffer $offer,
+    ): array {
+        $state = $request->session()->get(
+            $this->destinationVerificationSessionKey($offer),
+        );
+
+        return is_array($state) ? $state : [];
+    }
+
+    private function forgetDestinationVerificationState(
+        Request $request,
+        BookableSlotOffer $offer,
+    ): void {
+        $request->session()->forget(
+            $this->destinationVerificationSessionKey($offer),
+        );
+    }
+
+    private function destinationVerificationSessionKey(
+        BookableSlotOffer $offer,
+    ): string {
+        return 'scheduling.public.destination_verification.'.(string) $offer->offer_id;
+    }
+
+    private function bookingSessionId(Request $request): string
+    {
+        $key = 'scheduling.public.booking_session_id';
+        $sessionId = $request->session()->get($key);
+
+        if (is_string($sessionId) && trim($sessionId) !== '') {
+            return trim($sessionId);
+        }
+
+        $sessionId = (string) Str::uuid();
+
+        $request->session()->put($key, $sessionId);
+
+        return $sessionId;
     }
 
     private function serviceTimezone(BookableService $service): string
