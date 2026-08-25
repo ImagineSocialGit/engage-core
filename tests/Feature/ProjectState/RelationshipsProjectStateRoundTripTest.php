@@ -63,10 +63,24 @@ class RelationshipsProjectStateRoundTripTest extends TestCase
         );
 
         $sectionKeys = array_keys($document['sections']);
-        $this->assertSame(
-            ['core', 'relationships'],
-            array_slice($sectionKeys, 0, 2),
+        $coreIndex = array_search('core', $sectionKeys, true);
+        $relationshipsIndex = array_search('relationships', $sectionKeys, true);
+
+        $this->assertNotFalse($coreIndex);
+        $this->assertNotFalse($relationshipsIndex);
+        $this->assertTrue(
+            $coreIndex < $relationshipsIndex,
+            'Core Project State must be imported before Relationships.',
         );
+
+        $mortgageIndex = array_search('mortgage', $sectionKeys, true);
+
+        if ($mortgageIndex !== false) {
+            $this->assertTrue(
+                $relationshipsIndex < $mortgageIndex,
+                'Relationships Project State must be imported before Mortgage.',
+            );
+        }
 
         DB::table('contact_relationships')->delete();
         DB::table('contacts')->delete();

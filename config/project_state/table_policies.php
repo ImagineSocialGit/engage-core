@@ -110,50 +110,6 @@ return [
         'reason' => 'Location transfer support has not been added yet.',
     ],
 
-    'scheduling_hosts' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Scheduling transfer support has not been added yet.',
-    ],
-    'bookable_services' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Scheduling transfer support has not been added yet.',
-    ],
-    'scheduling_availability_windows' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Scheduling transfer support has not been added yet.',
-    ],
-    'appointments' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Scheduling transfer support has not been added yet.',
-    ],
-    'appointment_attendees' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Scheduling transfer support has not been added yet.',
-    ],
-    'bookable_service_hosts' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Scheduling transfer support has not been added yet.',
-    ],
-    'appointment_lifecycle_events' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Scheduling transfer support has not been added yet.',
-    ],
-    'scheduling_resources' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Scheduling transfer support has not been added yet.',
-    ],
-    'scheduling_host_resources' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Scheduling transfer support has not been added yet.',
-    ],
-    'bookable_service_resource_requirements' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Scheduling transfer support has not been added yet.',
-    ],
-    'scheduling_resource_occupancies' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Scheduling transfer support has not been added yet.',
-    ],
 
     'portal_users' => [
         'mode' => 'must_be_empty',

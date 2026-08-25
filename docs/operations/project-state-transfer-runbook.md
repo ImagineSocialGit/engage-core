@@ -21,7 +21,7 @@ format: engage-core-project-state
 version: authoritative current value in config/project_state.php
 ```
 
-The current contract includes dependency-ordered Core/universal sections plus optional Reporting and optional Mortgage sections. Reporting is included only when its activation schema is installed. Mortgage is included only when the complete Mortgage vertical schema is installed. A document containing an optional section is rejected when the target does not have that section's activation schema.
+The current contract includes dependency-ordered Core/universal sections plus optional Reporting, Mortgage, and Scheduling sections. Reporting is included only when its activation schema is installed. Mortgage is included only when the complete Mortgage vertical schema is installed. Scheduling is included only when the complete Scheduling schema is installed. A document containing an optional section is rejected when the target does not have that section's activation schema.
 
 The CRM surface is owner-only:
 
@@ -59,8 +59,8 @@ Project State does not transfer:
 - Redis queue contents, Horizon metadata, cache, or locks;
 - failed-job history;
 - Reporting sessions, raw observations, and projection checkpoints reset; retained Reporting daily metrics and imported external measurements transfer only when the Reporting schema is installed;
-- unsupported Scheduling, Location, Portal, Forms, Documents, or Commerce durable state; Mortgage durable state transfers when the complete optional Mortgage schema is installed;
-- active booking holds or slot offers;
+- unsupported Location, Portal, Forms, Documents, or Commerce durable state; Mortgage and Scheduling durable state transfer when their complete optional schemas are installed;
+- active Scheduling booking holds or slot offers, or destination-verification challenge/proof state;
 - external provider state.
 
 Do not proceed when excluded durable state must survive. Extend the contract first.
@@ -237,7 +237,7 @@ Under **Download current state**:
 The filename follows:
 
 ```text
-{client-key}-project-state-v11-YYYYMMDD-HHMMSS.json
+{client-key}-project-state-v{current-version}-YYYYMMDD-HHMMSS.json
 ```
 
 The response is streamed directly. The application does not intentionally leave a public server-side copy.

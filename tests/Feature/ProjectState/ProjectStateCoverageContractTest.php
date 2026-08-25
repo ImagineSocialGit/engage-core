@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\ProjectState;
 
+use App\Modules\Core\Models\Contact;
 use App\Support\ProjectState\ProjectStateContractRegistry;
 use App\Support\ProjectState\ProjectStateManager;
 use Illuminate\Database\Schema\Blueprint;
@@ -213,41 +214,22 @@ class ProjectStateCoverageContractTest extends TestCase
     {
         $now = now()->startOfSecond();
 
-        $taskId = (int) DB::table('tasks')->insertGetId([
-            'assigned_to_type' => null,
-            'assigned_to_id' => null,
-            'responsible_party' => 'internal',
-            'responsible_type' => null,
-            'responsible_id' => null,
-            'task_template_id' => null,
-            'task_template_key' => null,
-            'source' => 'manual',
-            'title' => 'Unsafe appointment link',
-            'description' => null,
-            'status' => 'open',
-            'priority' => null,
-            'due_at' => null,
-            'completed_at' => null,
-            'canceled_at' => null,
-            'canceled_reason' => null,
-            'archived_at' => null,
-            'meta' => null,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+        $contact = Contact::factory()->create();
 
-        DB::table('task_links')->insert([
-            'task_id' => $taskId,
-            'linkable_type' => 'App\\Modules\\Scheduling\\Models\\Appointment',
-            'linkable_id' => 999,
-            'role' => 'subject',
+        DB::table('contact_workflow_profiles')->insert([
+            'contact_id' => $contact->getKey(),
+            'contact_status_id' => null,
+            'assigned_to_type' => 'App\\Models\\User',
+            'assigned_to_id' => 999,
+            'last_status_changed_at' => null,
+            'meta' => null,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'Project-state polymorphic reference [task_links.0.linkable_type/linkable_id] targets unexported table [appointments].'
+            'Project-state polymorphic reference [contact_workflow_profiles.0.assigned_to_type/assigned_to_id] targets unexported table [users].'
         );
 
         app(ProjectStateManager::class)->export();

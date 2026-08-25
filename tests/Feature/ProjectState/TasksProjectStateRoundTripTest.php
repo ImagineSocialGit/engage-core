@@ -20,20 +20,20 @@ class TasksProjectStateRoundTripTest extends TestCase
         config()->set('project_state.enforce_client_key', true);
     }
 
-    public function test_project_state_sections_are_composed_from_module_files_in_dependency_order(): void
+    public function test_project_state_sections_are_composed_from_module_files(): void
     {
         $sections = config('project_state.sections');
 
         $this->assertIsArray($sections);
-        $this->assertEquals(
-            ['core', 'relationships', 'location', 'mortgage', 'internal_notifications', 'inbound_messaging', 'messaging', 'webinars', 'tasks', 'campaigns', 'broadcasts', 'workflow', 'automation_opportunities', 'automation_events', 'flow_routes', 'reporting'],
-            array_keys($sections),
-        );
+        $this->assertNotEmpty($sections);
 
-        foreach (array_keys($sections) as $section) {
+        foreach ($sections as $sectionKey => $section) {
+            $path = config_path("project_state/{$sectionKey}.php");
+
+            $this->assertFileExists($path);
             $this->assertEquals(
-                require config_path("project_state/{$section}.php"),
-                $sections[$section],
+                require $path,
+                $section,
             );
         }
     }

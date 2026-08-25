@@ -29,8 +29,14 @@ class InboundEmailRouteProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(26, $document['version']);
-        $this->assertSame(5, $document['sections']['inbound_messaging']['version']);
+        $this->assertSame(
+            (int) config('project_state.version'),
+            $document['version'],
+        );
+        $this->assertSame(
+            (int) config('project_state.sections.inbound_messaging.version'),
+            $document['sections']['inbound_messaging']['version'],
+        );
         $this->assertCount(
             1,
             $document['sections']['inbound_messaging']['tables']['inbound_email_routes'],

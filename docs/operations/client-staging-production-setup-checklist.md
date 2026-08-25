@@ -1310,7 +1310,7 @@ Required sequence:
 16. Verify providers, queues, relationships, and external side effects before reopening normal traffic.
 ```
 
-Project State does not transfer users, sessions, Redis jobs, cache/locks, provider state, or currently unsupported module data. Mortgage and Scheduling durable rows must remain empty until explicit transfer support exists.
+Project State does not transfer users, sessions, Redis jobs, cache/locks, provider state, or currently unsupported module data. Mortgage and Scheduling durable rows transfer when their complete optional schemas are installed. Scheduling slot offers and booking holds must still be resolved before export, and destination-verification challenge/proof state is intentionally transient.
 
 ## Other client data imports or migrations
 

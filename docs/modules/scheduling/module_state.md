@@ -133,6 +133,10 @@ Delivery crosses a neutral app-level `DestinationVerificationTransport` contract
 
 `CreatePublicBookingHoldAction` independently checks whether verification is currently required, validates the server-owned proof against the locked ordinary public offer and current booking session, consumes that proof exactly once, and only then delegates to `CreateBookingHoldAction`. The real hold action remains authoritative for current service/public status, location commitment, host assignment, resources, capacity, exact interval, and travel fit. A proof therefore cannot reserve capacity by itself or bypass a race that makes the slot unavailable. An idempotent replay of an already-created hold remains replayable after the original proof has been consumed. When no eligible verification transport exists, the direct offer-to-hold path remains available.
 
+Project State now treats Scheduling as an optional schema-activated section. Durable Scheduling configuration, availability, Appointments, attendees, lifecycle history, and Appointment-owned resource occupancy survive a controlled clean rebuild. `bookable_slot_offers` and `booking_holds` remain transient export blockers, and destination-verification challenges/proofs remain cache/session state rather than Project State data.
+
+Import clears environment- or integration-local `hostable`, `locationReference`, `createdBy`, and lifecycle-actor morphs that cannot be safely remapped from the transfer document. Canonical Scheduling-owned location snapshots remain authoritative. Core-backed primary-attendee and source-context references are remapped only for explicitly supported Core subject types; unsupported polymorphic subjects fail closed during Project State validation.
+
 ## Responsibility
 
 Scheduling answers:
@@ -1276,7 +1280,7 @@ Phase 4B.2D1 — COMPLETE: add first-class fixed/range service-duration policy, 
 Phase 4B.2D2 — COMPLETE: expose closed CRM range-service authoring plus public/internal check-in/check-out input, strict service-timezone wall-time resolution, and range-specific reschedule presentation; fixed-location PetServices stays do not require Location, and PetServices continues to own pet/compliance/feeding/medication meaning
 Phase 4B.3 — COMPLETE: restructure public booking around appointment-type-first progressive prerequisites, require canonical customer-site location before travel-aware fixed-slot availability, issue a short-lived non-blocking location-bound offer before the real hold, and preserve fixed/range server authority without exposing host/capacity/provenance state
 Phase 4B.4 — COMPLETE: add optional Messaging-backed email/SMS destination verification after non-blocking offer selection and before the capacity hold, with server-owned challenge/proof state, single-use offer/session-bound proof enforcement, no marketing-consent side effects, and a graceful no-Messaging path
-Scheduling Project State transfer support
+Scheduling Project State transfer support — COMPLETE: optional schema-activated durable transfer with transient offer/hold/verification exclusion and reference-safe restore semantics
 calendar views
 provider connection and synchronization persistence
 external free/busy adapters

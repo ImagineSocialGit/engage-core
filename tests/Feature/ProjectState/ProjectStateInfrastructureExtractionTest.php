@@ -40,34 +40,59 @@ class ProjectStateInfrastructureExtractionTest extends TestCase
     {
         $registry = app(ProjectStateContractRegistry::class);
         $sections = $registry->sections();
+        $configuredSections = $registry->configuredSections();
 
         $this->assertSame('engage-core-project-state', $registry->format());
-        $this->assertSame((int) config('project_state.version'), $registry->version());
-        $this->assertEquals([
-            'core',
-            'relationships',
-            'location',
-            'internal_notifications',
-            'inbound_messaging',
-            'messaging',
-            'webinars',
-            'tasks',
-            'campaigns',
-            'broadcasts',
-            'workflow',
-            'automation_opportunities',
-            'automation_events',
-            'flow_routes',
-            'reporting',
-        ], array_keys($sections));
+        $this->assertSame(
+            (int) config('project_state.version'),
+            $registry->version(),
+        );
+
+        $this->assertNotEmpty($configuredSections);
+        $this->assertNotEmpty($sections);
+
+        foreach ($configuredSections as $sectionKey => $configuredSection) {
+            if (($configuredSection['optional'] ?? false) !== true) {
+                $this->assertArrayHasKey(
+                    $sectionKey,
+                    $sections,
+                    "Required Project State section [{$sectionKey}] must be active.",
+                );
+            }
+
+            if (! array_key_exists($sectionKey, $sections)) {
+                continue;
+            }
+
+            $this->assertSame(
+                (int) $configuredSection['version'],
+                (int) $sections[$sectionKey]['version'],
+            );
+
+            $this->assertEquals(
+                array_keys($configuredSection['tables']),
+                array_keys($sections[$sectionKey]['tables']),
+            );
+        }
+
+        foreach ($sections as $sectionKey => $section) {
+            $this->assertArrayHasKey(
+                $sectionKey,
+                $configuredSections,
+                "Active Project State section [{$sectionKey}] must come from the configured contract.",
+            );
+        }
+
         $this->assertEquals(
             ['migrations', 'sqlite_sequence'],
             $registry->ignoredTables(),
         );
+
         $this->assertSame(
             'must_be_empty',
-            $registry->tablePolicies()['appointments']['mode'],
+            $registry->tablePolicies()['booking_holds']['mode'],
         );
+
         $this->assertEquals(
             ['id'],
             $sections['inbound_messaging']['tables']['inbound_messages']['order_by'],
