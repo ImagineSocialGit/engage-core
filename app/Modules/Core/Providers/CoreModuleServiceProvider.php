@@ -21,6 +21,7 @@ use App\Modules\Core\Services\Contacts\Filters\ImportBatchContactFilterCriterion
 use App\Modules\Core\Services\Contacts\Filters\SourceContactFilterCriterion;
 use App\Modules\Core\Services\Contacts\Filters\SubsourceContactFilterCriterion;
 use App\Modules\Core\Services\Contacts\Filters\TagContactFilterCriterion;
+use App\Modules\Core\Services\ProcessHighway\CoreProcessHighwayEntryRampContributor;
 use App\Modules\Core\Support\Contacts\ContactFilterCriterionRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
@@ -30,6 +31,7 @@ use App\Modules\Core\Support\Contacts\ContactShowDataRegistry;
 use App\Modules\Core\TokenContracts\ContactTokenSourceProvider;
 use App\Modules\Core\TokenContracts\SiteSettingTokenSourceProvider;
 use App\Modules\Core\Validation\CoreSetupValidationContributor;
+use App\Support\ProcessHighway\ProcessHighwayEntryRampInspector;
 use Illuminate\Support\ServiceProvider;
 
 class CoreModuleServiceProvider extends ServiceProvider
@@ -69,6 +71,10 @@ class CoreModuleServiceProvider extends ServiceProvider
             AddContactTagAutomationActionHandler::class,
             RemoveContactTagAutomationActionHandler::class,
         ], 'automation.action_handlers');
+
+        $this->app->tag([
+            CoreProcessHighwayEntryRampContributor::class,
+        ], ProcessHighwayEntryRampInspector::CONTRIBUTOR_TAG);
 
         $this->app->singleton(ContactShowDataRegistry::class, function ($app): ContactShowDataRegistry {
             return new ContactShowDataRegistry(

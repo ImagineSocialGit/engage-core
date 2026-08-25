@@ -31,7 +31,12 @@ final class ProcessHighwayMapBuilder
                     fn (mixed $key): bool => is_string($key) && $segmentsByKey->has($key),
                 ));
 
-                foreach ($this->connectedComponents($laneSegmentKeys, $nodes) as $componentKeys) {
+                foreach ($this->connectedComponents(
+                    segmentKeys: $laneSegmentKeys,
+                    segmentsByKey: $segmentsByKey,
+                    nodesByKey: $nodesByKey,
+                    edgesByKey: $edgesByKey,
+                ) as $componentKeys) {
                     $highways[] = $this->highway(
                         subject: $subject,
                         lane: $lane,
@@ -70,25 +75,75 @@ final class ProcessHighwayMapBuilder
 
     /**
      * @param array<int, string> $segmentKeys
-     * @param array<int, array<string, mixed>> $nodes
+     * @param \Illuminate\Support\Collection<string, array<string, mixed>> $segmentsByKey
+     * @param \Illuminate\Support\Collection<string, array<string, mixed>> $nodesByKey
+     * @param \Illuminate\Support\Collection<string, array<string, mixed>> $edgesByKey
      * @return array<int, array<int, string>>
      */
-    private function connectedComponents(array $segmentKeys, array $nodes): array
-    {
+    private function connectedComponents(
+        array $segmentKeys,
+        $segmentsByKey,
+        $nodesByKey,
+        $edgesByKey,
+    ): array {
         sort($segmentKeys);
         $allowed = array_fill_keys($segmentKeys, true);
         $adjacency = array_fill_keys($segmentKeys, []);
+        $entryMembership = [];
+        $mechanismMembership = [];
 
-        foreach ($nodes as $node) {
-            $members = array_values(array_unique(array_filter(
-                $node['segment_keys'] ?? [],
-                fn (mixed $key): bool => is_string($key) && isset($allowed[$key]),
-            )));
+        foreach ($segmentKeys as $segmentKey) {
+            $segment = $segmentsByKey->get($segmentKey);
 
-            for ($left = 0; $left < count($members); $left++) {
-                for ($right = $left + 1; $right < count($members); $right++) {
-                    $adjacency[$members[$left]][$members[$right]] = true;
-                    $adjacency[$members[$right]][$members[$left]] = true;
+            if (! is_array($segment)) {
+                continue;
+            }
+
+            foreach ($segment['entry_node_keys'] ?? [] as $entryNodeKey) {
+                if (is_string($entryNodeKey) && $entryNodeKey !== '') {
+                    $entryMembership[$entryNodeKey][] = $segmentKey;
+                }
+            }
+
+            $mechanismNodeKey = $segment['mechanism_node_key'] ?? null;
+
+            if (is_string($mechanismNodeKey) && $mechanismNodeKey !== '') {
+                $mechanismMembership[$mechanismNodeKey][] = $segmentKey;
+            }
+        }
+
+        foreach ($entryMembership as $members) {
+            $this->connectMembers($adjacency, $members);
+        }
+
+        foreach ($edgesByKey as $edge) {
+            if (! is_array($edge)) {
+                continue;
+            }
+
+            $producerKey = $edge['segment_key'] ?? null;
+            $targetNodeKey = $edge['to_node_key'] ?? null;
+
+            if (! is_string($producerKey) || ! isset($allowed[$producerKey])
+                || ! is_string($targetNodeKey) || $targetNodeKey === ''
+            ) {
+                continue;
+            }
+
+            $targetNode = $nodesByKey->get($targetNodeKey);
+            $isContactFact = is_array($targetNode)
+                && is_string($targetNode['attributes']['criterion_key'] ?? null)
+                && $targetNode['attributes']['criterion_key'] !== '';
+
+            if (! $isContactFact) {
+                foreach ($entryMembership[$targetNodeKey] ?? [] as $consumerKey) {
+                    $this->connect($adjacency, $producerKey, $consumerKey);
+                }
+            }
+
+            if (($edge['role'] ?? null) === 'exits_to') {
+                foreach ($mechanismMembership[$targetNodeKey] ?? [] as $consumerKey) {
+                    $this->connect($adjacency, $producerKey, $consumerKey);
                 }
             }
         }
@@ -131,6 +186,35 @@ final class ProcessHighwayMapBuilder
         }
 
         return $components;
+    }
+
+    /**
+     * @param array<string, array<string, bool>> $adjacency
+     * @param array<int, string> $members
+     */
+    private function connectMembers(array &$adjacency, array $members): void
+    {
+        $members = array_values(array_unique(array_filter(
+            $members,
+            fn (mixed $member): bool => is_string($member) && isset($adjacency[$member]),
+        )));
+
+        for ($left = 0; $left < count($members); $left++) {
+            for ($right = $left + 1; $right < count($members); $right++) {
+                $this->connect($adjacency, $members[$left], $members[$right]);
+            }
+        }
+    }
+
+    /** @param array<string, array<string, bool>> $adjacency */
+    private function connect(array &$adjacency, string $left, string $right): void
+    {
+        if ($left === $right || ! isset($adjacency[$left]) || ! isset($adjacency[$right])) {
+            return;
+        }
+
+        $adjacency[$left][$right] = true;
+        $adjacency[$right][$left] = true;
     }
 
     /**
@@ -246,7 +330,7 @@ final class ProcessHighwayMapBuilder
             ->map(fn (string $key): ?array => $componentNodesByKey->get($key))
             ->filter(fn (mixed $node): bool => is_array($node))
             ->values();
-        $qualifiers = $this->highwayQualifiers($nodes);
+        $qualifiers = $this->highwayQualifiers($entryNodes);
         $decoratedSegments = $segments
             ->map(fn (array $segment): array => $this->decorateSegment(
                 segment: $segment,
@@ -344,6 +428,65 @@ final class ProcessHighwayMapBuilder
             ->map(fn (mixed $key): ?array => is_string($key) ? $edgesByKey->get($key) : null)
             ->filter(fn (mixed $edge): bool => is_array($edge))
             ->values();
+        $reachableNodeKeys = $this->reachableNodeKeys(
+            startNodeKey: is_string($mechanismNodeKey) ? $mechanismNodeKey : '',
+            edges: $segmentEdges->all(),
+        );
+        $outcomeEdges = $segmentEdges
+            ->filter(function (array $edge) use ($nodesByKey): bool {
+                if (in_array($edge['role'] ?? null, ['consequence', 'exits', 'exits_to'], true)) {
+                    return true;
+                }
+
+                if (($edge['role'] ?? null) !== 'branch') {
+                    return false;
+                }
+
+                $target = $nodesByKey->get($edge['to_node_key'] ?? null);
+
+                return is_array($target)
+                    && in_array($target['role'] ?? null, ['consequence', 'exit'], true);
+            })
+            ->values();
+        $outcomeTargetKeys = $outcomeEdges
+            ->pluck('to_node_key')
+            ->filter(fn (mixed $key): bool => is_string($key))
+            ->unique();
+        $outcomesByTrigger = $outcomeEdges
+            ->groupBy('from_node_key')
+            ->map(fn ($triggerEdges): array => collect($triggerEdges)
+                ->map(function (array $edge) use ($nodesByKey): ?array {
+                    $node = $nodesByKey->get($edge['to_node_key'] ?? null);
+
+                    return is_array($node) ? [
+                        'edge' => $edge,
+                        'node' => $node,
+                    ] : null;
+                })
+                ->filter()
+                ->values()
+                ->all());
+        $journeyNodes = $segmentNodes
+            ->filter(fn (array $node): bool => in_array($node['key'], $reachableNodeKeys, true))
+            ->reject(fn (array $node): bool => $node['key'] === $mechanismNodeKey)
+            ->reject(fn (array $node): bool => $entryKeys->contains($node['key']))
+            ->reject(fn (array $node): bool => $exitKeys->contains($node['key']))
+            ->reject(fn (array $node): bool => $outcomeTargetKeys->contains($node['key']))
+            ->reject(fn (array $node): bool => ($node['role'] ?? null) === 'trigger')
+            ->map(function (array $node) use ($outcomesByTrigger): array {
+                $node['outcomes'] = $outcomesByTrigger->get($node['key'], []);
+
+                return $node;
+            })
+            ->values();
+        $visibleTriggerKeys = $journeyNodes
+            ->pluck('key')
+            ->when(
+                is_string($mechanismNodeKey),
+                fn ($keys) => $keys->push($mechanismNodeKey),
+            )
+            ->filter(fn (mixed $key): bool => is_string($key))
+            ->unique();
 
         return [
             ...$this->decorateAuthorityTarget($segment),
@@ -354,23 +497,76 @@ final class ProcessHighwayMapBuilder
                 ->filter(fn (array $node): bool => $entryKeys->contains($node['key']))
                 ->values()
                 ->all(),
-            'journey_nodes' => $segmentNodes
-                ->reject(fn (array $node): bool => $node['key'] === $mechanismNodeKey)
-                ->reject(fn (array $node): bool => $entryKeys->contains($node['key']))
-                ->reject(fn (array $node): bool => $exitKeys->contains($node['key']))
-                ->values()
-                ->all(),
+            'journey_nodes' => $journeyNodes->all(),
             'exit_nodes' => $segmentNodes
                 ->filter(fn (array $node): bool => $exitKeys->contains($node['key']))
                 ->values()
                 ->all(),
             'edges' => $segmentEdges->all(),
+            'mechanism_outcomes' => is_string($mechanismNodeKey)
+                ? $outcomesByTrigger->get($mechanismNodeKey, [])
+                : [],
+            'additional_outcome_groups' => $outcomesByTrigger
+                ->reject(fn (array $outcomes, string $triggerKey): bool => $visibleTriggerKeys->contains($triggerKey))
+                ->map(function (array $outcomes, string $triggerKey) use ($nodesByKey): array {
+                    return [
+                        'trigger_node' => $nodesByKey->get($triggerKey),
+                        'outcomes' => $outcomes,
+                    ];
+                })
+                ->filter(fn (array $group): bool => is_array($group['trigger_node']))
+                ->values()
+                ->all(),
             'branch_edges' => $segmentEdges
                 ->filter(fn (array $edge): bool => ($edge['role'] ?? null) === 'branch'
                     && ($edge['attributes']['operator'] ?? null) !== 'or')
                 ->values()
                 ->all(),
         ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $edges
+     * @return array<int, string>
+     */
+    private function reachableNodeKeys(string $startNodeKey, array $edges): array
+    {
+        if ($startNodeKey === '') {
+            return [];
+        }
+
+        $adjacency = [];
+
+        foreach ($edges as $edge) {
+            $from = $edge['from_node_key'] ?? null;
+            $to = $edge['to_node_key'] ?? null;
+
+            if (is_string($from) && is_string($to)) {
+                $adjacency[$from][] = $to;
+            }
+        }
+
+        $queue = [$startNodeKey];
+        $visited = [$startNodeKey => true];
+
+        while ($queue !== []) {
+            $current = array_shift($queue);
+
+            if (! is_string($current)) {
+                continue;
+            }
+
+            foreach ($adjacency[$current] ?? [] as $next) {
+                if (isset($visited[$next])) {
+                    continue;
+                }
+
+                $visited[$next] = true;
+                $queue[] = $next;
+            }
+        }
+
+        return array_keys($visited);
     }
 
     /**
@@ -450,29 +646,27 @@ final class ProcessHighwayMapBuilder
         ];
 
         foreach ($highways as $highway) {
-            foreach ($highway['segments'] as $segment) {
-                foreach ([...$segment['entry_nodes'], ...$segment['journey_nodes']] as $node) {
-                    $criterionKey = $node['attributes']['criterion_key'] ?? null;
-                    $value = $node['attributes']['value'] ?? null;
+            foreach ($highway['entry_nodes'] as $node) {
+                $criterionKey = $node['attributes']['criterion_key'] ?? null;
+                $value = $node['attributes']['value'] ?? null;
 
-                    if (! is_string($criterionKey) || $criterionKey === '' || ! is_string($value) || $value === '') {
-                        continue;
-                    }
-
-                    $filters[$criterionKey] ??= [
-                        'key' => $criterionKey,
-                        'label' => $this->criterionLabel($criterionKey),
-                        'priority' => $priorities[$criterionKey] ?? 100,
-                        'options' => [],
-                    ];
-                    $filters[$criterionKey]['options'][$value] ??= [
-                        'value' => $value,
-                        'label' => $node['attributes']['value_label']
-                            ?? $this->qualifierValueLabel($node, $criterionKey, $value),
-                        'highway_keys' => [],
-                    ];
-                    $filters[$criterionKey]['options'][$value]['highway_keys'][] = $highway['key'];
+                if (! is_string($criterionKey) || $criterionKey === '' || ! is_string($value) || $value === '') {
+                    continue;
                 }
+
+                $filters[$criterionKey] ??= [
+                    'key' => $criterionKey,
+                    'label' => $this->criterionLabel($criterionKey),
+                    'priority' => $priorities[$criterionKey] ?? 100,
+                    'options' => [],
+                ];
+                $filters[$criterionKey]['options'][$value] ??= [
+                    'value' => $value,
+                    'label' => $node['attributes']['value_label']
+                        ?? $this->qualifierValueLabel($node, $criterionKey, $value),
+                    'highway_keys' => [],
+                ];
+                $filters[$criterionKey]['options'][$value]['highway_keys'][] = $highway['key'];
             }
         }
 

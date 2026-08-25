@@ -88,7 +88,7 @@ segment_key on edges
 
 It does not expose the previous ambiguous `processes[]`, `process_count`, or compatibility `groups` projection.
 
-`ProcessHighwayMapBuilder` connects segments that share stable semantic nodes inside the same subject and lane. Each connected component becomes one business highway:
+`ProcessHighwayMapBuilder` connects segments only through business entrances and explicit handoffs inside the same subject and lane. Each connected component becomes one business highway:
 
 ```text
 highways[]
@@ -106,7 +106,11 @@ business highway
         -> durable outcomes and exits
 ```
 
-Shared nodes never connect segments across lanes. A standard-contact status and a relationship-scoped use of that same status therefore remain separate highways.
+Segments connect when they share an entry node, when one segment produces a non-contact-fact node used as another segment's entry, or when an `exits_to` edge explicitly targets another mechanism. Merely producing the same downstream status, tag, relationship stage, Campaign state, or other outcome does not connect otherwise unrelated processes.
+
+This directionality is essential. Cold Lead, Past Client, and Webinar reply Routes may all create an Engaged status, Hand Raiser tag, task, or Campaign-family outcome without becoming one giant highway. Shared downstream consequences remain visible beside the mechanism that causes them.
+
+Connections never cross lanes. A standard-contact status and a relationship-scoped use of that same status therefore remain separate highways.
 
 Highway keys are deterministic hashes of their lane and connected segment membership. They identify the composed read model only; they are not persisted authority.
 
@@ -200,13 +204,13 @@ flow_routes:route:cold_lead_high_intent_reply_routing
 
 A contributor may publish a reference-only appearance of a semantic node it does not own. The composer merges compatible appearances, retains an authoritative definition when one exists, records every participating segment, and combines exact edit targets.
 
-That is how a status or tag consequence can feed Campaign eligibility without Core querying either module's tables or inventing a dependency between those modules.
+Status and tag appearances remain reusable facts, but an output does not automatically merge into every process that happens to read the same fact. The entry-ramp inspector may show the producing Flow Route as one configured way that fact can be applied without folding the producer into the selected audience's main road.
 
 Conflicting owners, roles, or authoritative definitions for one semantic key fail composition instead of being guessed in Blade.
 
 ## Business-highway composition
 
-Within each subject and lane, two segments are connected when they participate in the same semantic node. The builder computes deterministic connected components from those shared memberships.
+Within each subject and lane, the builder computes deterministic components from shared entrances and explicit non-fact handoffs. General shared-node membership is not a composition rule.
 
 For every business highway, the read model exposes:
 
@@ -215,16 +219,52 @@ For every business highway, the read model exposes:
 - shared entry ramps;
 - terminal outcomes/exits;
 - nested module-owned segments;
-- nested journey and branch nodes;
-- qualifier values used for Status, Tag, Relationship, Webinar Outcome, Source, and future filters;
+- compact mechanism-owned actions;
+- outcomes attached to the exact mechanism or action that causes them;
+- qualifier values derived only from root entry ramps for Status, Tag, Relationship, Webinar Outcome, Source, and future filters;
 - searchable business text;
 - safe authoritative navigation targets.
 
 An entry candidate is a top-level ramp only when it has no incoming edge inside the connected highway. A scoped reply can therefore start a Flow Route without being misrepresented as a second top-level entrance when the Campaign message journey already leads into that reply.
 
-An exit candidate is terminal only when it has no outgoing edge inside the connected highway. If a Campaign segment exits directly into a Route mechanism, that Route is part of the center road and only the actual downstream completion remains in the terminal-outcome column.
+An exit candidate is terminal only when it has no outgoing edge inside the connected highway. If a Campaign segment exits directly into a Route mechanism, that Route remains part of the center road while the actual downstream completion is attached to the action that causes it.
 
 The composer never invents missing transitions. If no contributor establishes a connection, the UI displays separate highways or a visible gap rather than pretending the business process is configured.
+
+## Audience-first surface
+
+The CRM surface does not render any process until the user selects at least one contact scope or entry-fact filter. Free-text search refines an already selected audience; it is not an audience by itself.
+
+Filtering uses root entry ramps only. A status or tag created later by a Route is an outcome and cannot make that Route appear under an unrelated audience filter.
+
+The visual flow is top to bottom:
+
+```text
+selected entry ramps
+        ↓
+Campaign and/or Flow Route mechanisms
+        ├─ outcome beside its triggering action
+        └─ exit beside its triggering action
+```
+
+Campaigns and Flow Routes receive visible mechanism badges because they are the user-facing executable mechanisms. Core, Workflow, and other fact owners remain authoritative in the graph contract but do not display implementation-oriented module badges on entry ramps or outcomes.
+
+Campaign eligibility gateways and criteria are intentionally omitted from the Campaign card. The same conditions already appear as the Highway's entry ramps.
+
+## Entry-ramp inspection
+
+Status and Tag entry ramps open a bounded read-only inspector. Owner modules contribute current counts and ordinary application paths through:
+
+```text
+App\Support\ProcessHighway\Contracts\ProcessHighwayEntryRampContributor
+process_highway.entry_ramp_contributors
+```
+
+Core contributes Tag counts and import capability. Workflow contributes Status counts plus direct Contact editing and import capability. The shared inspector discovers configured Flow Routes from graph consequence edges and links to their authoritative Route editors.
+
+The count is the number of contacts whose current facts match the selected ramp. The application-path list explains how the fact can currently be assigned. It is not historical attribution.
+
+Tag rows currently contain only Contact, tag, and timestamps, and Core fact-change events are deliberately transient. A future request for source-by-source historical Tag counts would therefore require explicit provenance persistence; Process Highway does not infer or fabricate it.
 
 ## Ownership, wayfinding, and navigation
 

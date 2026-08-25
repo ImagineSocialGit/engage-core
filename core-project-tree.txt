@@ -308,6 +308,8 @@
 │   │   │   │   │       ├── SourceContactFilterCriterion.php
 │   │   │   │   │       ├── SubsourceContactFilterCriterion.php
 │   │   │   │   │       └── TagContactFilterCriterion.php
+│   │   │   │   ├── ProcessHighway
+│   │   │   │   │   └── CoreProcessHighwayEntryRampContributor.php
 │   │   │   │   └── SiteSettings
 │   │   │   │       └── SiteSettingResolver.php
 │   │   │   ├── Support
@@ -1327,8 +1329,10 @@
 │   │       │   │   ├── Filters
 │   │       │   │   │   └── StatusContactFilterCriterion.php
 │   │       │   │   └── WorkflowContactStatusUpdater.php
-│   │       │   └── ContactShow
-│   │       │       └── ContactWorkflowVisibilityDataProvider.php
+│   │       │   ├── ContactShow
+│   │       │   │   └── ContactWorkflowVisibilityDataProvider.php
+│   │       │   └── ProcessHighway
+│   │       │       └── WorkflowProcessHighwayEntryRampContributor.php
 │   │       └── Support
 │   ├── Providers
 │   │   ├── AppServiceProvider.php
@@ -1455,7 +1459,8 @@
 │       │   └── PresetPackageResolver.php
 │       ├── ProcessHighway
 │       │   ├── Contracts
-│       │   │   └── ProcessHighwayContributor.php
+│       │   │   ├── ProcessHighwayContributor.php
+│       │   │   └── ProcessHighwayEntryRampContributor.php
 │       │   ├── Data
 │       │   │   ├── ProcessHighwayAuthority.php
 │       │   │   ├── ProcessHighwayContribution.php
@@ -1463,6 +1468,7 @@
 │       │   │   ├── ProcessHighwayEditTarget.php
 │       │   │   ├── ProcessHighwayLane.php
 │       │   │   └── ProcessHighwayNode.php
+│       │   ├── ProcessHighwayEntryRampInspector.php
 │       │   ├── ProcessHighwayGraphComposer.php
 │       │   ├── ProcessHighwayMapBuilder.php
 │       │   ├── ProcessHighwayReadService.php
@@ -2333,7 +2339,9 @@
 │   │   │   ├── ContactStatusImportTreatmentTest.php
 │   │   │   ├── ContactTagAutomationTest.php
 │   │   │   ├── CoreSetupValidationContributorTest.php
+│   │   │   ├── ProcessHighwayAudienceIsolationTest.php
 │   │   │   ├── ProcessHighwayBusinessProcessAcceptanceTest.php
+│   │   │   ├── ProcessHighwayEntryRampInspectorTest.php
 │   │   │   ├── ProcessHighwayGraphContractTest.php
 │   │   │   ├── ProcessHighwayMapBuilderTest.php
 │   │   │   ├── ProcessHighwaySurfaceTest.php
@@ -2721,4 +2729,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-660 directories, 2062 files
+662 directories, 2068 files

@@ -9,10 +9,12 @@ use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
 use App\Modules\Workflow\Listeners\DispatchContactWorkflowStatusChangedFromAutomationEvent;
 use App\Modules\Workflow\Listeners\RecordManualStatusTransitionAutomationBehavior;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
-use App\Modules\Workflow\Services\Contacts\WorkflowContactStatusUpdater;
 use App\Modules\Workflow\Services\Contacts\Filters\StatusContactFilterCriterion;
+use App\Modules\Workflow\Services\Contacts\WorkflowContactStatusUpdater;
 use App\Modules\Workflow\Services\ContactShow\ContactWorkflowVisibilityDataProvider;
+use App\Modules\Workflow\Services\ProcessHighway\WorkflowProcessHighwayEntryRampContributor;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
+use App\Support\ProcessHighway\ProcessHighwayEntryRampInspector;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Event;
@@ -34,6 +36,10 @@ class WorkflowModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             StatusContactFilterCriterion::class,
         ], 'core.contact_filter_criteria');
+
+        $this->app->tag([
+            WorkflowProcessHighwayEntryRampContributor::class,
+        ], ProcessHighwayEntryRampInspector::CONTRIBUTOR_TAG);
     }
 
     public function boot(): void

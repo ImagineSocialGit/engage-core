@@ -11,13 +11,16 @@ final class ProcessHighwayReadService
     public function __construct(
         private readonly Container $container,
         private readonly ProcessHighwayGraphComposer $composer,
+        private readonly ProcessHighwayEntryRampInspector $entryRampInspector,
     ) {}
 
     /** @return array<string, mixed> */
     public function read(): array
     {
-        return $this->composer->compose(
-            $this->container->tagged(self::CONTRIBUTOR_TAG),
+        return $this->entryRampInspector->decorate(
+            $this->composer->compose(
+                $this->container->tagged(self::CONTRIBUTOR_TAG),
+            ),
         );
     }
 }

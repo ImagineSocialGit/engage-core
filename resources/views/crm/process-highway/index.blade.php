@@ -26,22 +26,9 @@
         ])
         ->values()
         ->all();
-    $roleLabels = [
-        'trigger' => 'Trigger',
-        'qualifier' => 'Contact fact',
-        'gateway' => 'Qualification',
-        'process' => 'Mechanism',
-        'action' => 'Action',
-        'consequence' => 'Outcome',
-        'exit' => 'Exit',
-    ];
-    $mechanismLabels = [
-        'campaigns' => 'Eligibility-driven messaging',
-        'flow_routes' => 'Procedural orchestration',
-    ];
-    $mechanismExplanations = [
-        'campaigns' => 'Campaigns continuously decide who qualifies for this messaging program.',
-        'flow_routes' => 'Flow Routes execute an ordered sequence when branching or multi-step coordination matters.',
+    $mechanismBadges = [
+        'campaigns' => 'Campaign',
+        'flow_routes' => 'Flow Route',
     ];
 @endphp
 
@@ -61,7 +48,16 @@
             laneOptions: @js($laneOptions->all()),
             query: '',
             qualifiers: @js($qualifierSelection),
+            ramp: null,
+            hasAudienceSelection() {
+                return this.lane !== ''
+                    || Object.values(this.qualifiers).some((value) => value !== '');
+            },
             matches(item) {
+                if (! this.hasAudienceSelection()) {
+                    return false;
+                }
+
                 if (this.subject && item.subject_key !== this.subject) {
                     return false;
                 }
@@ -83,96 +79,55 @@
             visibleCount() {
                 return this.items.filter((item) => this.matches(item)).length;
             },
-            hasActiveFilters() {
-                return this.lane !== ''
-                    || this.query.trim() !== ''
-                    || Object.values(this.qualifiers).some((value) => value !== '');
-            },
             clearFilters() {
                 this.lane = '';
                 this.query = '';
                 Object.keys(this.qualifiers).forEach((key) => this.qualifiers[key] = '');
             },
+            openRamp(ramp) {
+                this.ramp = ramp;
+            },
+            closeRamp() {
+                this.ramp = null;
+            },
         }"
+        x-on:keydown.escape.window="closeRamp()"
     >
-        <section class="rounded-3xl border border-slate-200 bg-white shadow-sm">
-            <div class="p-5 sm:p-8">
-                <div class="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-                    <div>
-                        <p class="text-sm font-semibold uppercase tracking-[0.16em] text-slate-600">
-                            Business process map
-                        </p>
-
-                        <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                            Follow the road from contact facts to outcomes
-                        </h2>
-
-                        <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-                            Each highway connects the facts that bring someone in, what happens automatically, and where the process can lead. Open any item to edit it in the feature that owns it.
-                        </p>
-                    </div>
-
-                    @if(($highway['highway_count'] ?? 0) > 0)
-                        <dl class="grid shrink-0 grid-cols-3 gap-2">
-                            <div class="min-w-24 rounded-2xl bg-slate-50 px-3 py-3 text-center ring-1 ring-slate-200">
-                                <dd class="text-xl font-semibold text-slate-950">{{ $highway['highway_count'] }}</dd>
-                                <dt class="text-xs font-medium text-slate-500">highways</dt>
-                            </div>
-                            <div class="min-w-24 rounded-2xl bg-slate-50 px-3 py-3 text-center ring-1 ring-slate-200">
-                                <dd class="text-xl font-semibold text-slate-950">{{ $highway['segment_count'] }}</dd>
-                                <dt class="text-xs font-medium text-slate-500">mechanisms</dt>
-                            </div>
-                            <div class="min-w-24 rounded-2xl bg-slate-50 px-3 py-3 text-center ring-1 ring-slate-200">
-                                <dd class="text-xl font-semibold text-slate-950">{{ $highway['source_count'] }}</dd>
-                                <dt class="text-xs font-medium text-slate-500">features</dt>
-                            </div>
-                        </dl>
-                    @endif
-                </div>
-
-                <div class="mt-6 grid gap-3 md:grid-cols-3">
-                    <div class="rounded-2xl bg-slate-50 px-4 py-4 ring-1 ring-slate-200">
-                        <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Process Highway</p>
-                        <p class="mt-1 text-sm font-semibold text-slate-900">The map and visibility layer</p>
-                        <p class="mt-1 text-xs leading-5 text-slate-600">It explains the process without executing or owning it.</p>
-                    </div>
-                    <div class="rounded-2xl px-4 py-4 ring-1 {{ module_tone('campaigns', 'panel') }}">
-                        <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Campaigns</p>
-                        <p class="mt-1 text-sm font-semibold text-slate-900">Eligibility-driven communication</p>
-                        <p class="mt-1 text-xs leading-5 text-slate-600">Contacts matching durable facts enter the messaging program directly.</p>
-                    </div>
-                    <div class="rounded-2xl px-4 py-4 ring-1 {{ module_tone('flow_routes', 'panel') }}">
-                        <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Flow Routes</p>
-                        <p class="mt-1 text-sm font-semibold text-slate-900">Procedural orchestration</p>
-                        <p class="mt-1 text-xs leading-5 text-slate-600">Routes appear only where ordering, branching, or coordination is configured.</p>
-                    </div>
-                </div>
-            </div>
+        <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+            <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Business process map</p>
+            <h2 class="mt-2 text-xl font-semibold tracking-tight text-slate-950">
+                Choose an audience to see what applies
+            </h2>
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                The map shows why contacts enter a process, which Campaigns or Flow Routes apply, and what each mechanism can cause.
+            </p>
         </section>
 
         @if(($highway['highway_count'] ?? 0) === 0)
             <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                <h2 class="text-lg font-semibold text-slate-950">No configured business highways yet</h2>
+                <h2 class="text-lg font-semibold text-slate-950">No configured business processes yet</h2>
                 <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                    This surface stays available when optional process features are disabled. Highways appear automatically as enabled features contribute connected facts and actions.
+                    Processes appear automatically as enabled features contribute contact entrances and mechanisms.
                 </p>
             </section>
         @else
             <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div>
-                        <h2 class="text-lg font-semibold tracking-tight text-slate-950">Choose what to map</h2>
+                        <h2 class="text-lg font-semibold tracking-tight text-slate-950">Audience filters</h2>
                         <p class="mt-1 text-sm leading-6 text-slate-600">
-                            Combine scope and contact facts to isolate the road you want to review.
+                            Select at least one scope or contact fact before the map is shown.
                         </p>
                     </div>
 
                     <div class="flex items-center gap-3 text-sm text-slate-600">
-                        <span><strong class="font-semibold text-slate-950" x-text="visibleCount()"></strong> shown</span>
+                        <span x-show="hasAudienceSelection()">
+                            <strong class="font-semibold text-slate-950" x-text="visibleCount()"></strong> shown
+                        </span>
                         <button
                             type="button"
                             x-cloak
-                            x-show="hasActiveFilters()"
+                            x-show="hasAudienceSelection() || query.trim() !== ''"
                             x-on:click="clearFilters()"
                             class="font-semibold text-slate-700 underline decoration-slate-300 underline-offset-4 transition hover:text-slate-950"
                         >
@@ -201,7 +156,7 @@
                             x-model="lane"
                             class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900 shadow-sm focus:border-slate-500 focus:ring-slate-500"
                         >
-                            <option value="">All contact scopes</option>
+                            <option value="">Choose a scope</option>
                             <template x-for="option in laneOptions.filter((option) => option.subject_key === subject)" :key="option.key">
                                 <option :value="option.key" x-text="option.label"></option>
                             </template>
@@ -215,7 +170,7 @@
                                 x-model="qualifiers['{{ $filter['key'] }}']"
                                 class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900 shadow-sm focus:border-slate-500 focus:ring-slate-500"
                             >
-                                <option value="">Any {{ strtolower($filter['label']) }}</option>
+                                <option value="">Choose {{ strtolower($filter['label']) }}</option>
                                 @foreach($filter['options'] as $option)
                                     <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
                                 @endforeach
@@ -224,18 +179,35 @@
                     @endforeach
 
                     <label class="block md:col-span-2 xl:col-span-4">
-                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-600">Find a process</span>
+                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-600">Refine visible processes</span>
                         <input
                             type="search"
                             x-model.debounce.200ms="query"
-                            placeholder="Search entrances, actions, outcomes, or program names"
-                            class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-slate-500 focus:ring-slate-500"
+                            x-bind:disabled="! hasAudienceSelection()"
+                            placeholder="Search process names or outcomes"
+                            class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm text-slate-900 shadow-sm placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 focus:border-slate-500 focus:ring-slate-500"
                         >
                     </label>
                 </div>
             </section>
 
-            <div class="space-y-6" aria-live="polite">
+            <section
+                x-show="! hasAudienceSelection()"
+                data-process-highway-awaiting-filter
+                class="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm"
+            >
+                <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                    <svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M7 12h10m-7 6h4" />
+                    </svg>
+                </div>
+                <h2 class="mt-4 text-lg font-semibold text-slate-950">Select an audience to begin</h2>
+                <p class="mt-2 text-sm leading-6 text-slate-600">
+                    Nothing is shown until at least one contact scope or fact is selected.
+                </p>
+            </section>
+
+            <div x-cloak x-show="hasAudienceSelection()" class="space-y-6" aria-live="polite">
                 @foreach($highways as $businessHighway)
                     <article
                         x-show="matches(@js([
@@ -249,263 +221,197 @@
                         data-business-highway="{{ $businessHighway['key'] }}"
                         class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
                     >
-                        <header class="border-b border-slate-200 bg-slate-50/70 px-5 py-5 sm:px-7">
-                            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                <div class="min-w-0">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <span class="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-300">
-                                            {{ $businessHighway['subject_label'] }}
-                                        </span>
-                                        <span class="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-300">
-                                            {{ $businessHighway['lane_label'] }}
-                                        </span>
-                                        <span @class([
-                                            'rounded-full px-2.5 py-1 text-xs font-bold ring-1',
-                                            'bg-emerald-50 text-emerald-800 ring-emerald-200' => $businessHighway['state'] === 'active',
-                                            'bg-amber-50 text-amber-900 ring-amber-200' => $businessHighway['state'] === 'needs_configuration',
-                                            'bg-slate-100 text-slate-600 ring-slate-200' => $businessHighway['state'] === 'off',
-                                        ])>
-                                            {{ $businessHighway['state_label'] }}
-                                        </span>
-                                    </div>
-
-                                    <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-950">
-                                        {{ $businessHighway['name'] }}
-                                    </h2>
-                                    <p class="mt-1 text-sm leading-6 text-slate-600">
-                                        {{ $businessHighway['segment_count'] }} connected {{ \Illuminate\Support\Str::plural('mechanism', $businessHighway['segment_count']) }} across {{ $businessHighway['source_count'] }} {{ \Illuminate\Support\Str::plural('feature', $businessHighway['source_count']) }}.
-                                    </p>
-                                </div>
-
-                                <div class="flex flex-wrap gap-2">
-                                    @foreach($businessHighway['source_keys'] as $sourceKey)
-                                        <span class="rounded-full px-2.5 py-1 text-xs font-semibold ring-1 {{ module_tone($sourceKey, 'badge') }}">
-                                            {{ \Illuminate\Support\Str::headline($sourceKey) }}
-                                        </span>
-                                    @endforeach
-                                </div>
+                        <header class="border-b border-slate-200 bg-slate-50/70 px-5 py-5 text-center sm:px-7">
+                            <div class="flex flex-wrap items-center justify-center gap-2">
+                                <span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-300">
+                                    {{ $businessHighway['lane_label'] }}
+                                </span>
+                                @if($businessHighway['state'] !== 'active')
+                                    <span @class([
+                                        'rounded-full px-2.5 py-1 text-xs font-semibold ring-1',
+                                        'bg-amber-50 text-amber-900 ring-amber-200' => $businessHighway['state'] === 'needs_configuration',
+                                        'bg-slate-100 text-slate-600 ring-slate-200' => $businessHighway['state'] === 'off',
+                                    ])>
+                                        {{ $businessHighway['state_label'] }}
+                                    </span>
+                                @endif
                             </div>
+                            <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-950">
+                                {{ $businessHighway['name'] }}
+                            </h2>
                         </header>
 
                         <div class="p-5 sm:p-7">
-                            <div class="grid gap-5 xl:grid-cols-[minmax(12rem,0.75fr)_2.5rem_minmax(30rem,2fr)_2.5rem_minmax(12rem,0.8fr)] xl:items-stretch">
-                                <section aria-label="Entry ramps">
-                                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Entry ramps</p>
-                                    <div class="mt-3 space-y-3">
-                                        @foreach($businessHighway['entry_nodes'] as $node)
-                                            @php($target = $node['navigation_target'])
+                            <section aria-label="Entry ramps" class="mx-auto max-w-4xl text-center">
+                                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Entry ramps</p>
+                                <div class="mt-3 flex flex-wrap justify-center gap-3">
+                                    @foreach($businessHighway['entry_nodes'] as $node)
+                                        @php($inspector = $node['inspector'] ?? null)
+                                        @php($target = $node['navigation_target'] ?? null)
+
+                                        @if(is_array($inspector))
+                                            <button
+                                                type="button"
+                                                x-on:click="openRamp(@js($inspector))"
+                                                data-entry-ramp-inspector="{{ $node['key'] }}"
+                                                class="group min-w-44 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-md"
+                                            >
+                                                <span class="block text-[0.68rem] font-bold uppercase tracking-[0.12em] text-slate-500">
+                                                    {{ $inspector['criterion_label'] }}
+                                                </span>
+                                                <span class="mt-1 flex items-center justify-between gap-3 text-sm font-semibold text-slate-950">
+                                                    {{ $inspector['value_label'] }}
+                                                    <svg viewBox="0 0 24 24" class="h-4 w-4 shrink-0 text-slate-400 transition group-hover:text-slate-700" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-6-6-6" />
+                                                    </svg>
+                                                </span>
+                                            </button>
+                                        @elseif(is_array($target))
                                             <a
                                                 href="{{ $target['url'] }}"
-                                                class="block rounded-2xl p-4 ring-1 transition hover:-translate-y-0.5 hover:shadow-md {{ module_tone($node['authority']['owner_key'], 'item') }}"
-                                                title="{{ $target['label'] }}"
+                                                class="group min-w-44 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-md"
                                             >
-                                                <span class="rounded-full px-2 py-1 text-[0.68rem] font-bold ring-1 {{ module_tone($node['authority']['owner_key'], 'badge') }}">
-                                                    {{ $node['authority']['owner_label'] }}
+                                                <span class="block text-[0.68rem] font-bold uppercase tracking-[0.12em] text-slate-500">Entrance</span>
+                                                <span class="mt-1 flex items-center justify-between gap-3 text-sm font-semibold text-slate-950">
+                                                    {{ $node['label'] }}
+                                                    <svg viewBox="0 0 24 24" class="h-4 w-4 shrink-0 text-slate-400 transition group-hover:text-slate-700" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-6-6-6" />
+                                                    </svg>
                                                 </span>
-                                                <span class="mt-3 block text-sm font-semibold leading-5 text-slate-950">{{ $node['label'] }}</span>
-                                                @if($node['detail'])
-                                                    <span class="mt-1 block text-xs leading-5 text-slate-600">{{ $node['detail'] }}</span>
-                                                @endif
                                             </a>
-                                        @endforeach
-                                    </div>
-                                </section>
-
-                                <div class="flex items-center justify-center text-slate-400" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" class="h-7 w-7 xl:hidden" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m0 0 6-6m-6 6-6-6" />
-                                    </svg>
-                                    <svg viewBox="0 0 24 24" class="hidden h-8 w-8 xl:block" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 12h16m0 0-6-6m6 6-6 6" />
-                                    </svg>
+                                        @endif
+                                    @endforeach
                                 </div>
+                            </section>
 
-                                <section aria-label="Business mechanisms">
-                                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">What happens, in order</p>
-                                    <div class="mt-3 space-y-4">
-                                        @foreach($businessHighway['segments'] as $segment)
-                                            @php($segmentTarget = $segment['navigation_target'])
-                                            <article
-                                                x-data="{ expanded: false }"
-                                                data-process-highway-segment="{{ $segment['key'] }}"
-                                                data-process-highway-owner="{{ $segment['source_key'] }}"
-                                                class="flex min-w-0 flex-col rounded-2xl p-4 ring-1 sm:p-5 {{ module_tone($segment['source_key'], 'panel') }}"
-                                            >
-                                                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                                    <div class="min-w-0">
-                                                        <div class="flex flex-wrap items-center gap-2">
-                                                            <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-950 text-xs font-bold text-white">
-                                                                {{ $loop->iteration }}
-                                                            </span>
+                            <div class="mx-auto my-4 flex h-10 w-px items-end justify-center bg-slate-300 text-slate-400" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" class="h-5 w-5 shrink-0 translate-y-2.5 bg-white" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6" />
+                                </svg>
+                            </div>
+
+                            <section aria-label="Applicable mechanisms" class="mx-auto max-w-4xl">
+                                <p class="text-center text-xs font-bold uppercase tracking-[0.14em] text-slate-500">What applies</p>
+                                <div class="mt-3 space-y-4">
+                                    @foreach($businessHighway['segments'] as $segment)
+                                        @php($segmentTarget = $segment['navigation_target'])
+                                        @php($mechanismBadge = $mechanismBadges[$segment['source_key']] ?? null)
+
+                                        <article
+                                            data-process-highway-segment="{{ $segment['key'] }}"
+                                            data-process-highway-owner="{{ $segment['source_key'] }}"
+                                            class="rounded-2xl p-4 ring-1 sm:p-5 {{ module_tone($segment['source_key'], 'panel') }}"
+                                        >
+                                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                                <div class="min-w-0">
+                                                    <div class="flex flex-wrap items-center gap-2">
+                                                        @if($mechanismBadge !== null)
                                                             <span class="rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ module_tone($segment['source_key'], 'badge') }}">
-                                                                {{ $segment['authority']['owner_label'] }}
+                                                                {{ $mechanismBadge }}
                                                             </span>
-                                                            <span @class([
-                                                                'rounded-full px-2.5 py-1 text-xs font-bold',
-                                                                'bg-emerald-100 text-emerald-800' => $segment['state'] === 'active',
-                                                                'bg-amber-100 text-amber-900' => $segment['state'] === 'needs_configuration',
-                                                                'bg-white/80 text-slate-600' => ! in_array($segment['state'], ['active', 'needs_configuration'], true),
-                                                            ])>
+                                                        @endif
+                                                        @if($segment['state'] !== 'active')
+                                                            <span class="rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-black/5">
                                                                 {{ $segment['state_label'] }}
                                                             </span>
-                                                        </div>
-
-                                                        <p class="mt-3 text-[0.68rem] font-bold uppercase tracking-[0.12em] text-slate-500">
-                                                            {{ $mechanismLabels[$segment['source_key']] ?? 'Owned process mechanism' }}
-                                                        </p>
-
-                                                        <h3 class="mt-1 text-base font-semibold leading-6 text-slate-950">{{ $segment['name'] }}</h3>
-                                                        @if($segment['description'])
-                                                            <p class="mt-1 text-sm leading-5 text-slate-600">{{ $segment['description'] }}</p>
-                                                        @endif
-
-                                                        @if(isset($mechanismExplanations[$segment['source_key']]))
-                                                            <p class="mt-2 text-xs leading-5 text-slate-500">{{ $mechanismExplanations[$segment['source_key']] }}</p>
                                                         @endif
                                                     </div>
-
-                                                    <a
-                                                        href="{{ $segmentTarget['url'] }}"
-                                                        class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-                                                    >
-                                                        {{ $segmentTarget['label'] }}
-                                                    </a>
+                                                    <h3 class="mt-2 text-base font-semibold leading-6 text-slate-950">{{ $segment['name'] }}</h3>
+                                                    @if($segment['description'])
+                                                        <p class="mt-1 text-sm leading-5 text-slate-600">{{ $segment['description'] }}</p>
+                                                    @endif
                                                 </div>
 
-                                                @if($segment['entry_summary'])
-                                                    <div class="mt-4 rounded-xl bg-white/75 px-3 py-3 text-sm leading-5 text-slate-700 ring-1 ring-black/5">
-                                                        <span class="font-semibold text-slate-950">Starts when:</span>
-                                                        {{ $segment['entry_summary'] }}
-                                                    </div>
-                                                @endif
-
-                                                <ol class="mt-4 space-y-0">
-                                                    @forelse($segment['journey_nodes'] as $node)
-                                                        @php($target = $node['navigation_target'])
-                                                        <li
-                                                            @if($loop->iteration > 4)
-                                                                x-cloak
-                                                                x-show="expanded"
-                                                            @endif
-                                                            class="relative flex gap-3 pb-4 last:pb-0"
-                                                        >
-                                                            @if(! $loop->last)
-                                                                <span class="absolute bottom-0 left-[0.6875rem] top-6 w-px bg-slate-300" aria-hidden="true"></span>
-                                                            @endif
-                                                            <span class="relative mt-1 h-5 w-5 shrink-0 rounded-full border-4 border-white bg-slate-400 ring-1 ring-slate-300" aria-hidden="true"></span>
-                                                            <a
-                                                                href="{{ $target['url'] }}"
-                                                                class="min-w-0 flex-1 rounded-xl px-3 py-3 ring-1 transition hover:shadow-sm {{ module_tone($node['authority']['owner_key'], 'item') }}"
-                                                                title="{{ $target['label'] }}"
-                                                            >
-                                                                <span class="flex flex-wrap items-center gap-2">
-                                                                    <span class="text-[0.68rem] font-bold uppercase tracking-[0.1em] text-slate-500">
-                                                                        {{ $roleLabels[$node['role']] ?? \Illuminate\Support\Str::headline($node['role']) }}
-                                                                    </span>
-                                                                    <span class="rounded-full px-2 py-0.5 text-[0.65rem] font-bold ring-1 {{ module_tone($node['authority']['owner_key'], 'badge') }}">
-                                                                        {{ $node['authority']['owner_label'] }}
-                                                                    </span>
-                                                                </span>
-                                                                <span class="mt-1 block text-sm font-semibold leading-5 text-slate-950">{{ $node['label'] }}</span>
-                                                                @if($node['detail'])
-                                                                    <span class="mt-1 block text-xs leading-5 text-slate-600">{{ $node['detail'] }}</span>
-                                                                @endif
-                                                            </a>
-                                                        </li>
-                                                    @empty
-                                                        <li class="rounded-xl bg-white/75 px-3 py-3 text-sm text-slate-600 ring-1 ring-black/5">
-                                                            This mechanism handles the transition directly.
-                                                        </li>
-                                                    @endforelse
-                                                </ol>
-
-                                                @if(count($segment['journey_nodes']) > 4)
-                                                    <button
-                                                        type="button"
-                                                        x-on:click="expanded = ! expanded"
-                                                        class="mt-1 self-start text-xs font-semibold text-slate-700 underline decoration-slate-300 underline-offset-4 transition hover:text-slate-950"
-                                                    >
-                                                        <span x-show="! expanded">Show {{ count($segment['journey_nodes']) - 4 }} more steps</span>
-                                                        <span x-cloak x-show="expanded">Show fewer steps</span>
-                                                    </button>
-                                                @endif
-
-                                                @if($segment['branch_edges'] !== [])
-                                                    <div class="mt-4 border-t border-black/5 pt-4">
-                                                        <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Decision paths</p>
-                                                        <div class="mt-2 flex flex-wrap gap-2">
-                                                            @foreach($segment['branch_edges'] as $edge)
-                                                                @php($target = $edge['navigation_target'])
-                                                                <a
-                                                                    href="{{ $target['url'] }}"
-                                                                    class="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-300 transition hover:bg-slate-50"
-                                                                    title="{{ $target['label'] }}"
-                                                                >
-                                                                    {{ $edge['label'] ?: 'Branch' }}
-                                                                    @if($edge['to_label'])
-                                                                        <span class="text-slate-400">→</span> {{ $edge['to_label'] }}
-                                                                    @endif
-                                                                </a>
-                                                            @endforeach
-                                                        </div>
-                                                    </div>
-                                                @endif
-
-                                                @if($segment['details'] !== [])
-                                                    <details class="mt-auto pt-4">
-                                                        <summary class="cursor-pointer text-sm font-semibold text-slate-700 marker:text-slate-400">
-                                                            How this is implemented
-                                                        </summary>
-                                                        <dl class="mt-3 grid gap-2 sm:grid-cols-2">
-                                                            @foreach($segment['details'] as $detail)
-                                                                <div class="rounded-xl bg-white/75 px-3 py-2 ring-1 ring-black/5">
-                                                                    <dt class="text-[0.68rem] font-bold uppercase tracking-[0.1em] text-slate-500">{{ $detail['label'] }}</dt>
-                                                                    <dd class="mt-1 text-xs font-semibold leading-5 text-slate-800">{{ $detail['value'] }}</dd>
-                                                                </div>
-                                                            @endforeach
-                                                        </dl>
-                                                    </details>
-                                                @endif
-                                            </article>
-                                        @endforeach
-                                    </div>
-                                </section>
-
-                                <div class="flex items-center justify-center text-slate-400" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" class="h-7 w-7 xl:hidden" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m0 0 6-6m-6 6-6-6" />
-                                    </svg>
-                                    <svg viewBox="0 0 24 24" class="hidden h-8 w-8 xl:block" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 12h16m0 0-6-6m6 6-6 6" />
-                                    </svg>
-                                </div>
-
-                                <section aria-label="Outcomes and exits">
-                                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Outcomes and exits</p>
-                                    <div class="mt-3 space-y-3">
-                                        @forelse($businessHighway['exit_nodes'] as $node)
-                                            @php($target = $node['navigation_target'])
-                                            <a
-                                                href="{{ $target['url'] }}"
-                                                class="block rounded-2xl p-4 ring-1 transition hover:-translate-y-0.5 hover:shadow-md {{ module_tone($node['authority']['owner_key'], 'item') }}"
-                                                title="{{ $target['label'] }}"
-                                            >
-                                                <span class="rounded-full px-2 py-1 text-[0.68rem] font-bold ring-1 {{ module_tone($node['authority']['owner_key'], 'badge') }}">
-                                                    {{ $node['authority']['owner_label'] }}
-                                                </span>
-                                                <span class="mt-3 block text-sm font-semibold leading-5 text-slate-950">{{ $node['label'] }}</span>
-                                                @if($node['detail'])
-                                                    <span class="mt-1 block text-xs leading-5 text-slate-600">{{ $node['detail'] }}</span>
-                                                @endif
-                                            </a>
-                                        @empty
-                                            <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm leading-5 text-slate-600">
-                                                The configured road continues into another connected mechanism.
+                                                <a
+                                                    href="{{ $segmentTarget['url'] }}"
+                                                    class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                                                >
+                                                    {{ $segmentTarget['label'] }}
+                                                </a>
                                             </div>
-                                        @endforelse
-                                    </div>
-                                </section>
-                            </div>
+
+                                            @if($segment['mechanism_outcomes'] !== [])
+                                                <div class="mt-4 grid gap-2 border-t border-black/5 pt-4 sm:grid-cols-2">
+                                                    @foreach($segment['mechanism_outcomes'] as $outcome)
+                                                        <a
+                                                            href="{{ $outcome['node']['navigation_target']['url'] }}"
+                                                            data-process-highway-outcome="{{ $outcome['node']['key'] }}"
+                                                            class="rounded-xl border border-slate-200 bg-white/80 px-3 py-3 transition hover:border-slate-300 hover:bg-white"
+                                                        >
+                                                            <span class="block text-[0.68rem] font-bold uppercase tracking-[0.1em] text-slate-500">
+                                                                {{ $outcome['edge']['label'] ?: 'Can lead to' }}
+                                                            </span>
+                                                            <span class="mt-1 block text-sm font-semibold text-slate-900">{{ $outcome['node']['label'] }}</span>
+                                                        </a>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+
+                                            @if($segment['journey_nodes'] !== [])
+                                                <div class="mt-4 space-y-3 border-t border-black/5 pt-4">
+                                                    @foreach($segment['journey_nodes'] as $node)
+                                                        @php($nodeTarget = $node['navigation_target'])
+                                                        <div @class([
+                                                            'grid gap-3',
+                                                            'lg:grid-cols-[minmax(0,1fr)_minmax(13rem,0.72fr)] lg:items-center' => $node['outcomes'] !== [],
+                                                        ])>
+                                                            <a
+                                                                href="{{ $nodeTarget['url'] }}"
+                                                                class="rounded-xl border border-black/5 bg-white/70 px-3 py-3 text-sm font-semibold text-slate-900 transition hover:bg-white"
+                                                            >
+                                                                {{ $node['label'] }}
+                                                            </a>
+
+                                                            @if($node['outcomes'] !== [])
+                                                                <div class="space-y-2 lg:border-l lg:border-slate-300 lg:pl-3">
+                                                                    @foreach($node['outcomes'] as $outcome)
+                                                                        <a
+                                                                            href="{{ $outcome['node']['navigation_target']['url'] }}"
+                                                                            data-process-highway-outcome="{{ $outcome['node']['key'] }}"
+                                                                            class="block rounded-xl border border-slate-200 bg-white px-3 py-2.5 transition hover:border-slate-300 hover:shadow-sm"
+                                                                        >
+                                                                            <span class="block text-[0.65rem] font-bold uppercase tracking-[0.1em] text-slate-500">
+                                                                                {{ $outcome['edge']['label'] ?: 'Can lead to' }}
+                                                                            </span>
+                                                                            <span class="mt-1 block text-sm font-semibold text-slate-900">{{ $outcome['node']['label'] }}</span>
+                                                                        </a>
+                                                                    @endforeach
+                                                                </div>
+                                                            @endif
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+
+                                            @if($segment['additional_outcome_groups'] !== [])
+                                                <div class="mt-4 space-y-3 border-t border-black/5 pt-4">
+                                                    @foreach($segment['additional_outcome_groups'] as $group)
+                                                        <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(13rem,0.72fr)] lg:items-center">
+                                                            <div class="rounded-xl border border-black/5 bg-white/70 px-3 py-3 text-sm font-semibold text-slate-900">
+                                                                {{ $group['trigger_node']['label'] }}
+                                                            </div>
+                                                            <div class="space-y-2 lg:border-l lg:border-slate-300 lg:pl-3">
+                                                                @foreach($group['outcomes'] as $outcome)
+                                                                    <a
+                                                                        href="{{ $outcome['node']['navigation_target']['url'] }}"
+                                                                        data-process-highway-outcome="{{ $outcome['node']['key'] }}"
+                                                                        class="block rounded-xl border border-slate-200 bg-white px-3 py-2.5 transition hover:border-slate-300 hover:shadow-sm"
+                                                                    >
+                                                                        <span class="block text-[0.65rem] font-bold uppercase tracking-[0.1em] text-slate-500">
+                                                                            {{ $outcome['edge']['label'] ?: 'Can lead to' }}
+                                                                        </span>
+                                                                        <span class="mt-1 block text-sm font-semibold text-slate-900">{{ $outcome['node']['label'] }}</span>
+                                                                    </a>
+                                                                @endforeach
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                        </article>
+                                    @endforeach
+                                </div>
+                            </section>
                         </div>
                     </article>
                 @endforeach
@@ -515,8 +421,8 @@
                     x-show="visibleCount() === 0"
                     class="rounded-3xl border border-dashed border-slate-300 bg-white p-6 text-center shadow-sm sm:p-8"
                 >
-                    <h2 class="text-lg font-semibold text-slate-950">No highway matches these filters</h2>
-                    <p class="mt-2 text-sm leading-6 text-slate-600">Clear one or more filters to widen the map.</p>
+                    <h2 class="text-lg font-semibold text-slate-950">No process matches these filters</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-600">Clear one or more filters to widen the audience.</p>
                     <button
                         type="button"
                         x-on:click="clearFilters()"
@@ -527,5 +433,78 @@
                 </section>
             </div>
         @endif
+
+        <div
+            x-cloak
+            x-show="ramp !== null"
+            x-transition.opacity
+            x-on:click.self="closeRamp()"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4"
+            role="presentation"
+        >
+            <section
+                x-show="ramp !== null"
+                class="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white shadow-2xl ring-1 ring-slate-950/10"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Entry ramp details"
+            >
+                <template x-if="ramp !== null">
+                    <div>
+                        <header class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-5 sm:px-6">
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500" x-text="ramp.criterion_label"></p>
+                                <h2 class="mt-1 text-xl font-semibold tracking-tight text-slate-950" x-text="ramp.value_label"></h2>
+                            </div>
+                            <button
+                                type="button"
+                                x-on:click="closeRamp()"
+                                class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-950"
+                                aria-label="Close"
+                            >
+                                <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18" />
+                                </svg>
+                            </button>
+                        </header>
+
+                        <div class="space-y-5 px-5 py-5 sm:px-6">
+                            <div class="rounded-2xl bg-slate-950 px-4 py-4 text-white">
+                                <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-300">Contacts currently matching</p>
+                                <p class="mt-1 text-3xl font-semibold" x-text="Number(ramp.contact_count).toLocaleString()"></p>
+                            </div>
+
+                            <div>
+                                <h3 class="text-sm font-semibold text-slate-950">How this can be applied</h3>
+                                <div class="mt-3 space-y-2">
+                                    <template x-for="source in ramp.application_sources" :key="source.key">
+                                        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                            <div class="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <p class="text-sm font-semibold text-slate-950" x-text="source.label"></p>
+                                                    <p class="mt-1 text-xs leading-5 text-slate-600" x-text="source.detail"></p>
+                                                </div>
+                                                <template x-if="source.url">
+                                                    <a
+                                                        x-bind:href="source.url"
+                                                        class="shrink-0 text-xs font-semibold text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
+                                                    >
+                                                        Open
+                                                    </a>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <p class="text-xs leading-5 text-slate-500">
+                                The total reflects current contact facts. The listed paths show configured ways the fact can be assigned, not a historical attribution breakdown.
+                            </p>
+                        </div>
+                    </div>
+                </template>
+            </section>
+        </div>
     </div>
 </x-layouts.crm>
