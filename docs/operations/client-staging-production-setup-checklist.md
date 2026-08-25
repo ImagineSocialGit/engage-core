@@ -456,21 +456,29 @@ Use strong unique credentials. Do not reuse production application-user password
 
 ## 16. Configure DNS, Nginx, and SSL
 
-Typical application topology:
+Typical deployment roles:
 
 ```text
 <root domain>
-crm.<root domain>
+    standard site domain
+
+<Core admin subdomain>.<root domain>
+    human-facing Engage Core administration; commonly crm or app
+
 webinar.<root domain>
+    public Engage Core Webinar host when enabled
+
 webhooks.<root domain>
+    public Engage Core webhook and signed integration host
 ```
 
-Use the actual environment topology; do not assume staging must use the exact same naming pattern as production.
+Use the actual environment topology; do not assume the Core admin label is always `crm` or that staging must use the exact same naming pattern as production. `CRM_APP_URL` remains the canonical Core environment key even when the deployed admin hostname uses `app`.
 
 For every hostname:
 
 - [ ] DNS resolves to the intended staging server.
-- [ ] Nginx points to the intended Engage Core `public/` directory.
+- [ ] Each Core-owned hostname points to the intended Engage Core `public/` directory.
+- [ ] The standard site domain points to its owning site application rather than Engage Core when the products are deployed together.
 - [ ] PHP-FPM socket/version is correct.
 - [ ] SSL is valid.
 - [ ] No hostname still points to a legacy checkout.
@@ -658,6 +666,32 @@ FlowRoutes/points/bindings
 ```
 
 Do not assume an old list of separate sync commands remains necessary. Use the current orchestrator and only run extra commands when current source explicitly requires them.
+
+## 20A. Run applicable module-specific post-install commands
+
+`engage:install` owns platform/module schema installation, selected preset materialization, and its initial setup-validation pass. `presets:sync` owns configured DB definitions. Do not rerun older module-specific sync commands for work already covered by those orchestrators.
+
+Run only the entries whose condition applies. The canonical registry is maintained in `deployment-command-workflow.md`.
+
+### Forms — external-intake credential issuance
+
+Run this when Forms is enabled for a server-to-server external intake client and that environment does not already have its valid client ID/signing-secret pair:
+
+```bash
+php artisan forms:external-intake:issue-secret [client]
+```
+
+When exactly one external client is configured, the optional client argument may be omitted. The command prints matching Engage Core and caller environment blocks; it does not write either environment.
+
+- [ ] Issue a distinct pair for this environment.
+- [ ] Copy the Core block into the selected Core client environment.
+- [ ] Copy the caller block into the matching external application environment.
+- [ ] Run `php artisan optimize:clear` in each application after changing its environment.
+- [ ] Never reuse the production pair in staging or the staging pair in production.
+
+The command is bootstrap-safe when the current Core secret is blank or invalid. If `engage:install` reached its final validation stage and reported the missing/invalid Forms client configuration, issue and install the credential here, clear cached configuration, and continue with the explicit setup-validation gate below.
+
+No other current module requires a mandatory module-specific post-install Artisan command beyond `engage:install` and `presets:sync`. Provider probes, smoke tests, user creation, and production process restarts remain in their owning checklist sections rather than this registry.
 
 ## 21. Run setup validation
 

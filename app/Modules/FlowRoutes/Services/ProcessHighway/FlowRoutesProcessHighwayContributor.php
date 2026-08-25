@@ -54,6 +54,8 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
             $this->presentation->presentedPoints($route, $points),
         )->keyBy('key');
         $replyProfileKeys = $this->replyProfileKeys($points);
+        $replyIntentKeys = $this->replyIntentKeys($points);
+        $replyChannels = $this->replyChannels($points);
         $processKey = ProcessHighwaySemanticKey::flowRoute((string) $route->key);
         $routeTarget = $this->routeTarget($route);
         $routeAuthority = new ProcessHighwayAuthority(
@@ -107,6 +109,10 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
             role: ProcessHighwayNode::ROLE_EXIT,
             authority: $routeAuthority,
             sortOrder: 400,
+            attributes: [
+                'highway_visibility' => 'hidden',
+                'technical_completion' => true,
+            ],
         ));
         $exitNodeKeys[] = $completedExitKey;
 
@@ -185,6 +191,10 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
                 authority: $routeAuthority,
                 label: 'No active Points',
                 sortOrder: $edgeOrder++,
+                attributes: [
+                    'highway_visibility' => 'hidden',
+                    'technical_completion' => true,
+                ],
             );
         } else {
             foreach ($startPoints as $startIndex => $startPoint) {
@@ -249,6 +259,10 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
                 authority: $routeAuthority,
                 label: $nextPoint instanceof FlowRoutePoint ? 'Then' : 'Complete',
                 sortOrder: $edgeOrder++,
+                attributes: $nextPoint instanceof FlowRoutePoint ? [] : [
+                    'highway_visibility' => 'hidden',
+                    'technical_completion' => true,
+                ],
             );
         }
 
@@ -279,9 +293,15 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
                 'trigger_type' => (string) ($route->trigger_type ?? ''),
                 'trigger_key' => (string) ($route->trigger_key ?? ''),
                 'category' => (string) data_get($route->meta, 'definition.category', 'other'),
-                'role' => (string) data_get($route->meta, 'definition.role', ''),
+                'role' => (string) data_get(
+                    $route->meta,
+                    'definition.default_role',
+                    data_get($route->meta, 'definition.role', ''),
+                ),
                 'point_count' => $points->count(),
                 'reply_profile_keys' => $replyProfileKeys,
+                'reply_intent_keys' => $replyIntentKeys,
+                'reply_channels' => $replyChannels,
             ],
         );
     }
@@ -707,6 +727,10 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
             sortOrder: $edgeOrder++,
             attributes: [
                 'on_no_match' => $onNoMatch,
+                ...($onNoMatch === 'completed' ? [
+                    'highway_visibility' => 'hidden',
+                    'technical_completion' => true,
+                ] : []),
             ],
         );
     }
@@ -784,8 +808,35 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
      */
     private function replyProfileKeys(Collection $points): array
     {
+        return $this->branchConditionValues($points, 'reply_profile_key');
+    }
+
+    /**
+     * @param Collection<int, FlowRoutePoint> $points
+     * @return array<int, string>
+     */
+    private function replyIntentKeys(Collection $points): array
+    {
+        return $this->branchConditionValues($points, 'reply_intent_key');
+    }
+
+    /**
+     * @param Collection<int, FlowRoutePoint> $points
+     * @return array<int, string>
+     */
+    private function replyChannels(Collection $points): array
+    {
+        return $this->branchConditionValues($points, 'channel');
+    }
+
+    /**
+     * @param Collection<int, FlowRoutePoint> $points
+     * @return array<int, string>
+     */
+    private function branchConditionValues(Collection $points, string $pathSuffix): array
+    {
         return $points
-            ->flatMap(function (FlowRoutePoint $point): array {
+            ->flatMap(function (FlowRoutePoint $point) use ($pathSuffix): array {
                 $definition = $this->definition($point);
                 $branches = is_array($definition['branches'] ?? null)
                     ? array_values(array_filter($definition['branches'], 'is_array'))
@@ -795,12 +846,12 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
                     ->flatMap(fn (array $branch): array => is_array($branch['conditions'] ?? null)
                         ? array_values(array_filter($branch['conditions'], 'is_array'))
                         : [])
-                    ->filter(function (array $condition): bool {
+                    ->filter(function (array $condition) use ($pathSuffix): bool {
                         $path = $this->string($condition['path'] ?? null);
                         $operator = $this->string($condition['operator'] ?? null) ?? 'equals';
 
                         return $path !== null
-                            && str_ends_with($path, 'reply_profile_key')
+                            && str_ends_with($path, $pathSuffix)
                             && in_array($operator, ['equals', 'equal', 'in'], true);
                     })
                     ->flatMap(function (array $condition): array {

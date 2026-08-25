@@ -1,0 +1,172 @@
+<?php
+
+namespace Tests\Feature\Core;
+
+use Tests\TestCase;
+
+class ProcessHighwayUsabilitySurfaceTest extends TestCase
+{
+    public function test_surface_requires_an_audience_and_progressively_discloses_one_business_process(): void
+    {
+        $view = $this->view('crm.process-highway.index', [
+            'title' => 'Process Highway',
+            'heading' => 'Process Highway',
+            'subheading' => 'Fixture subheading.',
+            'highway' => $this->highway(),
+        ]);
+
+        $view
+            ->assertSee('data-process-highway', false)
+            ->assertSee('data-process-highway-audience', false)
+            ->assertSee('data-process-highway-contact-mode', false)
+            ->assertSee('data-process-highway-relationship-type', false)
+            ->assertSee('data-process-highway-primary-filters', false)
+            ->assertSee('data-process-highway-awaiting-filter', false)
+            ->assertSee('data-process-highway-results', false)
+            ->assertSee('data-process-highway-exact-results', false)
+            ->assertSee('data-process-highway-no-exact-match', false)
+            ->assertSee('data-process-highway-partial-results', false)
+            ->assertSee('data-process-highway-result', false)
+            ->assertSee('data-process-highway-match="exact"', false)
+            ->assertSee('data-process-highway-match="partial"', false)
+            ->assertSee('data-process-highway-toggle="contacts:standard:highway:fixture"', false)
+            ->assertSee('data-process-highway-details="contacts:standard:highway:fixture"', false)
+            ->assertSee('data-process-highway-entry-expression="contacts:standard:highway:fixture"', false)
+            ->assertSee('data-process-highway-entry-requirement="status"', false)
+            ->assertSee('data-entry-ramp-inspector="workflow:status:past_contact"', false)
+            ->assertSee('data-process-highway-segment-group="programs"', false)
+            ->assertSee('data-process-highway-mechanism="campaigns"', false)
+            ->assertSee('data-process-highway-outcome="workflow:status:engaged"', false)
+            ->assertDontSee('data-process-highway-mechanism="workflow"', false);
+    }
+
+    /** @return array<string, mixed> */
+    private function highway(): array
+    {
+        $authority = [
+            'owner_key' => 'campaigns',
+            'owner_label' => 'Campaigns',
+            'tone' => 'rose',
+            'editable' => true,
+            'edit_targets' => [],
+        ];
+        $navigationTarget = [
+            'mode' => 'link',
+            'owner_key' => 'campaigns',
+            'owner_label' => 'Campaigns',
+            'label' => 'Edit Campaign',
+            'url' => '/campaigns/1/edit',
+            'method' => 'GET',
+            'capability' => null,
+            'resource' => ['type' => 'campaign', 'key' => 'past_client', 'id' => 1],
+            'container' => null,
+        ];
+        $entryNode = [
+            'key' => 'workflow:status:past_contact',
+            'label' => 'Status: Past Client',
+            'navigation_target' => [
+                ...$navigationTarget,
+                'owner_key' => 'workflow',
+                'owner_label' => 'Workflow',
+                'label' => 'Open Contacts',
+                'url' => '/contacts',
+            ],
+            'inspector' => [
+                'node_key' => 'workflow:status:past_contact',
+                'criterion_key' => 'status',
+                'criterion_label' => 'Status',
+                'value' => 'past_contact',
+                'value_label' => 'Past Client',
+                'contact_count' => 4,
+                'application_sources' => [],
+            ],
+        ];
+        $outcomeNode = [
+            'key' => 'workflow:status:engaged',
+            'label' => 'Status: Engaged',
+            'navigation_target' => [
+                ...$navigationTarget,
+                'owner_key' => 'workflow',
+                'owner_label' => 'Workflow',
+                'label' => 'Open Contacts',
+                'url' => '/contacts',
+            ],
+        ];
+
+        return [
+            'highway_count' => 1,
+            'subjects' => [[
+                'key' => 'contacts',
+                'label' => 'Contacts',
+                'lanes' => [[
+                    'key' => 'contacts:standard',
+                    'label' => 'Standard contacts',
+                    'subject_key' => 'contacts',
+                    'scope' => 'standard',
+                    'relationship_key' => null,
+                    'relationship_label' => null,
+                    'sort_order' => 10,
+                    'segment_keys' => ['campaigns:campaign:past_client'],
+                ]],
+            ]],
+            'qualifier_filters' => [[
+                'key' => 'status',
+                'label' => 'Status',
+                'priority' => 10,
+                'options' => [[
+                    'value' => 'past_contact',
+                    'label' => 'Past Client',
+                    'highway_keys' => ['contacts:standard:highway:fixture'],
+                ]],
+            ]],
+            'highways' => [[
+                'key' => 'contacts:standard:highway:fixture',
+                'name' => 'Past Client Nurture',
+                'subject_key' => 'contacts',
+                'subject_label' => 'Contacts',
+                'lane_key' => 'contacts:standard',
+                'lane_label' => 'Standard contacts',
+                'lane_scope' => 'standard',
+                'relationship_key' => null,
+                'state' => 'active',
+                'state_label' => 'Active',
+                'segment_count' => 1,
+                'qualifiers' => ['status' => ['past_contact']],
+                'entry_requirements' => [[
+                    'criterion_key' => 'status',
+                    'criterion_label' => 'Status',
+                    'operator' => 'any',
+                    'values' => [[
+                        'value' => 'past_contact',
+                        'label' => 'Past Client',
+                        'node_key' => 'workflow:status:past_contact',
+                    ]],
+                ]],
+                'search_text' => 'past client nurture engaged',
+                'entry_nodes' => [$entryNode],
+                'segments' => [[
+                    'key' => 'campaigns:campaign:past_client',
+                    'source_key' => 'campaigns',
+                    'name' => 'Past Client Nurture',
+                    'description' => 'Keeps in touch with past clients.',
+                    'state' => 'active',
+                    'state_label' => 'Active',
+                    'attributes' => [
+                        'mechanism_role' => 'eligibility_program',
+                    ],
+                    'authority' => $authority,
+                    'navigation_target' => $navigationTarget,
+                    'journey_nodes' => [],
+                    'mechanism_outcomes' => [[
+                        'edge' => [
+                            'key' => 'campaigns:campaign:past_client:edge:engaged',
+                            'label' => 'Positive reply can mark',
+                        ],
+                        'node' => $outcomeNode,
+                    ]],
+                    'additional_outcome_groups' => [],
+                ]],
+            ]],
+        ];
+    }
+}

@@ -68,7 +68,7 @@ class CampaignProcessHighwayContributorTest extends TestCase
             Campaign::INELIGIBLE_CANCEL,
             $segment['attributes']['ineligible_behavior'],
         );
-        $this->assertEquals([
+        $this->assertEqualsCanonicalizing([
             'status' => ['past_contact'],
             'tag' => ['VIP'],
         ], $segment['attributes']['eligibility_filter']);
@@ -130,10 +130,15 @@ class CampaignProcessHighwayContributorTest extends TestCase
         $this->assertSame(1, $graph['highway_count']);
         $businessHighway = $graph['highways'][0];
         $this->assertSame('contacts:standard', $businessHighway['lane_key']);
-        $this->assertEquals([
+        $this->assertEqualsCanonicalizing([
             'status' => ['past_contact'],
             'tag' => ['VIP'],
         ], $businessHighway['qualifiers']);
+        $this->assertSame('all', $businessHighway['entry_operator']);
+        $this->assertEqualsCanonicalizing(
+            ['status', 'tag'],
+            collect($businessHighway['entry_requirements'])->pluck('criterion_key')->all(),
+        );
         $this->assertCount(2, $businessHighway['entry_nodes']);
         $this->assertTrue(collect($businessHighway['entry_nodes'])->every(
             fn (array $node): bool => is_array($node['navigation_target']),
@@ -153,11 +158,20 @@ class CampaignProcessHighwayContributorTest extends TestCase
                 && $edge['from_node_key'] === $processKey.':consequence:eligible-again'
                 && $edge['to_node_key'] === $eligibilityGatewayKey,
         ));
+        $this->assertSame(
+            'hidden',
+            $nodes[$processKey.':consequence:eligible-again']['attributes']['highway_visibility'],
+        );
+        $this->assertTrue($edges->contains(
+            fn (array $edge): bool => $edge['from_node_key'] === $processKey.':consequence:eligible-again'
+                && ($edge['attributes']['highway_visibility'] ?? null) === 'hidden',
+        ));
+        $this->assertSame([], $businessHighway['segments'][0]['additional_outcome_groups']);
 
         $campaign->refresh();
 
         $this->assertSame(Campaign::STATUS_ACTIVE, $campaign->status);
-        $this->assertEquals([
+        $this->assertEqualsCanonicalizing([
             'status' => ['past_contact'],
             'tag' => ['VIP'],
         ], $campaign->eligibility_filter);
@@ -191,11 +205,11 @@ class CampaignProcessHighwayContributorTest extends TestCase
             Campaign::ENROLLMENT_MODE_MANUAL,
             $segment['attributes']['enrollment_mode'],
         );
-        $this->assertEquals(
+        $this->assertEqualsCanonicalizing(
             ['tag' => ['VIP']],
             $segment['attributes']['eligibility_filter'],
         );
-        $this->assertEquals(
+        $this->assertSame(
             [$processKey.':entry:manual'],
             $segment['entry_node_keys'],
         );

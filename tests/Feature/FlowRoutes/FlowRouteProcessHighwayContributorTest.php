@@ -45,6 +45,7 @@ class FlowRouteProcessHighwayContributorTest extends TestCase
             'meta' => json_encode([
                 'definition' => [
                     'category' => 'consumer_reply',
+                    'default_role' => 'reply_routing',
                 ],
             ]),
             'created_at' => now(),
@@ -129,6 +130,15 @@ class FlowRouteProcessHighwayContributorTest extends TestCase
             route('crm.flow-routes.show', $routeId),
             $businessHighway['segments'][0]['navigation_target']['url'],
         );
+        $this->assertSame(
+            ['high_intent'],
+            $businessHighway['segments'][0]['attributes']['reply_intent_keys'],
+        );
+        $this->assertSame(
+            'reply_routing',
+            $businessHighway['segments'][0]['attributes']['role'],
+        );
+        $this->assertSame([], $businessHighway['segments'][0]['additional_outcome_groups']);
 
         $this->assertSame(
             'inbound_messaging',
@@ -167,6 +177,7 @@ class FlowRouteProcessHighwayContributorTest extends TestCase
         $this->assertSame('Reply intent is High Intent', $matched['label']);
         $this->assertNotNull($noMatch);
         $this->assertSame('exits', $noMatch['role']);
+        $this->assertSame('hidden', $noMatch['attributes']['highway_visibility']);
         $this->assertNotNull($statusConsequence);
         $this->assertSame('consequence', $statusConsequence['role']);
         $this->assertSame('Changes status to', $statusConsequence['label']);

@@ -121,6 +121,11 @@ class ProcessHighwayBusinessProcessAcceptanceTest extends TestCase
             'status' => ['prospect_nurture'],
             'tag' => ['Old Lead'],
         ], $coldHighway['qualifiers']);
+        $this->assertSame('all', $coldHighway['entry_operator']);
+        $this->assertEqualsCanonicalizing(
+            ['status', 'tag'],
+            collect($coldHighway['entry_requirements'])->pluck('criterion_key')->all(),
+        );
         $this->assertFalse(in_array($coldReplyKey, $coldHighway['entry_node_keys'], true));
         $this->assertSame(
             'eligibility_program',
@@ -184,7 +189,7 @@ class ProcessHighwayBusinessProcessAcceptanceTest extends TestCase
                 ->firstWhere('source_key', 'flow_routes')['navigation_target']['url'],
         );
 
-        $webinarHighway = $highways->first(
+        $attendedHighway = $highways->first(
             fn (array $highway): bool => in_array(
                 ProcessHighwaySemanticKey::campaign((string) $attendedCampaign->key),
                 $highway['segment_keys'],
@@ -192,24 +197,45 @@ class ProcessHighwayBusinessProcessAcceptanceTest extends TestCase
             ),
         );
 
-        $this->assertNotNull($webinarHighway);
-        $this->assertTrue(in_array(
+        $missedHighway = $highways->first(
+            fn (array $highway): bool => in_array(
+                ProcessHighwaySemanticKey::campaign((string) $missedCampaign->key),
+                $highway['segment_keys'],
+                true,
+            ),
+        );
+
+        $this->assertNotNull($attendedHighway);
+        $this->assertNotNull($missedHighway);
+        $this->assertFalse(in_array(
             ProcessHighwaySemanticKey::campaign((string) $missedCampaign->key),
-            $webinarHighway['segment_keys'],
+            $attendedHighway['segment_keys'],
+            true,
+        ));
+        $this->assertFalse(in_array(
+            ProcessHighwaySemanticKey::campaign((string) $attendedCampaign->key),
+            $missedHighway['segment_keys'],
             true,
         ));
         $this->assertTrue(in_array(
             ProcessHighwaySemanticKey::flowRoute('webinar_high_intent_reply_routing'),
-            $webinarHighway['segment_keys'],
+            $attendedHighway['segment_keys'],
             true,
         ));
-        $this->assertEqualsCanonicalizing([
+        $this->assertTrue(in_array(
+            ProcessHighwaySemanticKey::flowRoute('webinar_high_intent_reply_routing'),
+            $missedHighway['segment_keys'],
+            true,
+        ));
+        $this->assertSame([
             ProcessHighwaySemanticKey::webinarOutcome('va-homebuyer-game-plan', 'attended'),
+        ], $attendedHighway['entry_node_keys']);
+        $this->assertSame([
             ProcessHighwaySemanticKey::webinarOutcome('va-homebuyer-game-plan', 'missed'),
-        ], $webinarHighway['entry_node_keys']);
+        ], $missedHighway['entry_node_keys']);
         $this->assertSame(
             route('crm.flow-routes.show', $webinarRouteId),
-            collect($webinarHighway['segments'])
+            collect($attendedHighway['segments'])
                 ->firstWhere('source_key', 'flow_routes')['navigation_target']['url'],
         );
 

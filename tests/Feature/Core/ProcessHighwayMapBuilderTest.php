@@ -129,6 +129,10 @@ class ProcessHighwayMapBuilderTest extends TestCase
             $standardRoute['key'],
         ], $connected['segment_keys']);
         $this->assertSame(['status' => ['engaged']], $connected['qualifiers']);
+        $this->assertSame('all', $connected['entry_operator']);
+        $this->assertSame('status', $connected['entry_requirements'][0]['criterion_key']);
+        $this->assertSame('any', $connected['entry_requirements'][0]['operator']);
+        $this->assertSame('engaged', $connected['entry_requirements'][0]['values'][0]['value']);
         $this->assertSame('Engaged', $connected['name']);
 
         $relationshipHighway = collect($map['highways'])->firstWhere(
@@ -203,6 +207,74 @@ class ProcessHighwayMapBuilderTest extends TestCase
         $this->assertSame('/campaigns/past-client/edit', $entry['navigation_target']['url']);
         $this->assertSame('inline', $entry['authority']['edit_targets'][0]['mode']);
         $this->assertSame('PATCH', $entry['authority']['edit_targets'][0]['method']);
+    }
+
+    public function test_reply_acknowledgements_attach_to_the_matching_business_branch(): void
+    {
+        $statusKey = 'workflow:status:past_contact';
+        $routing = $this->segment(
+            key: 'flow_routes:route:past_client_reply',
+            sourceKey: 'flow_routes',
+            laneKey: 'contacts:standard',
+            nodeKeys: [$statusKey, 'flow_routes:route:past_client_reply', 'flow_routes:route:past_client_reply:exit'],
+            entryNodeKeys: [$statusKey],
+            exitNodeKeys: ['flow_routes:route:past_client_reply:exit'],
+        );
+        $routing['attributes'] = [
+            'role' => 'reply_routing',
+            'reply_profile_keys' => ['past_client_nurture'],
+            'reply_intent_keys' => ['high_intent'],
+            'reply_channels' => [],
+        ];
+        $acknowledgement = $this->segment(
+            key: 'flow_routes:route:past_client_email_ack',
+            sourceKey: 'flow_routes',
+            laneKey: 'contacts:standard',
+            nodeKeys: [$statusKey, 'flow_routes:route:past_client_email_ack', 'flow_routes:route:past_client_email_ack:exit'],
+            entryNodeKeys: [$statusKey],
+            exitNodeKeys: ['flow_routes:route:past_client_email_ack:exit'],
+        );
+        $acknowledgement['attributes'] = [
+            'role' => 'reply_messaging',
+            'reply_profile_keys' => ['past_client_nurture'],
+            'reply_intent_keys' => ['high_intent'],
+            'reply_channels' => ['email'],
+        ];
+        $subjects = [[
+            'key' => 'contacts',
+            'label' => 'Contacts',
+            'lanes' => [[
+                'key' => 'contacts:standard',
+                'label' => 'Standard contacts',
+                'subject_key' => 'contacts',
+                'scope' => 'standard',
+                'relationship_key' => null,
+                'relationship_label' => null,
+                'sort_order' => 10,
+                'segment_keys' => [$routing['key'], $acknowledgement['key']],
+            ]],
+        ]];
+
+        $map = app(ProcessHighwayMapBuilder::class)->build(
+            segments: [$routing, $acknowledgement],
+            nodes: [
+                $this->node($statusKey, 'Status: Past Client', [$routing['key'], $acknowledgement['key']], 'status', 'past_contact'),
+                ...$this->mechanismAndExitNodes($routing),
+                ...$this->mechanismAndExitNodes($acknowledgement),
+            ],
+            edges: [
+                ...$this->segmentEdges($routing),
+                ...$this->segmentEdges($acknowledgement),
+            ],
+            subjects: $subjects,
+        );
+
+        $routingSegment = collect($map['highways'][0]['segments'])->firstWhere('key', $routing['key']);
+
+        $this->assertNotNull($routingSegment);
+        $this->assertSame(1, count($routingSegment['supporting_acknowledgements']));
+        $this->assertSame($acknowledgement['key'], $routingSegment['supporting_acknowledgements'][0]['key']);
+        $this->assertSame(['email'], $routingSegment['supporting_acknowledgements'][0]['channels']);
     }
 
     /**

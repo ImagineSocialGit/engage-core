@@ -392,6 +392,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
                     sortOrder: 275,
                     attributes: [
                         'reentry_policy' => Campaign::REENTRY_WHEN_ELIGIBLE_AGAIN,
+                        'highway_visibility' => 'hidden',
                     ],
                 );
                 $exitNodeKeys[] = $reentryKey;
@@ -403,6 +404,10 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
                     authority: $inlineAuthority,
                     label: 'Becomes eligible again',
                     sortOrder: $edgeOrder++,
+                    attributes: [
+                        'highway_visibility' => 'hidden',
+                        'reentry_policy' => Campaign::REENTRY_WHEN_ELIGIBLE_AGAIN,
+                    ],
                 );
                 $edges[] = new ProcessHighwayEdge(
                     key: $processKey.':edge:reenter',
@@ -412,6 +417,10 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
                     authority: $inlineAuthority,
                     label: 'Start a new eligible cycle',
                     sortOrder: $edgeOrder++,
+                    attributes: [
+                        'highway_visibility' => 'hidden',
+                        'reentry_policy' => Campaign::REENTRY_WHEN_ELIGIBLE_AGAIN,
+                    ],
                 );
             }
         }
@@ -610,9 +619,9 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
     private function ineligibleLabel(Campaign $campaign): string
     {
         return match ($campaign->ineligible_behavior) {
-            Campaign::INELIGIBLE_PAUSE => 'Pause if eligibility ends',
-            Campaign::INELIGIBLE_CANCEL => 'Stop if eligibility ends',
-            default => 'Keep running if eligibility ends',
+            Campaign::INELIGIBLE_PAUSE => 'Campaign pauses',
+            Campaign::INELIGIBLE_CANCEL => 'Campaign stops',
+            default => 'Campaign keeps running',
         };
     }
 

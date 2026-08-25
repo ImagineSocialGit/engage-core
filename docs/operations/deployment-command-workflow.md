@@ -52,6 +52,24 @@ php artisan engage:user:password [email]
 
 Do not use runtime module enablement, provider loading, or directory existence as a substitute for module installation state.
 
+## Module-specific post-install command registry
+
+This registry contains only enabled-module setup commands that are not already owned by `engage:install` or `presets:sync`. Run an entry only when its stated capability is configured for the environment. Future required module-owned setup commands must be added here and linked from the owning module/operations documentation.
+
+### Forms — external-intake credential issuance
+
+Condition: Forms is enabled for a server-to-server external intake client and the current environment does not already have its valid client ID/signing-secret pair.
+
+```bash
+php artisan forms:external-intake:issue-secret [client]
+```
+
+The optional client argument may be omitted when exactly one external intake client is configured. The command prints matching Engage Core and external-caller environment blocks without mutating either environment. Issue separate staging and production credentials, install each block in its matching environment, run `php artisan optimize:clear` in both applications, and rerun `php artisan setup:validate` in Core.
+
+This command is safe to run when the current configured secret is blank or invalid. It may therefore follow an `engage:install` run whose final setup-validation stage reported the incomplete Forms external-client configuration.
+
+No other current module requires a mandatory module-specific post-install Artisan command beyond `engage:install` and `presets:sync`.
+
 ## New client or new environment
 
 After the intended client configuration, environment variables, dependencies, and assets are in place:
@@ -60,6 +78,10 @@ After the intended client configuration, environment variables, dependencies, an
 cd [APP_PATH]
 php artisan optimize:clear
 php artisan engage:install --force
+
+# Run every applicable entry from the module-specific post-install registry.
+# If an entry changes environment values, clear cached configuration again.
+
 php artisan modules:status
 php artisan setup:validate
 ```

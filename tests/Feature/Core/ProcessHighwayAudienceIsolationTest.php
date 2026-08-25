@@ -124,6 +124,81 @@ class ProcessHighwayAudienceIsolationTest extends TestCase
         $this->assertSame(['status' => ['past_contact']], $map['highways'][0]['qualifiers']);
     }
 
+    public function test_shared_downstream_route_can_appear_in_two_highways_without_merging_their_entrances(): void
+    {
+        $attendedCampaignKey = 'campaigns:campaign:webinar_attended';
+        $missedCampaignKey = 'campaigns:campaign:webinar_missed';
+        $routeKey = 'flow_routes:route:webinar_reply';
+        $attendedEntryKey = 'webinars:outcome:attended';
+        $missedEntryKey = 'webinars:outcome:missed';
+        $replyProfileKey = 'inbound_messaging:reply_profile:webinar_homebuyer';
+        $completedKey = $routeKey.':completed';
+        $attendedCampaign = $this->segment($attendedCampaignKey, $attendedEntryKey, $replyProfileKey);
+        $missedCampaign = $this->segment($missedCampaignKey, $missedEntryKey, $replyProfileKey);
+        $route = $this->segment($routeKey, $replyProfileKey, $completedKey, 'flow_routes');
+
+        $attendedCampaign['edge_keys'] = [
+            $attendedCampaignKey.':edge:start',
+            $attendedCampaignKey.':edge:handoff',
+        ];
+        $missedCampaign['edge_keys'] = [
+            $missedCampaignKey.':edge:start',
+            $missedCampaignKey.':edge:handoff',
+        ];
+
+        $nodes = [
+            $this->criterionNode($attendedEntryKey, 'Webinar outcome: Attended', 'webinar_outcome', 'attended', [$attendedCampaignKey]),
+            $this->criterionNode($missedEntryKey, 'Webinar outcome: Missed', 'webinar_outcome', 'missed', [$missedCampaignKey]),
+            [
+                ...$this->baseNode($replyProfileKey, 'Reply to Webinar messages', 'inbound_messaging', [
+                    $attendedCampaignKey,
+                    $missedCampaignKey,
+                    $routeKey,
+                ]),
+                'role' => 'trigger',
+                'reference_only' => true,
+            ],
+            $this->mechanismNode($attendedCampaignKey),
+            $this->mechanismNode($missedCampaignKey),
+            $this->mechanismNode($routeKey, 'flow_routes'),
+            [
+                ...$this->baseNode($completedKey, 'Completed', 'flow_routes', [$routeKey]),
+                'role' => 'exit',
+            ],
+        ];
+        $edges = [
+            $this->edge($attendedCampaignKey.':edge:start', $attendedEntryKey, $attendedCampaignKey, 'starts', $attendedCampaignKey),
+            $this->edge($attendedCampaignKey.':edge:handoff', $attendedCampaignKey, $replyProfileKey, 'branch', $attendedCampaignKey),
+            $this->edge($missedCampaignKey.':edge:start', $missedEntryKey, $missedCampaignKey, 'starts', $missedCampaignKey),
+            $this->edge($missedCampaignKey.':edge:handoff', $missedCampaignKey, $replyProfileKey, 'branch', $missedCampaignKey),
+            ...$this->edges($route),
+        ];
+
+        $map = app(ProcessHighwayMapBuilder::class)->build(
+            segments: [$attendedCampaign, $missedCampaign, $route],
+            nodes: $nodes,
+            edges: $edges,
+            subjects: $this->subjects([$attendedCampaignKey, $missedCampaignKey, $routeKey]),
+        );
+
+        $this->assertSame(2, $map['highway_count']);
+        $attendedHighway = collect($map['highways'])->first(
+            fn (array $highway): bool => in_array($attendedCampaignKey, $highway['root_segment_keys'], true),
+        );
+        $missedHighway = collect($map['highways'])->first(
+            fn (array $highway): bool => in_array($missedCampaignKey, $highway['root_segment_keys'], true),
+        );
+
+        $this->assertNotNull($attendedHighway);
+        $this->assertNotNull($missedHighway);
+        $this->assertEqualsCanonicalizing([$attendedCampaignKey, $routeKey], $attendedHighway['segment_keys']);
+        $this->assertEqualsCanonicalizing([$missedCampaignKey, $routeKey], $missedHighway['segment_keys']);
+        $this->assertSame([$attendedEntryKey], $attendedHighway['entry_node_keys']);
+        $this->assertSame([$missedEntryKey], $missedHighway['entry_node_keys']);
+        $this->assertSame('attended', $attendedHighway['entry_requirements'][0]['values'][0]['value']);
+        $this->assertSame('missed', $missedHighway['entry_requirements'][0]['values'][0]['value']);
+    }
+
     /** @return array<string, mixed> */
     private function segment(
         string $key,
@@ -200,12 +275,23 @@ class ProcessHighwayAudienceIsolationTest extends TestCase
     /** @return array<string, mixed> */
     private function factNode(string $key, string $label, string $value, array $segmentKeys): array
     {
+        return $this->criterionNode($key, $label, 'status', $value, $segmentKeys);
+    }
+
+    /** @return array<string, mixed> */
+    private function criterionNode(
+        string $key,
+        string $label,
+        string $criterionKey,
+        string $value,
+        array $segmentKeys,
+    ): array {
         return [
             ...$this->baseNode($key, $label, 'workflow', $segmentKeys),
             'role' => 'qualifier',
             'reference_only' => true,
             'attributes' => [
-                'criterion_key' => 'status',
+                'criterion_key' => $criterionKey,
                 'value' => $value,
                 'value_label' => str($label)->after(': ')->toString(),
             ],

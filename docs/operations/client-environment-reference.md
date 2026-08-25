@@ -148,14 +148,23 @@ webhooks.[ROOT_DOMAIN]
 
 `WEBHOOKS_APP_URL` is not part of the active application environment contract.
 
-Typical production topology:
+Typical deployment roles:
 
 ```text
 [ROOT_DOMAIN]
-crm.[ROOT_DOMAIN]
+    standard site domain; it may be served by a separate Engage site application
+
+<CORE_ADMIN_SUBDOMAIN>.[ROOT_DOMAIN]
+    human-facing Engage Core administration; commonly crm or app
+
 webinar.[ROOT_DOMAIN]
+    public Engage Core Webinar host when Webinars is enabled
+
 webhooks.[ROOT_DOMAIN]
+    public Engage Core webhook and signed server-to-server integration host
 ```
+
+The Engage Core admin subdomain is deployment-owned. `CRM_APP_URL` remains the canonical environment key even when the selected hostname uses `app` rather than `crm`. Only Core-owned hostnames should route to the Engage Core `public/` directory; the standard site domain must route to its owning application.
 
 ## External Forms server-to-server access
 
