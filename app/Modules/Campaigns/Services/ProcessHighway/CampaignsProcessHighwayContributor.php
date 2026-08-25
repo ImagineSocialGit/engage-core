@@ -306,7 +306,11 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
             $replyNodeKey = ProcessHighwaySemanticKey::replyProfile($replyProfileKey);
             $replyAuthority = new ProcessHighwayAuthority(
                 ownerKey: 'inbound_messaging',
-                editTargets: [$messagesLinkTarget, $linkTarget],
+                editTargets: [
+                    $this->replyProfileTarget($replyProfileKey),
+                    $messagesLinkTarget,
+                    $linkTarget,
+                ],
             );
 
             $nodes[] = new ProcessHighwayNode(
@@ -732,6 +736,19 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
             resourceType: 'campaign',
             resourceKey: (string) $campaign->key,
             resourceId: (int) $campaign->getKey(),
+        );
+    }
+
+    private function replyProfileTarget(string $replyProfileKey): ProcessHighwayEditTarget
+    {
+        return ProcessHighwayEditTarget::link(
+            ownerKey: 'inbound_messaging',
+            label: 'Edit Reply Handling',
+            url: route('crm.inbound-messaging.reply-profiles.index', [
+                'profile' => $replyProfileKey,
+            ]),
+            resourceType: 'reply_profile',
+            resourceKey: $replyProfileKey,
         );
     }
 

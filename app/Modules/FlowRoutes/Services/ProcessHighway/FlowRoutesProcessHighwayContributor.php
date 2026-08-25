@@ -321,7 +321,10 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
                         role: ProcessHighwayNode::ROLE_TRIGGER,
                         authority: new ProcessHighwayAuthority(
                             ownerKey: 'inbound_messaging',
-                            editTargets: [$routeTarget],
+                            editTargets: [
+                                $this->replyProfileTarget($replyProfileKey),
+                                $routeTarget,
+                            ],
                         ),
                         detail: $summary !== '' ? $summary : null,
                         sortOrder: 10,
@@ -935,6 +938,19 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
             resourceType: 'flow_route',
             resourceKey: (string) $route->key,
             resourceId: (int) $route->getKey(),
+        );
+    }
+
+    private function replyProfileTarget(string $replyProfileKey): ProcessHighwayEditTarget
+    {
+        return ProcessHighwayEditTarget::link(
+            ownerKey: 'inbound_messaging',
+            label: 'Edit Reply Handling',
+            url: route('crm.inbound-messaging.reply-profiles.index', [
+                'profile' => $replyProfileKey,
+            ]),
+            resourceType: 'reply_profile',
+            resourceKey: $replyProfileKey,
         );
     }
 

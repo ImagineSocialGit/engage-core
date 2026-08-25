@@ -2,23 +2,89 @@
 
 namespace App\Modules\InboundMessaging\Services\Reply;
 
+use App\Modules\InboundMessaging\Models\InboundReplyProfile;
+use App\Modules\InboundMessaging\Models\InboundReplyRule;
+use Illuminate\Support\Facades\Schema;
+
 class InboundReplyIntentClassifier
 {
     public function classify(?string $replyProfileKey, string $normalizedText): ?string
     {
-        if (! is_string($replyProfileKey) || trim($replyProfileKey) === '' || $normalizedText === '') {
+        if (! is_string($replyProfileKey)
+            || trim($replyProfileKey) === ''
+            || $normalizedText === ''
+        ) {
             return null;
         }
 
-        $profile = config('messaging.reply_profiles.'.trim($replyProfileKey));
+        $replyProfileKey = trim($replyProfileKey);
+
+        if (Schema::hasTable('inbound_reply_profiles')) {
+            $profile = InboundReplyProfile::withTrashed()
+                ->with('activeIntents.activeRules')
+                ->where('key', $replyProfileKey)
+                ->first();
+
+            if ($profile instanceof InboundReplyProfile) {
+                if ($profile->trashed() || ! $profile->is_active) {
+                    return null;
+                }
+
+                return $this->classifyDatabaseProfile($profile, $normalizedText);
+            }
+        }
+
+        return $this->classifyConfiguredProfile($replyProfileKey, $normalizedText);
+    }
+
+    private function classifyDatabaseProfile(
+        InboundReplyProfile $profile,
+        string $normalizedText,
+    ): ?string {
+        $exactText = $this->exactText($normalizedText);
+
+        foreach ($profile->activeIntents as $intent) {
+            foreach ($intent->activeRules->where('match_type', InboundReplyRule::MATCH_EXACT) as $rule) {
+                if ($rule->normalized_value === $exactText && $exactText !== '') {
+                    return (string) $intent->key;
+                }
+            }
+        }
+
+        foreach ($profile->activeIntents as $intent) {
+            foreach ($intent->activeRules->where('match_type', InboundReplyRule::MATCH_KEYWORD) as $rule) {
+                if ($this->matches($normalizedText, $rule->value)) {
+                    return (string) $intent->key;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function classifyConfiguredProfile(
+        string $replyProfileKey,
+        string $normalizedText,
+    ): ?string {
+        $profiles = config('inbound_messaging.reply_profiles');
+
+        if (! is_array($profiles) || ! array_key_exists($replyProfileKey, $profiles)) {
+            $profiles = config('messaging.reply_profiles', []);
+        }
+
+        $profile = is_array($profiles)
+            ? ($profiles[$replyProfileKey] ?? null)
+            : null;
         $intents = is_array($profile) && is_array($profile['intents'] ?? null)
             ? $profile['intents']
             : [];
-
         $exactText = $this->exactText($normalizedText);
 
         foreach ($intents as $intentKey => $definition) {
-            if (! is_string($intentKey) || ! is_array($definition)) {
+            if (! is_string($intentKey)
+                || ! is_array($definition)
+                || ! (bool) ($definition['is_active'] ?? $definition['enabled'] ?? true)
+            ) {
                 continue;
             }
 
@@ -34,7 +100,10 @@ class InboundReplyIntentClassifier
         }
 
         foreach ($intents as $intentKey => $definition) {
-            if (! is_string($intentKey) || ! is_array($definition)) {
+            if (! is_string($intentKey)
+                || ! is_array($definition)
+                || ! (bool) ($definition['is_active'] ?? $definition['enabled'] ?? true)
+            ) {
                 continue;
             }
 

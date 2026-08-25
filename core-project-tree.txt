@@ -460,8 +460,10 @@
 │   │   │   │   ├── FlowRouteProgressMetaCanonicalizer.php
 │   │   │   │   ├── FlowRouteTriggerBindingResolver.php
 │   │   │   │   ├── PointHandlerRegistry.php
-│   │   │   │   └── ProcessHighway
-│   │   │   │       └── FlowRoutesProcessHighwayContributor.php
+│   │   │   │   ├── ProcessHighway
+│   │   │   │   │   └── FlowRoutesProcessHighwayContributor.php
+│   │   │   │   └── ReplyProfiles
+│   │   │   │       └── FlowRouteReplyProfileDependencyContributor.php
 │   │   │   ├── Support
 │   │   │   └── Validation
 │   │   │       └── FlowRoutesSetupValidationContributor.php
@@ -530,6 +532,11 @@
 │   │   │   │   │   └── RecordInboundEmailAction.php
 │   │   │   │   ├── ProcessInboundMessageAction.php
 │   │   │   │   ├── RecordInboundMessageAction.php
+│   │   │   │   ├── ReplyProfiles
+│   │   │   │   │   ├── DeleteInboundReplyProfileAction.php
+│   │   │   │   │   ├── SaveInboundReplyProfileAction.php
+│   │   │   │   │   ├── SetInboundReplyProfileStateAction.php
+│   │   │   │   │   └── SyncInboundReplyProfilesAction.php
 │   │   │   │   ├── SendContactConversationReplyAction.php
 │   │   │   │   └── Sms
 │   │   │   │       ├── HandleInboundSmsWebhookAction.php
@@ -538,6 +545,9 @@
 │   │   │   │       │   ├── RespondToSmsHelpInboundMessageAction.php
 │   │   │   │       │   └── RevokeSmsConsentFromInboundMessageAction.php
 │   │   │   │       └── ProcessInboundSmsMessageAction.php
+│   │   │   ├── Console
+│   │   │   │   └── Commands
+│   │   │   │       └── SyncInboundReplyProfilesCommand.php
 │   │   │   ├── Contracts
 │   │   │   │   ├── Email
 │   │   │   │   │   └── EmailWebhookHandler.php
@@ -546,7 +556,8 @@
 │   │   │   │       └── SmsWebhookHandler.php
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
-│   │   │   │   │   └── ContactConversationReplyController.php
+│   │   │   │   │   ├── ContactConversationReplyController.php
+│   │   │   │   │   └── InboundReplyProfileController.php
 │   │   │   │   └── Webhooks
 │   │   │   │       ├── EmailWebhookController.php
 │   │   │   │       └── SmsWebhookController.php
@@ -555,10 +566,14 @@
 │   │   │   │   └── InboundMessageReceived.php
 │   │   │   ├── Models
 │   │   │   │   ├── InboundMessage.php
-│   │   │   │   └── InboundMessageReceipt.php
+│   │   │   │   ├── InboundMessageReceipt.php
+│   │   │   │   ├── InboundReplyIntent.php
+│   │   │   │   ├── InboundReplyProfile.php
+│   │   │   │   └── InboundReplyRule.php
 │   │   │   ├── Providers
 │   │   │   │   └── InboundMessagingModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   │   ├── SaveInboundReplyProfileRequest.php
 │   │   │   │   └── StoreContactConversationReplyRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── ContactShow
@@ -575,13 +590,18 @@
 │   │   │   │   │   ├── InboundReplyIntentClassifier.php
 │   │   │   │   │   ├── InboundReplyTextNormalizer.php
 │   │   │   │   │   └── InboundSmsReplyCorrelator.php
+│   │   │   │   ├── ReplyProfiles
+│   │   │   │   │   ├── ReplyProfileDefinitionNormalizer.php
+│   │   │   │   │   └── ReplyProfileWorkspace.php
 │   │   │   │   └── Sms
 │   │   │   │       ├── InboundSmsMessageClassifier.php
 │   │   │   │       ├── InboundSmsPurposeResolver.php
 │   │   │   │       ├── InboundSmsSenderResolver.php
 │   │   │   │       ├── SmsWebhookHandlerResolver.php
 │   │   │   │       └── SmsWebhookPayload.php
-│   │   │   └── Support
+│   │   │   ├── Support
+│   │   │   └── Validation
+│   │   │       └── InboundMessagingSetupValidationContributor.php
 │   │   ├── InternalNotifications
 │   │   │   ├── Actions
 │   │   │   │   └── ScheduleInternalNotificationAction.php
@@ -829,6 +849,8 @@
 │   │   │   │   ├── MessageTemplateUsageResolver.php
 │   │   │   │   ├── PhoneNumberNormalizer.php
 │   │   │   │   ├── ProviderSubmissionLimiter.php
+│   │   │   │   ├── ReplyProfiles
+│   │   │   │   │   └── MessagingReplyProfileDependencyContributor.php
 │   │   │   │   ├── ResolvedMessageDispatchBuilder.php
 │   │   │   │   ├── ReusableMessageTemplateCatalog.php
 │   │   │   │   ├── RouteAuthoringMessageTemplateEligibilityResolver.php
@@ -1490,6 +1512,12 @@
 │       │   └── ProjectStateSchemaGuard.php
 │       ├── Queues
 │       │   └── QueueContract.php
+│       ├── ReplyHandling
+│       │   ├── Contracts
+│       │   │   └── ReplyProfileDependencyContributor.php
+│       │   ├── Data
+│       │   │   └── ReplyProfileDependency.php
+│       │   └── ReplyProfileDependencyRegistry.php
 │       ├── Reporting
 │       │   ├── Contracts
 │       │   │   ├── ReportingEventDefinitionContributor.php
@@ -1567,6 +1595,7 @@
 │   ├── forms.php
 │   ├── generated
 │   ├── horizon.php
+│   ├── inbound_messaging.php
 │   ├── location.php
 │   ├── logging.php
 │   ├── mail.php
@@ -1779,7 +1808,8 @@
 │   │   │   ├── inbound_messaging
 │   │   │   │   ├── 2026_05_19_154535_create_inbound_messages_table.php
 │   │   │   │   ├── 2026_07_19_031500_create_inbound_message_receipts_table.php
-│   │   │   │   └── 2026_08_22_061500_add_email_threading_fields_to_inbound_messages_table.php
+│   │   │   │   ├── 2026_08_22_061500_add_email_threading_fields_to_inbound_messages_table.php
+│   │   │   │   └── 2026_08_24_220000_create_inbound_reply_profile_tables.php
 │   │   │   ├── internal_notifications
 │   │   │   │   ├── 2026_04_10_173406_create_team_members_table.php
 │   │   │   │   └── 2026_04_11_174215_create_team_member_notification_preferences_table.php
@@ -2138,6 +2168,9 @@
 │       │   │       └── point-fields.blade.php
 │       │   ├── forms
 │       │   │   └── index.blade.php
+│       │   ├── inbound-messaging
+│       │   │   └── reply-profiles
+│       │   │       └── index.blade.php
 │       │   ├── messaging
 │       │   │   └── message-templates
 │       │   │       └── index.blade.php
@@ -2409,8 +2442,12 @@
 │   │   │   ├── InboundNormalReplyAutomationEventTest.php
 │   │   │   ├── InboundReplyFoundationTest.php
 │   │   │   ├── InboundReplyOutcomeClassifierTest.php
+│   │   │   ├── InboundReplyProfileGuardTest.php
+│   │   │   ├── InboundReplyProfileSyncTest.php
+│   │   │   ├── InboundReplyProfileWorkspaceTest.php
 │   │   │   ├── InboundSmsReOptInTest.php
 │   │   │   ├── ProcessInboundSmsMessageActionTest.php
+│   │   │   ├── ReplyProfileDependencyContributorTest.php
 │   │   │   ├── ResendInboundReplyEndToEndTest.php
 │   │   │   └── ResendReceivedEmailClientTest.php
 │   │   ├── Install
@@ -2548,6 +2585,7 @@
 │   │   │   ├── CoreContactImportProvenanceProjectStateTest.php
 │   │   │   ├── FlowRoutesProjectStateRoundTripTest.php
 │   │   │   ├── InboundMessagingProjectStateRoundTripTest.php
+│   │   │   ├── InboundReplyProfileProjectStateRoundTripTest.php
 │   │   │   ├── InternalNotificationsProjectStateRoundTripTest.php
 │   │   │   ├── LocationProjectStateRoundTripTest.php
 │   │   │   ├── MessagingProjectStateRoundTripTest.php
@@ -2729,4 +2767,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-662 directories, 2068 files
+674 directories, 2094 files

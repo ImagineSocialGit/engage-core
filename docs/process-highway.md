@@ -298,6 +298,8 @@ Campaign eligibility nodes and edges therefore include both:
 
 Campaign journey nodes link directly to the Campaign message-review modal. Campaign completion nodes link to Campaign Review. These are owner-editor handoffs; Process Highway does not host or submit the Campaign forms.
 
+Reply-profile nodes link first to InboundMessaging's authoritative **Reply Handling** workspace with the exact profile selected. Campaign and Flow Route editors remain secondary context targets. The Highway displays the business handoff but does not define reply phrases, intents, or execution consequences.
+
 More complex Flow Route changes continue to link to the exact Route or Point editor.
 
 ## Campaign graph projection

@@ -109,7 +109,7 @@ class ProcessHighwayBusinessProcessAcceptanceTest extends TestCase
         );
 
         $this->assertNotNull($coldHighway);
-        $this->assertEquals([
+        $this->assertSame([
             $coldCampaignKey,
             $coldRouteKey,
         ], $coldHighway['segment_keys']);
@@ -117,7 +117,7 @@ class ProcessHighwayBusinessProcessAcceptanceTest extends TestCase
             ProcessHighwaySemanticKey::status('prospect_nurture'),
             ProcessHighwaySemanticKey::tag('Old Lead'),
         ], $coldHighway['entry_node_keys']);
-        $this->assertEquals([
+        $this->assertEqualsCanonicalizing([
             'status' => ['prospect_nurture'],
             'tag' => ['Old Lead'],
         ], $coldHighway['qualifiers']);
@@ -143,10 +143,19 @@ class ProcessHighwayBusinessProcessAcceptanceTest extends TestCase
 
         $this->assertNotNull($coldReplyNode);
         $this->assertSame('inbound_messaging', $coldReplyNode['authority']['owner_key']);
-        $this->assertEquals([
+        $this->assertEqualsCanonicalizing([
             $coldCampaignKey,
             $coldRouteKey,
         ], $coldReplyNode['segment_keys']);
+        $this->assertTrue(collect($coldReplyNode['authority']['edit_targets'])->contains(
+            fn (array $target): bool => $target['owner_key'] === 'inbound_messaging'
+                && $target['resource']['type'] === 'reply_profile'
+                && $target['resource']['key'] === 'cold_lead_nurture'
+                && $target['url'] === route(
+                    'crm.inbound-messaging.reply-profiles.index',
+                    ['profile' => 'cold_lead_nurture'],
+                ),
+        ));
         $this->assertTrue(collect($graph['edges'])->contains(
             fn (array $edge): bool => $edge['from_node_key'] === $coldCampaignKey.':journey'
                 && $edge['to_node_key'] === $coldReplyKey,
@@ -161,7 +170,7 @@ class ProcessHighwayBusinessProcessAcceptanceTest extends TestCase
         );
 
         $this->assertNotNull($pastHighway);
-        $this->assertEquals([
+        $this->assertSame([
             ProcessHighwaySemanticKey::status('past_contact'),
         ], $pastHighway['entry_node_keys']);
         $this->assertTrue(in_array(
@@ -194,7 +203,7 @@ class ProcessHighwayBusinessProcessAcceptanceTest extends TestCase
             $webinarHighway['segment_keys'],
             true,
         ));
-        $this->assertEquals([
+        $this->assertEqualsCanonicalizing([
             ProcessHighwaySemanticKey::webinarOutcome('va-homebuyer-game-plan', 'attended'),
             ProcessHighwaySemanticKey::webinarOutcome('va-homebuyer-game-plan', 'missed'),
         ], $webinarHighway['entry_node_keys']);
@@ -214,7 +223,7 @@ class ProcessHighwayBusinessProcessAcceptanceTest extends TestCase
 
         $this->assertNotNull($campaignOnlyHighway);
         $this->assertSame(1, $campaignOnlyHighway['segment_count']);
-        $this->assertEquals(['campaigns'], $campaignOnlyHighway['source_keys']);
+        $this->assertSame(['campaigns'], $campaignOnlyHighway['source_keys']);
 
         $realtorHighway = $highways->first(
             fn (array $highway): bool => in_array(

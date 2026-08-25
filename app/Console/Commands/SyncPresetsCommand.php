@@ -8,6 +8,7 @@ use App\Modules\FlowRoutes\Actions\SyncFlowRouteCapabilitiesAction;
 use App\Modules\FlowRoutes\Actions\SyncFlowRoutePresetsAction;
 use App\Modules\Forms\Actions\SyncFormPresetsAction;
 use App\Modules\Forms\Data\FormPresetSyncResult;
+use App\Modules\InboundMessaging\Actions\ReplyProfiles\SyncInboundReplyProfilesAction;
 use App\Modules\Messaging\Actions\SyncMessageTemplatePresetsAction;
 use App\Modules\Tasks\Actions\SyncTaskPresetsAction;
 use App\Modules\Webinars\Actions\SyncWebinarScheduleProfilesAction;
@@ -26,6 +27,7 @@ class SyncPresetsCommand extends Command
         {--force-flow-routes : Overwrite customized FlowRoutes and FlowRoutePoints}
         {--force-tasks : Overwrite customized task templates}
         {--force-message-templates : Overwrite customized Messaging template presets and reactivate synced assignments}
+        {--force-reply-profiles : Overwrite customized inbound reply profiles}
         {--force-webinar-schedule-profiles : Overwrite customized webinar schedule profiles and profile items}';
 
     protected $description = 'Sync preset-owned database definitions in dependency-safe order. Campaign sync intentionally preserves customized records and has no force mode.';
@@ -35,6 +37,7 @@ class SyncPresetsCommand extends Command
         SyncTaskPresetsAction $syncTaskPresets,
         SyncWebinarScheduleProfilesAction $syncWebinarScheduleProfiles,
         SyncMessageTemplatePresetsAction $syncMessageTemplatePresets,
+        SyncInboundReplyProfilesAction $syncInboundReplyProfiles,
         SyncCampaignPresetsAction $syncCampaignPresets,
         SyncFlowRouteCapabilitiesAction $syncFlowRouteCapabilities,
         SyncFlowRoutePresetsAction $syncFlowRoutePresets,
@@ -126,6 +129,17 @@ class SyncPresetsCommand extends Command
             } else {
                 $this->line('');
                 $this->warn('Messaging template presets: module disabled; skipped.');
+            }
+
+            if (in_array('inbound_messaging', $runtimeModules, true)) {
+                $this->renderInboundReplyProfileResult(
+                    $syncInboundReplyProfiles->handle(
+                        force: (bool) $this->option('force-reply-profiles'),
+                    ),
+                );
+            } else {
+                $this->line('');
+                $this->warn('Inbound reply profiles: module disabled; skipped.');
             }
 
             if (in_array('webinars', $runtimeModules, true)) {
@@ -354,6 +368,23 @@ class SyncPresetsCommand extends Command
                 ['Assignments preserved', $result['assignments_preserved']],
                 ['Catalog entries created', $result['catalog_entries_created']],
                 ['Catalog entries updated', $result['catalog_entries_updated']],
+            ],
+        );
+    }
+
+    private function renderInboundReplyProfileResult(array $result): void
+    {
+        $this->line('');
+        $this->info('Inbound reply profiles');
+
+        $this->table(
+            ['Item', 'Count'],
+            [
+                ['Created', $result['created']],
+                ['Updated', $result['updated']],
+                ['Unchanged', $result['unchanged']],
+                ['Customized skipped', $result['customized_skipped']],
+                ['Removed skipped', $result['removed_skipped']],
             ],
         );
     }

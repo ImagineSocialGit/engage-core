@@ -423,6 +423,11 @@ return [
             'ui' => [
                 'tone' => 'blue',
             ],
+            'nav' => [
+                'label' => 'Reply Handling',
+                'route' => 'crm.inbound-messaging.reply-profiles.index',
+                'priority' => 81,
+            ],
             'depends_on' => ['core', 'messaging'],
             'providers' => [
                 InboundMessagingModuleServiceProvider::class,

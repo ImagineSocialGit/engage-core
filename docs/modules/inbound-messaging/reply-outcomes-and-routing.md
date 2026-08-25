@@ -36,6 +36,14 @@ Reply profiles may use:
 
 Use `exact` for dangerous short outcomes such as `NO`; do not classify the word `no` as a broad keyword.
 
+## Authoritative Reply Handling workspace
+
+Reply profiles, intents, and recognition rules are durable InboundMessaging records. The CRM **Reply Handling** workspace is their authoritative editor. Client config is bootstrap input, not runtime authority; the sync path preserves customized database rows unless force is requested.
+
+Messaging contributes dependencies from published message journeys, retained preset assignments, and ScheduledMessage correlation history. Flow Routes contributes dependencies from current Route conditions that reference `reply_profile_key` or `reply_intent_key`. Those references prevent unsafe profile/intent disablement or removal while leaving ordinary rule editing available.
+
+Campaigns and Flow Routes keep only stable profile/intent keys. They do not own or copy the recognition vocabulary. Process Highway reply nodes deep-link to Reply Handling for the profile and keep the Campaign/Route editor as secondary context.
+
 ## SMS compliance is separate from business reply intent
 
 SMS compliance keywords are classified before ordinary reply correlation:

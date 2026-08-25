@@ -124,7 +124,7 @@ class FlowRouteProcessHighwayContributorTest extends TestCase
             [ProcessHighwaySemanticKey::automationEvent('inbound_message.normal_reply')],
             $businessHighway['entry_node_keys'],
         );
-        $this->assertSame(['status' => ['engaged']], $businessHighway['qualifiers']);
+        $this->assertSame([], $businessHighway['qualifiers']);
         $this->assertSame(
             route('crm.flow-routes.show', $routeId),
             $businessHighway['segments'][0]['navigation_target']['url'],

@@ -10,7 +10,28 @@ The approved target stores one raw provider receipt and one normalized inbound b
 
 ## Reply correlation foundation
 
-Normal replies may carry narrow first-class correlation evidence back to the originating `ScheduledMessage`. Email correlation may be exact through a signed per-message Reply-To identity; SMS correlation is explicitly heuristic and bounded to recent sent deliveries for the same Contact/destination. Received email `subject` and RFC `message_id` are first-class normalized fields so CRM replies can preserve the visible subject and emit standard `In-Reply-To` / `References` threading headers while continuing to use a newly signed Engage Reply-To identity for the next inbound correlation hop. `reply_intent_key` is deterministic/config-driven classification evidence, not an automatic business outcome.
+Normal replies may carry narrow first-class correlation evidence back to the originating `ScheduledMessage`. Email correlation may be exact through a signed per-message Reply-To identity; SMS correlation is explicitly heuristic and bounded to recent sent deliveries for the same Contact/destination. Received email `subject` and RFC `message_id` are first-class normalized fields so CRM replies can preserve the visible subject and emit standard `In-Reply-To` / `References` threading headers while continuing to use a newly signed Engage Reply-To identity for the next inbound correlation hop. `reply_intent_key` is deterministic classification evidence, not an automatic business outcome.
+
+## Reply Handling authority
+
+InboundMessaging owns the durable reply vocabulary used to classify ordinary correlated replies:
+
+```text
+inbound_reply_profiles
+    one outgoing-conversation vocabulary
+
+inbound_reply_intents
+    normalized business meanings such as high_intent, later, or no
+
+inbound_reply_rules
+    exact-reply and bounded keyword rules
+```
+
+The database is runtime authority. `inbound_messaging.reply_profiles` is an idempotent bootstrap source, and `messaging.reply_profiles` remains a temporary compatibility bootstrap source for existing clients. `presets:sync` imports those definitions without overwriting customized database rows unless `--force-reply-profiles` is explicit.
+
+The CRM **Reply Handling** workspace is the authoritative human editing surface. It shows every profile and intent, the exact/keyword recognition rules, and dependencies contributed by Messaging and Flow Routes. Rule changes affect future replies only; historical `InboundMessage.reply_intent_key` evidence is not rewritten.
+
+Profile keys are immutable. A referenced profile cannot be disabled or removed, and a referenced intent cannot be disabled or removed. Recognition phrases and labels remain editable while referenced so operators can correct future classification without rebuilding Campaigns or Routes.
 
 The neutral `inbound_message.normal_reply` event exposes compact correlation/profile/intent identity for optional automation consumers. InternalNotifications remains free to notify a human even when no automation route exists. Domain-specific labels, tags, statuses, tasks, acknowledgements, and other consequences remain configuration/owning-module behavior rather than InboundMessaging features.
 
@@ -27,6 +48,7 @@ InboundMessaging owns:
 - inbound handler routing;
 - `InboundMessageReceived`;
 - neutral `inbound_message.normal_reply` automation events.
+- reply-profile, reply-intent, and reply-rule persistence and authoring.
 
 InboundMessaging may depend on:
 

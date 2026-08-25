@@ -1,8 +1,82 @@
 <?php
 
 return [
-    'version' => 3,
+    'version' => 4,
     'tables' => [
+        'inbound_reply_profiles' => [
+            'mode' => 'upsert',
+            'identity' => ['key'],
+            'preserve_id' => false,
+            'order_by' => ['key'],
+            'columns' => [
+                'id',
+                'key',
+                'label',
+                'description',
+                'is_active',
+                'source',
+                'source_config_path',
+                'source_version',
+                'is_customized',
+                'customized_at',
+                'last_synced_at',
+                'meta',
+                'created_at',
+                'updated_at',
+                'deleted_at',
+            ],
+            'json_columns' => ['meta'],
+        ],
+
+        'inbound_reply_intents' => [
+            'mode' => 'upsert',
+            'identity' => [
+                'inbound_reply_profile_id',
+                'key',
+            ],
+            'preserve_id' => false,
+            'order_by' => ['inbound_reply_profile_id', 'sort_order', 'id'],
+            'columns' => [
+                'id',
+                'inbound_reply_profile_id',
+                'key',
+                'label',
+                'description',
+                'is_active',
+                'sort_order',
+                'created_at',
+                'updated_at',
+            ],
+            'references' => [
+                'inbound_reply_profile_id' => 'inbound_reply_profiles',
+            ],
+        ],
+
+        'inbound_reply_rules' => [
+            'mode' => 'upsert',
+            'identity' => [
+                'inbound_reply_intent_id',
+                'match_type',
+                'normalized_value',
+            ],
+            'preserve_id' => false,
+            'order_by' => ['inbound_reply_intent_id', 'sort_order', 'id'],
+            'columns' => [
+                'id',
+                'inbound_reply_intent_id',
+                'match_type',
+                'value',
+                'normalized_value',
+                'is_active',
+                'sort_order',
+                'created_at',
+                'updated_at',
+            ],
+            'references' => [
+                'inbound_reply_intent_id' => 'inbound_reply_intents',
+            ],
+        ],
+
         'inbound_messages' => [
             'mode' => 'insert_empty',
             'preserve_id' => true,

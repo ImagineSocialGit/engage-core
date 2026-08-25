@@ -33,9 +33,11 @@ use App\Modules\Messaging\Services\Email\EmailProviderManager;
 use App\Modules\Messaging\Services\MessageChainExecutionContextResolver;
 use App\Modules\Messaging\Services\MessageRecipientGateRegistry;
 use App\Modules\Messaging\Services\MessageRecipientPayloadProviderRegistry;
+use App\Modules\Messaging\Services\ReplyProfiles\MessagingReplyProfileDependencyContributor;
 use App\Modules\Messaging\Services\Sms\SmsProviderManager;
 use App\Modules\Messaging\TokenContracts\MessagingTokenContextProvider;
 use App\Modules\Messaging\Validation\MessagingSetupValidationContributor;
+use App\Support\ReplyHandling\ReplyProfileDependencyRegistry;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Event;
@@ -84,6 +86,10 @@ class MessagingModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             MessagingSetupValidationContributor::class,
         ], 'setup.validation_contributors');
+
+        $this->app->tag([
+            MessagingReplyProfileDependencyContributor::class,
+        ], ReplyProfileDependencyRegistry::CONTRIBUTOR_TAG);
 
         $this->app->singleton(Client::class, function () {
             return new Client(

@@ -105,6 +105,8 @@ Location
 
 A silent module may still expose a narrow settings or diagnostics surface. That surface should appear inside shared settings or the consuming loud module unless administrators genuinely need to operate the silent capability independently.
 
+InboundMessaging's **Reply Handling** workspace is one deliberate exception. Reply profiles are shared by Campaign message journeys and Flow Routes, so placing the authoritative editor inside either consumer would imply false ownership. The narrow workspace exposes only the durable reply vocabulary, its recognition rules, and dependency-aware lifecycle controls; it is not a general InboundMessaging dashboard or inbox.
+
 ## Core and integrations
 
 Core is the platform foundation rather than a normal optional feature module. Its Contact and CRM-shell surfaces are loud, but Core itself is not presented to clients as a module named “Core.”
@@ -247,7 +249,7 @@ This registry records the current product direction. Reclassification requires a
 | --- | --- | --- | --- |
 | Core | platform foundation | platform exception | Present Contacts and the CRM shell; never present a module named Core. |
 | Messaging | universal | silent | Expose templates, consent, and delivery setup contextually or through shared settings; no primary Messaging workspace by default. |
-| InboundMessaging | universal | silent | Surface inbound activity through Contact/context panels and shared operational views; a future full inbox requires a deliberate product decision. |
+| InboundMessaging | universal | silent with one narrow authority surface | Surface inbound activity through Contact/context panels. Reply Handling owns shared reply-profile rules and dependency safeguards; a future full inbox still requires a deliberate product decision. |
 | InternalNotifications | universal | silent | Surface alerts and preferences in consuming workflows, Contact context, dashboards, or shared settings. |
 | Tasks | universal | loud | Provide routine Task index/detail and contextual Task actions. |
 | Workflow | universal | silent | Provide Contact lifecycle/profile behavior through Contact and consuming-module surfaces. |
