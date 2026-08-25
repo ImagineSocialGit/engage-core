@@ -25,6 +25,10 @@
 | execution_meta. Every condition must match before Route progress is created.
 | Entry criteria explain which event instance starts the Route; Points explain
 | what the Route does after it starts.
+| A change_status Point may declare from_contact_status_keys as a defensive
+| runtime precondition. FlowRoutes re-reads the current workflow status and
+| skips that action if the contact has already moved elsewhere. Use this for
+| stale-event safety, not a Decision that merely gates the status change.
 |
 | Keep module-owned executable values inside each Point's definition object.
 | Point-definition schemas and semantic reference checks come from the module
@@ -119,6 +123,7 @@ return [
                     'type' => 'change_status',
                     'definition' => [
                         'contact_status_key' => 'reviewed',
+                        'from_contact_status_keys' => ['awaiting_review'],
                     ],
                 ],
             ],

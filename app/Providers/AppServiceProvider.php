@@ -13,6 +13,10 @@ use App\Modules\Messaging\Import\MarketingPermissionContactImportPostProcessor;
 use App\Modules\InboundMessaging\Events\InboundMessageReceived;
 use App\Support\ModuleIntegrations\Forms\FormSubmissionConsentBridge;
 use App\Support\ModuleIntegrations\Forms\Messaging\GrantFormSubmissionMessagingConsent;
+use App\Support\DestinationVerification\Contracts\DestinationVerificationTransport;
+use App\Support\DestinationVerification\UnavailableDestinationVerificationTransport;
+use App\Support\ModuleIntegrations\Scheduling\Messaging\MessagingSchedulingDestinationVerificationTransport;
+use App\Support\ModuleIntegrations\Scheduling\Messaging\SchedulingDestinationVerificationRecipientGate;
 use App\Support\ModuleIntegrations\InternalNotifications\InboundMessaging\ScheduleInboundMessageInternalNotification;
 use App\Support\ModuleIntegrations\InternalNotifications\Tasks\InternalNotificationTaskScheduler;
 use App\Support\ModuleIntegrations\InternalNotifications\Tasks\OnlyActiveTeamMemberTaskAssignmentStrategyResolver;
@@ -73,6 +77,26 @@ class AppServiceProvider extends ServiceProvider
                 }
 
                 return new FormSubmissionConsentBridge($handlers);
+            },
+        );
+
+        $this->app->singleton(
+            DestinationVerificationTransport::class,
+            function ($app): DestinationVerificationTransport {
+                $enabled = $app->make(ModuleManager::class)
+                    ->enabledKeysWithDependencies();
+
+                if (in_array('scheduling', $enabled, true)
+                    && in_array('messaging', $enabled, true)
+                ) {
+                    return $app->make(
+                        MessagingSchedulingDestinationVerificationTransport::class,
+                    );
+                }
+
+                return $app->make(
+                    UnavailableDestinationVerificationTransport::class,
+                );
             },
         );
 
@@ -185,6 +209,15 @@ class AppServiceProvider extends ServiceProvider
         ], 'setup.validation_contributors');
 
         $enabledModules = $this->app->make(ModuleManager::class)->enabledKeysWithDependencies();
+
+        if (in_array('scheduling', $enabledModules, true)
+            && in_array('messaging', $enabledModules, true)
+        ) {
+            $this->app->tag(
+                SchedulingDestinationVerificationRecipientGate::class,
+                'messaging.message_recipient_gates',
+            );
+        }
 
         if (in_array('internal_notifications', $enabledModules, true)
             && in_array('tasks', $enabledModules, true)

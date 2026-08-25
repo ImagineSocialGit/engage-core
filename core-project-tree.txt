@@ -1033,6 +1033,8 @@
 │   │   │   │   ├── AvailabilityInterval.php
 │   │   │   │   ├── AvailabilitySearch.php
 │   │   │   │   ├── BookableSlot.php
+│   │   │   │   ├── DestinationVerificationChallenge.php
+│   │   │   │   ├── DestinationVerificationProof.php
 │   │   │   │   ├── SchedulingLocationSnapshot.php
 │   │   │   │   ├── TravelFeasibility.php
 │   │   │   │   └── TravelTimeEstimate.php
@@ -1075,6 +1077,7 @@
 │   │   │   │   │   └── TravelFeasibilityResolver.php
 │   │   │   │   ├── ContactShow
 │   │   │   │   │   └── SchedulingContactPanelProvider.php
+│   │   │   │   ├── PublicBookingDestinationVerificationService.php
 │   │   │   │   ├── SchedulingAvailabilityConfigurationWriter.php
 │   │   │   │   ├── SchedulingConfigurationWriter.php
 │   │   │   │   ├── SchedulingDurationResolver.php
@@ -1441,6 +1444,10 @@
 │       │   ├── Contracts
 │       │   │   └── DashboardPanelProvider.php
 │       │   └── DashboardPanelRegistry.php
+│       ├── DestinationVerification
+│       │   ├── Contracts
+│       │   │   └── DestinationVerificationTransport.php
+│       │   └── UnavailableDestinationVerificationTransport.php
 │       ├── ModuleIntegrations
 │       │   ├── Forms
 │       │   │   ├── Contracts
@@ -1458,7 +1465,11 @@
 │       │   │       ├── TeamMemberTaskAssignedRecipientResolver.php
 │       │   │       └── TeamMemberTaskAssigneeOptionProvider.php
 │       │   ├── RelationshipLocationAreaBridge.php
-│       │   └── RelationshipLocationAreaImportHandler.php
+│       │   ├── RelationshipLocationAreaImportHandler.php
+│       │   └── Scheduling
+│       │       └── Messaging
+│       │           ├── MessagingSchedulingDestinationVerificationTransport.php
+│       │           └── SchedulingDestinationVerificationRecipientGate.php
 │       ├── Modules
 │       │   ├── Migrations
 │       │   │   ├── MigrationScopeDefinition.php
@@ -2419,6 +2430,7 @@
 │   │   │   ├── FlowRouteAutomationEventExecutionContextTest.php
 │   │   │   ├── FlowRouteAutomationEventPersistenceTest.php
 │   │   │   ├── FlowRouteBindingControllerTest.php
+│   │   │   ├── FlowRouteConditionalStatusChangeTest.php
 │   │   │   ├── FlowRouteConditionBranchPointTest.php
 │   │   │   ├── FlowRouteControllerTest.php
 │   │   │   ├── FlowRouteDecisionAuthoringTest.php
@@ -2649,6 +2661,7 @@
 │   │   │   ├── CreateAppointmentActionTest.php
 │   │   │   ├── FindBookableAvailabilityActionTest.php
 │   │   │   ├── PublicBookingCompletionTest.php
+│   │   │   ├── PublicBookingDestinationVerificationServiceTest.php
 │   │   │   ├── PublicBookingHoldTest.php
 │   │   │   ├── PublicSchedulingSurfaceTest.php
 │   │   │   ├── RangeDurationBookingFoundationTest.php
@@ -2661,6 +2674,7 @@
 │   │   │   ├── SchedulingAvailabilityWindowFoundationTest.php
 │   │   │   ├── SchedulingConfigurationWorkspaceTest.php
 │   │   │   ├── SchedulingContactPanelTest.php
+│   │   │   ├── SchedulingDestinationVerificationMessagingBridgeTest.php
 │   │   │   ├── SchedulingFoundationTest.php
 │   │   │   ├── SchedulingHostAndServiceFoundationTest.php
 │   │   │   ├── SchedulingLocalDateTimeResolverTest.php
@@ -2788,4 +2802,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-675 directories, 2114 files
+679 directories, 2124 files

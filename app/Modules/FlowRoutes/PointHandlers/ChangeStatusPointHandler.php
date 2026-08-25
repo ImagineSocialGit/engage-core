@@ -10,6 +10,7 @@ use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\Workflow\Actions\TransitionContactWorkflowStatusAction;
+use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use Throwable;
 
 class ChangeStatusPointHandler implements PointHandler
@@ -70,9 +71,33 @@ class ChangeStatusPointHandler implements PointHandler
             );
         }
 
-        $currentStatusId = $context->progress->contact_status_id !== null
-            ? (int) $context->progress->contact_status_id
+        $workflowProfile = ContactWorkflowProfile::query()
+            ->with('contactStatus:id,key')
+            ->where('contact_id', $contact->getKey())
+            ->first();
+
+        $currentStatusId = $workflowProfile?->contact_status_id !== null
+            ? (int) $workflowProfile->contact_status_id
             : null;
+        $currentStatusKey = $workflowProfile?->contactStatus?->key;
+
+        if ($definition->fromContactStatusKeys !== []
+            && (! is_string($currentStatusKey)
+                || ! in_array($currentStatusKey, $definition->fromContactStatusKeys, true))
+        ) {
+            return PointExecutionResult::skipped(
+                reason: 'change_status_source_status_not_allowed',
+                meta: [
+                    'current_contact_status_id' => $currentStatusId,
+                    'current_contact_status_key' => $currentStatusKey,
+                    'allowed_contact_status_keys' => $definition->fromContactStatusKeys,
+                    'change_status_definition' => $definition->toMetaPayload(),
+                    'flow_route_progress_id' => $context->progress->getKey(),
+                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    'flow_routes' => $context->flowRouteProvenance(),
+                ],
+            );
+        }
 
         $targetStatusId = (int) $status->getKey();
 

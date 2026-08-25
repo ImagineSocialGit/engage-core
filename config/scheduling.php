@@ -51,6 +51,21 @@ return [
         'availability_max_days' => 31,
         'reservation_rate_limit_per_minute' => 12,
         'hold_review_rate_limit_per_minute' => 60,
+
+        'destination_verification' => [
+            'code_digits' => 6,
+            'challenge_ttl_seconds' => 300,
+            'proof_ttl_seconds' => 300,
+            'max_code_attempts' => 5,
+            'max_sends_per_challenge' => 3,
+            'resend_cooldown_seconds' => 30,
+            'rate_limits' => [
+                'per_ip_per_hour' => 20,
+                'per_destination_per_hour' => 6,
+                'per_offer_session_per_hour' => 8,
+                'per_challenge_per_hour' => 4,
+            ],
+        ],
     ],
 
 

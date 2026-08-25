@@ -4,9 +4,10 @@ namespace App\Modules\FlowRoutes\Authoring;
 
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\FlowRoutes\Data\Points\BranchEvaluatePointDefinition;
+use App\Modules\FlowRoutes\Data\Points\ChangeStatusPointDefinition;
+use App\Modules\FlowRoutes\Data\Points\WaitPointDefinition;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
-use App\Modules\FlowRoutes\Data\Points\WaitPointDefinition;
 use App\Support\AutomationCapabilities\Contracts\AutomationPointAuthoringContributor;
 use App\Support\AutomationCapabilities\Data\AutomationPointAuthoringContext;
 use App\Support\AutomationCapabilities\Data\AutomationPointAuthoringDefinition;
@@ -79,22 +80,7 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
         return match ($pointType) {
             'wait' => $this->waitFields($definition),
             'branch_evaluate' => $this->decisionFields($definition, $context),
-            'change_status' => [[
-                'type' => 'select',
-                'name' => 'contact_status_key',
-                'label' => 'New status',
-                'required' => true,
-                'value' => (string) ($definition['contact_status_key'] ?? ''),
-                'placeholder' => 'Choose a status',
-                'options' => ContactStatus::query()
-                    ->active()
-                    ->ordered()
-                    ->get(['key', 'name'])
-                    ->map(fn (ContactStatus $status): array => [
-                        'value' => (string) $status->key,
-                        'label' => (string) $status->name,
-                    ])->all(),
-            ]],
+            'change_status' => $this->changeStatusFields($definition),
             default => [],
         };
     }
@@ -129,7 +115,7 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
         return match ($pointType) {
             'wait' => $this->waitDefinition($input),
             'branch_evaluate' => $this->decisionDefinition($input, $context),
-            'change_status' => $this->changeStatusDefinition($input),
+            'change_status' => $this->changeStatusDefinition($input, $context),
             default => throw ValidationException::withMessages([
                 'capability_id' => 'That FlowRoutes-native Point type is not authorable.',
             ]),
@@ -609,8 +595,43 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
         );
     }
 
+    /** @param array<string, mixed> $definition */
+    private function changeStatusFields(array $definition): array
+    {
+        $parsed = ChangeStatusPointDefinition::from($definition);
+        $fields = [[
+            'type' => 'select',
+            'name' => 'contact_status_key',
+            'label' => 'New status',
+            'required' => true,
+            'value' => (string) ($definition['contact_status_key'] ?? ''),
+            'placeholder' => 'Choose a status',
+            'options' => ContactStatus::query()
+                ->active()
+                ->ordered()
+                ->get(['key', 'name'])
+                ->map(fn (ContactStatus $status): array => [
+                    'value' => (string) $status->key,
+                    'label' => (string) $status->name,
+                ])->all(),
+        ]];
+
+        if ($parsed->fromContactStatusKeys !== []) {
+            $fields[] = [
+                'type' => 'notice',
+                'title' => 'Current-status safety check',
+                'body' => 'This action runs only while the contact is still '.$this->statusList($parsed->fromContactStatusKeys).'. If the contact has already moved elsewhere, the Route safely skips this action.',
+            ];
+        }
+
+        return $fields;
+    }
+
     /** @param array<string, mixed> $input */
-    private function changeStatusDefinition(array $input): array
+    private function changeStatusDefinition(
+        array $input,
+        AutomationPointAuthoringContext $context,
+    ): array
     {
         $statusKey = trim((string) ($input['contact_status_key'] ?? ''));
         $status = ContactStatus::query()->active()->where('key', $statusKey)->first();
@@ -621,11 +642,29 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
             ]);
         }
 
-        return [
+        $existingDefinition = $context->point instanceof FlowRoutePoint
+            && is_array($context->point->definition)
+                ? $context->point->definition
+                : [];
+        $existingSettings = $context->point instanceof FlowRoutePoint
+            && is_array($context->point->settings)
+                ? $context->point->settings
+                : [];
+        $existing = ChangeStatusPointDefinition::from(
+            definition: $existingDefinition,
+            settings: $existingSettings,
+        );
+
+        return array_filter([
             'contact_status_key' => (string) $status->key,
-            'reason' => 'flow_route_change_status',
-            'on_same_status' => 'skipped',
-        ];
+            'from_contact_status_keys' => $existing->fromContactStatusKeys !== []
+                ? $existing->fromContactStatusKeys
+                : null,
+            'reason' => $existing->reason ?? 'flow_route_change_status',
+            'force' => $existing->force ?: null,
+            'on_same_status' => $existing->onSameStatus ?? 'skipped',
+            'meta' => $existing->meta !== [] ? $existing->meta : null,
+        ], static fn (mixed $value): bool => $value !== null);
     }
 
     /** @param array<string, mixed> $definition */
@@ -663,8 +702,38 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
 
         $name = ContactStatus::query()->where('key', $statusKey)->value('name');
         $label = is_string($name) && trim($name) !== '' ? $name : Str::headline($statusKey);
+        $parsed = ChangeStatusPointDefinition::from($definition);
+
+        if ($parsed->fromContactStatusKeys !== []) {
+            return 'Move the '.config('contacts.labels.singular', 'contact').' to '.$label
+                .' only if its current status is '.$this->statusList($parsed->fromContactStatusKeys).'.';
+        }
 
         return 'Move the '.config('contacts.labels.singular', 'contact').' to '.$label.'.';
+    }
+
+    /** @param array<int, string> $statusKeys */
+    private function statusList(array $statusKeys): string
+    {
+        $namesByKey = ContactStatus::query()
+            ->whereIn('key', $statusKeys)
+            ->pluck('name', 'key')
+            ->all();
+        $labels = array_map(
+            static fn (string $key): string => is_string($namesByKey[$key] ?? null)
+                && trim($namesByKey[$key]) !== ''
+                    ? trim($namesByKey[$key])
+                    : Str::headline($key),
+            $statusKeys,
+        );
+
+        if (count($labels) < 2) {
+            return $labels[0] ?? 'an allowed status';
+        }
+
+        $last = array_pop($labels);
+
+        return implode(', ', $labels).(count($labels) > 1 ? ', or ' : ' or ').$last;
     }
 
     private function quantity(int $value, string $unit): string

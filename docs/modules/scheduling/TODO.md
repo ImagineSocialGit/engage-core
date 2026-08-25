@@ -1,4 +1,5 @@
 # Scheduling TODO
 
-- [ ] Phase 4B.4: when Messaging has an eligible deliverable transactional channel, verify one email or SMS destination before creating a capacity-consuming hold; keep verification independent from marketing consent.
+- [x] Phase 4B.4 / 22E2A foundation: add a neutral optional destination-verification transport seam, Scheduling-owned ephemeral challenge/proof lifecycle, bounded resend/attempt/rate limits, hashed verification codes, and an optional Messaging bridge without adding Messaging as a Scheduling dependency or touching marketing consent.
+- [ ] Phase 4B.4 / 22E2B enforcement: add the public issue/verify/resend step and require a valid server-owned proof before the public offer can become a capacity-consuming `BookingHold`; revalidate offer/service/location/host/resource/capacity/travel state at the hold boundary and preserve the no-Messaging path.
 - [ ] Add first-class Scheduling Project State transfer support only after the durable configuration/public-booking contracts are stable enough to survive clean rebuilds.

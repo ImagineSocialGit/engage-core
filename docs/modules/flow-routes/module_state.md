@@ -35,6 +35,13 @@ channel. Use a `Decision` Point only when a running Route genuinely needs to bra
 procedure. Do not add a first technical Decision merely to reject events that should never have
 started the Route.
 
+A `change_status` Point may declare optional `from_contact_status_keys`. This is a precondition on
+that action, not a branch in the Route. At execution time the handler re-reads the authoritative
+`ContactWorkflowProfile` rather than trusting the status snapshot stored when Route progress
+began. A mismatch completes as a safe skip. The Route editor presents the source-status guard as
+part of the status action and preserves it when the destination status is edited. Use a separate
+`Decision` only when matching and non-matching contacts genuinely need different forward paths.
+
 The removed verbose route fields `key`, `trigger`, and `meta` are invalid. The removed Point fields
 `key`, `capability_key`, `sort_order`, `is_start`, `next_point_key`, `settings`, `source_version`,
 and `meta` are also invalid. There is no compatibility authoring path for those fields.
@@ -659,6 +666,11 @@ open the authoritative Tasks editor. FlowRoutes must not duplicate Task Template
 The editor should apply the same consequence-first posture to other automatic actions: explain repeated execution, skipped/no-op behavior, availability constraints, and the condition that allows a wait to resume.
 
 `Decision` is a constrained business branch. It checks one supported fact, sends the matching path to a named later Point, and either sends the otherwise path to another later Point or ends the Route. Existing advanced preset Decisions remain visible in plain language and are preserved when their shape cannot be represented safely by the constrained editor.
+
+`Change Status` may include a current-status safety check. It reads as one action—for example,
+“Move the contact to Engaged only if its current status is Prospect – Nurture”—and safely skips
+the transition when a delayed event arrives after the contact has already moved. Do not model
+that stale-event guard as a separate Decision.
 
 The normal Route editor still does not expose arbitrary graph editing, joins, connectors, nested branch trees, or generic node-canvas behavior.
 

@@ -95,6 +95,10 @@ class FlowRoutesAutomationPointDefinitionContributor implements AutomationPointD
                     ConfigSchema::string(),
                     referenceTarget: 'contact_statuses',
                 ),
+                'from_contact_status_keys' => ConfigField::optional(
+                    ConfigSchema::listOf(ConfigSchema::string()),
+                    referenceTarget: 'contact_statuses',
+                ),
                 'reason' => ConfigField::optional(ConfigSchema::string()),
                 'force' => ConfigField::defaulted(ConfigSchema::boolean(), false),
                 'on_same_status' => ConfigField::defaulted(
@@ -156,6 +160,20 @@ class FlowRoutesAutomationPointDefinitionContributor implements AutomationPointD
                     'contact_status_key' => $parsed->contactStatusKey,
                 ],
             );
+        }
+
+        if ($parsed instanceof ChangeStatusPointDefinition) {
+            foreach ($this->missingContactStatusSourceKeys($parsed) as $sourceStatusKey) {
+                yield $context->error(
+                    code: 'flow_routes.change_status_source_status_missing',
+                    message: "FlowRoute [{$context->containerKey}] point [{$context->pointKey}] references unavailable source ContactStatus [{$sourceStatusKey}].",
+                    path: "{$context->path}.definition.from_contact_status_keys",
+                    context: [
+                        'point_key' => $context->pointKey,
+                        'contact_status_key' => $sourceStatusKey,
+                    ],
+                );
+            }
         }
 
         if (! $parsed instanceof BranchEvaluatePointDefinition) {
@@ -237,6 +255,27 @@ class FlowRoutesAutomationPointDefinitionContributor implements AutomationPointD
         }
 
         return false;
+    }
+
+    /** @return array<int, string> */
+    private function missingContactStatusSourceKeys(
+        ChangeStatusPointDefinition $definition,
+    ): array {
+        if ($definition->fromContactStatusKeys === []) {
+            return [];
+        }
+
+        $existingKeys = ContactStatus::query()
+            ->active()
+            ->whereIn('key', $definition->fromContactStatusKeys)
+            ->pluck('key')
+            ->map(static fn (mixed $key): string => (string) $key)
+            ->all();
+
+        return array_values(array_diff(
+            $definition->fromContactStatusKeys,
+            $existingKeys,
+        ));
     }
 
     private function nullableString(mixed $value): ?string

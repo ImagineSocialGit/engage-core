@@ -6,10 +6,12 @@ class ChangeStatusPointDefinition
 {
     /**
      * @param array<string, mixed> $meta
+     * @param array<int, string> $fromContactStatusKeys
      */
     public function __construct(
         public readonly ?int $contactStatusId = null,
         public readonly ?string $contactStatusKey = null,
+        public readonly array $fromContactStatusKeys = [],
         public readonly ?string $reason = null,
         public readonly bool $force = false,
         public readonly ?string $onSameStatus = null,
@@ -24,6 +26,10 @@ class ChangeStatusPointDefinition
     public static function from(array $definition, array $settings = []): self
     {
         $source = array_replace_recursive($definition, $settings);
+        [$fromContactStatusKeys, $sourceStatusesAreInvalid] = self::stringList(
+            source: $source,
+            key: 'from_contact_status_keys',
+        );
 
         $contactStatusId = self::int(
             source: $source,
@@ -49,6 +55,7 @@ class ChangeStatusPointDefinition
             return new self(
                 contactStatusId: null,
                 contactStatusKey: null,
+                fromContactStatusKeys: $fromContactStatusKeys,
                 reason: self::string($source, ['reason']) ?? 'flow_route_change_status',
                 force: self::bool($source, 'force'),
                 onSameStatus: self::string($source, ['on_same_status']) ?? 'skipped',
@@ -60,9 +67,13 @@ class ChangeStatusPointDefinition
         return new self(
             contactStatusId: $contactStatusId,
             contactStatusKey: $contactStatusKey,
+            fromContactStatusKeys: $fromContactStatusKeys,
             reason: self::string($source, ['reason']) ?? 'flow_route_change_status',
             force: self::bool($source, 'force'),
             onSameStatus: self::string($source, ['on_same_status']) ?? 'skipped',
+            invalidReason: $sourceStatusesAreInvalid
+                ? 'change_status_invalid_source_statuses'
+                : null,
             meta: self::meta($source),
         );
     }
@@ -81,6 +92,7 @@ class ChangeStatusPointDefinition
         return [
             'contact_status_id' => $this->contactStatusId,
             'contact_status_key' => $this->contactStatusKey,
+            'from_contact_status_keys' => $this->fromContactStatusKeys,
             'reason' => $this->reason,
             'force' => $this->force,
             'on_same_status' => $this->onSameStatus,
@@ -134,6 +146,35 @@ class ChangeStatusPointDefinition
     private static function bool(array $source, string $key): bool
     {
         return (bool) ($source[$key] ?? false);
+    }
+
+    /**
+     * @param array<string, mixed> $source
+     * @return array{0: array<int, string>, 1: bool}
+     */
+    private static function stringList(array $source, string $key): array
+    {
+        if (! array_key_exists($key, $source)) {
+            return [[], false];
+        }
+
+        $values = $source[$key];
+
+        if (! is_array($values) || ! array_is_list($values)) {
+            return [[], true];
+        }
+
+        $normalized = [];
+
+        foreach ($values as $value) {
+            if (! is_string($value) || trim($value) === '') {
+                return [[], true];
+            }
+
+            $normalized[] = trim($value);
+        }
+
+        return [array_values(array_unique($normalized)), false];
     }
 
     /**

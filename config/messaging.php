@@ -43,6 +43,7 @@ return [
                 'webinar_waitlists' => true,
                 'internal_notifications' => true,
                 'route_send_message_points' => true,
+                'scheduling_public_booking' => true,
             ],
 
             'purpose_scopes' => [
@@ -63,6 +64,7 @@ return [
                 'webinar_waitlists' => true,
                 'internal_notifications' => false,
                 'route_send_message_points' => true,
+                'scheduling_public_booking' => true,
             ],
 
             'purpose_scopes' => [

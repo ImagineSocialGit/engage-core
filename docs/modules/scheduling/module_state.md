@@ -125,6 +125,12 @@ Customer-site availability must not be presented as authoritative until Scheduli
 
 Phase 4B.4 owns the actual Messaging-backed verification behavior. The non-blocking offer review boundary intentionally exists before the real hold so verification can be inserted there without making Messaging a Scheduling dependency.
 
+22E2A establishes the verification foundation behind that boundary without changing the public hold endpoint yet. `PublicBookingDestinationVerificationService` owns short-lived cache-backed challenges and proofs bound to the opaque offer plus the current booking session. Challenge codes are stored only as keyed hashes in Scheduling state, attempts and resends are bounded, IP/destination/offer-session/challenge request rates are limited, proof tokens are short-lived and single-use, and neither challenges nor proofs create Contacts, holds, Appointments, or Project State records.
+
+Delivery crosses a neutral app-level `DestinationVerificationTransport` contract. When both Scheduling and Messaging are enabled, `AppServiceProvider` binds the Messaging bridge and registers a recipient gate that permits only transactional `scheduling_public_booking` verification messages for active ordinary public offers. When Messaging is disabled or has no deliverable verification channel, the neutral unavailable transport exposes no channels and Scheduling remains usable. This verification path does not query, grant, revoke, or otherwise mutate marketing consent.
+
+22E2B is still required to expose the visitor verification routes/UI and to make the real public offer-to-hold transition require and consume a valid server-owned proof before capacity is reserved.
+
 ## Responsibility
 
 Scheduling answers:
