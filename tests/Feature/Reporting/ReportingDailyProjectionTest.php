@@ -224,6 +224,164 @@ class ReportingDailyProjectionTest extends TestCase
         $this->assertSame('America/Chicago', $checkpoint->meta['timezone']);
     }
 
+    public function test_projection_calibrates_retained_unknown_mobile_webview_and_interaction_evidence_without_mutating_raw_session(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-25 18:00:00 UTC'));
+        config(['client.timezone' => 'America/Chicago']);
+
+        $mobileWebview = ReportingSession::query()->create([
+            'token_hash' => hash('sha256', 'historical-mobile-webview'),
+            'host' => 'webinar.example.test',
+            'surface' => 'webinar_registration',
+            'started_at' => now()->subHours(3),
+            'last_seen_at' => now()->subHours(2),
+            'absolute_expires_at' => now()->addHour(),
+            'landing_path' => '/homebuyer-class',
+            'utm_source' => 'ig',
+            'utm_medium' => 'paid',
+            'traffic_class' => 'unknown',
+            'classifier_key' => 'browser_request_signals',
+            'classifier_version' => 2,
+            'classification_reasons' => ['user_agent_unrecognized'],
+            'device_class' => 'mobile',
+            'browser_family' => null,
+            'os_family' => 'iOS',
+        ]);
+
+        $this->observation(
+            session: $mobileWebview,
+            eventKey: 'webinar.page.view',
+            eventId: (string) Str::uuid(),
+            occurredAt: now()->subHours(3),
+            trafficClass: 'unknown',
+            properties: [
+                'page_revision' => 'revision-1',
+                'presentation' => 'inline',
+            ],
+        );
+
+        $interaction = ReportingSession::query()->create([
+            'token_hash' => hash('sha256', 'historical-interaction'),
+            'host' => 'webinar.example.test',
+            'surface' => 'webinar_registration',
+            'started_at' => now()->subHours(2),
+            'last_seen_at' => now()->subHour(),
+            'absolute_expires_at' => now()->addHour(),
+            'landing_path' => '/homebuyer-class',
+            'traffic_class' => 'unknown',
+            'classifier_key' => 'browser_request_signals',
+            'classifier_version' => 2,
+            'classification_reasons' => ['user_agent_unrecognized'],
+            'device_class' => null,
+            'browser_family' => null,
+            'os_family' => null,
+        ]);
+
+        $this->observation(
+            session: $interaction,
+            eventKey: 'webinar.page.view',
+            eventId: (string) Str::uuid(),
+            occurredAt: now()->subHours(2),
+            trafficClass: 'unknown',
+            properties: [
+                'page_revision' => 'revision-1',
+                'presentation' => 'inline',
+            ],
+        );
+        $this->observation(
+            session: $interaction,
+            eventKey: 'webinar.form.start',
+            eventId: (string) Str::uuid(),
+            occurredAt: now()->subHour(),
+            trafficClass: 'unknown',
+            properties: [
+                'page_revision' => 'revision-1',
+                'presentation' => 'inline',
+            ],
+        );
+
+        $unresolved = ReportingSession::query()->create([
+            'token_hash' => hash('sha256', 'historical-unresolved'),
+            'host' => 'webinar.example.test',
+            'surface' => 'webinar_registration',
+            'started_at' => now()->subMinutes(45),
+            'last_seen_at' => now()->subMinutes(40),
+            'absolute_expires_at' => now()->addHour(),
+            'landing_path' => '/homebuyer-class',
+            'traffic_class' => 'unknown',
+            'classifier_key' => 'browser_request_signals',
+            'classifier_version' => 2,
+            'classification_reasons' => ['user_agent_missing'],
+        ]);
+
+        $this->observation(
+            session: $unresolved,
+            eventKey: 'webinar.page.view',
+            eventId: (string) Str::uuid(),
+            occurredAt: now()->subMinutes(45),
+            trafficClass: 'unknown',
+            properties: [
+                'page_revision' => 'revision-1',
+                'presentation' => 'inline',
+            ],
+        );
+
+        $registry = new ReportingProjectionFactRegistry([]);
+        $projector = new ProjectReportingDailyMetricsAction($registry);
+        $date = CarbonImmutable::now('America/Chicago')->startOfDay();
+
+        $projector->handle($date, $date);
+
+        $this->assertMetric(
+            'webinar.landing_sessions',
+            ['slice' => 'all', 'traffic_class' => 'likely_human'],
+            2,
+            null,
+        );
+        $this->assertMetric(
+            'webinar.landing_sessions',
+            ['slice' => 'all', 'traffic_class' => 'unknown'],
+            1,
+            null,
+        );
+        $this->assertMetric(
+            'webinar.traffic_classification_resolution',
+            [
+                'slice' => 'all',
+                'recorded_traffic_class' => 'unknown',
+                'effective_traffic_class' => 'likely_human',
+                'reason' => 'mobile_webview_evidence',
+            ],
+            1,
+            null,
+        );
+        $this->assertMetric(
+            'webinar.traffic_classification_resolution',
+            [
+                'slice' => 'all',
+                'recorded_traffic_class' => 'unknown',
+                'effective_traffic_class' => 'likely_human',
+                'reason' => 'active_form_interaction',
+            ],
+            1,
+            null,
+        );
+        $this->assertMetric(
+            'webinar.traffic_classification_resolution',
+            [
+                'slice' => 'all',
+                'recorded_traffic_class' => 'unknown',
+                'effective_traffic_class' => 'unknown',
+                'reason' => 'user_agent_missing',
+            ],
+            1,
+            null,
+        );
+
+        $this->assertSame('unknown', $mobileWebview->refresh()->traffic_class);
+        $this->assertSame('unknown', $interaction->refresh()->traffic_class);
+    }
+
     /** @param array<string, mixed> $properties */
     private function observation(
         ReportingSession $session,

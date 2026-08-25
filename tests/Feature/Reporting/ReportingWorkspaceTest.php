@@ -3,6 +3,7 @@
 namespace Tests\Feature\Reporting;
 
 use App\Models\User;
+use App\Modules\Reporting\Actions\ProjectReportingDailyMetricsAction;
 use App\Modules\Reporting\Models\ReportingDailyMetric;
 use App\Modules\Reporting\Models\ReportingExternalMeasurement;
 use App\Modules\Reporting\Models\ReportingProjectionCheckpoint;
@@ -111,7 +112,7 @@ class ReportingWorkspaceTest extends TestCase
             ->assertOk()
             ->assertSee('No measured pre-registration loss is visible yet')
             ->assertSee('All 1 likely-human landing sessions reached a correlated registration in this period.')
-            ->assertSee('The primary funnel uses 1 likely-human landing sessions out of 3 observed landing sessions.')
+            ->assertSee('The primary funnel uses 1 likely-human landing sessions out of 3 observed landing sessions after bounded traffic-classification calibration.')
             ->assertSee('2 observed landing sessions remain unknown and are intentionally excluded from conversion.')
             ->assertSee('No ad-platform report is attached to this view yet');
     }
@@ -180,7 +181,7 @@ class ReportingWorkspaceTest extends TestCase
 
         $checkpoint = ReportingProjectionCheckpoint::query()
             ->where('projector_key', 'public_funnel')
-            ->where('projector_version', 1)
+            ->where('projector_version', ProjectReportingDailyMetricsAction::PROJECTOR_VERSION)
             ->first();
 
         $this->assertNotNull($checkpoint);
@@ -246,6 +247,19 @@ class ReportingWorkspaceTest extends TestCase
             'identity_hash' => hash('sha256', 'workspace-external'),
             'imported_at' => now(),
         ]);
+    }
+
+    public function test_workspace_exposes_classification_resolution_explanations(): void
+    {
+        $view = file_get_contents(resource_path('views/crm/reporting/index.blade.php'));
+        $service = file_get_contents(app_path('Modules/Reporting/Services/ReportingWorkspaceReadService.php'));
+
+        $this->assertIsString($view);
+        $this->assertIsString($service);
+        $this->assertStringContainsString('Unknown sessions resolved for analysis', $view);
+        $this->assertStringContainsString('Why traffic is still unknown', $view);
+        $this->assertStringContainsString('classification_resolution', $service);
+        $this->assertStringContainsString('mobile_webview_evidence', $service);
     }
 
     private function seedReportMetrics(): void
@@ -336,7 +350,7 @@ class ReportingWorkspaceTest extends TestCase
         ReportingDailyMetric::query()->create([
             'metric_date' => $date,
             'metric_key' => $metricKey,
-            'metric_version' => 1,
+            'metric_version' => ProjectReportingDailyMetricsAction::METRIC_VERSION,
             'dimension_hash' => hash(
                 'sha256',
                 json_encode($canonical, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),

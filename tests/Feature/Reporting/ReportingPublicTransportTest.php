@@ -61,7 +61,7 @@ class ReportingPublicTransportTest extends TestCase
         $this->assertSame('facebook_feed', $observation->external_placement);
         $this->assertSame('likely_human', $observation->traffic_class);
         $this->assertSame('browser_request_signals', $observation->classifier_key);
-        $this->assertSame(2, $observation->classifier_version);
+        $this->assertSame(3, $observation->classifier_version);
         $this->assertEquals([
             'browser_family_recognized',
             'same_origin_fetch_metadata',
@@ -117,11 +117,11 @@ class ReportingPublicTransportTest extends TestCase
 
         $this->assertSame('likely_automated', $observation->traffic_class);
         $this->assertSame('browser_request_signals', $observation->classifier_key);
-        $this->assertSame(2, $observation->classifier_version);
+        $this->assertSame(3, $observation->classifier_version);
         $this->assertEquals(['automation_user_agent'], $observation->classification_reasons);
     }
 
-    public function test_recognized_browser_without_fetch_metadata_is_likely_human_under_classifier_v2(): void
+    public function test_recognized_browser_without_fetch_metadata_is_likely_human_under_classifier_v3(): void
     {
         $this->configureBrowserEvent('public.example.test');
 
@@ -150,7 +150,7 @@ class ReportingPublicTransportTest extends TestCase
                 "Recognized {$browser} traffic without Fetch Metadata should remain in the likely-human bucket.",
             );
             $this->assertSame('browser_request_signals', $observation->classifier_key);
-            $this->assertSame(2, $observation->classifier_version);
+            $this->assertSame(3, $observation->classifier_version);
             $this->assertEquals([
                 'browser_family_recognized',
                 'fetch_metadata_missing',
@@ -158,7 +158,96 @@ class ReportingPublicTransportTest extends TestCase
         }
     }
 
-    public function test_missing_or_unrecognized_user_agent_remains_unknown_under_classifier_v2(): void
+    public function test_meta_in_app_and_embedded_mobile_webviews_are_recognized_under_classifier_v3(): void
+    {
+        $this->configureBrowserEvent('public.example.test');
+
+        foreach ([
+            'instagram_ios' => [
+                'user_agent' => 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 393.0.0.33.71 (iPhone17,1; iOS 18_6; en_US; en; scale=3.00; 1206x2622; IABMV/1)',
+                'browser_family' => 'Instagram In-App',
+                'device_class' => 'mobile',
+                'os_family' => 'iOS',
+                'reason' => 'in_app_browser_recognized',
+            ],
+            'facebook_ios' => [
+                'user_agent' => 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBAV/526.0.0.50.104;FBBV/800000000;FBDV/iPhone17,1;FBMD/iPhone;FBSN/iOS;FBSV/18.6;FBSS/3;FBID/phone;FBLC/en_US;FBOP/5]',
+                'browser_family' => 'Facebook In-App',
+                'device_class' => 'mobile',
+                'os_family' => 'iOS',
+                'reason' => 'in_app_browser_recognized',
+            ],
+            'facebook_android' => [
+                'user_agent' => 'Mozilla/5.0 (Linux; Android 15; Pixel 9 Build/AP4A.250205.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.0.0 Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/526.0.0.50.104;]',
+                'browser_family' => 'Facebook In-App',
+                'device_class' => 'mobile',
+                'os_family' => 'Android',
+                'reason' => 'in_app_browser_recognized',
+            ],
+            'generic_ios_webview' => [
+                'user_agent' => 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+                'browser_family' => 'iOS WebView',
+                'device_class' => 'mobile',
+                'os_family' => 'iOS',
+                'reason' => 'embedded_webview_recognized',
+            ],
+        ] as $case) {
+            $eventId = (string) Str::uuid();
+
+            $this->postObservation(
+                host: 'public.example.test',
+                eventId: $eventId,
+                sessionToken: '0123456789abcdef0123456789abcdef',
+                userAgent: $case['user_agent'],
+                fetchSite: null,
+            )->assertStatus(202);
+
+            $observation = ReportingObservation::query()
+                ->where('event_id', $eventId)
+                ->firstOrFail();
+
+            $this->assertSame('likely_human', $observation->traffic_class);
+            $this->assertSame(3, $observation->classifier_version);
+            $this->assertSame($case['browser_family'], $observation->browser_family);
+            $this->assertSame($case['device_class'], $observation->device_class);
+            $this->assertSame($case['os_family'], $observation->os_family);
+            $this->assertContains($case['reason'], $observation->classification_reasons);
+        }
+    }
+
+    public function test_existing_unknown_session_is_promoted_when_later_request_evidence_is_stronger(): void
+    {
+        $this->configureBrowserEvent('public.example.test');
+        $sessionToken = '0123456789abcdef0123456789abcdef';
+
+        $this->postObservation(
+            host: 'public.example.test',
+            eventId: (string) Str::uuid(),
+            sessionToken: $sessionToken,
+            userAgent: 'ExampleClient/1.0',
+            fetchSite: null,
+        )->assertStatus(202);
+
+        $session = ReportingSession::query()->sole();
+        $this->assertSame('unknown', $session->traffic_class);
+
+        $this->postObservation(
+            host: 'public.example.test',
+            eventId: (string) Str::uuid(),
+            sessionToken: $sessionToken,
+            userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 393.0.0.33.71',
+            fetchSite: null,
+        )->assertStatus(202);
+
+        $session->refresh();
+
+        $this->assertSame('likely_human', $session->traffic_class);
+        $this->assertSame(3, $session->classifier_version);
+        $this->assertSame('Instagram In-App', $session->browser_family);
+        $this->assertContains('in_app_browser_recognized', $session->classification_reasons);
+    }
+
+    public function test_missing_or_unrecognized_user_agent_remains_unknown_under_classifier_v3(): void
     {
         $this->configureBrowserEvent('public.example.test');
 
@@ -188,7 +277,7 @@ class ReportingPublicTransportTest extends TestCase
 
             $this->assertSame('unknown', $observation->traffic_class);
             $this->assertSame('browser_request_signals', $observation->classifier_key);
-            $this->assertSame(2, $observation->classifier_version);
+            $this->assertSame(3, $observation->classifier_version);
             $this->assertEquals($case['reasons'], $observation->classification_reasons);
         }
     }
@@ -354,7 +443,7 @@ class ReportingPublicTransportTest extends TestCase
     {
         config([
             'reporting.collection.browser_enabled' => true,
-            'reporting.classification.browser_classifier' => 'request_signals_v2',
+            'reporting.classification.browser_classifier' => 'request_signals_v3',
             'reporting.ingestion.rate_limit_per_ip_per_minute' => 120,
             'reporting.ingestion.rate_limit_per_session_per_minute' => 90,
             'reporting.events' => [

@@ -45,10 +45,29 @@ final class ReportingSessionResolver
             ->first();
 
         if ($session instanceof ReportingSession) {
+            $updates = [];
+
             if ($session->last_seen_at === null || $receivedAt->greaterThan($session->last_seen_at)) {
-                $session->forceFill([
-                    'last_seen_at' => $receivedAt,
-                ])->save();
+                $updates['last_seen_at'] = $receivedAt;
+            }
+
+            if ($this->classificationRank($trafficClass) > $this->classificationRank($session->traffic_class)) {
+                $updates = [
+                    ...$updates,
+                    'traffic_class' => $trafficClass,
+                    'classifier_key' => $classifierKey,
+                    'classifier_version' => $classifierVersion,
+                    'classification_reasons' => $classificationReasons !== []
+                        ? $classificationReasons
+                        : null,
+                    'device_class' => $deviceClass ?? $session->device_class,
+                    'browser_family' => $browserFamily ?? $session->browser_family,
+                    'os_family' => $osFamily ?? $session->os_family,
+                ];
+            }
+
+            if ($updates !== []) {
+                $session->forceFill($updates)->save();
             }
 
             return $session->refresh();
@@ -86,6 +105,15 @@ final class ReportingSessionResolver
             'browser_family' => $browserFamily,
             'os_family' => $osFamily,
         ]);
+    }
+
+    private function classificationRank(mixed $trafficClass): int
+    {
+        return match ($trafficClass) {
+            'likely_automated' => 2,
+            'likely_human' => 1,
+            default => 0,
+        };
     }
 
     public function tokenHash(?string $sessionToken): ?string

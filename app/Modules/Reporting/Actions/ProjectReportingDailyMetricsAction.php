@@ -5,6 +5,7 @@ namespace App\Modules\Reporting\Actions;
 use App\Modules\Reporting\Models\ReportingDailyMetric;
 use App\Modules\Reporting\Models\ReportingObservation;
 use App\Modules\Reporting\Models\ReportingProjectionCheckpoint;
+use App\Modules\Reporting\Models\ReportingSession;
 use App\Support\Reporting\Data\ReportingProjectionFact;
 use App\Support\Reporting\Data\ReportingProjectionWindow;
 use App\Support\Reporting\ReportingProjectionFactRegistry;
@@ -16,9 +17,9 @@ final class ProjectReportingDailyMetricsAction
 {
     public const PROJECTOR_KEY = 'public_funnel';
 
-    public const PROJECTOR_VERSION = 1;
+    public const PROJECTOR_VERSION = 2;
 
-    public const METRIC_VERSION = 1;
+    public const METRIC_VERSION = 2;
 
     private const WEBINAR_SURFACE = 'webinar_registration';
 
@@ -27,6 +28,7 @@ final class ProjectReportingDailyMetricsAction
     private const OWNED_METRIC_KEYS = [
         'webinar.landing_sessions',
         'webinar.traffic_share',
+        'webinar.traffic_classification_resolution',
         'webinar.funnel_sessions',
         'webinar.registration_conversion',
         'webinar.validation_failure_rate',
@@ -217,6 +219,17 @@ final class ProjectReportingDailyMetricsAction
         $totalsBySlice = [];
 
         foreach ($profiles as $profile) {
+            $this->incrementCount(
+                metrics: $metrics,
+                metricKey: 'webinar.traffic_classification_resolution',
+                dimensions: [
+                    'slice' => 'all',
+                    'recorded_traffic_class' => $profile['recorded_traffic_class'],
+                    'effective_traffic_class' => $profile['traffic_class'],
+                    'reason' => $profile['traffic_resolution_reason'],
+                ],
+            );
+
             foreach ($this->sessionSlices($profile) as $slice) {
                 $totalKey = $this->dimensionIdentity($slice);
                 $totalsBySlice[$totalKey] = [
@@ -735,6 +748,13 @@ final class ProjectReportingDailyMetricsAction
     private function landingProfiles(Collection $observations): array
     {
         $profiles = [];
+        $observationsBySession = $observations
+            ->filter(fn (ReportingObservation $observation): bool =>
+                $observation->reporting_session_id !== null
+            )
+            ->groupBy(fn (ReportingObservation $observation): int =>
+                (int) $observation->reporting_session_id
+            );
 
         foreach ($observations
             ->where('event_key', 'webinar.page.view')
@@ -751,10 +771,17 @@ final class ProjectReportingDailyMetricsAction
             $properties = is_array($observation->properties)
                 ? $observation->properties
                 : [];
+            $sessionId = (int) $session->getKey();
+            $classification = $this->effectiveTrafficClassification(
+                session: $session,
+                observations: $observationsBySession->get($sessionId, collect()),
+            );
 
-            $profiles[(int) $session->getKey()] = [
+            $profiles[$sessionId] = [
                 'path' => $observation->path,
-                'traffic_class' => $session->traffic_class ?: 'unknown',
+                'recorded_traffic_class' => $classification['recorded_class'],
+                'traffic_class' => $classification['effective_class'],
+                'traffic_resolution_reason' => $classification['reason'],
                 'utm_source' => $session->utm_source,
                 'utm_medium' => $session->utm_medium,
                 'utm_campaign' => $session->utm_campaign,
@@ -772,6 +799,111 @@ final class ProjectReportingDailyMetricsAction
         }
 
         return $profiles;
+    }
+
+    /**
+     * Raw request classification remains immutable. Projection may resolve an
+     * unknown session for analysis when retained evidence is strong enough to
+     * explain the calibration without inventing visitor identity.
+     *
+     * @param Collection<int, ReportingObservation> $observations
+     * @return array{recorded_class: string, effective_class: string, reason: string}
+     */
+    private function effectiveTrafficClassification(
+        ReportingSession $session,
+        Collection $observations,
+    ): array {
+        $recordedClass = in_array($session->traffic_class, [
+            'likely_human',
+            'likely_automated',
+            'unknown',
+        ], true)
+            ? (string) $session->traffic_class
+            : 'unknown';
+
+        if ($recordedClass !== 'unknown') {
+            return [
+                'recorded_class' => $recordedClass,
+                'effective_class' => $recordedClass,
+                'reason' => 'recorded_'.$recordedClass,
+            ];
+        }
+
+        $serverRejected = $observations->contains(function (ReportingObservation $observation): bool {
+            return $observation->event_key === 'webinar.bot_protection.result'
+                && data_get($observation->properties, 'outcome') === 'server_rejected';
+        });
+
+        if ($serverRejected) {
+            return [
+                'recorded_class' => 'unknown',
+                'effective_class' => 'unknown',
+                'reason' => 'server_bot_protection_rejected',
+            ];
+        }
+
+        $clientPassed = $observations->contains(function (ReportingObservation $observation): bool {
+            return $observation->event_key === 'webinar.bot_protection.result'
+                && data_get($observation->properties, 'outcome') === 'client_passed';
+        });
+
+        if ($clientPassed) {
+            return [
+                'recorded_class' => 'unknown',
+                'effective_class' => 'likely_human',
+                'reason' => 'client_bot_check_passed',
+            ];
+        }
+
+        $interactiveSubmit = $observations->contains(function (ReportingObservation $observation): bool {
+            return $observation->event_key === 'webinar.form.submit_attempt'
+                && data_get($observation->properties, 'bot_interacted') === true;
+        });
+
+        if ($interactiveSubmit) {
+            return [
+                'recorded_class' => 'unknown',
+                'effective_class' => 'likely_human',
+                'reason' => 'interactive_submit_evidence',
+            ];
+        }
+
+        $formInteracted = $observations->contains(
+            fn (ReportingObservation $observation): bool =>
+                $observation->event_key === 'webinar.form.start'
+        );
+
+        if ($formInteracted) {
+            return [
+                'recorded_class' => 'unknown',
+                'effective_class' => 'likely_human',
+                'reason' => 'active_form_interaction',
+            ];
+        }
+
+        $recordedReasons = is_array($session->classification_reasons)
+            ? array_values(array_filter(
+                $session->classification_reasons,
+                fn (mixed $reason): bool => is_string($reason) && trim($reason) !== '',
+            ))
+            : [];
+
+        if (in_array('user_agent_unrecognized', $recordedReasons, true)
+            && in_array($session->device_class, ['mobile', 'tablet'], true)
+            && in_array($session->os_family, ['iOS', 'Android'], true)
+        ) {
+            return [
+                'recorded_class' => 'unknown',
+                'effective_class' => 'likely_human',
+                'reason' => 'mobile_webview_evidence',
+            ];
+        }
+
+        return [
+            'recorded_class' => 'unknown',
+            'effective_class' => 'unknown',
+            'reason' => $recordedReasons[0] ?? 'insufficient_evidence',
+        ];
     }
 
     /**
@@ -1036,7 +1168,7 @@ final class ProjectReportingDailyMetricsAction
         DB::transaction(function () use ($metricDate, $rows): void {
             ReportingDailyMetric::query()
                 ->where('metric_date', $metricDate)
-                ->where('metric_version', self::METRIC_VERSION)
+                ->where('metric_version', '<=', self::METRIC_VERSION)
                 ->whereIn('metric_key', self::OWNED_METRIC_KEYS)
                 ->delete();
 

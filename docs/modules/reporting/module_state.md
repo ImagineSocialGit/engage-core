@@ -516,9 +516,11 @@ The exact classifier implementation may use narrow FOSS-derived device/bot parsi
 
 Browser code cannot assert `likely_human` itself.
 
-The current classifier is the bounded server-owned `request_signals_v2` implementation. It parses the full request user agent transiently, retains only coarse device/browser/OS families, and discards the full string. Explicit automation/headless/crawler request signatures classify as `likely_automated`. A recognized browser family on an already accepted same-origin public observation classifies as `likely_human` whether `Sec-Fetch-Site: same-origin` is present or omitted; the reason codes preserve whether Fetch Metadata was available. An explicitly non-same-origin Fetch Metadata value remains ambiguous and therefore `unknown` (and the public collection policy rejects it before persistence). Missing/unrecognized user-agent evidence also remains `unknown`. Version 1 history is not retroactively reclassified, so historical meaning remains explainable.
+The current classifier is the bounded server-owned `request_signals_v3` implementation. It parses the full request user agent transiently, retains only coarse device/browser/OS families, and discards the full string. Explicit automation/headless/crawler request signatures classify as `likely_automated`. Recognized standard browsers, Meta in-app browsers, and bounded iOS/Android WebView signatures on an already accepted same-origin public observation classify as `likely_human` whether `Sec-Fetch-Site: same-origin` is present or omitted; the reason codes preserve both embedded-browser recognition and whether Fetch Metadata was available. An explicitly non-same-origin Fetch Metadata value remains ambiguous and therefore `unknown` (and the public collection policy rejects it before persistence). Missing/unrecognized user-agent evidence remains `unknown` at ingestion.
 
-Imported, page-only/uncorrelated, unknown, and likely-automated traffic remain visible in Reporting. They do not silently enter the primary likely-human conversion denominator.
+Raw request classification remains immutable and explainable. The version-2 daily projector may resolve a retained `unknown` session into the analysis `likely_human` population only when bounded retained evidence explains the decision: a successful client bot/interactivity check, an interactive submit/form-start event, or a historical unrecognized mobile iOS/Android WebView signature inferred from retained coarse device/OS fields. Explicit `likely_automated` sessions are never promoted. Remaining unknown reasons and unknown-to-human calibration counts are projected and exposed in the CRM workspace.
+
+Imported, page-only/uncorrelated, unresolved unknown, and likely-automated traffic remain visible in Reporting. Unresolved unknown and likely-automated traffic do not enter the primary likely-human conversion denominator.
 
 ## Attribution contract
 
@@ -880,7 +882,7 @@ reporting.attribution
     explicitly approved click-ID keys and dedicated hash key
 
 reporting.classification
-    browser_classifier = request_signals_v2
+    browser_classifier = request_signals_v3
 
 reporting.retention
     raw_observations_days = 45
@@ -1193,7 +1195,7 @@ host-scoped ephemeral sessions and attribution normalization are implemented, in
 POST /_reporting/observations is the generic stateless public transport
 resources/js/reporting/client.js is the generic fail-open browser client
 public collection requires an event-definition surface plus exact browser_hosts match
-request classification is server-owned and persists only coarse bounded results; request_signals_v2 does not require optional Fetch Metadata when a recognized browser reaches the already same-origin-approved endpoint
+request classification is server-owned and persists only coarse bounded results; request_signals_v3 does not require optional Fetch Metadata when a recognized browser reaches the already same-origin-approved endpoint
 Webinars contributes namespaced browser funnel definitions through App\Support\Reporting only
 the Webinar registration page records page/CTA/modal/form/validation/throttle/bot diagnostics with bounded properties
 submit-attempt UUID correlation is available without copying the Reporting session token into Webinar state
@@ -1210,7 +1212,7 @@ Reporting now owns a CRM Webinar Registration workspace over retained daily aggr
 current Reporting, Webinar, and Messaging dependency cones have no detected module-boundary violations
 ```
 
-The first Reporting CRM workspace is implemented over the durable aggregate foundation. Phase 7B adds the concrete Meta CSV import/preview flow, period-based external measurement semantics, name-only fallback support, and stable-ID platform-vs-Engage comparison reads. Phase 7C retains authoritative imported external measurement history through the optional Reporting Project State section. Phase 7D calibrates browser request classification so a recognized browser is not excluded from the primary likely-human denominator merely because the optional `Sec-Fetch-Site` header is absent; classifier provenance advances to version 2 and historical version 1 rows retain their original meaning. Phase 8A adds a deterministic first-investigation layer, denominator clarity, bounded ad-attribution guidance, and explicit recent-data refresh while retaining the detailed evidence underneath. Phase 8B adds guarded directional comparison across source, campaign, group, creative, placement, landing page, presentation, and device dimensions using only retained likely-human conversion slices and explicit minimum-sample rules.
+The first Reporting CRM workspace is implemented over the durable aggregate foundation. Phase 7B adds the concrete Meta CSV import/preview flow, period-based external measurement semantics, name-only fallback support, and stable-ID platform-vs-Engage comparison reads. Phase 7C retains authoritative imported external measurement history through the optional Reporting Project State section. Phase 7D calibrates browser request classification so a recognized browser is not excluded from the primary likely-human denominator merely because the optional `Sec-Fetch-Site` header is absent. Phase 7E advances the classifier to version 3 to recognize common Meta in-app and embedded mobile WebView traffic, while projector version 2 can resolve retained historical unknowns from bounded mobile-WebView or first-party interaction evidence without rewriting raw request classification. Phase 8A adds a deterministic first-investigation layer, denominator clarity, bounded ad-attribution guidance, and explicit recent-data refresh while retaining the detailed evidence underneath. Phase 8B adds guarded directional comparison across source, campaign, group, creative, placement, landing page, presentation, and device dimensions using only retained likely-human conversion slices and explicit minimum-sample rules.
 
 ## Deferred possibilities
 

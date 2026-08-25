@@ -413,15 +413,15 @@
                 <div class="border-b border-slate-100 p-5 sm:p-8">
                     <h2 class="text-xl font-semibold tracking-tight text-slate-950">Traffic quality</h2>
                     <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
-                        Classification is intentionally conservative. Unknown traffic stays visible instead of being silently counted as human or automated.
+                        Request classification remains conservative, while the daily projection may resolve older unknown mobile-WebView or strong first-party interaction evidence without rewriting the raw observation.
                     </p>
                 </div>
 
                 <div class="grid gap-4 p-5 sm:grid-cols-3 sm:p-8">
                     @foreach([
-                        ['key' => 'likely_human', 'label' => 'Likely human', 'description' => 'Recognized browser traffic with same-origin request signals.'],
+                        ['key' => 'likely_human', 'label' => 'Likely human', 'description' => 'Recognized browser traffic plus bounded calibration from retained WebView or interaction evidence.'],
                         ['key' => 'likely_automated', 'label' => 'Likely automated', 'description' => 'Explicit crawler, bot, or headless signals.'],
-                        ['key' => 'unknown', 'label' => 'Unknown', 'description' => 'Not enough evidence to classify confidently.'],
+                        ['key' => 'unknown', 'label' => 'Unknown', 'description' => 'Still unresolved after request-signal and retained-behavior calibration.'],
                     ] as $trafficItem)
                         @php
                             $traffic = $report['traffic'][$trafficItem['key']];
@@ -436,6 +436,55 @@
                         </article>
                     @endforeach
                 </div>
+
+                @if(
+                    ($report['classification_resolution']['promoted_unknown'] ?? []) !== []
+                    || ($report['classification_resolution']['remaining_unknown'] ?? []) !== []
+                )
+                    <div class="border-t border-slate-100 px-5 py-5 sm:px-8">
+                        <div class="grid gap-5 lg:grid-cols-2">
+                            <div>
+                                <h3 class="text-sm font-semibold text-slate-950">Unknown sessions resolved for analysis</h3>
+                                <p class="mt-1 text-xs leading-5 text-slate-600">
+                                    These sessions were recorded as unknown, but retained evidence is strong enough to include them in the likely-human funnel without changing the raw classification record.
+                                </p>
+
+                                @if(($report['classification_resolution']['promoted_unknown'] ?? []) === [])
+                                    <p class="mt-3 text-sm text-slate-500">No unknown sessions were resolved in this period.</p>
+                                @else
+                                    <div class="mt-3 flex flex-wrap gap-2">
+                                        @foreach($report['classification_resolution']['promoted_unknown'] as $item)
+                                            <span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-950 ring-1 ring-emerald-200">
+                                                {{ $item['label'] }}
+                                                <span class="text-emerald-700">{{ number_format((int) $item['count']) }}</span>
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div>
+                                <h3 class="text-sm font-semibold text-slate-950">Why traffic is still unknown</h3>
+                                <p class="mt-1 text-xs leading-5 text-slate-600">
+                                    Remaining unknown sessions stay out of the primary conversion denominator until Reporting has stronger evidence.
+                                </p>
+
+                                @if(($report['classification_resolution']['remaining_unknown'] ?? []) === [])
+                                    <p class="mt-3 text-sm text-slate-500">No unresolved unknown sessions remain in this period.</p>
+                                @else
+                                    <div class="mt-3 flex flex-wrap gap-2">
+                                        @foreach($report['classification_resolution']['remaining_unknown'] as $item)
+                                            <span class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-800 ring-1 ring-slate-200">
+                                                {{ $item['label'] }}
+                                                <span class="text-slate-600">{{ number_format((int) $item['count']) }}</span>
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </section>
 
             <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
@@ -758,7 +807,7 @@
             <section class="rounded-3xl border border-slate-200 bg-slate-50/80 p-5 text-sm text-slate-700 shadow-sm sm:p-8">
                 <h2 class="font-semibold text-slate-950">How to read this report</h2>
                 <ul class="mt-3 list-disc space-y-2 pl-5 leading-6">
-                    <li>Primary registration conversion uses likely-human browser-observed landing sessions as its denominator; “Observed landing” totals in breakdowns can also include automated and unknown traffic.</li>
+                    <li>Primary registration conversion uses the calibrated likely-human browser-observed population; raw request classification remains auditable, and unresolved unknown plus automated traffic stay visible outside the denominator.</li>
                     <li>Validation failure rate uses submit attempts, not landing sessions.</li>
                     <li>Imported or uncorrelated registrations are visible in authoritative totals but do not inflate browser conversion.</li>
                     <li>Provider, confirmation, join, and attendance percentages use their own eligible authoritative populations.</li>

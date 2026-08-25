@@ -8,9 +8,9 @@ use LogicException;
 
 final class ReportingBrowserRequestClassifier
 {
-    public const CONFIG_KEY = 'request_signals_v2';
+    public const CONFIG_KEY = 'request_signals_v3';
     public const CLASSIFIER_KEY = 'browser_request_signals';
-    public const CLASSIFIER_VERSION = 2;
+    public const CLASSIFIER_VERSION = 3;
 
     private const AUTOMATION_PATTERN = '/(?:bot|crawler|spider|slurp|bingpreview|facebookexternalhit|facebot|twitterbot|linkedinbot|discordbot|telegrambot|whatsapp|yandexbot|baiduspider|duckduckbot|semrushbot|ahrefsbot|headlesschrome|phantomjs|selenium|playwright|puppeteer|curl\/|wget\/|python-requests|go-http-client|apache-httpclient)/i';
 
@@ -61,6 +61,7 @@ final class ReportingBrowserRequestClassifier
                 trafficClass: 'unknown',
                 reasons: [
                     'browser_family_recognized',
+                    ...$this->browserRecognitionReasons($browserFamily),
                     'fetch_metadata_not_same_origin',
                 ],
                 deviceClass: $deviceClass,
@@ -73,6 +74,7 @@ final class ReportingBrowserRequestClassifier
             trafficClass: 'likely_human',
             reasons: [
                 'browser_family_recognized',
+                ...$this->browserRecognitionReasons($browserFamily),
                 $fetchSite === 'same-origin'
                     ? 'same_origin_fetch_metadata'
                     : 'fetch_metadata_missing',
@@ -111,6 +113,10 @@ final class ReportingBrowserRequestClassifier
         }
 
         return match (true) {
+            preg_match('/(?:\bMessengerForiOS\b|\bFBAN\/MessengerForiOS\b|\bOrca-Android\b)/i', $userAgent) === 1 => 'Messenger In-App',
+            preg_match('/\bInstagram(?:\s|\/)/i', $userAgent) === 1 => 'Instagram In-App',
+            preg_match('/(?:\bFBAN\/|\bFBAV\/|\bFB_IAB\/|\bFBIOS\b|\bFB4A\b)/i', $userAgent) === 1 => 'Facebook In-App',
+            $this->isAndroidWebView($userAgent) => 'Android WebView',
             preg_match('/\bEdg(?:A|iOS)?\//', $userAgent) === 1 => 'Edge',
             preg_match('/\bOPR\//', $userAgent) === 1 => 'Opera',
             preg_match('/\bSamsungBrowser\//', $userAgent) === 1 => 'Samsung Internet',
@@ -118,8 +124,43 @@ final class ReportingBrowserRequestClassifier
             preg_match('/\b(?:Firefox|FxiOS)\//', $userAgent) === 1 => 'Firefox',
             preg_match('/\bSafari\//', $userAgent) === 1
                 && preg_match('/\bVersion\//', $userAgent) === 1 => 'Safari',
+            $this->isIosWebView($userAgent) => 'iOS WebView',
             default => null,
         };
+    }
+
+    /** @return array<int, string> */
+    private function browserRecognitionReasons(string $browserFamily): array
+    {
+        return match ($browserFamily) {
+            'Instagram In-App', 'Facebook In-App', 'Messenger In-App' => [
+                'in_app_browser_recognized',
+            ],
+            'Android WebView', 'iOS WebView' => [
+                'embedded_webview_recognized',
+            ],
+            default => [],
+        };
+    }
+
+    private function isAndroidWebView(string $userAgent): bool
+    {
+        return preg_match('/\bAndroid\b/i', $userAgent) === 1
+            && (
+                preg_match('/;\s*wv\)/i', $userAgent) === 1
+                || (
+                    preg_match('/\bVersion\/4\.0\b/i', $userAgent) === 1
+                    && preg_match('/\bChrome\//i', $userAgent) === 1
+                )
+            );
+    }
+
+    private function isIosWebView(string $userAgent): bool
+    {
+        return preg_match('/\b(?:iPhone|iPad|iPod)\b/i', $userAgent) === 1
+            && preg_match('/\bAppleWebKit\//i', $userAgent) === 1
+            && preg_match('/\bMobile\//i', $userAgent) === 1
+            && preg_match('/\bSafari\//i', $userAgent) !== 1;
     }
 
     private function deviceClass(string $userAgent, ?string $browserFamily): ?string

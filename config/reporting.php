@@ -70,7 +70,7 @@ return [
     */
 
     'classification' => [
-        'browser_classifier' => 'request_signals_v2',
+        'browser_classifier' => 'request_signals_v3',
     ],
 
     /*

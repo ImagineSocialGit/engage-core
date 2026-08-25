@@ -63,6 +63,7 @@ final class ReportingWorkspaceReadService
         );
         $adPlatformComparisons = $this->adPlatformComparisons($from, $through);
         $performanceComparisons = $this->performanceComparisons($rows);
+        $classificationResolution = $this->classificationResolutionSummary($rows);
 
         return [
             'has_data' => $rows->isNotEmpty(),
@@ -105,6 +106,7 @@ final class ReportingWorkspaceReadService
             ],
             'validation_fields' => $validationFields,
             'traffic' => $traffic,
+            'classification_resolution' => $classificationResolution,
             'ad_platform_comparisons' => $adPlatformComparisons,
             'performance_comparisons' => $performanceComparisons,
             'campaigns' => $this->browserBreakdown(
@@ -490,14 +492,14 @@ final class ReportingWorkspaceReadService
         $registrations = (int) ($correlationCoverage['denominator'] ?? 0);
 
         $body = sprintf(
-            'The primary funnel uses %s likely-human landing sessions out of %s observed landing sessions.',
+            'The primary funnel uses %s likely-human landing sessions out of %s observed landing sessions after bounded traffic-classification calibration.',
             number_format($likelyHuman),
             number_format($observed),
         );
 
         if ($unknown > 0) {
             $body .= sprintf(
-                ' %s observed landing sessions remain unknown and are intentionally excluded from conversion.',
+                ' %s observed landing sessions remain unresolved and are excluded from conversion.',
                 number_format($unknown),
             );
         }
@@ -510,14 +512,14 @@ final class ReportingWorkspaceReadService
             );
         }
 
-        $nextStep = 'Use the likely-human funnel for conversion decisions and the broader observed totals only as traffic-quality context.';
+        $nextStep = 'Use the calibrated likely-human funnel for conversion decisions while keeping unresolved and automated traffic visible as traffic-quality context.';
         $tone = 'positive';
 
         if ($registrations > 0 && $correlated < $registrations) {
             $nextStep = 'Treat browser-to-registration conversion as incomplete coverage until correlation improves; authoritative registration totals remain valid.';
             $tone = 'attention';
         } elseif ($unknown > 0) {
-            $nextStep = 'Keep the unknown share visible when interpreting conversion; do not silently add those sessions to the likely-human denominator.';
+            $nextStep = 'Review the remaining unknown-reason breakdown before interpreting conversion; Reporting only promotes unknown sessions when retained evidence explains the promotion.';
             $tone = 'neutral';
         }
 
@@ -688,7 +690,7 @@ final class ReportingWorkspaceReadService
             $insights[] = [
                 'title' => 'Traffic quality',
                 'body' => sprintf(
-                    '%s%% of observed landing traffic is classified as likely human; %s%% is likely automated and %s%% remains unknown.',
+                    '%s%% of observed landing traffic is classified as likely human after bounded calibration; %s%% is likely automated and %s%% remains unresolved.',
                     $this->formatPercent($humanShare['percent']),
                     $this->formatPercent($traffic['likely_automated']['share']['percent']),
                     $this->formatPercent($traffic['unknown']['share']['percent']),
@@ -1301,6 +1303,90 @@ final class ReportingWorkspaceReadService
     /**
      * @return array<int, array{value: string, count: int}>
      */
+    /**
+     * @return array{
+     *     promoted_unknown: array<int, array{reason: string, label: string, count: int}>,
+     *     remaining_unknown: array<int, array{reason: string, label: string, count: int}>
+     * }
+     */
+    private function classificationResolutionSummary(Collection $rows): array
+    {
+        return [
+            'promoted_unknown' => $this->classificationResolutionBreakdown(
+                rows: $rows,
+                recordedClass: 'unknown',
+                effectiveClass: 'likely_human',
+            ),
+            'remaining_unknown' => $this->classificationResolutionBreakdown(
+                rows: $rows,
+                recordedClass: 'unknown',
+                effectiveClass: 'unknown',
+            ),
+        ];
+    }
+
+    /**
+     * @return array<int, array{reason: string, label: string, count: int}>
+     */
+    private function classificationResolutionBreakdown(
+        Collection $rows,
+        string $recordedClass,
+        string $effectiveClass,
+    ): array {
+        $groups = [];
+
+        foreach ($this->metricRows(
+            $rows,
+            'webinar.traffic_classification_resolution',
+            ['slice' => 'all'],
+        ) as $row) {
+            $dimensions = is_array($row->dimensions) ? $row->dimensions : [];
+
+            if (($dimensions['recorded_traffic_class'] ?? null) !== $recordedClass
+                || ($dimensions['effective_traffic_class'] ?? null) !== $effectiveClass
+            ) {
+                continue;
+            }
+
+            $reason = $dimensions['reason'] ?? null;
+
+            if (! is_string($reason) || trim($reason) === '') {
+                continue;
+            }
+
+            $reason = trim($reason);
+            $groups[$reason] = ($groups[$reason] ?? 0) + (int) $row->numerator;
+        }
+
+        arsort($groups);
+
+        return array_map(
+            fn (string $reason, int $count): array => [
+                'reason' => $reason,
+                'label' => $this->classificationResolutionLabel($reason),
+                'count' => $count,
+            ],
+            array_keys($groups),
+            array_values($groups),
+        );
+    }
+
+    private function classificationResolutionLabel(string $reason): string
+    {
+        return match ($reason) {
+            'client_bot_check_passed' => 'Passed the client interaction check',
+            'interactive_submit_evidence' => 'Interactive submit evidence',
+            'active_form_interaction' => 'Active form interaction',
+            'mobile_webview_evidence' => 'Mobile app / embedded WebView evidence',
+            'server_bot_protection_rejected' => 'Server bot protection rejected the request',
+            'user_agent_missing' => 'User agent missing',
+            'user_agent_unrecognized' => 'User agent unrecognized',
+            'fetch_metadata_not_same_origin' => 'Fetch metadata was not same-origin',
+            'insufficient_evidence' => 'Insufficient classification evidence',
+            default => str_replace('_', ' ', ucfirst($reason)),
+        };
+    }
+
     private function dimensionCountBreakdown(
         Collection $rows,
         string $metricKey,
