@@ -612,6 +612,7 @@ Current implemented authorable Point types:
 
 ```text
 Wait
+Decision
 Change contact status
 Create task
 Send message
@@ -633,11 +634,13 @@ Create a Task automatically
 
 The editor should apply the same consequence-first posture to other automatic actions: explain repeated execution, skipped/no-op behavior, availability constraints, and the condition that allows a wait to resume.
 
-Advanced internal Point types may exist in the runtime model, but the normal Route editor does not expose arbitrary branching, graph editing, joins, connectors, nested branch trees, or generic node-canvas behavior.
+`Decision` is a constrained business branch. It checks one supported fact, sends the matching path to a named later Point, and either sends the otherwise path to another later Point or ends the Route. Existing advanced preset Decisions remain visible in plain language and are preserved when their shape cannot be represented safely by the constrained editor.
+
+The normal Route editor still does not expose arbitrary graph editing, joins, connectors, nested branch trees, or generic node-canvas behavior.
 
 The durable product rule is:
 
-> Routes are explicitly linear. Their purpose is to remove repetitive coordination and managerial work, not to become a generic automation canvas.
+> Routes are ordered procedural sequences with constrained forward Decisions. Their purpose is to remove repetitive coordination and managerial work, not to become a generic automation canvas.
 
 A useful product test is:
 
@@ -774,12 +777,11 @@ Prospect status changed
 
 Those are Points in one Route, not several unrelated active Routes competing for the same trigger.
 
-The normal client/operator authoring product is deliberately linear.
+The normal client/operator authoring product is deliberately ordered and forward-only.
 
 Do not expose:
 
 ```text
-arbitrary branching
 true/false path canvases
 joins
 nested branch trees
@@ -788,7 +790,7 @@ generic node-editor behavior
 arbitrary jump-back loops
 ```
 
-Internal runtime support for advanced Point types does not make those concepts appropriate for normal Route authoring.
+The supported `Decision` Point is not a general graph editor: it cannot jump backward, loop, join arbitrary branches, or create nested branch trees.
 
 Current Point placement policy:
 
@@ -799,6 +801,12 @@ Wait
 
 Change Status
     must be the final Point
+
+Decision
+    checks one supported business fact in normal authoring
+    every destination must be an active later Point
+    an otherwise path may end the Route
+    cannot jump backward or create a loop
 
 Create Task
     may occur anywhere

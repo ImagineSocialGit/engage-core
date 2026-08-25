@@ -35,6 +35,8 @@ class SaveInboundReplyProfileRequest extends FormRequest
             ],
             'label' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
+            'return_to' => ['nullable', 'string', 'max:2048'],
+            'reply_editor_profile_key' => ['nullable', 'string', 'max:96'],
             'intents' => ['required', 'array', 'min:1', 'max:20'],
             'intents.*.key' => [
                 'required',

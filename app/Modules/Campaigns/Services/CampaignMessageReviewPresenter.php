@@ -124,6 +124,12 @@ final class CampaignMessageReviewPresenter
                         'messageTemplatePreset' => $presetId,
                     ])
                     : '';
+                $message['reply_handling_update_action'] = $variantId > 0
+                    ? route('crm.campaigns.messages.reply-handling.update', [
+                        'campaign' => $campaign,
+                        'messageChainStepVariant' => $variantId,
+                    ])
+                    : '';
                 $messages[$messageIndex] = $message;
             }
 

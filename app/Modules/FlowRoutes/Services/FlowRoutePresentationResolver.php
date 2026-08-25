@@ -8,6 +8,7 @@ use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Support\AutomationCapabilities\AutomationPointAuthoringRegistry;
 use App\Support\AutomationCapabilities\Data\AutomationPointAuthoringContext;
+use App\Support\ReplyHandling\ReplyProfilePresentationRegistry;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -18,6 +19,7 @@ class FlowRoutePresentationResolver
 
     public function __construct(
         private readonly AutomationPointAuthoringRegistry $authoring,
+        private readonly ReplyProfilePresentationRegistry $replyProfiles,
     ) {}
 
     /**
@@ -83,7 +85,8 @@ class FlowRoutePresentationResolver
      *     type_label: string,
      *     label: string|null,
      *     summary: string,
-     *     condition_summaries: array<int, string>
+     *     condition_summaries: array<int, string>,
+     *     decision_paths: array<int, array<string, mixed>>
      * }>
      */
     public function presentedPoints(FlowRoute $route, ?Collection $points = null): array
@@ -104,6 +107,9 @@ class FlowRoutePresentationResolver
                     'label' => $this->meaningfulPointLabel($point),
                     'summary' => $this->pointEditorSummary($point, $route),
                     'condition_summaries' => array_slice($summaries, 1),
+                    'decision_paths' => $point->type === FlowRoutePointType::BranchEvaluate->value
+                        ? $this->decisionPaths($point, $route)
+                        : [],
                     'fields' => $this->authoring->has((string) $point->type)
                         ? $this->authoring->fields(
                             (string) $point->type,
@@ -139,7 +145,9 @@ class FlowRoutePresentationResolver
     {
         $route ??= $point->flowRoute;
         $definition = is_array($point->definition) ? $point->definition : [];
-        $primary = $this->authoring->has((string) $point->type)
+        $primary = $point->type === FlowRoutePointType::BranchEvaluate->value
+            ? $this->decisionSummary($point, $route)
+            : ($this->authoring->has((string) $point->type)
             ? $this->authoring->summary(
                 (string) $point->type,
                 $definition,
@@ -151,7 +159,7 @@ class FlowRoutePresentationResolver
                 FlowRoutePointType::BranchEvaluate->value => 'Choose the next path based on conditions.',
                 FlowRoutePointType::Noop->value => 'No action.',
                 default => (string) ($point->description ?: $point->name),
-            };
+            });
 
         return array_values(array_filter([
             $primary,
@@ -244,6 +252,10 @@ class FlowRoutePresentationResolver
 
     private function meaningfulPointLabel(FlowRoutePoint $point): ?string
     {
+        if ($point->type === FlowRoutePointType::BranchEvaluate->value) {
+            return null;
+        }
+
         $label = trim((string) $point->name);
 
         if ($label === '') {
@@ -284,6 +296,10 @@ class FlowRoutePresentationResolver
     {
         $definition = is_array($point->definition) ? $point->definition : [];
 
+        if ($point->type === FlowRoutePointType::BranchEvaluate->value) {
+            return $this->decisionSummary($point, $route);
+        }
+
         if ($this->authoring->has((string) $point->type)) {
             return $this->authoring->editorSummary(
                 (string) $point->type,
@@ -293,6 +309,178 @@ class FlowRoutePresentationResolver
         }
 
         return (string) ($point->description ?: $point->name);
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function decisionPaths(FlowRoutePoint $point, FlowRoute $route): array
+    {
+        $definition = is_array($point->definition) ? $point->definition : [];
+        $pointsByKey = $route->activeFlowRoutePoints()
+            ->get(['key', 'name'])
+            ->keyBy('key');
+        $paths = [];
+
+        foreach ($definition['branches'] ?? [] as $branch) {
+            if (! is_array($branch)) {
+                continue;
+            }
+
+            $conditions = is_array($branch['conditions'] ?? null)
+                ? array_values(array_filter($branch['conditions'], 'is_array'))
+                : [];
+            $targetKey = trim((string) ($branch['target_flow_route_point_key'] ?? ''));
+
+            $paths[] = [
+                'kind' => 'match',
+                'condition' => $this->decisionConditionSummary($conditions),
+                'destination' => $this->decisionDestination($targetKey, $pointsByKey),
+                'destination_key' => $targetKey !== '' ? $targetKey : null,
+            ];
+        }
+
+        $defaultTarget = trim((string) ($definition['default_target_flow_route_point_key'] ?? ''));
+        $paths[] = [
+            'kind' => 'otherwise',
+            'condition' => 'Otherwise',
+            'destination' => $defaultTarget !== ''
+                ? $this->decisionDestination($defaultTarget, $pointsByKey)
+                : 'End this Route',
+            'destination_key' => $defaultTarget !== '' ? $defaultTarget : null,
+        ];
+
+        return $paths;
+    }
+
+    private function decisionSummary(FlowRoutePoint $point, FlowRoute $route): string
+    {
+        $path = collect($this->decisionPaths($point, $route))->firstWhere('kind', 'match');
+        $condition = is_array($path) ? trim((string) ($path['condition'] ?? '')) : '';
+
+        if (str_starts_with($condition, 'If ')) {
+            $condition = Str::lower(Str::after($condition, 'If '));
+        }
+
+        return $condition !== ''
+            ? 'Decide whether '.$condition.'.'
+            : 'Decide what should happen next.';
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $conditions
+     */
+    private function decisionConditionSummary(array $conditions): string
+    {
+        $conditionsByPath = collect($conditions)
+            ->filter(fn (array $condition): bool => is_string($condition['path'] ?? null))
+            ->keyBy(fn (array $condition): string => (string) $condition['path']);
+        $profileCondition = $conditionsByPath->get(
+            'automation_event.payload.inbound_message.reply_profile_key',
+        );
+        $intentCondition = $conditionsByPath->get(
+            'automation_event.payload.inbound_message.reply_intent_key',
+        );
+
+        if (is_array($profileCondition) && is_array($intentCondition)) {
+            $profileKeys = $this->conditionValues($profileCondition);
+            $intentKeys = $this->conditionValues($intentCondition);
+            $outcomes = [];
+
+            foreach ($profileKeys as $profileKey) {
+                $profile = $this->replyProfiles->find($profileKey);
+
+                foreach ($intentKeys as $intentKey) {
+                    $intent = $profile !== null
+                        ? collect($profile->intents)->firstWhere('key', $intentKey)
+                        : null;
+                    $outcomes[] = ($profile?->label ?? Str::headline($profileKey))
+                        .' — '.(is_array($intent)
+                            ? (string) ($intent['label'] ?? Str::headline($intentKey))
+                            : Str::headline($intentKey));
+                }
+            }
+
+            $summary = 'If the reply outcome is '.$this->humanList($outcomes);
+            $channelCondition = $conditionsByPath->get(
+                'automation_event.payload.inbound_message.channel',
+            );
+
+            if (is_array($channelCondition)) {
+                $summary .= ' by '.$this->humanList(array_map(
+                    fn (string $channel): string => Str::upper($channel),
+                    $this->conditionValues($channelCondition),
+                ));
+            }
+
+            return $summary;
+        }
+
+        if (count($conditions) === 1) {
+            $condition = $conditions[0];
+            $values = $this->conditionValues($condition);
+
+            if (($condition['source'] ?? null) === 'contact_status'
+                && ($condition['path'] ?? null) === 'key') {
+                return 'If the contact status is '.$this->humanList(array_map(
+                    fn (string $statusKey): string => $this->statusName($statusKey),
+                    $values,
+                ));
+            }
+
+            if (($condition['source'] ?? null) === 'contact_tags') {
+                return 'If the contact has the tag '.$this->humanList($values);
+            }
+        }
+
+        $parts = collect($conditions)
+            ->map(function (array $condition): string {
+                $label = Str::of((string) ($condition['path'] ?? $condition['source'] ?? 'fact'))
+                    ->afterLast('.')
+                    ->headline()
+                    ->lower()
+                    ->toString();
+                $operator = match ((string) ($condition['operator'] ?? 'equals')) {
+                    'in', 'equals' => 'is',
+                    'contains' => 'contains',
+                    default => Str::headline((string) ($condition['operator'] ?? 'matches')),
+                };
+
+                return trim($label.' '.$operator.' '.$this->humanList($this->conditionValues($condition)));
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        return $parts !== []
+            ? 'If '.implode(' and ', $parts)
+            : 'If the configured conditions match';
+    }
+
+    /** @param array<string, mixed> $condition @return array<int, string> */
+    private function conditionValues(array $condition): array
+    {
+        $values = is_array($condition['values'] ?? null)
+            ? $condition['values']
+            : [$condition['value'] ?? null];
+
+        return array_values(array_filter(array_map(
+            fn (mixed $value): ?string => is_scalar($value) && trim((string) $value) !== ''
+                ? trim((string) $value)
+                : null,
+            $values,
+        )));
+    }
+
+    private function decisionDestination(string $targetKey, Collection $pointsByKey): string
+    {
+        $target = $pointsByKey->get($targetKey);
+
+        if ($target instanceof FlowRoutePoint) {
+            $name = trim((string) $target->name);
+
+            return $name !== '' ? $name : Str::headline($targetKey);
+        }
+
+        return $targetKey !== '' ? Str::headline($targetKey) : 'End this Route';
     }
 
     private function compactSummary(FlowRoute $route, array $summaryPoints): string

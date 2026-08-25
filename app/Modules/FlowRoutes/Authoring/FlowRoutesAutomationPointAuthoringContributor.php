@@ -3,10 +3,14 @@
 namespace App\Modules\FlowRoutes\Authoring;
 
 use App\Modules\Core\Models\ContactStatus;
+use App\Modules\FlowRoutes\Data\Points\BranchEvaluatePointDefinition;
+use App\Modules\FlowRoutes\Models\FlowRoute;
+use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Data\Points\WaitPointDefinition;
 use App\Support\AutomationCapabilities\Contracts\AutomationPointAuthoringContributor;
 use App\Support\AutomationCapabilities\Data\AutomationPointAuthoringContext;
 use App\Support\AutomationCapabilities\Data\AutomationPointAuthoringDefinition;
+use App\Support\ReplyHandling\ReplyProfilePresentationRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -14,8 +18,26 @@ use Throwable;
 
 class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAuthoringContributor
 {
+    public function __construct(
+        private readonly ReplyProfilePresentationRegistry $replyProfiles,
+    ) {}
+
     public function definitions(): iterable
     {
+        yield new AutomationPointAuthoringDefinition(
+            pointType: 'branch_evaluate',
+            moduleKey: 'flow_routes',
+            name: 'Decision',
+            description: 'Check one business fact and direct the Route to a later Point when it matches.',
+            tip: 'Use a Decision only when the next action depends on a contact fact or reply outcome. Each path must move forward so the Route cannot loop back on itself.',
+            useCases: [
+                'Continue to a task only when the contact has a selected status.',
+                'Handle a configured reply outcome differently from other replies.',
+            ],
+            typeLabel: 'Decision',
+            genericLabels: ['branch evaluate', 'evaluate branch', 'decision'],
+        );
+
         yield new AutomationPointAuthoringDefinition(
             pointType: 'wait',
             moduleKey: 'flow_routes',
@@ -48,13 +70,15 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
 
     public function available(string $pointType, AutomationPointAuthoringContext $context): bool
     {
-        return $pointType !== 'wait' || $context->existingPointTypes !== [];
+        return ! in_array($pointType, ['wait', 'branch_evaluate'], true)
+            || $context->existingPointTypes !== [];
     }
 
     public function fields(string $pointType, array $definition, AutomationPointAuthoringContext $context): array
     {
         return match ($pointType) {
             'wait' => $this->waitFields($definition),
+            'branch_evaluate' => $this->decisionFields($definition, $context),
             'change_status' => [[
                 'type' => 'select',
                 'name' => 'contact_status_key',
@@ -84,6 +108,15 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
                 'duration_unit' => ['nullable', 'in:minutes,hours,days,weeks'],
                 'resume_at' => ['nullable', 'date'],
             ],
+            'branch_evaluate' => [
+                'preserve_definition' => ['nullable', 'boolean'],
+                'decision_fact' => ['required_unless:preserve_definition,1', 'nullable', 'in:contact_status,contact_tag,reply_outcome'],
+                'decision_status_key' => ['required_if:decision_fact,contact_status', 'nullable', 'string', 'max:255'],
+                'decision_tag' => ['required_if:decision_fact,contact_tag', 'nullable', 'string', 'max:255'],
+                'decision_reply_outcome' => ['required_if:decision_fact,reply_outcome', 'nullable', 'string', 'max:255'],
+                'decision_target_point_key' => ['required_unless:preserve_definition,1', 'nullable', 'string', 'max:255'],
+                'decision_otherwise_target_point_key' => ['nullable', 'string', 'max:255'],
+            ],
             'change_status' => [
                 'contact_status_key' => ['required', 'string', 'max:255'],
             ],
@@ -95,6 +128,7 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
     {
         return match ($pointType) {
             'wait' => $this->waitDefinition($input),
+            'branch_evaluate' => $this->decisionDefinition($input, $context),
             'change_status' => $this->changeStatusDefinition($input),
             default => throw ValidationException::withMessages([
                 'capability_id' => 'That FlowRoutes-native Point type is not authorable.',
@@ -117,6 +151,7 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
 
         return match ($pointType) {
             'wait' => 'Wait',
+            'branch_evaluate' => 'Decision',
             'change_status' => 'Change status to '.Str::headline((string) ($definition['contact_status_key'] ?? 'selected status')),
             default => $fallback,
         };
@@ -126,6 +161,7 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
     {
         return match ($pointType) {
             'wait' => $this->waitSummary($definition),
+            'branch_evaluate' => $this->decisionSummary($definition),
             'change_status' => $this->changeStatusSummary($definition),
             default => '',
         };
@@ -136,6 +172,359 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
         return Str::of($this->summary($pointType, $definition, $context))
             ->rtrim('.')
             ->toString();
+    }
+
+    /** @param array<string, mixed> $definition */
+    private function decisionFields(array $definition, AutomationPointAuthoringContext $context): array
+    {
+        $draft = $this->decisionDraft($definition);
+
+        if ($definition !== [] && $draft === null) {
+            return [
+                [
+                    'type' => 'notice',
+                    'title' => 'This Decision has advanced paths',
+                    'body' => 'Its existing paths will be preserved. Use the Decision summary to review what happens, or replace it with simpler forward-only Decisions.',
+                ],
+                [
+                    'type' => 'hidden',
+                    'name' => 'preserve_definition',
+                    'value' => '1',
+                ],
+            ];
+        }
+
+        $draft ??= [
+            'fact' => 'contact_status',
+            'status_key' => '',
+            'tag' => '',
+            'reply_outcome' => '',
+            'target' => '',
+            'otherwise_target' => '',
+        ];
+
+        $targetOptions = $this->decisionTargetOptions($context);
+
+        return [
+            [
+                'type' => 'select',
+                'name' => 'decision_fact',
+                'label' => 'What should this Decision check?',
+                'required' => true,
+                'state' => true,
+                'value' => $draft['fact'],
+                'options' => [
+                    ['value' => 'contact_status', 'label' => 'Contact status'],
+                    ['value' => 'contact_tag', 'label' => 'Contact tag'],
+                    ['value' => 'reply_outcome', 'label' => 'Reply outcome'],
+                ],
+            ],
+            [
+                'type' => 'select',
+                'name' => 'decision_status_key',
+                'label' => 'Status to match',
+                'required' => true,
+                'value' => $draft['status_key'],
+                'placeholder' => 'Choose a status',
+                'show_when' => ['field' => 'decision_fact', 'equals' => 'contact_status'],
+                'options' => ContactStatus::query()
+                    ->active()
+                    ->ordered()
+                    ->get(['key', 'name'])
+                    ->map(fn (ContactStatus $status): array => [
+                        'value' => (string) $status->key,
+                        'label' => (string) $status->name,
+                    ])->all(),
+            ],
+            [
+                'type' => 'text',
+                'name' => 'decision_tag',
+                'label' => 'Tag to match',
+                'required' => true,
+                'value' => $draft['tag'],
+                'show_when' => ['field' => 'decision_fact', 'equals' => 'contact_tag'],
+            ],
+            [
+                'type' => 'select',
+                'name' => 'decision_reply_outcome',
+                'label' => 'Reply outcome to match',
+                'required' => true,
+                'value' => $draft['reply_outcome'],
+                'placeholder' => 'Choose a reply outcome',
+                'show_when' => ['field' => 'decision_fact', 'equals' => 'reply_outcome'],
+                'options' => $this->replyOutcomeOptions(),
+            ],
+            [
+                'type' => 'select',
+                'name' => 'decision_target_point_key',
+                'label' => 'When it matches, continue at',
+                'required' => true,
+                'value' => $draft['target'],
+                'placeholder' => 'Choose a later Point',
+                'options' => $targetOptions,
+            ],
+            [
+                'type' => 'select',
+                'name' => 'decision_otherwise_target_point_key',
+                'label' => 'Otherwise',
+                'value' => $draft['otherwise_target'],
+                'placeholder' => 'End this Route',
+                'options' => $targetOptions,
+                'help' => 'Leave blank to end the Route when the fact does not match.',
+            ],
+        ];
+    }
+
+    /** @param array<string, mixed> $input */
+    private function decisionDefinition(array $input, AutomationPointAuthoringContext $context): array
+    {
+        if (filter_var($input['preserve_definition'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            if ($context->point instanceof FlowRoutePoint && is_array($context->point->definition)) {
+                return $context->point->definition;
+            }
+
+            throw ValidationException::withMessages([
+                'preserve_definition' => 'There is no existing Decision definition to preserve.',
+            ]);
+        }
+
+        $fact = trim((string) ($input['decision_fact'] ?? ''));
+        $target = trim((string) ($input['decision_target_point_key'] ?? ''));
+        $otherwiseTarget = trim((string) ($input['decision_otherwise_target_point_key'] ?? ''));
+        $allowedTargets = collect($this->decisionTargetOptions($context))->pluck('value')->all();
+
+        if ($target === '' || ! in_array($target, $allowedTargets, true)) {
+            throw ValidationException::withMessages([
+                'decision_target_point_key' => 'Choose an active Point in this Route.',
+            ]);
+        }
+
+        if ($otherwiseTarget !== '' && ! in_array($otherwiseTarget, $allowedTargets, true)) {
+            throw ValidationException::withMessages([
+                'decision_otherwise_target_point_key' => 'Choose an active Point in this Route or end the Route.',
+            ]);
+        }
+
+        $conditions = match ($fact) {
+            'contact_status' => [$this->statusDecisionCondition($input)],
+            'contact_tag' => [$this->tagDecisionCondition($input)],
+            'reply_outcome' => $this->replyDecisionConditions($input),
+            default => throw ValidationException::withMessages([
+                'decision_fact' => 'Choose what this Decision should check.',
+            ]),
+        };
+
+        $definition = [
+            'branches' => [[
+                'conditions' => $conditions,
+                'target_flow_route_point_key' => $target,
+            ]],
+            'on_no_match' => BranchEvaluatePointDefinition::ON_NO_MATCH_COMPLETED,
+        ];
+
+        if ($otherwiseTarget !== '') {
+            $definition['default_target_flow_route_point_key'] = $otherwiseTarget;
+        }
+
+        return $definition;
+    }
+
+    /** @return array<string, mixed> */
+    private function statusDecisionCondition(array $input): array
+    {
+        $statusKey = trim((string) ($input['decision_status_key'] ?? ''));
+
+        if (! ContactStatus::query()->active()->where('key', $statusKey)->exists()) {
+            throw ValidationException::withMessages([
+                'decision_status_key' => 'Choose an active status.',
+            ]);
+        }
+
+        return [
+            'source' => 'contact_status',
+            'path' => 'key',
+            'operator' => 'equals',
+            'value' => $statusKey,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function tagDecisionCondition(array $input): array
+    {
+        $tag = trim((string) ($input['decision_tag'] ?? ''));
+
+        if ($tag === '') {
+            throw ValidationException::withMessages([
+                'decision_tag' => 'Enter the tag this Decision should match.',
+            ]);
+        }
+
+        return [
+            'source' => 'contact_tags',
+            'path' => 'values',
+            'operator' => 'contains',
+            'value' => $tag,
+        ];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function replyDecisionConditions(array $input): array
+    {
+        $outcome = trim((string) ($input['decision_reply_outcome'] ?? ''));
+        [$profileKey, $intentKey] = array_pad(explode('::', $outcome, 2), 2, '');
+        $profile = $this->replyProfiles->find($profileKey);
+        $intentExists = $profile !== null && collect($profile->intents)->contains(
+            fn (array $intent): bool => (string) ($intent['key'] ?? '') === $intentKey
+                && (bool) ($intent['active'] ?? false),
+        );
+
+        if (! $profile?->active || ! $intentExists) {
+            throw ValidationException::withMessages([
+                'decision_reply_outcome' => 'Choose an active reply outcome.',
+            ]);
+        }
+
+        return [
+            [
+                'source' => 'execution_meta',
+                'path' => 'automation_event.payload.inbound_message.reply_profile_key',
+                'operator' => 'equals',
+                'value' => $profileKey,
+            ],
+            [
+                'source' => 'execution_meta',
+                'path' => 'automation_event.payload.inbound_message.reply_intent_key',
+                'operator' => 'equals',
+                'value' => $intentKey,
+            ],
+        ];
+    }
+
+    /** @return array<int, array{value: string, label: string}> */
+    private function decisionTargetOptions(AutomationPointAuthoringContext $context): array
+    {
+        if (! $context->container instanceof FlowRoute) {
+            return [];
+        }
+
+        $points = $context->container->activeFlowRoutePoints()
+            ->orderBy('sort_order')
+            ->get(['id', 'key', 'name', 'sort_order']);
+
+        if ($context->point instanceof FlowRoutePoint) {
+            $points = $points->filter(
+                fn (FlowRoutePoint $point): bool => (int) $point->sort_order > (int) $context->point->sort_order,
+            );
+        }
+
+        return $points->map(fn (FlowRoutePoint $point): array => [
+            'value' => (string) $point->key,
+            'label' => (string) ($point->name ?: Str::headline((string) $point->key)),
+        ])->values()->all();
+    }
+
+    /** @return array<int, array{value: string, label: string}> */
+    private function replyOutcomeOptions(): array
+    {
+        return collect($this->replyProfiles->all())
+            ->filter(fn ($profile): bool => $profile->active)
+            ->flatMap(fn ($profile): array => collect($profile->intents)
+                ->filter(fn (array $intent): bool => (bool) ($intent['active'] ?? false))
+                ->map(fn (array $intent): array => [
+                    'value' => $profile->key.'::'.(string) $intent['key'],
+                    'label' => $profile->label.' — '.(string) $intent['label'],
+                ])->all())
+            ->values()
+            ->all();
+    }
+
+    /** @return array<string, string>|null */
+    private function decisionDraft(array $definition): ?array
+    {
+        if ($definition === []) {
+            return null;
+        }
+
+        $parsed = BranchEvaluatePointDefinition::from($definition);
+
+        if (! $parsed->isValid() || count($parsed->branches) !== 1) {
+            return null;
+        }
+
+        $branch = $parsed->branches[0];
+        $conditions = is_array($branch['conditions'] ?? null)
+            ? array_values(array_filter($branch['conditions'], 'is_array'))
+            : [];
+        $target = trim((string) ($branch['target_flow_route_point_key'] ?? ''));
+        $otherwise = (string) ($parsed->defaultTargetFlowRoutePointKey ?? '');
+
+        if (count($conditions) === 1) {
+            $condition = $conditions[0];
+            $operator = (string) ($condition['operator'] ?? '');
+            $value = is_string($condition['value'] ?? null) ? trim($condition['value']) : '';
+
+            if (($condition['source'] ?? null) === 'contact_status'
+                && ($condition['path'] ?? null) === 'key'
+                && $operator === 'equals'
+                && $value !== '') {
+                return compact('target') + [
+                    'fact' => 'contact_status',
+                    'status_key' => $value,
+                    'tag' => '',
+                    'reply_outcome' => '',
+                    'otherwise_target' => $otherwise,
+                ];
+            }
+
+            if (($condition['source'] ?? null) === 'contact_tags'
+                && $operator === 'contains'
+                && $value !== '') {
+                return compact('target') + [
+                    'fact' => 'contact_tag',
+                    'status_key' => '',
+                    'tag' => $value,
+                    'reply_outcome' => '',
+                    'otherwise_target' => $otherwise,
+                ];
+            }
+        }
+
+        if (count($conditions) === 2) {
+            $valuesByPath = collect($conditions)->mapWithKeys(function (array $condition): array {
+                if (($condition['source'] ?? null) !== 'execution_meta'
+                    || ($condition['operator'] ?? null) !== 'equals'
+                    || ! is_string($condition['path'] ?? null)
+                    || ! is_string($condition['value'] ?? null)) {
+                    return [];
+                }
+
+                return [(string) $condition['path'] => (string) $condition['value']];
+            });
+            $profileKey = $valuesByPath->get('automation_event.payload.inbound_message.reply_profile_key');
+            $intentKey = $valuesByPath->get('automation_event.payload.inbound_message.reply_intent_key');
+
+            if (is_string($profileKey) && $profileKey !== '' && is_string($intentKey) && $intentKey !== '') {
+                return compact('target') + [
+                    'fact' => 'reply_outcome',
+                    'status_key' => '',
+                    'tag' => '',
+                    'reply_outcome' => $profileKey.'::'.$intentKey,
+                    'otherwise_target' => $otherwise,
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /** @param array<string, mixed> $definition */
+    private function decisionSummary(array $definition): string
+    {
+        $parsed = BranchEvaluatePointDefinition::from($definition);
+
+        return $parsed->isValid()
+            ? 'Choose what happens next using '.count($parsed->branches).' configured '.Str::plural('path', count($parsed->branches)).'.'
+            : 'Review this Decision before the Route continues.';
     }
 
     /** @param array<string, mixed> $definition */

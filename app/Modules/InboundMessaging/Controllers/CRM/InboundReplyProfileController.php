@@ -46,7 +46,11 @@ class InboundReplyProfileController extends Controller
             profile: $inboundReplyProfile,
         );
 
-        return $this->redirectTo($profile)
+        $returnTo = $this->safeReturnPath($request->input('return_to'));
+
+        return ($returnTo !== null
+                ? redirect($returnTo)
+                : $this->redirectTo($profile))
             ->with('status', 'Reply handling rules updated. Future replies will use the new rules.');
     }
 
@@ -85,5 +89,31 @@ class InboundReplyProfileController extends Controller
         return redirect()->route('crm.inbound-messaging.reply-profiles.index', [
             'profile' => $profile->key,
         ]);
+    }
+
+    private function safeReturnPath(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        if ($value === ''
+            || ! str_starts_with($value, '/')
+            || str_starts_with($value, '//')
+            || str_contains($value, '\\')
+            || preg_match('/[\x00-\x1F\x7F]/', $value) === 1
+        ) {
+            return null;
+        }
+
+        $parts = parse_url($value);
+
+        if ($parts === false || isset($parts['scheme']) || isset($parts['host'])) {
+            return null;
+        }
+
+        return $value;
     }
 }

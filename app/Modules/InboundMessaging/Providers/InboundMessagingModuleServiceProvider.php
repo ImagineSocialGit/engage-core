@@ -6,10 +6,12 @@ use App\Modules\InboundMessaging\Console\Commands\SyncInboundReplyProfilesComman
 use App\Modules\InboundMessaging\Services\ContactShow\ContactConversationShowDataProvider;
 use App\Modules\InboundMessaging\Services\Dashboard\LeadRepliesDashboardPanelProvider;
 use App\Modules\InboundMessaging\Services\Email\EmailWebhookHandlerResolver;
+use App\Modules\InboundMessaging\Services\ReplyProfiles\InboundReplyProfilePresentationProvider;
 use App\Modules\InboundMessaging\Services\Sms\SmsWebhookHandlerResolver;
 use App\Modules\InboundMessaging\Validation\InboundMessagingSetupValidationContributor;
 use App\Support\Dashboard\DashboardPanelRegistry;
 use App\Support\ReplyHandling\ReplyProfileDependencyRegistry;
+use App\Support\ReplyHandling\ReplyProfilePresentationRegistry;
 use Illuminate\Support\ServiceProvider;
 
 class InboundMessagingModuleServiceProvider extends ServiceProvider
@@ -26,6 +28,17 @@ class InboundMessagingModuleServiceProvider extends ServiceProvider
             ReplyProfileDependencyRegistry::class,
             fn ($app): ReplyProfileDependencyRegistry => new ReplyProfileDependencyRegistry(
                 $app->tagged(ReplyProfileDependencyRegistry::CONTRIBUTOR_TAG),
+            ),
+        );
+
+        $this->app->tag([
+            InboundReplyProfilePresentationProvider::class,
+        ], ReplyProfilePresentationRegistry::PROVIDER_TAG);
+
+        $this->app->singleton(
+            ReplyProfilePresentationRegistry::class,
+            fn ($app): ReplyProfilePresentationRegistry => new ReplyProfilePresentationRegistry(
+                $app->tagged(ReplyProfilePresentationRegistry::PROVIDER_TAG),
             ),
         );
 

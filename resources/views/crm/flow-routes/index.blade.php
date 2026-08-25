@@ -162,7 +162,7 @@
                                             <span class="hidden text-orange-700 group-open:inline">· Hide route flow</span>
                                         </summary>
 
-                                        <ol class="mt-4 flex flex-col gap-2 lg:flex-row lg:items-stretch" aria-label="Route flow">
+                                        <ol class="mt-4 max-w-3xl space-y-2" aria-label="Route flow">
                                             @foreach($route['presented_points'] as $index => $point)
                                                 <li class="flex min-w-0 items-center gap-2">
                                                     <div
@@ -176,17 +176,27 @@
                                                         <span class="min-w-0">
                                                             <span class="block font-medium">{{ $point['summary'] }}</span>
 
-                                                            @foreach($point['condition_summaries'] as $conditionSummary)
+                                                        @foreach($point['condition_summaries'] as $conditionSummary)
                                                                 <span class="mt-1 block text-xs leading-5 text-slate-700">
                                                                     {{ $conditionSummary }}
                                                                 </span>
-                                                            @endforeach
+                                                        @endforeach
+
+                                                        @if(($point['decision_paths'] ?? []) !== [])
+                                                            <span data-flow-route-decision-paths class="mt-2 grid gap-1.5">
+                                                                @foreach($point['decision_paths'] as $path)
+                                                                    <span class="rounded-lg bg-white/85 px-2.5 py-2 text-xs leading-5 ring-1 ring-black/10">
+                                                                        <span class="block font-semibold text-slate-800">{{ $path['condition'] }}</span>
+                                                                        <span class="block text-slate-600">Continue at: {{ $path['destination'] }}</span>
+                                                                    </span>
+                                                                @endforeach
+                                                            </span>
+                                                        @endif
                                                         </span>
                                                     </div>
 
                                                     @unless($loop->last)
-                                                        <span class="hidden shrink-0 text-lg font-bold text-orange-500 lg:inline" aria-hidden="true">→</span>
-                                                        <span class="shrink-0 self-center text-lg font-bold text-orange-500 lg:hidden" aria-hidden="true">↓</span>
+                                                        <span class="shrink-0 self-center text-lg font-bold text-orange-500" aria-hidden="true">↓</span>
                                                     @endunless
                                                 </li>
                                             @endforeach

@@ -1302,7 +1302,7 @@ Campaigns -> Campaign definitions and message steps
 FlowRoutes -> concrete Route orchestration
 ```
 
-Normal client/operator Route authoring is deliberately linear. Do not create config merely to expose arbitrary branching canvases, joins, nested branch trees, connectors, generic node-editor behavior, or arbitrary jump-back loops.
+Normal client/operator Route authoring is ordered and forward-only. A constrained `Decision` may check one supported business fact and continue at a later Point, but config must not be created merely to expose arbitrary branching canvases, joins, nested branch trees, connectors, generic node-editor behavior, or arbitrary jump-back loops.
 
 Current normal authoring placement policy:
 
@@ -1312,6 +1312,10 @@ wait
 
 change_status
     must be terminal
+
+branch_evaluate (Decision)
+    every target must be an active later Point
+    cannot jump backward or form a loop
 
 create_task
 send_message
@@ -1371,6 +1375,7 @@ The current normal Route editor supports:
 
 ```text
 Wait
+Decision
 Change contact status
 Create task
 Send message
@@ -1378,7 +1383,7 @@ Start Campaign
 Stop Campaign
 ```
 
-Advanced internal Point types may exist, but normal authoring is explicitly linear and does not expose arbitrary branching.
+Advanced internal Point types may exist, but normal authoring exposes only constrained forward Decisions. Existing advanced Decision definitions are preserved rather than flattened by an editor that cannot represent them safely.
 
 `Stop Campaign` is contextually shown only when the Route already contains a `Start Campaign` Point.
 

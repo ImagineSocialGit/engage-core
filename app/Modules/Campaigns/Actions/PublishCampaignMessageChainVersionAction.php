@@ -12,6 +12,7 @@ use App\Modules\Messaging\Models\MessageChainVersion;
 use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplateVersion;
+use App\Support\ReplyHandling\ReplyProfilePresentationRegistry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -20,6 +21,7 @@ final class PublishCampaignMessageChainVersionAction
 {
     public function __construct(
         private readonly PublishMessageChainVersionAction $publishMessageChainVersion,
+        private readonly ReplyProfilePresentationRegistry $replyProfiles,
     ) {}
 
     /**
@@ -189,6 +191,91 @@ final class PublishCampaignMessageChainVersionAction
                 stepKey: $stepKey,
                 variantKey: $variantKey,
                 replacement: $replacement,
+                createdBy: $createdBy,
+            );
+        }, 3);
+    }
+
+    public function replaceVariantReplyProfile(
+        Campaign $campaign,
+        int $expectedVersionId,
+        int $messageChainStepVariantId,
+        ?string $replyProfileKey,
+        ?User $createdBy = null,
+    ): MessageChainVersion {
+        return DB::transaction(function () use (
+            $campaign,
+            $expectedVersionId,
+            $messageChainStepVariantId,
+            $replyProfileKey,
+            $createdBy,
+        ): MessageChainVersion {
+            [$lockedCampaign, $chain, $version] = $this->lockedContext(
+                campaign: $campaign,
+                expectedVersionId: $expectedVersionId,
+            );
+            $target = MessageChainStepVariant::query()
+                ->whereKey($messageChainStepVariantId)
+                ->whereHas(
+                    'messageChainStep',
+                    fn ($query) => $query->where(
+                        'message_chain_version_id',
+                        $version->getKey(),
+                    ),
+                )
+                ->first();
+
+            if (! $target instanceof MessageChainStepVariant) {
+                throw ValidationException::withMessages([
+                    'reply_profile_key' => 'That message is no longer part of the current Campaign schedule.',
+                ]);
+            }
+
+            $replyProfileKey = $this->nullableString($replyProfileKey);
+            $replyProfile = $this->replyProfiles->find($replyProfileKey);
+
+            if ($replyProfileKey !== null
+                && ($replyProfile === null || ! $replyProfile->active)
+            ) {
+                throw ValidationException::withMessages([
+                    'reply_profile_key' => 'Choose an active reply profile.',
+                ]);
+            }
+
+            $target->loadMissing('messageChainStep');
+            $definition = $version->definition();
+            $found = false;
+
+            foreach ($definition['steps'] as &$step) {
+                if ((string) $step['key'] !== (string) $target->messageChainStep?->key) {
+                    continue;
+                }
+
+                foreach ($step['variants'] as &$variant) {
+                    if ((string) $variant['key'] !== (string) $target->key) {
+                        continue;
+                    }
+
+                    $variant['reply_profile_key'] = $replyProfileKey;
+                    $found = true;
+                    break;
+                }
+                unset($variant);
+                break;
+            }
+            unset($step);
+
+            if (! $found) {
+                throw ValidationException::withMessages([
+                    'reply_profile_key' => 'That message is no longer part of the current Campaign schedule.',
+                ]);
+            }
+
+            return $this->publish(
+                campaign: $lockedCampaign,
+                chain: $chain,
+                previousVersion: $version,
+                steps: $definition['steps'],
                 createdBy: $createdBy,
             );
         }, 3);

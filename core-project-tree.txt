@@ -2175,7 +2175,10 @@
 │       │   │   └── message-templates
 │       │   │       └── index.blade.php
 │       │   ├── process-highway
-│       │   │   └── index.blade.php
+│       │   │   ├── _business-process.blade.php
+│       │   │   ├── index.blade.php
+│       │   │   ├── _outcome.blade.php
+│       │   │   └── _segment.blade.php
 │       │   ├── project-state
 │       │   │   └── index.blade.php
 │       │   ├── reporting
@@ -2378,6 +2381,7 @@
 │   │   │   ├── ProcessHighwayGraphContractTest.php
 │   │   │   ├── ProcessHighwayMapBuilderTest.php
 │   │   │   ├── ProcessHighwaySurfaceTest.php
+│   │   │   ├── ProcessHighwayUsabilitySurfaceTest.php
 │   │   │   └── SyncContactStatusPresetsActionTest.php
 │   │   ├── CRM
 │   │   │   ├── DashboardControllerTest.php
@@ -2767,4 +2771,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-674 directories, 2094 files
+674 directories, 2098 files

@@ -8,11 +8,16 @@ use App\Modules\Messaging\Models\MessageChainVersion;
 use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplateVersion;
+use App\Support\ReplyHandling\ReplyProfilePresentationRegistry;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 final class MessageChainVersionCarouselPresenter
 {
+    public function __construct(
+        private readonly ReplyProfilePresentationRegistry $replyProfiles,
+    ) {}
+
     /** @return array<string, mixed> */
     public function present(MessageChainVersion $version): array
     {
@@ -71,6 +76,11 @@ final class MessageChainVersionCarouselPresenter
                 $payload = $templateVersion instanceof MessageTemplateVersion
                     ? $templateVersion->payload()
                     : [];
+                $replyProfileKey = is_string($variant->reply_profile_key)
+                    && trim($variant->reply_profile_key) !== ''
+                        ? trim($variant->reply_profile_key)
+                        : null;
+                $replyHandling = $this->replyProfiles->find($replyProfileKey);
 
                 $channels[$channel]['messages'][] = [
                     'id' => 'chain-variant:'.$variant->getKey(),
@@ -94,6 +104,11 @@ final class MessageChainVersionCarouselPresenter
                     'scope' => (string) $variant->scope,
                     'message_type' => (string) $variant->message_type,
                     'message_type_label' => Str::headline((string) $variant->message_type),
+                    'reply_profile_key' => $replyProfileKey,
+                    'reply_handling' => $replyHandling?->toArray(),
+                    'reply_handling_index_url' => $this->replyProfiles->indexUrl(),
+                    'reply_handling_update_action' => '',
+                    'reply_handling_version_id' => (int) $version->getKey(),
                     'timing' => $this->timingLabel($step, $stepPosition),
                     'area_label' => $version->messageChain?->name ?? 'Message chain',
                     'payload' => $payload,
@@ -124,6 +139,8 @@ final class MessageChainVersionCarouselPresenter
                 $channels,
             )),
             'channels' => $channels,
+            'reply_profile_options' => $this->replyProfiles->options(),
+            'reply_handling_index_url' => $this->replyProfiles->indexUrl(),
         ];
     }
 

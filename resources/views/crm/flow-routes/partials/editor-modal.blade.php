@@ -97,7 +97,7 @@
                     <div>
                         <h3 class="text-lg font-semibold tracking-tight text-slate-950">Route flow</h3>
                         <p class="mt-1 text-sm leading-6 text-slate-700">
-                            Points run from top to bottom. Drag to reorder, then save the order when it changes.
+                            Points normally continue from top to bottom. A Decision can direct the Route to a later Point or end it.
                         </p>
                     </div>
 
@@ -184,6 +184,17 @@
                                                 {{ $conditionSummary }}
                                             </p>
                                         @endforeach
+
+                                        @if(($presented['decision_paths'] ?? []) !== [])
+                                            <div data-flow-route-decision-paths class="mt-3 grid gap-2 sm:grid-cols-2">
+                                                @foreach($presented['decision_paths'] as $path)
+                                                    <div class="rounded-xl bg-white/85 px-3 py-2 text-xs leading-5 ring-1 ring-black/10">
+                                                        <span class="block font-semibold text-slate-800">{{ $path['condition'] }}</span>
+                                                        <span class="mt-0.5 block text-slate-600">Continue at: {{ $path['destination'] }}</span>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endif
                                     </div>
                                 </div>
 
@@ -280,7 +291,8 @@
 
                                     <div>
                                         <label for="point-name-{{ $point->id }}" class="text-sm font-semibold text-slate-900">
-                                            Internal label <span class="font-normal text-slate-600">(optional)</span>
+                                            {{ $point->type === \App\Modules\FlowRoutes\Enums\FlowRoutePointType::BranchEvaluate->value ? 'Decision question' : 'Internal label' }}
+                                            <span class="font-normal text-slate-600">(optional)</span>
                                         </label>
                                         <input
                                             id="point-name-{{ $point->id }}"
@@ -376,7 +388,8 @@
 
                                     <div>
                                         <label for="point-name-{{ $flowRoute->id }}-{{ $capability['id'] }}" class="text-sm font-semibold text-slate-900">
-                                            Internal label <span class="font-normal text-slate-600">(optional)</span>
+                                            {{ ($capability['point_type'] ?? '') === \App\Modules\FlowRoutes\Enums\FlowRoutePointType::BranchEvaluate->value ? 'Decision question' : 'Internal label' }}
+                                            <span class="font-normal text-slate-600">(optional)</span>
                                         </label>
                                         <input
                                             id="point-name-{{ $flowRoute->id }}-{{ $capability['id'] }}"

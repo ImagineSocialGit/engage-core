@@ -10,6 +10,7 @@ use App\Modules\Campaigns\Actions\UpdateCampaignEligibilityAction;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Requests\CampaignEligibilityAuthoringRequest;
 use App\Modules\Campaigns\Requests\UpdateCampaignMessageRequest;
+use App\Modules\Campaigns\Requests\UpdateCampaignMessageReplyHandlingRequest;
 use App\Modules\Campaigns\Requests\UpdateCampaignScheduleRequest;
 use App\Modules\Campaigns\Services\CampaignEligibilityAuthoringService;
 use App\Modules\Campaigns\Services\CampaignMessageReviewPresenter;
@@ -169,6 +170,29 @@ class CampaignController extends Controller
                 'panel' => 'messages',
             ])
             ->with('status', 'Message and Campaign schedule versions published for future enrollments.');
+    }
+
+    public function updateMessageReplyHandling(
+        UpdateCampaignMessageReplyHandlingRequest $request,
+        Campaign $campaign,
+        MessageChainStepVariant $messageChainStepVariant,
+        PublishCampaignMessageChainVersionAction $publishCampaignVersion,
+    ): RedirectResponse {
+        $actor = $request->user();
+        $published = $publishCampaignVersion->replaceVariantReplyProfile(
+            campaign: $campaign,
+            expectedVersionId: $request->expectedVersionId(),
+            messageChainStepVariantId: (int) $messageChainStepVariant->getKey(),
+            replyProfileKey: $request->replyProfileKey(),
+            createdBy: $actor instanceof User ? $actor : null,
+        );
+
+        return redirect()
+            ->route('crm.campaigns.edit', [
+                'campaign' => $campaign,
+                'panel' => 'messages',
+            ])
+            ->with('status', 'Reply handling updated in Campaign schedule version '.$published->version.'.');
     }
 
     public function previewEligibility(

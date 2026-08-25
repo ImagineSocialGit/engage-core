@@ -23,6 +23,11 @@
             $fieldId = $name !== '' ? $name.'-'.$fieldSuffix : 'notice-'.$fieldSuffix.'-'.$loop->index;
         @endphp
 
+        @if($type === 'hidden')
+            <input type="hidden" name="{{ $name }}" value="{{ $value }}">
+            @continue
+        @endif
+
         <div
             @if($showWhen)
                 x-show='authoringState[@js($showWhen['field'] ?? '')] === @js($showWhen['equals'] ?? null)'

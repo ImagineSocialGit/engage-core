@@ -74,6 +74,9 @@ Route::middleware('module:campaigns')
         Route::patch('/{campaign}/schedule', [CampaignController::class, 'updateSchedule'])
             ->name('schedule.update');
 
+        Route::patch('/{campaign}/messages/{messageChainStepVariant}/reply-handling', [CampaignController::class, 'updateMessageReplyHandling'])
+            ->name('messages.reply-handling.update');
+
         Route::patch('/{campaign}/messages/{messageChainStepVariant}/{messageTemplatePreset}', [CampaignController::class, 'updateMessage'])
             ->name('messages.update');
 

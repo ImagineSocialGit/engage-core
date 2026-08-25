@@ -34,11 +34,27 @@
     }
 
     $failedEditId = (string) old('_editing_message_id', '');
+    $failedReplyProfileKey = (string) old('reply_editor_profile_key', '');
+    $replyProfileOptions = is_array($presentation['reply_profile_options'] ?? null)
+        ? $presentation['reply_profile_options']
+        : [];
 
     if ($failedEditId !== '') {
         foreach ($channels as $channelKey => $channel) {
             foreach (array_values($channel['messages'] ?? []) as $messageIndex => $message) {
                 if ((string) ($message['id'] ?? '') === $failedEditId) {
+                    $initialChannel = $channelKey;
+                    $indexes[$channelKey] = $messageIndex;
+                    break 2;
+                }
+            }
+        }
+    }
+
+    if ($failedReplyProfileKey !== '') {
+        foreach ($channels as $channelKey => $channel) {
+            foreach (array_values($channel['messages'] ?? []) as $messageIndex => $message) {
+                if ((string) ($message['reply_profile_key'] ?? '') === $failedReplyProfileKey) {
                     $initialChannel = $channelKey;
                     $indexes[$channelKey] = $messageIndex;
                     break 2;
@@ -63,6 +79,7 @@
             indexes: @js($indexes),
             counts: @js($counts),
             editingId: @js($failedEditId !== '' ? $failedEditId : null),
+            replyEditingKey: @js($failedReplyProfileKey !== '' ? $failedReplyProfileKey : null),
             dirty: {{ $failedEditId !== '' ? 'true' : 'false' }},
             touchStartX: null,
             currentCount() {
@@ -85,6 +102,7 @@
 
                 this.channel = channel;
                 this.editingId = null;
+                this.replyEditingKey = null;
                 this.dirty = false;
             },
             navigate(delta) {
@@ -97,11 +115,25 @@
                 const current = this.indexes[this.channel] || 0;
                 this.indexes[this.channel] = (current + delta + count) % count;
                 this.editingId = null;
+                this.replyEditingKey = null;
                 this.dirty = false;
             },
             startEdit(id) {
+                this.replyEditingKey = null;
                 this.editingId = id;
                 this.dirty = false;
+            },
+            openReply(key) {
+                if (! this.canLeaveEdit()) {
+                    return;
+                }
+
+                this.editingId = null;
+                this.replyEditingKey = key;
+                this.dirty = false;
+            },
+            closeReply() {
+                this.replyEditingKey = null;
             },
             cancelEdit() {
                 if (! this.canLeaveEdit()) {
@@ -162,7 +194,7 @@
                     <span
                         data-message-editor-mode
                         class="rounded-full bg-white px-3 py-1.5 text-slate-700 ring-1 ring-slate-200"
-                        x-text="editingId ? 'Edit copy' : 'Published copy'"
+                        x-text="editingId ? 'Edit copy' : (replyEditingKey ? 'Edit replies' : 'Published copy')"
                     ></span>
                     <span class="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">
                         <span x-text="currentPosition()"></span>
@@ -233,6 +265,22 @@
                                 ? trim($message['update_action'])
                                 : '';
                             $canEdit = $editable && $updateAction !== '';
+                            $replyHandling = is_array($message['reply_handling'] ?? null)
+                                ? $message['reply_handling']
+                                : null;
+                            $replyProfileKey = is_string($message['reply_profile_key'] ?? null)
+                                ? trim($message['reply_profile_key'])
+                                : '';
+                            $replyHandlingUpdateAction = is_string($message['reply_handling_update_action'] ?? null)
+                                ? trim($message['reply_handling_update_action'])
+                                : '';
+                            $replyHandlingIndexUrl = is_string($message['reply_handling_index_url'] ?? null)
+                                ? trim($message['reply_handling_index_url'])
+                                : '';
+                            $replyHandlingVersionId = (int) ($message['reply_handling_version_id'] ?? 0);
+                            $canAssignReplyHandling = $editable
+                                && $replyHandlingUpdateAction !== ''
+                                && $replyHandlingVersionId > 0;
                         @endphp
 
                         <article
@@ -358,6 +406,106 @@
                                 <p class="mt-5 text-xs leading-5 text-slate-500">
                                     Exact published preview. Dynamic tokens stay visible here and resolve when the message is prepared for a recipient.
                                 </p>
+
+                                @if($canAssignReplyHandling || $replyHandling !== null)
+                                    <section data-message-reply-handling class="mt-6 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 sm:p-5">
+                                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                            <div>
+                                                <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-indigo-700">When someone replies</p>
+
+                                                @if($replyHandling !== null)
+                                                    <h4 class="mt-1 font-black text-slate-950">{{ $replyHandling['label'] }}</h4>
+                                                    @if(filled($replyHandling['description'] ?? null))
+                                                        <p class="mt-1 text-sm leading-6 text-slate-600">{{ $replyHandling['description'] }}</p>
+                                                    @endif
+                                                @else
+                                                    <p class="mt-1 text-sm font-semibold text-slate-800">No special reply handling is attached to this message.</p>
+                                                @endif
+                                            </div>
+
+                                            @if($replyHandling !== null && $editable && is_string($replyHandling['update_action'] ?? null) && trim($replyHandling['update_action']) !== '')
+                                                <button
+                                                    type="button"
+                                                    data-message-reply-editor-open
+                                                    x-on:click="openReply(@js($replyProfileKey))"
+                                                    class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full border border-indigo-300 bg-white px-4 text-xs font-extrabold text-indigo-900 hover:bg-indigo-50"
+                                                >
+                                                    Review &amp; edit
+                                                </button>
+                                            @elseif($replyHandling !== null && is_string($replyHandling['details_url'] ?? null) && trim($replyHandling['details_url']) !== '')
+                                                <a
+                                                    href="{{ $replyHandling['details_url'] }}"
+                                                    class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full border border-indigo-300 bg-white px-4 text-xs font-extrabold text-indigo-900 hover:bg-indigo-50"
+                                                >
+                                                    View reply handling
+                                                </a>
+                                            @endif
+                                        </div>
+
+                                        @if($replyHandling !== null)
+                                            <div class="mt-4 grid gap-3 md:grid-cols-2">
+                                                <div class="rounded-xl bg-white p-3 ring-1 ring-indigo-100">
+                                                    <p class="text-xs font-extrabold uppercase tracking-wide text-slate-500">Recognized replies</p>
+                                                    <div class="mt-2 space-y-2">
+                                                        @foreach(($replyHandling['intents'] ?? []) as $intent)
+                                                            @continue(! ($intent['active'] ?? false))
+                                                            <div class="text-sm leading-5">
+                                                                <span class="font-bold text-slate-900">{{ $intent['label'] }}</span>
+                                                                <span class="block text-xs text-slate-600">
+                                                                    {{ implode(', ', array_values(array_unique(array_merge($intent['exact'] ?? [], $intent['keywords'] ?? [])))) }}
+                                                                </span>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+
+                                                <div class="rounded-xl bg-white p-3 ring-1 ring-indigo-100">
+                                                    <p class="text-xs font-extrabold uppercase tracking-wide text-slate-500">What happens</p>
+                                                    @if(($replyHandling['dependencies'] ?? []) !== [])
+                                                        <div class="mt-2 space-y-2">
+                                                            @foreach($replyHandling['dependencies'] as $dependency)
+                                                                <div class="text-sm leading-5">
+                                                                    <span class="font-bold text-slate-900">{{ $dependency['label'] }}</span>
+                                                                    @if(filled($dependency['detail'] ?? null))
+                                                                        <span class="block text-xs text-slate-600">{{ $dependency['detail'] }}</span>
+                                                                    @endif
+                                                                </div>
+                                                            @endforeach
+                                                        </div>
+                                                    @else
+                                                        <p class="mt-2 text-sm leading-5 text-slate-600">The reply is classified for reporting, but no follow-up automation currently uses it.</p>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endif
+
+                                        @if($canAssignReplyHandling)
+                                            <form method="POST" action="{{ $replyHandlingUpdateAction }}" data-message-reply-profile-form class="mt-4 flex flex-col gap-2 border-t border-indigo-200 pt-4 sm:flex-row sm:items-end">
+                                                @csrf
+                                                @method('PATCH')
+                                                <input type="hidden" name="message_chain_version_id" value="{{ $formContext['message_chain_version_id'] ?? $replyHandlingVersionId }}">
+                                                <div class="min-w-0 flex-1">
+                                                    <label class="text-xs font-extrabold uppercase tracking-wide text-slate-600">Reply rule for this message</label>
+                                                    <select name="reply_profile_key" class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900">
+                                                        <option value="">No special reply handling</option>
+                                                        @foreach($replyProfileOptions as $option)
+                                                            <option
+                                                                value="{{ $option['value'] }}"
+                                                                @selected($replyProfileKey === (string) $option['value'])
+                                                                @disabled(! ($option['active'] ?? false) && $replyProfileKey !== (string) $option['value'])
+                                                            >
+                                                                {{ $option['label'] }}{{ ($option['active'] ?? false) ? '' : ' (inactive)' }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-full bg-indigo-950 px-5 text-xs font-extrabold text-white hover:bg-indigo-900">
+                                                    Save reply rule
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </section>
+                                @endif
                             </div>
 
                             @if($canEdit)
@@ -504,6 +652,80 @@
                                         </button>
                                     </div>
                                 </form>
+                            @endif
+
+                            @if($editable && $replyHandling !== null && is_string($replyHandling['update_action'] ?? null) && trim($replyHandling['update_action']) !== '')
+                                <div
+                                    x-show="replyEditingKey === @js($replyProfileKey)"
+                                    x-cloak
+                                    class="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/65 p-3 sm:p-6"
+                                    role="dialog"
+                                    aria-modal="true"
+                                    aria-label="Edit reply handling"
+                                >
+                                    <div x-on:click.outside="closeReply()" class="max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl sm:max-h-[92vh] sm:p-7">
+                                        <div class="flex items-start justify-between gap-4">
+                                            <div>
+                                                <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-indigo-700">Reply handling</p>
+                                                <h3 class="mt-1 text-xl font-black text-slate-950">{{ $replyHandling['label'] }}</h3>
+                                                <p class="mt-2 text-sm leading-6 text-slate-600">Edit the words this message recognizes. Existing replies are not reclassified.</p>
+                                            </div>
+                                            <button type="button" x-on:click="closeReply()" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-xl text-slate-700" aria-label="Close reply editor">×</button>
+                                        </div>
+
+                                        <form method="POST" action="{{ $replyHandling['update_action'] }}" data-message-reply-editor-form class="mt-6 space-y-5">
+                                            @csrf
+                                            @method('PATCH')
+                                            <input type="hidden" name="key" value="{{ $replyHandling['key'] }}">
+                                            <input type="hidden" name="label" value="{{ $replyHandling['label'] }}">
+                                            <input type="hidden" name="description" value="{{ $replyHandling['description'] ?? '' }}">
+                                            <input type="hidden" name="reply_editor_profile_key" value="{{ $replyProfileKey }}">
+
+                                            @foreach($formContext as $contextKey => $contextValue)
+                                                @if(is_scalar($contextValue) || $contextValue === null)
+                                                    <input type="hidden" name="{{ $contextKey }}" value="{{ $contextValue }}">
+                                                @endif
+                                            @endforeach
+
+                                            @foreach(($replyHandling['intents'] ?? []) as $intentIndex => $intent)
+                                                <section class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                                    <input type="hidden" name="intents[{{ $intentIndex }}][key]" value="{{ $intent['key'] }}">
+                                                    <input type="hidden" name="intents[{{ $intentIndex }}][label]" value="{{ $intent['label'] }}">
+                                                    <input type="hidden" name="intents[{{ $intentIndex }}][description]" value="{{ $intent['description'] ?? '' }}">
+                                                    <input type="hidden" name="intents[{{ $intentIndex }}][is_active]" value="{{ ($intent['active'] ?? false) ? '1' : '0' }}">
+
+                                                    <h4 class="font-black text-slate-950">{{ $intent['label'] }}</h4>
+                                                    @if(filled($intent['description'] ?? null))
+                                                        <p class="mt-1 text-sm leading-5 text-slate-600">{{ $intent['description'] }}</p>
+                                                    @endif
+
+                                                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                                                        <div>
+                                                            <label class="text-sm font-extrabold text-slate-800">Exact replies</label>
+                                                            <textarea name="intents[{{ $intentIndex }}][exact]" rows="5" class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm leading-6 text-slate-900">{{ $failedReplyProfileKey === $replyProfileKey ? old('intents.'.$intentIndex.'.exact', $intent['exact_text'] ?? '') : ($intent['exact_text'] ?? '') }}</textarea>
+                                                        </div>
+                                                        <div>
+                                                            <label class="text-sm font-extrabold text-slate-800">Keywords or phrases</label>
+                                                            <textarea name="intents[{{ $intentIndex }}][keywords]" rows="5" class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm leading-6 text-slate-900">{{ $failedReplyProfileKey === $replyProfileKey ? old('intents.'.$intentIndex.'.keywords', $intent['keywords_text'] ?? '') : ($intent['keywords_text'] ?? '') }}</textarea>
+                                                        </div>
+                                                    </div>
+                                                </section>
+                                            @endforeach
+
+                                            <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                                                @if($replyHandlingIndexUrl !== '')
+                                                    <a href="{{ $replyHandlingIndexUrl }}?profile={{ urlencode($replyProfileKey) }}" class="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-extrabold text-slate-700 hover:bg-slate-50">
+                                                        Open full Reply Handling
+                                                    </a>
+                                                @endif
+                                                <div class="flex flex-col-reverse gap-2 sm:flex-row">
+                                                    <button type="button" x-on:click="closeReply()" class="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-extrabold text-slate-700">Cancel</button>
+                                                    <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full bg-indigo-950 px-6 text-sm font-extrabold text-white hover:bg-indigo-900">Save reply handling</button>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
                             @endif
                         </article>
                     @endforeach

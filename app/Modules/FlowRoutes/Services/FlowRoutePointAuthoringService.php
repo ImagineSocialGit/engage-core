@@ -146,6 +146,11 @@ class FlowRoutePointAuthoringService
                 ]),
             ])->save();
 
+            $this->placementPolicy->assertValidSequence(
+                $route->activeFlowRoutePoints()->orderBy('sort_order')->get(),
+                'save',
+            );
+
             $this->markRouteCustomized($route);
 
             return $point->refresh();
