@@ -224,13 +224,15 @@ Context-aware Messaging token validation
     Unknown and registered-but-unavailable tokens are hard errors.
     A global reference token list is not executable authority.
 
-Consent domains
+Consent boundary and acknowledgement domains
     Message identity remains channel + purpose + scope.
-    Consent identity is channel + purpose + consent domain.
-    ConsentDomainRegistry resolves exact and longest-prefix mappings, fails on ambiguity,
-    and keeps unknown unmapped scopes narrow.
-    Webinar-related scopes intentionally resolve to the webinar consent domain.
-    Scope-specific Webinar opt_ins definitions were removed in favor of
+    Hard permission identity is channel + purpose.
+    Scope remains persisted context, attribution, compatibility, and audit metadata; it is
+    not a separate permission gate.
+    ConsentDomainRegistry remains acknowledgement/context resolution only. It resolves exact
+    and longest-prefix scope mappings, fails on ambiguity, and may group related Webinar
+    scopes under one human-readable acknowledgement topic without changing authorization.
+    Scope-specific Webinar opt_ins definitions remain removed in favor of
     ConsentOptInDefinitionResolver and generic/module/client acknowledgement copy.
 
 Consent acknowledgement delivery consolidation

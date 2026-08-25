@@ -9,7 +9,7 @@ Use for repeatable Messaging consent/channel checks. It is not backlog.
 - SMS opt-in remains explicit and requires a phone number when selected.
 - Accepted or previously claimed/sent invitations cannot create duplicate consent rows or resend through the bypass.
 - Inject the public preference URL at runtime before provider send.
-- Accepted consent scopes match `messaging.permission_invitations.consent.scopes`.
+- Permission-invitation acceptance creates one marketing consent grant per explicitly selected channel, with `permission_invitation` retained as capture scope/provenance.
 - Client copy may change without breaking behavioral tests.
 
 ## SMS/channel visibility

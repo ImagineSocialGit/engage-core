@@ -13,13 +13,13 @@ use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use Carbon\CarbonInterface;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ContactPermissionInvitationService
 {
     public const MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION = 'imported_contact_permission_invitation';
+    public const CONSENT_CAPTURE_SCOPE = 'permission_invitation';
 
     public function __construct(
         private readonly MessageChannelAvailability $channelAvailability,
@@ -169,9 +169,9 @@ class ContactPermissionInvitationService
         ?string $phone = null,
     ): ContactPermissionInvitation {
         $channels = $this->normalizedAcceptedChannels($channels);
-        $scopes = $this->consentScopes();
+        $scope = self::CONSENT_CAPTURE_SCOPE;
 
-        $result = DB::transaction(function () use ($invitation, $channels, $scopes, $request, $phone): array {
+        $result = DB::transaction(function () use ($invitation, $channels, $scope, $request, $phone): array {
             $lockedInvitation = ContactPermissionInvitation::query()
                 ->with('contact')
                 ->lockForUpdate()
@@ -209,22 +209,20 @@ class ContactPermissionInvitationService
             $acceptedAt = now();
 
             foreach ($channels as $channel) {
-                foreach ($scopes as $scope) {
-                    $this->recordMessageConsent->handle($contact, [
-                        'channel' => $channel,
-                        'purpose' => MessagePurpose::Marketing->value,
-                        'scope' => $scope,
-                        'consented_at' => $acceptedAt,
-                        'source' => 'imported_contact_permission_invitation',
-                        'ip_address' => $request->ip(),
-                        'user_agent' => $request->userAgent(),
-                        'meta' => [
-                            'permission_invitation_id' => $lockedInvitation->getKey(),
-                            'permission_invitation_source' => $lockedInvitation->source,
-                            'accepted_from' => 'public_form',
-                        ],
-                    ]);
-                }
+                $this->recordMessageConsent->handle($contact, [
+                    'channel' => $channel,
+                    'purpose' => MessagePurpose::Marketing->value,
+                    'scope' => $scope,
+                    'consented_at' => $acceptedAt,
+                    'source' => 'imported_contact_permission_invitation',
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                    'meta' => [
+                        'permission_invitation_id' => $lockedInvitation->getKey(),
+                        'permission_invitation_source' => $lockedInvitation->source,
+                        'accepted_from' => 'public_form',
+                    ],
+                ]);
             }
 
             $lockedInvitation->forceFill([
@@ -236,7 +234,8 @@ class ContactPermissionInvitationService
                         'ip_address' => $request->ip(),
                         'user_agent' => $request->userAgent(),
                         'channels' => $channels,
-                        'scopes' => $scopes,
+                        'purpose' => MessagePurpose::Marketing->value,
+                        'scope' => $scope,
                     ],
                 ]),
             ])->save();
@@ -254,7 +253,7 @@ class ContactPermissionInvitationService
             $this->emitAcceptedAutomationEvent(
                 invitation: $acceptedInvitation,
                 channels: $channels,
-                scopes: $scopes,
+                scope: $scope,
             );
         }
 
@@ -327,12 +326,11 @@ class ContactPermissionInvitationService
 
     /**
      * @param array<int, string> $channels
-     * @param array<int, string> $scopes
      */
     private function emitAcceptedAutomationEvent(
         ContactPermissionInvitation $invitation,
         array $channels,
-        array $scopes,
+        string $scope,
     ): void {
         event(new AutomationEventRecorded(
             AutomationEventData::forSubject(
@@ -348,7 +346,8 @@ class ContactPermissionInvitationService
                         'source' => $invitation->source,
                         'accepted_at' => $invitation->accepted_at?->toISOString(),
                         'accepted_channels' => $channels,
-                        'consent_scopes' => $scopes,
+                        'consent_purpose' => MessagePurpose::Marketing->value,
+                        'consent_scope' => $scope,
                         'context_type' => $invitation->context_type,
                         'context_id' => $invitation->context_id,
                         'scheduled_message_id' => $invitation->scheduled_message_id,
@@ -432,29 +431,8 @@ class ContactPermissionInvitationService
             channels: $channels,
             surface: 'permission_invitations',
             purpose: 'marketing',
-            scope: 'broadcast',
+            scope: self::CONSENT_CAPTURE_SCOPE,
         );
     }
 
-    /**
-     * @return array<int, string>
-     */
-    public function consentScopes(): array
-    {
-        $scopes = config('messaging.permission_invitations.consent.scopes', [
-            'broadcast',
-            'campaign',
-        ]);
-
-        if (! is_array($scopes)) {
-            return ['broadcast'];
-        }
-
-        return array_values(array_unique(array_filter(array_map(
-            fn (mixed $scope): ?string => is_string($scope) && trim($scope) !== ''
-                ? str_replace('-', '_', strtolower(trim($scope)))
-                : null,
-            Arr::wrap($scopes),
-        )))) ?: ['broadcast'];
-    }
 }

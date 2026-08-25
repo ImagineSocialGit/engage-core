@@ -121,13 +121,13 @@ class WebinarRegistrationCombinedConsentTest extends TestCase
             'contact_id' => $registration->contact_id,
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'webinar',
+            'scope' => 'webinar_nurture',
         ]);
         $this->assertDatabaseHas('message_consents', [
             'contact_id' => $registration->contact_id,
             'channel' => MessageChannel::Sms->value,
             'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'webinar',
+            'scope' => 'webinar_nurture',
         ]);
 
         $this->assertSame(3, MessageConsent::query()->count());

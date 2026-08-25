@@ -44,7 +44,7 @@ Messaging owns:
 - compact scheduled-message execution records;
 - provider delivery attempts and terminal outbox events;
 - recipient/destination gates;
-- message consent, consent domains, revocations, and suppressions;
+- channel+purpose message consent, acknowledgement domains, revocations, and suppressions;
 - consent acknowledgement resolution and delivery composition;
 - contact permission invitations;
 - email/SMS provider contracts and managers;
@@ -837,25 +837,55 @@ message_chains
 
 Hiding SMS from an authoring surface does not disable backend consent, suppression, STOP/HELP, provider, or send-guard behavior.
 
-## Consent domains and opt-in acknowledgements
+## Consent boundary, scope metadata, and opt-in acknowledgements
 
-Message identity and consent identity remain separate:
+Message identity and hard permission identity are separate:
 
 ```text
 Message identity
     channel + purpose + operational scope
 
-Consent identity
-    channel + purpose + consent domain
+Hard permission identity
+    channel + purpose
+
+Scope
+    context + compatibility + attribution + audit metadata
 ```
 
-Operational scope describes what a specific message is doing. Consent domain describes
-the permission boundary that authorizes it.
+Operational scope describes what a specific message is doing. It is not a second
+permission gate. A valid grant on `email + marketing` may authorize an eligible email
+marketing message carrying another scope. Email never authorizes SMS, and consent for
+one purpose never authorizes another purpose.
 
-`ConsentDomainRegistry` supports two layers of resolution:
+`MessageConsentStateResolver` evaluates the newest consent and newest revocation across
+the entire Contact + channel + purpose boundary. Existing historical rows keep their
+stored scopes; no data rewrite is required. When timestamps tie, revocation wins. A later
+valid grant can reactivate that channel + purpose.
+
+`RevokeMessageConsentAction` creates one authoritative revocation for the channel +
+purpose boundary. The revocation may retain a requested or related scope only as capture
+context. SMS STOP therefore blocks all SMS messages for the affected purpose regardless
+of message scope without revoking email.
+
+`MessageGate` remains the final send authority. For Contact recipients it checks:
 
 ```text
-1. optional client policy: channel + purpose -> consent domain
+runtime/provider support
+valid destination
+channel + purpose consent state when required
+permission-invitation one-time rules when applicable
+suppression
+recipient-specific gates
+```
+
+Scheduling a message does not freeze consent. Dispatch-time gate evaluation still means a
+later revocation prevents an already scheduled consent-gated message from sending.
+
+Messaging still owns `ConsentDomainRegistry`, but domain resolution is not authorization
+authority. It supports acknowledgement/context grouping:
+
+```text
+1. optional client channel + purpose acknowledgement topic/domain
 2. otherwise scope policy:
        exact mapping wins
        otherwise longest registered prefix wins
@@ -863,61 +893,39 @@ the permission boundary that authorizes it.
        unknown unmapped scope falls back to itself
 ```
 
-The channel-purpose layer exists for deliberately broad authorization such as:
+This allows related scopes such as `webinar`, `webinar_waitlist`, and
+`webinar_nurture` to share human-readable acknowledgement context while authorization
+remains channel + purpose.
 
-```text
-email + marketing + any operational marketing scope -> marketing
-sms   + marketing + any operational marketing scope -> marketing
-```
+Email and SMS remain separate permission boundaries. An email unsubscribe revokes email
+marketing without revoking SMS marketing; SMS STOP revokes SMS marketing without
+revoking email marketing.
 
-It is disabled by default. A client must explicitly configure both the broad domain and
-the affected channel/purpose mappings. This prevents a generic platform change from
-silently broadening another client's disclosure or permission policy.
+CRM/Campaign classification must not be encoded as consent scope. Tags, statuses,
+relationship stages, fields, Webinar outcomes, and Campaign eligibility decide whether a
+program is relevant. Consent answers only whether the Contact may be contacted on that
+channel for that purpose.
 
-Email and SMS remain separate consent identities even when both resolve to the same
-named domain. An email unsubscribe therefore revokes email marketing without revoking
-SMS marketing; SMS STOP revokes SMS marketing without revoking email marketing.
+Imported consent uses `ImportMessageConsentAction` so provenance/capture scope is
+retained without emitting `MessageConsentGranted` or triggering opt-in acknowledgement
+behavior. Imported permission still resolves at channel + purpose.
 
-CRM/Campaign classification must not be encoded as consent scope. Status, relationship,
-tags, Location, source, Campaign family/priority, and similar business facts decide
-which authorized marketing is appropriate. Moving a Contact from one marketing journey
-to another does not require new consent when both journeys resolve to the same active
-channel-purpose domain.
+Forms supplies only accepted channel + purpose intents. The Messaging bridge validates
+those values and records `forms` as capture scope. Forms does not require a broad consent
+domain mapping before a valid explicit grant can be recorded.
 
-Example selected-client policy:
+Permission-invitation delivery is deliberately separate from normal marketing sends. The
+one-time invitation message is `email + transactional + permission_invitation` and still
+passes imported-contact/one-time eligibility plus suppression. Public acceptance creates
+one normal `marketing` consent grant per explicitly selected channel with
+`permission_invitation` retained as capture scope/provenance.
 
-```php
-'consent' => [
-    'channel_purpose_domains' => [
-        'email' => ['marketing' => 'marketing'],
-        'sms' => ['marketing' => 'marketing'],
-    ],
-],
+Opt-in acknowledgement definition, delivery policy, consolidation, and fallback remain
+Messaging-owned. `ConsentOptInDefinitionResolver` may use the resolved acknowledgement
+domain/topic to produce human-readable copy. Do not expose raw scope keys as end-user
+consent copy and do not infer authorization from acknowledgement grouping.
 
-'consent_domains' => [
-    'marketing' => [
-        'topic' => 'marketing communications',
-        'scopes' => [],
-        'scope_prefixes' => [],
-        'opt_in' => [],
-    ],
-],
-```
-
-`GrantMessageConsentAction`, `ImportMessageConsentAction`, `RevokeMessageConsentAction`,
-`MessageGate`, consent-state resolution, permission-invitation eligibility, and opt-in
-acknowledgement resolution all use the canonical channel + purpose + scope resolution
-path.
-
-Imported consent uses the dedicated import path so it does not emit a grant
-acknowledgement.
-
-Existing consent rows are not automatically broadened when a client enables a broader
-channel-purpose policy. Historical rows remain evidence of the permission identity that
-was actually stored. Any production reclassification/backfill must be explicit and
-based on verified disclosure evidence rather than a generic migration.
-
-### Forms consent bridge
+## Forms consent bridge
 
 Forms may declare server-owned consent intents using only:
 
@@ -925,14 +933,11 @@ Forms may declare server-owned consent intents using only:
 field + channel + purpose
 ```
 
-Forms does not choose a Messaging consent domain and does not pass an interest/CRM scope
-as the permission boundary. The optional Forms-to-Messaging integration requires
-`ConsentDomainRegistry::channelPurposeDomainFor()` to resolve an explicit configured
-domain for every declared channel/purpose before it grants consent.
-
-This fail-closed requirement is deliberate. A client using narrow scope consent can keep
-that policy unchanged, but a FormVersion that is intended to establish broad marketing
-permission cannot silently fall back to a narrow form or campaign scope.
+Forms does not choose a Messaging permission scope and does not pass an interest/CRM scope
+as the permission boundary. The optional Forms-to-Messaging integration validates each
+declared channel and purpose and records accepted permission directly on that boundary.
+It stores `forms` as capture scope/provenance. `ConsentDomainRegistry` may still provide
+acknowledgement/topic context, but no explicit domain mapping is required to authorize the grant.
 
 When a normalized consent field is `true`, the integration grants through
 `GrantMessageConsentAction`. A false, omitted, or null field does not revoke existing
@@ -943,8 +948,8 @@ Forms passes only bounded provenance pointers such as the FormSubmission ID,
 FormVersion ID, and accepting field key. It does not copy disclosure text, interest
 tags, Turnstile evidence, or arbitrary form payloads into MessageConsent metadata.
 Campaigns and Broadcasts remain unchanged: they keep their operational message scopes
-and continue to rely on the Messaging gate, which resolves those scopes to the active
-channel+purpose consent domain.
+and continue to rely on the Messaging gate, which evaluates active consent on the exact
+channel+purpose boundary.
 
 ### Consent acknowledgement resolution
 

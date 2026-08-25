@@ -77,12 +77,12 @@ return [
         'require_active_consent' => true,
 
         /*
-        | Optional channel + purpose overrides may intentionally collapse many
-        | operational scopes into one stored consent domain. Keep this empty by
-        | default so existing clients remain narrow unless their disclosure and
-        | policy explicitly authorize broader consent.
+        | Optional channel + purpose mappings select acknowledgement/context
+        | domains only. They do not participate in permission authorization.
+        | Hard permission is always resolved by exact channel + purpose; message
+        | scope remains message identity and consent capture/audit context.
         |
-        | Example client override:
+        | Example client override for acknowledgement topic resolution:
         | 'email' => ['marketing' => 'marketing'],
         | 'sms' => ['marketing' => 'marketing'],
         */

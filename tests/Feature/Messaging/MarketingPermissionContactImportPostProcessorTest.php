@@ -19,10 +19,8 @@ class MarketingPermissionContactImportPostProcessorTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_imports_email_and_sms_marketing_permission_into_the_broad_domain(): void
+    public function test_it_imports_email_and_sms_marketing_permission_with_capture_scope(): void
     {
-        $this->configureBroadMarketingConsent();
-
         $contact = Contact::factory()->create([
             'email' => 'person@example.test',
             'phone' => '+15555550123',
@@ -39,21 +37,19 @@ class MarketingPermissionContactImportPostProcessorTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => 'email',
             'purpose' => 'marketing',
-            'scope' => 'marketing',
+            'scope' => 'lead_nurture',
         ]);
         $this->assertDatabaseHas('message_consents', [
             'contact_id' => $contact->id,
             'channel' => 'sms',
             'purpose' => 'marketing',
-            'scope' => 'marketing',
+            'scope' => 'lead_nurture',
         ]);
         $this->assertSame(2, MessageConsent::query()->where('contact_id', $contact->id)->count());
     }
 
     public function test_missing_sms_destination_does_not_block_email_marketing_permission(): void
     {
-        $this->configureBroadMarketingConsent();
-
         $contact = Contact::factory()->create([
             'email' => 'person@example.test',
             'phone' => null,
@@ -73,7 +69,7 @@ class MarketingPermissionContactImportPostProcessorTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => 'email',
             'purpose' => 'marketing',
-            'scope' => 'marketing',
+            'scope' => 'lead_nurture',
         ]);
         $this->assertDatabaseMissing('message_consents', [
             'contact_id' => $contact->id,
@@ -83,8 +79,6 @@ class MarketingPermissionContactImportPostProcessorTest extends TestCase
 
     public function test_reimport_does_not_reactivate_a_currently_revoked_marketing_channel(): void
     {
-        $this->configureBroadMarketingConsent();
-
         $contact = Contact::factory()->create([
             'email' => 'person@example.test',
         ]);
@@ -121,21 +115,6 @@ class MarketingPermissionContactImportPostProcessorTest extends TestCase
             $consentCount,
             MessageConsent::query()->where('contact_id', $contact->id)->count(),
         );
-    }
-
-    private function configureBroadMarketingConsent(): void
-    {
-        config([
-            'messaging.consent_domains.marketing' => [
-                'topic' => 'marketing messages',
-                'scopes' => [],
-                'scope_prefixes' => [],
-            ],
-            'messaging.consent.channel_purpose_domains' => [
-                'email' => ['marketing' => 'marketing'],
-                'sms' => ['marketing' => 'marketing'],
-            ],
-        ]);
     }
 
     private function context(Contact $contact): ContactImportContext

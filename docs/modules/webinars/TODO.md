@@ -32,4 +32,4 @@ Retain this only until the one-time migration is completed and verified.
 - [ ] Confirm Rob `presets:sync` and `setup:validate` are clean.
 - [ ] Finalize importer dry-run-by-default plus explicit `--apply` behavior and actionable malformed-phone/SMS-consent row output.
 - [ ] Prepare and inspect the exact 11-row CSV in dry-run before apply.
-- [ ] After apply, verify 11 Contacts, expected consent domains, 11 Webinar registrations, no confirmations/opt-in sends, only future-valid reminders, and idempotent rerun with no duplicates.
+- [ ] After apply, verify 11 Contacts, expected channel+purpose consent state, 11 Webinar registrations, no confirmations/opt-in sends, only future-valid reminders, and idempotent rerun with no duplicates.

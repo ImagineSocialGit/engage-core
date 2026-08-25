@@ -70,8 +70,8 @@ class CreateContactPermissionInvitationsForImportBatchActionTest extends TestCas
         $this->assertSame($contact->getMorphClass(), $scheduledMessage->recipient_type);
         $this->assertSame($contact->id, $scheduledMessage->recipient_id);
         $this->assertSame(MessageChannel::Email->value, $scheduledMessage->channel);
-        $this->assertSame(MessagePurpose::Marketing->value, $scheduledMessage->purpose);
-        $this->assertSame('broadcast', $scheduledMessage->scope);
+        $this->assertSame(MessagePurpose::Transactional->value, $scheduledMessage->purpose);
+        $this->assertSame('permission_invitation', $scheduledMessage->scope);
         $this->assertSame('imported_contact_permission_invitation', $scheduledMessage->message_type);
         $this->assertContains($scheduledMessage->status, [
             ScheduledMessage::STATUS_PENDING,
@@ -112,22 +112,8 @@ class CreateContactPermissionInvitationsForImportBatchActionTest extends TestCas
         $this->assertSame(0, ScheduledMessage::query()->count());
     }
 
-    public function test_it_recognizes_one_shared_marketing_domain_as_covering_multiple_required_scopes(): void
+    public function test_it_recognizes_any_active_email_marketing_grant_as_covering_permission_boundary(): void
     {
-        config([
-            'messaging.permission_invitations.consent.scopes' => [
-                'broadcast',
-                'campaign',
-            ],
-            'messaging.consent.channel_purpose_domains.email.marketing' => 'marketing',
-            'messaging.consent_domains.marketing' => [
-                'topic' => 'marketing communications',
-                'scopes' => [],
-                'scope_prefixes' => [],
-                'opt_in' => [],
-            ],
-        ]);
-
         $importBatch = ContactImportBatch::factory()->create();
 
         $contact = Contact::factory()->create([
@@ -149,7 +135,7 @@ class CreateContactPermissionInvitationsForImportBatchActionTest extends TestCas
             'contact_id' => $contact->id,
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'marketing',
+            'scope' => 'campaign',
         ]);
 
         $result = app(CreateContactPermissionInvitationsForImportBatchAction::class)
@@ -202,8 +188,8 @@ class CreateContactPermissionInvitationsForImportBatchActionTest extends TestCas
             'context_type' => $importBatch->getMorphClass(),
             'context_id' => $importBatch->id,
             'channel' => MessageChannel::Email->value,
-            'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'broadcast',
+            'purpose' => MessagePurpose::Transactional->value,
+            'scope' => 'permission_invitation',
             'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
             'status' => ScheduledMessage::STATUS_PENDING,
             'meta' => [

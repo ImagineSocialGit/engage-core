@@ -327,7 +327,7 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => 'sms',
             'purpose' => 'marketing',
-            'scope' => 'webinar',
+            'scope' => 'channel_purpose',
             'reason' => ConsentRevocation::REASON_STOP,
             'source' => 'telnyx_inbound_sms',
         ]);
@@ -336,7 +336,7 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => 'sms',
             'purpose' => 'transactional',
-            'scope' => 'webinar',
+            'scope' => 'channel_purpose',
         ]);
 
         $this->assertDatabaseCount('consent_revocations', 1);
@@ -361,7 +361,7 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => 'sms',
             'purpose' => 'transactional',
-            'scope' => 'webinar',
+            'scope' => 'channel_purpose',
             'reason' => ConsentRevocation::REASON_STOP,
             'source' => 'telnyx_inbound_sms',
         ]);
@@ -370,7 +370,7 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => 'sms',
             'purpose' => 'marketing',
-            'scope' => 'webinar',
+            'scope' => 'channel_purpose',
         ]);
 
         $this->assertDatabaseCount('consent_revocations', 1);
@@ -395,7 +395,7 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => 'sms',
             'purpose' => 'marketing',
-            'scope' => 'webinar',
+            'scope' => 'channel_purpose',
             'reason' => ConsentRevocation::REASON_STOP,
         ]);
 
@@ -403,7 +403,7 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => 'sms',
             'purpose' => 'transactional',
-            'scope' => 'webinar',
+            'scope' => 'channel_purpose',
             'reason' => ConsentRevocation::REASON_STOP,
         ]);
 

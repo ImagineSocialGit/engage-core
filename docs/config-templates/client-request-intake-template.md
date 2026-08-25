@@ -13,12 +13,12 @@ Rules:
 - Do not preserve old behavior by default.
 - Do not invent columns, runtime features, unsupported module behavior, undocumented tokens, or available fields.
 - Token availability is executable context, not a free-form allowlist. Validate authorable message tokens through `TokenContractRegistry` and the shared `MessageTemplateTokenValidator`; do not treat `config/reference/tokens.php` or caller-supplied `allowedTokens` as runtime authority.
-- Message identity and consent identity are separate. A message uses `channel + purpose + scope`; consent uses `channel + purpose + consent domain`.
+- Message identity and consent identity are separate. A message uses `channel + purpose + scope`; hard consent authorization uses exact `channel + purpose`. Scope/domain metadata is context, not a permission gate.
 - Do not add per-scope `opt_ins` groups to reusable Webinar Messaging definition files. Messaging resolves consent acknowledgements through `ConsentDomainRegistry` and `ConsentOptInDefinitionResolver`, using generic Messaging copy plus module/domain topic metadata and optional module/client overrides.
 - Messaging-owned delivery consolidation may combine compatible lifecycle and consent-acknowledgement intents into one physical message. Preserve covered intent keys/consent IDs and require an explicit standalone fallback for uncovered required acknowledgements.
 - Reserved `{delivery_consolidation_*}` placeholders are internal composition fields. Do not treat them as universal authorable tokens or invent new ones outside a documented consolidation-aware template context.
-- Webinar message scopes such as `webinar`, `webinar_waitlist`, and `webinar_nurture` may share the `webinar` consent domain. Unknown unmapped scopes must remain narrow rather than broadening accidentally.
-- Imported consent should use the dedicated import path so it normalizes to the consent domain without emitting `MessageConsentGranted` or sending an opt-in acknowledgement.
+- Webinar message scopes such as `webinar`, `webinar_waitlist`, and `webinar_nurture` may share the `webinar` acknowledgement domain for copy/context; this never changes authorization.
+- Imported consent should use the dedicated import path so it retains provenance/capture scope without emitting `MessageConsentGranted` or sending an opt-in acknowledgement.
 - Messaging configs own reusable message copy and delivery templates.
 - Reusable Messaging templates must not own `timing`, `schedule`, `conditions`, lifecycle enablement, sequencing, dependencies, or module-specific skip behavior for module-owned flows.
 - Every resolved module-owned dispatch must provide either exact caller-owned `sendAt` or explicit caller-owned behavior; there is no implicit immediate fallback.

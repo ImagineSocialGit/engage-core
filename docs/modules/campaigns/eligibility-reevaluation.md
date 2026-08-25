@@ -80,13 +80,12 @@ Evaluator-only tests that intentionally mutate eligibility facts while directly 
 - Existing Slam Dunk Campaign-routing/cleanup Flow Routes remain in place.
 - Campaign authoring UI is not changed.
 - Process Highway does not yet display Campaign eligibility.
-- Messaging consent/scope semantics are unchanged.
+- Messaging now enforces consent at channel + purpose; Campaign scope remains operational/context identity and does not gate permission.
 
 ## Remaining refactor roadmap
 
 1. Campaign authoring UI: eligibility builder, automatic/manual enrollment, re-entry, ineligible behavior, and audience preview.
 2. Process Highway integration: Campaign eligibility/enrollment/journey alongside Flow Routes.
 3. Slam Dunk migration: enable automatic eligibility and remove redundant lifecycle Campaign-routing routes while keeping real orchestration.
-4. Messaging scope/consent cleanup: channel + purpose as the hard marketing permission boundary.
-5. Preset/bootstrap hardening and portable stable-key Campaign JSON.
-6. Final acceptance and Slam Dunk go-live checks.
+4. Preset/bootstrap hardening and portable stable-key Campaign JSON.
+5. Final acceptance and Slam Dunk go-live checks.

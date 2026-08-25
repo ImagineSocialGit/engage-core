@@ -105,7 +105,7 @@ final class MarketingPermissionContactImportPostProcessor implements ContactImpo
         );
 
         return sprintf(
-            'Import %s marketing permission under scope [%s].',
+            'Import %s marketing permission; retain capture scope [%s].',
             implode(' + ', $channels),
             $config['scope'],
         );
@@ -137,14 +137,13 @@ final class MarketingPermissionContactImportPostProcessor implements ContactImpo
                 contact: $context->contact,
                 channel: $channel,
                 purpose: MessagePurpose::Marketing,
-                scope: $config['scope'],
             );
 
             if ($activeConsent !== null) {
                 $channels[$channel] = [
                     'state' => 'reused',
                     'consent_id' => (int) $activeConsent->getKey(),
-                    'domain' => $activeConsent->scope,
+                    'scope' => $activeConsent->scope,
                 ];
                 $applied++;
                 continue;
@@ -154,13 +153,11 @@ final class MarketingPermissionContactImportPostProcessor implements ContactImpo
                 contact: $context->contact,
                 channel: $channel,
                 purpose: MessagePurpose::Marketing,
-                scope: $config['scope'],
             );
             $latestConsent = $this->consentState->latestConsent(
                 contact: $context->contact,
                 channel: $channel,
                 purpose: MessagePurpose::Marketing,
-                scope: $config['scope'],
             );
 
             if ($latestRevocation !== null
@@ -194,14 +191,14 @@ final class MarketingPermissionContactImportPostProcessor implements ContactImpo
             $channels[$channel] = [
                 'state' => $result['created'] ? 'granted' : 'reused',
                 'consent_id' => (int) $result['consent']->getKey(),
-                'domain' => $result['consent']->scope,
+                'scope' => $result['consent']->scope,
             ];
             $applied++;
         }
 
         $meta = [
             'purpose' => MessagePurpose::Marketing->value,
-            'requested_scope' => $config['scope'],
+            'capture_scope' => $config['scope'],
             'channels' => $channels,
         ];
 

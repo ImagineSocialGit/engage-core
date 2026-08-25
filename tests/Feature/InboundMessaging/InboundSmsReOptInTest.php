@@ -35,7 +35,7 @@ class InboundSmsReOptInTest extends TestCase
         ]);
     }
 
-    public function test_start_restores_only_historical_sms_consent_whose_latest_revocation_was_stop(): void
+    public function test_start_restores_only_historical_sms_purpose_whose_latest_revocation_was_stop(): void
     {
         $contact = Contact::factory()->create([
             'phone' => '+15551234567',
@@ -60,7 +60,7 @@ class InboundSmsReOptInTest extends TestCase
         app(RevokeMessageConsentAction::class)->handle($contact, [
             'channel' => 'sms',
             'purpose' => 'marketing',
-            'scope' => 'campaign',
+            'scope' => 'different_marketing_context',
             'reason' => ConsentRevocation::REASON_STOP,
             'source' => 'test_stop',
             'revoked_at' => now()->subDay(),
@@ -69,7 +69,7 @@ class InboundSmsReOptInTest extends TestCase
         app(RevokeMessageConsentAction::class)->handle($contact, [
             'channel' => 'sms',
             'purpose' => 'transactional',
-            'scope' => 'webinar',
+            'scope' => 'different_transactional_context',
             'reason' => ConsentRevocation::REASON_MANUAL_REQUEST,
             'source' => 'test_manual',
             'revoked_at' => now()->subDay(),
@@ -100,13 +100,11 @@ class InboundSmsReOptInTest extends TestCase
             contact: $contact,
             channel: 'sms',
             purpose: 'marketing',
-            scope: 'campaign',
         ));
         $this->assertFalse($state->isActive(
             contact: $contact,
             channel: 'sms',
             purpose: 'transactional',
-            scope: 'webinar',
         ));
 
         $this->assertSame(

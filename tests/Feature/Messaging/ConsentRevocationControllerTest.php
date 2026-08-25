@@ -17,7 +17,7 @@ class ConsentRevocationControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_signed_transactional_opt_out_requires_confirmation_and_revokes_only_requested_scope(): void
+    public function test_signed_transactional_opt_out_requires_confirmation_and_revokes_transactional_purpose_boundary(): void
     {
         $contact = $this->createContact();
 
@@ -46,15 +46,15 @@ class ConsentRevocationControllerTest extends TestCase
             'scope' => 'webinar',
         ]);
 
-        $this->assertDatabaseMissing('consent_revocations', [
-            'contact_id' => $contact->id,
-            'channel' => MessageChannel::Email->value,
-            'purpose' => MessagePurpose::Transactional->value,
-            'scope' => 'waitlist',
-        ]);
+        $this->assertFalse(app(MessageEligibilityGate::class)->canSend(
+            $contact,
+            MessageChannel::Email,
+            MessagePurpose::Transactional,
+            'waitlist',
+        ));
     }
 
-    public function test_marketing_unsubscribe_requires_confirmation_before_revoking_all_scopes(): void
+    public function test_marketing_unsubscribe_requires_confirmation_before_revoking_channel_purpose_boundary(): void
     {
         $contact = $this->createContact();
 
@@ -77,16 +77,16 @@ class ConsentRevocationControllerTest extends TestCase
         $this->assertDatabaseHas('consent_revocations', [
             'contact_id' => $contact->id,
             'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'webinar',
+            'scope' => 'channel_purpose',
         ]);
 
-        $this->assertDatabaseHas('consent_revocations', [
-            'contact_id' => $contact->id,
-            'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'waitlist',
-        ]);
-
-        $this->assertSame(2, ConsentRevocation::query()->count());
+        $this->assertSame(1, ConsentRevocation::query()->count());
+        $this->assertFalse(app(MessageEligibilityGate::class)->canSend(
+            $contact,
+            MessageChannel::Email,
+            MessagePurpose::Marketing,
+            'waitlist',
+        ));
     }
 
     public function test_unsigned_marketing_unsubscribe_get_is_rejected(): void

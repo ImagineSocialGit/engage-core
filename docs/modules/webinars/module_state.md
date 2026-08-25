@@ -13,10 +13,11 @@ provider data, and arbitrary `meta` remain excluded; join/cancel/registration/pl
 available only in producer contexts that explicitly compute or supply them.
 
 
-Webinars contributes the `webinar` Messaging consent domain. Exact `webinar` scope plus the
-`webinar_` prefix cover Webinar-related message scopes such as `webinar_waitlist` and
-`webinar_nurture`, while Messaging remains the owner of consent storage, normalization, gates,
-revocation, and acknowledgement resolution.
+Webinars contributes the `webinar` Messaging acknowledgement domain. Exact `webinar` scope plus
+the `webinar_` prefix group Webinar-related message scopes such as `webinar_waitlist` and
+`webinar_nurture` for acknowledgement/context resolution. Messaging remains the owner of consent
+storage, channel+purpose authorization, revocation, suppression, gates, and acknowledgement
+resolution; the Webinar domain does not broaden or narrow permission.
 
 ### Canonical waitlist registration token
 
@@ -606,7 +607,7 @@ ended_at
 
 `notified_at` remains the first successfully planned availability notification. For a one-shot signup it also removes the row from future eligibility. For a recurring signup it is historical context only; the subscription remains eligible until `expires_at` or `ended_at` closes it.
 
-Automatic missed-attendee subscription creation does not grant Messaging consent. Webinars may retain only configured channels that are available on the `webinar_waitlists` surface and already have active marketing consent in the resolved Webinar consent domain. Revocation, suppression, provider availability, and send-time gates remain Messaging-owned.
+Automatic missed-attendee subscription creation does not grant Messaging consent. Webinars may retain only configured channels that are available on the `webinar_waitlists` surface and already have active consent for that channel + marketing purpose. Operational Webinar scope remains message/context identity only. Revocation, suppression, provider availability, and send-time gates remain Messaging-owned.
 
 Recurring availability delivery reuses the existing waitlist MessageChain. Stable per-occurrence dedupe remains:
 

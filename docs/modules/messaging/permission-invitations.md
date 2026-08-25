@@ -61,7 +61,7 @@ Broadcasts must not directly create permission invitation records or bypass Mess
 6. Contacts are skipped when they:
    - are not imported
    - have no email address
-   - already have the configured marketing email consent
+   - already have active email marketing consent on the channel+purpose boundary
    - already have an imported-contact email permission invitation row
    - already have a pending or sent imported-contact permission invitation scheduled message
 7. Messaging schedules the canonical imported-contact permission invitation email message.
@@ -71,7 +71,7 @@ Broadcasts must not directly create permission invitation records or bypass Mess
 11. Messaging injects the public preference URL into the email payload.
 12. The contact clicks the CTA/link.
 13. The public preference page lets the contact choose email, SMS, or both, depending on channel availability config.
-14. Messaging creates `MessageConsent` rows for the configured scopes.
+14. Messaging creates one normal marketing `MessageConsent` row for each explicitly selected channel.
 15. Messaging marks the invitation accepted and stores accepted channels.
 16. After the acceptance transaction succeeds, Messaging emits the neutral `permission_invitation.accepted` automation event exactly once for that invitation.
 
@@ -130,50 +130,30 @@ This prevents repeated operator clicks from scheduling duplicate invitation mess
 
 Accepted public preferences create normal `MessageConsent` records.
 
-Default scopes are:
-
-```php
-'broadcast'
-'campaign'
-```
-
-Scopes are configured at:
+The hard permission identity is:
 
 ```text
-messaging.permission_invitations.consent.scopes
+channel + purpose
 ```
 
-
-These configured values are requested Messaging scopes. Consent persistence still passes through `ConsentDomainRegistry`.
-
-That means:
+Permission-invitation acceptance uses:
 
 ```text
-mapped related scope
-    -> store/check the resolved consent domain
-
-unknown unmapped scope
-    -> remain narrow by falling back to itself
-
-ambiguous equal-specificity mapping
-    -> fail loudly
+purpose = marketing
+scope = permission_invitation
+source = imported_contact_permission_invitation
 ```
 
-Permission invitations do not bypass consent-domain normalization and should not create a second parallel consent model.
+One consent row is created per explicitly selected channel. The stored
+`permission_invitation` scope is capture provenance/context only; it does not limit the
+marketing permission to invitation-specific messages and it is not configurable as an
+accepted-scope list.
 
-The default purpose for consent records created from accepted preferences is:
+The invitation email itself remains transactional because it exists to ask for
+communication preferences, not to send normal marketing content.
 
-```text
-marketing
-```
-
-The invitation email itself remains transactional because it exists to ask for communication preferences, not to send normal marketing content.
-
-The source is:
-
-```text
-imported_contact_permission_invitation
-```
+A later channel+marketing revocation blocks every marketing message scope on that channel.
+Revoking email marketing does not revoke SMS marketing, and vice versa.
 
 ## SMS behavior
 
@@ -209,16 +189,19 @@ Expected top-level keys:
 
 ```php
 return [
+    'public' => [],
     'email' => [],
-    'consent' => [],
     'content' => [],
     'style' => [],
 ];
 ```
 
+`public` controls the public base URL override/fallback.
+
 `email` controls the invitation email subject/body and CTA labels.
 
-`consent.scopes` controls which Messaging scopes are requested after acceptance; the consent grant path normalizes each through `ConsentDomainRegistry` before persistence.
+Accepted channels always create marketing consent at the channel+purpose boundary with
+`permission_invitation` retained as capture scope; there is no configurable consent-scope list.
 
 `content` controls public-page copy.
 
@@ -265,7 +248,7 @@ The acceptance path should:
 lock the invitation row
 recheck accepted state inside the transaction
 update the SMS phone number, when selected/provided
-create/update configured MessageConsent rows
+create/update one marketing MessageConsent row per accepted channel
 mark the invitation accepted
 commit
 emit permission_invitation.accepted after the transaction succeeds
@@ -277,7 +260,8 @@ Payload includes compact invitation context such as:
 
 ```text
 accepted_channels
-consent_scopes
+consent_purpose
+consent_scope
 accepted_at
 invitation source/status/channel
 context_type / context_id

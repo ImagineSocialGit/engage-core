@@ -232,7 +232,7 @@ Revocation target evidence:
 contact/message-consent relationship
 channel
 purpose
-consent domain
+capture scope/context when available
 reason code
 provider/source
 source_event_id

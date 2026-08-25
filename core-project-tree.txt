@@ -1066,10 +1066,13 @@
 │   │   │   │   ├── CancelAppointmentRequest.php
 │   │   │   │   ├── CompletePublicBookingRequest.php
 │   │   │   │   ├── CreatePublicBookingHoldRequest.php
+│   │   │   │   ├── IssuePublicBookingDestinationVerificationRequest.php
 │   │   │   │   ├── IssuePublicBookingSlotOfferRequest.php
 │   │   │   │   ├── PreparePublicBookingRequest.php
 │   │   │   │   ├── RescheduleAppointmentRequest.php
-│   │   │   │   └── StoreAppointmentRequest.php
+│   │   │   │   ├── ResendPublicBookingDestinationVerificationRequest.php
+│   │   │   │   ├── StoreAppointmentRequest.php
+│   │   │   │   └── VerifyPublicBookingDestinationVerificationRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── Availability
 │   │   │   │   │   ├── AppointmentOccupancyResolver.php
@@ -2669,6 +2672,7 @@
 │   │   │   ├── CreateAppointmentActionTest.php
 │   │   │   ├── FindBookableAvailabilityActionTest.php
 │   │   │   ├── PublicBookingCompletionTest.php
+│   │   │   ├── PublicBookingDestinationVerificationEnforcementTest.php
 │   │   │   ├── PublicBookingDestinationVerificationServiceTest.php
 │   │   │   ├── PublicBookingHoldTest.php
 │   │   │   ├── PublicSchedulingSurfaceTest.php
@@ -2810,4 +2814,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-680 directories, 2131 files
+680 directories, 2135 files

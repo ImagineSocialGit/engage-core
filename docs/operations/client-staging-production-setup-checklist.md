@@ -139,7 +139,7 @@ When applicable, review:
 - [ ] Contact statuses.
 - [ ] Forms preset groups and server-owned submission mappings when Forms is enabled.
 - [ ] External Forms caller allowlist/HMAC environment when Engage Sites will call Core.
-- [ ] Channel + purpose consent domains when a selected FormVersion can grant Messaging consent.
+- [ ] Channel + purpose consent intent for every selected FormVersion that can grant Messaging consent; acknowledgement-domain mapping is optional context/copy configuration only.
 - [ ] Client key/token extensions.
 
 For an Artist Sites client using the reusable Core form, confirm before deployment:
@@ -147,9 +147,10 @@ For an Artist Sites client using the reusable Core form, confirm before deployme
 ```text
 selected preset package includes groups.forms = ['artist_updates']
 FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS includes artist_updates
-email / marketing broad consent domain is configured when Messaging is enabled
-sms / marketing broad consent domain is configured if the selected artist_updates
-  contract retains sms_marketing_consent
+email_marketing_consent maps to email / marketing when Messaging is enabled
+sms_marketing_consent maps to sms / marketing if the selected artist_updates
+  contract retains SMS consent
+optional acknowledgement-domain mappings do not alter those permission boundaries
 ```
 
 Do not switch the public Artist Sites destination to Core yet. Package selection and Core readiness come first.
@@ -725,8 +726,8 @@ Core staging must first satisfy:
 [ ] external Forms intake enabled
 [ ] matching external client ID/secret configured
 [ ] allowed_forms includes artist_updates
-[ ] email/marketing channel + purpose domain configured when Messaging consent is used
-[ ] sms/marketing channel + purpose domain configured when the selected form retains SMS consent
+[ ] email_marketing_consent maps to email / marketing when Messaging consent is used
+[ ] sms_marketing_consent maps to sms / marketing when the selected form retains SMS consent
 [ ] setup:validate has no Forms runtime errors
 ```
 
@@ -1105,7 +1106,7 @@ Before production cutover:
 [ ] production current artist_updates FormVersion is the approved required-verification version
 [ ] production external Forms client ID/secret matches the production Artist Sites caller
 [ ] production allowlist includes artist_updates
-[ ] production broad channel + purpose consent domains match the approved client policy
+[ ] production Forms consent intents match the approved channel + purpose policy; any acknowledgement-domain mappings are context/copy only
 [ ] production setup:validate passes
 [ ] production Artist Sites still has its previous destination until the read-only probe passes
 ```

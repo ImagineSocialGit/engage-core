@@ -198,7 +198,7 @@ class ArtistUpdatesPresetTest extends TestCase
 
         foreach ($consents as $consent) {
             $this->assertSame(MessagePurpose::Marketing, $consent->purpose);
-            $this->assertSame('marketing', $consent->scope);
+            $this->assertSame('forms', $consent->scope);
             $this->assertSame('forms_submission', $consent->source);
         }
     }

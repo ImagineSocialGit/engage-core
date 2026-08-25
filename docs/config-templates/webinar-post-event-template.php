@@ -71,7 +71,7 @@ return [
     /*
     | Missed-attendee future availability subscriptions are optional and
     | Webinar-owned. Enabling this does not grant Messaging consent. Only
-    | channels with current marketing consent in the Webinar consent domain
+    | channels with current marketing consent for that exact channel + marketing purpose
     | are retained on the recurring subscription.
     |
     | notification_lead_days delays recurring missed-attendee availability

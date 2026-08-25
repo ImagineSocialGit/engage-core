@@ -17,7 +17,6 @@ use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Services\MessageGate;
 use App\Support\ModuleIntegrations\Forms\FormSubmissionConsentBridge;
-use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -34,23 +33,6 @@ class FormSubmissionMessagingConsentBridgeTest extends TestCase
             'forms',
             'messaging',
         ]);
-        config()->set('messaging.consent_domains', [
-            'marketing' => [
-                'topic' => 'marketing communications',
-                'scopes' => [],
-                'scope_prefixes' => [],
-                'opt_in' => [],
-            ],
-        ]);
-        config()->set('messaging.consent.channel_purpose_domains', [
-            'email' => [
-                'marketing' => 'marketing',
-            ],
-            'sms' => [
-                'marketing' => 'marketing',
-            ],
-        ]);
-
         $this->app->forgetInstance(FormSubmissionConsentBridge::class);
     }
 
@@ -71,7 +53,7 @@ class FormSubmissionMessagingConsentBridgeTest extends TestCase
 
         $this->assertSame(MessageChannel::Email, $consent->channel);
         $this->assertSame(MessagePurpose::Marketing, $consent->purpose);
-        $this->assertSame('marketing', $consent->scope);
+        $this->assertSame('forms', $consent->scope);
         $this->assertSame('forms_submission', $consent->source);
         $this->assertSame(
             $first->submissionId,
@@ -198,34 +180,32 @@ class FormSubmissionMessagingConsentBridgeTest extends TestCase
         );
     }
 
-    public function test_messaging_enabled_form_consent_requires_explicit_channel_purpose_policy_before_writes(): void
+    public function test_messaging_enabled_form_consent_does_not_require_channel_purpose_domain_mapping(): void
     {
         config()->set('messaging.consent.channel_purpose_domains', []);
         $this->app->forgetInstance(FormSubmissionConsentBridge::class);
         $this->publishedArtistForm();
 
-        $this->expectException(DomainException::class);
-        $this->expectExceptionMessage(
-            'an explicit channel-purpose consent domain is required',
+        $result = app(CreateFormSubmissionAction::class)->handle(
+            $this->artistInput(
+                externalId: '28153b02-2a94-420a-b202-5653c04e0a36',
+                emailConsent: true,
+                smsConsent: false,
+            ),
         );
 
-        try {
-            app(CreateFormSubmissionAction::class)->handle(
-                $this->artistInput(
-                    externalId: '28153b02-2a94-420a-b202-5653c04e0a36',
-                    emailConsent: true,
-                    smsConsent: false,
-                ),
-            );
-        } finally {
-            $this->assertSame(0, FormSubmission::query()->count());
-            $this->assertSame(0, Contact::query()->count());
-            $this->assertSame(0, ContactTag::query()->count());
-            $this->assertSame(0, MessageConsent::query()->count());
-        }
+        $this->assertNotNull($result->contactId);
+        $this->assertSame(1, FormSubmission::query()->count());
+        $this->assertSame(1, MessageConsent::query()->count());
+        $this->assertDatabaseHas('message_consents', [
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'forms',
+            'source' => 'forms_submission',
+        ]);
     }
 
-    public function test_setup_validation_reports_missing_channel_purpose_policy(): void
+    public function test_setup_validation_accepts_consent_without_channel_purpose_domain_mapping(): void
     {
         config()->set('messaging.consent.channel_purpose_domains', []);
         $this->app->forgetInstance(FormSubmissionConsentBridge::class);
@@ -238,15 +218,7 @@ class FormSubmissionMessagingConsentBridgeTest extends TestCase
                 $finding->code === 'forms.runtime.submission_consent_invalid',
         );
 
-        $this->assertNotNull($finding);
-        $this->assertStringContainsString(
-            'explicit channel-purpose consent domain is required',
-            $finding->message,
-        );
-        $this->assertStringContainsString(
-            'settings.submission.consents',
-            $finding->path,
-        );
+        $this->assertNull($finding);
     }
 
     public function test_forms_only_runtime_records_the_form_answer_without_requiring_messaging(): void

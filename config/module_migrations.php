@@ -81,12 +81,13 @@ return [
 
         'inbound_messaging' => [
             'path' => 'database/migrations/modules/inbound_messaging',
-            'schema_version' => 3,
+            'schema_version' => 4,
             'migrations' => [
                 '2026_05_19_154535_create_inbound_messages_table.php',
                 '2026_07_19_031500_create_inbound_message_receipts_table.php',
                 '2026_08_22_061500_add_email_threading_fields_to_inbound_messages_table.php',
                 '2026_08_24_220000_create_inbound_reply_profile_tables.php',
+                '2026_08_25_120000_create_inbound_email_routes_and_add_route_evidence.php',
             ],
         ],
 

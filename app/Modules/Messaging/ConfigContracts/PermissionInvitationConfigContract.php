@@ -41,9 +41,6 @@ class PermissionInvitationConfigContract implements ConfigContract
                 'cta_label' => ConfigField::optional($copy()),
                 'secondary_link_label' => ConfigField::optional($copy()),
             ])),
-            'consent' => ConfigField::optional(ConfigSchema::object([
-                'scopes' => ConfigField::optional(ConfigSchema::listOf(ConfigSchema::string())),
-            ])),
             'content' => ConfigField::optional(ConfigSchema::object([
                 'title' => ConfigField::optional($copy()),
                 'meta_description' => ConfigField::optional($copy()),
@@ -85,9 +82,6 @@ class PermissionInvitationConfigContract implements ConfigContract
                 'subject' => 'Confirm how you want to hear from us',
                 'body' => 'Hi {first_name}, please confirm your preferences.',
                 'cta_label' => 'Confirm my preferences',
-            ],
-            'consent' => [
-                'scopes' => ['broadcast', 'campaign'],
             ],
         ];
     }

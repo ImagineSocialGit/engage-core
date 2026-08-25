@@ -109,7 +109,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => 'email',
             'purpose' => 'marketing',
-            'scope' => 'webinar',
+            'scope' => 'webinar_nurture',
         ]);
         $this->assertSame(['email'], $registration->meta['accepted_channels']['transactional']);
         $this->assertSame(['email'], $registration->meta['accepted_channels']['marketing']);
@@ -179,7 +179,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => 'sms',
             'purpose' => 'marketing',
-            'scope' => 'webinar',
+            'scope' => 'webinar_nurture',
         ]);
         $this->assertSame(['email', 'sms'], $registration->meta['accepted_channels']['transactional']);
         $this->assertSame(['email', 'sms'], $registration->meta['accepted_channels']['marketing']);

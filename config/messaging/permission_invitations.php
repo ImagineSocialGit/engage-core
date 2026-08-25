@@ -18,13 +18,6 @@ return [
         'secondary_link_label' => 'Or copy and paste this link into your browser',
     ],
 
-    'consent' => [
-        'scopes' => [
-            'broadcast',
-            'campaign',
-        ],
-    ],
-
     'content' => [
         'title' => 'Confirm how you want to hear from us',
         'meta_description' => 'Choose whether you want to receive email, text messages, or both.',

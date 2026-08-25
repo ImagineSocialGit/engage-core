@@ -13,7 +13,7 @@ class HandleInboundEmailWebhookActionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_provider_unsubscribe_revokes_all_marketing_email_consent_domains(): void
+    public function test_provider_unsubscribe_revokes_marketing_email_channel_purpose_boundary(): void
     {
         $contact = Contact::factory()->create([
             'email' => 'unsubscribe@example.com',
@@ -58,10 +58,10 @@ class HandleInboundEmailWebhookActionTest extends TestCase
             ->where('purpose', 'marketing')
             ->get();
 
-        $this->assertCount(3, $marketingRevocations);
-        $this->assertEqualsCanonicalizing(
-            ['webinar', 'broadcast', 'campaign'],
-            $marketingRevocations->pluck('scope')->all(),
+        $this->assertCount(1, $marketingRevocations);
+        $this->assertSame(
+            'channel_purpose',
+            $marketingRevocations->sole()->scope,
         );
         $this->assertTrue($marketingRevocations->every(
             fn (ConsentRevocation $revocation): bool => $revocation->reason === ConsentRevocation::REASON_PROVIDER_UNSUBSCRIBE

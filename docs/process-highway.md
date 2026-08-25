@@ -431,9 +431,9 @@ The focused business-map contract proves:
 
 ## Remaining refactor roadmap
 
-1. Dev visual acceptance and bounded follow-up fixes after the full-site refresh.
-2. Messaging scope/consent cleanup
-   - channel + purpose becomes the hard marketing-permission boundary;
-   - scope becomes compatibility/context metadata.
+1. Reply Handling + Message Template authoring integration.
+2. Dev visual acceptance and bounded follow-up fixes after the full-site refresh.
 3. Preset/bootstrap hardening and portable stable-key Campaign JSON.
 4. Final acceptance and Slam Dunk go-live.
+
+Messaging consent now uses channel + purpose as the hard permission boundary; scope remains compatibility/context/audit metadata.

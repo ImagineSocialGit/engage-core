@@ -23,6 +23,9 @@ class RecordMessageConsentAction
     /**
      * Persist a consent transition without emitting events or dispatching messages.
      *
+     * Channel + purpose is the permission boundary. Scope is retained as the
+     * capture/audit context and may still resolve to an acknowledgement domain.
+     *
      * @param array<string, mixed> $data
      *
      * @throws ValidationException
@@ -61,7 +64,6 @@ class RecordMessageConsentAction
                 contact: $contact,
                 channel: $channel,
                 purpose: $purpose,
-                scope: $domain,
             );
 
             if ($activeConsent instanceof MessageConsent) {
@@ -82,7 +84,6 @@ class RecordMessageConsentAction
                 ->where('contact_id', $contact->getKey())
                 ->where('channel', $channel)
                 ->where('purpose', $purpose)
-                ->where('scope', $domain)
                 ->where('consented_at', $consentedAt)
                 ->when(
                     isset($validated['source']),
@@ -90,7 +91,11 @@ class RecordMessageConsentAction
                     fn ($query) => $query->whereNull('source'),
                 )
                 ->orderByDesc('id')
-                ->first();
+                ->get()
+                ->first(fn (MessageConsent $consent): bool => $this->matchesRequestedScope(
+                    consent: $consent,
+                    requestedScope: $requestedScope,
+                ));
 
             $created = false;
             $consent = $existingHistoricalConsent;
@@ -100,7 +105,7 @@ class RecordMessageConsentAction
                     'contact_id' => $contact->getKey(),
                     'channel' => $channel,
                     'purpose' => $purpose,
-                    'scope' => $domain,
+                    'scope' => $requestedScope,
                     'consented_at' => $consentedAt,
                     'ip_address' => $validated['ip_address'] ?? null,
                     'user_agent' => $validated['user_agent'] ?? null,
@@ -109,6 +114,7 @@ class RecordMessageConsentAction
                         is_array($validated['meta'] ?? null) ? $validated['meta'] : [],
                         [
                             'consent' => [
+                                'permission_boundary' => 'channel_purpose',
                                 'requested_scope' => $requestedScope,
                                 'domain' => $domain,
                             ],
@@ -123,7 +129,6 @@ class RecordMessageConsentAction
                 contact: $contact,
                 channel: $channel,
                 purpose: $purpose,
-                scope: $domain,
             );
 
             return new MessageConsentGrantResult(
@@ -138,6 +143,20 @@ class RecordMessageConsentAction
                 becameActive: $isActive,
             );
         });
+    }
+
+    private function matchesRequestedScope(
+        MessageConsent $consent,
+        string $requestedScope,
+    ): bool {
+        if ($this->normalizeSegment((string) $consent->scope) === $requestedScope) {
+            return true;
+        }
+
+        $historicalRequestedScope = data_get($consent->meta, 'consent.requested_scope');
+
+        return is_string($historicalRequestedScope)
+            && $this->normalizeSegment($historicalRequestedScope) === $requestedScope;
     }
 
     private function normalizeSegment(string $value): string

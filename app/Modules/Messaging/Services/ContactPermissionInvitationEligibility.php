@@ -33,22 +33,18 @@ class ContactPermissionInvitationEligibility
             return false;
         }
 
-        foreach ($this->permissionInvitationService->consentScopes() as $scope) {
-            if (! $this->hasActiveMarketingEmailConsent($contact, $scope)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function hasActiveMarketingEmailConsent(Contact $contact, string $scope): bool
-    {
-        return $this->consentStateResolver->isActive(
+        if ($this->consentStateResolver->isActive(
             contact: $contact,
             channel: MessageChannel::Email,
             purpose: MessagePurpose::Marketing,
-            scope: $scope,
+        )) {
+            return false;
+        }
+
+        return ! $this->consentStateResolver->isRevoked(
+            contact: $contact,
+            channel: MessageChannel::Email,
+            purpose: MessagePurpose::Marketing,
         );
     }
 
@@ -58,7 +54,7 @@ class ContactPermissionInvitationEligibility
             ->where('recipient_type', $contact->getMorphClass())
             ->where('recipient_id', $contact->getKey())
             ->where('channel', MessageChannel::Email->value)
-            ->where('purpose', MessagePurpose::Marketing->value)
+            ->where('purpose', MessagePurpose::Transactional->value)
             ->where('message_type', ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION)
             ->whereIn('status', [
                 ScheduledMessage::STATUS_PENDING,

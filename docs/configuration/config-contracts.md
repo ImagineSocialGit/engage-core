@@ -80,7 +80,7 @@ Examples:
 - Messaging owns reusable copy and delivery-template metadata.
 - Campaigns owns journey sequencing, timing, conditions, variant strategy, and dependencies.
 - Webinars owns lifecycle schedules, conditions, enablement, and Webinar skip rules.
-- Messaging owns consent-domain resolution and consent acknowledgements; message scopes and consent domains are separate identities.
+- Messaging owns channel+purpose consent state and consent acknowledgements; message scope remains operational/context identity, while consent-domain resolution is acknowledgement/context metadata rather than authorization.
 - FlowRoutes owns route triggers, graph/order, Point type, and Point-specific executable definitions.
 - Tasks owns task-template responsibility, assignment, and due defaults.
 

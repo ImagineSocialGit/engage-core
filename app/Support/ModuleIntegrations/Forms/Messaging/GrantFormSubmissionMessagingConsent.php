@@ -7,17 +7,16 @@ use App\Modules\Forms\Data\FormSubmissionConsentIntent;
 use App\Modules\Forms\Data\PublishedForm;
 use App\Modules\Forms\Models\FormSubmission;
 use App\Modules\Messaging\Actions\GrantMessageConsentAction;
-use App\Modules\Messaging\Services\ConsentDomainRegistry;
+use App\Modules\Messaging\Enums\MessageChannel;
+use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Support\ModuleIntegrations\Forms\Contracts\FormSubmissionConsentHandler;
 use DomainException;
-use InvalidArgumentException;
 
 final class GrantFormSubmissionMessagingConsent implements FormSubmissionConsentHandler
 {
-    private const REQUESTED_SCOPE = 'forms';
+    private const CAPTURE_SCOPE = 'forms';
 
     public function __construct(
-        private readonly ConsentDomainRegistry $consentDomains,
         private readonly GrantMessageConsentAction $grantConsent,
     ) {}
 
@@ -29,25 +28,19 @@ final class GrantFormSubmissionMessagingConsent implements FormSubmissionConsent
         array $intents,
     ): void {
         foreach ($intents as $intent) {
-            try {
-                $domain = $this->consentDomains->channelPurposeDomainFor(
-                    channel: $intent->channel,
-                    purpose: $intent->purpose,
-                );
-            } catch (InvalidArgumentException $exception) {
+            if (MessageChannel::tryFrom($intent->channel) === null) {
                 throw $this->configurationException(
                     form: $form,
                     intent: $intent,
-                    detail: $exception->getMessage(),
-                    previous: $exception,
+                    detail: "unsupported Messaging channel [{$intent->channel}]",
                 );
             }
 
-            if ($domain === null) {
+            if (MessagePurpose::tryFrom($intent->purpose) === null) {
                 throw $this->configurationException(
                     form: $form,
                     intent: $intent,
-                    detail: 'an explicit channel-purpose consent domain is required',
+                    detail: "unsupported Messaging purpose [{$intent->purpose}]",
                 );
             }
         }
@@ -74,7 +67,7 @@ final class GrantFormSubmissionMessagingConsent implements FormSubmissionConsent
                 data: [
                     'channel' => $intent->channel,
                     'purpose' => $intent->purpose,
-                    'scope' => self::REQUESTED_SCOPE,
+                    'scope' => self::CAPTURE_SCOPE,
                     'consented_at' => $submission->submitted_at ?? now(),
                     'ip_address' => $submission->ip_address,
                     'user_agent' => $submission->user_agent,
@@ -96,11 +89,9 @@ final class GrantFormSubmissionMessagingConsent implements FormSubmissionConsent
         PublishedForm $form,
         FormSubmissionConsentIntent $intent,
         string $detail,
-        ?\Throwable $previous = null,
     ): DomainException {
         return new DomainException(
             "Published form [{$form->key}] consent field [{$intent->field}] cannot grant [{$intent->channel}:{$intent->purpose}] permission because {$detail}.",
-            previous: $previous,
         );
     }
 }

@@ -679,7 +679,7 @@ class SendScheduledMessageJobTest extends TestCase
         Event::assertNotDispatched(ScheduledMessageSent::class);
     }
 
-    public function test_it_skips_when_consent_was_revoked_before_send(): void
+    public function test_it_skips_when_channel_purpose_consent_is_revoked_under_a_different_scope_before_send(): void
     {
         Event::fake([ScheduledMessageSent::class]);
 
@@ -693,7 +693,7 @@ class SendScheduledMessageJobTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => 'email',
             'purpose' => 'marketing',
-            'scope' => 'webinar',
+            'scope' => 'past_client_nurture',
             'revoked_at' => now(),
             'source' => 'test',
         ]);
@@ -1134,10 +1134,6 @@ Thanks.",
             'client.key' => null,
             'messaging.permission_invitations.content' => [],
             'messaging.permission_invitations.style' => [],
-            'messaging.permission_invitations.consent.scopes' => [
-                'broadcast',
-                'campaign',
-            ],
         ]);
 
         $contact = Contact::factory()->create([
@@ -1168,17 +1164,14 @@ Thanks.",
             'contact_id' => $contact->id,
             'channel' => 'email',
             'purpose' => 'marketing',
-            'scope' => 'broadcast',
+            'scope' => 'permission_invitation',
             'source' => 'imported_contact_permission_invitation',
         ]);
-
-        $this->assertDatabaseHas('message_consents', [
-            'contact_id' => $contact->id,
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'campaign',
-            'source' => 'imported_contact_permission_invitation',
-        ]);
+        $this->assertSame(1, MessageConsent::query()
+            ->where('contact_id', $contact->id)
+            ->where('channel', 'email')
+            ->where('purpose', 'marketing')
+            ->count());
 
         $this->get(route('messaging.permission-invitations.show', ['token' => $invitation->token]))
             ->assertOk()

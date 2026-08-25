@@ -46,13 +46,17 @@ class GrantMessageConsentActionTest extends TestCase
         $this->assertTrue($result->becameActive);
         $this->assertSame('webinar_nurture', $result->requestedScope);
         $this->assertSame('webinar', $result->domain);
+        $this->assertSame(
+            'channel_purpose',
+            data_get($result->consent->meta, 'consent.permission_boundary'),
+        );
 
         $this->assertDatabaseHas('message_consents', [
             'id' => $result->consent->getKey(),
             'contact_id' => $contact->id,
             'channel' => 'email',
             'purpose' => 'marketing',
-            'scope' => 'webinar',
+            'scope' => 'webinar_nurture',
             'source' => 'test',
             'ip_address' => '127.0.0.1',
             'user_agent' => 'PHPUnit',
@@ -61,7 +65,7 @@ class GrantMessageConsentActionTest extends TestCase
         Event::assertDispatched(
             MessageConsentGranted::class,
             fn (MessageConsentGranted $event): bool => $event->messageConsent->is($result->consent)
-                && $event->scope === 'webinar'
+                && $event->scope === 'webinar_nurture'
                 && ($event->data['requested_scope'] ?? null) === 'webinar_nurture',
         );
     }
@@ -127,7 +131,7 @@ class GrantMessageConsentActionTest extends TestCase
             'message_consent_id' => $first->consent->id,
             'channel' => 'sms',
             'purpose' => 'marketing',
-            'scope' => 'webinar',
+            'scope' => 'different_marketing_context',
             'reason' => ConsentRevocation::REASON_STOP,
             'revoked_at' => now()->subDay(),
             'source' => 'inbound_stop',

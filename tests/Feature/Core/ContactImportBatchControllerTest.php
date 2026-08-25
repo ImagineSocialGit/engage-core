@@ -132,8 +132,8 @@ class ContactImportBatchControllerTest extends TestCase
             'context_type' => $importBatch->getMorphClass(),
             'context_id' => $importBatch->id,
             'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'broadcast',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
             'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
             'status' => ScheduledMessage::STATUS_PENDING,
             'meta' => [

@@ -40,8 +40,8 @@ class CreateContactPermissionInvitationsForImportBatchAction
                     $messages = $this->dispatchMessageAction->handle(
                         recipient: $contact,
                         channel: MessageChannel::Email,
-                        purpose: MessagePurpose::Marketing,
-                        scope: 'broadcast',
+                        purpose: MessagePurpose::Transactional,
+                        scope: 'permission_invitation',
                         dispatchKeys: 'imported_contact_permission_invitation',
                         behavior: [
                             'timing' => 'immediate',
@@ -64,8 +64,8 @@ class CreateContactPermissionInvitationsForImportBatchAction
                             [
                                 'dispatch_key' => 'imported_contact_permission_invitation',
                                 'channel' => MessageChannel::Email->value,
-                                'purpose' => MessagePurpose::Marketing->value,
-                                'scope' => 'broadcast',
+                                'purpose' => MessagePurpose::Transactional->value,
+                                'scope' => 'permission_invitation',
                                 'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
                                 'payload_class' => EmailPayload::class,
                                 'queue' => 'marketing',

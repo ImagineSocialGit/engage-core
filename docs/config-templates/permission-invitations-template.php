@@ -49,25 +49,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Consent scopes created after public acceptance
+    | Consent created after public acceptance
     |--------------------------------------------------------------------------
     |
-    | These configured values are requested Messaging scopes. Granting consent
-    | resolves each through ConsentDomainRegistry before persistence, so related
-    | scopes may intentionally collapse to one consent domain while unknown
-    | unmapped scopes remain narrow.
+    | Acceptance creates one normal marketing consent grant per explicitly
+    | selected channel. Messaging stores `permission_invitation` as capture
+    | scope for provenance/context; scope is not a configurable permission gate.
     |
     | The one-time invitation send remains email-only; SMS consent is created
     | only when the contact explicitly selects SMS and provides/confirms a phone
     | number.
     |
     */
-    'consent' => [
-        'scopes' => [
-            'broadcast',
-            'campaign',
-        ],
-    ],
 
     /*
     |--------------------------------------------------------------------------

@@ -639,7 +639,7 @@ Invalid submission rules or Contact/tag mappings fail closed. `FormsSetupValidat
 
 Consent mappings are server-owned and intentionally contain only `field`, `channel`, and `purpose`. Forms does not accept a consent `scope` or consent-domain key in the mapping. A configured consent field must be a `checkbox` or `boolean` field, and a `true` normalized value means explicit acceptance. `false`, omitted, or null values do not revoke existing permission; revocation remains owned by Messaging unsubscribe/STOP/preference flows.
 
-Forms resolves the consent intent but does not own Messaging state. `FormSubmissionConsentBridge` is an optional shared integration seam. When Messaging is enabled, the Messaging implementation requires an explicit `channel + purpose -> consent domain` policy before it will grant anything. This prevents a consent-enabled form from silently falling back to a narrow operational scope. When Messaging is disabled, the submitted consent answer remains durable on the pinned FormSubmission/FormSubmissionValue graph but no MessageConsent is created and no later retroactive grant is implied.
+Forms resolves the consent intent but does not own Messaging state. `FormSubmissionConsentBridge` is an optional shared integration seam. When Messaging is enabled, the Messaging implementation validates the requested channel and purpose and grants against that exact permission boundary. The persisted capture scope is `forms` for provenance/context; Forms does not choose or require a consent-domain policy. When Messaging is disabled, the submitted consent answer remains durable on the pinned FormSubmission/FormSubmissionValue graph but no MessageConsent is created and no later retroactive grant is implied.
 
 A successful bridge grant uses the existing Messaging `GrantMessageConsentAction`. The stored permission identity therefore follows Messaging's configured channel+purpose domain, while the originating form field and FormSubmission/FormVersion IDs are retained as bounded provenance pointers. The bridge does not duplicate disclosure text, provider payloads, interest tags, or human-verification evidence into Messaging metadata. The immutable FormVersion plus the pinned submission/value/provenance graph remains the source evidence.
 
@@ -724,7 +724,7 @@ email_marketing_consent=true -> email / marketing
 sms_marketing_consent=true   -> sms / marketing
 ```
 
-There is no Forms-authored consent scope. Operational message scopes continue to identify the message family; Messaging resolves authorization through its configured channel + purpose consent domain. A client that selects this reusable form while Messaging is enabled must therefore deliberately configure the corresponding broad channel + purpose domains. Existing clients without that policy remain unchanged.
+There is no Forms-authored permission scope. Operational message scopes continue to identify the message family. Messaging authorization uses exact channel + purpose, while the bridge stores `forms` as capture scope for provenance/context. Optional acknowledgement-domain configuration may still improve human-readable acknowledgement topic/copy, but it cannot broaden or narrow permission.
 
 The reusable verification policy is deliberately staged:
 

@@ -31,8 +31,10 @@ class GrantSmsConsentFromInboundMessageAction implements InboundMessageHandler
         $purpose = $this->value($inboundMessage->purpose);
         $restored = 0;
 
-        foreach ($this->historicalDomains($sender, $purpose) as $domain) {
-            if (! $this->restorable($sender, $domain['purpose'], $domain['scope'])) {
+        foreach ($this->historicalPurposes($sender, $purpose) as $historicalPurpose) {
+            $consent = $this->restorableConsent($sender, $historicalPurpose);
+
+            if (! $consent instanceof MessageConsent) {
                 continue;
             }
 
@@ -40,14 +42,15 @@ class GrantSmsConsentFromInboundMessageAction implements InboundMessageHandler
                 contact: $sender,
                 data: [
                     'channel' => MessageChannel::Sms->value,
-                    'purpose' => $domain['purpose'],
-                    'scope' => $domain['scope'],
+                    'purpose' => $historicalPurpose,
+                    'scope' => $consent->scope,
                     'source' => $this->source($inboundMessage),
                     'consented_at' => $inboundMessage->received_at ?? now(),
                     'meta' => [
                         'reopt_in' => [
                             'reason_context' => 'inbound_start_keyword',
                             'inbound_message_id' => $inboundMessage->getKey(),
+                            'restored_from_consent_id' => (int) $consent->getKey(),
                         ],
                     ],
                 ],
@@ -67,9 +70,9 @@ class GrantSmsConsentFromInboundMessageAction implements InboundMessageHandler
     }
 
     /**
-     * @return array<int, array{purpose: string, scope: string}>
+     * @return array<int, string>
      */
-    private function historicalDomains(Contact $contact, ?string $purpose): array
+    private function historicalPurposes(Contact $contact, ?string $purpose): array
     {
         return MessageConsent::query()
             ->where('contact_id', $contact->getKey())
@@ -78,66 +81,57 @@ class GrantSmsConsentFromInboundMessageAction implements InboundMessageHandler
                 $purpose !== null,
                 fn ($query) => $query->where('purpose', $purpose),
             )
-            ->get(['purpose', 'scope'])
-            ->map(fn (MessageConsent $consent): array => [
-                'purpose' => $this->value($consent->purpose) ?? '',
-                'scope' => is_string($consent->scope) ? trim($consent->scope) : '',
-            ])
-            ->filter(
-                fn (array $domain): bool =>
-                    $domain['purpose'] !== '' && $domain['scope'] !== '',
-            )
-            ->unique(
-                fn (array $domain): string =>
-                    $domain['purpose'].'|'.$domain['scope'],
-            )
+            ->pluck('purpose')
+            ->map(fn (mixed $value): ?string => $this->value($value))
+            ->filter(fn (?string $value): bool => $value !== null)
+            ->unique()
             ->values()
             ->all();
     }
 
-    private function restorable(
+    private function restorableConsent(
         Contact $contact,
         string $purpose,
-        string $scope,
-    ): bool {
+    ): ?MessageConsent {
         if ($this->consentState->isActive(
             contact: $contact,
             channel: MessageChannel::Sms,
             purpose: $purpose,
-            scope: $scope,
         )) {
-            return false;
+            return null;
         }
 
         $consent = $this->consentState->latestConsent(
             contact: $contact,
             channel: MessageChannel::Sms,
             purpose: $purpose,
-            scope: $scope,
         );
         $revocation = $this->consentState->latestRevocation(
             contact: $contact,
             channel: MessageChannel::Sms,
             purpose: $purpose,
-            scope: $scope,
         );
 
-        return $consent instanceof MessageConsent
-            && $revocation instanceof ConsentRevocation
-            && $revocation->reason === ConsentRevocation::REASON_STOP
-            && $revocation->revoked_at->greaterThanOrEqualTo($consent->consented_at);
+        if (! $consent instanceof MessageConsent
+            || ! $revocation instanceof ConsentRevocation
+            || $revocation->reason !== ConsentRevocation::REASON_STOP
+            || $revocation->revoked_at->lessThan($consent->consented_at)
+        ) {
+            return null;
+        }
+
+        return $consent;
     }
 
     private function hasActiveSmsConsent(
         Contact $contact,
         ?string $purpose,
     ): bool {
-        foreach ($this->historicalDomains($contact, $purpose) as $domain) {
+        foreach ($this->historicalPurposes($contact, $purpose) as $historicalPurpose) {
             if ($this->consentState->isActive(
                 contact: $contact,
                 channel: MessageChannel::Sms,
-                purpose: $domain['purpose'],
-                scope: $domain['scope'],
+                purpose: $historicalPurpose,
             )) {
                 return true;
             }

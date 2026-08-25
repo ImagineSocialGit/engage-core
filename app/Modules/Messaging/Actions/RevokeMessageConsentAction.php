@@ -8,16 +8,17 @@ use App\Modules\Messaging\Models\ConsentRevocation;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Rules\ConsentRevocationRules;
 use App\Modules\Messaging\Services\Consent\MessageConsentStateResolver;
-use App\Modules\Messaging\Services\ConsentDomainRegistry;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class RevokeMessageConsentAction
 {
+    private const FALLBACK_CAPTURE_SCOPE = 'channel_purpose';
+
     public function __construct(
-        private readonly ConsentDomainRegistry $consentDomainRegistry,
         private readonly MessageConsentStateResolver $stateResolver,
     ) {}
 
@@ -29,132 +30,84 @@ class RevokeMessageConsentAction
     public function handle(Contact $contact, array $data): array
     {
         $validated = Validator::make($data, ConsentRevocationRules::rules())->validate();
+        $channel = $this->normalizeSegment($validated['channel']);
+        $purpose = $this->normalizeSegment($validated['purpose']);
+        $requestedScope = isset($validated['scope'])
+            ? $this->normalizeSegment($validated['scope'])
+            : null;
+        $revokedAt = isset($validated['revoked_at'])
+            ? Carbon::parse($validated['revoked_at'])
+            : now();
 
-        return DB::transaction(function () use ($contact, $validated): array {
-            $scope = isset($validated['scope'])
-                ? $this->consentDomainRegistry->domainFor(
-                    channel: $validated['channel'],
-                    purpose: $validated['purpose'],
-                    scope: $validated['scope'],
-                )
-                : null;
+        return DB::transaction(function () use (
+            $contact,
+            $validated,
+            $channel,
+            $purpose,
+            $requestedScope,
+            $revokedAt,
+        ): array {
+            Contact::query()
+                ->whereKey($contact->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-            if ($scope !== null) {
-                $result = $this->revokeScope($contact, $validated, $scope);
+            $activeRevocation = $this->stateResolver->activeRevocation(
+                contact: $contact,
+                channel: $channel,
+                purpose: $purpose,
+            );
 
-                $this->dispatchRevokedEventAfterCommit(
-                    contact: $contact,
-                    revocation: $result['revocation'],
-                    created: $result['created'],
-                    validated: $validated,
-                    scope: $scope,
-                );
-
+            if ($activeRevocation instanceof ConsentRevocation) {
                 return [
-                    'revocations' => new Collection([$result['revocation']]),
-                    'created' => $result['created'],
+                    'revocations' => new Collection([$activeRevocation]),
+                    'created' => false,
                 ];
             }
 
-            $scopes = collect(array_keys($this->consentDomainRegistry->definitions()))
-                ->merge(
-                    MessageConsent::query()
-                        ->where('contact_id', $contact->getKey())
-                        ->where('channel', $validated['channel'])
-                        ->where('purpose', $validated['purpose'])
-                        ->pluck('scope')
-                )
-                ->filter(
-                    fn (mixed $scope): bool => is_string($scope)
-                        && trim($scope) !== ''
-                )
-                ->map(
-                    fn (string $scope): string => $this->consentDomainRegistry
-                        ->domainFor(
-                            channel: $validated['channel'],
-                            purpose: $validated['purpose'],
-                            scope: $scope,
-                        )
-                )
-                ->unique()
-                ->values();
+            $latestConsent = $this->stateResolver->latestConsent(
+                contact: $contact,
+                channel: $channel,
+                purpose: $purpose,
+            );
+            $captureScope = $requestedScope
+                ?? self::FALLBACK_CAPTURE_SCOPE;
 
-            $revocations = new Collection();
-            $created = false;
-
-            foreach ($scopes as $resolvedScope) {
-                $result = $this->revokeScope($contact, $validated, $resolvedScope);
-
-                $revocations->push($result['revocation']);
-                $created = $created || $result['created'];
-
-                $this->dispatchRevokedEventAfterCommit(
-                    contact: $contact,
-                    revocation: $result['revocation'],
-                    created: $result['created'],
-                    validated: $validated,
-                    scope: $resolvedScope,
-                );
-            }
-
-            return [
-                'revocations' => $revocations,
-                'created' => $created,
-            ];
-        });
-    }
-
-    /**
-     * @param array<string, mixed> $validated
-     * @return array{revocation: ConsentRevocation, created: bool}
-     */
-    private function revokeScope(Contact $contact, array $validated, string $scope): array
-    {
-        $revokedAt = $validated['revoked_at'] ?? now();
-
-        $latestConsent = $this->stateResolver->latestConsent(
-            contact: $contact,
-            channel: $validated['channel'],
-            purpose: $validated['purpose'],
-            scope: $scope,
-        );
-
-        $existingRevocation = ConsentRevocation::query()
-            ->where('contact_id', $contact->getKey())
-            ->where('channel', $validated['channel'])
-            ->where('purpose', $validated['purpose'])
-            ->where('scope', $scope)
-            ->when(
-                $latestConsent,
-                fn ($query) => $query->where('revoked_at', '>=', $latestConsent->consented_at),
-            )
-            ->orderByDesc('revoked_at')
-            ->orderByDesc('id')
-            ->first();
-
-        if ($existingRevocation) {
-            return [
-                'revocation' => $existingRevocation,
-                'created' => false,
-            ];
-        }
-
-        return [
-            'revocation' => ConsentRevocation::query()->create([
+            $revocation = ConsentRevocation::query()->create([
                 'contact_id' => $contact->getKey(),
                 'message_consent_id' => $validated['message_consent_id'] ?? $latestConsent?->id,
-                'channel' => $validated['channel'],
-                'purpose' => $validated['purpose'],
-                'scope' => $scope,
+                'channel' => $channel,
+                'purpose' => $purpose,
+                'scope' => $captureScope,
                 'reason' => $validated['reason'],
                 'revoked_at' => $revokedAt,
                 'source' => $validated['source'] ?? null,
                 'ip_address' => $validated['ip_address'] ?? null,
                 'user_agent' => $validated['user_agent'] ?? null,
-                'meta' => $validated['meta'] ?? null,
-            ]),
-            'created' => true,
-        ];
+                'meta' => array_replace_recursive(
+                    is_array($validated['meta'] ?? null) ? $validated['meta'] : [],
+                    [
+                        'consent' => [
+                            'permission_boundary' => 'channel_purpose',
+                            'requested_scope' => $requestedScope,
+                            'related_consent_scope' => $this->captureScopeFromConsent($latestConsent),
+                        ],
+                    ],
+                ),
+            ]);
+
+            $this->dispatchRevokedEventAfterCommit(
+                contact: $contact,
+                revocation: $revocation,
+                validated: $validated,
+                requestedScope: $requestedScope,
+            );
+
+            return [
+                'revocations' => new Collection([$revocation]),
+                'created' => true,
+            ];
+        });
     }
 
     /**
@@ -163,29 +116,42 @@ class RevokeMessageConsentAction
     private function dispatchRevokedEventAfterCommit(
         Contact $contact,
         ConsentRevocation $revocation,
-        bool $created,
         array $validated,
-        string $scope,
+        ?string $requestedScope,
     ): void {
-        if (! $created) {
-            return;
-        }
-
-        DB::afterCommit(function () use ($contact, $revocation, $validated, $scope): void {
+        DB::afterCommit(function () use ($contact, $revocation, $validated, $requestedScope): void {
             MessageConsentRevoked::dispatch(
                 contact: $contact,
                 consentRevocation: $revocation,
-                channel: $validated['channel'],
-                purpose: $validated['purpose'],
-                scope: $scope,
+                channel: $revocation->channel->value,
+                purpose: $revocation->purpose->value,
+                scope: $revocation->scope,
                 data: [
                     'reason' => $validated['reason'],
                     'source' => $validated['source'] ?? null,
                     'ip_address' => $validated['ip_address'] ?? null,
                     'user_agent' => $validated['user_agent'] ?? null,
-                    'meta' => $validated['meta'] ?? null,
+                    'meta' => $revocation->meta,
+                    'requested_scope' => $requestedScope,
+                    'permission_boundary' => 'channel_purpose',
                 ],
             );
         });
+    }
+
+    private function captureScopeFromConsent(?MessageConsent $consent): ?string
+    {
+        if (! $consent instanceof MessageConsent || ! is_string($consent->scope)) {
+            return null;
+        }
+
+        $scope = $this->normalizeSegment($consent->scope);
+
+        return $scope !== '' ? $scope : null;
+    }
+
+    private function normalizeSegment(string $value): string
+    {
+        return str_replace('-', '_', strtolower(trim($value)));
     }
 }

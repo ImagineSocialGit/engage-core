@@ -301,7 +301,7 @@ return [
         'permission_invitation.accepted' => [
             'producer' => 'messaging',
             'contact_required' => true,
-            'description' => 'An imported-contact permission invitation was accepted and Messaging recorded the selected channels/consent scopes.',
+            'description' => 'An imported-contact permission invitation was accepted and Messaging recorded the selected channels and marketing permission.',
             'status' => 'active',
         ],
     ],

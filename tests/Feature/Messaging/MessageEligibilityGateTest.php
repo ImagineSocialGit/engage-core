@@ -52,7 +52,7 @@ class MessageEligibilityGateTest extends TestCase
         );
     }
 
-    public function test_webinar_domain_consent_allows_waitlist_and_nurture_message_scopes(): void
+    public function test_channel_purpose_consent_allows_different_message_scopes(): void
     {
         $contact = Contact::factory()->create([
             'email' => 'person@example.com',
@@ -62,7 +62,7 @@ class MessageEligibilityGateTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'webinar',
+            'scope' => 'lead_nurture',
             'consented_at' => now(),
             'source' => 'test',
         ]);
@@ -84,7 +84,7 @@ class MessageEligibilityGateTest extends TestCase
         ));
     }
 
-    public function test_revoking_webinar_domain_blocks_all_webinar_message_scopes_for_that_channel_and_purpose(): void
+    public function test_revocation_blocks_every_scope_on_the_same_channel_and_purpose(): void
     {
         $contact = Contact::factory()->create([
             'email' => 'person@example.com',
@@ -94,7 +94,7 @@ class MessageEligibilityGateTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'webinar',
+            'scope' => 'lead_nurture',
             'consented_at' => now()->subMinute(),
             'source' => 'test',
         ]);
@@ -104,7 +104,7 @@ class MessageEligibilityGateTest extends TestCase
             'message_consent_id' => $consent->id,
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'webinar',
+            'scope' => 'past_client_nurture',
             'revoked_at' => now(),
             'reason' => ConsentRevocation::REASON_UNSUBSCRIBE,
             'source' => 'test',

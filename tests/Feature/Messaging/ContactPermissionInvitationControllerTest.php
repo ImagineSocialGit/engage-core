@@ -22,10 +22,6 @@ class ContactPermissionInvitationControllerTest extends TestCase
         parent::setUp();
 
         config([
-            'messaging.permission_invitations.consent.scopes' => [
-                'broadcast',
-                'campaign',
-            ],
             'messaging.channel_availability.email.runtime_supported' => true,
             'messaging.channel_availability.email.provider_enabled' => true,
             'messaging.channel_availability.email.surfaces.permission_invitations' => true,
@@ -102,17 +98,15 @@ class ContactPermissionInvitationControllerTest extends TestCase
         $this->assertNotNull($invitation->accepted_at);
         $this->assertSame(['email'], $invitation->accepted_channels);
 
-        foreach (['broadcast', 'campaign'] as $scope) {
-            $this->assertDatabaseHas('message_consents', [
-                'contact_id' => $invitation->contact_id,
-                'channel' => MessageChannel::Email->value,
-                'purpose' => MessagePurpose::Marketing->value,
-                'scope' => $scope,
-                'source' => 'imported_contact_permission_invitation',
-            ]);
-        }
+        $this->assertDatabaseHas('message_consents', [
+            'contact_id' => $invitation->contact_id,
+            'channel' => MessageChannel::Email->value,
+            'purpose' => MessagePurpose::Marketing->value,
+            'scope' => 'permission_invitation',
+            'source' => 'imported_contact_permission_invitation',
+        ]);
 
-        $this->assertSame(2, MessageConsent::query()->count());
+        $this->assertSame(1, MessageConsent::query()->count());
     }
 
     public function test_accepting_invitation_emits_permission_invitation_accepted_automation_event(): void
@@ -141,7 +135,8 @@ class ContactPermissionInvitationControllerTest extends TestCase
                     && $event->event->subjectType === $invitation->getMorphClass()
                     && $event->event->subjectId === $invitation->getKey()
                     && ($event->event->payload['permission_invitation']['accepted_channels'] ?? null) === ['email']
-                    && ($event->event->payload['permission_invitation']['consent_scopes'] ?? null) === ['broadcast', 'campaign']
+                    && ($event->event->payload['permission_invitation']['consent_purpose'] ?? null) === 'marketing'
+                    && ($event->event->payload['permission_invitation']['consent_scope'] ?? null) === 'permission_invitation'
                     && ($event->event->meta['source_module'] ?? null) === 'messaging'
                     && ($event->event->meta['source'] ?? null) === 'imported_contact_permission_invitation';
             },
@@ -194,17 +189,15 @@ class ContactPermissionInvitationControllerTest extends TestCase
         $this->assertSame(['sms'], $invitation->accepted_channels);
         $this->assertSame('+15555550123', $invitation->contact->phone);
 
-        foreach (['broadcast', 'campaign'] as $scope) {
-            $this->assertDatabaseHas('message_consents', [
-                'contact_id' => $invitation->contact_id,
-                'channel' => MessageChannel::Sms->value,
-                'purpose' => MessagePurpose::Marketing->value,
-                'scope' => $scope,
-                'source' => 'imported_contact_permission_invitation',
-            ]);
-        }
+        $this->assertDatabaseHas('message_consents', [
+            'contact_id' => $invitation->contact_id,
+            'channel' => MessageChannel::Sms->value,
+            'purpose' => MessagePurpose::Marketing->value,
+            'scope' => 'permission_invitation',
+            'source' => 'imported_contact_permission_invitation',
+        ]);
 
-        $this->assertSame(2, MessageConsent::query()->count());
+        $this->assertSame(1, MessageConsent::query()->count());
     }
 
     public function test_sms_opt_in_requires_phone_when_sms_is_enabled(): void
@@ -252,18 +245,16 @@ class ContactPermissionInvitationControllerTest extends TestCase
         $this->assertSame(['email', 'sms'], $invitation->accepted_channels);
         $this->assertSame('+15555550123', $invitation->contact->phone);
 
-        $this->assertSame(4, MessageConsent::query()->count());
+        $this->assertSame(2, MessageConsent::query()->count());
 
         foreach (['email', 'sms'] as $channel) {
-            foreach (['broadcast', 'campaign'] as $scope) {
-                $this->assertDatabaseHas('message_consents', [
-                    'contact_id' => $invitation->contact_id,
-                    'channel' => $channel,
-                    'purpose' => MessagePurpose::Marketing->value,
-                    'scope' => $scope,
-                    'source' => 'imported_contact_permission_invitation',
-                ]);
-            }
+            $this->assertDatabaseHas('message_consents', [
+                'contact_id' => $invitation->contact_id,
+                'channel' => $channel,
+                'purpose' => MessagePurpose::Marketing->value,
+                'scope' => 'permission_invitation',
+                'source' => 'imported_contact_permission_invitation',
+            ]);
         }
     }
 
@@ -297,7 +288,7 @@ class ContactPermissionInvitationControllerTest extends TestCase
             'contact_id' => $invitation->contact_id,
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'broadcast',
+            'scope' => 'permission_invitation',
             'consented_at' => now()->subMinute(),
             'source' => 'imported_contact_permission_invitation',
         ]);
@@ -337,7 +328,7 @@ class ContactPermissionInvitationControllerTest extends TestCase
             'contact_id' => $invitation->contact_id,
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'broadcast',
+            'scope' => 'permission_invitation',
             'consented_at' => now()->subMinute(),
             'source' => 'imported_contact_permission_invitation',
         ]);
@@ -356,12 +347,8 @@ class ContactPermissionInvitationControllerTest extends TestCase
         Event::assertNotDispatched(AutomationEventRecorded::class);
     }
 
-    public function test_acceptance_falls_back_to_broadcast_scope_when_scope_config_is_missing(): void
+    public function test_acceptance_uses_fixed_permission_invitation_capture_scope(): void
     {
-        config([
-            'messaging.permission_invitations.consent.scopes' => null,
-        ]);
-
         $invitation = $this->invitation();
 
         $response = $this->post(route('messaging.permission-invitations.store', [
@@ -378,7 +365,7 @@ class ContactPermissionInvitationControllerTest extends TestCase
             'contact_id' => $invitation->contact_id,
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'broadcast',
+            'scope' => 'permission_invitation',
             'source' => 'imported_contact_permission_invitation',
         ]);
 

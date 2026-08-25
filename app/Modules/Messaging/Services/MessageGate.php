@@ -5,7 +5,6 @@ namespace App\Modules\Messaging\Services;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
-use App\Modules\Messaging\Models\ConsentRevocation;
 use App\Modules\Messaging\Services\Consent\MessageConsentStateResolver;
 
 class MessageGate
@@ -13,7 +12,6 @@ class MessageGate
     public function __construct(
         private readonly MessageSuppressionService $messageSuppressionService,
         private readonly ContactPermissionInvitationService $permissionInvitationService,
-        private readonly ConsentDomainRegistry $consentDomainRegistry,
         private readonly MessageConsentStateResolver $consentStateResolver,
     ) {}
 
@@ -44,16 +42,17 @@ class MessageGate
             return false;
         }
 
-        $consentDomain = $this->consentDomainRegistry->domainFor(
-            channel: $channel,
-            purpose: $purpose,
-            scope: $scope,
-        );
-
-        if (
-            ! $this->consentStateResolver->isActive($contact, $channel, $purpose, $consentDomain)
-            && ! $this->allowsImportedContactInvitationPass($contact, $channel, $messageKey, $context)
-        ) {
+        if ($messageKey === ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION) {
+            if (! $this->allowsImportedContactInvitationPass(
+                contact: $contact,
+                channel: $channel,
+                purpose: $purpose,
+                messageKey: $messageKey,
+                context: $context,
+            )) {
+                return false;
+            }
+        } elseif (! $this->consentStateResolver->isActive($contact, $channel, $purpose)) {
             return false;
         }
 
@@ -75,10 +74,11 @@ class MessageGate
     private function allowsImportedContactInvitationPass(
         Contact $contact,
         string $channel,
+        string $purpose,
         ?string $messageKey,
         array $context,
     ): bool {
-        if (! $messageKey) {
+        if ($purpose !== MessagePurpose::Transactional->value || ! $messageKey) {
             return false;
         }
 
@@ -91,10 +91,11 @@ class MessageGate
             return false;
         }
 
-        return ! ConsentRevocation::query()
-            ->where('contact_id', $contact->getKey())
-            ->where('channel', $channel)
-            ->exists();
+        return ! $this->consentStateResolver->isRevoked(
+            contact: $contact,
+            channel: $channel,
+            purpose: MessagePurpose::Marketing,
+        );
     }
 
     private function destinationFor(Contact $contact, string $channel): ?string

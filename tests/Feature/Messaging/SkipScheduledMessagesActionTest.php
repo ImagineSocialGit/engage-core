@@ -87,8 +87,8 @@ class SkipScheduledMessagesActionTest extends TestCase
             'context_type' => $batch->getMorphClass(),
             'context_id' => $batch->getKey(),
             'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'broadcast',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
             'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
             'status' => ScheduledMessage::STATUS_PENDING,
         ]);

@@ -137,7 +137,7 @@ This batch does not introduce a second customization system.
 - Slam Dunk client Campaign definitions remain unchanged.
 - Existing Slam Dunk Campaign-routing Flow Routes remain in place.
 - Process Highway is unchanged.
-- Messaging consent/scope semantics are unchanged.
+- Messaging now enforces consent at channel + purpose; Campaign scope remains operational/context identity and does not gate permission.
 - Schedule authoring is still summarized from the current MessageChain journey.
 - Existing Campaign message editing remains the Messages stage.
 - No database migration is required.

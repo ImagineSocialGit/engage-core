@@ -70,8 +70,8 @@ class SkipScheduledMessagesAction
                 ->where('context_type', $importBatch->getMorphClass())
                 ->where('context_id', $importBatch->getKey())
                 ->where('channel', MessageChannel::Email->value)
-                ->where('purpose', MessagePurpose::Marketing->value)
-                ->where('scope', 'broadcast')
+                ->where('purpose', MessagePurpose::Transactional->value)
+                ->where('scope', 'permission_invitation')
                 ->where('message_type', ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION),
             reason: $reason ?: 'permission_invitation_cancelled',
         );

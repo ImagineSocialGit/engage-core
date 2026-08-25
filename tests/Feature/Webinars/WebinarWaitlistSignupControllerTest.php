@@ -121,7 +121,7 @@ class WebinarWaitlistSignupControllerTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'webinar',
+            'scope' => 'webinar_waitlist',
             'source' => 'webinar_waitlist',
         ]);
 
@@ -330,7 +330,7 @@ class WebinarWaitlistSignupControllerTest extends TestCase
                 'contact_id' => $contact->id,
                 'channel' => $channel,
                 'purpose' => MessagePurpose::Marketing->value,
-                'scope' => 'webinar',
+                'scope' => 'webinar_waitlist',
                 'source' => 'webinar_waitlist',
             ]);
         }

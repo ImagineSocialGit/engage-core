@@ -68,7 +68,7 @@ See [Config Contracts and Token Contracts](config-contracts.md) and the
 22. Avoid backward compatibility/legacy aliases unless explicitly chosen.
 23. Normal Broadcasts require normal Messaging consent. Do not use Broadcasts as a general imported-contact consent bypass.
 24. Imported-contact opt-in invitations are a distinct one-time Messaging flow with configurable public copy/style.
-25. Message scope and consent identity are separate. Messages use `channel + purpose + scope`; consent uses `channel + purpose + consent domain`.
+25. Message scope and consent identity are separate. Messages use `channel + purpose + scope`; hard consent authorization uses exact `channel + purpose`. Scope/domain metadata must not become a second permission gate.
 26. Do not add per-scope `opt_ins` groups to Webinar Messaging definitions. Consent acknowledgements resolve through `ConsentDomainRegistry` and `ConsentOptInDefinitionResolver`.
 27. `MessageTemplateTokenValidator` is the canonical authorable-token validator for Messaging copy; config/setup validation, preset sync, and CRM template editing reuse it against `TokenContractRegistry`.
 28. Webinar schedule profiles may use `delay(minutes)`, `anchored(minutes)`, or `next_day_at(time = HH:MM)`. `next_day_at` uses client timezone rather than per-item timezone.
@@ -189,9 +189,9 @@ marketing:{client_scope}
 
 Client overrides may be vertical-specific when the client itself is vertical-specific.
 
-## Message scopes vs consent domains
+## Message scopes, permission boundaries, and acknowledgement domains
 
-Do not create one consent identity for every Messaging scope.
+Do not create one consent permission identity for every Messaging scope.
 
 The durable split is:
 
@@ -199,11 +199,16 @@ The durable split is:
 Message identity
     channel + purpose + scope
 
-Consent identity
-    channel + purpose + consent domain
+Hard permission identity
+    channel + purpose
+
+Scope
+    context + compatibility + attribution + audit metadata
 ```
 
-Messaging owns `ConsentDomainRegistry`. Resolution rules are:
+A grant for `email + marketing` may authorize eligible email-marketing messages carrying a different scope. A grant on email never authorizes SMS, and a grant for one purpose never authorizes another purpose. Revocation at `channel + purpose` blocks every scope on that boundary until a newer valid grant exists.
+
+Messaging still owns `ConsentDomainRegistry`, but it is not authorization authority. It supplies acknowledgement/context grouping such as a human-readable topic for related scopes. Scope resolution rules remain:
 
 ```text
 exact mapping wins
@@ -212,7 +217,7 @@ equal-specificity ambiguity fails loudly
 unknown unmapped scopes fall back to themselves
 ```
 
-Current Webinar example:
+Current Webinar acknowledgement example:
 
 ```text
 message scopes
@@ -220,11 +225,11 @@ message scopes
     webinar_waitlist
     webinar_nurture
 
-consent domain
+acknowledgement domain
     webinar
 ```
 
-The Webinar domain intentionally covers exact `webinar` plus the `webinar_` prefix. This allows related future Webinar scopes to share consent when the module has explicitly declared that relationship.
+The Webinar domain may group exact `webinar` plus the `webinar_` prefix for acknowledgement copy/context without broadening or narrowing permission. Authorization still asks only whether the Contact has active consent for the exact channel + purpose.
 
 Do not add per-scope Webinar `opt_ins` definition groups. Consent acknowledgements resolve through `ConsentOptInDefinitionResolver`, which combines:
 
@@ -240,7 +245,7 @@ Do not expose raw scope keys to end users as consent copy. Use a human-readable 
 
 System markers such as `:client_name` and `:consent_topic` belong to the consent acknowledgement resolver. They are not normal authorable `{token}` values.
 
-Imported consent should use `ImportMessageConsentAction` so state is normalized to the consent domain without emitting `MessageConsentGranted` or sending an opt-in acknowledgement.
+Imported consent should use `ImportMessageConsentAction` so provenance/capture scope is retained without emitting `MessageConsentGranted` or sending an opt-in acknowledgement. Imported permission still resolves at channel + purpose.
 
 
 ### Consent acknowledgement delivery consolidation
@@ -682,7 +687,7 @@ post_attended
 post_missed
 ```
 
-Do not add per-scope `opt_ins` groups. Consent acknowledgements resolve through Messaging consent domains.
+Do not add per-scope `opt_ins` groups. Consent acknowledgements may use Messaging acknowledgement domains for context/copy; authorization remains channel + purpose.
 
 When a reusable lifecycle template participates in a documented Messaging delivery-consolidation policy, it may include reserved placement fields supplied by that composer. Those fields do not transfer acknowledgement ownership to the lifecycle module and do not become general authorable tokens.
 
@@ -1171,7 +1176,7 @@ Expected fallback behavior:
 
 - Missing client config files use the default config.
 - Client associative-array overrides merge over default config without dropping unspecified nested keys.
-- Numeric arrays replace the default array when present. This is intentional for ordered definitions and lists such as `consent.scopes`.
+- Numeric arrays replace the default array when present. This is intentional for ordered definitions and other list-valued config fields.
 - Missing optional public-page `content` or `style` keys should fall back to safe defaults or render without breaking the page.
 - Client copy changes should not break behavioral tests unless exact copy is the behavior under test.
 
@@ -1184,7 +1189,7 @@ Before accepting a client config, validate:
 - Runtime-only URLs are supplied by runtime payloads/services and are not guessed in static config.
 - SMS channel visibility uses Messaging channel availability for the relevant surface instead of one-off provider checks.
 - Permission invitation configs preserve email-only bypass sending, explicit SMS opt-in, and configured consent scopes.
-- Consent-domain mappings are unambiguous and intentionally broader or narrower than message scopes.
+- Consent-domain mappings, when present, are unambiguous and used only for acknowledgement/context resolution; they do not alter the channel+purpose permission boundary.
 - Webinar Messaging definition files do not reintroduce per-scope `opt_ins`.
 - `next_day_at` schedule items use strict `HH:MM` and rely on client timezone rather than embedding one.
 
@@ -1675,10 +1680,9 @@ Template reference:
 docs/config-templates/permission-invitations-template.php
 ```
 
-This config owns the public permission-invitation base URL, invitation email subject/body/CTA labels, public preference-page copy, accepted consent scopes, and Tailwind-style class strings for the public page.
+This config owns the public permission-invitation base URL, invitation email subject/body/CTA labels, public preference-page copy, and Tailwind-style class strings for the public page.
 
-
-Configured permission-invitation scopes are requested Messaging scopes. Consent creation still normalizes each through `ConsentDomainRegistry`; mapped related scopes may collapse to one domain, while unknown unmapped scopes remain narrow.
+Permission-invitation acceptance creates one normal `marketing` consent grant per explicitly selected channel. The persisted capture scope is `permission_invitation`; it is provenance/context metadata, not a configurable permission boundary.
 
 Expected top-level shape:
 
@@ -1694,10 +1698,6 @@ return [
         'body' => 'Hi {first_name}, please confirm your communication preferences so we know how you want to hear from us.',
         'cta_label' => 'Confirm my preferences',
         'secondary_link_label' => 'Or copy and paste this link into your browser',
-    ],
-
-    'consent' => [
-        'scopes' => ['broadcast', 'campaign'],
     ],
 
     'content' => [
@@ -1852,7 +1852,7 @@ Line breaks count toward the encoded SMS length and may increase message segment
 - [ ] Are purpose/scope pairs correct?
 - [ ] Are marketing webinar campaigns using `marketing:webinar_nurture`?
 - [ ] Are transactional webinar messages using `transactional:webinar`?
-- [ ] Are Webinar-related message scopes mapped to the intended consent domain rather than creating one consent identity per scope?
+- [ ] Does consent authorization use exact channel + purpose regardless of operational message scope?
 - [ ] Do `next_day_at` schedule items use strict `HH:MM` and client timezone rather than embedding timezone?
 - [ ] Will delayed lifecycle conditions be available for send-time revalidation?
 - [ ] Is mortgage-specific copy isolated to mortgage-specific scopes or client overrides?
@@ -1892,8 +1892,9 @@ Rules:
 - Mortgage-specific copy should use mortgage-specific scopes or client overrides.
 - Use documented tokens only.
 - Validate Messaging tokens against the exact producer context; do not use a global token allowlist.
-- Keep message scope separate from consent domain.
-- Do not add per-scope Webinar `opt_ins`; use Messaging consent-domain acknowledgement resolution.
+- Keep message scope separate from the channel+purpose permission boundary.
+- Use `ConsentDomainRegistry` only for acknowledgement/context resolution, never to authorize a send.
+- Do not add per-scope Webinar `opt_ins`; use Messaging acknowledgement-domain resolution.
 - Webinar schedule profiles may use delay(minutes), anchored(minutes), or next_day_at(time=HH:MM); next_day_at uses client timezone.
 - If the client request needs a missing token, recommend adding that token to the runtime payload or changing the copy.
 - Use the configured client-facing business noun in UI/copy when appropriate, but keep internal keys/identifiers universal and `contact`-based.

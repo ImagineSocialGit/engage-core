@@ -80,7 +80,7 @@ everything else -> normal_reply
 
 `YES` is not a compliance re-opt-in keyword. It remains available to client reply profiles as a business intent.
 
-START only restores historical SMS consent domains whose latest revocation was a STOP revocation. It does not recreate permission after manual, preference, provider-unsubscribe, or other non-STOP revocations, and it does not invent a consent domain that the Contact never held.
+START only restores historical SMS purposes whose latest channel+purpose revocation was a STOP revocation. It does not recreate permission after manual, preference, provider-unsubscribe, or other non-STOP revocations, and it does not invent a purpose the Contact never previously held. The restored grant may retain the prior consent row's scope as provenance/context, but scope is not the permission boundary.
 
 ## FlowRoutes event execution
 
@@ -182,8 +182,10 @@ Messaging
 The operator reply uses the same channel as the inbound message and never bypasses
 MessageGate. Purpose and scope are reused from the inbound/correlated ScheduledMessage
 when present. If scope is missing but Messaging explicitly maps the channel/purpose pair
-to a consent domain, that canonical domain key is used as the reply scope. If purpose or
-a safe scope/domain context still cannot be resolved, the composer is not sendable.
+to an acknowledgement/context domain, that canonical key may be reused as the reply scope
+for message identity. This fallback does not authorize the reply; MessageGate still evaluates
+consent only at channel + purpose. If purpose or a safe scope/context still cannot be resolved,
+the composer is not sendable.
 
 CRM replies are normal `ScheduledMessage` records with `message_type=conversation_reply`.
 They retain only compact operational provenance (`surface=crm_contact_conversation`) and

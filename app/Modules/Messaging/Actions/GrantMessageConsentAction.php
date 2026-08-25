@@ -41,7 +41,7 @@ class GrantMessageConsentAction
                 messageConsent: $result->consent,
                 channel: $result->channel,
                 purpose: $result->purpose,
-                scope: $result->domain,
+                scope: $result->requestedScope,
                 context: $context,
                 data: [
                     'source' => $result->consent->source,
@@ -50,6 +50,7 @@ class GrantMessageConsentAction
                     'meta' => $result->consent->meta,
                     'requested_scope' => $result->requestedScope,
                     'domain' => $result->domain,
+                    'permission_boundary' => 'channel_purpose',
                 ],
             );
         });

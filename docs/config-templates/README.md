@@ -55,21 +55,24 @@ contact.first_name
 
 Do not create separate runtime payload fields, database columns, event keys, preset keys, route keys, or validation branches for each client noun. The alias layer exists for UX; canonical runtime identity remains stable.
 
-## Consent domains and opt-in acknowledgements
+## Consent boundary and opt-in acknowledgements
 
-Message identity and consent identity are intentionally separate:
+Message identity and consent permission identity are intentionally separate:
 
 ```text
 Message identity
     channel + purpose + scope
 
-Consent identity
-    channel + purpose + consent domain
+Hard permission identity
+    channel + purpose
+
+Scope/domain metadata
+    context + compatibility + attribution + acknowledgement grouping
 ```
 
-Do not add per-scope `opt_ins` groups to Webinar Messaging definition files. Messaging resolves consent acknowledgements through `ConsentDomainRegistry` and `ConsentOptInDefinitionResolver`.
+Do not add per-scope `opt_ins` groups to Webinar Messaging definition files. Messaging resolves consent acknowledgements through `ConsentDomainRegistry` and `ConsentOptInDefinitionResolver`, but authorization does not depend on the resolved domain.
 
-Current Webinar direction:
+Current Webinar acknowledgement direction:
 
 ```text
 message scopes
@@ -77,11 +80,11 @@ message scopes
     webinar_waitlist
     webinar_nurture
 
-consent domain
+acknowledgement domain
     webinar
 ```
 
-Exact mappings win, otherwise the longest matching registered prefix wins. Ambiguous equal-specificity mappings fail loudly. Unknown unmapped scopes remain narrow by falling back to themselves.
+Exact mappings win, otherwise the longest matching registered prefix wins. Ambiguous equal-specificity mappings fail loudly. Unknown unmapped scopes fall back to themselves for acknowledgement/context purposes only.
 
 Generic acknowledgement copy is Messaging-owned and may receive system markers such as:
 
@@ -211,7 +214,7 @@ Preset groups are composition-only. Durable preset ownership belongs to contribu
 | `task-presets-template.php` | DB-owned task template/default definitions. Task preset sync creates task templates only, not live tasks. |
 | `webinar-schedule-profiles-template.php` | DB-owned Webinar behavior profiles/items. These exclusively own Webinar lifecycle timing, conditions, enablement, and Webinar-specific skip behavior, not reusable copy. |
 | `webinar-post-event-template.php` | Webinar post-event provider orchestration such as attendance recording, playback resolution, follow-up dispatch, and automation events. |
-| `permission-invitations-template.php` | Imported-contact one-time permission invitation copy, public preference page copy/style, and accepted consent scopes. |
+| `permission-invitations-template.php` | Imported-contact one-time permission invitation copy and public preference page copy/style. Accepted channels create channel+purpose marketing consent with fixed invitation provenance. |
 | `contact-status-presets-template.php` | Core contact status definitions. |
 | `relationships-template.php` | Contact relationship types, relationship-specific stages, labels, visibility, and the configured default relationship workspace. |
 | `presets-root-template.php` | Root preset loading/orchestration config. |
@@ -249,7 +252,7 @@ messaging.{channel}.definitions.{purpose}.{scope}.campaigns.{campaign_key}.steps
 - SMS visibility belongs to Messaging channel availability for the relevant surface, not one-off provider checks.
 - For SMS line breaks, use a nowdoc or `\n` in a double-quoted PHP string; single-quoted `'\n'` remains literal and line breaks affect segmentation.
 - Imported-contact permission invitations are a distinct Messaging-owned one-time consent flow, not a normal Broadcast bypass.
-- Message scopes and consent domains are separate. Do not create a new consent identity merely because a new message scope exists.
+- Message scopes and the permission boundary are separate. Do not create a new consent permission merely because a new message scope exists; authorization is channel + purpose.
 - Webinar consent acknowledgements come from consent-domain resolution, not scope-specific `opt_ins` groups in reusable message definition files.
 - Authorable message tokens are validated through `TokenContractRegistry` + `MessageTemplateTokenValidator`; do not use a global token allowlist.
 - Reserved `{delivery_consolidation_*}` fields are internal composition placeholders, not universal authorable tokens.
@@ -398,7 +401,7 @@ Rules:
 - Mortgage-specific copy should use mortgage-specific scopes or client overrides.
 - Use documented tokens only.
 - Validate authorable tokens against the exact producer context; do not use a global token allowlist.
-- Keep message scope separate from consent domain.
+- Keep message scope separate from the channel+purpose permission boundary; consent domains are acknowledgement/context only.
 - Do not add per-scope `opt_ins` groups to Webinar Messaging definitions; use consent-domain acknowledgement resolution.
 - Delivery consolidation is Messaging-owned; preserve covered intent/consent provenance and standalone fallback behavior.
 - Treat `{delivery_consolidation_*}` as reserved composition fields, not universal authorable tokens.

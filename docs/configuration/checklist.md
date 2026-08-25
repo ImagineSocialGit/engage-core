@@ -7,8 +7,8 @@ Use after config, preset, or client-template changes. It is not backlog.
 - Do not guess runtime-only URLs/tokens in static config.
 - Campaign presets own journey behavior, not reusable message copy; resolve templates through first-class channel/purpose/scope identity.
 - Messaging templates live under the expected channel/purpose/scope path and do not own module lifecycle timing/conditions.
-- Webinar Messaging definitions do not reintroduce per-scope `opt_ins`; consent acknowledgements resolve through Messaging consent domains.
-- Message scopes map to intentional consent domains; unknown scopes remain narrow.
+- Webinar Messaging definitions do not reintroduce per-scope `opt_ins`; consent acknowledgements resolve through Messaging acknowledgement domains.
+- Consent authorization uses exact `channel + purpose`. Message scope remains context/audit identity and must not become a permission gate.
 - `next_day_at` uses strict `HH:MM` plus client timezone rather than embedding a timezone per item.
 - Delayed conditions remain available for send-time revalidation without copying canonical chain definitions into every ScheduledMessage.
 - Task presets create DB-owned TaskTemplate definitions only, never live Tasks.

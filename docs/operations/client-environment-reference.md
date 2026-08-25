@@ -206,9 +206,10 @@ For the reusable Artist Sites intake, environment allowlisting is only one part 
 ```text
 - enable Forms in client config/modules.php;
 - explicitly select the Forms preset group `artist_updates` in the selected package;
-- when Messaging-backed marketing consent is used, configure the intended
-  channel + purpose domains for email/marketing and, when SMS consent remains
-  in the selected form contract, sms/marketing;
+- when Messaging-backed marketing consent is used, confirm the intended channel +
+  purpose permissions are represented by the form's accepted consent fields; optional
+  consent-domain mappings may be configured only when custom acknowledgement/topic
+  grouping is desired;
 - sync the selected preset so a public current `artist_updates` FormVersion exists.
 ```
 

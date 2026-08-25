@@ -33,7 +33,6 @@ class RevokeSmsConsentFromInboundMessageAction implements InboundMessageHandler
                 inboundMessage: $inboundMessage,
                 contact: $sender,
                 purpose: $purpose,
-                scope: null,
             );
 
             $inboundMessage->markProcessed();
@@ -42,32 +41,28 @@ class RevokeSmsConsentFromInboundMessageAction implements InboundMessageHandler
         }
 
         $this->logUnknownProviderContext($inboundMessage, $sender);
-        $this->revokeAllSmsConsent($inboundMessage, $sender);
+        $this->revokeKnownSmsPurposes($inboundMessage, $sender);
 
         $inboundMessage->markProcessed();
 
         return $this->stopResponse();
     }
 
-    private function revokeAllSmsConsent(InboundMessage $inboundMessage, Contact $contact): void
+    private function revokeKnownSmsPurposes(InboundMessage $inboundMessage, Contact $contact): void
     {
         MessageConsent::query()
             ->where('contact_id', $contact->id)
             ->where('channel', MessageChannel::Sms->value)
-            ->get(['purpose', 'scope'])
-            ->map(fn (MessageConsent $consent): array => [
-                'purpose' => $this->value($consent->purpose),
-                'scope' => $consent->scope,
-            ])
-            ->filter(fn (array $consent): bool => $consent['purpose'] !== null)
-            ->unique(fn (array $consent): string => $consent['purpose'].'|'.$consent['scope'])
+            ->pluck('purpose')
+            ->map(fn (mixed $purpose): ?string => $this->value($purpose))
+            ->filter(fn (?string $purpose): bool => $purpose !== null)
+            ->unique()
             ->values()
-            ->each(function (array $consent) use ($inboundMessage, $contact): void {
+            ->each(function (string $purpose) use ($inboundMessage, $contact): void {
                 $this->revokePurpose(
                     inboundMessage: $inboundMessage,
                     contact: $contact,
-                    purpose: $consent['purpose'],
-                    scope: $consent['scope'],
+                    purpose: $purpose,
                 );
             });
     }
@@ -76,12 +71,10 @@ class RevokeSmsConsentFromInboundMessageAction implements InboundMessageHandler
         InboundMessage $inboundMessage,
         Contact $contact,
         string $purpose,
-        ?string $scope,
     ): void {
         $this->revokeMessageConsentAction->handle($contact, [
             'channel' => MessageChannel::Sms->value,
             'purpose' => $purpose,
-            'scope' => $scope,
             'reason' => ConsentRevocation::REASON_STOP,
             'source' => $this->source($inboundMessage),
             'meta' => $this->revocationMeta($inboundMessage),
@@ -112,7 +105,7 @@ class RevokeSmsConsentFromInboundMessageAction implements InboundMessageHandler
 
     private function logUnknownProviderContext(InboundMessage $inboundMessage, Contact $contact): void
     {
-        logger()->warning('Unknown inbound SMS provider context ID; revoking all SMS consent for contact.', [
+        logger()->warning('Unknown inbound SMS provider context ID; revoking all known SMS purposes for contact.', [
             'contact_id' => $contact->id,
             'inbound_message_id' => $inboundMessage->id,
             'provider' => $inboundMessage->provider,
@@ -132,6 +125,8 @@ class RevokeSmsConsentFromInboundMessageAction implements InboundMessageHandler
             return (string) $value->value;
         }
 
-        return is_string($value) ? $value : null;
+        return is_string($value) && trim($value) !== ''
+            ? trim($value)
+            : null;
     }
 }

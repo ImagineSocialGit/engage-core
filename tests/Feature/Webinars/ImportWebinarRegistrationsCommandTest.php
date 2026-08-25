@@ -110,14 +110,14 @@ class ImportWebinarRegistrationsCommandTest extends TestCase
             'contact_id' => $contact->getKey(),
             'channel' => 'email',
             'purpose' => 'marketing',
-            'scope' => 'webinar',
+            'scope' => 'webinar_nurture',
         ]);
 
         $this->assertDatabaseHas('message_consents', [
             'contact_id' => $contact->getKey(),
             'channel' => 'sms',
             'purpose' => 'marketing',
-            'scope' => 'webinar',
+            'scope' => 'webinar_nurture',
         ]);
     }
 

@@ -7,53 +7,42 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ConsentRevocation;
 use App\Modules\Messaging\Models\MessageConsent;
-use App\Modules\Messaging\Services\ConsentDomainRegistry;
 
 class MessageConsentStateResolver
 {
-    public function __construct(
-        private readonly ConsentDomainRegistry $consentDomainRegistry,
-    ) {}
-
+    /**
+     * Scope is accepted for call-site compatibility and audit context only.
+     * Permission state is resolved across the complete channel + purpose boundary.
+     */
     public function latestConsent(
         Contact|int $contact,
         MessageChannel|string $channel,
         MessagePurpose|string $purpose,
-        string $scope,
+        ?string $scope = null,
     ): ?MessageConsent {
-        $canonicalScope = $this->consentDomainRegistry->domainFor(
-            channel: $channel,
-            purpose: $purpose,
-            scope: $scope,
-        );
-
         return MessageConsent::query()
             ->where('contact_id', $this->contactId($contact))
             ->where('channel', $this->enumValue($channel))
             ->where('purpose', $this->enumValue($purpose))
-            ->where('scope', $canonicalScope)
             ->orderByDesc('consented_at')
             ->orderByDesc('id')
             ->first();
     }
 
+    /**
+     * Scope is accepted for call-site compatibility and audit context only.
+     * Revocation state is resolved across the complete channel + purpose boundary.
+     */
     public function latestRevocation(
         Contact|int $contact,
         MessageChannel|string $channel,
         MessagePurpose|string $purpose,
-        string $scope,
+        ?string $scope = null,
     ): ?ConsentRevocation {
-        $canonicalScope = $this->consentDomainRegistry->domainFor(
-            channel: $channel,
-            purpose: $purpose,
-            scope: $scope,
-        );
-
         return ConsentRevocation::query()
             ->where('contact_id', $this->contactId($contact))
             ->where('channel', $this->enumValue($channel))
             ->where('purpose', $this->enumValue($purpose))
-            ->where('scope', $canonicalScope)
             ->orderByDesc('revoked_at')
             ->orderByDesc('id')
             ->first();
@@ -63,15 +52,15 @@ class MessageConsentStateResolver
         Contact|int $contact,
         MessageChannel|string $channel,
         MessagePurpose|string $purpose,
-        string $scope,
+        ?string $scope = null,
     ): ?MessageConsent {
-        $consent = $this->latestConsent($contact, $channel, $purpose, $scope);
+        $consent = $this->latestConsent($contact, $channel, $purpose);
 
         if (! $consent instanceof MessageConsent) {
             return null;
         }
 
-        $revocation = $this->latestRevocation($contact, $channel, $purpose, $scope);
+        $revocation = $this->latestRevocation($contact, $channel, $purpose);
 
         if ($revocation && $revocation->revoked_at->greaterThanOrEqualTo($consent->consented_at)) {
             return null;
@@ -80,13 +69,43 @@ class MessageConsentStateResolver
         return $consent;
     }
 
+    public function activeRevocation(
+        Contact|int $contact,
+        MessageChannel|string $channel,
+        MessagePurpose|string $purpose,
+        ?string $scope = null,
+    ): ?ConsentRevocation {
+        $revocation = $this->latestRevocation($contact, $channel, $purpose);
+
+        if (! $revocation instanceof ConsentRevocation) {
+            return null;
+        }
+
+        $consent = $this->latestConsent($contact, $channel, $purpose);
+
+        if ($consent && $consent->consented_at->greaterThan($revocation->revoked_at)) {
+            return null;
+        }
+
+        return $revocation;
+    }
+
     public function isActive(
         Contact|int $contact,
         MessageChannel|string $channel,
         MessagePurpose|string $purpose,
-        string $scope,
+        ?string $scope = null,
     ): bool {
-        return $this->activeConsent($contact, $channel, $purpose, $scope) instanceof MessageConsent;
+        return $this->activeConsent($contact, $channel, $purpose) instanceof MessageConsent;
+    }
+
+    public function isRevoked(
+        Contact|int $contact,
+        MessageChannel|string $channel,
+        MessagePurpose|string $purpose,
+        ?string $scope = null,
+    ): bool {
+        return $this->activeRevocation($contact, $channel, $purpose) instanceof ConsentRevocation;
     }
 
     private function contactId(Contact|int $contact): int

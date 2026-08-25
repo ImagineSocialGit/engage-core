@@ -51,11 +51,6 @@ return [
     'style' => [
         'button' => 'client-button',
     ],
-    'consent' => [
-        'scopes' => [
-            'broadcast',
-        ],
-    ],
 ];
 PHP);
 
@@ -66,10 +61,6 @@ PHP);
             'messaging.permission_invitations.content.body' => 'Default body',
             'messaging.permission_invitations.style.button' => 'default-button',
             'messaging.permission_invitations.style.card' => 'default-card',
-            'messaging.permission_invitations.consent.scopes' => [
-                'broadcast',
-                'campaign',
-            ],
         ]);
 
         (new ClientServiceProvider($this->app))->register();
@@ -78,7 +69,6 @@ PHP);
         $this->assertSame('Default body', config('messaging.permission_invitations.content.body'));
         $this->assertSame('client-button', config('messaging.permission_invitations.style.button'));
         $this->assertSame('default-card', config('messaging.permission_invitations.style.card'));
-        $this->assertSame(['broadcast'], config('messaging.permission_invitations.consent.scopes'));
     }
 
     public function test_sparse_numeric_client_arrays_replace_defaults_instead_of_merging(): void

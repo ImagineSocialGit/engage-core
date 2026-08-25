@@ -14,7 +14,7 @@ class ImportMessageConsentActionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_import_is_silent_and_reuses_an_existing_active_grant(): void
+    public function test_import_is_silent_and_reuses_existing_channel_purpose_permission_across_scopes(): void
     {
         Event::fake([MessageConsentGranted::class]);
 
@@ -45,7 +45,7 @@ class ImportMessageConsentActionTest extends TestCase
         $this->assertDatabaseCount('message_consents', 1);
         $this->assertDatabaseHas('message_consents', [
             'id' => $first['consent']->getKey(),
-            'scope' => 'webinar',
+            'scope' => 'webinar_waitlist',
             'source' => 'first_import',
         ]);
 
@@ -73,7 +73,7 @@ class ImportMessageConsentActionTest extends TestCase
             'message_consent_id' => $first['consent']->id,
             'channel' => 'email',
             'purpose' => 'marketing',
-            'scope' => 'webinar',
+            'scope' => 'another_marketing_context',
             'reason' => ConsentRevocation::REASON_UNSUBSCRIBE,
             'revoked_at' => '2026-07-05 12:00:00',
             'source' => 'historical_import',
