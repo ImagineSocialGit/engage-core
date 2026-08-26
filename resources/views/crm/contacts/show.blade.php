@@ -114,6 +114,16 @@
                             <p class="mt-0.5 text-sm font-semibold">
                                 {{ $progressionLabel }}
                             </p>
+
+                            @if($showContactStatusProgression && $currentStatus)
+                                <a
+                                    href="{{ route('crm.process-highway.index', ['status' => $currentStatus->key]) }}"
+                                    data-contact-status-process-highway
+                                    class="mt-1 block text-[11px] font-semibold text-slate-600 underline decoration-slate-300 underline-offset-4 transition hover:text-slate-950"
+                                >
+                                    See what happens with this status
+                                </a>
+                            @endif
                         </div>
                     @endif
                 </div>

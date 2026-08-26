@@ -148,6 +148,40 @@ class ContactControllerTest extends TestCase
         ]);
     }
 
+
+    public function test_contact_status_links_to_process_highway_with_the_current_status_preselected(): void
+    {
+        config()->set('modules.enabled', array_values(array_unique([
+            ...config('modules.enabled', []),
+            'workflow',
+        ])));
+
+        $user = User::factory()->create();
+        $status = ContactStatus::query()->create([
+            'key' => 'past_contact',
+            'name' => 'Past Client',
+            'is_active' => true,
+            'sort_order' => 10,
+        ]);
+        $contact = Contact::factory()->create();
+
+        ContactWorkflowProfile::query()->create([
+            'contact_id' => $contact->getKey(),
+            'contact_status_id' => $status->getKey(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('crm.contacts.show', $contact))
+            ->assertOk()
+            ->assertSee('data-contact-status-process-highway', false)
+            ->assertSee(
+                route('crm.process-highway.index', [
+                    'status' => 'past_contact',
+                ]),
+                false,
+            );
+    }
+
     public function test_it_renders_import_preview_with_csv_mapping_fields(): void
     {
         Storage::fake('local');

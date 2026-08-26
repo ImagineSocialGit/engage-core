@@ -1,7 +1,66 @@
+
 @php
     $subjects = collect($highway['subjects'] ?? []);
     $highways = collect($highway['highways'] ?? []);
     $qualifierFilters = collect($highway['qualifier_filters'] ?? []);
+    $initialQualifierSelection = collect($initialQualifierSelection ?? [])
+        ->filter(fn (mixed $value, mixed $key): bool =>
+            is_string($key)
+            && is_string($value)
+            && trim($key) !== ''
+            && trim($value) !== ''
+        )
+        ->map(fn (string $value): string => trim($value))
+        ->all();
+    $initialStatus = $initialQualifierSelection['status'] ?? null;
+
+    if (is_string($initialStatus) && $initialStatus !== '') {
+        $statusFilterIndex = $qualifierFilters->search(
+            fn (array $filter): bool => ($filter['key'] ?? null) === 'status',
+        );
+        $statusOption = [
+            'value' => $initialStatus,
+            'label' => str($initialStatus)
+                ->replace(['_', '-'], ' ')
+                ->headline()
+                ->toString(),
+            'highway_keys' => [],
+        ];
+
+        if ($statusFilterIndex === false) {
+            $qualifierFilters->push([
+                'key' => 'status',
+                'label' => 'Status',
+                'priority' => 10,
+                'options' => [$statusOption],
+            ]);
+        } else {
+            $statusFilter = $qualifierFilters->get($statusFilterIndex);
+            $statusOptions = collect($statusFilter['options'] ?? []);
+
+            if (! $statusOptions->contains(
+                fn (array $option): bool => ($option['value'] ?? null) === $initialStatus,
+            )) {
+                $statusFilter['options'] = $statusOptions
+                    ->push($statusOption)
+                    ->sortBy(fn (array $option): array => [
+                        $option['label'] ?? '',
+                        $option['value'] ?? '',
+                    ])
+                    ->values()
+                    ->all();
+                $qualifierFilters->put($statusFilterIndex, $statusFilter);
+            }
+        }
+
+        $qualifierFilters = $qualifierFilters
+            ->sortBy(fn (array $filter): array => [
+                $filter['priority'] ?? 100,
+                $filter['label'] ?? '',
+            ])
+            ->values();
+    }
+
     $primaryQualifierKeys = ['status', 'tag', 'webinar_outcome'];
     $primaryQualifierFilters = $qualifierFilters
         ->filter(fn (array $filter): bool => in_array($filter['key'], $primaryQualifierKeys, true))
@@ -40,6 +99,13 @@
     $qualifierSelection = $qualifierFilters
         ->mapWithKeys(fn (array $filter): array => [$filter['key'] => ''])
         ->all();
+    $qualifierSelection = array_replace(
+        $qualifierSelection,
+        $initialQualifierSelection,
+    );
+    $entryRampInspectors = is_array($highway['entry_ramp_inspectors'] ?? null)
+        ? $highway['entry_ramp_inspectors']
+        : [];
     $qualifierLabels = $qualifierFilters
         ->mapWithKeys(fn (array $filter): array => [
             $filter['key'] => [
@@ -85,9 +151,13 @@
             query: '',
             qualifiers: @js($qualifierSelection),
             qualifierLabels: @js($qualifierLabels),
+            rampInspectors: @js($entryRampInspectors),
             expandedHighway: '',
             showMoreFilters: false,
             ramp: null,
+            init() {
+                this.filterChanged();
+            },
             selectedCriteria() {
                 return Object.entries(this.qualifiers)
                     .filter(([, value]) => value !== '')
@@ -186,11 +256,51 @@
 
                 this.selectedCriteria().forEach(({ key, value }) => {
                     const filter = this.qualifierLabels[key] || {};
-                    const option = (filter.options || {})[value] || value;
-                    labels.push(`${filter.label || key}: ${option}`);
+                    const option = (filter.options || {})[value] || this.humanize(value);
+                    labels.push(`${filter.label || this.humanize(key)}: ${option}`);
                 });
 
                 return labels;
+            },
+            humanize(value) {
+                return String(value || '')
+                    .replace(/[_-]+/g, ' ')
+                    .replace(/\b\w/g, (character) => character.toUpperCase());
+            },
+            missingRequirements(item) {
+                const selected = this.selectedCriteria();
+
+                return (item.entry_requirements || []).filter((requirement) => {
+                    return ! selected.some((criterion) => {
+                        return criterion.key === requirement.criterion_key
+                            && (requirement.values || []).some((candidate) => candidate.value === criterion.value);
+                    });
+                });
+            },
+            requirementSummary(requirement) {
+                const values = (requirement.values || [])
+                    .map((candidate) => candidate.label || candidate.value)
+                    .filter(Boolean);
+
+                return `${requirement.criterion_label || this.humanize(requirement.criterion_key)}: ${values.join(' or ')}`;
+            },
+            selectedStatusInspector() {
+                const status = this.qualifiers.status || '';
+
+                if (! status) {
+                    return null;
+                }
+
+                return Object.values(this.rampInspectors).find((inspector) => {
+                    return inspector.criterion_key === 'status' && inspector.value === status;
+                }) || null;
+            },
+            openSelectedStatusInspector() {
+                const inspector = this.selectedStatusInspector();
+
+                if (inspector) {
+                    this.openRamp(inspector);
+                }
             },
             setContactMode(mode) {
                 this.contactMode = mode;
@@ -285,7 +395,7 @@
                     @foreach($primaryQualifierFilters as $filter)
                         <label class="block">
                             <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-600">{{ $filter['label'] }}</span>
-                            <select x-model="qualifiers['{{ $filter['key'] }}']" x-on:change="filterChanged()" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900 shadow-sm focus:border-slate-500 focus:ring-slate-500">
+                            <select x-model="qualifiers['{{ $filter['key'] }}']" x-on:change="filterChanged()" data-process-highway-qualifier="{{ $filter['key'] }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900 shadow-sm focus:border-slate-500 focus:ring-slate-500">
                                 <option value="">Any {{ strtolower($filter['label']) }}</option>
                                 @foreach($filter['options'] as $option)
                                     <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
@@ -293,6 +403,33 @@
                             </select>
                         </label>
                     @endforeach
+                </div>
+
+                <div
+                    x-cloak
+                    x-show="selectedStatusInspector() !== null"
+                    data-process-highway-status-inspector
+                    class="mt-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <div class="min-w-0">
+                        <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Selected status</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-950" x-text="selectedStatusInspector()?.value_label"></p>
+                        <p class="mt-1 text-xs leading-5 text-slate-600">
+                            <span x-text="selectedStatusInspector()?.exact_process_count || 0"></span>
+                            <span x-text="(selectedStatusInspector()?.exact_process_count || 0) === 1 ? 'direct process' : 'direct processes'"></span>
+                            ·
+                            <span x-text="selectedStatusInspector()?.partial_process_count || 0"></span>
+                            <span x-text="(selectedStatusInspector()?.partial_process_count || 0) === 1 ? 'process with additional requirements' : 'processes with additional requirements'"></span>
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        x-on:click="openSelectedStatusInspector()"
+                        class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
+                    >
+                        See what happens with this status
+                    </button>
                 </div>
 
                 @if($subjects->count() > 1 || $secondaryQualifierFilters->isNotEmpty())
@@ -316,7 +453,7 @@
                             @foreach($secondaryQualifierFilters as $filter)
                                 <label @if($filter['key'] === 'relationship') x-cloak x-show="contactMode === 'relationship'" @endif class="block">
                                     <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-600">{{ $filter['key'] === 'relationship' ? 'Relationship stage' : $filter['label'] }}</span>
-                                    <select x-model="qualifiers['{{ $filter['key'] }}']" x-on:change="filterChanged()" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900 shadow-sm focus:border-slate-500 focus:ring-slate-500">
+                                    <select x-model="qualifiers['{{ $filter['key'] }}']" x-on:change="filterChanged()" data-process-highway-qualifier="{{ $filter['key'] }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900 shadow-sm focus:border-slate-500 focus:ring-slate-500">
                                         <option value="">Any {{ strtolower($filter['label']) }}</option>
                                         @foreach($filter['options'] as $option)
                                             <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
@@ -405,6 +542,88 @@
                             <div class="rounded-2xl bg-slate-950 px-4 py-4 text-white">
                                 <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-300">Contacts currently matching</p>
                                 <p class="mt-1 text-3xl font-semibold" x-text="Number(ramp.contact_count).toLocaleString()"></p>
+                            </div>
+
+                            <div x-show="(ramp.processes || []).length > 0" data-process-highway-impact-processes>
+                                <div class="flex items-end justify-between gap-3">
+                                    <div>
+                                        <h3 class="text-sm font-semibold text-slate-950" x-text="ramp.criterion_key === 'status' ? 'What happens with this status' : 'What this fact can start'"></h3>
+                                        <p class="mt-1 text-xs leading-5 text-slate-600">
+                                            Direct matches can start from this fact alone. Partial matches still require the other facts shown.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="mt-3 space-y-3">
+                                    <template x-for="process in ramp.processes" :key="process.key">
+                                        <article data-process-highway-impact-process class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                                <div class="min-w-0">
+                                                    <span
+                                                        class="inline-flex rounded-full bg-white px-2.5 py-1 text-[0.7rem] font-bold text-slate-700 ring-1 ring-slate-300"
+                                                        x-text="process.match_label"
+                                                    ></span>
+                                                    <h4 class="mt-2 text-sm font-semibold text-slate-950" x-text="process.name"></h4>
+                                                </div>
+                                                <span class="text-xs font-semibold text-slate-500" x-text="process.state_label"></span>
+                                            </div>
+
+                                            <template x-if="(process.remaining_requirements || []).length > 0">
+                                                <div class="mt-3 rounded-xl bg-amber-50 px-3 py-2 ring-1 ring-amber-200">
+                                                    <p class="text-[0.68rem] font-bold uppercase tracking-[0.1em] text-amber-800">Also requires</p>
+                                                    <p
+                                                        class="mt-1 text-xs leading-5 text-amber-950"
+                                                        x-text="(process.remaining_requirements || []).map((requirement) => `${requirement.criterion_label}: ${(requirement.values || []).join(' or ')}`).join(' · ')"
+                                                    ></p>
+                                                </div>
+                                            </template>
+
+                                            <div class="mt-3 space-y-3">
+                                                <template x-for="segment in process.segments" :key="segment.key">
+                                                    <div class="rounded-xl border border-slate-200 bg-white p-3">
+                                                        <div class="flex items-start justify-between gap-3">
+                                                            <div class="min-w-0">
+                                                                <p class="text-[0.68rem] font-bold uppercase tracking-[0.1em] text-slate-500" x-text="segment.owner_label"></p>
+                                                                <p class="mt-1 text-sm font-semibold text-slate-900" x-text="segment.name"></p>
+                                                            </div>
+                                                            <template x-if="segment.navigation_target && segment.navigation_target.url">
+                                                                <a
+                                                                    x-bind:href="segment.navigation_target.url"
+                                                                    class="shrink-0 text-xs font-semibold text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
+                                                                >
+                                                                    Open
+                                                                </a>
+                                                            </template>
+                                                        </div>
+
+                                                        <template x-if="(segment.effects || []).length > 0">
+                                                            <ul class="mt-3 space-y-2 border-t border-slate-100 pt-3">
+                                                                <template x-for="effect in segment.effects" :key="effect.key">
+                                                                    <li class="text-xs leading-5 text-slate-700">
+                                                                        <div class="flex items-start justify-between gap-3">
+                                                                            <div class="min-w-0">
+                                                                                <span class="font-semibold text-slate-900" x-text="effect.label"></span>
+                                                                                <span x-show="effect.detail" class="mt-0.5 block text-slate-500" x-text="effect.detail"></span>
+                                                                            </div>
+                                                                            <template x-if="effect.navigation_target && effect.navigation_target.url">
+                                                                                <a
+                                                                                    x-bind:href="effect.navigation_target.url"
+                                                                                    class="shrink-0 font-semibold text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
+                                                                                >
+                                                                                    Edit
+                                                                                </a>
+                                                                            </template>
+                                                                        </div>
+                                                                    </li>
+                                                                </template>
+                                                            </ul>
+                                                        </template>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </article>
+                                    </template>
+                                </div>
                             </div>
 
                             <div>

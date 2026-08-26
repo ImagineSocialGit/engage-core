@@ -251,6 +251,24 @@ Campaigns and Flow Routes receive visible mechanism badges because they are the 
 
 Campaign eligibility gateways and criteria are intentionally omitted from the Campaign card. The same conditions already appear as the Highway's entry ramps.
 
+### Contextual status wayfinding
+
+The Contact workspace may link to Process Highway with the contact's current Status:
+
+```text
+/process-highway?status=past_contact
+```
+
+This is a read-only wayfinding hint, not an execution request. The controller carries the Status key into the audience filter and the Highway answers the same question the operator would answer manually:
+
+```text
+What happens automatically to contacts with this status?
+```
+
+The Status may be preselected even when no configured Highway currently uses it. When other highways exist, that lands on the normal zero-match state; when no business highway exists at all, the general empty state remains authoritative. Either way, the operator can distinguish "nothing is configured for this status" from "I could not find the right automation screen."
+
+The contextual launcher does not mutate Contact, Campaign, Flow Route, Messaging, or other runtime state. It also does not add a hidden dependency from Core to those modules.
+
 ## Entry-ramp inspection
 
 Status and Tag entry ramps open a bounded read-only inspector. Owner modules contribute current counts and ordinary application paths through:
@@ -263,6 +281,28 @@ process_highway.entry_ramp_contributors
 Core contributes Tag counts and import capability. Workflow contributes Status counts plus direct Contact editing and import capability. The shared inspector discovers configured Flow Routes from graph consequence edges and links to their authoritative Route editors.
 
 The count is the number of contacts whose current facts match the selected ramp. The application-path list explains how the fact can currently be assigned. It is not historical attribution.
+
+The same inspector also derives forward impact from the already composed Highway graph. For the selected fact it shows:
+
+- exact processes whose complete entrance is satisfied by that one fact;
+- partial processes that still require additional facts or relationship context;
+- every visible owning mechanism in those business highways;
+- visible ordered actions and branches;
+- durable outcomes such as status/tag changes and Campaign starts/stops;
+- Campaign message journeys and reply-routing handoffs when their contributors expose them;
+- exact GET links back to the owning editors.
+
+This forward-impact summary is generic graph composition. `ProcessHighwayEntryRampInspector` does not query Campaigns, Flow Routes, Messaging, Tasks, Inbound Messaging, or other owning-module tables to manufacture consequences. It summarizes only nodes, edges, segment effects, and navigation targets already contributed to the read model.
+
+The two inspector directions are intentionally distinct:
+
+```text
+What happens with this fact?
+    selected fact -> exact/partial processes -> actions/outcomes
+
+How can this fact be applied?
+    configured editors/imports/Routes -> selected fact
+```
 
 Tag rows currently contain only Contact, tag, and timestamps, and Core fact-change events are deliberately transient. A future request for source-by-source historical Tag counts would therefore require explicit provenance persistence; Process Highway does not infer or fabricate it.
 

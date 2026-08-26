@@ -1,3 +1,4 @@
+
 @php($filterItem = [
     'key' => $businessHighway['key'],
     'subject_key' => $businessHighway['subject_key'],
@@ -64,6 +65,24 @@
                 <span x-text="expandedHighway === @js($businessHighway['key']) ? 'Hide process' : 'Review process'">Review process</span>
             </button>
         </div>
+
+        @if($matchKind === 'partial')
+            <div
+                x-show="missingRequirements(@js($filterItem)).length > 0"
+                data-process-highway-missing-requirements="{{ $businessHighway['key'] }}"
+                class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-3"
+            >
+                <p class="text-xs font-bold uppercase tracking-[0.1em] text-amber-800">Still required</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                    <template x-for="requirement in missingRequirements(@js($filterItem))" :key="requirement.criterion_key">
+                        <span
+                            class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-amber-950 ring-1 ring-amber-200"
+                            x-text="requirementSummary(requirement)"
+                        ></span>
+                    </template>
+                </div>
+            </div>
+        @endif
 
         @if($entryRequirements->isNotEmpty())
             <div class="mt-5" data-process-highway-entry-expression="{{ $businessHighway['key'] }}">

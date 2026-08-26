@@ -13,6 +13,9 @@ class ProcessHighwayUsabilitySurfaceTest extends TestCase
             'heading' => 'Process Highway',
             'subheading' => 'Fixture subheading.',
             'highway' => $this->highway(),
+            'initialQualifierSelection' => [
+                'status' => 'past_contact',
+            ],
         ]);
 
         $view
@@ -21,6 +24,7 @@ class ProcessHighwayUsabilitySurfaceTest extends TestCase
             ->assertSee('data-process-highway-contact-mode', false)
             ->assertSee('data-process-highway-relationship-type', false)
             ->assertSee('data-process-highway-primary-filters', false)
+            ->assertSee('data-process-highway-qualifier="status"', false)
             ->assertSee('data-process-highway-awaiting-filter', false)
             ->assertSee('data-process-highway-results', false)
             ->assertSee('data-process-highway-exact-results', false)
@@ -34,6 +38,10 @@ class ProcessHighwayUsabilitySurfaceTest extends TestCase
             ->assertSee('data-process-highway-entry-expression="contacts:standard:highway:fixture"', false)
             ->assertSee('data-process-highway-entry-requirement="status"', false)
             ->assertSee('data-entry-ramp-inspector="workflow:status:past_contact"', false)
+            ->assertSee('data-process-highway-status-inspector', false)
+            ->assertSee('data-process-highway-impact-processes', false)
+            ->assertSee('data-process-highway-impact-process', false)
+            ->assertSee('data-process-highway-missing-requirements="contacts:standard:highway:fixture"', false)
             ->assertSee('data-process-highway-segment-group="programs"', false)
             ->assertSee('data-process-highway-mechanism="campaigns"', false)
             ->assertSee('data-process-highway-outcome="workflow:status:engaged"', false)
@@ -79,6 +87,28 @@ class ProcessHighwayUsabilitySurfaceTest extends TestCase
                 'value_label' => 'Past Client',
                 'contact_count' => 4,
                 'application_sources' => [],
+                'process_count' => 1,
+                'exact_process_count' => 1,
+                'partial_process_count' => 0,
+                'processes' => [[
+                    'key' => 'contacts:standard:highway:fixture',
+                    'name' => 'Past Client Nurture',
+                    'match' => 'exact',
+                    'match_label' => 'Exact match',
+                    'state' => 'active',
+                    'state_label' => 'Active',
+                    'remaining_requirements' => [],
+                    'segments' => [[
+                        'key' => 'campaigns:campaign:past_client',
+                        'name' => 'Past Client Nurture',
+                        'owner_key' => 'campaigns',
+                        'owner_label' => 'Campaigns',
+                        'state' => 'active',
+                        'state_label' => 'Active',
+                        'navigation_target' => $navigationTarget,
+                        'effects' => [],
+                    ]],
+                ]],
             ],
         ];
         $outcomeNode = [
@@ -119,6 +149,9 @@ class ProcessHighwayUsabilitySurfaceTest extends TestCase
                     'highway_keys' => ['contacts:standard:highway:fixture'],
                 ]],
             ]],
+            'entry_ramp_inspectors' => [
+                'workflow:status:past_contact' => $entryNode['inspector'],
+            ],
             'highways' => [[
                 'key' => 'contacts:standard:highway:fixture',
                 'name' => 'Past Client Nurture',

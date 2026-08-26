@@ -39,6 +39,36 @@ class ProcessHighwaySurfaceTest extends TestCase
         $this->assertCount(0, $highway['qualifier_filters']);
     }
 
+
+    public function test_status_query_preselects_the_highway_audience_without_requiring_a_matching_process(): void
+    {
+        config()->set('modules.enabled', [
+            'core',
+        ]);
+
+        $response = $this->actingAs($this->createUser())
+            ->get(route('crm.process-highway.index', [
+                'status' => 'past_contact',
+            ]))
+            ->assertOk();
+
+        $this->assertEquals(
+            ['status' => 'past_contact'],
+            $response->viewData('initialQualifierSelection'),
+        );
+
+        $invalidResponse = $this->actingAs($this->createUser())
+            ->get(route('crm.process-highway.index', [
+                'status' => ['past_contact'],
+            ]))
+            ->assertOk();
+
+        $this->assertEquals(
+            [],
+            $invalidResponse->viewData('initialQualifierSelection'),
+        );
+    }
+
     public function test_flow_routes_contribute_owned_nodes_edges_and_exact_edit_targets(): void
     {
         config()->set('modules.enabled', array_values(array_unique([
