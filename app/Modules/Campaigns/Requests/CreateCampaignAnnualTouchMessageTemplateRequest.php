@@ -2,7 +2,6 @@
 
 namespace App\Modules\Campaigns\Requests;
 
-use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use Illuminate\Foundation\Http\FormRequest;
@@ -19,13 +18,6 @@ class CreateCampaignAnnualTouchMessageTemplateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'campaign_id' => [
-                'required',
-                'integer',
-                Rule::exists('campaigns', 'id')->where(
-                    fn ($query) => $query->where('status', '!=', Campaign::STATUS_ARCHIVED),
-                ),
-            ],
             'channel' => ['required', 'string', Rule::in(['email', 'sms'])],
             'name' => ['required', 'string', 'max:191'],
             'subject' => [
@@ -46,11 +38,6 @@ class CreateCampaignAnnualTouchMessageTemplateRequest extends FormRequest
                 'max:1600',
             ],
         ];
-    }
-
-    public function campaignId(): int
-    {
-        return (int) $this->validated('campaign_id');
     }
 
     public function channel(): string

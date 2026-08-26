@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Campaigns;
 
-use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignTouchDate;
 use App\Modules\Campaigns\Models\CampaignTouchProgram;
 use App\Modules\Campaigns\Models\CampaignTouchVariant;
@@ -13,21 +12,11 @@ class CampaignTouchDateFoundationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_campaign_can_store_annual_touch_program_dates_and_channel_variants(): void
+    public function test_standalone_program_can_store_annual_touch_dates_and_channel_variants(): void
     {
-        $campaign = Campaign::query()->create([
-            'key' => 'past_client_nurture',
-            'name' => 'Past Client Nurture',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'mortgage_past_client',
-            'status' => Campaign::STATUS_INACTIVE,
-        ]);
-
         $program = CampaignTouchProgram::query()->create([
-            'campaign_id' => $campaign->getKey(),
-            'key' => 'annual_touch_base',
-            'name' => 'Annual touch-base dates',
+            'key' => 'past_client_annual_touches',
+            'name' => 'Past Client annual touches',
             'audience_type' => CampaignTouchProgram::AUDIENCE_CONTACT_STATUS,
             'audience_key' => 'past_client',
             'recurrence' => CampaignTouchProgram::RECURRENCE_ANNUAL,
@@ -48,8 +37,8 @@ class CampaignTouchDateFoundationTest extends TestCase
             'campaign_touch_date_id' => $birthday->getKey(),
             'key' => 'email',
             'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'mortgage_past_client',
+            'purpose' => CampaignTouchProgram::MESSAGE_PURPOSE,
+            'scope' => CampaignTouchProgram::MESSAGE_SCOPE,
             'message_template_preset_id' => null,
             'sort_order' => 10,
         ]);
@@ -58,8 +47,8 @@ class CampaignTouchDateFoundationTest extends TestCase
             'campaign_touch_date_id' => $birthday->getKey(),
             'key' => 'sms',
             'channel' => 'sms',
-            'purpose' => 'marketing',
-            'scope' => 'mortgage_past_client',
+            'purpose' => CampaignTouchProgram::MESSAGE_PURPOSE,
+            'scope' => CampaignTouchProgram::MESSAGE_SCOPE,
             'message_template_preset_id' => null,
             'sort_order' => 20,
         ]);
@@ -75,16 +64,20 @@ class CampaignTouchDateFoundationTest extends TestCase
             'sort_order' => 20,
         ]);
 
-        $campaign->refresh()->load('touchPrograms.touchDates.variants');
+        $loadedProgram = CampaignTouchProgram::query()
+            ->with('touchDates.variants')
+            ->whereKey($program->getKey())
+            ->firstOrFail();
 
-        $loadedProgram = $campaign->touchPrograms->first();
-
-        $this->assertInstanceOf(CampaignTouchProgram::class, $loadedProgram);
         $this->assertSame('past_client', $loadedProgram->audience_key);
         $this->assertSame(10, $loadedProgram->repeat_years);
         $this->assertSame(2, $loadedProgram->touchDates->count());
         $this->assertEquals(['email', 'sms'], $birthday->variants()->pluck('channel')->all());
         $this->assertSame(12, $holiday->month);
         $this->assertSame(25, $holiday->day);
+        $this->assertDatabaseHas('campaign_touch_programs', [
+            'id' => $program->getKey(),
+            'campaign_id' => null,
+        ]);
     }
 }

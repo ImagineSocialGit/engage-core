@@ -1,45 +1,45 @@
-# Campaign annual touch dates
+# Annual touch dates
 
-Campaigns owns recurring annual touch behavior.
+Campaigns owns the recurring annual-touch capability, but an annual-touch program is a standalone business process. It is not a child of a Campaign and does not require Campaign enrollment, eligibility, or active state.
 
-This capability is intentionally separate from ordinary relative Campaign steps.
-It is for durable calendar touches such as birthdays, loan anniversaries, client
-anniversaries, and holidays.
+This capability is intentionally separate from ordinary relative Campaign steps. It is for durable calendar touches such as birthdays, loan anniversaries, client anniversaries, and holidays.
 
 ## Ownership
 
 Campaigns owns:
 
-- which Campaign the annual touch program belongs to;
+- the annual-touch program identity and enabled state;
 - the qualifying audience;
-- when the annual date occurs;
-- how many years it repeats;
+- when each annual date occurs;
+- how many years the program repeats;
 - which Email/SMS variants participate;
 - occurrence idempotency.
 
-Messaging continues to own reusable message copy, consent/suppression policy,
-recipient destination validation, scheduling, and provider delivery.
+Messaging continues to own reusable message copy, channel + purpose consent enforcement, suppression policy, recipient destination validation, scheduling, and provider delivery.
 
-The framework scheduler is used to wake Campaigns. This does not create a
-dependency on the Scheduling module.
+The framework scheduler is used to wake Campaigns. This does not create a dependency on the Scheduling module.
+
+## Standalone program identity
+
+`campaign_touch_programs.key` is the Project State identity for the program. The current UI creates a globally unique key and treats the Contact Status audience as the operator-facing process identity.
+
+The database retains a nullable `campaign_id` column only as a transitional compatibility/provenance seam for rows created before the standalone-program cutover. Application models, authoring, runtime selection, dispatch context, and Project State identity do not use that value. New programs leave it null, and deleting a legacy referenced Campaign nulls the column instead of deleting the annual-touch program.
 
 ## Current runtime
 
-The runtime scanner is `ProcessDueCampaignTouchDatesJob`, registered every minute
-by `CampaignsModuleServiceProvider`.
+The runtime scanner is `ProcessDueCampaignTouchDatesJob`, registered every minute by `CampaignsModuleServiceProvider`.
 
-For each active annual program it:
+For each enabled annual program it:
 
-1. confirms the parent Campaign is active;
-2. resolves today's eligible annual date in the client timezone;
-3. resolves the audience through Core's contact-filter registry;
-4. excludes any contact/variant/year occurrence already recorded;
-5. hands the selected template to `DispatchMessageAction`;
-6. records the occurrence in `campaign_touch_dispatches`.
+1. resolves today's eligible annual date in the client timezone;
+2. resolves the Contact Status audience through Core's contact-filter registry;
+3. excludes any contact/variant/year occurrence already recorded;
+4. hands the selected template to `DispatchMessageAction` using the `CampaignTouchProgram` as the message context;
+5. records the occurrence in `campaign_touch_dispatches`.
 
-Messaging remains the delivery authority. A message denied by Messaging's
-planning gate is recorded as skipped for that annual occurrence and is not
-retried later in the same year.
+There is no parent-Campaign active-state check.
+
+Messaging remains the delivery authority. A message denied by Messaging's planning gate is recorded as skipped for that annual occurrence and is not retried later in the same year.
 
 ## Supported date sources
 
@@ -57,78 +57,74 @@ A touch can provide `month` and `day`, such as December 25.
 
 ### Registered date source
 
-`registered_date_source` remains reserved for a future module-contributed date
-registry. The runtime currently ignores it rather than importing another
-module's model or table.
+`registered_date_source` remains reserved for a future module-contributed date registry. The runtime currently ignores it rather than importing another module's model or table.
 
 ## Audience
 
 The current program audience type is `contact_status`.
 
-Campaigns asks Core's generic `ContactFilterResolver` for criterion `status`.
-When Workflow contributes that criterion, a value such as `past_client`
-resolves normally. If no enabled module contributes the criterion, the filter
-fails closed and no contacts are selected.
+Campaigns asks Core's generic `ContactFilterResolver` for criterion `status`. When Workflow contributes that criterion, a value such as `past_client` resolves normally. If no enabled module contributes the criterion, the filter fails closed and no contacts are selected.
 
 Campaigns therefore does not depend on Workflow.
 
+The Contact Status is the actual qualification boundary. An otherwise unrelated Campaign does not have to be selected merely to provide program identity.
+
 ## Repeat window
 
-`starts_on` may explicitly anchor a touch program. If it is null, the program's
-creation date is used.
+`starts_on` may explicitly anchor a touch program. If it is null, the program's creation date is used.
 
-`repeat_years = 10` means annual occurrences are eligible from the start date
-until, but not including, the date ten years later.
+`repeat_years = 10` means annual occurrences are eligible from the start date until, but not including, the date ten years later.
 
 Past dates are not backfilled.
+
+## Message context
+
+New messages authored from Annual Touches receive server-owned context from the annual-touch surface:
+
+- purpose: `marketing`;
+- scope: `annual_touch`;
+- dispatch key: `campaign_touch_due`;
+- queue: `marketing`;
+- catalog/selection context: `campaign_annual_touch`.
+
+The `campaign_touch_due` token context exposes Contact fields that the standalone runtime can actually supply. Campaign fields are intentionally not authorable for this dispatch context because no Campaign is required at send time.
+
+Templates created during the brief pre-cutover Campaign-owned implementation that contain `{campaign.*}` fields must be edited before they are used by the standalone runtime. New Annual Touch template authoring rejects those fields through the existing token validator.
+
+Existing saved reusable marketing templates can still be selected where the reusable-template catalog permits them. A selected variant preserves that template's channel, purpose, and scope; channel + purpose remains the Messaging permission boundary.
 
 ## Idempotency
 
 `campaign_touch_dispatches` uniquely identifies:
 
-- Campaign touch variant;
+- annual-touch variant;
 - Contact;
 - occurrence year.
 
-The same logical occurrence also receives a stable Messaging occurrence key.
-Scheduler retries therefore do not intentionally produce duplicate sends.
+The same logical occurrence also receives a stable Messaging occurrence key. Scheduler retries therefore do not intentionally produce duplicate sends.
 
-The dispatch table is runtime state and is declared `insert_empty` in Project
-State, matching other runtime execution records.
+The dispatch table is runtime state and is declared `insert_empty` in Project State, matching other runtime execution records.
 
-## Authoring direction
+## Authoring surface
 
-The intended Campaign UI remains intentionally small:
+The intended UI remains intentionally small:
 
-- Have recurring annual touch-base dates
-- Audience / Contact Status
-- Repeat for X years
-- Repeater rows:
-  - Birthday
-  - fixed annual date
-  - future registered date source
-- Email/SMS template selections per row
+- Contact Status audience;
+- Repeat for X years;
+- optional start date;
+- enabled/off state;
+- repeater rows for Birthday, fixed annual dates, and future registered date sources;
+- Email/SMS template selections per row;
+- inline reusable-message creation.
 
-Annual-touch authoring intentionally selects only Messaging-owned saved reusable
-marketing messages. It does not expose the full active template catalog. Campaign
-step messages, Webinar lifecycle reminders/confirmations, reply acknowledgements,
-and other owner-specific templates are excluded from new annual-touch selection.
+Annual-touch authoring intentionally selects only Messaging-owned saved reusable marketing messages. Campaign step messages, Webinar lifecycle reminders/confirmations, reply acknowledgements, and other owner-specific templates are excluded from new annual-touch selection.
 
-The Annual Touches workspace can also create an Email or SMS message inline. The operator
-provides the message name and copy; Campaigns supplies the selected Campaign's server-owned
-annual-touch context to Messaging. New templates therefore receive the correct marketing
-purpose, Campaign scope, `campaign_touch_due` dispatch context, payload class, queue,
-Campaign catalog grouping, and annual-touch selection eligibility automatically. The new
-template is returned to the open editor and selected without discarding unsaved annual-touch
-rows.
+The Annual Touches workspace can create an Email or SMS message inline. Messaging receives the standalone annual-touch context from server-side Campaigns code, creates the reusable template, returns it to the open editor, and the UI selects it without discarding unsaved rows.
 
-The shared creation primitive is intentionally not Annual-Touch-specific. Other authoring
-surfaces may later supply their own context to the same Messaging action without schema,
-client-config, or preset-sync changes.
+The shared Messaging creation primitive remains context-driven rather than Annual-Touch-specific. Other authoring surfaces may supply their own context later without changing the Message Template persistence schema.
 
-If an older annual-touch program already references a now-ineligible active marketing
-template, the editor may continue to show and preserve that existing selection so a
-normal edit does not strand historical configuration. New selections must use the
-safe reusable catalog.
+Available fields are projected from `TokenContractRegistry` for `campaign_touch_due`; the UI does not maintain a second token allowlist. Server-side `MessageTemplateTokenValidator` remains authoritative at creation time.
 
-The runtime and schema do not require that UI to exist.
+When an existing annual-touch program is reopened, saved Email/SMS template options are server-rendered before Alpine initializes each selector. The selected preset ids are normalized to string values for browser binding so persisted selections do not visually fall back to `No email` or `No SMS`.
+
+If an older annual-touch program already references a now-ineligible active marketing template, the editor may continue to show and preserve that existing selection so a normal edit does not strand historical configuration. New selections must use the safe reusable catalog.

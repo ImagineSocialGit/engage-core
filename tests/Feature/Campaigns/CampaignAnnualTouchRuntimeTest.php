@@ -3,7 +3,6 @@
 namespace Tests\Feature\Campaigns;
 
 use App\Modules\Campaigns\Actions\ProcessDueCampaignTouchDatesAction;
-use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignTouchDate;
 use App\Modules\Campaigns\Models\CampaignTouchDispatch;
 use App\Modules\Campaigns\Models\CampaignTouchProgram;
@@ -31,13 +30,13 @@ class CampaignAnnualTouchRuntimeTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_due_birthday_touch_schedules_once_through_messaging(): void
+    public function test_due_birthday_touch_schedules_once_through_messaging_without_campaign_ownership(): void
     {
         Queue::fake();
         config()->set('client.timezone', 'UTC');
         Carbon::setTestNow('2026-08-22 09:05:00 UTC');
 
-        [$campaign, $status] = $this->campaignAndStatus();
+        $status = $this->pastClientStatus();
 
         $contact = Contact::query()->create([
             'first_name' => 'Jamie',
@@ -53,12 +52,12 @@ class CampaignAnnualTouchRuntimeTest extends TestCase
 
         app(GrantMessageConsentAction::class)->handle($contact, [
             'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'mortgage_past_client',
+            'purpose' => CampaignTouchProgram::MESSAGE_PURPOSE,
+            'scope' => CampaignTouchProgram::MESSAGE_SCOPE,
             'source' => 'test',
         ]);
 
-        $variant = $this->birthdayVariant($campaign);
+        [$program, $variant] = $this->birthdayVariant();
 
         $first = app(ProcessDueCampaignTouchDatesAction::class)->handle();
         $second = app(ProcessDueCampaignTouchDatesAction::class)->handle();
@@ -76,10 +75,12 @@ class CampaignAnnualTouchRuntimeTest extends TestCase
         $this->assertSame(2026, $dispatch->occurrence_year);
         $this->assertSame(CampaignTouchDispatch::STATUS_SCHEDULED, $dispatch->status);
         $this->assertSame($message->getKey(), $dispatch->scheduled_message_id);
-        $this->assertEquals(
-            ['campaign_touch_due'],
-            $message->dispatch_keys,
-        );
+        $this->assertEquals([ProcessDueCampaignTouchDatesAction::DISPATCH_KEY], $message->dispatch_keys);
+        $this->assertSame($program->getMorphClass(), $message->context_type);
+        $this->assertSame($program->getKey(), $message->context_id);
+        $this->assertSame($program->getKey(), data_get($dispatch->meta, 'campaign_touch_program_id'));
+        $this->assertNull(data_get($dispatch->meta, 'campaign_id'));
+        $this->assertNull(data_get($message->meta, 'campaign_key'));
     }
 
     public function test_touch_program_ignores_wrong_status_and_expired_repeat_window(): void
@@ -88,8 +89,7 @@ class CampaignAnnualTouchRuntimeTest extends TestCase
         config()->set('client.timezone', 'UTC');
         Carbon::setTestNow('2026-08-22 09:05:00 UTC');
 
-        [$campaign] = $this->campaignAndStatus();
-
+        $this->pastClientStatus();
         $wrongStatus = ContactStatus::query()->create([
             'key' => 'engaged',
             'name' => 'Engaged',
@@ -110,16 +110,15 @@ class CampaignAnnualTouchRuntimeTest extends TestCase
             'last_status_changed_at' => now(),
         ]);
 
-        $variant = $this->birthdayVariant(
-            campaign: $campaign,
+        [, $variant] = $this->birthdayVariant(
             startsOn: '2020-01-01',
             repeatYears: 3,
         );
 
         app(GrantMessageConsentAction::class)->handle($contact, [
             'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'mortgage_past_client',
+            'purpose' => CampaignTouchProgram::MESSAGE_PURPOSE,
+            'scope' => CampaignTouchProgram::MESSAGE_SCOPE,
             'source' => 'test',
         ]);
 
@@ -133,45 +132,31 @@ class CampaignAnnualTouchRuntimeTest extends TestCase
         $this->assertDatabaseCount('scheduled_messages', 0);
     }
 
-    /**
-     * @return array{0: Campaign, 1: ContactStatus}
-     */
-    private function campaignAndStatus(): array
+    private function pastClientStatus(): ContactStatus
     {
-        $campaign = Campaign::query()->create([
-            'key' => 'past_client_nurture',
-            'name' => 'Past Client Nurture',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'mortgage_past_client',
-            'status' => Campaign::STATUS_ACTIVE,
-        ]);
-
-        $status = ContactStatus::query()->create([
+        return ContactStatus::query()->create([
             'key' => 'past_client',
             'name' => 'Past Client',
             'is_core' => true,
             'is_active' => true,
             'sort_order' => 10,
         ]);
-
-        return [$campaign, $status];
     }
 
+    /** @return array{0: CampaignTouchProgram, 1: CampaignTouchVariant} */
     private function birthdayVariant(
-        Campaign $campaign,
         string $startsOn = '2026-01-01',
         int $repeatYears = 10,
-    ): CampaignTouchVariant {
+    ): array {
         $program = CampaignTouchProgram::query()->create([
-            'campaign_id' => $campaign->getKey(),
-            'key' => 'annual_touch_base',
-            'name' => 'Annual touch-base dates',
+            'key' => 'past_client_annual_touches',
+            'name' => 'Past Client annual touches',
             'audience_type' => CampaignTouchProgram::AUDIENCE_CONTACT_STATUS,
             'audience_key' => 'past_client',
             'recurrence' => CampaignTouchProgram::RECURRENCE_ANNUAL,
             'repeat_years' => $repeatYears,
             'starts_on' => $startsOn,
+            'is_active' => true,
         ]);
 
         $date = CampaignTouchDate::query()->create([
@@ -188,8 +173,8 @@ class CampaignAnnualTouchRuntimeTest extends TestCase
             'key' => 'past_client_birthday_email',
             'name' => 'Past Client Birthday Email',
             'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'mortgage_past_client',
+            'purpose' => CampaignTouchProgram::MESSAGE_PURPOSE,
+            'scope' => CampaignTouchProgram::MESSAGE_SCOPE,
             'message_type' => 'birthday',
             'payload_class' => EmailPayload::class,
             'queue' => 'marketing',
@@ -202,16 +187,18 @@ class CampaignAnnualTouchRuntimeTest extends TestCase
             'is_active' => true,
         ]);
 
-        return CampaignTouchVariant::query()->create([
+        $variant = CampaignTouchVariant::query()->create([
             'campaign_touch_date_id' => $date->getKey(),
             'key' => 'email',
             'name' => 'Email',
             'sort_order' => 10,
             'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'mortgage_past_client',
+            'purpose' => CampaignTouchProgram::MESSAGE_PURPOSE,
+            'scope' => CampaignTouchProgram::MESSAGE_SCOPE,
             'message_template_preset_id' => $preset->getKey(),
             'is_active' => true,
         ]);
+
+        return [$program, $variant];
     }
 }

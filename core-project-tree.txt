@@ -846,6 +846,7 @@
 │   │   │   │   ├── MessageRecipientPayloadResolver.php
 │   │   │   │   ├── MessageSendTimeResolver.php
 │   │   │   │   ├── MessageSuppressionService.php
+│   │   │   │   ├── MessageTemplateAuthoringFieldPresenter.php
 │   │   │   │   ├── MessageTemplateCatalogCarouselPresenter.php
 │   │   │   │   ├── MessageTemplateCompositionConfigRegistry.php
 │   │   │   │   ├── MessageTemplateCompositionEditorPresenter.php
@@ -1797,7 +1798,8 @@
 │   │   │   │   ├── 2026_06_12_050339_create_campaign_enrollments_table.php
 │   │   │   │   ├── 2026_08_22_113501_create_campaign_touch_date_tables.php
 │   │   │   │   ├── 2026_08_22_114000_add_campaign_touch_runtime.php
-│   │   │   │   └── 2026_08_23_203900_add_campaign_eligibility_foundation.php
+│   │   │   │   ├── 2026_08_23_203900_add_campaign_eligibility_foundation.php
+│   │   │   │   └── 2026_08_25_220000_decouple_campaign_touch_programs_from_campaigns.php
 │   │   │   ├── commerce
 │   │   │   │   ├── 2026_07_02_000005_create_commerce_customers_table.php
 │   │   │   │   ├── 2026_07_02_000006_create_commerce_products_table.php
@@ -2124,6 +2126,7 @@
 │       │   │   ├── favicons.blade.php
 │       │   │   └── public.blade.php
 │       │   ├── messaging
+│       │   │   ├── available-fields.blade.php
 │       │   │   ├── message-chain-carousel.blade.php
 │       │   │   └── message-editor-carousel.blade.php
 │       │   ├── section.blade.php
@@ -2820,4 +2823,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-680 directories, 2141 files
+680 directories, 2144 files

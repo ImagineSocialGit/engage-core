@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 7,
+    'version' => 8,
     'tables' => [
         'campaigns' => [
             'mode' => 'upsert',
@@ -115,12 +115,9 @@ return [
 
         'campaign_touch_programs' => [
             'mode' => 'upsert',
-            'identity' => [
-                'campaign_id',
-                'key',
-            ],
+            'identity' => ['key'],
             'preserve_id' => false,
-            'order_by' => ['campaign_id', 'id'],
+            'order_by' => ['key'],
             'columns' => [
                 'id',
                 'campaign_id',

@@ -3,7 +3,6 @@
 namespace App\Modules\Campaigns\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignTouchDate;
 use App\Modules\Campaigns\Models\CampaignTouchProgram;
 use App\Modules\Campaigns\Actions\ProcessDueCampaignTouchDatesAction;
@@ -13,6 +12,7 @@ use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Messaging\Actions\CreateReusableMessageTemplateAction;
 use App\Modules\Messaging\Data\ReusableMessageTemplateAuthoringContext;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
+use App\Modules\Messaging\Services\MessageTemplateAuthoringFieldPresenter;
 use App\Modules\Messaging\Services\ReusableMessageTemplateCatalog;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -29,15 +29,13 @@ class CampaignAnnualTouchController extends Controller
 {
     public function __construct(
         private readonly ReusableMessageTemplateCatalog $reusableTemplates,
+        private readonly MessageTemplateAuthoringFieldPresenter $authoringFields,
     ) {}
 
     public function index(Request $request): View
     {
         $programs = CampaignTouchProgram::query()
-            ->with([
-                'campaign',
-                'touchDates.variants.messageTemplatePreset',
-            ])
+            ->with('touchDates.variants.messageTemplatePreset')
             ->orderByDesc('is_active')
             ->orderBy('name')
             ->orderBy('id')
@@ -56,16 +54,15 @@ class CampaignAnnualTouchController extends Controller
         return view('crm.campaigns.annual-touches.index', [
             'programs' => $programs,
             'editingProgram' => $editingProgram,
-            'campaigns' => Campaign::query()
-                ->where('status', '!=', Campaign::STATUS_ARCHIVED)
-                ->orderBy('name')
-                ->get(),
             'contactStatuses' => ContactStatus::query()
                 ->active()
                 ->ordered()
                 ->get(),
             'emailTemplates' => $templates->get('email', collect())->values(),
             'smsTemplates' => $templates->get('sms', collect())->values(),
+            'annualTouchAvailableFields' => $this->authoringFields->groupsForContext(
+                ProcessDueCampaignTouchDatesAction::DISPATCH_KEY,
+            ),
         ]);
     }
 
@@ -73,24 +70,12 @@ class CampaignAnnualTouchController extends Controller
         CreateCampaignAnnualTouchMessageTemplateRequest $request,
         CreateReusableMessageTemplateAction $createReusableMessageTemplate,
     ): JsonResponse {
-        $campaign = Campaign::query()
-            ->whereKey($request->campaignId())
-            ->where('status', '!=', Campaign::STATUS_ARCHIVED)
-            ->firstOrFail();
-
-        if ((string) $campaign->purpose !== 'marketing') {
-            throw ValidationException::withMessages([
-                'campaign_id' => 'Annual-touch messages require a marketing Campaign.',
-            ]);
-        }
-
         try {
             $preset = $createReusableMessageTemplate->handle(
                 name: $request->templateName(),
                 channel: $request->channel(),
                 payload: $request->payload(),
                 context: $this->annualTouchAuthoringContext(
-                    campaign: $campaign,
                     channel: $request->channel(),
                     payloadClass: $request->payloadClass(),
                 ),
@@ -115,8 +100,7 @@ class CampaignAnnualTouchController extends Controller
 
         $program = DB::transaction(function () use ($validated): CampaignTouchProgram {
             $program = CampaignTouchProgram::query()->create([
-                'campaign_id' => (int) $validated['campaign_id'],
-                'key' => $this->newProgramKey((int) $validated['campaign_id']),
+                'key' => $this->newProgramKey(),
                 'name' => 'Annual touch-base dates',
                 'audience_type' => CampaignTouchProgram::AUDIENCE_CONTACT_STATUS,
                 'audience_key' => $validated['audience_key'],
@@ -177,14 +161,6 @@ class CampaignAnnualTouchController extends Controller
         ?CampaignTouchProgram $program = null,
     ): array {
         $rules = [
-            'campaign_id' => [
-                Rule::requiredIf($program === null),
-                'nullable',
-                'integer',
-                Rule::exists('campaigns', 'id')->where(
-                    fn ($query) => $query->where('status', '!=', Campaign::STATUS_ARCHIVED),
-                ),
-            ],
             'audience_key' => [
                 'required',
                 'string',
@@ -208,10 +184,6 @@ class CampaignAnnualTouchController extends Controller
         ];
 
         $validated = $request->validate($rules);
-
-        if ($program instanceof CampaignTouchProgram) {
-            $validated['campaign_id'] = (int) $program->campaign_id;
-        }
 
         foreach ($validated['touches'] as $index => $touch) {
             $field = 'touches.'.$index;
@@ -437,7 +409,6 @@ class CampaignAnnualTouchController extends Controller
     }
 
     private function annualTouchAuthoringContext(
-        Campaign $campaign,
         string $channel,
         string $payloadClass,
     ): ReusableMessageTemplateAuthoringContext {
@@ -445,8 +416,8 @@ class CampaignAnnualTouchController extends Controller
 
         return new ReusableMessageTemplateAuthoringContext(
             contextKey: 'campaign_annual_touch',
-            purpose: 'marketing',
-            scope: (string) $campaign->scope,
+            purpose: CampaignTouchProgram::MESSAGE_PURPOSE,
+            scope: CampaignTouchProgram::MESSAGE_SCOPE,
             dispatchKey: ProcessDueCampaignTouchDatesAction::DISPATCH_KEY,
             messageType: 'campaign_annual_touch',
             payloadClass: $payloadClass,
@@ -454,13 +425,11 @@ class CampaignAnnualTouchController extends Controller
             moduleKey: 'campaigns',
             moduleLabel: 'Campaigns',
             surface: 'campaigns',
-            groupKey: 'campaign:'.$campaign->key.':annual_touches:'.$channel,
-            groupLabel: $campaign->name.' — Annual Touches — '.$channelLabel,
+            groupKey: 'annual_touches:'.$channel,
+            groupLabel: 'Annual Touches — '.$channelLabel,
             usageType: 'campaign_annual_touch',
             selectionContexts: ['campaign_annual_touch'],
-            description: 'Reusable CRM-authored annual-touch message for '.$campaign->name.'.',
-            contextType: $campaign->getMorphClass(),
-            contextId: (int) $campaign->getKey(),
+            description: 'Reusable CRM-authored standalone annual-touch message.',
         );
     }
 
@@ -473,14 +442,11 @@ class CampaignAnnualTouchController extends Controller
         return (int) $value;
     }
 
-    private function newProgramKey(int $campaignId): string
+    private function newProgramKey(): string
     {
         do {
-            $key = 'annual_touch_'.$campaignId.'_'.Str::lower(Str::random(8));
-        } while (CampaignTouchProgram::query()
-            ->where('campaign_id', $campaignId)
-            ->where('key', $key)
-            ->exists());
+            $key = 'annual_touch_'.Str::lower(Str::random(12));
+        } while (CampaignTouchProgram::query()->where('key', $key)->exists());
 
         return $key;
     }

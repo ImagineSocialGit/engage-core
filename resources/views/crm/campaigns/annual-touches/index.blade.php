@@ -1,12 +1,11 @@
 <x-layouts.crm
     title="Annual Touches"
     heading="Annual Touches"
-    subheading="Set recurring birthday and calendar-date messages for a Campaign audience."
+    subheading="Set recurring birthday and calendar-date messages for a Contact Status audience."
     module="campaigns"
 >
     @php
         $editing = $editingProgram instanceof \App\Modules\Campaigns\Models\CampaignTouchProgram;
-        $defaultCampaignId = old('campaign_id', $editing ? $editingProgram->campaign_id : request('campaign'));
         $defaultAudienceKey = old('audience_key', $editing ? $editingProgram->audience_key : '');
         $defaultRepeatYears = old('repeat_years', $editing ? $editingProgram->repeat_years : 10);
         $defaultStartsOn = old('starts_on', $editing && $editingProgram->starts_on ? $editingProgram->starts_on->toDateString() : '');
@@ -53,20 +52,6 @@
             }
         }
 
-        $emailTemplateOptions = $emailTemplates
-            ->map(fn ($template) => [
-                'id' => (string) $template->getKey(),
-                'name' => (string) $template->name,
-            ])
-            ->values()
-            ->all();
-        $smsTemplateOptions = $smsTemplates
-            ->map(fn ($template) => [
-                'id' => (string) $template->getKey(),
-                'name' => (string) $template->name,
-            ])
-            ->values()
-            ->all();
     @endphp
 
     <div class="min-w-0 space-y-6">
@@ -124,9 +109,8 @@
                 class="mt-6 space-y-6"
                 x-data="{
                     rows: @js(array_values($initialTouches)),
-                    selectedCampaignId: @js((string) $defaultCampaignId),
-                    emailTemplates: @js($emailTemplateOptions),
-                    smsTemplates: @js($smsTemplateOptions),
+                    newEmailTemplates: [],
+                    newSmsTemplates: [],
                     templateCreator: {
                         open: false,
                         saving: false,
@@ -137,6 +121,14 @@
                         subject: '',
                         body: '',
                         message: '',
+                        activeField: 'body',
+                    },
+                    init() {
+                        this.rows = this.rows.map((row) => ({
+                            ...row,
+                            email_template_preset_id: row.email_template_preset_id ? String(row.email_template_preset_id) : '',
+                            sms_template_preset_id: row.sms_template_preset_id ? String(row.sms_template_preset_id) : '',
+                        }));
                     },
                     addRow() {
                         this.rows.push({
@@ -157,13 +149,14 @@
                         this.templateCreator = {
                             open: true,
                             saving: false,
-                            error: this.selectedCampaignId ? '' : 'Choose a Campaign first so the message gets the correct annual-touch context.',
+                            error: '',
                             channel,
                             rowIndex: index,
                             name: this.rows[index]?.name ?? '',
                             subject: '',
                             body: '',
                             message: '',
+                            activeField: channel === 'sms' ? 'message' : 'body',
                         };
                     },
                     closeTemplateCreator() {
@@ -171,12 +164,44 @@
                             this.templateCreator.open = false;
                         }
                     },
-                    async createTemplate() {
-                        if (! this.selectedCampaignId) {
-                            this.templateCreator.error = 'Choose a Campaign first so the message gets the correct annual-touch context.';
-                            return;
-                        }
+                    setActiveTemplateField(field) {
+                        this.templateCreator.activeField = field;
+                    },
+                    insertField(syntax) {
+                        const field = this.templateCreator.channel === 'sms'
+                            ? 'message'
+                            : (['subject', 'body'].includes(this.templateCreator.activeField)
+                                ? this.templateCreator.activeField
+                                : 'body');
+                        const element = this.$root.querySelector(`[data-template-authoring-field='${field}']`);
+                        const currentValue = String(this.templateCreator[field] ?? '');
+                        const selectionStart = element && Number.isInteger(element.selectionStart)
+                            ? element.selectionStart
+                            : currentValue.length;
+                        const selectionEnd = element && Number.isInteger(element.selectionEnd)
+                            ? element.selectionEnd
+                            : selectionStart;
 
+                        this.templateCreator[field] = currentValue.slice(0, selectionStart)
+                            + syntax
+                            + currentValue.slice(selectionEnd);
+
+                        this.$nextTick(() => {
+                            const updatedElement = this.$root.querySelector(`[data-template-authoring-field='${field}']`);
+
+                            if (! updatedElement) {
+                                return;
+                            }
+
+                            const nextPosition = selectionStart + syntax.length;
+                            updatedElement.focus();
+
+                            if (typeof updatedElement.setSelectionRange === 'function') {
+                                updatedElement.setSelectionRange(nextPosition, nextPosition);
+                            }
+                        });
+                    },
+                    async createTemplate() {
                         this.templateCreator.saving = true;
                         this.templateCreator.error = '';
 
@@ -189,7 +214,6 @@
                                     'X-CSRF-TOKEN': @js(csrf_token()),
                                 },
                                 body: JSON.stringify({
-                                    campaign_id: this.selectedCampaignId,
                                     channel: this.templateCreator.channel,
                                     name: this.templateCreator.name,
                                     subject: this.templateCreator.subject,
@@ -209,13 +233,17 @@
                             const option = { id: String(result.id), name: result.name };
 
                             if (result.channel === 'sms') {
-                                this.smsTemplates.push(option);
-                                this.smsTemplates.sort((a, b) => a.name.localeCompare(b.name));
-                                this.rows[this.templateCreator.rowIndex].sms_template_preset_id = option.id;
+                                this.newSmsTemplates.push(option);
+                                this.newSmsTemplates.sort((a, b) => a.name.localeCompare(b.name));
+                                this.$nextTick(() => {
+                                    this.rows[this.templateCreator.rowIndex].sms_template_preset_id = option.id;
+                                });
                             } else {
-                                this.emailTemplates.push(option);
-                                this.emailTemplates.sort((a, b) => a.name.localeCompare(b.name));
-                                this.rows[this.templateCreator.rowIndex].email_template_preset_id = option.id;
+                                this.newEmailTemplates.push(option);
+                                this.newEmailTemplates.sort((a, b) => a.name.localeCompare(b.name));
+                                this.$nextTick(() => {
+                                    this.rows[this.templateCreator.rowIndex].email_template_preset_id = option.id;
+                                });
                             }
 
                             this.templateCreator.open = false;
@@ -232,31 +260,8 @@
                     @method('PUT')
                 @endif
 
-                <div class="grid min-w-0 gap-4 lg:grid-cols-4">
+                <div class="grid min-w-0 gap-4 lg:grid-cols-3">
                     <div class="min-w-0 lg:col-span-2">
-                        <label class="text-sm font-bold text-slate-900">Campaign</label>
-                        @if($editing)
-                            <div class="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-800">
-                                {{ $editingProgram->campaign?->name ?? 'Campaign' }}
-                            </div>
-                        @else
-                            <select
-                                name="campaign_id"
-                                x-model="selectedCampaignId"
-                                required
-                                class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900"
-                            >
-                                <option value="">Select a Campaign</option>
-                                @foreach($campaigns as $campaign)
-                                    <option value="{{ $campaign->getKey() }}" @selected((string) $defaultCampaignId === (string) $campaign->getKey())>
-                                        {{ $campaign->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        @endif
-                    </div>
-
-                    <div class="min-w-0">
                         <label class="text-sm font-bold text-slate-900">Contact Status</label>
                         <select
                             name="audience_key"
@@ -311,7 +316,7 @@
                         >
                         <span>
                             <span class="block text-sm font-bold text-slate-900">Enabled</span>
-                            <span class="block text-xs text-slate-500">Active Campaigns can send these touches when they become due.</span>
+                            <span class="block text-xs text-slate-500">This annual-touch program can send its configured messages when each date becomes due.</span>
                         </span>
                     </label>
                 </div>
@@ -431,8 +436,14 @@
                                         class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900"
                                     >
                                         <option value="">No email</option>
-                                        <template x-for="template in emailTemplates" :key="`email-${template.id}`">
-                                            <option :value="template.id" x-text="template.name"></option>
+                                        @foreach($emailTemplates as $template)
+                                            <option
+                                                value="{{ $template->getKey() }}"
+                                                data-template-option-id="{{ $template->getKey() }}"
+                                            >{{ $template->name }}</option>
+                                        @endforeach
+                                        <template x-for="template in newEmailTemplates" :key="`new-email-${template.id}`">
+                                            <option :value="template.id" x-text="template.name" data-new-template-option></option>
                                         </template>
                                     </select>
                                 </div>
@@ -454,8 +465,14 @@
                                         class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900"
                                     >
                                         <option value="">No SMS</option>
-                                        <template x-for="template in smsTemplates" :key="`sms-${template.id}`">
-                                            <option :value="template.id" x-text="template.name"></option>
+                                        @foreach($smsTemplates as $template)
+                                            <option
+                                                value="{{ $template->getKey() }}"
+                                                data-template-option-id="{{ $template->getKey() }}"
+                                            >{{ $template->name }}</option>
+                                        @endforeach
+                                        <template x-for="template in newSmsTemplates" :key="`new-sms-${template.id}`">
+                                            <option :value="template.id" x-text="template.name" data-new-template-option></option>
                                         </template>
                                     </select>
                                 </div>
@@ -469,6 +486,7 @@
                     x-cloak
                     class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4"
                     @keydown.escape.window="closeTemplateCreator()"
+                    @message-field-insert="insertField($event.detail.syntax)"
                 >
                     <div
                         class="w-full max-w-2xl rounded-3xl bg-white p-5 shadow-2xl sm:p-7"
@@ -479,7 +497,7 @@
                                 <p class="text-xs font-bold uppercase tracking-[0.16em] text-rose-700">Annual Touch message</p>
                                 <h3 class="mt-2 text-xl font-semibold text-slate-950" x-text="templateCreator.channel === 'sms' ? 'Create SMS message' : 'Create email message'"></h3>
                                 <p class="mt-2 text-sm leading-6 text-slate-600">
-                                    Messaging fills in the annual-touch purpose, scope, dispatch context, catalog grouping, and token rules from the selected Campaign.
+                                    Messaging fills in the standalone annual-touch purpose, scope, dispatch context, catalog grouping, and valid fields automatically.
                                 </p>
                             </div>
                             <button type="button" @click="closeTemplateCreator()" class="text-sm font-bold text-slate-500 hover:text-slate-900">Close</button>
@@ -497,11 +515,24 @@
                                 <div class="space-y-4">
                                     <div>
                                         <label class="text-sm font-bold text-slate-900">Subject</label>
-                                        <input type="text" x-model="templateCreator.subject" maxlength="255" class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm text-slate-900">
+                                        <input
+                                            type="text"
+                                            x-model="templateCreator.subject"
+                                            @focus="setActiveTemplateField('subject')"
+                                            maxlength="255"
+                                            data-template-authoring-field="subject"
+                                            class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm text-slate-900"
+                                        >
                                     </div>
                                     <div>
                                         <label class="text-sm font-bold text-slate-900">Body</label>
-                                        <textarea x-model="templateCreator.body" rows="9" class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900"></textarea>
+                                        <textarea
+                                            x-model="templateCreator.body"
+                                            @focus="setActiveTemplateField('body')"
+                                            rows="9"
+                                            data-template-authoring-field="body"
+                                            class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                                        ></textarea>
                                     </div>
                                 </div>
                             </template>
@@ -509,9 +540,21 @@
                             <template x-if="templateCreator.channel === 'sms'">
                                 <div>
                                     <label class="text-sm font-bold text-slate-900">Message</label>
-                                    <textarea x-model="templateCreator.message" rows="6" maxlength="1600" class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900"></textarea>
+                                    <textarea
+                                        x-model="templateCreator.message"
+                                        @focus="setActiveTemplateField('message')"
+                                        rows="6"
+                                        maxlength="1600"
+                                        data-template-authoring-field="message"
+                                        class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                                    ></textarea>
                                 </div>
                             </template>
+
+                            <x-messaging.available-fields
+                                :groups="$annualTouchAvailableFields"
+                                class="mt-5"
+                            />
                         </div>
 
                         <div class="mt-6 flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
@@ -525,7 +568,7 @@
 
                 <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
                     <p class="text-xs leading-5 text-slate-500">
-                        Choose a saved reusable message or create one here. New messages automatically receive the selected Campaign's annual-touch context and are selected in this row after creation.
+                        Choose a saved reusable message or create one here. New messages automatically receive the standalone annual-touch context and are selected in this row after creation.
                     </p>
                     <button
                         type="submit"
@@ -548,14 +591,13 @@
                         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                             <div class="min-w-0">
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <h3 class="break-words font-semibold text-slate-950">{{ $program->campaign?->name ?? 'Campaign' }}</h3>
+                                    <h3 class="break-words font-semibold text-slate-950">{{ $contactStatuses->firstWhere('key', $program->audience_key)?->name ?? $program->audience_key }}</h3>
                                     <span class="rounded-full px-2.5 py-1 text-xs font-bold {{ $program->is_active ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-100 text-slate-600' }}">
                                         {{ $program->is_active ? 'Enabled' : 'Off' }}
                                     </span>
                                 </div>
                                 <p class="mt-2 text-sm text-slate-600">
-                                    Status: <strong>{{ $contactStatuses->firstWhere('key', $program->audience_key)?->name ?? $program->audience_key }}</strong>
-                                    · {{ $program->repeat_years }} years
+                                    Contact Status audience · {{ $program->repeat_years }} years
                                     · {{ $program->touchDates->where('is_active', true)->count() }} annual {{ \Illuminate\Support\Str::plural('date', $program->touchDates->where('is_active', true)->count()) }}
                                 </p>
                             </div>

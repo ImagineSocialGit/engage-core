@@ -94,11 +94,6 @@ class Campaign extends Model
         return $this->steps()->where('is_active', true);
     }
 
-    public function touchPrograms(): HasMany
-    {
-        return $this->hasMany(CampaignTouchProgram::class)->orderBy('id');
-    }
-
     public function enrollments(): HasMany
     {
         return $this->hasMany(CampaignEnrollment::class);

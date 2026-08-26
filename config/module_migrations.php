@@ -218,7 +218,7 @@ return [
 
         'campaigns' => [
             'path' => 'database/migrations/modules/campaigns',
-            'schema_version' => 5,
+            'schema_version' => 6,
             'migrations' => [
                 '2026_06_12_050337_create_campaigns_table.php',
                 '2026_06_12_050338_create_campaign_steps_table.php',
@@ -226,6 +226,7 @@ return [
                 '2026_08_22_113501_create_campaign_touch_date_tables.php',
                 '2026_08_22_114000_add_campaign_touch_runtime.php',
                 '2026_08_23_203900_add_campaign_eligibility_foundation.php',
+                '2026_08_25_220000_decouple_campaign_touch_programs_from_campaigns.php',
             ],
         ],
 

@@ -51,7 +51,7 @@
         <section class="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
             <div class="min-w-0">
                 <div class="text-sm font-bold text-rose-950">Recurring annual touch-base dates</div>
-                <p class="mt-1 break-words text-sm text-rose-800">Set birthday and fixed annual Email/SMS touches for a Campaign audience, repeating for a defined number of years.</p>
+                <p class="mt-1 break-words text-sm text-rose-800">Set birthday and fixed annual Email/SMS touches for a Contact Status audience, repeating for a defined number of years.</p>
             </div>
             <a
                 href="{{ route('crm.campaigns.annual-touches.index') }}"

@@ -2,7 +2,6 @@
 
 namespace App\Modules\Campaigns\Actions;
 
-use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignTouchDate;
 use App\Modules\Campaigns\Models\CampaignTouchDispatch;
 use App\Modules\Campaigns\Models\CampaignTouchProgram;
@@ -55,13 +54,7 @@ class ProcessDueCampaignTouchDatesAction
         $programs = CampaignTouchProgram::query()
             ->where('is_active', true)
             ->where('recurrence', CampaignTouchProgram::RECURRENCE_ANNUAL)
-            ->whereHas(
-                'campaign',
-                fn (Builder $query): Builder =>
-                    $query->where('status', Campaign::STATUS_ACTIVE),
-            )
             ->with([
-                'campaign',
                 'touchDates' => fn ($query) => $query->where('is_active', true),
                 'touchDates.variants' => fn ($query) => $query
                     ->where('is_active', true)
@@ -144,9 +137,8 @@ class ProcessDueCampaignTouchDatesAction
                                     ? null
                                     : 'messaging_planning_gate_denied',
                                 'meta' => [
-                                    'campaign_id' => $program->campaign_id,
-                                    'campaign_key' => $program->campaign?->key,
                                     'campaign_touch_program_id' => $program->getKey(),
+                                    'campaign_touch_program_key' => $program->key,
                                     'campaign_touch_date_id' => $touchDate->getKey(),
                                     'source_type' => $touchDate->source_type,
                                     'source_key' => $touchDate->source_key,
@@ -400,11 +392,10 @@ class ProcessDueCampaignTouchDatesAction
             purpose: $variant->purpose,
             scope: $variant->scope,
             dispatchKeys: self::DISPATCH_KEY,
-            context: $program->campaign,
+            context: $program,
             triggeredAt: $now,
             sendAt: $now,
             meta: [
-                'campaign_key' => $program->campaign?->key,
                 'campaign_touch' => [
                     'program_id' => $program->getKey(),
                     'program_key' => $program->key,

@@ -42,7 +42,7 @@ class CampaignTokenContextProvider implements TokenContextProvider
         yield new TokenContextDefinition(
             key: ProcessDueCampaignTouchDatesAction::DISPATCH_KEY,
             owner: 'campaigns',
-            description: 'Recurring Campaign annual touch message rendering.',
+            description: 'Standalone recurring annual touch message rendering.',
             sourceTokens: [
                 'contact.first_name',
                 'contact.last_name',
@@ -50,14 +50,6 @@ class CampaignTokenContextProvider implements TokenContextProvider
                 'contact.email',
                 'contact.phone',
                 'contact.birthday',
-                'campaign.id',
-                'campaign.key',
-                'campaign.name',
-                'campaign.description',
-                'campaign.channel',
-                'campaign.purpose',
-                'campaign.scope',
-                'campaign.status',
             ],
             channels: ['email', 'sms'],
             purposes: ['marketing'],

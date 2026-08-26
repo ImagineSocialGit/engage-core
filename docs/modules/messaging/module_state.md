@@ -1284,6 +1284,22 @@ contract and does not require preset sync. Contextual selectors may ask
 for one surface does not automatically leak into an incompatible picker. Legacy saved
 Broadcast messages remain selectable in Broadcasts and Annual Touches for compatibility.
 
+
+### Context-aware available fields
+
+`MessageTemplateAuthoringFieldPresenter` is the reusable Messaging presentation seam for
+operator-facing Available fields / Insert field controls. It accepts an executable dispatch
+context key and projects only the canonical sources registered on that context in
+`TokenContractRegistry`. A source alias is preferred for insertion when one is explicitly
+registered (for example `{first_name}` for `contact.first_name`); otherwise the canonical
+syntax is inserted (for example `{campaign.name}`).
+
+The presenter does not invent module fields, inspect module tables, or maintain its own token
+allowlist. Owning modules continue to contribute `TokenSourceProvider` and
+`TokenContextProvider` definitions. Authoring surfaces may reuse the accompanying Messaging
+Blade component and handle the emitted insertion event in their local editor. Creation and
+update paths must still validate submitted copy through `MessageTemplateTokenValidator`.
+
 ## Completed refactor boundary and remaining work
 
 The 15A/15B implementation sequence is complete for the core Messaging persistence contract:

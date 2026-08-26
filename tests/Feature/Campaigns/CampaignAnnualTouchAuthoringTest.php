@@ -4,7 +4,6 @@ namespace Tests\Feature\Campaigns;
 
 use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
-use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Actions\ProcessDueCampaignTouchDatesAction;
 use App\Modules\Campaigns\Models\CampaignTouchProgram;
 use App\Modules\Core\Models\ContactStatus;
@@ -19,16 +18,11 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_campaigns_exposes_and_saves_recurring_annual_touch_authoring(): void
+    public function test_standalone_annual_touch_program_is_authored_from_contact_status_and_messages(): void
     {
         config()->set('modules.enabled', ['campaigns', 'messaging']);
 
         $user = User::factory()->create();
-        $campaign = Campaign::factory()->create([
-            'status' => Campaign::STATUS_ACTIVE,
-            'purpose' => 'marketing',
-            'scope' => 'mortgage_past_client',
-        ]);
         ContactStatus::query()->create([
             'key' => 'past_client',
             'name' => 'Past Client',
@@ -49,19 +43,20 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
 
         $this->withoutMiddleware(ForceStagingAccess::class);
 
-        $this->actingAs($user)
-            ->get(route('crm.campaigns.annual-touches.index'))
+        $index = $this->actingAs($user)
+            ->get(route('crm.campaigns.annual-touches.index'));
+
+        $index
             ->assertOk()
-            ->assertSee('Have recurring annual touch-base dates')
-            ->assertSee('Past Client')
-            ->assertSee('Birthday Email')
-            ->assertSee('Birthday SMS')
-            ->assertDontSee($campaignStepTemplate->name);
+            ->assertViewHas('contactStatuses', fn ($statuses): bool => $statuses->contains('key', 'past_client'))
+            ->assertViewHas('emailTemplates', fn ($templates): bool => $templates->contains('id', $email->getKey())
+                && ! $templates->contains('id', $campaignStepTemplate->getKey()))
+            ->assertViewHas('smsTemplates', fn ($templates): bool => $templates->contains('id', $sms->getKey()))
+            ->assertDontSee('name="campaign_id"', false);
 
         $response = $this->actingAs($user)->post(
             route('crm.campaigns.annual-touches.store'),
             [
-                'campaign_id' => $campaign->getKey(),
                 'audience_key' => 'past_client',
                 'repeat_years' => 10,
                 'starts_on' => '2026-08-22',
@@ -96,6 +91,10 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
         $this->assertSame(10, $program->repeat_years);
         $this->assertTrue($program->is_active);
         $this->assertSame(2, $program->touchDates()->where('is_active', true)->count());
+        $this->assertDatabaseHas('campaign_touch_programs', [
+            'id' => $program->getKey(),
+            'campaign_id' => null,
+        ]);
         $this->assertDatabaseHas('campaign_touch_dates', [
             'campaign_touch_program_id' => $program->getKey(),
             'source_type' => 'contact_field',
@@ -117,31 +116,45 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
             'message_template_preset_id' => $sms->getKey(),
             'is_active' => true,
         ]);
+
+        $editResponse = $this->actingAs($user)
+            ->get(route('crm.campaigns.annual-touches.index', ['edit' => $program->getKey()]));
+
+        $editResponse
+            ->assertOk()
+            ->assertSee('data-template-option-id="'.$email->getKey().'"', false)
+            ->assertSee('data-template-option-id="'.$sms->getKey().'"', false)
+            ->assertViewHas('annualTouchAvailableFields', function (array $groups): bool {
+                $fields = collect($groups)->flatMap(
+                    fn (array $group) => $group['fields'] ?? [],
+                );
+
+                return $fields->contains(
+                    fn (array $field): bool => ($field['token'] ?? null) === 'contact.first_name'
+                        && ($field['syntax'] ?? null) === '{first_name}',
+                ) && $fields->contains(
+                    fn (array $field): bool => ($field['token'] ?? null) === 'contact.birthday'
+                        && ($field['syntax'] ?? null) === '{birthday}',
+                ) && ! $fields->contains(
+                    fn (array $field): bool => str_starts_with((string) ($field['token'] ?? ''), 'campaign.'),
+                );
+            });
     }
 
-    public function test_annual_touch_surface_can_create_contextual_message_templates_without_leaving_the_form(): void
+    public function test_annual_touch_surface_creates_standalone_contextual_message_templates(): void
     {
         config()->set('modules.enabled', ['campaigns', 'messaging']);
 
         $user = User::factory()->create();
-        $campaign = Campaign::factory()->create([
-            'key' => 'past_client_nurture',
-            'name' => 'Past Client Nurture',
-            'status' => Campaign::STATUS_ACTIVE,
-            'purpose' => 'marketing',
-            'scope' => 'mortgage_past_client',
-        ]);
-
         $this->withoutMiddleware(ForceStagingAccess::class);
 
         $emailResponse = $this->actingAs($user)->postJson(
             route('crm.campaigns.annual-touches.message-templates.store'),
             [
-                'campaign_id' => $campaign->getKey(),
                 'channel' => 'email',
                 'name' => 'Birthday Greeting',
-                'subject' => 'Happy birthday',
-                'body' => 'Hope you have a great birthday.',
+                'subject' => 'Happy birthday, {first_name}',
+                'body' => 'Hi {first_name}, hope you have a great birthday.',
             ],
         );
 
@@ -155,10 +168,9 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
         $smsResponse = $this->actingAs($user)->postJson(
             route('crm.campaigns.annual-touches.message-templates.store'),
             [
-                'campaign_id' => $campaign->getKey(),
                 'channel' => 'sms',
                 'name' => 'Birthday Text',
-                'message' => 'Happy birthday! Hope you have a great day.',
+                'message' => 'Happy birthday, {first_name}! Hope you have a great day.',
             ],
         );
 
@@ -179,29 +191,45 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
             ->where('message_template_preset_id', $emailPreset->getKey())
             ->sole();
 
-        $this->assertSame('marketing', $emailPreset->purpose);
-        $this->assertSame('mortgage_past_client', $emailPreset->scope);
+        $this->assertSame(CampaignTouchProgram::MESSAGE_PURPOSE, $emailPreset->purpose);
+        $this->assertSame(CampaignTouchProgram::MESSAGE_SCOPE, $emailPreset->scope);
         $this->assertEquals([ProcessDueCampaignTouchDatesAction::DISPATCH_KEY], $emailPreset->dispatch_keys);
         $this->assertSame('campaigns', $emailCatalog->module_key);
         $this->assertSame('campaigns', $emailCatalog->surface);
         $this->assertSame('campaign_annual_touch', $emailCatalog->usage_type);
-        $this->assertSame($campaign->getMorphClass(), $emailCatalog->context_type);
-        $this->assertSame($campaign->getKey(), $emailCatalog->context_id);
+        $this->assertNull($emailCatalog->context_type);
+        $this->assertNull($emailCatalog->context_id);
+        $this->assertSame('annual_touches:email', $emailCatalog->group_key);
         $this->assertEquals(
             ['campaign_annual_touch'],
             data_get($emailCatalog->meta, 'authoring.selection_contexts'),
         );
         $this->assertEquals([
-            'subject' => 'Happy birthday',
-            'body' => 'Hope you have a great birthday.',
+            'subject' => 'Happy birthday, {first_name}',
+            'body' => 'Hi {first_name}, hope you have a great birthday.',
         ], $emailTemplate->currentPayload());
+    }
 
-        $this->actingAs($user)
-            ->get(route('crm.campaigns.annual-touches.index', ['campaign' => $campaign->getKey()]))
-            ->assertOk()
-            ->assertSee('Birthday Greeting')
-            ->assertSee('Birthday Text')
-            ->assertSee('+ Add new message');
+    public function test_annual_touch_template_creation_rejects_campaign_fields_that_runtime_no_longer_supplies(): void
+    {
+        config()->set('modules.enabled', ['campaigns', 'messaging']);
+
+        $user = User::factory()->create();
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)->postJson(
+            route('crm.campaigns.annual-touches.message-templates.store'),
+            [
+                'channel' => 'email',
+                'name' => 'Invalid Campaign Token',
+                'subject' => 'Hello {first_name}',
+                'body' => 'From {campaign.name}',
+            ],
+        )->assertUnprocessable();
+
+        $this->assertDatabaseMissing('message_template_presets', [
+            'name' => 'Invalid Campaign Token',
+        ]);
     }
 
     public function test_annual_touch_authoring_rejects_lifecycle_owned_templates_as_new_selections(): void
@@ -209,11 +237,6 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
         config()->set('modules.enabled', ['campaigns', 'messaging']);
 
         $user = User::factory()->create();
-        $campaign = Campaign::factory()->create([
-            'status' => Campaign::STATUS_ACTIVE,
-            'purpose' => 'marketing',
-            'scope' => 'mortgage_past_client',
-        ]);
         ContactStatus::query()->create([
             'key' => 'past_client',
             'name' => 'Past Client',
@@ -245,7 +268,6 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('crm.campaigns.annual-touches.store'), [
-                'campaign_id' => $campaign->getKey(),
                 'audience_key' => 'past_client',
                 'repeat_years' => 10,
                 'is_active' => 1,
