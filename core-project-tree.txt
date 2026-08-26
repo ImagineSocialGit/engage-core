@@ -590,7 +590,6 @@
 │   │   │   ├── Models
 │   │   │   │   ├── InboundEmailRoute.php
 │   │   │   │   ├── InboundMessage.php
-│   │   │   │   ├── InboundMessageReceipt.php
 │   │   │   │   ├── InboundReplyIntent.php
 │   │   │   │   ├── InboundReplyProfile.php
 │   │   │   │   └── InboundReplyRule.php
@@ -1873,7 +1872,8 @@
 │   │   │   │   ├── 2026_08_22_061500_add_email_threading_fields_to_inbound_messages_table.php
 │   │   │   │   ├── 2026_08_24_220000_create_inbound_reply_profile_tables.php
 │   │   │   │   ├── 2026_08_25_120000_create_inbound_email_routes_and_add_route_evidence.php
-│   │   │   │   └── 2026_08_26_054500_add_inbox_triage_to_inbound_messages_table.php
+│   │   │   │   ├── 2026_08_26_054500_add_inbox_triage_to_inbound_messages_table.php
+│   │   │   │   └── 2026_08_26_124500_consolidate_inbound_webhook_persistence.php
 │   │   │   ├── internal_notifications
 │   │   │   │   ├── 2026_04_10_173406_create_team_members_table.php
 │   │   │   │   └── 2026_04_11_174215_create_team_member_notification_preferences_table.php

@@ -4,10 +4,11 @@ namespace Tests\Feature\InboundMessaging;
 
 use App\Modules\InboundMessaging\Actions\RecordInboundMessageAction;
 use App\Modules\InboundMessaging\Actions\Sms\ProcessInboundSmsMessageAction;
+use App\Modules\InboundMessaging\Events\InboundMessageReceived;
 use App\Modules\InboundMessaging\Models\InboundMessage;
-use App\Modules\InboundMessaging\Models\InboundMessageReceipt;
 use App\Modules\InboundMessaging\Services\InboundMessageRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Mockery;
 use RuntimeException;
 use Tests\TestCase;
@@ -16,8 +17,10 @@ class ProcessInboundSmsMessageActionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_failed_processing_is_retryable_and_completion_is_stored_once(): void
+    public function test_generic_processor_does_not_own_business_processed_state(): void
     {
+        Event::fake([InboundMessageReceived::class]);
+
         $inboundMessage = app(RecordInboundMessageAction::class)->handle([
             'channel' => 'sms',
             'provider' => 'telnyx',
@@ -39,11 +42,8 @@ class ProcessInboundSmsMessageActionTest extends TestCase
             $this->assertSame('Simulated inbound handler failure.', $exception->getMessage());
         }
 
-        $receipt = $inboundMessage->receipt()->firstOrFail();
-
-        $this->assertSame(InboundMessageReceipt::STATUS_RETRYABLE_FAILED, $receipt->status);
-        $this->assertSame(1, $receipt->attempts);
-        $this->assertSame('Simulated inbound handler failure.', $receipt->last_error);
+        $inboundMessage->refresh();
+        $this->assertNull($inboundMessage->processed_at);
 
         $successfulRouter = Mockery::mock(InboundMessageRouter::class);
         $successfulRouter->shouldReceive('route')
@@ -53,14 +53,9 @@ class ProcessInboundSmsMessageActionTest extends TestCase
         $action = new ProcessInboundSmsMessageAction($successfulRouter);
 
         $this->assertSame('Stored provider response', $action->handle($inboundMessage));
-        $this->assertSame('Stored provider response', $action->handle($inboundMessage));
 
-        $receipt->refresh();
-
-        $this->assertSame(InboundMessageReceipt::STATUS_COMPLETED, $receipt->status);
-        $this->assertSame(2, $receipt->attempts);
-        $this->assertSame('Stored provider response', $receipt->response_message);
-        $this->assertNull($receipt->last_error);
-        $this->assertNotNull($receipt->completed_at);
+        $inboundMessage->refresh();
+        $this->assertNull($inboundMessage->processed_at);
+        Event::assertDispatchedTimes(InboundMessageReceived::class, 2);
     }
 }

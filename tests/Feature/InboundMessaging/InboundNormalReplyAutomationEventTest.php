@@ -41,9 +41,6 @@ class InboundNormalReplyAutomationEventTest extends TestCase
                 'purpose' => 'marketing',
                 'scope' => null,
                 'received_at' => $receivedAt,
-                'meta' => [
-                    'source' => 'telnyx_inbound_sms',
-                ],
             ],
             sender: $contact,
         );

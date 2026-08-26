@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 6,
+    'version' => 7,
     'tables' => [
         'inbound_email_routes' => [
             'mode' => 'upsert',
@@ -101,6 +101,7 @@ return [
             'order_by' => ['id'],
             'columns' => [
                 'id',
+                'webhook_inbox_receipt_id',
                 'sender_type',
                 'sender_id',
                 'related_contact_id',
@@ -108,7 +109,9 @@ return [
                 'channel',
                 'provider',
                 'provider_event_id',
+                'provider_event_key',
                 'provider_message_id',
+                'provider_message_key',
                 'provider_context_id',
                 'message_id',
                 'from_type',
@@ -131,11 +134,12 @@ return [
                 'inbox_status',
                 'reviewed_at',
                 'completed_at',
-                'meta',
                 'created_at',
                 'updated_at',
             ],
-            'json_columns' => ['meta'],
+            'null_on_import' => [
+                'webhook_inbox_receipt_id',
+            ],
             'references' => [
                 'related_contact_id' => 'contacts',
             ],

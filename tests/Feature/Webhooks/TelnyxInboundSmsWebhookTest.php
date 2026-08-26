@@ -12,7 +12,7 @@ use App\Modules\Messaging\Models\ConsentRevocation;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use App\Modules\InboundMessaging\Models\InboundMessage;
-use App\Modules\InboundMessaging\Models\InboundMessageReceipt;
+use App\Support\Webhooks\Models\WebhookInboxReceipt;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\InternalNotifications\Models\TeamMember;
@@ -89,6 +89,7 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             'event_type' => 'message.sent',
             'is_inbound' => false,
             'body' => 'STOP',
+            'received_at' => now()->startOfSecond()->toIso8601String(),
         ])->assertOk();
 
         $this->assertDatabaseCount('inbound_messages', 0);
@@ -106,6 +107,7 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             'from' => '+1 (555) 123-4567',
             'to' => '+1 (555) 000-1111',
             'body' => 'HELP',
+            'received_at' => now()->startOfSecond()->toIso8601String(),
         ]);
 
         $response
@@ -258,6 +260,7 @@ class TelnyxInboundSmsWebhookTest extends TestCase
         $this->postTelnyxWebhook([
             'from' => '+15551234567',
             'body' => 'Please call me',
+            'received_at' => now()->startOfSecond()->toIso8601String(),
         ])->assertOk();
 
         $inboundMessage = InboundMessage::query()->first();
@@ -441,6 +444,7 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             'provider_event_id' => 'evt_duplicate_help',
             'provider_message_id' => 'msg_duplicate_help',
             'body' => 'HELP',
+            'received_at' => '2026-08-26T12:00:00+00:00',
         ];
 
         $this->postTelnyxWebhook($payload)
@@ -451,13 +455,21 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             ->assertSee('Reply STOP to opt out of SMS messages.');
 
         $this->assertDatabaseCount('inbound_messages', 1);
-        $this->assertDatabaseCount('inbound_message_receipts', 1);
+        $this->assertDatabaseCount('webhook_inbox_receipts', 1);
 
-        $receipt = InboundMessageReceipt::query()->firstOrFail();
+        $receipt = WebhookInboxReceipt::query()->firstOrFail();
+        $inboundMessage = InboundMessage::query()->firstOrFail();
 
-        $this->assertSame(InboundMessageReceipt::STATUS_COMPLETED, $receipt->status);
+        $this->assertSame(WebhookInboxReceipt::STATUS_COMPLETED, $receipt->status);
         $this->assertSame(1, $receipt->attempts);
-        $this->assertStringContainsString('Reply STOP', $receipt->response_message);
+        $this->assertStringContainsString(
+            'Reply STOP',
+            (string) data_get($receipt->outcome, 'response_message'),
+        );
+        $this->assertSame(
+            $receipt->getKey(),
+            $inboundMessage->webhook_inbox_receipt_id,
+        );
     }
 
     public function test_duplicate_stop_webhook_revokes_consent_once(): void
@@ -472,13 +484,14 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             'provider_context_id' => self::MARKETING_PROFILE_ID,
             'from' => '+15551234567',
             'body' => 'STOP',
+            'received_at' => '2026-08-26T12:00:00+00:00',
         ];
 
         $this->postTelnyxWebhook($payload)->assertOk();
         $this->postTelnyxWebhook($payload)->assertOk();
 
         $this->assertDatabaseCount('inbound_messages', 1);
-        $this->assertDatabaseCount('inbound_message_receipts', 1);
+        $this->assertDatabaseCount('webhook_inbox_receipts', 1);
         $this->assertDatabaseCount('consent_revocations', 1);
     }
 
@@ -499,13 +512,14 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             'provider_context_id' => self::MARKETING_PROFILE_ID,
             'from' => '+15551234567',
             'body' => 'Please call me',
+            'received_at' => '2026-08-26T12:00:00+00:00',
         ];
 
         $this->postTelnyxWebhook($payload)->assertOk();
         $this->postTelnyxWebhook($payload)->assertOk();
 
         $this->assertDatabaseCount('inbound_messages', 1);
-        $this->assertDatabaseCount('inbound_message_receipts', 1);
+        $this->assertDatabaseCount('webhook_inbox_receipts', 1);
         $this->assertSame(1, ScheduledMessage::query()
             ->where('scope', 'inbound_messages')
             ->where('message_type', 'inbound_reply')

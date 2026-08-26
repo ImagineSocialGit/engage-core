@@ -6,11 +6,12 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\InboundMessaging\Actions\RecordInboundMessageAction;
 use App\Modules\InboundMessaging\Events\InboundMessageReceived;
 use App\Modules\InboundMessaging\Models\InboundMessage;
-use App\Modules\InboundMessaging\Models\InboundMessageReceipt;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use App\Support\AutomationEvents\Services\AutomationEventOutbox;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schema;
+use LogicException;
 use Mockery;
 use RuntimeException;
 use Tests\TestCase;
@@ -19,7 +20,7 @@ class InboundMessageAutomationOutboxTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_normal_reply_receipt_message_and_automation_event_are_committed_together(): void
+    public function test_normal_reply_message_identity_and_automation_event_are_committed_together(): void
     {
         Event::fake([
             InboundMessageReceived::class,
@@ -36,20 +37,20 @@ class InboundMessageAutomationOutboxTest extends TestCase
         $this->assertDatabaseHas('inbound_messages', [
             'id' => $message->getKey(),
             'classification' => InboundMessage::CLASSIFICATION_NORMAL_REPLY,
-        ]);
-        $this->assertDatabaseHas('inbound_message_receipts', [
-            'inbound_message_id' => $message->getKey(),
-            'status' => InboundMessageReceipt::STATUS_RECEIVED,
+            'provider_event_key' => $this->providerKey('event', 'evt_batch_11'),
+            'provider_message_key' => $this->providerKey('message', 'msg_batch_11'),
         ]);
         $this->assertDatabaseHas('automation_event_outbox_events', [
             'event_key' => RecordInboundMessageAction::NORMAL_REPLY_AUTOMATION_EVENT_KEY,
             'subject_type' => $message->getMorphClass(),
             'subject_id' => (string) $message->getKey(),
         ]);
+        $this->assertFalse(Schema::hasTable('inbound_message_receipts'));
+        $this->assertFalse(Schema::hasColumn('inbound_messages', 'meta'));
         Event::assertNotDispatched(InboundMessageReceived::class);
     }
 
-    public function test_repeated_provider_identity_returns_one_message_receipt_and_automation_event(): void
+    public function test_repeated_provider_identity_returns_one_message_and_one_automation_event(): void
     {
         Event::fake([
             InboundMessageReceived::class,
@@ -73,37 +74,34 @@ class InboundMessageAutomationOutboxTest extends TestCase
         $this->assertTrue($first->is($sameMessage));
         $this->assertTrue($first->is($sameEvent));
         $this->assertDatabaseCount('inbound_messages', 1);
-        $this->assertDatabaseCount('inbound_message_receipts', 1);
         $this->assertDatabaseCount('automation_event_outbox_events', 1);
         Event::assertNotDispatched(InboundMessageReceived::class);
     }
 
-    public function test_first_replay_links_a_completed_receipt_to_a_legacy_message(): void
+    public function test_event_and_message_identity_cannot_point_to_different_inbound_messages(): void
     {
-        $legacy = InboundMessage::query()->create([
-            'client_key' => config('client.key'),
-            'channel' => 'sms',
-            'provider' => 'telnyx',
-            'provider_event_id' => 'evt_legacy',
-            'provider_message_id' => 'msg_legacy',
-            'classification' => InboundMessage::CLASSIFICATION_IGNORED,
-            'received_at' => now()->subDay(),
+        $action = app(RecordInboundMessageAction::class);
+
+        $action->handle([
+            ...$this->normalReplyData(),
+            'provider_event_id' => 'evt-one',
+            'provider_message_id' => 'msg-one',
+        ]);
+        $action->handle([
+            ...$this->normalReplyData(),
+            'provider_event_id' => 'evt-two',
+            'provider_message_id' => 'msg-two',
         ]);
 
-        $resolved = app(RecordInboundMessageAction::class)->handle([
-            'channel' => 'sms',
-            'provider' => 'telnyx',
-            'provider_event_id' => 'evt_legacy',
-            'provider_message_id' => 'msg_legacy',
-            'classification' => InboundMessage::CLASSIFICATION_IGNORED,
-            'received_at' => now(),
-        ]);
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage(
+            'Inbound provider event and message identifiers resolve to different messages.',
+        );
 
-        $this->assertTrue($legacy->is($resolved));
-        $this->assertDatabaseCount('inbound_messages', 1);
-        $this->assertDatabaseHas('inbound_message_receipts', [
-            'inbound_message_id' => $legacy->getKey(),
-            'status' => InboundMessageReceipt::STATUS_COMPLETED,
+        $action->handle([
+            ...$this->normalReplyData(),
+            'provider_event_id' => 'evt-one',
+            'provider_message_id' => 'msg-two',
         ]);
     }
 
@@ -130,7 +128,6 @@ class InboundMessageAutomationOutboxTest extends TestCase
         }
 
         $this->assertDatabaseCount('inbound_messages', 0);
-        $this->assertDatabaseCount('inbound_message_receipts', 0);
         $this->assertDatabaseCount('automation_event_outbox_events', 0);
         Event::assertNotDispatched(InboundMessageReceived::class);
     }
@@ -152,5 +149,15 @@ class InboundMessageAutomationOutboxTest extends TestCase
             'purpose' => 'marketing',
             'received_at' => now(),
         ];
+    }
+
+    private function providerKey(string $type, string $identifier): string
+    {
+        return hash('sha256', implode("\0", [
+            (string) config('client.key', ''),
+            'telnyx',
+            $type,
+            $identifier,
+        ]));
     }
 }

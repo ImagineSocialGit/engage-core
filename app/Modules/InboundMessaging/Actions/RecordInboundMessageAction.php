@@ -4,9 +4,9 @@ namespace App\Modules\InboundMessaging\Actions;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\InboundMessaging\Models\InboundMessage;
-use App\Modules\InboundMessaging\Models\InboundMessageReceipt;
 use App\Support\AutomationEvents\Data\AutomationEventData;
 use App\Support\AutomationEvents\Services\AutomationEventOutbox;
+use App\Support\Webhooks\Models\WebhookInboxReceipt;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -36,8 +36,7 @@ class RecordInboundMessageAction
                 3,
             );
         } catch (UniqueConstraintViolationException $exception) {
-            $receipt = $this->receiptForIdentity($identity);
-            $inboundMessage = $receipt?->inboundMessage()->first();
+            $inboundMessage = $this->messageForIdentity($identity);
 
             if ($inboundMessage instanceof InboundMessage) {
                 return $inboundMessage;
@@ -63,29 +62,11 @@ class RecordInboundMessageAction
         ?Model $sender,
         array $identity,
     ): InboundMessage {
-        $receipt = $this->receiptForIdentity($identity, lock: true);
+        $existing = $this->messageForIdentity($identity, lock: true);
 
-        if ($receipt instanceof InboundMessageReceipt) {
-            return $this->messageForReceipt($receipt);
+        if ($existing instanceof InboundMessage) {
+            return $existing;
         }
-
-        $legacyMessage = $this->legacyMessage($identity);
-
-        if ($legacyMessage instanceof InboundMessage) {
-            $this->createReceipt(
-                identity: $identity,
-                status: InboundMessageReceipt::STATUS_COMPLETED,
-                inboundMessage: $legacyMessage,
-                completedAt: now(),
-            );
-
-            return $legacyMessage;
-        }
-
-        $receipt = $this->createReceipt(
-            identity: $identity,
-            status: InboundMessageReceipt::STATUS_RECEIVED,
-        );
 
         $requiresInboxReview = ($data['classification'] ?? null)
             === InboundMessage::CLASSIFICATION_NORMAL_REPLY;
@@ -94,11 +75,14 @@ class RecordInboundMessageAction
             : ($data['received_at'] ?? now());
 
         $inboundMessage = new InboundMessage([
+            'webhook_inbox_receipt_id' => $this->webhookInboxReceiptId($identity),
             'client_key' => $identity['client_key'],
             'channel' => $data['channel'],
             'provider' => $identity['provider'],
             'provider_event_id' => $identity['provider_event_id'],
+            'provider_event_key' => $identity['provider_event_key'],
             'provider_message_id' => $identity['provider_message_id'],
+            'provider_message_key' => $identity['provider_message_key'],
             'provider_context_id' => $data['provider_context_id'] ?? null,
             'message_id' => $data['message_id'] ?? null,
             'from_type' => $data['from_type'] ?? null,
@@ -128,7 +112,6 @@ class RecordInboundMessageAction
                 : InboundMessage::INBOX_STATUS_DONE,
             'reviewed_at' => null,
             'completed_at' => $inboxSettledAt,
-            'meta' => $data['meta'] ?? null,
         ]);
 
         if ($sender) {
@@ -136,10 +119,6 @@ class RecordInboundMessageAction
         }
 
         $inboundMessage->save();
-
-        $receipt->forceFill([
-            'inbound_message_id' => $inboundMessage->getKey(),
-        ])->save();
 
         $this->recordRoutedEmailAutomationEvent(
             inboundMessage: $inboundMessage,
@@ -164,17 +143,17 @@ class RecordInboundMessageAction
      *     provider_message_key: ?string
      * } $identity
      */
-    private function receiptForIdentity(
+    private function messageForIdentity(
         array $identity,
         bool $lock = false,
-    ): ?InboundMessageReceipt {
+    ): ?InboundMessage {
         if ($identity['provider_event_key'] === null
             && $identity['provider_message_key'] === null
         ) {
             return null;
         }
 
-        $query = InboundMessageReceipt::query()
+        $query = InboundMessage::query()
             ->where(function (Builder $identities) use ($identity): void {
                 if ($identity['provider_event_key'] !== null) {
                     $identities->where(
@@ -199,15 +178,15 @@ class RecordInboundMessageAction
             $query->lockForUpdate();
         }
 
-        $receipts = $query->limit(2)->get();
+        $messages = $query->limit(2)->get();
 
-        if ($receipts->count() > 1) {
+        if ($messages->count() > 1) {
             throw new LogicException(
-                'Inbound provider event and message identifiers resolve to different receipts.',
+                'Inbound provider event and message identifiers resolve to different messages.',
             );
         }
 
-        return $receipts->first();
+        return $messages->first();
     }
 
     /**
@@ -220,78 +199,24 @@ class RecordInboundMessageAction
      *     provider_message_key: ?string
      * } $identity
      */
-    private function legacyMessage(array $identity): ?InboundMessage
+    private function webhookInboxReceiptId(array $identity): ?int
     {
-        if ($identity['provider_event_id'] === null
-            && $identity['provider_message_id'] === null
-        ) {
+        $callbackIdentity = $identity['provider_event_id']
+            ?? $identity['provider_message_id'];
+
+        if ($callbackIdentity === null) {
             return null;
         }
 
-        return InboundMessage::query()
+        $receiptId = WebhookInboxReceipt::query()
             ->where('client_key', $identity['client_key'])
             ->where('provider', $identity['provider'])
-            ->where(function (Builder $identifiers) use ($identity): void {
-                if ($identity['provider_event_id'] !== null) {
-                    $identifiers->where(
-                        'provider_event_id',
-                        $identity['provider_event_id'],
-                    );
-                }
+            ->where('provider_event_id', $callbackIdentity)
+            ->value('id');
 
-                if ($identity['provider_message_id'] !== null) {
-                    $method = $identity['provider_event_id'] !== null
-                        ? 'orWhere'
-                        : 'where';
-
-                    $identifiers->{$method}(
-                        'provider_message_id',
-                        $identity['provider_message_id'],
-                    );
-                }
-            })
-            ->lockForUpdate()
-            ->orderBy('id')
-            ->first();
-    }
-
-    /**
-     * @param array{
-     *     client_key: ?string,
-     *     provider: string,
-     *     provider_event_id: ?string,
-     *     provider_message_id: ?string,
-     *     provider_event_key: ?string,
-     *     provider_message_key: ?string
-     * } $identity
-     */
-    private function createReceipt(
-        array $identity,
-        string $status,
-        ?InboundMessage $inboundMessage = null,
-        mixed $completedAt = null,
-    ): InboundMessageReceipt {
-        return InboundMessageReceipt::query()->create([
-            'inbound_message_id' => $inboundMessage?->getKey(),
-            ...$identity,
-            'status' => $status,
-            'attempts' => 0,
-            'completed_at' => $completedAt,
-        ]);
-    }
-
-    private function messageForReceipt(
-        InboundMessageReceipt $receipt,
-    ): InboundMessage {
-        $inboundMessage = $receipt->inboundMessage()->first();
-
-        if (! $inboundMessage instanceof InboundMessage) {
-            throw new LogicException(
-                "Inbound message receipt [{$receipt->getKey()}] has no message.",
-            );
-        }
-
-        return $inboundMessage;
+        return is_numeric($receiptId)
+            ? (int) $receiptId
+            : null;
     }
 
     /**

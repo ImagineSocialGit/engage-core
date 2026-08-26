@@ -13,6 +13,7 @@ use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Services\Consent\MessageConsentStateResolver;
 use App\Support\AutomationEvents\Models\AutomationEventOutboxEvent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class InboundSmsReOptInTest extends TestCase
@@ -92,7 +93,7 @@ class InboundSmsReOptInTest extends TestCase
 
         $this->assertSame(InboundMessage::CLASSIFICATION_CONSENT_GRANT, $inbound->classification);
         $this->assertNotNull($inbound->processed_at);
-        $this->assertNull($inbound->meta);
+        $this->assertFalse(Schema::hasColumn('inbound_messages', 'meta'));
 
         $state = app(MessageConsentStateResolver::class);
 

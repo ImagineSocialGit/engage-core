@@ -10,6 +10,7 @@ use App\Modules\Messaging\Payloads\Internal\InternalEmailNotificationPayload;
 use App\Support\ProjectState\ProjectStateManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class InboundMessagingProjectStateRoundTripTest extends TestCase
@@ -24,21 +25,30 @@ class InboundMessagingProjectStateRoundTripTest extends TestCase
         config()->set('project_state.enforce_client_key', true);
     }
 
-    public function test_inbound_message_history_round_trips_without_operational_receipts(): void
+    public function test_normalized_inbound_history_round_trips_without_operational_webhook_receipts(): void
     {
         $this->seedSourceState();
 
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
+        $inboundRow = $document['sections']['inbound_messaging']['tables']['inbound_messages'][0];
 
         $this->assertSame((int) config('project_state.version'), $document['version']);
+        $this->assertSame(7, $document['sections']['inbound_messaging']['version']);
         $this->assertCount(
             1,
             $document['sections']['inbound_messaging']['tables']['inbound_messages'],
         );
-        $this->assertArrayNotHasKey(
-            'inbound_message_receipts',
-            $document['sections']['inbound_messaging']['tables'],
+        $this->assertArrayHasKey('webhook_inbox_receipt_id', $inboundRow);
+        $this->assertNull($inboundRow['webhook_inbox_receipt_id']);
+        $this->assertArrayNotHasKey('meta', $inboundRow);
+        $this->assertSame(
+            $this->providerKey('event', 'evt-project-state-inbound'),
+            $inboundRow['provider_event_key'],
+        );
+        $this->assertSame(
+            $this->providerKey('message', 'received-project-state-inbound'),
+            $inboundRow['provider_message_key'],
         );
 
         $this->prepareCleanTarget();
@@ -62,13 +72,22 @@ class InboundMessagingProjectStateRoundTripTest extends TestCase
         ]);
         $this->assertDatabaseHas('inbound_messages', [
             'id' => 50,
+            'webhook_inbox_receipt_id' => null,
             'sender_type' => Contact::class,
             'sender_id' => 40,
             'client_key' => 'test-client',
             'channel' => 'email',
             'provider' => 'resend',
             'provider_event_id' => 'evt-project-state-inbound',
+            'provider_event_key' => $this->providerKey(
+                'event',
+                'evt-project-state-inbound',
+            ),
             'provider_message_id' => 'received-project-state-inbound',
+            'provider_message_key' => $this->providerKey(
+                'message',
+                'received-project-state-inbound',
+            ),
             'provider_context_id' => null,
             'message_id' => '<project-state-inbound@example.test>',
             'from_type' => 'email',
@@ -80,17 +99,8 @@ class InboundMessagingProjectStateRoundTripTest extends TestCase
             'classification' => InboundMessage::CLASSIFICATION_NORMAL_REPLY,
             'purpose' => 'marketing',
             'scope' => 'inbound_messages',
+            'inbox_status' => InboundMessage::INBOX_STATUS_NEW,
         ]);
-
-        $meta = $this->jsonColumn(
-            table: 'inbound_messages',
-            id: 50,
-            column: 'meta',
-        );
-
-        $this->assertEquals([
-            'source' => 'resend_received_email',
-        ], $meta);
 
         $this->assertDatabaseHas('scheduled_messages', [
             'id' => 60,
@@ -103,7 +113,8 @@ class InboundMessagingProjectStateRoundTripTest extends TestCase
             'status' => 'sent',
         ]);
 
-        $this->assertDatabaseCount('inbound_message_receipts', 0);
+        $this->assertFalse(Schema::hasTable('inbound_message_receipts'));
+        $this->assertFalse(Schema::hasColumn('inbound_messages', 'meta'));
         $this->assertDatabaseCount('project_state_resume_items', 0);
     }
 
@@ -171,13 +182,23 @@ class InboundMessagingProjectStateRoundTripTest extends TestCase
 
         DB::table('inbound_messages')->insert([
             'id' => 50,
+            'webhook_inbox_receipt_id' => null,
             'sender_type' => Contact::class,
             'sender_id' => 40,
+            'related_contact_id' => null,
             'client_key' => 'test-client',
             'channel' => 'email',
             'provider' => 'resend',
             'provider_event_id' => 'evt-project-state-inbound',
+            'provider_event_key' => $this->providerKey(
+                'event',
+                'evt-project-state-inbound',
+            ),
             'provider_message_id' => 'received-project-state-inbound',
+            'provider_message_key' => $this->providerKey(
+                'message',
+                'received-project-state-inbound',
+            ),
             'provider_context_id' => null,
             'message_id' => '<project-state-inbound@example.test>',
             'from_type' => 'email',
@@ -191,9 +212,9 @@ class InboundMessagingProjectStateRoundTripTest extends TestCase
             'scope' => 'inbound_messages',
             'received_at' => $now->copy()->subMinutes(5),
             'processed_at' => $now->copy()->subMinutes(4),
-            'meta' => json_encode([
-                'source' => 'resend_received_email',
-            ]),
+            'inbox_status' => InboundMessage::INBOX_STATUS_NEW,
+            'reviewed_at' => null,
+            'completed_at' => null,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
@@ -232,30 +253,10 @@ class InboundMessagingProjectStateRoundTripTest extends TestCase
             'message_chain_enrollment_id' => null,
             'message_chain_step_variant_id' => null,
         ]);
-
-        DB::table('inbound_message_receipts')->insert([
-            'id' => 51,
-            'inbound_message_id' => 50,
-            'client_key' => 'test-client',
-            'provider' => 'resend',
-            'provider_event_id' => 'evt-project-state-inbound',
-            'provider_message_id' => 'received-project-state-inbound',
-            'provider_event_key' => hash('sha256', 'evt-project-state-inbound'),
-            'provider_message_key' => hash('sha256', 'received-project-state-inbound'),
-            'status' => 'completed',
-            'attempts' => 1,
-            'response_message' => null,
-            'last_error' => null,
-            'last_attempted_at' => $now->copy()->subMinutes(4),
-            'completed_at' => $now->copy()->subMinutes(4),
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
     }
 
     private function prepareCleanTarget(): void
     {
-        DB::table('inbound_message_receipts')->delete();
         DB::table('scheduled_messages')->delete();
         DB::table('inbound_messages')->delete();
         DB::table('team_member_notification_preferences')->delete();
@@ -263,19 +264,13 @@ class InboundMessagingProjectStateRoundTripTest extends TestCase
         DB::table('contacts')->delete();
     }
 
-    /**
-     * @return array<int|string, mixed>
-     */
-    private function jsonColumn(string $table, int $id, string $column): array
+    private function providerKey(string $type, string $identifier): string
     {
-        $value = DB::table($table)
-            ->where('id', $id)
-            ->value($column);
-
-        $decoded = json_decode((string) $value, true, flags: JSON_THROW_ON_ERROR);
-
-        $this->assertIsArray($decoded);
-
-        return $decoded;
+        return hash('sha256', implode("\0", [
+            'test-client',
+            'resend',
+            $type,
+            $identifier,
+        ]));
     }
 }

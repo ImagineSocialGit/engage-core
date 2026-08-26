@@ -6,9 +6,9 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Support\Webhooks\Models\WebhookInboxReceipt;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class InboundMessage extends Model
@@ -24,6 +24,7 @@ class InboundMessage extends Model
     public const INBOX_STATUS_DONE = 'done';
 
     protected $fillable = [
+        'webhook_inbox_receipt_id',
         'sender_type',
         'sender_id',
         'related_contact_id',
@@ -31,7 +32,9 @@ class InboundMessage extends Model
         'channel',
         'provider',
         'provider_event_id',
+        'provider_event_key',
         'provider_message_id',
+        'provider_message_key',
         'provider_context_id',
         'message_id',
         'from_type',
@@ -54,12 +57,12 @@ class InboundMessage extends Model
         'inbox_status',
         'reviewed_at',
         'completed_at',
-        'meta',
     ];
 
     protected function casts(): array
     {
         return [
+            'webhook_inbox_receipt_id' => 'integer',
             'sender_id' => 'integer',
             'related_contact_id' => 'integer',
             'correlated_scheduled_message_id' => 'integer',
@@ -69,7 +72,6 @@ class InboundMessage extends Model
             'processed_at' => 'datetime',
             'reviewed_at' => 'datetime',
             'completed_at' => 'datetime',
-            'meta' => 'array',
         ];
     }
 
@@ -96,9 +98,12 @@ class InboundMessage extends Model
         ];
     }
 
-    public function receipt(): HasOne
+    public function webhookInboxReceipt(): BelongsTo
     {
-        return $this->hasOne(InboundMessageReceipt::class);
+        return $this->belongsTo(
+            WebhookInboxReceipt::class,
+            'webhook_inbox_receipt_id',
+        );
     }
 
     public function sender(): MorphTo

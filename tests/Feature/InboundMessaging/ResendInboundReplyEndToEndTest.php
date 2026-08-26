@@ -126,8 +126,13 @@ class ResendInboundReplyEndToEndTest extends TestCase
             ->assertNoContent();
 
         $this->assertDatabaseCount('inbound_messages', 1);
-        $this->assertDatabaseCount('inbound_message_receipts', 1);
         $this->assertDatabaseCount('webhook_inbox_receipts', 1);
+
+        $receipt = WebhookInboxReceipt::query()->firstOrFail();
+        $this->assertSame(
+            $receipt->getKey(),
+            $inbound->webhook_inbox_receipt_id,
+        );
         $this->assertDatabaseCount('automation_event_outbox_events', 1);
 
         Http::assertSentCount(1);

@@ -4,9 +4,9 @@
 
 InboundMessaging is a reusable capability module.
 
-The current raw SMS request copy in `inbound_messages.meta`, full email event data copied into suppression/revocation metadata, and overlapping inbound/webhook receipt identity are transitional persistence debt.
+The canonical inbound persistence cutover is complete for normalized inbound messages. Provider webhook ingestion stores one canonical raw receipt in `webhook_inbox_receipts`, while `inbound_messages` stores only normalized business/message facts. The former `inbound_message_receipts` table and generic `inbound_messages.meta` column are removed.
 
-The approved target stores one raw provider receipt and one normalized inbound business record.
+Messaging-owned suppression/revocation evidence remains a separate compliance concern and is not duplicated onto normalized inbound rows.
 
 ## Reply correlation foundation
 
@@ -143,7 +143,7 @@ Raw webhook retention must be explicit.
 
 Normalized business/compliance records may outlive raw receipts.
 
-## Target inbound-message schema
+## Normalized inbound-message schema
 
 Conceptual fields:
 
@@ -185,7 +185,7 @@ timestamps
 Rules:
 
 - raw request/event data is absent;
-- no generic `meta` column is planned;
+- no generic `meta` column exists;
 - provider hash keys enforce normalized idempotency directly on the business record;
 - the webhook receipt FK connects normalized state to the one raw ingestion record;
 - provider event/message IDs remain first-class for support and reconciliation;
@@ -196,26 +196,25 @@ Rules:
 
 ## Inbound receipt consolidation
 
-The current `inbound_message_receipts` table duplicates provider identity and processing state already represented by the webhook inbox plus the normalized inbound record.
-
-Target direction:
+The consolidation is complete.
 
 ```text
 webhook_inbox_receipts
     provider request idempotency, claims, retry, raw payload, processing result
 
 inbound_messages
-    normalized message idempotency through unique provider event/message hash keys
+    normalized message identity and business state
+    provider_event_key / provider_message_key enforce normalized idempotency
+    webhook_inbox_receipt_id links back to canonical ingestion when one exists
 ```
 
-Remove `inbound_message_receipts` after every inbound-message-producing provider path uses the canonical webhook inbox and direct unique identity on `inbound_messages`.
+Email and SMS webhook entry points use the shared webhook inbox before normalized processing. SMS uses the provider event ID as the canonical callback identity and falls back to the provider message ID when the provider does not supply a separate event ID. Duplicate webhook deliveries therefore replay the stored canonical webhook outcome instead of rerunning inbound business processing.
 
-A non-webhook importer or manual ingestion path must either:
+`ProcessInboundMessageAction` uses `processed_at` only as the normalized business-processing completion guard. Retry/claim/error state belongs exclusively to `webhook_inbox_receipts`.
 
-- create a canonical webhook/source receipt equivalent; or
-- use the same explicit normalized provider/source identity keys.
+A non-webhook importer or manual ingestion path may have a null `webhook_inbox_receipt_id`, but it must provide a stable provider/source event or message identifier so the same normalized provider hash keys prevent duplicate `inbound_messages` rows.
 
-Do not keep a second receipt table merely for compatibility symmetry.
+Project State keeps `webhook_inbox_receipt_id` in the complete `inbound_messages` column contract, but classifies it with `null_on_import`. The source value may appear in an export because Project State requires complete schema coverage; it is cleared during import because canonical `webhook_inbox_receipts` are environment-local operational evidence and are not transferred. Durable normalized provider event/message identity remains in the first-class provider ID/hash columns.
 
 ## SMS normalization
 
@@ -365,15 +364,22 @@ suppression/revocation reason mappings are supported
 automation events remain compact
 ```
 
-## Migration boundary
+## Persistence boundary
 
-The next migrations/models batch should:
+Current persistence authority is:
 
-- add the webhook-receipt FK and unique provider identity hashes to `inbound_messages`;
-- remove target `inbound_messages.meta`;
-- remove or mark `inbound_message_receipts` for deletion as part of the pre-production schema replacement;
-- remove target suppression/revocation generic metadata where narrow fields are sufficient;
-- add relationships and schema/model tests;
-- leave webhook controllers/actions and runtime cutover for a later InboundMessaging batch.
+```text
+webhook_inbox_receipts
+    one raw provider-ingestion receipt
+    request identity + payload fingerprint
+    claim/retry/completion + compact outcome
 
-The runtime cutover should then stop copying raw SMS/email provider data and route all provider requests through the canonical receipt boundary.
+inbound_messages
+    one normalized inbound business record
+    direct event/message hash identities
+    optional canonical webhook receipt link
+    no raw request copy
+    no generic meta
+```
+
+Provider webhooks must enter through the canonical webhook inbox before normalized processing. Normalized processing may fail and retry without creating a second receipt layer; `processed_at` remains null until business processing completes successfully.

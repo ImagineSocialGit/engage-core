@@ -96,7 +96,6 @@ class RecordInboundEmailAction
                 'inbound_email_route_source' => $route?->source,
                 'inbound_email_route_context' => $route?->context_key,
                 'received_at' => $receivedAt ? Carbon::parse($receivedAt) : now(),
-                'meta' => null,
             ],
             sender: $sender,
         );
