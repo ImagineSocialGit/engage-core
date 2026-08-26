@@ -6,6 +6,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Data\Automation\SendMessageAutomationDefinition;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Services\DirectMessageTemplateResolver;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Support\AutomationCapabilities\Contracts\AutomationActionHandler;
 use App\Support\AutomationCapabilities\Data\AutomationActionContext;
@@ -17,6 +18,7 @@ class SendMessageAutomationActionHandler implements AutomationActionHandler
     public function __construct(
         private readonly DispatchMessageAction $dispatchMessage,
         private readonly MessageChannelAvailability $messageChannelAvailability,
+        private readonly DirectMessageTemplateResolver $directTemplates,
     ) {}
 
     public function key(): string
@@ -43,6 +45,33 @@ class SendMessageAutomationActionHandler implements AutomationActionHandler
             ]);
         }
 
+        $exactTemplateDefinition = null;
+        $candidateKey = $definition->directTemplateCandidateKey();
+
+        if ($candidateKey !== null) {
+            $exactTemplateDefinition = $this->directTemplates->definition($candidateKey);
+
+            if (! is_array($exactTemplateDefinition) && $definition->hasAuthoritativeTemplateKey()) {
+                return AutomationActionResult::failed('send_message_template_missing', output: [
+                    'message_template_key' => $candidateKey,
+                    'send_message_definition' => $definition->toMetaPayload(),
+                ]);
+            }
+        }
+
+        $channel = is_array($exactTemplateDefinition)
+            ? (string) ($exactTemplateDefinition['channel'] ?? '')
+            : (string) $definition->channel;
+        $purpose = is_array($exactTemplateDefinition)
+            ? (string) ($exactTemplateDefinition['purpose'] ?? '')
+            : (string) $definition->purpose;
+        $scope = is_array($exactTemplateDefinition)
+            ? (string) ($exactTemplateDefinition['scope'] ?? '')
+            : (string) $definition->scope;
+        $dispatchKeys = is_array($exactTemplateDefinition)
+            ? $this->dispatchKeys($exactTemplateDefinition)
+            : $definition->dispatchKeys;
+
         $surface = match ($context->surface) {
             'flow_routes' => 'route_send_message_points',
             null, '' => 'automation_actions',
@@ -50,10 +79,10 @@ class SendMessageAutomationActionHandler implements AutomationActionHandler
         };
 
         if (! $this->messageChannelAvailability->isVisibleForSurface(
-            channel: $definition->channel,
+            channel: $channel,
             surface: $surface,
-            purpose: $definition->purpose,
-            scope: $definition->scope,
+            purpose: $purpose,
+            scope: $scope,
         )) {
             return AutomationActionResult::skipped('send_message_channel_unavailable', output: [
                 'send_message_definition' => $definition->toMetaPayload(),
@@ -63,10 +92,10 @@ class SendMessageAutomationActionHandler implements AutomationActionHandler
         try {
             $scheduledMessages = $this->dispatchMessage->handle(
                 recipient: $contact,
-                channel: $definition->channel,
-                purpose: $definition->purpose,
-                scope: $definition->scope,
-                dispatchKeys: $definition->dispatchKeys,
+                channel: $channel,
+                purpose: $purpose,
+                scope: $scope,
+                dispatchKeys: $dispatchKeys,
                 payload: $this->payload($definition, $context),
                 context: $context->source ?? $contact,
                 triggeredAt: now(),
@@ -79,6 +108,9 @@ class SendMessageAutomationActionHandler implements AutomationActionHandler
                     $definition->meta,
                 ),
                 criteria: $definition->criteria,
+                definitions: is_array($exactTemplateDefinition)
+                    ? [$exactTemplateDefinition]
+                    : [],
             );
         } catch (Throwable $exception) {
             return AutomationActionResult::failed('send_message_dispatch_failed', output: [
@@ -120,6 +152,24 @@ class SendMessageAutomationActionHandler implements AutomationActionHandler
                 'send_message_definition' => $definition->toMetaPayload(),
             ],
         );
+    }
+
+    /** @return array<int, string> */
+    private function dispatchKeys(array $definition): array
+    {
+        $keys = $definition['dispatch_keys'] ?? $definition['dispatch_key'] ?? [];
+        $keys = is_string($keys) ? [$keys] : $keys;
+
+        if (! is_array($keys)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(array_map(
+            static fn (mixed $key): ?string => is_string($key) && trim($key) !== ''
+                ? trim($key)
+                : null,
+            $keys,
+        ))));
     }
 
     /** @return array<string, mixed> */

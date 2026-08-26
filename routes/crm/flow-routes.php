@@ -12,6 +12,9 @@ Route::middleware('module:flow_routes')
         Route::get('/', [FlowRouteController::class, 'index'])
             ->name('index');
 
+        Route::post('/', [FlowRouteController::class, 'store'])
+            ->name('store');
+
         Route::get('/bindings', [FlowRouteBindingController::class, 'index'])
             ->name('bindings.index');
 

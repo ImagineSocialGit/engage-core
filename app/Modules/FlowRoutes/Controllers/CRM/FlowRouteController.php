@@ -3,11 +3,16 @@
 namespace App\Modules\FlowRoutes\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Models\ContactStatus;
 use App\Modules\FlowRoutes\Models\FlowRoute;
+use App\Modules\FlowRoutes\Requests\StoreFlowRouteRequest;
 use App\Modules\FlowRoutes\Services\FlowRouteEditorCatalog;
 use App\Modules\FlowRoutes\Services\FlowRoutePresentationResolver;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class FlowRouteController extends Controller
 {
@@ -16,7 +21,7 @@ class FlowRouteController extends Controller
         private readonly FlowRouteEditorCatalog $editorCatalog,
     ) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $routeModels = FlowRoute::query()
             ->currentVersion()
@@ -94,13 +99,25 @@ class FlowRouteController extends Controller
             ->sortBy('label')
             ->values();
 
-        $requestedEditorId = request()->integer('edit_route');
+        $requestedEditorId = $request->integer('edit_route');
+        $contactStatuses = ContactStatus::query()
+            ->active()
+            ->ordered()
+            ->get();
+        $requestedStatusKey = trim((string) $request->query('status', ''));
+        $createRouteStatus = $requestedStatusKey !== ''
+            ? $contactStatuses->firstWhere('key', $requestedStatusKey)
+            : null;
 
         return view('crm.flow-routes.index', [
             'routes' => $routes,
             'routeEditors' => $routeEditors,
             'editorOptions' => $this->editorCatalog->editorOptions(),
             'openRouteEditorId' => $routeEditors->has($requestedEditorId) ? $requestedEditorId : null,
+            'openCreateRoute' => $request->boolean('create')
+                || (string) $request->session()->getOldInput('_flow_route_create') === '1',
+            'createRouteContactStatuses' => $contactStatuses,
+            'createRouteStatusId' => $createRouteStatus?->getKey(),
             'automaticActions' => $automaticActions,
             'routeSummary' => [
                 'routes' => $routes->count(),
@@ -110,5 +127,39 @@ class FlowRouteController extends Controller
                 'unassigned_routes' => $routes->where('assignment_count', 0)->count(),
             ],
         ]);
+    }
+
+    public function store(StoreFlowRouteRequest $request): RedirectResponse
+    {
+        $status = ContactStatus::query()
+            ->active()
+            ->findOrFail($request->contactStatusId());
+
+        $route = FlowRoute::query()->create([
+            'key' => 'crm_route_'.Str::lower((string) Str::uuid()),
+            'contact_status_id' => $status->getKey(),
+            'owner_type' => null,
+            'owner_id' => null,
+            'owner_group' => 'client',
+            'name' => $request->routeName(),
+            'description' => $request->routeDescription(),
+            'version' => 1,
+            'is_current_version' => true,
+            'trigger_type' => FlowRoute::TRIGGER_CONTACT_STATUS,
+            'trigger_key' => (string) $status->key,
+            'is_active' => true,
+            'source_version' => null,
+            'is_customized' => true,
+            'customized_at' => now(),
+            'meta' => [
+                'authoring' => [
+                    'source' => 'crm',
+                ],
+            ],
+        ]);
+
+        return redirect()
+            ->route('crm.flow-routes.index', ['edit_route' => $route->getKey()])
+            ->with('status', 'Route created. Add its Points, then choose it in Assignments when it is ready to run.');
     }
 }

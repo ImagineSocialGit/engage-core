@@ -35,6 +35,17 @@ class MessagingTokenContextProvider implements TokenContextProvider
         );
 
         yield new TokenContextDefinition(
+            key: 'flow_route_send_message',
+            owner: 'messaging',
+            description: 'Reusable copy sent directly by a Flow Route send-message Point.',
+            sourceTokens: self::CONTACT_COPY_SOURCES,
+            channels: ['email', 'sms'],
+            purposes: ['marketing', 'transactional'],
+            scopes: ['general'],
+            surfaces: ['route_send_message_points'],
+        );
+
+        yield new TokenContextDefinition(
             key: 'imported_contact_permission_invitation',
             owner: 'messaging',
             description: 'One-time imported-contact permission invitation copy.',

@@ -446,6 +446,7 @@
 │   │   │   │   └── FlowRoutesModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   │   ├── StoreFlowRoutePointRequest.php
+│   │   │   │   ├── StoreFlowRouteRequest.php
 │   │   │   │   ├── UpdateFlowRoutePointOrderRequest.php
 │   │   │   │   ├── UpdateFlowRoutePointRequest.php
 │   │   │   │   └── UpdateFlowRouteTriggerBindingRequest.php
@@ -464,7 +465,8 @@
 │   │   │   │   ├── FlowRouteTriggerBindingResolver.php
 │   │   │   │   ├── PointHandlerRegistry.php
 │   │   │   │   ├── ProcessHighway
-│   │   │   │   │   └── FlowRoutesProcessHighwayContributor.php
+│   │   │   │   │   ├── FlowRoutesProcessHighwayContributor.php
+│   │   │   │   │   └── FlowRoutesProcessHighwayEntryRampActionContributor.php
 │   │   │   │   └── ReplyProfiles
 │   │   │   │       └── FlowRouteReplyProfileDependencyContributor.php
 │   │   │   ├── Support
@@ -533,6 +535,8 @@
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── HandleInboundEmailWebhookAction.php
 │   │   │   │   │   └── RecordInboundEmailAction.php
+│   │   │   │   ├── EmailRoutes
+│   │   │   │   │   └── SaveInboundEmailRouteAction.php
 │   │   │   │   ├── ProcessInboundMessageAction.php
 │   │   │   │   ├── RecordInboundMessageAction.php
 │   │   │   │   ├── ReplyProfiles
@@ -560,6 +564,7 @@
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
 │   │   │   │   │   ├── ContactConversationReplyController.php
+│   │   │   │   │   ├── InboundEmailRouteController.php
 │   │   │   │   │   └── InboundReplyProfileController.php
 │   │   │   │   └── Webhooks
 │   │   │   │       ├── EmailWebhookController.php
@@ -579,6 +584,7 @@
 │   │   │   ├── Providers
 │   │   │   │   └── InboundMessagingModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   │   ├── SaveInboundEmailRouteRequest.php
 │   │   │   │   ├── SaveInboundReplyProfileRequest.php
 │   │   │   │   └── StoreContactConversationReplyRequest.php
 │   │   │   ├── Services
@@ -589,7 +595,8 @@
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailWebhookHandlerResolver.php
 │   │   │   │   │   ├── EmailWebhookPayload.php
-│   │   │   │   │   └── InboundEmailRouteResolver.php
+│   │   │   │   │   ├── InboundEmailRouteResolver.php
+│   │   │   │   │   └── InboundEmailRouteWorkspace.php
 │   │   │   │   ├── InboundMessageRouter.php
 │   │   │   │   ├── Reply
 │   │   │   │   │   ├── EmailReplySubjectResolver.php
@@ -723,6 +730,7 @@
 │   │   │   ├── Controllers
 │   │   │   │   ├── ContactImportBatchPermissionInvitationController.php
 │   │   │   │   ├── CRM
+│   │   │   │   │   ├── CreateFlowRouteMessageTemplateController.php
 │   │   │   │   │   └── MessageTemplatePresetController.php
 │   │   │   │   └── Public
 │   │   │   │       ├── ConsentRevocationController.php
@@ -799,6 +807,7 @@
 │   │   │   ├── Providers
 │   │   │   │   └── MessagingModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   │   ├── CreateFlowRouteMessageTemplateRequest.php
 │   │   │   │   ├── StoreContactPermissionInvitationConsentRequest.php
 │   │   │   │   ├── UpdateMessageTemplateCompositionLayerRequest.php
 │   │   │   │   └── UpdateMessageTemplatePresetRequest.php
@@ -819,6 +828,7 @@
 │   │   │   │   │   └── ContactScheduledMessagesVisibilityDataProvider.php
 │   │   │   │   ├── CtaTrackingRequestClassifier.php
 │   │   │   │   ├── DevMessageSink.php
+│   │   │   │   ├── DirectMessageTemplateResolver.php
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailDomainHealthChecker.php
 │   │   │   │   │   ├── EmailHygieneService.php
@@ -1512,6 +1522,7 @@
 │       ├── ProcessHighway
 │       │   ├── Contracts
 │       │   │   ├── ProcessHighwayContributor.php
+│       │   │   ├── ProcessHighwayEntryRampActionContributor.php
 │       │   │   └── ProcessHighwayEntryRampContributor.php
 │       │   ├── Data
 │       │   │   ├── ProcessHighwayAuthority.php
@@ -2026,6 +2037,7 @@
 │   │   └── workflow
 │   │       └── module_state.md
 │   ├── module-surfaces.md
+│   ├── module-ui-ux-review-playbook.md
 │   ├── operations
 │   │   ├── client-environment-reference.md
 │   │   ├── client-staging-production-setup-checklist.md
@@ -2130,7 +2142,8 @@
 │       │   ├── messaging
 │       │   │   ├── available-fields.blade.php
 │       │   │   ├── message-chain-carousel.blade.php
-│       │   │   └── message-editor-carousel.blade.php
+│       │   │   ├── message-editor-carousel.blade.php
+│       │   │   └── route-message-template-picker.blade.php
 │       │   ├── section.blade.php
 │       │   ├── tasks
 │       │   ├── ui
@@ -2206,6 +2219,8 @@
 │       │   ├── forms
 │       │   │   └── index.blade.php
 │       │   ├── inbound-messaging
+│       │   │   ├── email-routes
+│       │   │   │   └── index.blade.php
 │       │   │   └── reply-profiles
 │       │   │       └── index.blade.php
 │       │   ├── messaging
@@ -2450,6 +2465,7 @@
 │   │   │   ├── FlowRouteConditionalStatusChangeTest.php
 │   │   │   ├── FlowRouteConditionBranchPointTest.php
 │   │   │   ├── FlowRouteControllerTest.php
+│   │   │   ├── FlowRouteCreationAuthoringTest.php
 │   │   │   ├── FlowRouteDecisionAuthoringTest.php
 │   │   │   ├── FlowRouteEditorControllerTest.php
 │   │   │   ├── FlowRouteEntryCriteriaTest.php
@@ -2459,6 +2475,7 @@
 │   │   │   ├── FlowRoutePointPlacementPolicyTest.php
 │   │   │   ├── FlowRoutePresetStaleRetirementTest.php
 │   │   │   ├── FlowRouteProcessHighwayContributorTest.php
+│   │   │   ├── FlowRouteProcessHighwayEntryRampActionContributorTest.php
 │   │   │   ├── FlowRouteProgressMetaCanonicalizerTest.php
 │   │   │   ├── FlowRoutesModelSchemaTest.php
 │   │   │   ├── FlowRoutesSetupValidationContributorTest.php
@@ -2488,6 +2505,7 @@
 │   │   │   ├── HandleInboundEmailWebhookActionTest.php
 │   │   │   ├── InboundEmailRouteResolutionTest.php
 │   │   │   ├── InboundEmailRouteSetupValidationTest.php
+│   │   │   ├── InboundEmailRouteWorkspaceTest.php
 │   │   │   ├── InboundMessageAutomationOutboxTest.php
 │   │   │   ├── InboundNormalReplyAutomationEventTest.php
 │   │   │   ├── InboundReplyFoundationTest.php
@@ -2529,12 +2547,14 @@
 │   │   │   ├── CreateContactPermissionInvitationsForImportBatchActionTest.php
 │   │   │   ├── CreateReusableMessageTemplateActionTest.php
 │   │   │   ├── CtaEngagementTrackingTest.php
+│   │   │   ├── DirectMessageTemplateAutomationRuntimeTest.php
 │   │   │   ├── DispatchConsentOptInMessageActionTest.php
 │   │   │   ├── DispatchMessageActionTest.php
 │   │   │   ├── EmailHygieneServiceTest.php
 │   │   │   ├── EmailMessagingServiceTest.php
 │   │   │   ├── EmailPayloadTest.php
 │   │   │   ├── EmailReplyAddressGeneratorTest.php
+│   │   │   ├── FlowRouteReusableMessageTemplateAuthoringTest.php
 │   │   │   ├── GrantMessageConsentActionTest.php
 │   │   │   ├── ImportMessageConsentActionTest.php
 │   │   │   ├── InternalNotificationChannelResolverTest.php
@@ -2828,4 +2848,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-681 directories, 2148 files
+683 directories, 2166 files

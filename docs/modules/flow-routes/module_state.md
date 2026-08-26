@@ -450,6 +450,12 @@ FlowRoutePoint is one concrete configured action inside one Route version.
 A Route editor may allow copying an existing `FlowRoutePoint` from another current Route, but cloning creates a new independent `FlowRoutePoint`. Later edits must not propagate back to the source Route.
 
 
+## CRM Route creation safety
+
+Normal CRM authoring can create a new Status-triggered Route directly from Manage Routes or from a Process Highway Status launcher. Creation writes a customized current Route version with the selected Status as trigger identity, but it deliberately creates no `FlowRouteTriggerBinding`. The operator builds/reviews Points first and then enables the Route through the existing Assignments workspace. This prevents an empty or half-built Route from silently replacing the currently assigned behavior.
+
+The initial creation surface is intentionally Status-first because Contact Status is already a stable authoring criterion and binding surface. Activity/event Route creation should wait for an authoritative event-catalog authoring seam rather than asking operators to type technical event keys.
+
 ## Messaging point behavior ownership
 
 FlowRoutes may use Messaging in two distinct ways:
@@ -465,7 +471,7 @@ Messaging owns immutable template/chain versions, chain progression, scheduled d
 
 ### Direct template send
 
-A direct send Point stores stable `message_template_id` authoring identity.
+A direct send Point stores stable `message_template_key` authoring identity. The key is the portable canonical `MessageTemplate.key`, not a database id, so Flow Route definition JSON survives Project State export/import without cross-section id mapping.
 
 When the Point executes:
 
@@ -527,9 +533,9 @@ consent acknowledgements
 module-private Broadcast templates
 ```
 
-The Route editor should hide unavailable Messaging actions when no eligible template/chain exists.
+The Route editor may expose Send message whenever Messaging has a visible direct-Route channel, even when no reusable template exists yet, because the editor can create the first reusable template contextually. Existing selection is restricted to templates that Messaging marks safe for the `flow_routes` selection context; bounded legacy `meta.route_authoring.eligible` support remains compatibility-only.
 
-Server-side validation must enforce the same rule.
+Server-side validation must enforce the same selection rule. New direct-template Points store only the stable `message_template_key` plus Point-owned no-message behavior; Messaging resolves channel/purpose/scope/dispatch identity from that exact template at execution time. Older direct Points that still store `message_template_preset_key` plus route coordinates remain executable during compatibility cleanup.
 
 ### Persistence boundary
 

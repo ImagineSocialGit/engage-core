@@ -306,6 +306,14 @@ How can this fact be applied?
 
 Tag rows currently contain only Contact, tag, and timestamps, and Core fact-change events are deliberately transient. A future request for source-by-source historical Tag counts would therefore require explicit provenance persistence; Process Highway does not infer or fabricate it.
 
+### Bounded entry-ramp authoring launchers
+
+Entry-ramp inspectors may receive optional owner-provided GET launchers through `ProcessHighwayEntryRampActionContributor`. The Highway validates/presents those links but does not mutate owner state itself.
+
+FlowRoutes contributes the first launcher for Status entry ramps: **Automate something for this status**. It deep-links to Flow Routes with the Status preselected in Create Route. Route creation remains safe because the new Route is unassigned until the operator explicitly chooses it in Flow Routes Assignments. If FlowRoutes is disabled, its contributor is absent and the Highway exposes no FlowRoutes authoring action.
+
+This is the preferred pattern for future Highway action affordances: contextual GET navigation into the owning module, never a Highway-owned POST or duplicated business-rule implementation.
+
 ## Ownership, wayfinding, and navigation
 
 Every visible segment, node, and edge declares:

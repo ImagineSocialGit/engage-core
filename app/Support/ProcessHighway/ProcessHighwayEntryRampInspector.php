@@ -2,6 +2,7 @@
 
 namespace App\Support\ProcessHighway;
 
+use App\Support\ProcessHighway\Contracts\ProcessHighwayEntryRampActionContributor;
 use App\Support\ProcessHighway\Contracts\ProcessHighwayEntryRampContributor;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Collection;
@@ -10,6 +11,7 @@ use Illuminate\Support\Str;
 final class ProcessHighwayEntryRampInspector
 {
     public const CONTRIBUTOR_TAG = 'process_highway.entry_ramp_contributors';
+    public const ACTION_CONTRIBUTOR_TAG = 'process_highway.entry_ramp_action_contributors';
 
     public function __construct(
         private readonly Container $container,
@@ -22,6 +24,7 @@ final class ProcessHighwayEntryRampInspector
     public function decorate(array $graph): array
     {
         $providers = $this->providers();
+        $actionProviders = $this->actionProviders();
         $segmentsByKey = collect($graph['segments'] ?? [])->keyBy('key');
         $edgesByTarget = collect($graph['edges'] ?? [])->groupBy('to_node_key');
         $entryRampKeys = collect($graph['highways'] ?? [])
@@ -91,6 +94,11 @@ final class ProcessHighwayEntryRampInspector
                     ->where('match', 'partial')
                     ->count(),
                 'processes' => $processes,
+                'actions' => $this->actionsForRamp(
+                    providers: $actionProviders[$criterionKey] ?? [],
+                    value: $value,
+                    node: $node,
+                ),
             ];
         }
 
@@ -136,6 +144,64 @@ final class ProcessHighwayEntryRampInspector
         }
 
         return $providers;
+    }
+
+    /** @return array<string, array<int, ProcessHighwayEntryRampActionContributor>> */
+    private function actionProviders(): array
+    {
+        $providers = [];
+
+        foreach ($this->container->tagged(self::ACTION_CONTRIBUTOR_TAG) as $provider) {
+            if (! $provider instanceof ProcessHighwayEntryRampActionContributor) {
+                continue;
+            }
+
+            $criterionKey = trim($provider->criterionKey());
+
+            if ($criterionKey !== '') {
+                $providers[$criterionKey][] = $provider;
+            }
+        }
+
+        return $providers;
+    }
+
+    /**
+     * @param array<int, ProcessHighwayEntryRampActionContributor> $providers
+     * @param array<string, mixed> $node
+     * @return array<int, array<string, mixed>>
+     */
+    private function actionsForRamp(array $providers, string $value, array $node): array
+    {
+        return collect($providers)
+            ->flatMap(fn (ProcessHighwayEntryRampActionContributor $provider): array => $provider->actions($value, $node))
+            ->map(function (mixed $action): ?array {
+                if (! is_array($action)) {
+                    return null;
+                }
+
+                $key = $this->string($action['key'] ?? null);
+                $label = $this->string($action['label'] ?? null);
+                $detail = $this->string($action['detail'] ?? null);
+                $url = $this->string($action['url'] ?? null);
+
+                if ($key === null || $label === null || $detail === null || $url === null) {
+                    return null;
+                }
+
+                return array_filter([
+                    'key' => $key,
+                    'label' => $label,
+                    'detail' => $detail,
+                    'url' => $url,
+                    'owner_key' => $this->string($action['owner_key'] ?? null),
+                    'owner_label' => $this->string($action['owner_label'] ?? null),
+                ], fn (mixed $item): bool => $item !== null);
+            })
+            ->filter()
+            ->unique('key')
+            ->values()
+            ->all();
     }
 
     /**

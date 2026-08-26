@@ -34,7 +34,14 @@
                 x-cloak
             @endif
         >
-            @if($type === 'resource')
+            @if($type === 'component')
+                <x-dynamic-component
+                    :component="$field['component']"
+                    :field="$field"
+                    :field-suffix="$fieldSuffix"
+                    :value="$value"
+                />
+            @elseif($type === 'resource')
                 <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-900">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div class="min-w-0">

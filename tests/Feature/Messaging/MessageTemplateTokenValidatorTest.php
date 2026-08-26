@@ -25,7 +25,7 @@ class MessageTemplateTokenValidatorTest extends TestCase
             surface: 'webinar_registrations',
         );
 
-        $this->assertSame([], $issues);
+        $this->assertEquals([], $issues);
     }
 
     public function test_it_reports_unknown_tokens_as_hard_errors(): void
@@ -127,7 +127,7 @@ class MessageTemplateTokenValidatorTest extends TestCase
             ],
         ]);
 
-        $this->assertSame([
+        $this->assertEquals([
             'first_name',
             'webinar_join_url',
         ], $tokens);
@@ -157,6 +157,33 @@ class MessageTemplateTokenValidatorTest extends TestCase
             surface: 'webinar_registrations',
         );
 
-        $this->assertSame([], $issues);
+        $this->assertEquals([], $issues);
     }
+
+    public function test_flow_route_send_message_context_exposes_only_runtime_safe_contact_copy_fields(): void
+    {
+        $validator = app(\App\Modules\Messaging\Services\MessageTemplateTokenValidator::class);
+
+        $this->assertEquals([], $validator->validatePayload(
+            payload: ['subject' => 'Hello {first_name}', 'body' => 'Hi {contact.name}'],
+            dispatchKeys: ['flow_route_send_message'],
+            channel: 'email',
+            purpose: 'marketing',
+            scope: 'general',
+            surface: 'route_send_message_points',
+        ));
+
+        $issues = $validator->validatePayload(
+            payload: ['subject' => 'Hello', 'body' => 'Join {webinar_title}'],
+            dispatchKeys: ['flow_route_send_message'],
+            channel: 'email',
+            purpose: 'marketing',
+            scope: 'general',
+            surface: 'route_send_message_points',
+        );
+
+        $this->assertCount(1, $issues);
+        $this->assertStringContainsString('not available for dispatch context [flow_route_send_message]', $issues[0]['message']);
+    }
+
 }

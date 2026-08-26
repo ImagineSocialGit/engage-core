@@ -1,4 +1,3 @@
-
 @php
     $subjects = collect($highway['subjects'] ?? []);
     $highways = collect($highway['highways'] ?? []);
@@ -622,6 +621,26 @@
                                                 </template>
                                             </div>
                                         </article>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <div x-show="(ramp.actions || []).length > 0" data-process-highway-entry-actions>
+                                <h3 class="text-sm font-semibold text-slate-950">Want to add automation?</h3>
+                                <p class="mt-1 text-xs leading-5 text-slate-600">Continue in the feature that owns the automation. Process Highway will keep showing the result here once it is configured.</p>
+                                <div class="mt-3 space-y-2">
+                                    <template x-for="action in ramp.actions" :key="action.key">
+                                        <a
+                                            x-bind:href="action.url"
+                                            class="flex items-start justify-between gap-4 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-left transition hover:border-orange-300 hover:bg-orange-100"
+                                            data-process-highway-entry-action
+                                        >
+                                            <span>
+                                                <span class="block text-sm font-semibold text-orange-950" x-text="action.label"></span>
+                                                <span class="mt-1 block text-xs leading-5 text-orange-900/80" x-text="action.detail"></span>
+                                            </span>
+                                            <span class="shrink-0 text-xs font-semibold text-orange-900">Open →</span>
+                                        </a>
                                     </template>
                                 </div>
                             </div>

@@ -1275,7 +1275,7 @@ This keeps creation contextual without coupling Messaging to consuming modules:
 ```text
 Broadcasts -> Broadcast authoring context -> Messaging create action
 Campaign Annual Touches -> annual-touch authoring context -> Messaging create action
-Flow Routes (future UI wiring) -> Route authoring context -> Messaging create action
+Flow Routes -> Route authoring context -> Messaging create action
 ```
 
 Authoring context is persisted in existing preset/catalog metadata. It is not a new schema
@@ -1284,6 +1284,16 @@ contract and does not require preset sync. Contextual selectors may ask
 for one surface does not automatically leak into an incompatible picker. Legacy saved
 Broadcast messages remain selectable in Broadcasts and Annual Touches for compatibility.
 
+
+### Direct Flow Route reusable messages
+
+Flow Route direct-message authoring uses the contextual reusable-message seam rather than exposing the entire MessageTemplatePreset table. New Route messages are created with selection context `flow_routes`, dispatch context `flow_route_send_message`, scope `general`, surface `route_send_message_points`, and operator-selected channel plus purpose. Marketing is the authoring default; transactional remains an explicit service/operational choice.
+
+The Route Point persists canonical `message_template_key` identity. At execution, `DirectMessageTemplateResolver` resolves that exact active preset/canonical MessageTemplate/current immutable version and supplies exactly one definition to `DispatchMessageAction`. The resulting ScheduledMessage pins `message_template_version_id`; later template edits affect later Route executions but never rewrite already-scheduled messages.
+
+`meta.route_authoring.eligible` remains a bounded legacy read path for previously exposed templates. New CRM-authored templates use `authoring.selection_contexts` and `ReusableMessageTemplateCatalog`; do not add new legacy route-eligibility metadata.
+
+The executable `flow_route_send_message` token context exposes only Contact copy values already guaranteed by Messaging's recipient payload resolver (`first_name`, `last_name`, `name`, `email`, `phone` and canonical Contact forms). Route-only technical interpolation tokens are not presented as client-facing reusable message fields.
 
 ### Context-aware available fields
 

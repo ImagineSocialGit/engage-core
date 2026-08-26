@@ -11,6 +11,8 @@ class SendMessageAutomationDefinition
      * @param array<string, mixed> $meta
      */
     public function __construct(
+        public readonly ?string $messageTemplateKey,
+        public readonly ?string $legacyMessageTemplatePresetKey,
         public readonly ?string $channel,
         public readonly ?string $purpose,
         public readonly ?string $scope,
@@ -26,20 +28,26 @@ class SendMessageAutomationDefinition
     /** @param array<string, mixed> $input */
     public static function from(array $input): self
     {
+        $messageTemplateKey = self::string($input, 'message_template_key');
+        $legacyMessageTemplatePresetKey = self::string($input, 'message_template_preset_key');
         $channel = self::string($input, 'channel');
         $purpose = self::string($input, 'purpose');
         $scope = self::string($input, 'scope');
         $dispatchKeys = self::dispatchKeys($input);
 
-        $invalidReason = match (true) {
-            $channel === null => 'send_message_missing_channel',
-            $purpose === null => 'send_message_missing_purpose',
-            $scope === null => 'send_message_missing_scope',
-            $dispatchKeys === [] => 'send_message_missing_dispatch_keys',
-            default => null,
-        };
+        $invalidReason = $messageTemplateKey !== null
+            ? null
+            : match (true) {
+                $channel === null => 'send_message_missing_channel',
+                $purpose === null => 'send_message_missing_purpose',
+                $scope === null => 'send_message_missing_scope',
+                $dispatchKeys === [] => 'send_message_missing_dispatch_keys',
+                default => null,
+            };
 
         return new self(
+            messageTemplateKey: $messageTemplateKey,
+            legacyMessageTemplatePresetKey: $legacyMessageTemplatePresetKey,
             channel: $channel,
             purpose: $purpose,
             scope: $scope,
@@ -58,10 +66,22 @@ class SendMessageAutomationDefinition
         return $this->invalidReason === null;
     }
 
+    public function directTemplateCandidateKey(): ?string
+    {
+        return $this->messageTemplateKey ?? $this->legacyMessageTemplatePresetKey;
+    }
+
+    public function hasAuthoritativeTemplateKey(): bool
+    {
+        return $this->messageTemplateKey !== null;
+    }
+
     /** @return array<string, mixed> */
     public function toMetaPayload(): array
     {
-        return [
+        return array_filter([
+            'message_template_key' => $this->messageTemplateKey,
+            'message_template_preset_key' => $this->legacyMessageTemplatePresetKey,
             'channel' => $this->channel,
             'purpose' => $this->purpose,
             'scope' => $this->scope,
@@ -71,7 +91,7 @@ class SendMessageAutomationDefinition
             'anchor' => $this->anchor,
             'on_no_messages' => $this->onNoMessages,
             'meta' => $this->meta,
-        ];
+        ], static fn (mixed $value): bool => $value !== null);
     }
 
     /** @param array<string, mixed> $input */

@@ -8,6 +8,7 @@
         class="space-y-6"
         x-data="{
             openRouteEditor: @js($openRouteEditorId),
+            openCreateRoute: @js((bool) $openCreateRoute),
             openRoute(id) {
                 this.openRouteEditor = Number(id);
                 const url = new URL(window.location.href);
@@ -20,8 +21,21 @@
                 url.searchParams.delete('edit_route');
                 window.history.replaceState({}, '', url);
             },
+            openCreate() {
+                this.openCreateRoute = true;
+                const url = new URL(window.location.href);
+                url.searchParams.set('create', '1');
+                window.history.replaceState({}, '', url);
+            },
+            closeCreate() {
+                this.openCreateRoute = false;
+                const url = new URL(window.location.href);
+                url.searchParams.delete('create');
+                url.searchParams.delete('status');
+                window.history.replaceState({}, '', url);
+            },
         }"
-        x-effect="document.body.classList.toggle('overflow-hidden', openRouteEditor !== null)"
+        x-effect="document.body.classList.toggle('overflow-hidden', openRouteEditor !== null || openCreateRoute)"
     >
         @include('crm.flow-routes.partials.navigation')
 
@@ -38,6 +52,17 @@
                 <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-700">
                     Routes connect repetitive actions, waits, and follow-up work into a clear path. Review a Route below to understand what it does.
                 </p>
+
+                <div class="mt-5">
+                    <button
+                        type="button"
+                        x-on:click="openCreate()"
+                        class="inline-flex w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 sm:w-auto"
+                        data-flow-route-create
+                    >
+                        Create Route
+                    </button>
+                </div>
 
                 @if($routeSummary['unassigned_routes'] > 0)
                     <div class="mt-6 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
@@ -380,6 +405,78 @@
                 </div>
             </section>
         @endif
+
+
+        <template x-teleport="body">
+            <div
+                x-cloak
+                x-show="openCreateRoute"
+                x-transition.opacity
+                x-on:keydown.escape.window="closeCreate()"
+                x-on:click.self="closeCreate()"
+                class="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-4"
+                role="presentation"
+                data-flow-route-create-modal
+            >
+                <section
+                    x-show="openCreateRoute"
+                    x-transition
+                    class="max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl ring-1 ring-black/10"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="create-route-heading"
+                >
+                    <header class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-5 sm:px-6">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-[0.14em] text-orange-700">Flow Routes</p>
+                            <h2 id="create-route-heading" class="mt-1 text-xl font-semibold tracking-tight text-slate-950">Create Route</h2>
+                            <p class="mt-2 text-sm leading-6 text-slate-600">Start with the Status that should make this Route eligible. You will build the Route before assigning it.</p>
+                        </div>
+                        <button type="button" x-on:click="closeCreate()" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-950" aria-label="Close Create Route">
+                            <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18" /></svg>
+                        </button>
+                    </header>
+
+                    <form method="POST" action="{{ route('crm.flow-routes.store') }}" class="space-y-5 px-5 py-5 sm:px-6">
+                        @csrf
+                        <input type="hidden" name="_flow_route_create" value="1">
+
+                        <div>
+                            <label for="create-route-name" class="text-sm font-semibold text-slate-900">Route name <span class="text-red-700" aria-hidden="true">*</span></label>
+                            <input id="create-route-name" name="name" type="text" value="{{ old('name') }}" required maxlength="255" placeholder="Past Client Follow-Up" class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200">
+                            @error('name')<p class="mt-1 text-sm text-red-700">{{ $message }}</p>@enderror
+                        </div>
+
+                        <div>
+                            <label for="create-route-status" class="text-sm font-semibold text-slate-900">Contact Status <span class="text-red-700" aria-hidden="true">*</span></label>
+                            <select id="create-route-status" name="contact_status_id" required class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200" data-flow-route-create-status>
+                                <option value="">Choose a Status</option>
+                                @foreach($createRouteContactStatuses as $status)
+                                    <option value="{{ $status->getKey() }}" @selected((string) old('contact_status_id', $createRouteStatusId) === (string) $status->getKey())>{{ $status->name }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1 text-xs leading-5 text-slate-600">This defines who the Route is for. Assignment is a separate safety step.</p>
+                            @error('contact_status_id')<p class="mt-1 text-sm text-red-700">{{ $message }}</p>@enderror
+                        </div>
+
+                        <div>
+                            <label for="create-route-description" class="text-sm font-semibold text-slate-900">Description <span class="font-normal text-slate-500">Optional</span></label>
+                            <textarea id="create-route-description" name="description" rows="3" maxlength="2000" placeholder="What this Route is meant to accomplish." class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200">{{ old('description') }}</textarea>
+                            @error('description')<p class="mt-1 text-sm text-red-700">{{ $message }}</p>@enderror
+                        </div>
+
+                        <div class="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+                            <span class="font-semibold">Safe by default:</span> creating this Route does not assign it to the Status. Add and review its Points first, then choose it in Assignments when it is ready to run.
+                        </div>
+
+                        <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
+                            <button type="button" x-on:click="closeCreate()" class="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50 sm:w-auto">Cancel</button>
+                            <button type="submit" class="inline-flex w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 sm:w-auto">Create and build Route</button>
+                        </div>
+                    </form>
+                </section>
+            </div>
+        </template>
 
         @foreach($routeEditors as $editor)
             @include('crm.flow-routes.partials.editor-modal', [

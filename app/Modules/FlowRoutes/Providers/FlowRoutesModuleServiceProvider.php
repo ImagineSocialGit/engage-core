@@ -22,6 +22,7 @@ use App\Modules\FlowRoutes\Services\ContactShow\ContactRoutesVisibilityDataProvi
 use App\Modules\FlowRoutes\Services\FlowRouteConditionEvaluatorRegistry;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Modules\FlowRoutes\Services\ProcessHighway\FlowRoutesProcessHighwayContributor;
+use App\Modules\FlowRoutes\Services\ProcessHighway\FlowRoutesProcessHighwayEntryRampActionContributor;
 use App\Modules\FlowRoutes\Services\ReplyProfiles\FlowRouteReplyProfileDependencyContributor;
 use App\Modules\FlowRoutes\Validation\FlowRoutesSetupValidationContributor;
 use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
@@ -100,6 +101,10 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             FlowRoutesProcessHighwayContributor::class,
         ], 'process_highway.contributors');
+
+        $this->app->tag([
+            FlowRoutesProcessHighwayEntryRampActionContributor::class,
+        ], 'process_highway.entry_ramp_action_contributors');
 
         $this->app->tag([
             FlowRouteReplyProfileDependencyContributor::class,

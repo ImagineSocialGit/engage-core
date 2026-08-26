@@ -4,6 +4,7 @@ namespace App\Modules\Messaging\Automation;
 
 use App\Modules\Messaging\Data\Automation\SendMessageAutomationDefinition;
 use App\Modules\Messaging\Enums\MessageChannel;
+use App\Modules\Messaging\Services\DirectMessageTemplateResolver;
 use App\Modules\Messaging\Services\MessageDefinitionResolver;
 use App\Support\AutomationCapabilities\Contracts\AutomationPointDefinitionContributor;
 use App\Support\AutomationCapabilities\Data\AutomationPointDefinition;
@@ -18,6 +19,7 @@ class MessagingAutomationPointDefinitionContributor implements AutomationPointDe
 
     public function __construct(
         private readonly MessageDefinitionResolver $messageDefinitionResolver,
+        private readonly DirectMessageTemplateResolver $directTemplates,
     ) {}
 
     public function definitions(): iterable
@@ -27,11 +29,13 @@ class MessagingAutomationPointDefinitionContributor implements AutomationPointDe
         yield new AutomationPointDefinition(
             pointType: 'send_message',
             schema: ConfigSchema::object([
-                'channel' => ConfigField::required(
+                'message_template_key' => ConfigField::optional(ConfigSchema::string()),
+                'message_template_preset_key' => ConfigField::optional(ConfigSchema::string()),
+                'channel' => ConfigField::optional(
                     ConfigSchema::string(allowedValues: MessageChannel::values()),
                 ),
-                'purpose' => ConfigField::required(ConfigSchema::string()),
-                'scope' => ConfigField::required(ConfigSchema::string()),
+                'purpose' => ConfigField::optional(ConfigSchema::string()),
+                'scope' => ConfigField::optional(ConfigSchema::string()),
                 'dispatch_key' => ConfigField::optional(ConfigSchema::string()),
                 'dispatch_keys' => ConfigField::optional(
                     ConfigSchema::listOf(ConfigSchema::string()),
@@ -44,8 +48,6 @@ class MessagingAutomationPointDefinitionContributor implements AutomationPointDe
                     'skipped',
                 ),
                 'meta' => ConfigField::defaulted($open, []),
-            ], atLeastOne: [
-                ['dispatch_key', 'dispatch_keys'],
             ]),
         );
     }
@@ -77,6 +79,30 @@ class MessagingAutomationPointDefinitionContributor implements AutomationPointDe
             );
 
             return;
+        }
+
+        $candidateKey = $parsed->directTemplateCandidateKey();
+
+        if ($candidateKey !== null) {
+            $direct = $this->directTemplates->definition($candidateKey);
+
+            if (is_array($direct)) {
+                return;
+            }
+
+            if ($parsed->hasAuthoritativeTemplateKey()) {
+                yield $context->error(
+                    code: 'flow_routes.messaging_template_missing',
+                    message: "FlowRoute [{$context->containerKey}] point [{$context->pointKey}] references unavailable Message Template [{$candidateKey}].",
+                    path: "{$context->path}.definition.message_template_key",
+                    context: [
+                        'point_key' => $context->pointKey,
+                        'message_template_key' => $candidateKey,
+                    ],
+                );
+
+                return;
+            }
         }
 
         try {
