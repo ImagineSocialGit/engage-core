@@ -263,9 +263,10 @@
                             @if($comparison['exact_comparison']['available'])
                                 <div class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
                                     <div class="font-semibold text-emerald-950">Exact stable-ID comparison available</div>
-                                    <div class="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+                                    <div class="mt-3 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+                                        <div><span class="font-semibold">Observed Engage sessions:</span> {{ number_format((int) $comparison['exact_comparison']['engage_observed_sessions']) }}</div>
                                         <div><span class="font-semibold">Likely-human Engage sessions:</span> {{ number_format((int) $comparison['exact_comparison']['engage_likely_human_sessions']) }}</div>
-                                        <div><span class="font-semibold">Engage registrations:</span> {{ number_format((int) $comparison['exact_comparison']['engage_registrations']) }}</div>
+                                        <div><span class="font-semibold">Attributed registrations:</span> {{ number_format((int) $comparison['exact_comparison']['engage_registrations']) }}</div>
                                         <div>
                                             <span class="font-semibold">Cost / Engage registration:</span>
                                             @if($comparison['exact_comparison']['cost_per_registration'] !== null)
@@ -276,7 +277,7 @@
                                         </div>
                                     </div>
                                     <p class="mt-3 text-xs leading-5 text-emerald-900">
-                                        Exact comparison covers {{ number_format((int) $comparison['matched_stable_rows']) }} of {{ number_format((int) $comparison['row_count']) }} imported row(s). Platform landing-page views and Engage likely-human sessions are intentionally shown as different measurements.
+                                        Exact comparison covers {{ number_format((int) $comparison['matched_stable_rows']) }} of {{ number_format((int) $comparison['row_count']) }} imported row(s). Platform landing-page views, observed first-party sessions, and calibrated likely-human sessions are intentionally shown as different measurements. Attributed registrations are authoritative local registrations correlated back to those tracked sessions.
                                     </p>
                                 </div>
                             @elseif($comparison['name_fallback_rows'] > 0)
@@ -496,10 +497,10 @@
                 </div>
 
                 @if($report['campaigns'] === [])
-                    <div class="p-8 text-sm text-slate-600">No attributed campaign traffic was projected in this date range.</div>
+                    <div class="p-8 text-sm text-slate-600">No attributed campaign or referral traffic was projected in this date range.</div>
                 @else
                     <div class="overflow-x-auto">
-                        <table class="min-w-[72rem] text-sm">
+                        <table class="min-w-[82rem] text-sm">
                             <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <tr>
                                     <th class="px-5 py-3">Source / medium</th>
@@ -511,7 +512,8 @@
                                     <th class="px-5 py-3 text-right">Likely-human landing</th>
                                     <th class="px-5 py-3 text-right">Form starts</th>
                                     <th class="px-5 py-3 text-right">Reached submit</th>
-                                    <th class="px-5 py-3 text-right">Registration</th>
+                                    <th class="px-5 py-3 text-right">Attributed registrations</th>
+                                    <th class="px-5 py-3 text-right">Human conversion</th>
                                     <th class="px-5 py-3 text-right">Validation</th>
                                 </tr>
                             </thead>
@@ -519,9 +521,9 @@
                                 @foreach($report['campaigns'] as $row)
                                     <tr>
                                         <td class="px-5 py-4 font-medium text-slate-900">
-                                            {{ $row['dimensions']['utm_source'] ?? '—' }}
+                                            {{ $row['dimensions']['utm_source'] ?? $row['dimensions']['referrer_host'] ?? '—' }}
                                             <span class="text-slate-400">/</span>
-                                            {{ $row['dimensions']['utm_medium'] ?? '—' }}
+                                            {{ $row['dimensions']['utm_medium'] ?? (filled($row['dimensions']['referrer_host'] ?? null) ? 'referral' : '—') }}
                                         </td>
                                         <td class="px-5 py-4 text-slate-700">
                                             <div>{{ $row['dimensions']['utm_campaign'] ?? '—' }}</div>
@@ -554,6 +556,12 @@
                                         </td>
                                         <td class="px-5 py-4 text-right text-slate-700">{{ number_format((int) $row['form_starts']) }}</td>
                                         <td class="px-5 py-4 text-right text-slate-700">{{ number_format((int) $row['submit_sessions']) }}</td>
+                                        <td class="px-5 py-4 text-right font-semibold text-slate-950">
+                                            <div>{{ number_format((int) $row['attributed_registrations']) }}</div>
+                                            @if((int) ($row['meta_click_registrations'] ?? 0) > 0)
+                                                <div class="mt-1 text-xs font-medium text-slate-500">{{ number_format((int) $row['meta_click_registrations']) }} with Meta click evidence</div>
+                                            @endif
+                                        </td>
                                         <td class="px-5 py-4 text-right font-semibold text-slate-950">{{ $percent($row['registration_conversion']) }}</td>
                                         <td class="px-5 py-4 text-right text-slate-700">{{ $percent($row['validation_failure_rate']) }}</td>
                                     </tr>
@@ -650,6 +658,8 @@
                 <div class="grid gap-4 p-5 sm:grid-cols-2 sm:p-8 xl:grid-cols-4">
                     @foreach([
                         ['label' => 'Local registrations', 'type' => 'count', 'value' => $report['after_registration']['local_registrations'], 'note' => 'Authoritative public Webinar registrations.'],
+                        ['label' => 'Attributed registrations', 'type' => 'count', 'value' => $report['after_registration']['attributed_registrations'], 'note' => 'Authoritative registrations correlated to a retained first-party Reporting session.'],
+                        ['label' => 'Meta-click registrations', 'type' => 'count', 'value' => $report['after_registration']['meta_click_registrations'], 'note' => 'Attributed registrations whose retained session contains a hashed Meta fbclid.'],
                         ['label' => 'Browser correlation', 'type' => 'ratio', 'value' => $report['after_registration']['correlation_coverage'], 'note' => 'Registrations matched to a browser submit attempt.'],
                         ['label' => 'Provider completion', 'type' => 'ratio', 'value' => $report['after_registration']['provider_completion'], 'note' => 'Provider-required registrations that completed provider sync.'],
                         ['label' => 'Confirmation planned', 'type' => 'ratio', 'value' => $report['after_registration']['confirmation_planning'], 'note' => 'Eligible completed registrations with confirmation planning.'],

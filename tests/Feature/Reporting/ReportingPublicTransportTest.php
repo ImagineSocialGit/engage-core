@@ -27,6 +27,7 @@ class ReportingPublicTransportTest extends TestCase
             query: [
                 'utm_source' => 'newsletter',
                 'utm_campaign' => 'august_webinar',
+                'fbclid' => 'meta-click-raw-value',
                 'engage_platform' => 'meta',
                 'engage_campaign_id' => 'cmp-100',
                 'engage_group_id' => 'grp-200',
@@ -59,6 +60,14 @@ class ReportingPublicTransportTest extends TestCase
         $this->assertSame('grp-200', $observation->external_group_id);
         $this->assertSame('ad-300', $observation->external_creative_id);
         $this->assertSame('facebook_feed', $observation->external_placement);
+        $this->assertEquals([
+            'meta_fbclid' => hash_hmac(
+                'sha256',
+                "meta_fbclid\0meta-click-raw-value",
+                (string) config('reporting.attribution.click_id_hash_key'),
+            ),
+        ], $observation->click_id_hashes);
+        $this->assertEquals($observation->click_id_hashes, $session->click_id_hashes);
         $this->assertSame('likely_human', $observation->traffic_class);
         $this->assertSame('browser_request_signals', $observation->classifier_key);
         $this->assertSame(3, $observation->classifier_version);
@@ -78,6 +87,7 @@ class ReportingPublicTransportTest extends TestCase
 
         $this->assertStringNotContainsString(self::BROWSER_UA, $persisted);
         $this->assertStringNotContainsString('127.0.0.1', $persisted);
+        $this->assertStringNotContainsString('meta-click-raw-value', $persisted);
     }
 
     public function test_missing_browser_session_token_falls_back_to_page_only_observation(): void

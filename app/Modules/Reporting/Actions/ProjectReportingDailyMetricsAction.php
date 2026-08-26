@@ -17,7 +17,7 @@ final class ProjectReportingDailyMetricsAction
 {
     public const PROJECTOR_KEY = 'public_funnel';
 
-    public const PROJECTOR_VERSION = 2;
+    public const PROJECTOR_VERSION = 3;
 
     public const METRIC_VERSION = 2;
 
@@ -31,6 +31,8 @@ final class ProjectReportingDailyMetricsAction
         'webinar.traffic_classification_resolution',
         'webinar.funnel_sessions',
         'webinar.registration_conversion',
+        'webinar.attributed_registrations',
+        'webinar.registration_attribution_evidence',
         'webinar.validation_failure_rate',
         'webinar.validation_failures',
         'webinar.throttled_requests',
@@ -436,11 +438,7 @@ final class ProjectReportingDailyMetricsAction
         Collection $facts,
         Collection $observations,
     ): void {
-        $submitObservations = $observations
-            ->where('event_key', 'webinar.form.submit_attempt')
-            ->keyBy(fn (ReportingObservation $observation): string =>
-                strtolower((string) $observation->event_id)
-            );
+        $submitObservations = $this->correlatedSubmitObservations($facts);
         $convertedSessionIds = [];
 
         foreach ($facts as $fact) {
@@ -457,6 +455,64 @@ final class ProjectReportingDailyMetricsAction
 
             if ($correlatedSessionId !== null) {
                 $convertedSessionIds[$correlatedSessionId] = true;
+            }
+
+            if ($correlatedObservation instanceof ReportingObservation
+                && $correlatedObservation->session instanceof ReportingSession
+            ) {
+                $attributionProfile = $this->registrationAttributionProfile(
+                    $correlatedObservation,
+                );
+
+                foreach ($this->sessionSlices($attributionProfile) as $slice) {
+                    $this->incrementCount(
+                        metrics: $metrics,
+                        metricKey: 'webinar.attributed_registrations',
+                        dimensions: $slice,
+                    );
+
+                    $this->incrementCount(
+                        metrics: $metrics,
+                        metricKey: 'webinar.registration_attribution_evidence',
+                        dimensions: [
+                            ...$slice,
+                            'evidence' => 'session_correlation',
+                        ],
+                    );
+
+                    if ($this->hasCampaignAttribution($attributionProfile)) {
+                        $this->incrementCount(
+                            metrics: $metrics,
+                            metricKey: 'webinar.registration_attribution_evidence',
+                            dimensions: [
+                                ...$slice,
+                                'evidence' => 'campaign_attribution',
+                            ],
+                        );
+                    }
+
+                    if (filled($attributionProfile['referrer_host'] ?? null)) {
+                        $this->incrementCount(
+                            metrics: $metrics,
+                            metricKey: 'webinar.registration_attribution_evidence',
+                            dimensions: [
+                                ...$slice,
+                                'evidence' => 'referrer_host',
+                            ],
+                        );
+                    }
+
+                    if ($this->hasMetaClickEvidence($attributionProfile)) {
+                        $this->incrementCount(
+                            metrics: $metrics,
+                            metricKey: 'webinar.registration_attribution_evidence',
+                            dimensions: [
+                                ...$slice,
+                                'evidence' => 'meta_click_id',
+                            ],
+                        );
+                    }
+                }
             }
 
             foreach ($this->producerSlices($fact) as $slice) {
@@ -651,6 +707,108 @@ final class ProjectReportingDailyMetricsAction
     }
 
     /**
+     * Resolve authoritative registration correlation against retained submit
+     * observations, not only observations that happened inside the fact day.
+     * This keeps attribution intact across local-midnight boundaries while the
+     * registration fact remains authoritative for the conversion itself.
+     *
+     * @param Collection<int, ReportingProjectionFact> $facts
+     * @return Collection<string, ReportingObservation>
+     */
+    private function correlatedSubmitObservations(Collection $facts): Collection
+    {
+        $correlationIds = $facts
+            ->map(fn (ReportingProjectionFact $fact): ?string =>
+                is_string($fact->correlationId) && trim($fact->correlationId) !== ''
+                    ? trim($fact->correlationId)
+                    : null
+            )
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($correlationIds->isEmpty()) {
+            return collect();
+        }
+
+        return ReportingObservation::query()
+            ->with('session')
+            ->where('surface', self::WEBINAR_SURFACE)
+            ->where('event_key', 'webinar.form.submit_attempt')
+            ->whereIn('event_id', $correlationIds->all())
+            ->get()
+            ->keyBy(fn (ReportingObservation $observation): string =>
+                strtolower((string) $observation->event_id)
+            );
+    }
+
+    /** @return array<string, mixed> */
+    private function registrationAttributionProfile(
+        ReportingObservation $observation,
+    ): array {
+        /** @var ReportingSession $session */
+        $session = $observation->session;
+        $properties = is_array($observation->properties)
+            ? $observation->properties
+            : [];
+        $clickIdHashes = is_array($session->click_id_hashes)
+            ? $session->click_id_hashes
+            : [];
+
+        return [
+            'path' => $session->landing_path ?: $observation->path,
+            'referrer_host' => $session->referrer_host,
+            'utm_source' => $session->utm_source,
+            'utm_medium' => $session->utm_medium,
+            'utm_campaign' => $session->utm_campaign,
+            'utm_content' => $session->utm_content,
+            'utm_term' => $session->utm_term,
+            'external_platform' => $session->external_platform,
+            'external_campaign_id' => $session->external_campaign_id,
+            'external_group_id' => $session->external_group_id,
+            'external_creative_id' => $session->external_creative_id,
+            'external_placement' => $session->external_placement,
+            'page_revision' => $properties['page_revision'] ?? null,
+            'presentation' => $properties['presentation'] ?? null,
+            'device_class' => $session->device_class,
+            'click_id_hashes' => $clickIdHashes,
+        ];
+    }
+
+    /** @param array<string, mixed> $profile */
+    private function hasCampaignAttribution(array $profile): bool
+    {
+        foreach ([
+            'utm_source',
+            'utm_medium',
+            'utm_campaign',
+            'utm_content',
+            'utm_term',
+            'external_platform',
+            'external_campaign_id',
+            'external_group_id',
+            'external_creative_id',
+            'external_placement',
+        ] as $key) {
+            if (filled($profile[$key] ?? null)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param array<string, mixed> $profile */
+    private function hasMetaClickEvidence(array $profile): bool
+    {
+        $hashes = is_array($profile['click_id_hashes'] ?? null)
+            ? $profile['click_id_hashes']
+            : [];
+
+        return filled($hashes['meta_fbclid'] ?? null);
+    }
+
+    /**
      * @param array<string, array<string, mixed>> $metrics
      * @param Collection<int, ReportingProjectionFact> $facts
      */
@@ -782,6 +940,7 @@ final class ProjectReportingDailyMetricsAction
                 'recorded_traffic_class' => $classification['recorded_class'],
                 'traffic_class' => $classification['effective_class'],
                 'traffic_resolution_reason' => $classification['reason'],
+                'referrer_host' => $session->referrer_host,
                 'utm_source' => $session->utm_source,
                 'utm_medium' => $session->utm_medium,
                 'utm_campaign' => $session->utm_campaign,
@@ -868,6 +1027,30 @@ final class ProjectReportingDailyMetricsAction
             ];
         }
 
+        $activeEngagement = $observations->first(function (ReportingObservation $observation): bool {
+            if ($observation->event_key !== 'webinar.engagement.signal') {
+                return false;
+            }
+
+            return in_array(
+                data_get($observation->properties, 'signal'),
+                ['active_10s', 'scroll_25'],
+                true,
+            );
+        });
+
+        if ($activeEngagement instanceof ReportingObservation) {
+            $signal = (string) data_get($activeEngagement->properties, 'signal');
+
+            return [
+                'recorded_class' => 'unknown',
+                'effective_class' => 'likely_human',
+                'reason' => $signal === 'scroll_25'
+                    ? 'scroll_depth_evidence'
+                    : 'active_time_evidence',
+            ];
+        }
+
         $formInteracted = $observations->contains(
             fn (ReportingObservation $observation): bool =>
                 $observation->event_key === 'webinar.form.start'
@@ -923,18 +1106,10 @@ final class ProjectReportingDailyMetricsAction
             ];
         }
 
-        if (filled($profile['utm_source'] ?? null)
-            || filled($profile['utm_medium'] ?? null)
-            || filled($profile['utm_campaign'] ?? null)
-            || filled($profile['utm_content'] ?? null)
-            || filled($profile['utm_term'] ?? null)
-            || filled($profile['external_platform'] ?? null)
-            || filled($profile['external_campaign_id'] ?? null)
-            || filled($profile['external_group_id'] ?? null)
-            || filled($profile['external_creative_id'] ?? null)
-            || filled($profile['external_placement'] ?? null)
-        ) {
-            $slices[] = [
+        $hasCampaignIdentity = $this->hasCampaignAttribution($profile);
+
+        if ($hasCampaignIdentity || filled($profile['referrer_host'] ?? null)) {
+            $campaignSlice = [
                 'slice' => 'campaign',
                 'utm_source' => $profile['utm_source'] ?? null,
                 'utm_medium' => $profile['utm_medium'] ?? null,
@@ -947,6 +1122,14 @@ final class ProjectReportingDailyMetricsAction
                 'external_creative_id' => $profile['external_creative_id'] ?? null,
                 'external_placement' => $profile['external_placement'] ?? null,
             ];
+
+            // Referrer is a fallback source dimension for untagged acquisition.
+            // Do not fragment already-tagged paid campaigns by browser referrer host.
+            if (! $hasCampaignIdentity && filled($profile['referrer_host'] ?? null)) {
+                $campaignSlice['referrer_host'] = $profile['referrer_host'];
+            }
+
+            $slices[] = $campaignSlice;
         }
 
         if (filled($profile['page_revision'] ?? null)
@@ -1038,17 +1221,7 @@ final class ProjectReportingDailyMetricsAction
         return match ($slice['slice'] ?? 'all') {
             'all' => true,
             'path' => ($profile['path'] ?? null) === ($slice['path'] ?? null),
-            'campaign' =>
-                ($profile['utm_source'] ?? null) === ($slice['utm_source'] ?? null)
-                && ($profile['utm_medium'] ?? null) === ($slice['utm_medium'] ?? null)
-                && ($profile['utm_campaign'] ?? null) === ($slice['utm_campaign'] ?? null)
-                && ($profile['utm_content'] ?? null) === ($slice['utm_content'] ?? null)
-                && ($profile['utm_term'] ?? null) === ($slice['utm_term'] ?? null)
-                && ($profile['external_platform'] ?? null) === ($slice['external_platform'] ?? null)
-                && ($profile['external_campaign_id'] ?? null) === ($slice['external_campaign_id'] ?? null)
-                && ($profile['external_group_id'] ?? null) === ($slice['external_group_id'] ?? null)
-                && ($profile['external_creative_id'] ?? null) === ($slice['external_creative_id'] ?? null)
-                && ($profile['external_placement'] ?? null) === ($slice['external_placement'] ?? null),
+            'campaign' => $this->campaignProfileMatchesSlice($profile, $slice),
             'presentation' =>
                 ($profile['page_revision'] ?? null) === ($slice['page_revision'] ?? null)
                 && ($profile['presentation'] ?? null) === ($slice['presentation'] ?? null),
@@ -1056,6 +1229,33 @@ final class ProjectReportingDailyMetricsAction
                 ($profile['device_class'] ?? null) === ($slice['device_class'] ?? null),
             default => false,
         };
+    }
+
+    /**
+     * @param array<string, mixed> $profile
+     * @param array<string, scalar|null> $slice
+     */
+    private function campaignProfileMatchesSlice(array $profile, array $slice): bool
+    {
+        foreach ([
+            'utm_source',
+            'utm_medium',
+            'utm_campaign',
+            'utm_content',
+            'utm_term',
+            'external_platform',
+            'external_campaign_id',
+            'external_group_id',
+            'external_creative_id',
+            'external_placement',
+        ] as $key) {
+            if (($profile[$key] ?? null) !== ($slice[$key] ?? null)) {
+                return false;
+            }
+        }
+
+        return ! array_key_exists('referrer_host', $slice)
+            || ($profile['referrer_host'] ?? null) === $slice['referrer_host'];
     }
 
     /**

@@ -370,6 +370,8 @@ Core defaults to `modal`. A client or permitted series override may select `inli
 
 In `modal` mode, registration CTAs open the dialog. In `inline` mode, the form is rendered in the landing-page hero and CTAs scroll/focus that form instead of opening a second selling step. Reporting continues to receive the configured `presentation` dimension; `webinar.modal.open` is emitted only for the modal experience.
 
+The public Webinar page also emits only two bounded passive engagement signals for Reporting calibration: `webinar.engagement.signal` with `active_10s` after 10 visible seconds, or `scroll_25` after 25% page scroll. These events carry the existing bounded page revision/presentation dimensions and never record mouse paths, touch streams, or keystrokes. Reporting remains optional and owns any traffic-classification interpretation of those signals.
+
 Registration-owned presentation includes:
 
 ```text

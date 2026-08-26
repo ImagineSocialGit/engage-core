@@ -23,6 +23,7 @@ class WebinarReportingFunnelContractTest extends TestCase
             'webinar.form.validation_failed',
             'webinar.request.throttled',
             'webinar.bot_protection.result',
+            'webinar.engagement.signal',
         ], $definitions->keys()->all());
 
         $expectedHost = 'webinar.'.strtolower(rtrim((string) config('app.root_domain'), '.'));
@@ -95,6 +96,7 @@ class WebinarReportingFunnelContractTest extends TestCase
             'webinar.form.validation_failed',
             'webinar.request.throttled',
             'webinar.bot_protection.result',
+            'webinar.engagement.signal',
         ] as $eventKey) {
             $this->assertStringContainsString($eventKey, $script);
         }

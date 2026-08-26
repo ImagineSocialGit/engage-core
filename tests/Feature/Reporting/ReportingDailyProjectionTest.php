@@ -46,6 +46,9 @@ class ReportingDailyProjectionTest extends TestCase
             'external_group_id' => 'grp-200',
             'external_creative_id' => 'ad-300',
             'external_placement' => 'facebook_feed',
+            'click_id_hashes' => [
+                'meta_fbclid' => hash('sha256', 'test-meta-click'),
+            ],
             'traffic_class' => 'likely_human',
             'classifier_key' => 'browser_request_signals',
             'classifier_version' => 1,
@@ -193,6 +196,36 @@ class ReportingDailyProjectionTest extends TestCase
             1,
         );
         $this->assertMetric(
+            'webinar.attributed_registrations',
+            ['slice' => 'all'],
+            1,
+            null,
+        );
+        $this->assertMetric(
+            'webinar.attributed_registrations',
+            [
+                'slice' => 'campaign',
+                'utm_source' => 'meta',
+                'utm_medium' => 'paid_social',
+                'utm_campaign' => 'august_homebuyer',
+                'utm_content' => 'creative_a',
+                'utm_term' => 'first_time_buyers',
+                'external_platform' => 'meta',
+                'external_campaign_id' => 'cmp-100',
+                'external_group_id' => 'grp-200',
+                'external_creative_id' => 'ad-300',
+                'external_placement' => 'facebook_feed',
+            ],
+            1,
+            null,
+        );
+        $this->assertMetric(
+            'webinar.registration_attribution_evidence',
+            ['slice' => 'all', 'evidence' => 'meta_click_id'],
+            1,
+            null,
+        );
+        $this->assertMetric(
             'webinar.validation_failure_rate',
             ['slice' => 'all', 'traffic_class' => 'likely_human'],
             1,
@@ -222,6 +255,261 @@ class ReportingDailyProjectionTest extends TestCase
 
         $this->assertSame($date->toDateString(), $checkpoint->cursor);
         $this->assertSame('America/Chicago', $checkpoint->meta['timezone']);
+    }
+
+    public function test_authoritative_registration_attribution_survives_unknown_traffic_and_does_not_require_same_day_landing_profile(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-25 18:00:00 UTC'));
+        config(['client.timezone' => 'America/Chicago']);
+
+        $session = ReportingSession::query()->create([
+            'token_hash' => hash('sha256', 'unknown-paid-session'),
+            'host' => 'webinar.example.test',
+            'surface' => 'webinar_registration',
+            'started_at' => now()->subHours(2),
+            'last_seen_at' => now()->subHour(),
+            'absolute_expires_at' => now()->addHour(),
+            'landing_path' => '/homebuyer-game-plan',
+            'utm_source' => 'ig',
+            'utm_medium' => 'paid',
+            'utm_campaign' => 'homebuyer_game_plan',
+            'external_platform' => 'meta',
+            'external_campaign_id' => 'cmp-paid',
+            'external_group_id' => 'grp-paid',
+            'external_creative_id' => 'ad-paid',
+            'external_placement' => 'instagram_feed',
+            'click_id_hashes' => [
+                'meta_fbclid' => hash('sha256', 'paid-click'),
+            ],
+            'traffic_class' => 'unknown',
+            'classifier_key' => 'browser_request_signals',
+            'classifier_version' => 2,
+            'classification_reasons' => ['user_agent_missing'],
+            'device_class' => 'mobile',
+            'os_family' => 'iOS',
+        ]);
+
+        $submitAttemptId = (string) Str::uuid();
+        $this->observation(
+            session: $session,
+            eventKey: 'webinar.form.submit_attempt',
+            eventId: $submitAttemptId,
+            occurredAt: now()->subHour(),
+            trafficClass: 'unknown',
+            properties: [
+                'page_revision' => 'rob-register-inline-v3',
+                'presentation' => 'inline',
+            ],
+        );
+
+        $series = WebinarSeries::factory()->create([
+            'slug' => 'homebuyer-game-plan',
+        ]);
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+            'slug' => 'homebuyer-game-plan-september',
+            'external_id' => 'zoom-paid',
+            'platform' => 'zoom',
+            'starts_at' => now()->addDays(5),
+        ]);
+        WebinarRegistration::factory()->for($webinar)->create([
+            'status' => 'registered',
+            'source' => 'webinar_subdomain',
+            'registered_at' => now()->subMinutes(50),
+            'meta' => [
+                'public_submission_attempt_id' => $submitAttemptId,
+                'registration_finalization' => ['status' => 'completed'],
+                'provider_sync' => ['status' => 'succeeded'],
+            ],
+        ]);
+
+        $projector = new ProjectReportingDailyMetricsAction(
+            new ReportingProjectionFactRegistry([
+                app(WebinarFunnelFactContributor::class),
+            ]),
+        );
+        $date = CarbonImmutable::now('America/Chicago')->startOfDay();
+
+        $projector->handle($date, $date);
+
+        $campaign = [
+            'slice' => 'campaign',
+            'utm_source' => 'ig',
+            'utm_medium' => 'paid',
+            'utm_campaign' => 'homebuyer_game_plan',
+            'external_platform' => 'meta',
+            'external_campaign_id' => 'cmp-paid',
+            'external_group_id' => 'grp-paid',
+            'external_creative_id' => 'ad-paid',
+            'external_placement' => 'instagram_feed',
+        ];
+
+        $this->assertMetric(
+            'webinar.attributed_registrations',
+            $campaign,
+            1,
+            null,
+        );
+        $this->assertMetric(
+            'webinar.registration_attribution_evidence',
+            [...$campaign, 'evidence' => 'meta_click_id'],
+            1,
+            null,
+        );
+        $this->assertFalse(
+            ReportingDailyMetric::query()
+                ->where('metric_key', 'webinar.registration_conversion')
+                ->get()
+                ->contains(fn (ReportingDailyMetric $metric): bool =>
+                    data_get($metric->dimensions, 'slice') === 'campaign'
+                ),
+        );
+    }
+
+    public function test_authoritative_registration_attribution_uses_referrer_host_when_campaign_tags_are_absent(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-25 18:00:00 UTC'));
+        config(['client.timezone' => 'America/Chicago']);
+
+        $session = ReportingSession::query()->create([
+            'token_hash' => hash('sha256', 'referral-session'),
+            'host' => 'webinar.example.test',
+            'surface' => 'webinar_registration',
+            'started_at' => now()->subHour(),
+            'last_seen_at' => now()->subMinutes(30),
+            'absolute_expires_at' => now()->addHours(3),
+            'landing_path' => '/homebuyer-game-plan',
+            'referrer_host' => 'trusted-referral.example',
+            'traffic_class' => 'likely_human',
+            'classifier_key' => 'browser_request_signals',
+            'classifier_version' => 3,
+            'classification_reasons' => ['browser_family_recognized'],
+            'device_class' => 'mobile',
+        ]);
+
+        $submitAttemptId = (string) Str::uuid();
+        $this->observation(
+            session: $session,
+            eventKey: 'webinar.form.submit_attempt',
+            eventId: $submitAttemptId,
+            occurredAt: now()->subMinutes(30),
+            trafficClass: 'likely_human',
+            properties: [
+                'page_revision' => 'rob-register-inline-v3',
+                'presentation' => 'inline',
+            ],
+        );
+
+        $series = WebinarSeries::factory()->create([
+            'slug' => 'homebuyer-game-plan',
+        ]);
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+            'slug' => 'homebuyer-game-plan-referral',
+            'external_id' => 'zoom-referral',
+            'platform' => 'zoom',
+            'starts_at' => now()->addDays(5),
+        ]);
+        WebinarRegistration::factory()->for($webinar)->create([
+            'status' => 'registered',
+            'source' => 'webinar_subdomain',
+            'registered_at' => now()->subMinutes(25),
+            'meta' => [
+                'public_submission_attempt_id' => $submitAttemptId,
+                'registration_finalization' => ['status' => 'completed'],
+                'provider_sync' => ['status' => 'succeeded'],
+            ],
+        ]);
+
+        $projector = new ProjectReportingDailyMetricsAction(
+            new ReportingProjectionFactRegistry([
+                app(WebinarFunnelFactContributor::class),
+            ]),
+        );
+        $date = CarbonImmutable::now('America/Chicago')->startOfDay();
+
+        $projector->handle($date, $date);
+
+        $referralMetric = ReportingDailyMetric::query()
+            ->where('metric_key', 'webinar.attributed_registrations')
+            ->get()
+            ->first(fn (ReportingDailyMetric $metric): bool =>
+                data_get($metric->dimensions, 'slice') === 'campaign'
+                && data_get($metric->dimensions, 'referrer_host') === 'trusted-referral.example'
+            );
+
+        $this->assertNotNull($referralMetric);
+        $this->assertSame(1, $referralMetric->numerator);
+        $this->assertNull(data_get($referralMetric->dimensions, 'utm_source'));
+    }
+
+    public function test_projection_can_resolve_unknown_session_from_bounded_active_engagement_signal(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-25 18:00:00 UTC'));
+        config(['client.timezone' => 'America/Chicago']);
+
+        $session = ReportingSession::query()->create([
+            'token_hash' => hash('sha256', 'bounded-engagement-session'),
+            'host' => 'webinar.example.test',
+            'surface' => 'webinar_registration',
+            'started_at' => now()->subMinutes(20),
+            'last_seen_at' => now()->subMinutes(10),
+            'absolute_expires_at' => now()->addHours(3),
+            'landing_path' => '/homebuyer-game-plan',
+            'traffic_class' => 'unknown',
+            'classifier_key' => 'browser_request_signals',
+            'classifier_version' => 3,
+            'classification_reasons' => ['user_agent_unrecognized'],
+        ]);
+
+        $this->observation(
+            session: $session,
+            eventKey: 'webinar.page.view',
+            eventId: (string) Str::uuid(),
+            occurredAt: now()->subMinutes(20),
+            trafficClass: 'unknown',
+            properties: [
+                'page_revision' => 'rob-register-inline-v3',
+                'presentation' => 'inline',
+            ],
+        );
+        $this->observation(
+            session: $session,
+            eventKey: 'webinar.engagement.signal',
+            eventId: (string) Str::uuid(),
+            occurredAt: now()->subMinutes(10),
+            trafficClass: 'unknown',
+            properties: [
+                'page_revision' => 'rob-register-inline-v3',
+                'presentation' => 'inline',
+                'signal' => 'active_10s',
+            ],
+        );
+
+        $projector = new ProjectReportingDailyMetricsAction(
+            new ReportingProjectionFactRegistry([]),
+        );
+        $date = CarbonImmutable::now('America/Chicago')->startOfDay();
+
+        $projector->handle($date, $date);
+
+        $this->assertMetric(
+            'webinar.traffic_classification_resolution',
+            [
+                'slice' => 'all',
+                'recorded_traffic_class' => 'unknown',
+                'effective_traffic_class' => 'likely_human',
+                'reason' => 'active_time_evidence',
+            ],
+            1,
+            null,
+        );
+        $this->assertMetric(
+            'webinar.landing_sessions',
+            ['slice' => 'all', 'traffic_class' => 'likely_human'],
+            1,
+            null,
+        );
     }
 
     public function test_projection_calibrates_retained_unknown_mobile_webview_and_interaction_evidence_without_mutating_raw_session(): void

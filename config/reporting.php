@@ -80,9 +80,9 @@ return [
     |
     | Query parameters are collected only when explicitly allowlisted; the public
     | browser transport rejects submitted unknown keys. Stable external campaign
-    | identity uses the canonical engage_* keys below. Raw external click IDs are
-    | never persisted. Leave click_id_keys empty until a concrete approved
-    | reconciliation use exists and a dedicated secret hash key is configured.
+    | identity uses the canonical engage_* keys below. Meta fbclid is approved for
+    | reconciliation but is never persisted raw: Reporting stores only an HMAC
+    | using a client-specific subkey derived from the deployment APP_KEY.
     |
     */
 
@@ -107,8 +107,22 @@ return [
             'placement' => 'engage_placement',
         ],
 
-        'click_id_keys' => [],
-        'click_id_hash_key' => null,
+        'click_id_keys' => [
+            'fbclid' => 'meta_fbclid',
+        ],
+        'click_id_hash_key' => (static function (): ?string {
+            $appKey = config('app.key');
+
+            if (! is_string($appKey) || trim($appKey) === '') {
+                return null;
+            }
+
+            return hash_hmac(
+                'sha256',
+                'reporting-click-identifiers:v1|'.(string) config('client.key', 'client'),
+                $appKey,
+            );
+        })(),
     ],
 
     /*

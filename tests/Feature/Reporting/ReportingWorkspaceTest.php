@@ -60,6 +60,9 @@ class ReportingWorkspaceTest extends TestCase
             ->assertSee('USD 100.00')
             ->assertSee('USD 20.00')
             ->assertSee('Campaign / source traffic')
+            ->assertSee('Attributed registrations')
+            ->assertSee('Observed Engage sessions')
+            ->assertSee('Meta-click registrations')
             ->assertSee('cmp-100')
             ->assertSee('grp-200')
             ->assertSee('ad-300')
@@ -282,6 +285,8 @@ class ReportingWorkspaceTest extends TestCase
             ['webinar.validation_failure_rate', ['slice' => 'all', 'traffic_class' => 'likely_human'], 6, 30],
             ['webinar.validation_failures', ['slice' => 'all', 'field_key' => 'email'], 4, null],
             ['webinar.local_registrations', ['slice' => 'all'], 12, null],
+            ['webinar.attributed_registrations', ['slice' => 'all'], 12, null],
+            ['webinar.registration_attribution_evidence', ['slice' => 'all', 'evidence' => 'meta_click_id'], 4, null],
             ['webinar.registration_correlation_coverage', ['slice' => 'all'], 12, 12],
             ['webinar.provider_completion', ['slice' => 'all'], 11, 12],
             ['webinar.confirmation_planning', ['slice' => 'all'], 11, 11],
@@ -303,6 +308,8 @@ class ReportingWorkspaceTest extends TestCase
             ['webinar.funnel_sessions', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'utm_term' => 'first_time_buyers', 'external_platform' => 'meta', 'external_campaign_id' => 'cmp-100', 'external_group_id' => 'grp-200', 'external_creative_id' => 'ad-300', 'external_placement' => 'facebook_feed', 'traffic_class' => 'likely_human', 'step' => 'form_start'], 12, null],
             ['webinar.funnel_sessions', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'utm_term' => 'first_time_buyers', 'external_platform' => 'meta', 'external_campaign_id' => 'cmp-100', 'external_group_id' => 'grp-200', 'external_creative_id' => 'ad-300', 'external_placement' => 'facebook_feed', 'traffic_class' => 'likely_human', 'step' => 'submit_attempt'], 10, null],
             ['webinar.registration_conversion', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'utm_term' => 'first_time_buyers', 'external_platform' => 'meta', 'external_campaign_id' => 'cmp-100', 'external_group_id' => 'grp-200', 'external_creative_id' => 'ad-300', 'external_placement' => 'facebook_feed', 'traffic_class' => 'likely_human'], 5, 20],
+            ['webinar.attributed_registrations', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'utm_term' => 'first_time_buyers', 'external_platform' => 'meta', 'external_campaign_id' => 'cmp-100', 'external_group_id' => 'grp-200', 'external_creative_id' => 'ad-300', 'external_placement' => 'facebook_feed'], 5, null],
+            ['webinar.registration_attribution_evidence', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'utm_term' => 'first_time_buyers', 'external_platform' => 'meta', 'external_campaign_id' => 'cmp-100', 'external_group_id' => 'grp-200', 'external_creative_id' => 'ad-300', 'external_placement' => 'facebook_feed', 'evidence' => 'meta_click_id'], 4, null],
             ['webinar.validation_failure_rate', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'august_homebuyer', 'utm_content' => 'creative_a', 'utm_term' => 'first_time_buyers', 'external_platform' => 'meta', 'external_campaign_id' => 'cmp-100', 'external_group_id' => 'grp-200', 'external_creative_id' => 'ad-300', 'external_placement' => 'facebook_feed', 'traffic_class' => 'likely_human'], 2, 10],
 
             ['webinar.landing_sessions', ['slice' => 'path', 'path' => '/homebuyer-class', 'traffic_class' => 'likely_human'], 80, null],

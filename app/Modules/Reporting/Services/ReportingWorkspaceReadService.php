@@ -115,6 +115,7 @@ final class ReportingWorkspaceReadService
                 identityKeys: [
                     'utm_source',
                     'utm_medium',
+                    'referrer_host',
                     'utm_campaign',
                     'utm_content',
                     'utm_term',
@@ -145,6 +146,16 @@ final class ReportingWorkspaceReadService
                     $rows,
                     'webinar.local_registrations',
                     ['slice' => 'all'],
+                ),
+                'attributed_registrations' => $this->countMetric(
+                    $rows,
+                    'webinar.attributed_registrations',
+                    ['slice' => 'all'],
+                ),
+                'meta_click_registrations' => $this->countMetric(
+                    $rows,
+                    'webinar.registration_attribution_evidence',
+                    ['slice' => 'all', 'evidence' => 'meta_click_id'],
                 ),
                 'correlation_coverage' => $correlationCoverage,
                 'provider_completion' => $providerCompletion,
@@ -1147,6 +1158,16 @@ final class ReportingWorkspaceReadService
                     'webinar.funnel_sessions',
                     [...$humanDimensions, 'step' => 'submit_attempt'],
                 ),
+                'attributed_registrations' => $this->countMetric(
+                    $rows,
+                    'webinar.attributed_registrations',
+                    $dimensions,
+                ),
+                'meta_click_registrations' => $this->countMetric(
+                    $rows,
+                    'webinar.registration_attribution_evidence',
+                    [...$dimensions, 'evidence' => 'meta_click_id'],
+                ),
                 'registration_conversion' => $this->ratio(
                     $rows,
                     'webinar.registration_conversion',
@@ -1377,6 +1398,8 @@ final class ReportingWorkspaceReadService
             'client_bot_check_passed' => 'Passed the client interaction check',
             'interactive_submit_evidence' => 'Interactive submit evidence',
             'active_form_interaction' => 'Active form interaction',
+            'active_time_evidence' => 'At least 10 seconds of active page time',
+            'scroll_depth_evidence' => 'At least 25% page scroll',
             'mobile_webview_evidence' => 'Mobile app / embedded WebView evidence',
             'server_bot_protection_rejected' => 'Server bot protection rejected the request',
             'user_agent_missing' => 'User agent missing',
@@ -1526,6 +1549,7 @@ final class ReportingWorkspaceReadService
                 ->where('identity_quality', ReportingExternalMeasurement::IDENTITY_STABLE_IDS)
                 ->values();
             $matchedRows = 0;
+            $engageObservedLandingSessions = 0;
             $engageLandingSessions = 0;
             $engageRegistrations = 0;
             $matchedSpend = 0.0;
@@ -1541,17 +1565,21 @@ final class ReportingWorkspaceReadService
                 }
 
                 $matchedRows++;
+                $engageObservedLandingSessions += $this->countMetric(
+                    $matching,
+                    'webinar.landing_sessions',
+                    [],
+                );
                 $engageLandingSessions += $this->countMetric(
                     $matching,
                     'webinar.landing_sessions',
                     ['traffic_class' => 'likely_human'],
                 );
-                $conversion = $this->ratio(
+                $engageRegistrations += $this->countMetric(
                     $matching,
-                    'webinar.registration_conversion',
-                    ['traffic_class' => 'likely_human'],
+                    'webinar.attributed_registrations',
+                    [],
                 );
-                $engageRegistrations += (int) $conversion['numerator'];
 
                 if ($measurement->spend !== null) {
                     $matchedSpend += (float) $measurement->spend;
@@ -1601,6 +1629,7 @@ final class ReportingWorkspaceReadService
                 ],
                 'exact_comparison' => [
                     'available' => $matchedRows > 0,
+                    'engage_observed_sessions' => $engageObservedLandingSessions,
                     'engage_likely_human_sessions' => $engageLandingSessions,
                     'engage_registrations' => $engageRegistrations,
                     'matched_spend' => $matchedSpendAvailable ? round($matchedSpend, 4) : null,

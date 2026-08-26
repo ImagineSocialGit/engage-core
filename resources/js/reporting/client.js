@@ -6,6 +6,7 @@ const DEFAULT_QUERY_KEYS = [
     'utm_campaign',
     'utm_content',
     'utm_term',
+    'fbclid',
     'engage_platform',
     'engage_campaign_id',
     'engage_group_id',

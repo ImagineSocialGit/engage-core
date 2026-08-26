@@ -9,6 +9,7 @@ use InvalidArgumentException;
 final class WebinarBehaviorEventDefinitionContributor implements ReportingEventDefinitionContributor
 {
     public const SURFACE = 'webinar_registration';
+
     public const VERSION = 1;
 
     /** @return iterable<int, ReportingEventDefinition> */
@@ -97,6 +98,23 @@ final class WebinarBehaviorEventDefinitionContributor implements ReportingEventD
                 ],
             ],
             browserHosts: $browserHosts,
+        );
+
+        yield $this->definition(
+            key: 'webinar.engagement.signal',
+            properties: [
+                ...$common,
+                'signal' => [
+                    'type' => ReportingEventDefinition::PROPERTY_ENUM,
+                    'required' => true,
+                    'values' => [
+                        'active_10s',
+                        'scroll_25',
+                    ],
+                ],
+            ],
+            browserHosts: $browserHosts,
+            funnelEligible: false,
         );
 
         yield $this->definition(

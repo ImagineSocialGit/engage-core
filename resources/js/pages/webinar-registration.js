@@ -46,11 +46,17 @@ export default function webinarRegistrationPage(config = {}) {
         reportingBotProtectionOutcome: normalizedString(reporting.botProtectionOutcome),
         reportingFormStarted: false,
         reportingLastCtaLocation: null,
+        reportingVisibleSeconds: 0,
+        reportingEngagementTimer: null,
+        reportingScrollHandler: null,
+        reportingActive10sRecorded: false,
+        reportingScroll25Recorded: false,
 
         init() {
             this.initializeCountdown()
             this.initializeStickyCta()
             this.recordReportingEvent('webinar.page.view')
+            this.initializeReportingEngagementSignals()
 
             if (this.reportingValidationFields.length > 0) {
                 this.recordRegistrationValidationFailure(this.reportingValidationFields)
@@ -238,6 +244,65 @@ export default function webinarRegistrationPage(config = {}) {
             )
         },
 
+        initializeReportingEngagementSignals() {
+            if (!this.reportingEnabled) {
+                return
+            }
+
+            this.reportingEngagementTimer = window.setInterval(() => {
+                if (document.visibilityState !== 'visible') {
+                    return
+                }
+
+                this.reportingVisibleSeconds += 1
+
+                if (this.reportingVisibleSeconds >= 10 && !this.reportingActive10sRecorded) {
+                    this.reportingActive10sRecorded = true
+                    this.recordReportingEvent('webinar.engagement.signal', {
+                        signal: 'active_10s',
+                    })
+                    window.clearInterval(this.reportingEngagementTimer)
+                    this.reportingEngagementTimer = null
+                }
+            }, 1000)
+
+            this.reportingScrollHandler = () => {
+                if (this.reportingScroll25Recorded) {
+                    return
+                }
+
+                const documentElement = document.documentElement
+                const scrollableHeight = Math.max(
+                    0,
+                    documentElement.scrollHeight - window.innerHeight,
+                )
+
+                if (scrollableHeight <= 0) {
+                    return
+                }
+
+                const scrollTop = Math.max(
+                    0,
+                    window.scrollY || documentElement.scrollTop || 0,
+                )
+
+                if ((scrollTop / scrollableHeight) < 0.25) {
+                    return
+                }
+
+                this.reportingScroll25Recorded = true
+                this.recordReportingEvent('webinar.engagement.signal', {
+                    signal: 'scroll_25',
+                })
+
+                window.removeEventListener('scroll', this.reportingScrollHandler)
+                this.reportingScrollHandler = null
+            }
+
+            window.addEventListener('scroll', this.reportingScrollHandler, { passive: true })
+            this.reportingScrollHandler()
+        },
+
         initializeCountdown() {
             if (!this.countdownTarget) {
                 return
@@ -393,6 +458,16 @@ export default function webinarRegistrationPage(config = {}) {
             }
 
             this.stickyObserver?.disconnect()
+
+            if (this.reportingEngagementTimer) {
+                window.clearInterval(this.reportingEngagementTimer)
+                this.reportingEngagementTimer = null
+            }
+
+            if (this.reportingScrollHandler) {
+                window.removeEventListener('scroll', this.reportingScrollHandler)
+                this.reportingScrollHandler = null
+            }
 
             if (this.formOpen && this.reportingPresentation === 'modal') {
                 this.restoreRegistrationModalDocumentState()
