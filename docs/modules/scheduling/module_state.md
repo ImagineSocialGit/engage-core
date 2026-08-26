@@ -66,7 +66,7 @@ The expected environment contract is:
 SCHEDULING_APP_URL=https://booking.[ROOT_DOMAIN]
 ```
 
-`config/scheduling.php` validates that value as a root-level HTTP or HTTPS origin, derives the route host, and disables only the public surface when the value is missing or malformed. `ClientEnvironmentLoader` treats `SCHEDULING_APP_URL` as selected-client deployment configuration.
+`config/scheduling.php` normalizes that value as a root-level HTTP or HTTPS origin and derives the route host. An omitted value intentionally disables only the optional public surface. A non-empty malformed value also keeps public routes disabled for safety, but `SchedulingSetupValidationContributor` reports it as a `setup:validate` error so a deployment cannot silently lose public booking. `ClientEnvironmentLoader` treats `SCHEDULING_APP_URL` as selected-client deployment configuration.
 
 The currently implemented public routes are:
 

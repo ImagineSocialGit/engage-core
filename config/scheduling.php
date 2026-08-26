@@ -1,11 +1,12 @@
 <?php
 
 $publicUrl = env('SCHEDULING_APP_URL');
+$publicUrlConfigured = $publicUrl !== null && $publicUrl !== '';
 $normalizedPublicUrl = null;
 $publicHost = null;
 $publicScheme = null;
 
-if (is_string($publicUrl) && trim($publicUrl) !== '') {
+if ($publicUrlConfigured && is_string($publicUrl)) {
     $candidate = trim($publicUrl);
     $parts = parse_url($candidate);
 
@@ -44,6 +45,7 @@ if (is_string($publicUrl) && trim($publicUrl) !== '') {
 return [
 
     'public' => [
+        'configured' => $publicUrlConfigured,
         'enabled' => $normalizedPublicUrl !== null,
         'url' => $normalizedPublicUrl,
         'host' => $publicHost,

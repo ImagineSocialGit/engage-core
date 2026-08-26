@@ -5,6 +5,7 @@ namespace App\Modules\Scheduling\Providers;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Scheduling\Jobs\ExpireBookingHoldsJob;
 use App\Modules\Scheduling\Services\ContactShow\SchedulingContactPanelProvider;
+use App\Modules\Scheduling\Validation\SchedulingSetupValidationContributor;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -13,7 +14,10 @@ class SchedulingModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->tag(
+            SchedulingSetupValidationContributor::class,
+            'setup.validation_contributors',
+        );
     }
 
     public function boot(): void

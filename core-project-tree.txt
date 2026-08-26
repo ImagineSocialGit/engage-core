@@ -1096,7 +1096,9 @@
 │   │   │   │   ├── SchedulingLocationSnapshotResolver.php
 │   │   │   │   ├── SchedulingReadService.php
 │   │   │   │   └── SchedulingResourceConfigurationWriter.php
-│   │   │   └── Support
+│   │   │   ├── Support
+│   │   │   └── Validation
+│   │   │       └── SchedulingSetupValidationContributor.php
 │   │   ├── Tasks
 │   │   │   ├── Actions
 │   │   │   │   ├── BuildTaskDigestsAction.php
@@ -2712,6 +2714,7 @@
 │   │   │   ├── ModuleMigrationsSetupValidationContributorTest.php
 │   │   │   ├── PresetCompositionSetupValidationContributorTest.php
 │   │   │   ├── ReferenceRegistrySetupValidationContributorTest.php
+│   │   │   ├── SchedulingSetupValidationContributorTest.php
 │   │   │   ├── SetupValidationManagerTest.php
 │   │   │   ├── SetupValidationRegistrationTest.php
 │   │   │   └── ValidateSetupCommandTest.php
@@ -2824,4 +2827,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-680 directories, 2145 files
+681 directories, 2147 files
