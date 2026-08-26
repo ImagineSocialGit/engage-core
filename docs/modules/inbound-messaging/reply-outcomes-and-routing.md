@@ -46,13 +46,14 @@ Campaigns and Flow Routes keep only stable profile/intent keys. They do not own 
 
 ## Semantic inbound email routes
 
-External systems may target durable semantic aliases under the configured inbound domain without pretending those messages are replies to Engage-originated mail. `INBOUND_EMAIL_DOMAIN` remains environment/DNS configuration; `inbound_email_routes` owns the runtime route rows.
+External systems may target durable named aliases under the configured inbound domain without pretending those messages are replies to Engage-originated mail. `INBOUND_EMAIL_DOMAIN` remains environment/DNS configuration; `inbound_email_routes` owns the runtime route rows.
 
-Example:
+Examples:
 
 ```text
-arive+application@replies.example.com -> arive_application / arive / application
-arive+approval@replies.example.com    -> arive_approval / arive / approval
+website-forms@replies.example.com
+event-registrations@replies.example.com
+vendor-updates@replies.example.com
 ```
 
 Resolution order is deliberate:
@@ -65,11 +66,19 @@ Resolution order is deliberate:
 
 `reply+...` is a reserved local-part namespace owned by signed Engage Reply-To identities. The CRM Inbound Addresses workspace prevents operators from creating semantic routes in that namespace, and runtime resolution ignores it defensively.
 
-The CRM workspace edits only durable route identity and context. `INBOUND_EMAIL_DOMAIN` remains read-only deployment/DNS configuration and is never stored or authored as part of a route row.
+The operator-facing workspace asks only for a plain-language name and mailbox/local-part. Internal route identity/source/context remain hidden durable metadata. `INBOUND_EMAIL_DOMAIN` remains read-only deployment/DNS configuration and is never stored or authored as part of a route row.
 
 A resolved route is snapshotted on the `InboundMessage` as `inbound_email_route_key`, `inbound_email_route_source`, and `inbound_email_route_context`. The neutral `inbound_email.route_received` automation event exposes those same compact values and may have a null Contact ID. This lets a provider/domain adapter consume the route first, then resolve or create business identity without making InboundMessaging depend on that external system.
 
 The inbound body remains canonical on `inbound_messages`; it is not copied into the route automation event.
+
+## Human Inbox
+
+Every ordinary inbound reply and routed inbound email is visible in the Inbound Messaging Inbox whether or not any automation consumes it. The Inbox supports Needs review / In progress / Done state, search, friendly `Received through` filtering, and matched/unmatched-person filtering.
+
+When a message is sent by an external system but concerns a person, the operator may link an existing Contact or create a Contact from the message. That association is stored separately from sender provenance: the external system remains the sender, while the Contact is the person the message is about.
+
+Inbox triage is not a FlowRoute and does not require Tasks. Marking a message reviewed/done or manually linking a person does not replay or fabricate an automation event. Optional integrations may still interpret routed messages and emit their own owning-domain business events separately.
 
 ## SMS compliance is separate from business reply intent
 

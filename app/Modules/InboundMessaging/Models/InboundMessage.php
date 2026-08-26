@@ -2,6 +2,7 @@
 
 namespace App\Modules\InboundMessaging\Models;
 
+use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ScheduledMessage;
@@ -18,9 +19,14 @@ class InboundMessage extends Model
     public const CLASSIFICATION_NORMAL_REPLY = 'normal_reply';
     public const CLASSIFICATION_IGNORED = 'ignored';
 
+    public const INBOX_STATUS_NEW = 'new';
+    public const INBOX_STATUS_REVIEWED = 'reviewed';
+    public const INBOX_STATUS_DONE = 'done';
+
     protected $fillable = [
         'sender_type',
         'sender_id',
+        'related_contact_id',
         'client_key',
         'channel',
         'provider',
@@ -45,6 +51,9 @@ class InboundMessage extends Model
         'inbound_email_route_context',
         'received_at',
         'processed_at',
+        'inbox_status',
+        'reviewed_at',
+        'completed_at',
         'meta',
     ];
 
@@ -52,11 +61,14 @@ class InboundMessage extends Model
     {
         return [
             'sender_id' => 'integer',
+            'related_contact_id' => 'integer',
             'correlated_scheduled_message_id' => 'integer',
             'channel' => MessageChannel::class,
             'purpose' => MessagePurpose::class,
             'received_at' => 'datetime',
             'processed_at' => 'datetime',
+            'reviewed_at' => 'datetime',
+            'completed_at' => 'datetime',
             'meta' => 'array',
         ];
     }
@@ -72,6 +84,18 @@ class InboundMessage extends Model
         ];
     }
 
+    /**
+     * @return array<int, string>
+     */
+    public static function inboxStatuses(): array
+    {
+        return [
+            self::INBOX_STATUS_NEW,
+            self::INBOX_STATUS_REVIEWED,
+            self::INBOX_STATUS_DONE,
+        ];
+    }
+
     public function receipt(): HasOne
     {
         return $this->hasOne(InboundMessageReceipt::class);
@@ -80,6 +104,14 @@ class InboundMessage extends Model
     public function sender(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    public function relatedContact(): BelongsTo
+    {
+        return $this->belongsTo(
+            Contact::class,
+            'related_contact_id',
+        );
     }
 
     public function correlatedScheduledMessage(): BelongsTo

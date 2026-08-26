@@ -14,24 +14,50 @@ Normal replies may carry narrow first-class correlation evidence back to the ori
 
 ## Inbound email route authority
 
-InboundMessaging also owns durable semantic mailbox routes for inbound email that does not correlate to an Engage-originated ScheduledMessage. The database table `inbound_email_routes` is runtime authority. `INBOUND_EMAIL_DOMAIN` remains deployment/DNS infrastructure; route rows own only the local-part and business context.
+InboundMessaging also owns durable semantic mailbox routes for inbound email that does not correlate to an Engage-originated ScheduledMessage. The database table `inbound_email_routes` is runtime authority. `INBOUND_EMAIL_DOMAIN` remains deployment/DNS infrastructure; route rows own only the local-part and durable internal routing context.
 
-The CRM **Inbound Addresses** workspace is the authoritative human editor for these rows. Operators may create routes, edit their local-part/label/source/context, and enable or disable them. Route `key` is immutable after creation because it is durable semantic identity. The configured receiving domain is displayed read-only and remains deployment configuration.
+The CRM **Inbound Addresses** workspace is the authoritative human editor for these rows. The operator experience is deliberately nontechnical: an admin names the address, chooses its mailbox/local-part, and enables or disables it. Internal route key/source/context fields remain durable implementation metadata and are not operator-facing concepts. Existing integration-owned source/context values are preserved when an address is edited. The configured receiving domain is displayed read-only and remains deployment configuration.
 
 The `reply+` local-part namespace is reserved for signed Engage Reply-To identities and may not be used by semantic inbound routes. Runtime route resolution also ignores that namespace defensively, so a direct/imported row cannot shadow exact signed reply correlation.
 
 Example:
 
 ```text
-arive+application@{INBOUND_EMAIL_DOMAIN}
-    key = arive_application
-    source = arive
-    context = application
+website-forms@{INBOUND_EMAIL_DOMAIN}
+    displayed as: Website Forms
 ```
 
 Signed Engage Reply-To correlation always wins. Only a non-correlated recipient address is considered for semantic route resolution. When a route resolves, the normalized inbound row snapshots the stable route key/source/context in narrow first-class columns so historical evidence does not depend on a later route edit or deletion.
 
-A resolved route emits the compact neutral `inbound_email.route_received` automation event. It may have no Contact yet; provider/domain integration code may use the route context to parse the normalized inbound message and establish Contact/business state later. The event never copies the inbound body or raw provider payload.
+A resolved route emits the compact neutral `inbound_email.route_received` automation event. It may have no Contact yet; provider/domain integration code may use the internal route context to parse the normalized inbound message and establish Contact/business state later. The event never copies the inbound body or raw provider payload.
+
+## Inbox authority
+
+InboundMessaging owns a durable human-review Inbox for normalized inbound email and SMS. The Inbox is the baseline product behavior, not an automation fallback: every ordinary inbound reply or routed inbound email has a human-readable home even when FlowRoutes, Tasks, InternalNotifications, or a domain-specific integration are unavailable.
+
+Inbox state is intentionally small:
+
+```text
+new       -> Needs review
+reviewed  -> In progress
+done      -> Done
+```
+
+New ordinary replies enter `new`. Compliance/system-handled classifications such as STOP/START/HELP/ignored enter `done` after capture because their primary system consequence is already deterministic. Historical messages that predate the Inbox are backfilled to `done` during the Inbox migration so deployment does not manufacture a historical work queue.
+
+`sender_type` / `sender_id` continue to mean who actually sent the message. `related_contact_id` is a separate optional human association for a message that is about a Contact even when the transport sender is a vendor or external system. Manually linking or creating a Contact from the Inbox does not rewrite sender provenance and does not retroactively emit automation events.
+
+The Inbox presents business-language context:
+
+```text
+From
+Received through
+Related person
+Received at
+Needs review / In progress / Done
+```
+
+`Received through` is derived from the friendly Inbound Address label, the friendly Reply Handling profile label, or a simple Email/Text fallback. Internal route keys, event keys, IDs, provider context, and other implementation details are not operator-facing Inbox concepts.
 
 ## Reply Handling authority
 
@@ -70,6 +96,7 @@ InboundMessaging owns:
 - `InboundMessageReceived`;
 - neutral `inbound_message.normal_reply` automation events;
 - semantic inbound-email route persistence/resolution and neutral `inbound_email.route_received` automation events;
+- durable inbound Inbox triage and related-Contact association;
 - reply-profile, reply-intent, and reply-rule persistence and authoring.
 
 InboundMessaging may depend on:
@@ -125,6 +152,7 @@ id
 webhook_inbox_receipt_id nullable
 sender_type nullable
 sender_id nullable
+related_contact_id nullable
 client_key nullable
 channel
 provider
@@ -148,6 +176,9 @@ inbound_email_route_source nullable
 inbound_email_route_context nullable
 received_at nullable
 processed_at nullable
+inbox_status
+reviewed_at nullable
+completed_at nullable
 timestamps
 ```
 

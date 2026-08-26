@@ -87,6 +87,12 @@ class RecordInboundMessageAction
             status: InboundMessageReceipt::STATUS_RECEIVED,
         );
 
+        $requiresInboxReview = ($data['classification'] ?? null)
+            === InboundMessage::CLASSIFICATION_NORMAL_REPLY;
+        $inboxSettledAt = $requiresInboxReview
+            ? null
+            : ($data['received_at'] ?? now());
+
         $inboundMessage = new InboundMessage([
             'client_key' => $identity['client_key'],
             'channel' => $data['channel'],
@@ -117,6 +123,11 @@ class RecordInboundMessageAction
                 $data['inbound_email_route_context'] ?? null,
             'received_at' => $data['received_at'] ?? null,
             'processed_at' => $data['processed_at'] ?? null,
+            'inbox_status' => $requiresInboxReview
+                ? InboundMessage::INBOX_STATUS_NEW
+                : InboundMessage::INBOX_STATUS_DONE,
+            'reviewed_at' => null,
+            'completed_at' => $inboxSettledAt,
             'meta' => $data['meta'] ?? null,
         ]);
 

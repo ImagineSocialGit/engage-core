@@ -6,7 +6,7 @@
 <x-layouts.crm
     title="Inbound Addresses"
     heading="Inbound Addresses"
-    subheading="Create stable email aliases that identify why an external system sent a message."
+    subheading="Create separate email addresses so the Inbox can show why a message arrived."
     module="inbound_messaging"
 >
     <div
@@ -34,27 +34,33 @@
 
         <div class="flex flex-wrap items-center gap-2">
             <a
-                href="{{ route('crm.inbound-messaging.reply-profiles.index') }}"
+                href="{{ route('crm.inbound-messaging.inbox.index') }}"
                 class="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:text-slate-950"
             >
-                Reply profiles
+                Inbox
             </a>
             <span class="rounded-full bg-slate-950 px-3 py-2 text-sm font-semibold text-white">
                 Inbound addresses
             </span>
+            <a
+                href="{{ route('crm.inbound-messaging.reply-profiles.index') }}"
+                class="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:text-slate-950"
+            >
+                Reply Handling
+            </a>
         </div>
 
         <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
             <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div class="max-w-3xl">
                     <p class="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">
-                        Semantic inbound email
+                        Organize incoming email
                     </p>
                     <h2 class="mt-2 text-xl font-semibold tracking-tight text-slate-950">
-                        Give external systems a stable address
+                        Give different kinds of messages their own address
                     </h2>
                     <p class="mt-2 text-sm leading-6 text-slate-600">
-                        Use an inbound address when the recipient address itself should identify the source or event before the message body is parsed. Signed Engage reply addresses remain separate and always take priority.
+                        Name an address for the business reason it exists, such as Website Forms, Event Registrations, or Vendor Updates. Messages received there will carry that name into the Inbox.
                     </p>
                 </div>
 
@@ -80,22 +86,22 @@
 
             <div class="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                    Receiving domain
+                    Your receiving domain
                 </p>
 
                 @if($workspace['domain_ready'])
-                    <p class="mt-1 break-all font-mono text-sm font-semibold text-slate-900">
+                    <p class="mt-1 break-all text-sm font-semibold text-slate-900">
                         {{ $domain }}
                     </p>
                     <p class="mt-2 text-xs leading-5 text-slate-500">
-                        This domain comes from INBOUND_EMAIL_DOMAIN and is deployment configuration. It is intentionally not editable here.
+                        This is managed with the site's email/DNS setup and cannot be changed here.
                     </p>
                 @else
                     <p class="mt-1 text-sm font-semibold text-amber-800">
-                        INBOUND_EMAIL_DOMAIN is not configured.
+                        A receiving domain has not been configured yet.
                     </p>
                     <p class="mt-2 text-xs leading-5 text-slate-500">
-                        You may prepare route definitions here, but setup validation will block active routes until a valid receiving domain is configured.
+                        You can prepare addresses now, but they cannot receive mail until the receiving domain is configured.
                     </p>
                 @endif
             </div>
@@ -113,7 +119,7 @@
                         Add inbound address
                     </h2>
                     <p class="mt-1 text-sm text-slate-600">
-                        The route key is permanent identity. The local part may be changed later.
+                        Give it a plain-language name and choose the part before the @ sign.
                     </p>
                 </div>
 
@@ -135,93 +141,43 @@
                 <input type="hidden" name="form_mode" value="create">
 
                 <div>
-                    <label for="route-key" class="block text-sm font-semibold text-slate-800">
-                        Route key
-                    </label>
-                    <input
-                        id="route-key"
-                        name="key"
-                        type="text"
-                        value="{{ old('key') }}"
-                        placeholder="arive_application"
-                        autocomplete="off"
-                        class="mt-2 block w-full rounded-xl border-slate-300 text-sm shadow-sm"
-                    >
-                    <p class="mt-1 text-xs text-slate-500">
-                        Stable internal identity. Lowercase letters, numbers, and underscores.
-                    </p>
-                </div>
-
-                <div>
-                    <label for="route-local-part" class="block text-sm font-semibold text-slate-800">
-                        Address local part
-                    </label>
-                    <input
-                        id="route-local-part"
-                        name="local_part"
-                        type="text"
-                        value="{{ old('local_part') }}"
-                        placeholder="arive+application"
-                        autocomplete="off"
-                        class="mt-2 block w-full rounded-xl border-slate-300 text-sm shadow-sm"
-                    >
-                    <p class="mt-1 text-xs text-slate-500">
-                        {{ $domain ? '@'.$domain : '@{INBOUND_EMAIL_DOMAIN}' }} · The reply+ prefix is reserved for signed Engage replies.
-                    </p>
-                </div>
-
-                <div>
                     <label for="route-label" class="block text-sm font-semibold text-slate-800">
-                        Label
+                        Name
                     </label>
                     <input
                         id="route-label"
                         name="label"
                         type="text"
                         value="{{ old('label') }}"
-                        placeholder="Arive application"
-                        class="mt-2 block w-full rounded-xl border-slate-300 text-sm shadow-sm"
-                    >
-                </div>
-
-                <div>
-                    <label for="route-source" class="block text-sm font-semibold text-slate-800">
-                        Source
-                    </label>
-                    <input
-                        id="route-source"
-                        name="source"
-                        type="text"
-                        value="{{ old('source') }}"
-                        placeholder="arive"
-                        autocomplete="off"
+                        placeholder="Website Forms"
                         class="mt-2 block w-full rounded-xl border-slate-300 text-sm shadow-sm"
                     >
                     <p class="mt-1 text-xs text-slate-500">
-                        Stable external-system or source identity.
+                        This is what people will see under “Received through” in the Inbox.
                     </p>
                 </div>
 
                 <div>
-                    <label for="route-context" class="block text-sm font-semibold text-slate-800">
-                        Context
-                        <span class="font-normal text-slate-500">(optional)</span>
+                    <label for="route-local-part" class="block text-sm font-semibold text-slate-800">
+                        Email address
                     </label>
-                    <input
-                        id="route-context"
-                        name="context_key"
-                        type="text"
-                        value="{{ old('context_key') }}"
-                        placeholder="application"
-                        autocomplete="off"
-                        class="mt-2 block w-full rounded-xl border-slate-300 text-sm shadow-sm"
-                    >
-                    <p class="mt-1 text-xs text-slate-500">
-                        A narrower event or business context within the source.
-                    </p>
+                    <div class="mt-2 flex rounded-xl shadow-sm">
+                        <input
+                            id="route-local-part"
+                            name="local_part"
+                            type="text"
+                            value="{{ old('local_part') }}"
+                            placeholder="website-forms"
+                            autocomplete="off"
+                            class="min-w-0 flex-1 rounded-l-xl border-slate-300 text-sm"
+                        >
+                        <span class="inline-flex items-center rounded-r-xl border border-l-0 border-slate-300 bg-slate-50 px-3 text-sm text-slate-500">
+                            {{ $domain ? '@'.$domain : '@your-inbound-domain' }}
+                        </span>
+                    </div>
                 </div>
 
-                <div class="flex items-end lg:justify-end">
+                <div class="lg:col-span-2 lg:flex lg:justify-end">
                     <button
                         type="submit"
                         class="w-full rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 lg:w-auto"
@@ -234,12 +190,9 @@
 
         <section class="space-y-4">
             @forelse($routes as $row)
-                @php
-                    $route = $row['route'];
-                @endphp
+                @php($route = $row['route'])
 
                 <article
-                    id="inbound-email-route-{{ $route->id }}"
                     class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"
                     data-inbound-email-route-editor
                 >
@@ -254,24 +207,9 @@
                                 </span>
                             </div>
 
-                            <p class="mt-2 break-all font-mono text-sm text-slate-800">
+                            <p class="mt-2 break-all text-sm font-semibold text-slate-700">
                                 {{ $row['address'] }}
                             </p>
-
-                            <div class="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-500">
-                                <span>
-                                    Key:
-                                    <strong class="font-mono font-semibold text-slate-700">{{ $route->key }}</strong>
-                                </span>
-                                <span>
-                                    Source:
-                                    <strong class="font-mono font-semibold text-slate-700">{{ $route->source }}</strong>
-                                </span>
-                                <span>
-                                    Context:
-                                    <strong class="font-mono font-semibold text-slate-700">{{ $route->context_key ?: '—' }}</strong>
-                                </span>
-                            </div>
                         </div>
 
                         <form
@@ -303,31 +241,13 @@
                     >
                         @csrf
                         @method('PATCH')
-                        <input type="hidden" name="key" value="{{ $route->key }}">
-
-                        <div>
-                            <label
-                                for="route-local-part-{{ $route->id }}"
-                                class="block text-sm font-semibold text-slate-800"
-                            >
-                                Address local part
-                            </label>
-                            <input
-                                id="route-local-part-{{ $route->id }}"
-                                name="local_part"
-                                type="text"
-                                value="{{ $route->local_part }}"
-                                autocomplete="off"
-                                class="mt-2 block w-full rounded-xl border-slate-300 text-sm shadow-sm"
-                            >
-                        </div>
 
                         <div>
                             <label
                                 for="route-label-{{ $route->id }}"
                                 class="block text-sm font-semibold text-slate-800"
                             >
-                                Label
+                                Name
                             </label>
                             <input
                                 id="route-label-{{ $route->id }}"
@@ -340,37 +260,24 @@
 
                         <div>
                             <label
-                                for="route-source-{{ $route->id }}"
+                                for="route-local-part-{{ $route->id }}"
                                 class="block text-sm font-semibold text-slate-800"
                             >
-                                Source
+                                Email address
                             </label>
-                            <input
-                                id="route-source-{{ $route->id }}"
-                                name="source"
-                                type="text"
-                                value="{{ $route->source }}"
-                                autocomplete="off"
-                                class="mt-2 block w-full rounded-xl border-slate-300 text-sm shadow-sm"
-                            >
-                        </div>
-
-                        <div>
-                            <label
-                                for="route-context-{{ $route->id }}"
-                                class="block text-sm font-semibold text-slate-800"
-                            >
-                                Context
-                                <span class="font-normal text-slate-500">(optional)</span>
-                            </label>
-                            <input
-                                id="route-context-{{ $route->id }}"
-                                name="context_key"
-                                type="text"
-                                value="{{ $route->context_key }}"
-                                autocomplete="off"
-                                class="mt-2 block w-full rounded-xl border-slate-300 text-sm shadow-sm"
-                            >
+                            <div class="mt-2 flex rounded-xl shadow-sm">
+                                <input
+                                    id="route-local-part-{{ $route->id }}"
+                                    name="local_part"
+                                    type="text"
+                                    value="{{ $route->local_part }}"
+                                    autocomplete="off"
+                                    class="min-w-0 flex-1 rounded-l-xl border-slate-300 text-sm"
+                                >
+                                <span class="inline-flex items-center rounded-r-xl border border-l-0 border-slate-300 bg-slate-50 px-3 text-sm text-slate-500">
+                                    {{ $domain ? '@'.$domain : '@your-inbound-domain' }}
+                                </span>
+                            </div>
                         </div>
 
                         <div class="lg:col-span-2 lg:flex lg:justify-end">
@@ -389,7 +296,7 @@
                         No inbound addresses yet
                     </h2>
                     <p class="mt-2 text-sm text-slate-500">
-                        Add one when an external system needs a stable semantic recipient address.
+                        Add one when a website, vendor, or other external system needs its own recognizable place in the Inbox.
                     </p>
                 </div>
             @endforelse

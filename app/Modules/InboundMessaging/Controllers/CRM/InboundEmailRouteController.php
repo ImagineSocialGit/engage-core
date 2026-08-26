@@ -24,9 +24,9 @@ final class InboundEmailRouteController extends Controller
         SaveInboundEmailRouteRequest $request,
         SaveInboundEmailRouteAction $save,
     ): RedirectResponse {
-        $route = $save->handle($request->definition());
+        $save->handle($request->definition());
 
-        return $this->redirectTo($route)
+        return $this->redirectTo()
             ->with('status', 'Inbound address created.');
     }
 
@@ -35,12 +35,12 @@ final class InboundEmailRouteController extends Controller
         InboundEmailRoute $inboundEmailRoute,
         SaveInboundEmailRouteAction $save,
     ): RedirectResponse {
-        $route = $save->handle(
+        $save->handle(
             data: $request->definition(),
             route: $inboundEmailRoute,
         );
 
-        return $this->redirectTo($route)
+        return $this->redirectTo()
             ->with('status', 'Inbound address updated.');
     }
 
@@ -56,7 +56,7 @@ final class InboundEmailRouteController extends Controller
             'is_active' => (bool) $validated['is_active'],
         ])->save();
 
-        return $this->redirectTo($inboundEmailRoute)
+        return $this->redirectTo()
             ->with(
                 'status',
                 $inboundEmailRoute->is_active
@@ -65,11 +65,10 @@ final class InboundEmailRouteController extends Controller
             );
     }
 
-    private function redirectTo(InboundEmailRoute $route): RedirectResponse
+    private function redirectTo(): RedirectResponse
     {
-        return redirect()->to(
-            route('crm.inbound-messaging.email-routes.index')
-            .'#inbound-email-route-'.$route->getKey(),
+        return redirect()->route(
+            'crm.inbound-messaging.email-routes.index',
         );
     }
 }

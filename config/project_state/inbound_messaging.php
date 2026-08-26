@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 5,
+    'version' => 6,
     'tables' => [
         'inbound_email_routes' => [
             'mode' => 'upsert',
@@ -103,6 +103,7 @@ return [
                 'id',
                 'sender_type',
                 'sender_id',
+                'related_contact_id',
                 'client_key',
                 'channel',
                 'provider',
@@ -127,11 +128,17 @@ return [
                 'inbound_email_route_context',
                 'received_at',
                 'processed_at',
+                'inbox_status',
+                'reviewed_at',
+                'completed_at',
                 'meta',
                 'created_at',
                 'updated_at',
             ],
             'json_columns' => ['meta'],
+            'references' => [
+                'related_contact_id' => 'contacts',
+            ],
             'deferred_references' => [
                 'correlated_scheduled_message_id' => 'scheduled_messages',
             ],

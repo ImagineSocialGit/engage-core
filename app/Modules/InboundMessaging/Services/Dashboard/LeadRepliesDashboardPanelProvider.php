@@ -5,14 +5,17 @@ namespace App\Modules\InboundMessaging\Services\Dashboard;
 use App\Models\DashboardAcknowledgement;
 use App\Modules\Core\Models\Contact;
 use App\Modules\InboundMessaging\Models\InboundMessage;
+use App\Modules\InboundMessaging\Services\Inbox\InboundInboxWorkspace;
 use App\Support\Dashboard\Contracts\DashboardPanelProvider;
-use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class LeadRepliesDashboardPanelProvider implements DashboardPanelProvider
 {
+    public function __construct(
+        private readonly InboundInboxWorkspace $inboxWorkspace,
+    ) {}
+
     public function key(): string
     {
         return 'inbound_messaging.replies';
@@ -28,17 +31,30 @@ class LeadRepliesDashboardPanelProvider implements DashboardPanelProvider
      */
     public function panel(Request $request): array
     {
-        $acknowledgedIds = $this->acknowledgedItemKeys($request, DashboardAcknowledgement::TYPE_INBOUND_MESSAGE);
+        $acknowledgedIds = $this->acknowledgedItemKeys(
+            $request,
+            DashboardAcknowledgement::TYPE_INBOUND_MESSAGE,
+        );
 
         $baseQuery = InboundMessage::query()
-            ->with('sender')
-            ->where('classification', InboundMessage::CLASSIFICATION_NORMAL_REPLY)
-            ->where('received_at', '>=', now()->subDays(3))
-            ->when($acknowledgedIds !== [], fn (Builder $query) => $query->whereNotIn('id', $acknowledgedIds));
+            ->with([
+                'sender',
+                'relatedContact',
+                'correlatedScheduledMessage.messageChainStepVariant',
+            ])
+            ->whereIn('inbox_status', [
+                InboundMessage::INBOX_STATUS_NEW,
+                InboundMessage::INBOX_STATUS_REVIEWED,
+            ])
+            ->when(
+                $acknowledgedIds !== [],
+                fn (Builder $query): Builder =>
+                    $query->whereNotIn('id', $acknowledgedIds),
+            );
 
-        $recentCount = (clone $baseQuery)->count();
+        $openCount = (clone $baseQuery)->count();
 
-        $replies = (clone $baseQuery)
+        $messages = (clone $baseQuery)
             ->latest('received_at')
             ->latest('id')
             ->limit(8)
@@ -48,22 +64,26 @@ class LeadRepliesDashboardPanelProvider implements DashboardPanelProvider
             'key' => $this->key(),
             'module' => $this->module(),
             'slot' => 'immediate_work',
-            'priority' => $recentCount > 0 ? 110 : 90,
+            'priority' => $openCount > 0 ? 110 : 90,
             'order' => 20,
             'view' => 'lead_replies',
-            'title' => str(config('contacts.labels.plural'))->title().' needing attention',
-            'description' => 'Recent replies that may need a human response.',
-            'empty_title' => 'No '.config('contacts.labels.singular').' replies need review.',
-            'empty_description' => 'New replies will show here when a '.config('contacts.labels.singular').' needs a human response.',
-            'summary_label' => config('contacts.labels.singular').' replies',
-            'count' => $recentCount,
-            'attention_count' => $recentCount,
-            'items' => $replies->map(fn (InboundMessage $message): array => $this->leadReplyItem($message))->values(),
-            'primary_action' => $this->primaryAction($replies->first()),
+            'title' => 'Inbox needing attention',
+            'description' => 'Inbound messages that still need a human review or follow-up.',
+            'empty_title' => 'Inbox is caught up.',
+            'empty_description' => 'New replies and routed inbound messages will appear here.',
+            'summary_label' => 'inbox messages',
+            'count' => $openCount,
+            'attention_count' => $openCount,
+            'items' => $messages
+                ->map(fn (InboundMessage $message): array =>
+                    $this->dashboardItem($message)
+                )
+                ->values(),
+            'primary_action' => $this->primaryAction($messages->first()),
             'actions' => [
                 [
-                    'label' => 'View all '.config('contacts.labels.plural'),
-                    'href' => route('crm.contacts.index'),
+                    'label' => 'Open Inbox',
+                    'href' => route('crm.inbound-messaging.inbox.index'),
                 ],
             ],
         ];
@@ -78,49 +98,53 @@ class LeadRepliesDashboardPanelProvider implements DashboardPanelProvider
             return null;
         }
 
-        $contact = $message->sender instanceof Contact ? $message->sender : null;
-
         return [
-            'label' => $contact ? 'Review reply' : 'Review message',
-            'href' => $contact
-                ? route('crm.contacts.show', $contact).'?activity_tab=messages&focus=inbound_message:'.$message->id
-                : null,
-            'summary' => 'A recent reply is the clearest '.config('contacts.labels.singular').' to review first.',
+            'label' => 'Review message',
+            'href' => route('crm.inbound-messaging.inbox.show', $message),
+            'summary' => 'Inbound work stays available in the Inbox until it is done.',
         ];
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function leadReplyItem(InboundMessage $message): array
+    private function dashboardItem(InboundMessage $message): array
     {
-        $contact = $message->sender instanceof Contact ? $message->sender : null;
-        $sender = $contact ? $this->contactName($contact) : ($message->from_value ?: 'Unknown sender');
+        $item = $this->inboxWorkspace->presentMessage($message);
+        $person = $item['person'] ?? null;
+        $sender = (string) ($item['sender_label'] ?? 'Unknown sender');
 
         return [
-            'key' => (string) $message->id,
+            'key' => (string) $message->getKey(),
             'type' => DashboardAcknowledgement::TYPE_INBOUND_MESSAGE,
             'sort_at' => $message->received_at ?? $message->created_at,
-            'label' => 'New reply',
-            'tone' => 'blue',
-            'title' => $sender.' replied',
+            'label' => (string) ($item['status_label'] ?? 'Needs review'),
+            'tone' => $message->inbox_status === InboundMessage::INBOX_STATUS_REVIEWED
+                ? 'slate'
+                : 'blue',
+            'title' => $person instanceof Contact
+                ? (string) $item['person_label'].' replied'
+                : ((string) ($item['subject'] ?? '') !== ''
+                    ? (string) $item['subject']
+                    : $sender.' sent a message'),
             'subtitle' => trim(implode(' · ', array_filter([
-                strtoupper($this->enumValue($message->channel)),
-                $this->dateLabel($message->received_at),
+                $person instanceof Contact ? null : $sender,
+                $item['received_through'] ?? null,
+                $item['received_at_label'] ?? null,
             ]))),
-            'description' => $message->body,
-            'href' => $contact
-                ? route('crm.contacts.show', $contact).'?activity_tab=messages&focus=inbound_message:'.$message->id
-                : null,
-            'action_label' => $contact ? 'Review reply' : 'Review message',
+            'description' => (string) ($item['preview'] ?? ''),
+            'href' => route('crm.inbound-messaging.inbox.show', $message),
+            'action_label' => 'Review message',
         ];
     }
 
     /**
      * @return array<int, string>
      */
-    private function acknowledgedItemKeys(Request $request, string $itemType): array
-    {
+    private function acknowledgedItemKeys(
+        Request $request,
+        string $itemType,
+    ): array {
         $userId = $request->user()?->id;
 
         if (! $userId) {
@@ -131,34 +155,12 @@ class LeadRepliesDashboardPanelProvider implements DashboardPanelProvider
             ->active()
             ->where('user_id', $userId)
             ->where('surface', DashboardAcknowledgement::SURFACE_CRM_DASHBOARD)
-            ->where('item_type', DashboardAcknowledgement::normalizeItemType($itemType))
+            ->where(
+                'item_type',
+                DashboardAcknowledgement::normalizeItemType($itemType),
+            )
             ->pluck('item_key')
             ->values()
             ->all();
-    }
-
-    private function dateLabel(mixed $date): ?string
-    {
-        return $date?->copy()
-            ->timezone(config('client.timezone', config('app.timezone', 'UTC')))
-            ->format('M j, g:i A');
-    }
-
-    private function enumValue(mixed $value): string
-    {
-        if ($value instanceof BackedEnum) {
-            return (string) $value->value;
-        }
-
-        return (string) $value;
-    }
-
-    private function contactName(Contact $contact): string
-    {
-        $name = trim((string) ($contact->name ?: trim(
-            trim((string) $contact->first_name).' '.trim((string) $contact->last_name)
-        )));
-
-        return $name !== '' ? $name : ($contact->email ?: Str::title(config('contacts.labels.singular')).' #'.$contact->id);
     }
 }

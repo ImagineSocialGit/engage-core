@@ -2,8 +2,32 @@
 
 use App\Modules\InboundMessaging\Controllers\CRM\ContactConversationReplyController;
 use App\Modules\InboundMessaging\Controllers\CRM\InboundEmailRouteController;
+use App\Modules\InboundMessaging\Controllers\CRM\InboundInboxController;
 use App\Modules\InboundMessaging\Controllers\CRM\InboundReplyProfileController;
 use Illuminate\Support\Facades\Route;
+
+Route::middleware('module:inbound_messaging')
+    ->prefix('inbox')
+    ->name('crm.inbound-messaging.inbox.')
+    ->group(function (): void {
+        Route::get('/', [InboundInboxController::class, 'index'])
+            ->name('index');
+
+        Route::get('/{inboundMessage}', [InboundInboxController::class, 'show'])
+            ->name('show');
+
+        Route::patch('/{inboundMessage}/status', [InboundInboxController::class, 'state'])
+            ->name('state');
+
+        Route::patch('/{inboundMessage}/person', [InboundInboxController::class, 'link'])
+            ->name('person.link');
+
+        Route::delete('/{inboundMessage}/person', [InboundInboxController::class, 'unlink'])
+            ->name('person.unlink');
+
+        Route::post('/{inboundMessage}/person', [InboundInboxController::class, 'createContact'])
+            ->name('person.create');
+    });
 
 Route::middleware('module:inbound_messaging')
     ->prefix('reply-handling/inbound-addresses')
