@@ -3,6 +3,7 @@
 namespace App\Support\ProjectState;
 
 use Illuminate\Support\Facades\Schema;
+use JsonException;
 use RuntimeException;
 
 class ProjectStateContractRegistry
@@ -444,7 +445,55 @@ class ProjectStateContractRegistry
 
     public function version(): int
     {
-        return (int) config('project_state.version', 1);
+        return array_sum($this->sectionVersions());
+    }
+
+    /**
+     * Ordered configured section-version vector.
+     *
+     * @return array<string, int>
+     */
+    public function sectionVersions(): array
+    {
+        $versions = [];
+
+        foreach ($this->configuredSections() as $sectionKey => $section) {
+            $versions[$sectionKey] = (int) $section['version'];
+        }
+
+        return $versions;
+    }
+
+    /**
+     * Exact compatibility identity for the normalized configured contract.
+     *
+     * The human-readable root version is intentionally only the sum of section
+     * versions. The fingerprint also covers section order and every normalized
+     * table/import contract detail, so distinct version vectors or an accidental
+     * contract edit without a section bump cannot compare as compatible.
+     */
+    public function contractFingerprint(): string
+    {
+        try {
+            $encoded = json_encode(
+                [
+                    'format' => $this->format(),
+                    'sections' => $this->configuredSections(),
+                ],
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_INVALID_UTF8_SUBSTITUTE
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_THROW_ON_ERROR,
+            );
+        } catch (JsonException $exception) {
+            throw new RuntimeException(
+                'Project-state contract could not be fingerprinted.',
+                previous: $exception,
+            );
+        }
+
+        return 'sha256:'.hash('sha256', $encoded);
     }
     private function isStringList(mixed $value, bool $allowEmpty = true): bool
     {

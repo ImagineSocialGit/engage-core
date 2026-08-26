@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\ProjectState;
 
+use App\Support\ProjectState\ProjectStateContractRegistry;
 use App\Support\ProjectState\ProjectStateDocumentCodec;
 use App\Support\ProjectState\ProjectStateExporter;
 use App\Support\ProjectState\ProjectStateManager;
@@ -33,7 +34,18 @@ class ProjectStateExporterExtractionTest extends TestCase
             $managerDocument = app(ProjectStateManager::class)->export();
 
             $this->assertEquals($exporterDocument, $managerDocument);
-            $this->assertSame((int) config('project_state.version'), $managerDocument['version']);
+
+            $registry = app(ProjectStateContractRegistry::class);
+
+            $this->assertSame($registry->version(), $managerDocument['version']);
+            $this->assertSame(
+                $registry->contractFingerprint(),
+                $managerDocument['contract']['fingerprint'],
+            );
+            $this->assertEquals(
+                $registry->sectionVersions(),
+                $managerDocument['contract']['section_versions'],
+            );
             $this->assertSame(
                 $managerDocument['checksum'],
                 app(ProjectStateDocumentCodec::class)->checksum($managerDocument),

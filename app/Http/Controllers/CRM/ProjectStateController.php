@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Support\ProjectState\ProjectStateContractRegistry;
 use App\Support\ProjectState\ProjectStateManager;
 use App\Support\ProjectState\ProjectStateResumeManager;
 use Illuminate\Contracts\View\View;
@@ -17,6 +18,7 @@ class ProjectStateController extends Controller
 {
     public function __construct(
         private readonly ProjectStateResumeManager $resumeManager,
+        private readonly ProjectStateContractRegistry $contractRegistry,
     ) {}
 
     public function index(Request $request): View
@@ -49,9 +51,10 @@ class ProjectStateController extends Controller
         ) ?: 'client';
 
         $filename = sprintf(
-            '%s-project-state-v%d-%s.json',
+            '%s-project-state-v%d-%s-%s.json',
             strtolower($clientKey),
-            (int) config('project_state.version', 1),
+            $this->contractRegistry->version(),
+            substr(str_replace('sha256:', '', $this->contractRegistry->contractFingerprint()), 0, 12),
             now('UTC')->format('Ymd-His'),
         );
 
@@ -178,8 +181,10 @@ class ProjectStateController extends Controller
                 5000,
                 max(1, (int) config('project_state.resume_batch_size', 500)),
             ),
-            'format' => (string) config('project_state.format'),
-            'formatVersion' => (int) config('project_state.version'),
+            'format' => $this->contractRegistry->format(),
+            'formatVersion' => $this->contractRegistry->version(),
+            'contractFingerprint' => $this->contractRegistry->contractFingerprint(),
+            'sectionVersions' => $this->contractRegistry->sectionVersions(),
             'maxUploadMegabytes' => round(
                 max(1, (int) config('project_state.max_upload_kilobytes', 102400)) / 1024,
                 1,

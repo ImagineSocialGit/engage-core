@@ -18,8 +18,14 @@ Developer contract changes belong in [`../project-state-extension-guide.md`](../
 
 ```text
 format: engage-core-project-state
-version: authoritative current value in config/project_state.php
+version: derived sum of the configured section versions
+contract.fingerprint: exact SHA-256 identity of the normalized configured contract
+contract.section_versions: ordered section-version vector
 ```
+
+The root version is derived and must never be incremented manually. Exact compatibility is established by the section-version vector plus the contract fingerprint. A change to any owning section version composes automatically into the root version; the fingerprint prevents different vectors or exact contract shapes from colliding behind the same root sum.
+
+The fingerprint/vector cutover is itself a current-format boundary. Exports created before this change that contain only the old manually maintained root version must be re-exported from current code or transformed externally before import.
 
 The current contract includes dependency-ordered Core/universal sections plus optional Reporting, Mortgage, and Scheduling sections. Reporting is included only when its activation schema is installed. Mortgage is included only when the complete Mortgage vertical schema is installed. Scheduling is included only when the complete Scheduling schema is installed. A document containing an optional section is rejected when the target does not have that section's activation schema.
 
@@ -237,7 +243,7 @@ Under **Download current state**:
 The filename follows:
 
 ```text
-{client-key}-project-state-v{current-version}-YYYYMMDD-HHMMSS.json
+{client-key}-project-state-v{derived-version}-{contract-fingerprint-prefix}-YYYYMMDD-HHMMSS.json
 ```
 
 The response is streamed directly. The application does not intentionally leave a public server-side copy.
@@ -262,13 +268,17 @@ Confirm:
 
 ```text
 format = engage-core-project-state
-version = current project_state.version from config/project_state.php
+version = current derived root version
+contract.fingerprint = current exact contract fingerprint
+contract.section_versions = current ordered section-version vector
 client_key = expected selected client
 source.environment = expected source environment
 source.database = expected source database
-sections = expected current sections
+sections = expected current active sections
 checksum is present
 ```
+
+The Project State page shows the current derived version, exact fingerprint, and section-version vector. The root number alone is not sufficient evidence of compatibility.
 
 Do not hand-edit row data or the checksum.
 
@@ -387,7 +397,7 @@ VALID
 
 The report should show:
 
-- format/version;
+- format/derived version and contract identity;
 - client key;
 - row count for every transferred table;
 - errors;
@@ -399,7 +409,7 @@ The report should show:
 Examples:
 
 ```text
-unsupported format or version
+unsupported format, derived version, section-version vector, or contract fingerprint
 wrong client key
 invalid checksum
 missing section/table

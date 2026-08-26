@@ -1,3 +1,4 @@
+
 # Engage Core — Project State Extension Guide
 
 ## Purpose
@@ -12,10 +13,16 @@ This guide is for developers extending the Project State contract. Operators sho
 
 ```text
 format: engage-core-project-state
-version: authoritative current value in config/project_state.php
+version: derived sum of the configured section versions
+contract.fingerprint: deterministic SHA-256 identity of the normalized configured contract
+contract.section_versions: ordered section-version vector
 ```
 
-The application accepts only the current root format version and the current version of every configured section. It does not contain in-application translators for older exports.
+The root integer is a human-readable compatibility label only; it is never bumped by hand. Each Project State section owns its own monotonically increasing version. `ProjectStateContractRegistry` derives the root version from those section versions and derives the exact contract fingerprint from the normalized configured contract, including section order and table/import semantics.
+
+The fingerprint/vector cutover is itself a current-format boundary. Exports created before this change that contain only the old manually maintained root version must be re-exported from current code or transformed externally before import.
+
+The application accepts only the current derived root version, exact current section-version vector, exact current contract fingerprint, and current version of each transferred section. It does not contain in-application translators for older exports.
 
 Current scope:
 
@@ -650,30 +657,45 @@ After adding the section:
 
 Project State is exact-current-format only.
 
-### Bump a section version when
+### Bump the owning section version
 
-Bump the owning section version when its serialized table contract or import semantics change, including:
+Bump the owning section version whenever that section's serialized table contract or import semantics change, including:
 
 - adding/removing/renaming a transferred table;
 - adding/removing/renaming a column;
 - changing identity or preserved-ID behavior;
 - changing reference structure;
 - changing import transformations that alter restored meaning;
+- changing optional activation semantics;
 - adding required resume semantics.
 
-### Bump the root version when
+Do **not** edit the root version number. `config/project_state.php` derives it as the sum of the configured section versions. If Campaigns and Messaging independently bump in separate branches, the merged root version naturally reflects both increments.
 
-Bump the root version when a previously exported full document is no longer directly accepted or would restore different meaning.
+The root sum is intentionally not the exact compatibility authority because two different version vectors can have the same sum. Every export therefore also contains:
 
-For the current implementation, most section contract changes that make prior files incompatible should also bump the root version because the application has no embedded translation layer.
+```json
+"contract": {
+    "fingerprint": "sha256:...",
+    "section_versions": {
+        "core": 3,
+        "scheduling": 1,
+        "...": 1
+    }
+}
+```
 
-Current-contract tests must derive the expected root and section versions from the authoritative Project State config instead of copying the current numeric version into each assertion. Explicit numeric versions belong only in tests that intentionally exercise an older, newer, or otherwise incompatible document contract. This keeps a legitimate version bump localized to the executable contract rather than creating mechanical edits across unrelated round-trip tests.
+`ProjectStateContractRegistry::contractFingerprint()` hashes the normalized configured contract, not merely the root sum. This means:
 
-Durable docs should follow the same rule: point to `config/project_state.php` for the current numeric version unless a historical version number is itself the subject being documented.
+- different section-version vectors cannot masquerade as compatible because they share a sum;
+- section ordering is part of the exact contract identity;
+- an accidental table/import contract edit without the required section-version bump still changes the fingerprint and invalidates stale exports;
+- optional sections participate in the configured contract fingerprint even when their activation schema is absent and the section is omitted from a particular export.
 
-### Do not bump versions for
+Current-contract tests should derive expected root and section versions from `ProjectStateContractRegistry` or the authoritative Project State config. Explicit numeric versions belong only in tests that intentionally exercise a historical or incompatible document contract.
 
-Do not bump the document contract for:
+### Do not bump a section version for
+
+Do not bump a section version for:
 
 - internal class extraction/refactoring;
 - dependency-injection cleanup;
@@ -682,9 +704,15 @@ Do not bump the document contract for:
 - error-message cleanup that does not change accepted data;
 - performance changes that preserve serialization and restoration semantics.
 
+### Adding or removing a root section
+
+Adding a section normally begins that section at version `1`. Registering it in the dependency-safe root order automatically changes both the derived root version and exact fingerprint.
+
+Removing or reordering a root section also changes the fingerprint. Treat either operation as a full current-contract change and review import dependency semantics carefully.
+
 ### Older files
 
-Do not weaken current validation to accept an older shape.
+Do not weaken current validation to accept an older shape, root sum, section vector, or fingerprint.
 
 Transform an older export externally into the current contract, verify the transformed document, and preserve the original export and transformation record.
 
@@ -776,7 +804,7 @@ Before merging a Project State contract change:
 [ ] Environment-local values use null_on_import
 [ ] Runnable work imports inert
 [ ] Resume category exists and has tested dependencies
-[ ] Section/root versions are deliberately evaluated
+[ ] Owning section version is deliberately evaluated; root version/fingerprint derive automatically
 [ ] Coverage and round-trip tests are updated
 [ ] Full suite and setup validation are green
 [ ] Operator runbook is updated for new operational behavior

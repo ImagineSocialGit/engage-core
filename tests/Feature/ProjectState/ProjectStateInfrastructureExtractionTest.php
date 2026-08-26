@@ -99,6 +99,85 @@ class ProjectStateInfrastructureExtractionTest extends TestCase
         );
     }
 
+    public function test_root_version_and_fingerprint_are_derived_from_the_section_contracts(): void
+    {
+        $registry = app(ProjectStateContractRegistry::class);
+        $sectionVersions = $registry->sectionVersions();
+
+        $this->assertNotEmpty($sectionVersions);
+        $this->assertSame(array_sum($sectionVersions), $registry->version());
+        $this->assertSame($registry->version(), (int) config('project_state.version'));
+        $this->assertStringStartsWith('sha256:', $registry->contractFingerprint());
+    }
+
+    public function test_independent_section_version_bumps_compose_without_a_manual_root_bump(): void
+    {
+        $registry = app(ProjectStateContractRegistry::class);
+        $beforeVersion = $registry->version();
+        $beforeFingerprint = $registry->contractFingerprint();
+
+        $sections = config('project_state.sections');
+        $sections['campaigns']['version']++;
+        $sections['messaging']['version']++;
+        config()->set('project_state.sections', $sections);
+
+        $this->assertSame($beforeVersion + 2, $registry->version());
+        $this->assertNotSame($beforeFingerprint, $registry->contractFingerprint());
+    }
+
+    public function test_contract_fingerprint_changes_for_an_exact_contract_edit_even_without_a_section_version_bump(): void
+    {
+        $registry = app(ProjectStateContractRegistry::class);
+        $beforeVersion = $registry->version();
+        $beforeFingerprint = $registry->contractFingerprint();
+
+        $sections = config('project_state.sections');
+        $sections['core']['tables']['contacts']['order_by'] = ['id', 'email'];
+        config()->set('project_state.sections', $sections);
+
+        $this->assertSame($beforeVersion, $registry->version());
+        $this->assertNotSame($beforeFingerprint, $registry->contractFingerprint());
+    }
+
+    public function test_validator_rejects_a_different_section_vector_even_when_the_root_sum_is_unchanged(): void
+    {
+        $manager = app(ProjectStateManager::class);
+        $codec = app(ProjectStateDocumentCodec::class);
+        $document = $manager->export();
+
+        $campaignVersion = $document['contract']['section_versions']['campaigns'];
+        $messagingVersion = $document['contract']['section_versions']['messaging'];
+
+        $document['contract']['section_versions']['campaigns'] = $campaignVersion - 1;
+        $document['contract']['section_versions']['messaging'] = $messagingVersion + 1;
+        $document['version'] = array_sum($document['contract']['section_versions']);
+        $document['checksum'] = $codec->checksum($document);
+
+        $report = $manager->validate($document);
+
+        $this->assertFalse($report['valid']);
+        $this->assertContains(
+            sprintf(
+                'Project-state contract section [campaigns] requires version [%d]; document has [%d].',
+                $campaignVersion,
+                $campaignVersion - 1,
+            ),
+            $report['errors'],
+        );
+        $this->assertContains(
+            sprintf(
+                'Project-state contract section [messaging] requires version [%d]; document has [%d].',
+                $messagingVersion,
+                $messagingVersion + 1,
+            ),
+            $report['errors'],
+        );
+        $this->assertContains(
+            'The project-state section-version vector does not match the current contract.',
+            $report['errors'],
+        );
+    }
+
     public function test_manager_preserves_invalid_json_errors_after_codec_extraction(): void
     {
         $this->expectException(InvalidArgumentException::class);

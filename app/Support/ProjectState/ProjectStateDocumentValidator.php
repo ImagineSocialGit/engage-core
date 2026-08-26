@@ -467,10 +467,12 @@ class ProjectStateDocumentValidator
 
         if (($document['version'] ?? null) !== $this->contractRegistry->version()) {
             $errors[] = sprintf(
-                'The project-state document must use version [%d].',
+                'The project-state document must use derived version [%d].',
                 $this->contractRegistry->version(),
             );
         }
+
+        $this->validateContractEnvelope($document, $errors);
 
         $clientKey = (string) ($document['client_key'] ?? '');
         $expectedClientKey = (string) config('client.key', '');
@@ -489,6 +491,78 @@ class ProjectStateDocumentValidator
             || ! hash_equals($this->documentCodec->checksum($document), $checksum)
         ) {
             $errors[] = 'The project-state checksum is invalid.';
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $document
+     * @param array<int, string> $errors
+     */
+    private function validateContractEnvelope(
+        array $document,
+        array &$errors,
+    ): void {
+        $contract = $document['contract'] ?? null;
+
+        if (! is_array($contract)) {
+            $errors[] = 'The project-state document must contain a contract object.';
+
+            return;
+        }
+
+        $expectedVersions = $this->contractRegistry->sectionVersions();
+        $actualVersions = $contract['section_versions'] ?? null;
+
+        if (! is_array($actualVersions)) {
+            $errors[] = 'The project-state contract must contain a section_versions object.';
+        } else {
+            foreach ($expectedVersions as $sectionKey => $expectedVersion) {
+                if (! array_key_exists($sectionKey, $actualVersions)) {
+                    $errors[] = "Project-state contract section [{$sectionKey}] is missing from the section-version vector.";
+
+                    continue;
+                }
+
+                $actualVersion = $actualVersions[$sectionKey];
+
+                if (! is_int($actualVersion) || $actualVersion !== $expectedVersion) {
+                    $rendered = is_scalar($actualVersion)
+                        ? (string) $actualVersion
+                        : gettype($actualVersion);
+
+                    $errors[] = sprintf(
+                        'Project-state contract section [%s] requires version [%d]; document has [%s].',
+                        $sectionKey,
+                        $expectedVersion,
+                        $rendered,
+                    );
+                }
+            }
+
+            foreach (array_keys($actualVersions) as $sectionKey) {
+                if (! is_string($sectionKey)
+                    || ! array_key_exists($sectionKey, $expectedVersions)
+                ) {
+                    $rendered = is_string($sectionKey)
+                        ? $sectionKey
+                        : (string) $sectionKey;
+
+                    $errors[] = "Project-state contract section [{$rendered}] is not configured by this application.";
+                }
+            }
+
+            if ($actualVersions !== $expectedVersions) {
+                $errors[] = 'The project-state section-version vector does not match the current contract.';
+            }
+        }
+
+        $fingerprint = $contract['fingerprint'] ?? null;
+        $expectedFingerprint = $this->contractRegistry->contractFingerprint();
+
+        if (! is_string($fingerprint)
+            || ! hash_equals($expectedFingerprint, $fingerprint)
+        ) {
+            $errors[] = "The project-state contract fingerprint does not match [{$expectedFingerprint}].";
         }
     }
 

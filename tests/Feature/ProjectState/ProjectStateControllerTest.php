@@ -50,6 +50,8 @@ class ProjectStateControllerTest extends TestCase
             ->assertSee('php artisan engage:install --force --no-create-user')
             ->assertSee('php artisan modules:status')
             ->assertSee('php artisan engage:user:add')
+            ->assertSee('Contract fingerprint')
+            ->assertSee('Section versions')
             ->assertSee('docs/operations/project-state-transfer-runbook.md');
     }
 

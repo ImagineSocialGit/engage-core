@@ -50,10 +50,30 @@
                 <div class="rounded-2xl border border-amber-200 bg-white/80 p-4">
                     <dt class="font-semibold text-slate-950">Current format</dt>
                     <dd class="mt-1 font-mono text-xs text-slate-700">{{ $format }} v{{ $formatVersion }}</dd>
+                    <dd class="mt-2 text-xs leading-5 text-slate-600">
+                        The displayed version is derived from the section versions. It is not incremented manually.
+                    </dd>
+                </div>
+                <div class="rounded-2xl border border-amber-200 bg-white/80 p-4">
+                    <dt class="font-semibold text-slate-950">Contract fingerprint</dt>
+                    <dd class="mt-1 break-all font-mono text-xs text-slate-700">{{ $contractFingerprint }}</dd>
+                    <dd class="mt-2 text-xs leading-5 text-slate-600">
+                        This fingerprint is the exact compatibility identity used during validation.
+                    </dd>
                 </div>
                 <div class="rounded-2xl border border-amber-200 bg-white/80 p-4">
                     <dt class="font-semibold text-slate-950">Upload limit</dt>
                     <dd class="mt-1 text-slate-700">{{ $maxUploadMegabytes }} MB</dd>
+                </div>
+                <div class="rounded-2xl border border-amber-200 bg-white/80 p-4">
+                    <dt class="font-semibold text-slate-950">Section versions</dt>
+                    <dd class="mt-2 flex flex-wrap gap-1.5">
+                        @foreach($sectionVersions as $sectionKey => $sectionVersion)
+                            <span class="rounded-full border border-amber-200 bg-white px-2 py-1 font-mono text-[11px] text-slate-700">
+                                {{ $sectionKey }}:{{ $sectionVersion }}
+                            </span>
+                        @endforeach
+                    </dd>
                 </div>
             </dl>
         </section>

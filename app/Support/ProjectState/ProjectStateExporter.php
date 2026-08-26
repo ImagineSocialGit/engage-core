@@ -71,6 +71,10 @@ class ProjectStateExporter
             $document = [
                 'format' => $this->contractRegistry->format(),
                 'version' => $this->contractRegistry->version(),
+                'contract' => [
+                    'fingerprint' => $this->contractRegistry->contractFingerprint(),
+                    'section_versions' => $this->contractRegistry->sectionVersions(),
+                ],
                 'exported_at' => now('UTC')->toISOString(),
                 'client_key' => (string) config('client.key', ''),
                 'source' => [
