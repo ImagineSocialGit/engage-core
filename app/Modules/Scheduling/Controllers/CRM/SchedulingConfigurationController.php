@@ -10,6 +10,7 @@ use App\Modules\Scheduling\Services\SchedulingReadService;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -21,8 +22,8 @@ class SchedulingConfigurationController extends Controller
     public function index(SchedulingReadService $read): View
     {
         return view('crm.scheduling.configuration', [
-            'title' => 'Scheduling Configuration',
-            'heading' => 'Scheduling Configuration',
+            'title' => 'Scheduling Setup',
+            'heading' => 'Scheduling Setup',
             'hosts' => $read->configurationHosts(),
             'services' => $read->configurationServices(),
             'timezones' => timezone_identifiers_list(),
@@ -48,7 +49,10 @@ class SchedulingConfigurationController extends Controller
             'sort_order',
         ]);
 
-        $validated = $request->validate($this->hostRules(includeKey: true));
+        $validated = validator(
+            $this->hostCreatePayload($request),
+            $this->hostRules(includeKey: true),
+        )->validate();
 
         try {
             $writer->createHost($validated);
@@ -102,9 +106,10 @@ class SchedulingConfigurationController extends Controller
             ...$this->serviceFieldNames(),
         ]);
 
-        $validated = $request->validate(
+        $validated = validator(
+            $this->serviceCreatePayload($request),
             $this->serviceRules(includeKey: true),
-        );
+        )->validate();
 
         try {
             $writer->createService($validated);
@@ -190,6 +195,149 @@ class SchedulingConfigurationController extends Controller
         }
 
         return $this->configurationRedirect('assignments-updated');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function hostCreatePayload(Request $request): array
+    {
+        $payload = $request->all();
+
+        if (! is_string($payload['key'] ?? null) || trim((string) $payload['key']) === '') {
+            $payload['key'] = $this->generatedHostKey((string) ($payload['name'] ?? ''));
+        }
+
+        $payload += [
+            'status' => SchedulingHost::STATUS_ACTIVE,
+            'timezone' => $this->defaultTimezone(),
+            'capacity' => 1,
+            'email' => null,
+            'phone' => null,
+            'sort_order' => $this->nextHostSortOrder(),
+        ];
+
+        return $payload;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serviceCreatePayload(Request $request): array
+    {
+        $payload = $request->all();
+
+        if (! is_string($payload['key'] ?? null) || trim((string) $payload['key']) === '') {
+            $payload['key'] = $this->generatedServiceKey((string) ($payload['name'] ?? ''));
+        }
+
+        $payload += [
+            'description' => null,
+            'status' => BookableService::STATUS_ACTIVE,
+            'duration_mode' => BookableService::DURATION_MODE_FIXED,
+            'duration_minutes' => 60,
+            'minimum_duration_minutes' => null,
+            'maximum_duration_minutes' => null,
+            'slot_interval_minutes' => 15,
+            'buffer_before_minutes' => 0,
+            'buffer_after_minutes' => 0,
+            'minimum_notice_minutes' => 0,
+            'booking_horizon_days' => 60,
+            'cancellation_notice_minutes' => 0,
+            'reschedule_notice_minutes' => 0,
+            'timezone' => $this->defaultTimezone(),
+            'location_type' => null,
+            'location_label' => null,
+            'location_instructions' => null,
+            'location_url' => null,
+            'location_address_line_1' => null,
+            'location_address_line_2' => null,
+            'location_city' => null,
+            'location_region' => null,
+            'location_postal_code' => null,
+            'location_country' => null,
+            'capacity' => 1,
+            'requires_confirmation' => false,
+            'is_public' => false,
+            'sort_order' => $this->nextServiceSortOrder(),
+        ];
+
+        return $payload;
+    }
+
+    private function generatedHostKey(string $name): string
+    {
+        return $this->generatedKey(
+            name: $name,
+            fallback: 'staff',
+            exists: fn (string $key): bool => SchedulingHost::withTrashed()
+                ->where('key', $key)
+                ->exists(),
+        );
+    }
+
+    private function generatedServiceKey(string $name): string
+    {
+        return $this->generatedKey(
+            name: $name,
+            fallback: 'service',
+            exists: fn (string $key): bool => BookableService::withTrashed()
+                ->where('key', $key)
+                ->exists(),
+        );
+    }
+
+    /**
+     * @param callable(string): bool $exists
+     */
+    private function generatedKey(
+        string $name,
+        string $fallback,
+        callable $exists,
+    ): string {
+        $base = Str::slug($name, '_');
+        $base = $base !== '' ? $base : $fallback;
+        $base = mb_substr($base, 0, 170);
+        $candidate = $base;
+        $sequence = 2;
+
+        while ($exists($candidate)) {
+            $suffix = '_'.$sequence;
+            $candidate = mb_substr(
+                $base,
+                0,
+                max(1, 191 - mb_strlen($suffix)),
+            ).$suffix;
+            $sequence++;
+        }
+
+        return $candidate;
+    }
+
+    private function defaultTimezone(): string
+    {
+        $timezone = config('client.timezone', config('app.timezone', 'UTC'));
+
+        return is_string($timezone)
+            && in_array($timezone, timezone_identifiers_list(), true)
+                ? $timezone
+                : 'UTC';
+    }
+
+    private function nextHostSortOrder(): int
+    {
+        return min(
+            100000,
+            ((int) SchedulingHost::withTrashed()->max('sort_order')) + 10,
+        );
+    }
+
+    private function nextServiceSortOrder(): int
+    {
+        return min(
+            100000,
+            ((int) BookableService::withTrashed()->max('sort_order')) + 10,
+        );
     }
 
     /**

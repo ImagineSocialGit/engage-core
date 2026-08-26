@@ -162,9 +162,13 @@ Record:
 [ ] Are blocked/inert actions explained?
 [ ] Is partial readiness visible?
 [ ] Can the user reach the first useful result without exploring unrelated screens?
+[ ] Does the consuming surface contain the setup needed to complete its own job?
+[ ] If later maintenance lives elsewhere, does the first successful use name and link that exact location?
 ```
 
 If several durable prerequisites are required, explicitly assess whether the module needs a guided setup state.
+
+Do not treat the shared Settings & setup directory as the default answer to first use. The cross-platform getting-started area must remain deliberately limited; it should teach a few high-value platform concepts rather than mirror every enabled module as a checklist.
 
 ### Routine-use review
 
@@ -362,6 +366,18 @@ Long-term maintenance
 ```
 
 Do not force first-time users through maintenance-oriented screens simply because those screens already exist.
+
+For every durable choice created or selected during first use, record:
+
+```text
+Where is it first introduced or configured?
+Where is its authoritative long-term maintenance screen?
+Does Settings & setup link to that screen when the choice is shared or reusable?
+After the first successful use, is the later location taught once with an exact path and direct link?
+Will that guidance stay out of the way on later routine uses?
+```
+
+The first-use surface may link to the same maintenance screen when that is the simplest experience. It must still explain the choice in the context of the task. Do not duplicate durable state or create a second form merely to make the settings directory feel complete.
 
 ---
 

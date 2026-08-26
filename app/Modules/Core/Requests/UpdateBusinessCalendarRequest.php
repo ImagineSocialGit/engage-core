@@ -17,6 +17,7 @@ class UpdateBusinessCalendarRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'from' => ['nullable', Rule::in(['routes', 'settings'])],
             'skipped_weekdays' => ['sometimes', 'array', 'max:6'],
             'skipped_weekdays.*' => ['integer', 'distinct', 'between:1,7'],
             'exclusions' => ['sometimes', 'array', 'max:366'],

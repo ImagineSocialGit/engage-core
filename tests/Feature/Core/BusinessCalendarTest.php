@@ -102,6 +102,25 @@ class BusinessCalendarTest extends TestCase
         ]);
     }
 
+    public function test_business_calendar_preserves_routes_as_the_return_context(): void
+    {
+        $user = User::factory()->create();
+
+        $this
+            ->actingAs($user)
+            ->get(route('crm.business-calendar.edit', ['from' => 'routes']))
+            ->assertOk()
+            ->assertViewHas('returnContext', 'routes');
+
+        $this
+            ->actingAs($user)
+            ->put(route('crm.business-calendar.update'), [
+                'from' => 'routes',
+                'skipped_weekdays' => [6, 7],
+            ])
+            ->assertRedirect(route('crm.business-calendar.edit', ['from' => 'routes']));
+    }
+
     public function test_calendar_rejects_skipping_every_weekday(): void
     {
         $user = User::factory()->create();

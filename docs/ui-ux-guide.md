@@ -308,6 +308,31 @@ If the contact show page already uses a status index or status selector pattern,
 
 Do not introduce a new layout for the same mental model unless the new screen asks a meaningfully different question.
 
+### Keep setup with the work that needs it
+
+Most first-time setup belongs inside the workspace where the user is trying to do the work. A user should not have to complete a platform-wide checklist before sending a message, creating a booking, building a Route, or handling another ordinary business task.
+
+Use **Settings & setup** as a compact long-term maintenance directory for durable choices that may need to be found apart from their original workflow. It is not a second copy of every module screen and it is not a mandatory installation wizard.
+
+Apply these rules:
+
+```text
+The consuming surface exposes what is required to complete that surface.
+Shared or reusable choices have one authoritative maintenance screen.
+Settings & setup links to that screen; it does not duplicate its form or state.
+The getting-started area stays deliberately short and teaches the platform shape.
+It does not grow into one checklist item per enabled module.
+```
+
+When a user first creates or selects something whose later maintenance lives elsewhere, show a one-time contextual handoff after the action succeeds:
+
+```text
+Business days are shared.
+You can change them later under Settings & setup -> Business days.
+```
+
+The handoff must name the exact maintenance location and offer a direct link. Do not repeatedly interrupt routine work after the user has learned the location. Keep persistent explanation visible inside the original surface whenever it still matters to the decision being made.
+
 ### Preserve context for inline CRM actions
 
 CRM workflows should avoid unnecessary full-page reloads when an operator is acting inside a focused context such as a dashboard panel, task list, modal, contact panel, or setup checklist.
@@ -1447,6 +1472,9 @@ Does the UI avoid raw schema/config/event/provider jargon?
 Would a first-time client feel calm rather than overwhelmed?
 Does the screen avoid making the client feel like a software administrator?
 Does the UI preserve context after save where reloads would be frustrating?
+Does first-time setup stay in the surface that needs it?
+If later maintenance lives elsewhere, is that exact location taught once and linked?
+Is the shared getting-started list limited rather than mirroring every module?
 Is this production/client UI, not a reused dev-testing pattern?
 ```
 

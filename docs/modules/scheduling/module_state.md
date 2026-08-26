@@ -18,7 +18,7 @@ Scheduling owns the complete user-facing appointment and booking experience. Opt
 Scheduling should follow the Engage Core product barometer:
 
 ```text
-A client-facing scheduling task should be completable in 10-15 minutes total, and common appointment scheduling should usually take far less.
+A client-facing scheduling task should be completable in roughly 5-10 minutes total, and common appointment scheduling should usually take far less.
 ```
 
 Scheduling a known appointment on a known day should feel closer to a 30-second task than a configuration workflow.
@@ -44,6 +44,29 @@ Wire reminders and follow-up behavior.
 ```
 
 Scheduling should not become a generic calendar-builder product for clients to maintain.
+
+## CRM first-use and readiness UX
+
+The Scheduling CRM workspace distinguishes first-use setup from routine scheduling work. A truly empty installation should not present a cockpit of zero-value counters and unusable controls. It should guide the operator through the business prerequisites in this order:
+
+```text
+1. What can people schedule?
+2. Who handles appointments? (optional unless explicit assignment is needed)
+3. When can appointments happen?
+4. Book a test appointment
+```
+
+`SchedulingSetupReadiness` derives setup state from current Scheduling-owned runtime facts. Internal readiness requires at least one active service and at least one applicable positive availability window. An active SchedulingHost is intentionally not required because hostless services are valid runtime behavior. Public readiness additionally requires the public Scheduling surface to be enabled and at least one active public service.
+
+The first-use service create path asks for business inputs and generates or defaults technical values such as stable keys, status, timezone, capacity, slot interval, booking horizon, and sort order. Existing advanced service settings remain available after creation for uncommon policy needs such as variable-length/range bookings, buffers, notice windows, capacity policy, and detailed location behavior.
+
+SchedulingHost remains the internal model name, but normal client-facing setup uses staff/provider language. The UI should not require a client to understand internal host, provenance, key, source-ownership, or sort-order terminology to add a person who can handle appointments.
+
+Resources remain an advanced capability for rooms, equipment, or other limited shared items and should not dominate basic Scheduling setup.
+
+The availability engine remains generalized and authoritative. Its CRM authoring surface is the next dedicated UX pass: normal users should primarily express normal hours, exceptions, and unavailable times rather than reason about rule shape, union/intersection, or raw capacity mechanics.
+
+Any specialized term that must remain visible follows the shared UI/UX rule: explain it visibly below the control when understanding is important to the current decision, or use an accessible hover/focus/tap help affordance for secondary repeated terminology.
 
 ## Universal public booking surface
 

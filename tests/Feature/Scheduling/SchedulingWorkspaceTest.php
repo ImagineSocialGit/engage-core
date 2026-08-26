@@ -47,6 +47,35 @@ class SchedulingWorkspaceTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_empty_workspace_leads_with_guided_setup_instead_of_zero_state_dashboard(): void
+    {
+        $response = $this->actingAs(User::factory()->create())
+            ->get(route('crm.scheduling.index'));
+
+        $response
+            ->assertOk()
+            ->assertSee('data-scheduling-setup-readiness', false)
+            ->assertSee('data-scheduling-setup-step="service"', false)
+            ->assertSee('data-scheduling-setup-step="availability"', false)
+            ->assertDontSee('data-scheduling-routine-workspace', false);
+    }
+
+    public function test_workspace_hides_setup_guide_once_service_and_availability_are_ready(): void
+    {
+        $service = $this->service(['name' => 'Ready Consultation']);
+        $startsAt = CarbonImmutable::parse('2026-08-04 09:00:00 UTC');
+        $this->availability($service, null, $startsAt, $startsAt->addHour());
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('crm.scheduling.index', [
+                'bookable_service_id' => $service->id,
+                'date' => '2026-08-04',
+            ]))
+            ->assertOk()
+            ->assertDontSee('data-scheduling-setup-readiness', false)
+            ->assertSee('data-scheduling-routine-workspace', false);
+    }
+
     public function test_scheduling_navigation_and_workspace_present_upcoming_operational_state(): void
     {
         $user = User::factory()->create();

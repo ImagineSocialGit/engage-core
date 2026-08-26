@@ -98,6 +98,62 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
             );
     }
 
+    public function test_first_use_configuration_is_service_first_and_hides_generated_create_fields(): void
+    {
+        $response = $this->actingAs(User::factory()->create())
+            ->get(route('crm.scheduling.configuration.index'));
+
+        $response
+            ->assertOk()
+            ->assertSeeInOrder([
+                'data-configuration-section="services"',
+                'data-configuration-section="hosts"',
+            ], false)
+            ->assertDontSee('name="key"', false)
+            ->assertDontSee('name="sort_order"', false);
+    }
+
+    public function test_first_use_create_paths_generate_technical_defaults_from_business_inputs(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post(route('crm.scheduling.configuration.services.store'), [
+                'name' => 'Planning Call',
+                'duration_minutes' => 30,
+            ])
+            ->assertRedirect(route('crm.scheduling.configuration.index'))
+            ->assertSessionHasNoErrors();
+
+        $service = BookableService::query()->sole();
+
+        $this->assertSame('planning_call', $service->key);
+        $this->assertSame(BookableService::STATUS_ACTIVE, $service->status);
+        $this->assertSame(BookableService::DURATION_MODE_FIXED, $service->duration_mode);
+        $this->assertSame(30, $service->duration_minutes);
+        $this->assertSame(15, $service->slot_interval_minutes);
+        $this->assertSame(1, $service->capacity);
+        $this->assertFalse($service->requires_confirmation);
+        $this->assertFalse($service->is_public);
+        $this->assertSame(10, $service->sort_order);
+
+        $this->actingAs($user)
+            ->post(route('crm.scheduling.configuration.hosts.store'), [
+                'name' => 'Taylor Smith',
+                'email' => 'taylor@example.test',
+            ])
+            ->assertRedirect(route('crm.scheduling.configuration.index'))
+            ->assertSessionHasNoErrors();
+
+        $host = SchedulingHost::query()->sole();
+
+        $this->assertSame('taylor_smith', $host->key);
+        $this->assertSame(SchedulingHost::STATUS_ACTIVE, $host->status);
+        $this->assertSame(1, $host->capacity);
+        $this->assertSame(10, $host->sort_order);
+        $this->assertSame('taylor@example.test', $host->email);
+    }
+
     public function test_manual_hosts_are_created_and_updated_without_caller_owned_internals(): void
     {
         $user = User::factory()->create();

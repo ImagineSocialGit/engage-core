@@ -154,6 +154,14 @@
 
                 <main class="min-w-0 flex-1 {{ $mainSurfaceClass }}">
                     <div class="mx-auto w-full max-w-375 px-4 py-6 sm:px-6 sm:py-8">
+                        @if(session()->has(\App\Support\Guidance\FirstUseGuidance::SESSION_KEY))
+                            <div class="mb-6">
+                                <x-ui.feedback.contextual-guidance
+                                    :guidance="session(\App\Support\Guidance\FirstUseGuidance::SESSION_KEY)"
+                                />
+                            </div>
+                        @endif
+
                         {{ $slot }}
                     </div>
                 </main>

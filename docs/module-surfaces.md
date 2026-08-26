@@ -140,7 +140,19 @@ Rules:
 - a silent module may be explicitly enabled and remain embedded-only;
 - a loud module must still be explicitly available before its product surfaces are exposed.
 
-The current module config does not need a `surface_mode` runtime field. Documentation is the architecture authority until a concrete navigation or setup registry needs executable surface metadata.
+The module config deliberately does not infer a general `surface_mode`. Documentation remains the authority for loud/silent product classification. Concrete executable contributions are narrower:
+
+```text
+nav
+    eligible registered routes for the shared CRM navigation
+
+settings
+    module-owned links collected into the shared Settings & setup directory
+```
+
+`ModuleManager` exposes only contributions from explicitly enabled module definitions and ignores routes that are not registered. Dependency-loaded modules do not gain visibility merely because their providers are available. Settings contributions link to one authoritative maintenance surface; they do not duplicate the owning module's forms or persistence.
+
+The app-level `modules.settings` configuration owns the small category vocabulary and the deliberately capped getting-started list. Getting started is platform orientation, not executable surface metadata for every module and not a second installation checklist.
 
 ## The consuming module owns the experience
 
@@ -304,4 +316,4 @@ For each revision:
 2. identify current committed workflows;
 3. move unsupported audited ideas into deferred possibilities;
 4. keep the consuming loud module responsible for the user experience;
-5. add runtime surface metadata only when an executable navigation/settings registry actually requires it.
+5. add a concrete `nav` or `settings` contribution only when a registered product surface requires it; do not add a broad `surface_mode` merely for symmetry.

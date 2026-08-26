@@ -27,6 +27,7 @@ class ModuleNavigationTest extends TestCase
         $this->assertContains('crm.webinar-series.index', $routes);
         $this->assertContains('crm.flow-routes.index', $routes);
         $this->assertContains('crm.broadcasts.index', $routes);
+        $this->assertContains('crm.settings.index', $routes);
     }
 
     public function test_disabled_modules_do_not_expose_their_navigation_routes(): void

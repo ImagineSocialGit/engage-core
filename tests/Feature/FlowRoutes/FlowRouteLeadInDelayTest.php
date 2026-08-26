@@ -3,12 +3,14 @@
 namespace Tests\Feature\FlowRoutes;
 
 use App\Http\Middleware\ForceStagingAccess;
+use App\Models\DashboardAcknowledgement;
 use App\Models\User;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRouteCapability;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
+use App\Support\Guidance\FirstUseGuidance;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -42,7 +44,15 @@ class FlowRouteLeadInDelayTest extends TestCase
             ])
             ->assertRedirect(route('crm.flow-routes.index', [
                 'edit_route' => $route->getKey(),
-            ]));
+            ]))
+            ->assertSessionHas(FirstUseGuidance::SESSION_KEY, function (array $guidance): bool {
+                return isset(
+                    $guidance['title'],
+                    $guidance['message'],
+                    $guidance['action_label'],
+                    $guidance['action_url'],
+                );
+            });
 
         $points = $route->activeFlowRoutePoints()->orderBy('sort_order')->get();
         $wait = $points->first();
@@ -53,6 +63,12 @@ class FlowRouteLeadInDelayTest extends TestCase
         $this->assertTrue($wait->is_start);
         $this->assertSame($action->getKey(), $wait->next_flow_route_point_id);
         $this->assertFalse($action->refresh()->is_start);
+        $this->assertDatabaseHas('dashboard_acknowledgements', [
+            'user_id' => $user->getKey(),
+            'surface' => FirstUseGuidance::SURFACE,
+            'item_type' => FirstUseGuidance::TYPE_SETTING_LOCATION,
+            'item_key' => 'business_days',
+        ]);
     }
 
     public function test_saving_the_lead_in_delay_updates_the_existing_first_wait(): void
@@ -113,6 +129,54 @@ class FlowRouteLeadInDelayTest extends TestCase
         $this->assertTrue($action->refresh()->is_active);
         $this->assertTrue($action->is_start);
         $this->assertNull($action->next_flow_route_point_id);
+    }
+
+    public function test_business_day_setting_location_guidance_is_shown_only_once_per_user(): void
+    {
+        $user = User::factory()->create();
+        $route = $this->createRoute();
+        $this->createActionPoint($route);
+        $this->createWaitCapability();
+
+        $input = [
+            'start_timing' => 'delayed',
+            'wait_mode' => 'duration',
+            'duration_value' => 2,
+            'duration_unit' => 'business_days',
+        ];
+
+        $this
+            ->actingAs($user)
+            ->patch(route('crm.flow-routes.start-delay.update', $route), $input)
+            ->assertSessionHas(FirstUseGuidance::SESSION_KEY);
+
+        $this
+            ->actingAs($user)
+            ->get(route('crm.flow-routes.index'))
+            ->assertOk();
+
+        $this
+            ->actingAs($user)
+            ->patch(route('crm.flow-routes.start-delay.update', $route), $input)
+            ->assertSessionMissing(FirstUseGuidance::SESSION_KEY);
+
+        $otherUser = User::factory()->create();
+
+        $this
+            ->actingAs($otherUser)
+            ->patch(route('crm.flow-routes.start-delay.update', $route), $input)
+            ->assertSessionHas(FirstUseGuidance::SESSION_KEY);
+
+        $this->assertSame(1, DashboardAcknowledgement::query()
+            ->where('user_id', $user->getKey())
+            ->surface(FirstUseGuidance::SURFACE)
+            ->item(FirstUseGuidance::TYPE_SETTING_LOCATION, 'business_days')
+            ->count());
+        $this->assertSame(1, DashboardAcknowledgement::query()
+            ->where('user_id', $otherUser->getKey())
+            ->surface(FirstUseGuidance::SURFACE)
+            ->item(FirstUseGuidance::TYPE_SETTING_LOCATION, 'business_days')
+            ->count());
     }
 
     private function createRoute(): FlowRoute

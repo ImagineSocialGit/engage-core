@@ -266,8 +266,8 @@
                     @endif
                 </div>
 
-                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div>
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                    <div class="col-span-2">
                         <p class="text-sm text-slate-500">Email</p>
                         <p class="break-words font-medium text-slate-900">{{ $contact->email ?: '—' }}</p>
                     </div>

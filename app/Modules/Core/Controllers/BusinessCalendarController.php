@@ -7,6 +7,7 @@ use App\Modules\Core\Models\BusinessCalendarExclusion;
 use App\Modules\Core\Requests\UpdateBusinessCalendarRequest;
 use App\Modules\Core\Services\BusinessCalendar\DefaultBusinessCalendarResolver;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -17,10 +18,13 @@ class BusinessCalendarController extends Controller
         private readonly DefaultBusinessCalendarResolver $calendars,
     ) {}
 
-    public function edit(): View
+    public function edit(Request $request): View
     {
         return view('crm.business-calendar.edit', [
             'calendar' => $this->calendars->resolve(),
+            'returnContext' => $request->query('from') === 'routes'
+                ? 'routes'
+                : 'settings',
             'weekdays' => [
                 1 => 'Monday',
                 2 => 'Tuesday',
@@ -88,7 +92,11 @@ class BusinessCalendarController extends Controller
         });
 
         return redirect()
-            ->route('crm.business-calendar.edit')
+            ->route('crm.business-calendar.edit', [
+                'from' => ($validated['from'] ?? null) === 'routes'
+                    ? 'routes'
+                    : null,
+            ])
             ->with('status', 'Business days updated.');
     }
 }

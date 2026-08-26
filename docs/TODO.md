@@ -7,7 +7,6 @@ Delete completed items rather than accumulating project history. Durable archite
 ## Module system and shared surfaces
 
 - [ ] Apply the module identity/state standard when each module is next materially revised; do not churn files solely for symmetry.
-- [ ] Add executable navigation/settings contribution metadata only when a concrete registry or UI workflow requires it.
 - [ ] Refactor the hard-coded installed-module inventory assertion in `tests/Feature/Modules/ModuleDependencyBoundaryTest.php` so `config/modules.php` remains the only hand-maintained module-existence registry.
 
 ## Project State framework

@@ -176,7 +176,167 @@ class ModuleManager
         return array_values($items);
     }
 
+    /**
+     * @return array<int, array{
+     *     key: string,
+     *     label: string,
+     *     description: string,
+     *     priority: int
+     * }>
+     */
+    public function settingsCategories(): array
+    {
+        $categories = [];
 
+        foreach (Arr::wrap(config('modules.settings.categories', [])) as $key => $category) {
+            if (! is_string($key) || trim($key) === '' || ! is_array($category)) {
+                continue;
+            }
+
+            $label = $category['label'] ?? null;
+            $description = $category['description'] ?? null;
+
+            if (! is_string($label) || trim($label) === ''
+                || ! is_string($description) || trim($description) === '') {
+                continue;
+            }
+
+            $categories[] = [
+                'key' => trim($key),
+                'label' => trim($label),
+                'description' => trim($description),
+                'priority' => (int) ($category['priority'] ?? 100),
+            ];
+        }
+
+        usort($categories, function (array $a, array $b): int {
+            $priority = $a['priority'] <=> $b['priority'];
+
+            return $priority !== 0
+                ? $priority
+                : strnatcasecmp($a['label'], $b['label']);
+        });
+
+        return array_values($categories);
+    }
+
+    /**
+     * @return array<int, array{
+     *     key: string,
+     *     module: string,
+     *     category: string,
+     *     label: string,
+     *     description: string,
+     *     route: string,
+     *     href: string,
+     *     priority: int
+     * }>
+     */
+    public function settingsItems(): array
+    {
+        $items = [];
+
+        foreach ($this->enabledDefinitions() as $moduleKey => $definition) {
+            foreach ($this->normalizeSettingsItems($definition['settings'] ?? []) as $item) {
+                $route = $item['route'] ?? null;
+
+                if (! is_string($route) || trim($route) === '' || ! Route::has($route)) {
+                    continue;
+                }
+
+                $key = $item['key'] ?? null;
+                $category = $item['category'] ?? null;
+                $label = $item['label'] ?? null;
+                $description = $item['description'] ?? null;
+
+                if (! is_string($key) || trim($key) === ''
+                    || ! is_string($category) || trim($category) === ''
+                    || ! is_string($label) || trim($label) === ''
+                    || ! is_string($description) || trim($description) === '') {
+                    continue;
+                }
+
+                $items[] = [
+                    'key' => $moduleKey.'.'.trim($key),
+                    'module' => $moduleKey,
+                    'category' => trim($category),
+                    'label' => trim($label),
+                    'description' => trim($description),
+                    'route' => trim($route),
+                    'href' => route(trim($route)),
+                    'priority' => (int) ($item['priority'] ?? 100),
+                ];
+            }
+        }
+
+        usort($items, function (array $a, array $b): int {
+            $priority = $a['priority'] <=> $b['priority'];
+
+            return $priority !== 0
+                ? $priority
+                : strnatcasecmp($a['label'], $b['label']);
+        });
+
+        return array_values($items);
+    }
+
+    /**
+     * @return array<int, array{
+     *     key: string,
+     *     module: string,
+     *     label: string,
+     *     description: string,
+     *     route: string,
+     *     href: string,
+     *     priority: int
+     * }>
+     */
+    public function gettingStartedItems(): array
+    {
+        $items = [];
+
+        foreach (Arr::wrap(config('modules.settings.getting_started.items', [])) as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $moduleKey = $item['module'] ?? null;
+            $route = $item['route'] ?? null;
+            $key = $item['key'] ?? null;
+            $label = $item['label'] ?? null;
+            $description = $item['description'] ?? null;
+
+            if (! is_string($moduleKey) || ! $this->enabled($moduleKey)
+                || ! is_string($route) || ! Route::has($route)
+                || ! is_string($key) || trim($key) === ''
+                || ! is_string($label) || trim($label) === ''
+                || ! is_string($description) || trim($description) === '') {
+                continue;
+            }
+
+            $items[] = [
+                'key' => trim($key),
+                'module' => $moduleKey,
+                'label' => trim($label),
+                'description' => trim($description),
+                'route' => $route,
+                'href' => route($route),
+                'priority' => (int) ($item['priority'] ?? 100),
+            ];
+        }
+
+        usort($items, function (array $a, array $b): int {
+            $priority = $a['priority'] <=> $b['priority'];
+
+            return $priority !== 0
+                ? $priority
+                : strnatcasecmp($a['label'], $b['label']);
+        });
+
+        $maximum = max(0, (int) config('modules.settings.getting_started.max', 3));
+
+        return array_slice(array_values($items), 0, $maximum);
+    }
 
     /**
      * @param array<string, mixed> $item
@@ -247,6 +407,25 @@ class ModuleManager
         }
 
         return [$nav];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeSettingsItems(mixed $settings): array
+    {
+        if (! is_array($settings) || $settings === []) {
+            return [];
+        }
+
+        if (array_is_list($settings)) {
+            return array_values(array_filter(
+                $settings,
+                fn (mixed $item): bool => is_array($item),
+            ));
+        }
+
+        return [$settings];
     }
 
     /**

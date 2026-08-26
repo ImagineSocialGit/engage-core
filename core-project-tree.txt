@@ -262,7 +262,8 @@
 │   │   │   │   ├── ContactController.php
 │   │   │   │   ├── ContactImportBatchController.php
 │   │   │   │   ├── ContactLookupController.php
-│   │   │   │   └── ContactNoteController.php
+│   │   │   │   ├── ContactNoteController.php
+│   │   │   │   └── SettingsController.php
 │   │   │   ├── Data
 │   │   │   │   └── Contacts
 │   │   │   │       ├── ContactImportContext.php
@@ -1119,7 +1120,8 @@
 │   │   │   │   ├── SchedulingLocalDateTimeResolver.php
 │   │   │   │   ├── SchedulingLocationSnapshotResolver.php
 │   │   │   │   ├── SchedulingReadService.php
-│   │   │   │   └── SchedulingResourceConfigurationWriter.php
+│   │   │   │   ├── SchedulingResourceConfigurationWriter.php
+│   │   │   │   └── SchedulingSetupReadiness.php
 │   │   │   ├── Support
 │   │   │   └── Validation
 │   │   │       └── SchedulingSetupValidationContributor.php
@@ -1485,6 +1487,8 @@
 │       │   ├── Contracts
 │       │   │   └── DestinationVerificationTransport.php
 │       │   └── UnavailableDestinationVerificationTransport.php
+│       ├── Guidance
+│       │   └── FirstUseGuidance.php
 │       ├── ModuleIntegrations
 │       │   ├── Forms
 │       │   │   ├── Contracts
@@ -2172,7 +2176,8 @@
 │       │   │   ├── disclosures.blade.php
 │       │   │   ├── feedback
 │       │   │   │   ├── alert.blade.php
-│       │   │   │   └── badge.blade.php
+│       │   │   │   ├── badge.blade.php
+│       │   │   │   └── contextual-guidance.blade.php
 │       │   │   ├── form
 │       │   │   │   ├── checkbox.blade.php
 │       │   │   │   ├── error.blade.php
@@ -2268,6 +2273,8 @@
 │       │   │   ├── reschedule.blade.php
 │       │   │   ├── resources.blade.php
 │       │   │   └── show.blade.php
+│       │   ├── settings
+│       │   │   └── index.blade.php
 │       │   ├── tasks
 │       │   │   ├── index.blade.php
 │       │   │   ├── show.blade.php
@@ -2461,6 +2468,7 @@
 │   │   │   ├── ProcessHighwayMapBuilderTest.php
 │   │   │   ├── ProcessHighwaySurfaceTest.php
 │   │   │   ├── ProcessHighwayUsabilitySurfaceTest.php
+│   │   │   ├── SettingsHubTest.php
 │   │   │   └── SyncContactStatusPresetsActionTest.php
 │   │   ├── CRM
 │   │   │   ├── DashboardControllerTest.php
@@ -2752,6 +2760,7 @@
 │   │   │   ├── SchedulingLocalDateTimeResolverTest.php
 │   │   │   ├── SchedulingLocationSnapshotRuntimeTest.php
 │   │   │   ├── SchedulingResourceConfigurationWorkspaceTest.php
+│   │   │   ├── SchedulingSetupReadinessTest.php
 │   │   │   ├── SchedulingWorkspaceTest.php
 │   │   │   └── TravelAwareAvailabilityTest.php
 │   │   ├── SetupValidation
@@ -2876,4 +2885,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-688 directories, 2189 files
+690 directories, 2196 files

@@ -8,6 +8,7 @@ use App\Modules\Core\Controllers\ContactController;
 use App\Modules\Core\Controllers\ContactImportBatchController;
 use App\Modules\Core\Controllers\ContactLookupController;
 use App\Modules\Core\Controllers\ContactNoteController;
+use App\Modules\Core\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [DashboardController::class, 'index'])->name('crm.index');
@@ -23,6 +24,9 @@ Route::get('/business-days', [BusinessCalendarController::class, 'edit'])
 
 Route::put('/business-days', [BusinessCalendarController::class, 'update'])
     ->name('crm.business-calendar.update');
+
+Route::get('/settings', SettingsController::class)
+    ->name('crm.settings.index');
 
 Route::get('/project-state', [ProjectStateController::class, 'index'])
     ->name('crm.project-state.index');

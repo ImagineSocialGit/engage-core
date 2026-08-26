@@ -14,6 +14,7 @@ use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Requests\StoreAppointmentRequest;
 use App\Modules\Scheduling\Services\SchedulingLocationSnapshotResolver;
 use App\Modules\Scheduling\Services\SchedulingReadService;
+use App\Modules\Scheduling\Services\SchedulingSetupReadiness;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
@@ -29,6 +30,7 @@ class SchedulingController extends Controller
     public function index(
         Request $request,
         SchedulingReadService $read,
+        SchedulingSetupReadiness $setupReadiness,
     ): View {
         $query = $request->validate([
             'contact_id' => ['nullable', 'integer', 'exists:contacts,id'],
@@ -128,6 +130,7 @@ class SchedulingController extends Controller
             'pendingCount' => $upcomingAppointments
                 ->where('status', Appointment::STATUS_PENDING)
                 ->count(),
+            'setupReadiness' => $setupReadiness->summary(),
             'selectedContact' => $selectedContact,
             'selectedContactLabel' => $selectedContactLabel,
             'idempotencyKey' => $request->old(

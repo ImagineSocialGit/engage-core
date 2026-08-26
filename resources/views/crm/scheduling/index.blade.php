@@ -1,7 +1,7 @@
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
-    subheading="Review upcoming appointments and schedule a contact into a currently available time."
+    subheading="Set up Scheduling, review upcoming appointments, and book a contact into an available time."
 >
     <div class="space-y-6">
         <div class="flex sm:justify-end">
@@ -10,7 +10,7 @@
                 class="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto"
                 data-scheduling-configuration-link
             >
-                Manage configuration
+                Manage setup
             </a>
         </div>
 
@@ -26,7 +26,102 @@
             </x-ui.feedback.alert>
         @endif
 
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        @if (! $setupReadiness['internal_ready'])
+            <x-ui.card class="space-y-5" data-scheduling-setup-readiness>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
+                            Set up Scheduling
+                        </div>
+                        <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
+                            Get ready to book the first appointment
+                        </h2>
+                        <p class="mt-1 max-w-2xl text-sm text-slate-500">
+                            Start with what people can schedule, then add availability. Staff or providers are optional unless appointments need a specific assignee.
+                        </p>
+                    </div>
+
+                    <span class="inline-flex self-start rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                        Setup incomplete
+                    </span>
+                </div>
+
+                <div class="grid gap-3 lg:grid-cols-2">
+                    <div class="rounded-xl border border-slate-200 p-4" data-scheduling-setup-step="service">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full {{ $setupReadiness['has_service'] ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700' }} text-sm font-semibold">
+                                {{ $setupReadiness['has_service'] ? '✓' : '1' }}
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="font-semibold text-slate-900">What can people schedule?</p>
+                                <p class="mt-1 text-sm text-slate-500">
+                                    Add at least one active service, such as a consultation, lesson, visit, or appointment type.
+                                </p>
+                                <a href="{{ route('crm.scheduling.configuration.index') }}#services" class="mt-3 inline-flex text-sm font-semibold text-teal-700 hover:underline">
+                                    {{ $setupReadiness['has_service'] ? 'Review services' : 'Add the first service' }}
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rounded-xl border border-slate-200 p-4" data-scheduling-setup-step="people">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full {{ $setupReadiness['has_active_host'] ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700' }} text-sm font-semibold">
+                                {{ $setupReadiness['has_active_host'] ? '✓' : '2' }}
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="font-semibold text-slate-900">Who handles appointments?</p>
+                                <p class="mt-1 text-sm text-slate-500">
+                                    Optional. Add staff or providers only when a booking needs to be assigned to a specific person.
+                                </p>
+                                <a href="{{ route('crm.scheduling.configuration.index') }}#people" class="mt-3 inline-flex text-sm font-semibold text-teal-700 hover:underline">
+                                    {{ $setupReadiness['has_active_host'] ? 'Review staff and providers' : 'Add staff or a provider' }}
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rounded-xl border border-slate-200 p-4" data-scheduling-setup-step="availability">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full {{ $setupReadiness['has_availability'] ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700' }} text-sm font-semibold">
+                                {{ $setupReadiness['has_availability'] ? '✓' : '3' }}
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="font-semibold text-slate-900">When can appointments happen?</p>
+                                <p class="mt-1 text-sm text-slate-500">
+                                    Add at least one available time so Scheduling can offer or create appointments.
+                                </p>
+                                <a href="{{ route('crm.scheduling.configuration.availability.index') }}" class="mt-3 inline-flex text-sm font-semibold text-teal-700 hover:underline">
+                                    {{ $setupReadiness['has_availability'] ? 'Review availability' : 'Set availability' }}
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rounded-xl border border-slate-200 p-4" data-scheduling-setup-step="test">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700">
+                                4
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="font-semibold text-slate-900">Book a test appointment</p>
+                                <p class="mt-1 text-sm text-slate-500">
+                                    Once a service and availability are ready, come back here and schedule a contact to make sure the setup behaves the way you expect.
+                                </p>
+                                @if ($setupReadiness['has_service'] && $setupReadiness['has_availability'])
+                                    <span class="mt-3 inline-flex text-sm font-semibold text-emerald-700">Ready to test</span>
+                                @else
+                                    <span class="mt-3 inline-flex text-sm font-medium text-slate-400">Finish the required steps first</span>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </x-ui.card>
+        @endif
+
+        @if (! $setupReadiness['empty'])
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-scheduling-routine-workspace>
             <x-ui.card>
                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Upcoming
@@ -47,7 +142,7 @@
                     {{ $pendingCount }}
                 </p>
                 <p class="mt-1 text-sm text-slate-500">
-                    Pending appointments that still need lifecycle follow-up.
+                    Appointments that still need confirmation.
                 </p>
             </x-ui.card>
 
@@ -159,7 +254,7 @@
                         </h2>
 
                         <p class="mt-1 text-sm text-slate-500">
-                            Availability is recalculated from current service, host, window, hold, and appointment state.
+                            Times shown reflect the current hours, assigned staff, existing appointments, and other booking limits.
                         </p>
                     </div>
 
@@ -207,7 +302,7 @@
                             @if($requiresHost)
                                 <div>
                                     <x-ui.form.label for="scheduling_host_id">
-                                        Host
+                                        Staff / provider
                                     </x-ui.form.label>
 
                                     <x-ui.form.select
@@ -215,7 +310,7 @@
                                         name="scheduling_host_id"
                                         onchange="this.form.submit()"
                                     >
-                                        <option value="">Choose a host</option>
+                                        <option value="">Choose staff / provider</option>
 
                                         @foreach($hosts as $host)
                                             <option
@@ -229,7 +324,7 @@
 
                                     @if($hosts->isEmpty())
                                         <p class="mt-2 text-xs font-semibold text-amber-700">
-                                            This service has no active assigned host.
+                                            No active staff or provider is assigned to this service.
                                         </p>
                                     @endif
                                 </div>
@@ -428,7 +523,7 @@
 
                                     @if($requiresHost && ! $selectedHost)
                                         <p class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                                            Choose an active assigned host before entering the stay interval.
+                                            Choose assigned staff or a provider before entering the stay interval.
                                         </p>
                                     @else
                                         <div class="mt-2 grid gap-4 sm:grid-cols-2">
@@ -464,7 +559,7 @@
 
                                     @if($requiresHost && ! $selectedHost)
                                         <p class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                                            Choose an active assigned host before selecting a time.
+                                            Choose assigned staff or a provider before selecting a time.
                                         </p>
                                     @elseif($slots === [])
                                         <p class="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
@@ -523,5 +618,6 @@
                 @endif
             </div>
         </div>
+        @endif
     </div>
 </x-layouts.crm>

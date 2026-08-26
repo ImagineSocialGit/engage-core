@@ -1,7 +1,7 @@
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
-    subheading="Manage the durable hosts, services, and host assignments used by Scheduling."
+    subheading="Choose what people can schedule, who can handle appointments, and when appointments can happen."
 >
     @php
         $hostStatuses = [
@@ -30,7 +30,7 @@
             </a>
 
             <p class="text-sm text-slate-500">
-                Keys and source ownership are immutable after creation.
+                Start with a service. Scheduling fills in the rest with safe defaults.
             </p>
         </div>
 
@@ -50,437 +50,82 @@
             </x-ui.feedback.alert>
         @endif
 
-        <x-ui.card>
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between" data-scheduling-resource-configuration-link>
-                <div>
-                    <p class="text-sm font-semibold text-slate-900">Selective-overlap resources</p>
-                    <p class="mt-1 text-sm text-slate-500">
-                        Manage resource identities, host capacities, service requirements, and configured resource ceilings in the dedicated workspace.
-                    </p>
-                </div>
-
-                <a
-                    href="{{ route('crm.scheduling.configuration.resources.index') }}"
-                    class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
-                >
-                    Manage resources
-                </a>
-            </div>
-        </x-ui.card>
-
-        <x-ui.card>
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between" data-scheduling-availability-configuration-link>
-                <div>
-                    <p class="text-sm font-semibold text-slate-900">Availability and blackout rules</p>
-                    <p class="mt-1 text-sm text-slate-500">
-                        Manage weekly schedules, absolute exceptions, capacities, and resolved-slot previews in the dedicated workspace.
-                    </p>
-                </div>
-
-                <a
-                    href="{{ route('crm.scheduling.configuration.availability.index') }}"
-                    class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
-                >
-                    Manage availability
-                </a>
-            </div>
-        </x-ui.card>
-
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <x-ui.card>
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Hosts</p>
-                <p class="mt-2 text-3xl font-semibold text-slate-900" data-configuration-host-count="{{ $hosts->count() }}">
-                    {{ $hosts->count() }}
-                </p>
-            </x-ui.card>
-
-            <x-ui.card>
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Active hosts</p>
-                <p class="mt-2 text-3xl font-semibold text-slate-900">
-                    {{ $hosts->where('status', \App\Modules\Scheduling\Models\SchedulingHost::STATUS_ACTIVE)->count() }}
-                </p>
-            </x-ui.card>
-
-            <x-ui.card>
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Services</p>
-                <p class="mt-2 text-3xl font-semibold text-slate-900" data-configuration-service-count="{{ $services->count() }}">
-                    {{ $services->count() }}
-                </p>
-            </x-ui.card>
-
-            <x-ui.card>
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Public services</p>
-                <p class="mt-2 text-3xl font-semibold text-slate-900">
-                    {{ $services->where('status', \App\Modules\Scheduling\Models\BookableService::STATUS_ACTIVE)->where('is_public', true)->count() }}
-                </p>
-            </x-ui.card>
-        </div>
-
         <datalist id="scheduling-timezones">
             @foreach ($timezones as $timezone)
                 <option value="{{ $timezone }}"></option>
             @endforeach
         </datalist>
 
-        <section class="space-y-5" data-configuration-section="hosts">
-            <div>
-                <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                    Hosts
-                </div>
-                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
-                    Scheduling hosts
-                </h2>
-            </div>
-
-            <x-ui.card class="space-y-4">
-                <h3 class="font-semibold text-slate-900">Create a manual host</h3>
-
-                <form
-                    method="POST"
-                    action="{{ route('crm.scheduling.configuration.hosts.store') }}"
-                    class="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
-                    data-configuration-host-create
-                >
-                    @csrf
-
-                    <label class="{{ $labelClass }}">
-                        Key
-                        <input class="{{ $inputClass }}" name="key" value="{{ old('key') }}" required pattern="[a-z0-9]+(?:[-_][a-z0-9]+)*">
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Name
-                        <input class="{{ $inputClass }}" name="name" value="{{ old('name') }}" required>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Status
-                        <select class="{{ $inputClass }}" name="status" required>
-                            @foreach ($hostStatuses as $status)
-                                <option value="{{ $status }}" @selected(old('status', 'active') === $status)>
-                                    {{ str($status)->replace('_', ' ')->title() }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Timezone
-                        <input class="{{ $inputClass }}" name="timezone" list="scheduling-timezones" value="{{ old('timezone', $defaultTimezone) }}" required>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Overall concurrent appointment capacity
-                        <input class="{{ $inputClass }}" type="number" min="1" max="100000" name="capacity" value="{{ old('capacity', 1) }}" required>
-                        <span class="mt-1 block text-xs font-normal text-slate-500">
-                            Maximum simultaneous Appointments for this host. This is not a physical-presence or appointment-type-specific limit.
-                        </span>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Email
-                        <input class="{{ $inputClass }}" type="email" name="email" value="{{ old('email') }}">
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Phone
-                        <input class="{{ $inputClass }}" name="phone" value="{{ old('phone') }}">
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Sort order
-                        <input class="{{ $inputClass }}" type="number" min="0" max="100000" name="sort_order" value="{{ old('sort_order', 0) }}" required>
-                    </label>
-
-                    <div class="md:col-span-2 xl:col-span-4">
-                        <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
-                            Create host
-                        </button>
-                    </div>
-                </form>
-            </x-ui.card>
-
-            <div class="grid gap-4 xl:grid-cols-2">
-                @forelse ($hosts as $host)
-                    @php
-                        $hostEditable = (bool) $host->getAttribute('crm_editable');
-                    @endphp
-
-                    <div
-                        data-scheduling-host-id="{{ $host->id }}"
-                        data-crm-editable="{{ $hostEditable ? '1' : '0' }}"
-                    >
-                        <x-ui.card class="space-y-4">
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <h3 class="font-semibold text-slate-900">{{ $host->name }}</h3>
-                                <p class="mt-1 font-mono text-xs text-slate-500">{{ $host->key }}</p>
-                            </div>
-                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                {{ str($host->status)->replace('_', ' ')->title() }}
-                            </span>
-                        </div>
-
-                        <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-4">
-                            <div>
-                                <dt class="text-slate-500">Source</dt>
-                                <dd class="font-medium text-slate-900">{{ $host->source }}</dd>
-                            </div>
-                            <div>
-                                <dt class="text-slate-500">Assignments</dt>
-                                <dd class="font-medium text-slate-900" data-active-assignment-count="{{ $host->active_service_assignments_count }}">
-                                    {{ $host->active_service_assignments_count }}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt class="text-slate-500">Appointments</dt>
-                                <dd class="font-medium text-slate-900" data-appointment-count="{{ $host->appointments_count }}">
-                                    {{ $host->appointments_count }}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt class="text-slate-500">Windows</dt>
-                                <dd class="font-medium text-slate-900">{{ $host->availability_windows_count }}</dd>
-                            </div>
-                        </dl>
-
-                        @if ($hostEditable)
-                            <form
-                                method="POST"
-                                action="{{ route('crm.scheduling.configuration.hosts.update', $host) }}"
-                                class="grid gap-4 sm:grid-cols-2"
-                                data-configuration-host-update="{{ $host->id }}"
-                            >
-                                @csrf
-                                @method('PATCH')
-                                <input type="hidden" name="current_version" value="{{ $host->updated_at?->toISOString() }}">
-
-                                <label class="{{ $labelClass }}">
-                                    Name
-                                    <input class="{{ $inputClass }}" name="name" value="{{ $host->name }}" required>
-                                </label>
-
-                                <label class="{{ $labelClass }}">
-                                    Status
-                                    <select class="{{ $inputClass }}" name="status" required>
-                                        @foreach ($hostStatuses as $status)
-                                            <option value="{{ $status }}" @selected($host->status === $status)>
-                                                {{ str($status)->replace('_', ' ')->title() }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </label>
-
-                                <label class="{{ $labelClass }}">
-                                    Timezone
-                                    <input class="{{ $inputClass }}" name="timezone" list="scheduling-timezones" value="{{ $host->timezone }}" required>
-                                </label>
-
-                                <label class="{{ $labelClass }}">
-                                    Overall concurrent appointment capacity
-                                    <input class="{{ $inputClass }}" type="number" min="1" max="100000" name="capacity" value="{{ $host->capacity }}" required>
-                                    <span class="mt-1 block text-xs font-normal text-slate-500">
-                                        Maximum simultaneous Appointments for this host. This is not a physical-presence or appointment-type-specific limit.
-                                    </span>
-                                </label>
-
-                                <label class="{{ $labelClass }}">
-                                    Email
-                                    <input class="{{ $inputClass }}" type="email" name="email" value="{{ $host->email }}">
-                                </label>
-
-                                <label class="{{ $labelClass }}">
-                                    Phone
-                                    <input class="{{ $inputClass }}" name="phone" value="{{ $host->phone }}">
-                                </label>
-
-                                <label class="{{ $labelClass }}">
-                                    Sort order
-                                    <input class="{{ $inputClass }}" type="number" min="0" max="100000" name="sort_order" value="{{ $host->sort_order }}" required>
-                                </label>
-
-                                <div class="self-end">
-                                    <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto">
-                                        Save host
-                                    </button>
-                                </div>
-                            </form>
-                        @else
-                            <div class="{{ $readOnlyClass }}" data-configuration-read-only="host">
-                                <p class="text-sm text-slate-600">
-                                    This host is owned by a provider, the system, or another model and is read-only here.
-                                </p>
-                            </div>
-                        @endif
-                        </x-ui.card>
-                    </div>
-                @empty
-                    <x-ui.card>
-                        <div data-configuration-empty="hosts" class="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
-                            No hosts are configured.
-                        </div>
-                    </x-ui.card>
-                @endforelse
-            </div>
-        </section>
-
-        <section class="space-y-5" data-configuration-section="services">
+        <section class="space-y-5" id="services" data-configuration-section="services">
             <div>
                 <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
                     Services
                 </div>
                 <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
-                    Bookable services
+                    What can people schedule?
                 </h2>
             </div>
 
-            <x-ui.card class="space-y-4">
-                <h3 class="font-semibold text-slate-900">Create a manual service</h3>
+            <x-ui.card class="space-y-5">
+                <div>
+                    <h3 class="text-lg font-semibold text-slate-900">Add something people can schedule</h3>
+                    <p class="mt-1 text-sm text-slate-500">
+                        Start with the basics. Scheduling will fill in sensible defaults, and you can change advanced booking rules later.
+                    </p>
+                </div>
 
                 <form
                     method="POST"
                     action="{{ route('crm.scheduling.configuration.services.store') }}"
-                    class="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+                    class="grid gap-4 md:grid-cols-2"
                     data-configuration-service-create
-                    x-data="{ locationType: @js(old('location_type', '')), durationMode: @js(old('duration_mode', 'fixed')) }"
+                    x-data="{ locationType: @js(old('location_type', '')) }"
                 >
                     @csrf
 
                     <label class="{{ $labelClass }}">
-                        Key
-                        <input class="{{ $inputClass }}" name="key" value="{{ old('key') }}" required pattern="[a-z0-9]+(?:[-_][a-z0-9]+)*">
+                        What can people schedule?
+                        <input class="{{ $inputClass }}" name="name" value="{{ old('name') }}" placeholder="30-minute consultation" required>
                     </label>
 
                     <label class="{{ $labelClass }}">
-                        Name
-                        <input class="{{ $inputClass }}" name="name" value="{{ old('name') }}" required>
+                        Appointment length (minutes)
+                        <input class="{{ $inputClass }}" type="number" min="1" max="1440" name="duration_minutes" value="{{ old('duration_minutes', 60) }}" required>
                     </label>
 
                     <label class="{{ $labelClass }} md:col-span-2">
-                        Description
-                        <textarea class="{{ $inputClass }}" name="description" rows="2">{{ old('description') }}</textarea>
+                        Description <span class="font-normal text-slate-400">(optional)</span>
+                        <textarea class="{{ $inputClass }}" name="description" rows="2" placeholder="What should a customer or staff member know about this appointment?">{{ old('description') }}</textarea>
                     </label>
 
                     <label class="{{ $labelClass }}">
-                        Status
-                        <select class="{{ $inputClass }}" name="status" required>
-                            @foreach ($serviceStatuses as $status)
-                                <option value="{{ $status }}" @selected(old('status', 'active') === $status)>
-                                    {{ str($status)->replace('_', ' ')->title() }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Timezone
-                        <input class="{{ $inputClass }}" name="timezone" list="scheduling-timezones" value="{{ old('timezone', $defaultTimezone) }}" required>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Duration mode
-                        <select class="{{ $inputClass }}" name="duration_mode" x-model="durationMode" required>
-                            <option value="fixed">Fixed appointment</option>
-                            <option value="range">Range / multi-day stay</option>
-                        </select>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        <span x-text="durationMode === 'range' ? 'Default duration minutes' : 'Duration minutes'"></span>
-                        <input class="{{ $inputClass }}" type="number" min="1" x-bind:max="durationMode === 'range' ? {{ \App\Modules\Scheduling\Models\BookableService::MAX_RANGE_DURATION_MINUTES }} : 1440" name="duration_minutes" value="{{ old('duration_minutes', 60) }}" required>
-                    </label>
-
-                    <label class="{{ $labelClass }}" x-show="durationMode === 'range'" x-cloak>
-                        Minimum duration minutes
-                        <input class="{{ $inputClass }}" type="number" min="1" max="{{ \App\Modules\Scheduling\Models\BookableService::MAX_RANGE_DURATION_MINUTES }}" name="minimum_duration_minutes" value="{{ old('minimum_duration_minutes', 1440) }}" x-bind:disabled="durationMode !== 'range'" x-bind:required="durationMode === 'range'">
-                    </label>
-
-                    <label class="{{ $labelClass }}" x-show="durationMode === 'range'" x-cloak>
-                        Maximum duration minutes
-                        <input class="{{ $inputClass }}" type="number" min="1" max="{{ \App\Modules\Scheduling\Models\BookableService::MAX_RANGE_DURATION_MINUTES }}" name="maximum_duration_minutes" value="{{ old('maximum_duration_minutes', 10080) }}" x-bind:disabled="durationMode !== 'range'" x-bind:required="durationMode === 'range'">
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Slot interval minutes
-                        <input class="{{ $inputClass }}" type="number" min="1" max="1440" name="slot_interval_minutes" value="{{ old('slot_interval_minutes', 15) }}" required>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Buffer before
-                        <input class="{{ $inputClass }}" type="number" min="0" name="buffer_before_minutes" value="{{ old('buffer_before_minutes', 0) }}" required>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Buffer after
-                        <input class="{{ $inputClass }}" type="number" min="0" name="buffer_after_minutes" value="{{ old('buffer_after_minutes', 0) }}" required>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Minimum notice minutes
-                        <input class="{{ $inputClass }}" type="number" min="0" name="minimum_notice_minutes" value="{{ old('minimum_notice_minutes', 0) }}" required>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Booking horizon days
-                        <input class="{{ $inputClass }}" type="number" min="0" name="booking_horizon_days" value="{{ old('booking_horizon_days', 60) }}" required>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Cancellation notice minutes
-                        <input class="{{ $inputClass }}" type="number" min="0" name="cancellation_notice_minutes" value="{{ old('cancellation_notice_minutes', 0) }}" required>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Reschedule notice minutes
-                        <input class="{{ $inputClass }}" type="number" min="0" name="reschedule_notice_minutes" value="{{ old('reschedule_notice_minutes', 0) }}" required>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Overall concurrent appointment capacity
-                        <input class="{{ $inputClass }}" type="number" min="1" max="100000" name="capacity" value="{{ old('capacity', 1) }}" required>
-                        <span class="mt-1 block text-xs font-normal text-slate-500">
-                            Maximum simultaneous Appointments for this service before host, assignment, and availability-window limits are applied.
-                        </span>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Sort order
-                        <input class="{{ $inputClass }}" type="number" min="0" max="100000" name="sort_order" value="{{ old('sort_order', 0) }}" required>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Location type
+                        Where does it happen?
                         <select class="{{ $inputClass }}" name="location_type" x-model="locationType">
-                            <option value="">Not specified</option>
-                            <option value="{{ \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_PHONE }}">Phone</option>
-                            <option value="{{ \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_VIRTUAL }}">Virtual</option>
-                            <option value="{{ \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_FIXED }}">Fixed location</option>
-                            <option value="{{ \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_CUSTOMER_SITE }}">Customer site</option>
+                            <option value="">Decide later</option>
+                            <option value="{{ \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_PHONE }}" @selected(old('location_type') === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_PHONE)>Phone</option>
+                            <option value="{{ \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_VIRTUAL }}" @selected(old('location_type') === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_VIRTUAL)>Online / virtual</option>
+                            <option value="{{ \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_FIXED }}" @selected(old('location_type') === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_FIXED)>A fixed location</option>
+                            <option value="{{ \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_CUSTOMER_SITE }}" @selected(old('location_type') === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_CUSTOMER_SITE)>At the customer’s location</option>
                         </select>
                     </label>
 
-                    <label class="{{ $labelClass }}">
-                        Location label
-                        <input class="{{ $inputClass }}" name="location_label" value="{{ old('location_label') }}" x-bind:disabled="locationType === ''">
+                    <label class="{{ $labelClass }}" x-show="locationType !== ''" x-cloak>
+                        Location name <span class="font-normal text-slate-400">(optional)</span>
+                        <input class="{{ $inputClass }}" name="location_label" value="{{ old('location_label') }}" placeholder="Main office" x-bind:disabled="locationType === ''">
                     </label>
 
-                    <label class="{{ $labelClass }} md:col-span-2 xl:col-span-4">
-                        Location instructions
-                        <textarea class="{{ $inputClass }}" name="location_instructions" rows="2" x-bind:disabled="locationType === ''">{{ old('location_instructions') }}</textarea>
+                    <label class="{{ $labelClass }} md:col-span-2" x-show="locationType === 'virtual'" x-cloak>
+                        Meeting link <span class="font-normal text-slate-400">(optional)</span>
+                        <input class="{{ $inputClass }}" type="url" name="location_url" value="{{ old('location_url') }}" placeholder="https://…" x-bind:disabled="locationType !== 'virtual'">
                     </label>
 
-                    <label class="{{ $labelClass }} md:col-span-2 xl:col-span-4" x-show="locationType === 'virtual'" x-cloak>
-                        Virtual meeting URL
-                        <input class="{{ $inputClass }}" type="url" name="location_url" value="{{ old('location_url') }}" x-bind:disabled="locationType !== 'virtual'">
-                    </label>
-
-                    <div class="grid gap-4 md:col-span-2 md:grid-cols-2 xl:col-span-4 xl:grid-cols-4" x-show="locationType === 'fixed'" x-cloak>
+                    <div class="grid gap-4 md:col-span-2 md:grid-cols-2" x-show="locationType === 'fixed'" x-cloak>
                         <label class="{{ $labelClass }} md:col-span-2">
-                            Address line 1
+                            Street address
                             <input class="{{ $inputClass }}" name="location_address_line_1" value="{{ old('location_address_line_1') }}" x-bind:disabled="locationType !== 'fixed'">
                         </label>
                         <label class="{{ $labelClass }} md:col-span-2">
-                            Address line 2
+                            Address line 2 <span class="font-normal text-slate-400">(optional)</span>
                             <input class="{{ $inputClass }}" name="location_address_line_2" value="{{ old('location_address_line_2') }}" x-bind:disabled="locationType !== 'fixed'">
                         </label>
                         <label class="{{ $labelClass }}">
@@ -498,31 +143,48 @@
                         <label class="{{ $labelClass }}">
                             Country code
                             <input class="{{ $inputClass }}" name="location_country" value="{{ old('location_country', 'US') }}" maxlength="2" x-bind:disabled="locationType !== 'fixed'">
+                            <span class="mt-1 block text-xs font-normal text-slate-500">
+                                Use the two-letter country code, such as US or CA.
+                            </span>
                         </label>
                     </div>
 
-                    <p class="text-xs text-slate-500 md:col-span-2 xl:col-span-4" x-show="locationType === 'customer_site'" x-cloak>
-                        Customer-site services collect the service address from each booking. Only the optional label and instructions are stored on the service.
+                    <label class="{{ $labelClass }} md:col-span-2" x-show="locationType !== ''" x-cloak>
+                        Location instructions <span class="font-normal text-slate-400">(optional)</span>
+                        <textarea class="{{ $inputClass }}" name="location_instructions" rows="2" x-bind:disabled="locationType === ''">{{ old('location_instructions') }}</textarea>
+                    </label>
+
+                    <p class="text-sm text-slate-500 md:col-span-2" x-show="locationType === 'customer_site'" x-cloak>
+                        The customer will provide the address when the appointment is booked.
                     </p>
 
-                    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-5 md:col-span-2 xl:col-span-4">
-                        <label class="inline-flex items-start gap-2 text-sm font-medium text-slate-700">
-                            <input type="hidden" name="requires_confirmation" value="0">
-                            <input type="checkbox" name="requires_confirmation" value="1" @checked(old('requires_confirmation'))>
-                            Requires confirmation
+                    <div class="space-y-3 md:col-span-2">
+                        <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-3 text-sm text-slate-700">
+                            <input type="hidden" name="is_public" value="0">
+                            <input class="mt-0.5" type="checkbox" name="is_public" value="1" @checked(old('is_public'))>
+                            <span>
+                                <span class="block font-semibold text-slate-900">Let customers book this themselves</span>
+                                <span class="mt-0.5 block text-slate-500">Makes this service eligible for the public booking page when public Scheduling is enabled.</span>
+                            </span>
                         </label>
 
-                        <label class="inline-flex items-start gap-2 text-sm font-medium text-slate-700">
-                            <input type="hidden" name="is_public" value="0">
-                            <input type="checkbox" name="is_public" value="1" @checked(old('is_public'))>
-                            Publicly bookable
+                        <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-3 text-sm text-slate-700">
+                            <input type="hidden" name="requires_confirmation" value="0">
+                            <input class="mt-0.5" type="checkbox" name="requires_confirmation" value="1" @checked(old('requires_confirmation'))>
+                            <span>
+                                <span class="block font-semibold text-slate-900">Require staff confirmation</span>
+                                <span class="mt-0.5 block text-slate-500">New appointments start as awaiting confirmation instead of being immediately scheduled.</span>
+                            </span>
                         </label>
                     </div>
 
-                    <div class="md:col-span-2 xl:col-span-4">
+                    <div class="md:col-span-2">
                         <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
-                            Create service
+                            Add service
                         </button>
+                        <p class="mt-2 text-xs text-slate-500">
+                            Need a multi-day stay, variable-length booking, extra time between appointments, multiple appointments at once, or another uncommon rule? Add the service first, then open Advanced service settings.
+                        </p>
                     </div>
                 </form>
             </x-ui.card>
@@ -544,20 +206,15 @@
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h3 class="font-semibold text-slate-900">{{ $service->name }}</h3>
-                                <p class="mt-1 font-mono text-xs text-slate-500">{{ $service->key }}</p>
                             </div>
                             <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                                 {{ str($service->status)->replace('_', ' ')->title() }}
                             </span>
                         </div>
 
-                        <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
+                        <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
                             <div>
-                                <dt class="text-slate-500">Source</dt>
-                                <dd class="font-medium text-slate-900">{{ $service->source }}</dd>
-                            </div>
-                            <div>
-                                <dt class="text-slate-500">Active hosts</dt>
+                                <dt class="text-slate-500">Assigned people</dt>
                                 <dd class="font-medium text-slate-900" data-active-host-count="{{ $service->active_host_assignments_count }}">
                                     {{ $service->active_host_assignments_count }}
                                 </dd>
@@ -573,7 +230,7 @@
                                 </dd>
                             </div>
                             <div>
-                                <dt class="text-slate-500">Windows</dt>
+                                <dt class="text-slate-500">Availability rules</dt>
                                 <dd class="font-medium text-slate-900">{{ $service->availability_windows_count }}</dd>
                             </div>
                         </dl>
@@ -581,7 +238,7 @@
                         @if ($serviceEditable)
                             <details>
                                 <summary class="cursor-pointer text-sm font-semibold text-teal-700">
-                                    Edit service policy
+                                    Advanced service settings
                                 </summary>
 
                                 <form
@@ -622,75 +279,75 @@
                                     </label>
 
                                     <label class="{{ $labelClass }}">
-                                        Duration mode
+                                        Booking length
                                         <select class="{{ $inputClass }}" name="duration_mode" x-model="durationMode" required>
-                                            <option value="fixed">Fixed appointment</option>
-                                            <option value="range">Range / multi-day stay</option>
+                                            <option value="fixed">One fixed length</option>
+                                            <option value="range">Flexible length / multi-day stay</option>
                                         </select>
                                     </label>
 
                                     <label class="{{ $labelClass }}">
-                                        <span x-text="durationMode === 'range' ? 'Default duration minutes' : 'Duration minutes'"></span>
+                                        <span x-text="durationMode === 'range' ? 'Default booking length (minutes)' : 'Appointment length (minutes)'"></span>
                                         <input class="{{ $inputClass }}" type="number" min="1" x-bind:max="durationMode === 'range' ? {{ \App\Modules\Scheduling\Models\BookableService::MAX_RANGE_DURATION_MINUTES }} : 1440" name="duration_minutes" value="{{ $service->duration_minutes }}" required>
                                     </label>
 
                                     <label class="{{ $labelClass }}" x-show="durationMode === 'range'" x-cloak>
-                                        Minimum duration minutes
+                                        Shortest allowed booking (minutes)
                                         <input class="{{ $inputClass }}" type="number" min="1" max="{{ \App\Modules\Scheduling\Models\BookableService::MAX_RANGE_DURATION_MINUTES }}" name="minimum_duration_minutes" value="{{ $service->minimum_duration_minutes ?? $service->duration_minutes }}" x-bind:disabled="durationMode !== 'range'" x-bind:required="durationMode === 'range'">
                                     </label>
 
                                     <label class="{{ $labelClass }}" x-show="durationMode === 'range'" x-cloak>
-                                        Maximum duration minutes
+                                        Longest allowed booking (minutes)
                                         <input class="{{ $inputClass }}" type="number" min="1" max="{{ \App\Modules\Scheduling\Models\BookableService::MAX_RANGE_DURATION_MINUTES }}" name="maximum_duration_minutes" value="{{ $service->maximum_duration_minutes ?? $service->duration_minutes }}" x-bind:disabled="durationMode !== 'range'" x-bind:required="durationMode === 'range'">
                                     </label>
 
                                     <label class="{{ $labelClass }}">
-                                        Slot interval minutes
+                                        How often should start times be offered? (minutes)
                                         <input class="{{ $inputClass }}" type="number" min="1" max="1440" name="slot_interval_minutes" value="{{ $service->slot_interval_minutes }}" required>
-                                    </label>
-
-                                    <label class="{{ $labelClass }}">
-                                        Overall concurrent appointment capacity
-                                        <input class="{{ $inputClass }}" type="number" min="1" max="100000" name="capacity" value="{{ $service->capacity }}" required>
                                         <span class="mt-1 block text-xs font-normal text-slate-500">
-                                            Maximum simultaneous Appointments for this service before host, assignment, and availability-window limits are applied.
+                                            For example, 15 offers starts at 9:00, 9:15, 9:30, and so on when those times are available.
                                         </span>
                                     </label>
 
                                     <label class="{{ $labelClass }}">
-                                        Buffer before
+                                        How many of these appointments can happen at the same time?
+                                        <input class="{{ $inputClass }}" type="number" min="1" max="100000" name="capacity" value="{{ $service->capacity }}" required>
+                                        <span class="mt-1 block text-xs font-normal text-slate-500">
+                                            Use 1 unless this service is designed to allow more than one appointment at the same time. Other staff and availability limits still apply.
+                                        </span>
+                                    </label>
+
+                                    <label class="{{ $labelClass }}">
+                                        Extra time kept free before each appointment (minutes)
                                         <input class="{{ $inputClass }}" type="number" min="0" name="buffer_before_minutes" value="{{ $service->buffer_before_minutes }}" required>
                                     </label>
 
                                     <label class="{{ $labelClass }}">
-                                        Buffer after
+                                        Extra time kept free after each appointment (minutes)
                                         <input class="{{ $inputClass }}" type="number" min="0" name="buffer_after_minutes" value="{{ $service->buffer_after_minutes }}" required>
                                     </label>
 
                                     <label class="{{ $labelClass }}">
-                                        Minimum notice minutes
+                                        Minimum advance notice before booking (minutes)
                                         <input class="{{ $inputClass }}" type="number" min="0" name="minimum_notice_minutes" value="{{ $service->minimum_notice_minutes }}" required>
                                     </label>
 
                                     <label class="{{ $labelClass }}">
-                                        Booking horizon days
+                                        How far ahead can people book? (days)
                                         <input class="{{ $inputClass }}" type="number" min="0" name="booking_horizon_days" value="{{ $service->booking_horizon_days }}" required>
                                     </label>
 
                                     <label class="{{ $labelClass }}">
-                                        Cancellation notice minutes
+                                        Required notice to cancel (minutes)
                                         <input class="{{ $inputClass }}" type="number" min="0" name="cancellation_notice_minutes" value="{{ $service->cancellation_notice_minutes }}" required>
                                     </label>
 
                                     <label class="{{ $labelClass }}">
-                                        Reschedule notice minutes
+                                        Required notice to reschedule (minutes)
                                         <input class="{{ $inputClass }}" type="number" min="0" name="reschedule_notice_minutes" value="{{ $service->reschedule_notice_minutes }}" required>
                                     </label>
 
-                                    <label class="{{ $labelClass }}">
-                                        Sort order
-                                        <input class="{{ $inputClass }}" type="number" min="0" max="100000" name="sort_order" value="{{ $service->sort_order }}" required>
-                                    </label>
+                                    <input type="hidden" name="sort_order" value="{{ $service->sort_order }}">
 
                                     <label class="{{ $labelClass }}">
                                         Location type
@@ -773,7 +430,7 @@
 
                             <details>
                                 <summary class="cursor-pointer text-sm font-semibold text-teal-700">
-                                    Manage host assignments
+                                    Choose who can handle this
                                 </summary>
 
                                 <form
@@ -810,12 +467,12 @@
                                                     {{ $host->name }}
                                                 </label>
                                                 <p class="mt-1 text-xs text-slate-500">
-                                                    {{ $host->status }} · {{ $host->timezone }} · overall capacity {{ $host->capacity }}
+                                                    {{ str($host->status)->replace("_", " ")->title() }} · {{ $host->timezone }}
                                                 </p>
                                             </div>
 
                                             <label class="{{ $labelClass }}">
-                                                Overall concurrency override
+                                                Maximum simultaneous appointments for this pairing <span class="font-normal text-slate-400">(optional)</span>
                                                 <input
                                                     class="{{ $inputClass }}"
                                                     type="number"
@@ -825,26 +482,19 @@
                                                     value="{{ $assignment?->capacity_override }}"
                                                 >
                                                 <span class="mt-1 block text-xs font-normal text-slate-500">
-                                                    Optional total-concurrency limit for this service and host pairing; it does not define which appointment types may overlap.
+                                                    Leave blank to use the normal service and staff limits.
                                                 </span>
                                             </label>
 
-                                            <label class="{{ $labelClass }}">
-                                                Sort order
-                                                <input
-                                                    class="{{ $inputClass }}"
-                                                    type="number"
-                                                    min="0"
-                                                    max="100000"
-                                                    name="assignments[{{ $loop->index }}][sort_order]"
-                                                    value="{{ $assignment?->sort_order ?? $host->sort_order }}"
-                                                    required
-                                                >
-                                            </label>
+                                            <input
+                                                type="hidden"
+                                                name="assignments[{{ $loop->index }}][sort_order]"
+                                                value="{{ $assignment?->sort_order ?? $host->sort_order }}"
+                                            >
                                         </div>
                                     @empty
                                         <div data-configuration-empty="assignment-hosts" class="rounded-xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">
-                                            Create a host before assigning this service.
+                                            Add a staff member or provider before assigning this service.
                                         </div>
                                     @endforelse
 
@@ -871,5 +521,223 @@
                 @endforelse
             </div>
         </section>
+
+        <section class="space-y-5" id="people" data-configuration-section="hosts">
+            <div>
+                <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
+                    People
+                </div>
+                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
+                    Who can handle appointments?
+                </h2>
+            </div>
+
+            <x-ui.card class="space-y-5">
+                <div>
+                    <h3 class="text-lg font-semibold text-slate-900">Add staff or a provider</h3>
+                    <p class="mt-1 text-sm text-slate-500">
+                        This step is optional. Add someone here when appointments need to be assigned to a specific person or provider.
+                    </p>
+                </div>
+
+                <form
+                    method="POST"
+                    action="{{ route('crm.scheduling.configuration.hosts.store') }}"
+                    class="grid gap-4 md:grid-cols-3"
+                    data-configuration-host-create
+                >
+                    @csrf
+
+                    <label class="{{ $labelClass }}">
+                        Name
+                        <input class="{{ $inputClass }}" name="name" value="{{ old('name') }}" placeholder="Taylor Smith" required>
+                    </label>
+
+                    <label class="{{ $labelClass }}">
+                        Email <span class="font-normal text-slate-400">(optional)</span>
+                        <input class="{{ $inputClass }}" type="email" name="email" value="{{ old('email') }}">
+                    </label>
+
+                    <label class="{{ $labelClass }}">
+                        Phone <span class="font-normal text-slate-400">(optional)</span>
+                        <input class="{{ $inputClass }}" name="phone" value="{{ old('phone') }}">
+                    </label>
+
+                    <div class="md:col-span-3">
+                        <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
+                            Add staff or provider
+                        </button>
+                    </div>
+                </form>
+            </x-ui.card>
+
+            <div class="grid gap-4 xl:grid-cols-2">
+                @forelse ($hosts as $host)
+                    @php
+                        $hostEditable = (bool) $host->getAttribute('crm_editable');
+                    @endphp
+
+                    <div
+                        data-scheduling-host-id="{{ $host->id }}"
+                        data-crm-editable="{{ $hostEditable ? '1' : '0' }}"
+                    >
+                        <x-ui.card class="space-y-4">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <h3 class="font-semibold text-slate-900">{{ $host->name }}</h3>
+                            </div>
+                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                {{ str($host->status)->replace('_', ' ')->title() }}
+                            </span>
+                        </div>
+
+                        <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+                            <div>
+                                <dt class="text-slate-500">Services</dt>
+                                <dd class="font-medium text-slate-900" data-active-assignment-count="{{ $host->active_service_assignments_count }}">
+                                    {{ $host->active_service_assignments_count }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-slate-500">Appointments</dt>
+                                <dd class="font-medium text-slate-900" data-appointment-count="{{ $host->appointments_count }}">
+                                    {{ $host->appointments_count }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-slate-500">Availability rules</dt>
+                                <dd class="font-medium text-slate-900">{{ $host->availability_windows_count }}</dd>
+                            </div>
+                        </dl>
+
+                        @if ($hostEditable)
+                            <details>
+                                <summary class="cursor-pointer text-sm font-semibold text-teal-700">
+                                    Advanced staff / provider settings
+                                </summary>
+
+                                <form
+                                    method="POST"
+                                    action="{{ route('crm.scheduling.configuration.hosts.update', $host) }}"
+                                    class="mt-4 grid gap-4 sm:grid-cols-2"
+                                    data-configuration-host-update="{{ $host->id }}"
+                                >
+                                @csrf
+                                @method('PATCH')
+                                <input type="hidden" name="current_version" value="{{ $host->updated_at?->toISOString() }}">
+
+                                <label class="{{ $labelClass }}">
+                                    Name
+                                    <input class="{{ $inputClass }}" name="name" value="{{ $host->name }}" required>
+                                </label>
+
+                                <label class="{{ $labelClass }}">
+                                    Status
+                                    <select class="{{ $inputClass }}" name="status" required>
+                                        @foreach ($hostStatuses as $status)
+                                            <option value="{{ $status }}" @selected($host->status === $status)>
+                                                {{ str($status)->replace('_', ' ')->title() }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </label>
+
+                                <label class="{{ $labelClass }}">
+                                    Timezone
+                                    <input class="{{ $inputClass }}" name="timezone" list="scheduling-timezones" value="{{ $host->timezone }}" required>
+                                </label>
+
+                                <label class="{{ $labelClass }}">
+                                    How many appointments can this person handle at the same time?
+                                    <input class="{{ $inputClass }}" type="number" min="1" max="100000" name="capacity" value="{{ $host->capacity }}" required>
+                                    <span class="mt-1 block text-xs font-normal text-slate-500">
+                                        Use 1 for the normal case. Increase it only when this person can genuinely handle multiple appointments at once.
+                                    </span>
+                                </label>
+
+                                <label class="{{ $labelClass }}">
+                                    Email
+                                    <input class="{{ $inputClass }}" type="email" name="email" value="{{ $host->email }}">
+                                </label>
+
+                                <label class="{{ $labelClass }}">
+                                    Phone
+                                    <input class="{{ $inputClass }}" name="phone" value="{{ $host->phone }}">
+                                </label>
+
+                                <input type="hidden" name="sort_order" value="{{ $host->sort_order }}">
+
+                                <div class="self-end">
+                                    <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto">
+                                        Save changes
+                                    </button>
+                                </div>
+                            </form>
+                            </details>
+                        @else
+                            <div class="{{ $readOnlyClass }}" data-configuration-read-only="host">
+                                <p class="text-sm text-slate-600">
+                                    This person is managed automatically and cannot be edited here.
+                                </p>
+                            </div>
+                        @endif
+                        </x-ui.card>
+                    </div>
+                @empty
+                    <x-ui.card>
+                        <div data-configuration-empty="hosts" class="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+                            No staff or providers have been added. That is fine when appointments do not need a specific assignee.
+                        </div>
+                    </x-ui.card>
+                @endforelse
+            </div>
+        </section>
+
+
+        <section id="availability" class="space-y-4">
+            <div>
+                <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
+                    Hours & availability
+                </div>
+                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
+                    When can appointments happen?
+                </h2>
+            </div>
+
+            <x-ui.card>
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between" data-scheduling-availability-configuration-link>
+                    <div>
+                        <p class="font-semibold text-slate-900">Set normal hours and exceptions</p>
+                        <p class="mt-1 text-sm text-slate-500">
+                            Tell Scheduling when appointments are normally available and when they should be blocked for exceptions.
+                        </p>
+                    </div>
+
+                    <a
+                        href="{{ route('crm.scheduling.configuration.availability.index') }}"
+                        class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
+                    >
+                        Set availability
+                    </a>
+                </div>
+            </x-ui.card>
+        </section>
+
+        <details class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-scheduling-resource-configuration-link>
+            <summary class="cursor-pointer text-sm font-semibold text-slate-800">
+                Advanced: rooms, equipment, and shared capacity
+            </summary>
+            <div class="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-sm text-slate-500">
+                    Use Resources only when a booking depends on limited rooms, equipment, or another shared item. Most businesses do not need this for basic Scheduling setup.
+                </p>
+                <a
+                    href="{{ route('crm.scheduling.configuration.resources.index') }}"
+                    class="inline-flex w-full justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto"
+                >
+                    Manage advanced resources
+                </a>
+            </div>
+        </details>
     </div>
 </x-layouts.crm>

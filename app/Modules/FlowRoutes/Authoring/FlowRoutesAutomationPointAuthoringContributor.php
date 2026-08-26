@@ -570,7 +570,7 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
                 'type' => 'resource',
                 'title' => 'How business days are counted',
                 'body' => 'Business-day waits skip the weekdays and dates selected for this business. Changing that calendar affects waits that begin later, not people who are already waiting.',
-                'action_url' => route('crm.business-calendar.edit'),
+                'action_url' => route('crm.business-calendar.edit', ['from' => 'routes']),
                 'action_label' => 'Manage business days',
                 'show_when' => ['field' => 'duration_unit', 'equals' => 'business_days'],
             ],

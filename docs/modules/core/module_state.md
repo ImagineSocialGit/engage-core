@@ -17,6 +17,8 @@ Core owns:
 - contact show extension registries
 - module-safe contact-facing extension points
 - the shared business calendar used by modules that count business days
+- the shared Settings & setup directory and its limited getting-started area
+- reusable one-time CRM guidance for teaching where a durable setting can be maintained later
 
 ContactStatus preset sync may be run directly through Core tooling, but normal new-project setup should be orchestrated by the app-level `presets:sync` command.
 
@@ -39,6 +41,33 @@ Modules may ask Core to add a number of business days to a timestamp. The calcul
 Changing the calendar affects calculations performed after the change. Any consumer that begins a wait must persist its calculated result and treat that result as authoritative; calendar changes must not silently move work that is already waiting.
 
 `business_calendars` and `business_calendar_exclusions` are Core-owned Project State. They are client-managed durable state, not deployment config or preset data.
+
+The Business days editor is the authoritative long-term maintenance screen for this calendar. Consuming surfaces may expose the relevant choice and link into the editor with return context. The editor explains that changes affect future calculations rather than work whose date was already calculated.
+
+## Settings & setup directory
+
+Core owns the shared Settings & setup page, while each module owns the settings screen and durable state behind its contributed link.
+
+`ModuleManager` resolves:
+
+```text
+module-owned navigation contributions
+module-owned settings contributions
+app-owned settings categories
+the capped getting-started list
+```
+
+Only explicitly enabled module definitions contribute visible settings or navigation. A contribution is omitted when its named route is not registered. Dependency loading alone does not expose a product surface.
+
+The directory is a maintenance and wayfinding surface. It does not copy module forms, own module configuration, or require users to configure every enabled capability before beginning work. First-time setup remains in the consuming workflow wherever practical. The getting-started area is capped at three high-value orientation links so it cannot become an installation checklist.
+
+## One-time maintenance-location guidance
+
+`FirstUseGuidance` lets a consuming CRM workflow teach the long-term home of a durable choice after the first successful use. The guidance names the exact Settings & setup location and includes a direct action link.
+
+The seen marker reuses `dashboard_acknowledgements` with a dedicated surface and item type. This avoids another per-user onboarding-state table. One row per user/concept is sufficient; the service must not write a new row on every use. The flash payload is presentation-only and is rendered by the shared CRM layout.
+
+FlowRoutes business-day waits are the first consumer. Core does not import or call FlowRoutes to provide the behavior.
 
 
 ## Canonical contact terminology and client-facing aliases

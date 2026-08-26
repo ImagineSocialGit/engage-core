@@ -258,7 +258,7 @@
                                 Business-day waits skip the weekdays and dates selected for this business. Calendar changes affect waits that begin later, not people already waiting.
                             </p>
                             <a
-                                href="{{ route('crm.business-calendar.edit') }}"
+                                href="{{ route('crm.business-calendar.edit', ['from' => 'routes']) }}"
                                 class="mt-3 inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
                             >
                                 Manage business days

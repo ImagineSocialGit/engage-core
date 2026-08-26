@@ -3,6 +3,7 @@
 namespace App\Modules\FlowRoutes\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Requests\StoreFlowRoutePointRequest;
@@ -10,13 +11,16 @@ use App\Modules\FlowRoutes\Requests\UpdateFlowRouteLeadInDelayRequest;
 use App\Modules\FlowRoutes\Requests\UpdateFlowRoutePointOrderRequest;
 use App\Modules\FlowRoutes\Requests\UpdateFlowRoutePointRequest;
 use App\Modules\FlowRoutes\Services\FlowRoutePointAuthoringService;
+use App\Support\Guidance\FirstUseGuidance;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class FlowRouteEditorController extends Controller
 {
     public function __construct(
         private readonly FlowRoutePointAuthoringService $authoring,
+        private readonly FirstUseGuidance $guidance,
     ) {}
 
     public function show(FlowRoute $flowRoute): RedirectResponse
@@ -34,11 +38,14 @@ class FlowRouteEditorController extends Controller
     ): RedirectResponse {
         $this->ensureCurrentVersion($flowRoute);
 
-        $this->authoring->create(
+        $input = $request->validated();
+        $point = $this->authoring->create(
             route: $flowRoute,
             capabilityId: (int) $request->validated('capability_id'),
-            input: $request->validated(),
+            input: $input,
         );
+
+        $this->explainBusinessDaySettings($request, $input, $point);
 
         return $this->redirectToEditor($flowRoute, 'Point added to Route.');
     }
@@ -51,11 +58,14 @@ class FlowRouteEditorController extends Controller
         $this->ensureCurrentVersion($flowRoute);
         $this->ensurePointBelongsToRoute($flowRoute, $flowRoutePoint);
 
-        $this->authoring->update(
+        $input = $request->validated();
+        $point = $this->authoring->update(
             route: $flowRoute,
             point: $flowRoutePoint,
-            input: $request->validated(),
+            input: $input,
         );
+
+        $this->explainBusinessDaySettings($request, $input, $point);
 
         return $this->redirectToEditor($flowRoute, 'Point updated.');
     }
@@ -66,10 +76,13 @@ class FlowRouteEditorController extends Controller
     ): RedirectResponse {
         $this->ensureCurrentVersion($flowRoute);
 
+        $input = $request->validated();
         $this->authoring->updateLeadInDelay(
             route: $flowRoute,
-            input: $request->validated(),
+            input: $input,
         );
+
+        $this->explainBusinessDaySettings($request, $input);
 
         return $this->redirectToEditor($flowRoute, 'Route start updated.');
     }
@@ -147,5 +160,31 @@ class FlowRouteEditorController extends Controller
                 'edit_route' => $flowRoute->getKey(),
             ])
             ->with('status', $message);
+    }
+
+    /** @param array<string, mixed> $input */
+    private function explainBusinessDaySettings(
+        Request $request,
+        array $input,
+        ?FlowRoutePoint $point = null,
+    ): void {
+        if (($input['start_timing'] ?? null) === 'immediate'
+            || ($input['wait_mode'] ?? 'duration') !== 'duration'
+            || ($input['duration_unit'] ?? null) !== 'business_days'
+            || ($point instanceof FlowRoutePoint && $point->type !== FlowRoutePointType::Wait->value)
+        ) {
+            return;
+        }
+
+        $this->guidance->flashOnce(
+            request: $request,
+            key: 'business_days',
+            guidance: [
+                'title' => 'Business days are shared',
+                'message' => 'This delay uses the business-wide weekdays and dates that do not count. You can change them later under Settings & setup → Business days.',
+                'action_label' => 'Open Business days',
+                'action_url' => route('crm.business-calendar.edit'),
+            ],
+        );
     }
 }

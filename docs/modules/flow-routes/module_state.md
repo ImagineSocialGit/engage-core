@@ -119,6 +119,10 @@ resume_at
 
 `business_days` delegates date calculation to Core's shared business calendar and uses the client timezone. When a contact reaches the Wait, FlowRoutes calculates and persists `resume_at`. Later calendar changes affect only waits that begin later; the stored `resume_at` remains authoritative for progress already waiting.
 
+The Route authoring surface explains that Business days are shared and links directly to Core's authoritative Business days editor. That link carries Routes as return context so the user can return to the work they were doing. The editor itself remains reachable later through Settings & setup -> Business days.
+
+After a user first saves a business-day Wait, FlowRoutes uses the shared `FirstUseGuidance` seam to teach that exact maintenance location. The handoff is recorded once per user/concept through the existing acknowledgement store and is not shown on every later Route edit. This guidance adds no FlowRoutes-owned setting, calendar table, or onboarding table.
+
 Process Highway continues to read and present the ordinary persisted Wait Point. It does not receive a special lead-in-delay node type or mutation authority.
 
 FlowRoute preset sync requires referenced Campaign definitions to exist by stable key. An inactive or archived Campaign is a valid dormant reference; runtime enrollment skips it as `campaign_inactive` until the Campaign returns to `active`.

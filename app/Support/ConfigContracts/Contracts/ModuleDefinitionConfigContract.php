@@ -32,6 +32,15 @@ class ModuleDefinitionConfigContract implements ConfigContract
             'class' => ConfigField::optional(ConfigSchema::string()),
         ]);
 
+        $settingsItem = ConfigSchema::object([
+            'key' => ConfigField::required(ConfigSchema::string()),
+            'category' => ConfigField::required(ConfigSchema::string()),
+            'label' => ConfigField::required(ConfigSchema::string()),
+            'description' => ConfigField::required(ConfigSchema::string()),
+            'route' => ConfigField::required(ConfigSchema::string()),
+            'priority' => ConfigField::defaulted(ConfigSchema::integer(), 100),
+        ]);
+
         return ConfigSchema::object([
             'name' => ConfigField::required(ConfigSchema::string()),
             'ui' => ConfigField::optional(ConfigSchema::object([
@@ -40,6 +49,10 @@ class ModuleDefinitionConfigContract implements ConfigContract
             'nav' => ConfigField::optional(ConfigSchema::oneOf([
                 $navItem,
                 ConfigSchema::listOf($navItem),
+            ])),
+            'settings' => ConfigField::optional(ConfigSchema::oneOf([
+                $settingsItem,
+                ConfigSchema::listOf($settingsItem),
             ])),
             'always_on' => ConfigField::defaulted(ConfigSchema::boolean(), false),
             'depends_on' => ConfigField::defaulted(

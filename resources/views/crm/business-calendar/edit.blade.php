@@ -1,3 +1,4 @@
+
 @php
     $storedExclusions = $calendar->exclusions->map(fn ($exclusion): array => [
         'key' => (string) $exclusion->key,
@@ -39,6 +40,17 @@
     module="core"
 >
     <div class="mx-auto max-w-5xl">
+        <nav class="mb-5 flex flex-wrap items-center gap-2 text-sm" aria-label="Settings location">
+            <a
+                href="{{ route('crm.settings.index') }}"
+                class="font-semibold text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
+            >
+                Settings & setup
+            </a>
+            <span class="text-slate-400" aria-hidden="true">/</span>
+            <span class="text-slate-600">Business days</span>
+        </nav>
+
         @if(session('status'))
             <div class="mb-6">
                 <x-ui.feedback.alert type="success">
@@ -87,6 +99,7 @@
         >
             @csrf
             @method('PUT')
+            <input type="hidden" name="from" value="{{ $returnContext }}">
             <input type="hidden" name="skipped_weekdays_present" value="1">
 
             <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
@@ -232,10 +245,10 @@
 
             <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <a
-                    href="{{ route('crm.flow-routes.index') }}"
+                    href="{{ $returnContext === 'routes' ? route('crm.flow-routes.index') : route('crm.settings.index') }}"
                     class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
                 >
-                    Back to Routes
+                    {{ $returnContext === 'routes' ? 'Back to Routes' : 'Back to Settings & setup' }}
                 </a>
 
                 <button

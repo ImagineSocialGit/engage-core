@@ -156,6 +156,73 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Shared Settings & Setup
+    |--------------------------------------------------------------------------
+    |
+    | Module-owned settings links are collected into one maintenance directory.
+    | Normal first-use setup remains inside the workspace that needs it. The
+    | short getting-started list is intentionally capped so it cannot become a
+    | second installation checklist.
+    |
+    */
+
+    'settings' => [
+        'categories' => [
+            'business_operations' => [
+                'label' => 'Business operations',
+                'description' => 'Shared timing and operating choices used across more than one part of the CRM.',
+                'priority' => 10,
+            ],
+            'work' => [
+                'label' => 'Work and appointments',
+                'description' => 'Reusable defaults for tasks, bookings, availability, and the people or resources involved.',
+                'priority' => 20,
+            ],
+            'communications' => [
+                'label' => 'Communications',
+                'description' => 'Reusable message wording and the shared rules used to recognize and handle replies.',
+                'priority' => 30,
+            ],
+            'automation' => [
+                'label' => 'Automatic follow-up',
+                'description' => 'Choose which follow-up runs after important business moments and maintain recurring outreach.',
+                'priority' => 40,
+            ],
+        ],
+        'getting_started' => [
+            'max' => 3,
+            'items' => [
+                [
+                    'key' => 'people',
+                    'module' => 'core',
+                    'label' => 'Add your people',
+                    'description' => 'Add someone manually or import an existing list, then open a record to see the shared history.',
+                    'route' => 'crm.contacts.index',
+                    'priority' => 10,
+                ],
+                [
+                    'key' => 'process_highway',
+                    'module' => 'core',
+                    'label' => 'See how work moves',
+                    'description' => 'Use the Process Highway to understand how statuses, follow-up, tasks, and messages fit together.',
+                    'route' => 'crm.process-highway.index',
+                    'priority' => 20,
+                ],
+                [
+                    'key' => 'routes',
+                    'module' => 'flow_routes',
+                    'label' => 'Review what happens automatically',
+                    'description' => 'Open Routes to see the actions the CRM takes after a status change or other business activity.',
+                    'route' => 'crm.flow-routes.index',
+                    'priority' => 30,
+                ],
+            ],
+        ],
+    ],
+
+
+    /*
+    |--------------------------------------------------------------------------
     | Module Wayfinding Tones
     |--------------------------------------------------------------------------
     |
@@ -390,6 +457,19 @@ return [
                     'route' => 'crm.process-highway.index',
                     'priority' => 21,
                 ],
+                [
+                    'label' => 'Settings & setup',
+                    'route' => 'crm.settings.index',
+                    'priority' => 900,
+                ],
+            ],
+            'settings' => [
+                'key' => 'business_days',
+                'category' => 'business_operations',
+                'label' => 'Business days',
+                'description' => 'Choose the weekdays and specific dates that business-day delays skip. Changes affect waits that begin later.',
+                'route' => 'crm.business-calendar.edit',
+                'priority' => 10,
             ],
             'always_on' => true,
             'depends_on' => [],
@@ -412,6 +492,14 @@ return [
                 'route' => 'crm.messaging.message-templates.index',
                 'priority' => 80,
             ],
+            'settings' => [
+                'key' => 'message_templates',
+                'category' => 'communications',
+                'label' => 'Message templates',
+                'description' => 'Edit reusable email and text-message wording. Saved changes are used by future messages that select those templates.',
+                'route' => 'crm.messaging.message-templates.index',
+                'priority' => 40,
+            ],
             'depends_on' => ['core'],
             'providers' => [
                 MessagingModuleServiceProvider::class,
@@ -427,6 +515,14 @@ return [
                 'label' => 'Reply Handling',
                 'route' => 'crm.inbound-messaging.reply-profiles.index',
                 'priority' => 81,
+            ],
+            'settings' => [
+                'key' => 'reply_handling',
+                'category' => 'communications',
+                'label' => 'Reply handling',
+                'description' => 'Choose how incoming replies are recognized and what each shared reply outcome means to follow-up Routes and Campaigns.',
+                'route' => 'crm.inbound-messaging.reply-profiles.index',
+                'priority' => 50,
             ],
             'depends_on' => ['core', 'messaging'],
             'providers' => [
@@ -455,6 +551,14 @@ return [
                 'route' => 'crm.tasks.index',
                 'priority' => 25,
             ],
+            'settings' => [
+                'key' => 'task_templates',
+                'category' => 'work',
+                'label' => 'Task templates',
+                'description' => 'Maintain reusable task names, timing, and responsibility defaults used when the CRM creates future work.',
+                'route' => 'crm.tasks.templates.index',
+                'priority' => 20,
+            ],
             'depends_on' => ['core'],
             'preset_contributors' => [
                 TasksPresetContributor::class,
@@ -472,6 +576,14 @@ return [
             'nav' => [
                 'label' => 'Scheduling',
                 'route' => 'crm.scheduling.index',
+                'priority' => 30,
+            ],
+            'settings' => [
+                'key' => 'booking_setup',
+                'category' => 'work',
+                'label' => 'Booking setup',
+                'description' => 'Manage services, hosts, normal availability, and shared resources used to decide when appointments can be offered.',
+                'route' => 'crm.scheduling.configuration.index',
                 'priority' => 30,
             ],
             'depends_on' => ['core'],
@@ -586,6 +698,14 @@ return [
                 'route' => 'crm.flow-routes.index',
                 'priority' => 90,
             ],
+            'settings' => [
+                'key' => 'route_assignments',
+                'category' => 'automation',
+                'label' => 'Route assignments',
+                'description' => 'Choose which Routes run when a contact reaches a status or an important business activity occurs.',
+                'route' => 'crm.flow-routes.bindings.index',
+                'priority' => 60,
+            ],
             'depends_on' => ['workflow'],
             'providers' => [
                 FlowRoutesModuleServiceProvider::class,
@@ -601,6 +721,14 @@ return [
                 'label' => 'Campaigns',
                 'route' => 'crm.campaigns.index',
                 'priority' => 42,
+            ],
+            'settings' => [
+                'key' => 'annual_touches',
+                'category' => 'automation',
+                'label' => 'Annual follow-up',
+                'description' => 'Maintain recurring birthday, anniversary, holiday, and other date-based outreach used in future years.',
+                'route' => 'crm.campaigns.annual-touches.index',
+                'priority' => 70,
             ],
             'depends_on' => ['core', 'messaging'],
             'providers' => [
@@ -633,6 +761,14 @@ return [
                 'label' => 'Webinars',
                 'route' => 'crm.webinar-series.index',
                 'priority' => 70,
+            ],
+            'settings' => [
+                'key' => 'message_templates',
+                'category' => 'communications',
+                'label' => 'Webinar messages',
+                'description' => 'Edit reusable confirmations, reminders, and follow-up wording used by future webinar communication.',
+                'route' => 'crm.webinars.message-templates.index',
+                'priority' => 80,
             ],
             'depends_on' => ['core', 'messaging'],
             'preset_contributors' => [
