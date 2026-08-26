@@ -223,6 +223,7 @@ class FlowRoutesAutomationPointDefinitionContributor implements AutomationPointD
             'minutes',
             'hours',
             'days',
+            'business_days',
             'weeks',
         ];
 
@@ -233,6 +234,7 @@ class FlowRoutesAutomationPointDefinitionContributor implements AutomationPointD
             'minutes' => ConfigField::optional(ConfigSchema::integer()),
             'hours' => ConfigField::optional(ConfigSchema::integer()),
             'days' => ConfigField::optional(ConfigSchema::integer()),
+            'business_days' => ConfigField::optional(ConfigSchema::integer()),
             'weeks' => ConfigField::optional(ConfigSchema::integer()),
         ], atLeastOne: [
             $timingFields,

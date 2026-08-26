@@ -24,6 +24,9 @@ Route::middleware('module:flow_routes')
         Route::get('/{flowRoute}', [FlowRouteEditorController::class, 'show'])
             ->name('show');
 
+        Route::patch('/{flowRoute}/start-delay', [FlowRouteEditorController::class, 'updateLeadInDelay'])
+            ->name('start-delay.update');
+
         Route::post('/{flowRoute}/points', [FlowRouteEditorController::class, 'storePoint'])
             ->name('points.store');
 

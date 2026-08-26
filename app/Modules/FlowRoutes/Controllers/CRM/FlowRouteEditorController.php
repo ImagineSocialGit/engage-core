@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Requests\StoreFlowRoutePointRequest;
+use App\Modules\FlowRoutes\Requests\UpdateFlowRouteLeadInDelayRequest;
 use App\Modules\FlowRoutes\Requests\UpdateFlowRoutePointOrderRequest;
 use App\Modules\FlowRoutes\Requests\UpdateFlowRoutePointRequest;
 use App\Modules\FlowRoutes\Services\FlowRoutePointAuthoringService;
@@ -57,6 +58,20 @@ class FlowRouteEditorController extends Controller
         );
 
         return $this->redirectToEditor($flowRoute, 'Point updated.');
+    }
+
+    public function updateLeadInDelay(
+        UpdateFlowRouteLeadInDelayRequest $request,
+        FlowRoute $flowRoute,
+    ): RedirectResponse {
+        $this->ensureCurrentVersion($flowRoute);
+
+        $this->authoring->updateLeadInDelay(
+            route: $flowRoute,
+            input: $request->validated(),
+        );
+
+        return $this->redirectToEditor($flowRoute, 'Route start updated.');
     }
 
     public function destroyPoint(

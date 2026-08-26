@@ -2,6 +2,7 @@
 
 namespace App\Modules\FlowRoutes\PointHandlers;
 
+use App\Modules\Core\Services\BusinessCalendar\BusinessCalendarDateCalculator;
 use App\Modules\FlowRoutes\Contracts\PointHandler;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
@@ -11,6 +12,10 @@ use Carbon\CarbonImmutable;
 
 class WaitPointHandler implements PointHandler
 {
+    public function __construct(
+        private readonly ?BusinessCalendarDateCalculator $businessCalendar = null,
+    ) {}
+
     public function type(): string { return FlowRoutePointType::Wait->value; }
 
     public function handle(PointExecutionContext $context): PointExecutionResult
@@ -38,7 +43,20 @@ class WaitPointHandler implements PointHandler
             ]);
         }
 
-        $definition = WaitPointDefinition::from($context->definition, $context->settings, $now);
+        $definition = WaitPointDefinition::from(
+            definition: $context->definition,
+            settings: $context->settings,
+            now: $now,
+            businessDayCalculator: fn (
+                int $businessDays,
+                CarbonImmutable $from,
+                string $timezone,
+            ): CarbonImmutable => ($this->businessCalendar ?? app(BusinessCalendarDateCalculator::class))->addBusinessDays(
+                from: $from,
+                businessDays: $businessDays,
+                timezone: $timezone,
+            ),
+        );
 
         if (! $definition->isValid()) {
             return PointExecutionResult::failed($definition->invalidReason ?? 'invalid_wait_point_definition', [

@@ -1,8 +1,46 @@
 <?php
 
 return [
-    'version' => 3,
+    'version' => 4,
     'tables' => [
+        'business_calendars' => [
+            'mode' => 'upsert',
+            'identity' => ['key'],
+            'preserve_id' => false,
+            'order_by' => ['key'],
+            'columns' => [
+                'id',
+                'key',
+                'name',
+                'skipped_weekdays',
+                'is_default',
+                'created_at',
+                'updated_at',
+            ],
+            'json_columns' => ['skipped_weekdays'],
+        ],
+
+        'business_calendar_exclusions' => [
+            'mode' => 'insert_empty',
+            'preserve_id' => true,
+            'order_by' => ['id'],
+            'columns' => [
+                'id',
+                'business_calendar_id',
+                'key',
+                'name',
+                'recurrence',
+                'exact_date',
+                'month',
+                'day',
+                'created_at',
+                'updated_at',
+            ],
+            'references' => [
+                'business_calendar_id' => 'business_calendars',
+            ],
+        ],
+
         'contact_statuses' => [
             'mode' => 'upsert',
             'identity' => ['key'],

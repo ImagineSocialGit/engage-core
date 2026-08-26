@@ -3,6 +3,38 @@
     $routePresentation = $editor['route'];
     $points = $editor['points'];
     $capabilities = $editor['capabilities'];
+    $leadInWait = $points->first()?->type === \App\Modules\FlowRoutes\Enums\FlowRoutePointType::Wait->value
+        ? $points->first()
+        : null;
+    $businessPoints = $leadInWait ? $points->slice(1)->values() : $points;
+    $leadInDefinition = $leadInWait
+        ? array_replace_recursive($leadInWait->settings ?? [], $leadInWait->definition ?? [])
+        : [];
+    $leadInWaitMode = filled($leadInDefinition['resume_at'] ?? null) ? 'resume_at' : 'duration';
+    $leadInDurationUnit = 'days';
+    $leadInDurationValue = 1;
+
+    foreach (['weeks', 'business_days', 'days', 'hours', 'minutes'] as $candidateUnit) {
+        if (is_numeric($leadInDefinition[$candidateUnit] ?? null)) {
+            $leadInDurationUnit = $candidateUnit;
+            $leadInDurationValue = (int) $leadInDefinition[$candidateUnit];
+            break;
+        }
+    }
+
+    $leadInPresentation = $leadInWait
+        ? collect($routePresentation['presented_points'])->firstWhere('key', $leadInWait->key)
+        : null;
+    $isCurrentEditor = (int) request()->integer('edit_route') === (int) $flowRoute->getKey();
+    $startTimingValue = $isCurrentEditor
+        ? old('start_timing', $leadInWait ? 'delayed' : 'immediate')
+        : ($leadInWait ? 'delayed' : 'immediate');
+    $waitModeValue = $isCurrentEditor ? old('wait_mode', $leadInWaitMode) : $leadInWaitMode;
+    $durationValue = $isCurrentEditor ? old('duration_value', $leadInDurationValue) : $leadInDurationValue;
+    $durationUnit = $isCurrentEditor ? old('duration_unit', $leadInDurationUnit) : $leadInDurationUnit;
+    $resumeAtValue = $isCurrentEditor
+        ? old('resume_at', (string) ($leadInDefinition['resume_at'] ?? ''))
+        : (string) ($leadInDefinition['resume_at'] ?? '');
 @endphp
 
 <template x-teleport="body">
@@ -18,7 +50,7 @@
 >
     <div
         x-data="flowRouteEditor(
-            @js($points->map(fn ($point) => [
+            @js($businessPoints->map(fn ($point) => [
                 'id' => (int) $point->getKey(),
                 'type' => (string) $point->type,
             ])->values()->all()),
@@ -106,18 +138,161 @@
                 @endforeach
             </section>
 
+            <section
+                x-data="{
+                    startTiming: @js($startTimingValue),
+                    waitMode: @js($waitModeValue),
+                    durationUnit: @js($durationUnit),
+                }"
+                class="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+            >
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h3 class="font-semibold text-slate-950">When should this Route begin?</h3>
+                        <p class="mt-1 text-sm leading-6 text-slate-700">
+                            Choose whether the first action happens right away or after a lead-in delay.
+                        </p>
+                    </div>
+
+                    @if($leadInPresentation)
+                        <span class="rounded-full bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-900 ring-1 ring-orange-200">
+                            {{ rtrim((string) ($leadInPresentation['summary'] ?? 'Delay before first action'), '.') }}
+                        </span>
+                    @endif
+                </div>
+
+                <form method="POST" action="{{ route('crm.flow-routes.start-delay.update', $flowRoute) }}" class="mt-5">
+                    @csrf
+                    @method('PATCH')
+
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <label class="flex cursor-pointer gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 has-checked:border-orange-400 has-checked:bg-orange-50">
+                            <input
+                                type="radio"
+                                name="start_timing"
+                                value="immediate"
+                                x-model="startTiming"
+                                class="mt-1 h-4 w-4 border-slate-300 text-orange-700 focus:ring-orange-500"
+                            >
+                            <span>
+                                <span class="block text-sm font-semibold text-slate-950">Immediately</span>
+                                <span class="mt-1 block text-xs leading-5 text-slate-600">Begin with the first action as soon as this Route starts.</span>
+                            </span>
+                        </label>
+
+                        <label class="flex cursor-pointer gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 has-checked:border-orange-400 has-checked:bg-orange-50">
+                            <input
+                                type="radio"
+                                name="start_timing"
+                                value="delayed"
+                                x-model="startTiming"
+                                class="mt-1 h-4 w-4 border-slate-300 text-orange-700 focus:ring-orange-500"
+                            >
+                            <span>
+                                <span class="block text-sm font-semibold text-slate-950">After a delay</span>
+                                <span class="mt-1 block text-xs leading-5 text-slate-600">Wait before the first action happens.</span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div x-show="startTiming === 'delayed'" x-cloak class="mt-4 rounded-xl border border-orange-200 bg-orange-50/60 p-4">
+                        <fieldset>
+                            <legend class="text-sm font-semibold text-slate-950">How should the delay be set?</legend>
+
+                            <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:gap-6">
+                                <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-800">
+                                    <input type="radio" name="wait_mode" value="duration" x-model="waitMode" class="text-orange-700 focus:ring-orange-500">
+                                    For an amount of time
+                                </label>
+                                <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-800">
+                                    <input type="radio" name="wait_mode" value="resume_at" x-model="waitMode" class="text-orange-700 focus:ring-orange-500">
+                                    Until a date and time
+                                </label>
+                            </div>
+                        </fieldset>
+
+                        <div x-show="waitMode === 'duration'" class="mt-4 grid gap-4 sm:grid-cols-2">
+                            <label class="block">
+                                <span class="text-sm font-semibold text-slate-900">Wait</span>
+                                <input
+                                    type="number"
+                                    name="duration_value"
+                                    value="{{ $durationValue }}"
+                                    min="0"
+                                    max="100000"
+                                    class="mt-1 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm shadow-sm focus:border-orange-500 focus:ring-orange-500"
+                                >
+                            </label>
+
+                            <label class="block">
+                                <span class="text-sm font-semibold text-slate-900">Time period</span>
+                                <select
+                                    name="duration_unit"
+                                    x-model="durationUnit"
+                                    class="mt-1 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm shadow-sm focus:border-orange-500 focus:ring-orange-500"
+                                >
+                                    <option value="minutes">Minutes</option>
+                                    <option value="hours">Hours</option>
+                                    <option value="days">Days</option>
+                                    <option value="business_days">Business days</option>
+                                    <option value="weeks">Weeks</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        <div x-show="waitMode === 'resume_at'" class="mt-4 max-w-md">
+                            <label class="block">
+                                <span class="text-sm font-semibold text-slate-900">Begin the first action at</span>
+                                <input
+                                    type="datetime-local"
+                                    name="resume_at"
+                                    value="{{ $resumeAtValue }}"
+                                    class="mt-1 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm shadow-sm focus:border-orange-500 focus:ring-orange-500"
+                                >
+                            </label>
+                        </div>
+
+                        <div x-show="waitMode === 'duration' && durationUnit === 'business_days'" class="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                            <p class="text-sm font-semibold text-slate-950">How business days are counted</p>
+                            <p class="mt-1 text-xs leading-5 text-slate-600">
+                                Business-day waits skip the weekdays and dates selected for this business. Calendar changes affect waits that begin later, not people already waiting.
+                            </p>
+                            <a
+                                href="{{ route('crm.business-calendar.edit') }}"
+                                class="mt-3 inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                            >
+                                Manage business days
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 flex justify-end">
+                        <button
+                            type="submit"
+                            class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 sm:w-auto"
+                        >
+                            Save Route start
+                        </button>
+                    </div>
+                </form>
+            </section>
+
             <section class="mt-7">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div>
-                        <h3 class="text-lg font-semibold tracking-tight text-slate-950">Route flow</h3>
+                        <h3 class="text-lg font-semibold tracking-tight text-slate-950">Actions</h3>
                         <p class="mt-1 text-sm leading-6 text-slate-700">
-                            Points normally continue from top to bottom. A Decision can direct the Route to a later Point or end it.
+                            The first action happens after any lead-in delay. Actions normally continue from top to bottom; a Decision can direct the Route to a later action or end it.
                         </p>
                     </div>
 
                     <form method="POST" action="{{ route('crm.flow-routes.points.order', $flowRoute) }}" x-show="orderChanged" x-transition class="w-full sm:w-auto">
                         @csrf
                         @method('PATCH')
+
+                        @if($leadInWait)
+                            <input type="hidden" name="point_ids[]" value="{{ $leadInWait->getKey() }}">
+                        @endif
 
                         <template x-for="pointId in pointOrder" :key="pointId">
                             <input type="hidden" name="point_ids[]" :value="pointId">
@@ -133,7 +308,7 @@
                 </div>
 
                 <div x-ref="pointList" class="mt-5 space-y-3">
-                    @forelse($points as $index => $point)
+                    @forelse($businessPoints as $index => $point)
                         @php
                             $presented = collect($routePresentation['presented_points'])->firstWhere('key', $point->key);
                             $moduleKey = $presented['module_key'] ?? ($point->capability?->module_key ?: 'flow_routes');
@@ -374,7 +549,7 @@
                         </div>
                     @empty
                         <div class="rounded-2xl border border-dashed border-amber-300 bg-amber-50 px-5 py-6 text-sm text-amber-950">
-                            This Route has no active Points. Add one below to define what it should do.
+                            This Route has no active actions. Add the first action below, then choose whether it should happen immediately or after a delay.
                         </div>
                     @endforelse
                 </div>

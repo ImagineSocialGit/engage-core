@@ -92,6 +92,35 @@ FlowRoutes owns:
 - trigger binding selection behavior
 - route owner morph metadata
 
+## Lead-in delays and business-day waits
+
+The Route editor presents start timing as a Route-level business decision:
+
+```text
+Immediately
+After a delay
+```
+
+This is a presentation layer over the existing Point runtime. A lead-in delay is persisted as the ordinary first active `wait` Point before the first business action. FlowRoutes does not have a second route-level scheduling engine or a second persisted delay concept.
+
+If the first active Point is a Wait, the editor presents it separately from the action list as the delay before the first action. Removing the lead-in delay deactivates that first Wait and rebuilds the ordinary Point chain. Moving a Wait away from first position makes it an ordinary in-route Wait again. The existing rule remains: a Wait cannot be the only or final active Point.
+
+Wait definitions support:
+
+```text
+seconds
+minutes
+hours
+days
+business_days
+weeks
+resume_at
+```
+
+`business_days` delegates date calculation to Core's shared business calendar and uses the client timezone. When a contact reaches the Wait, FlowRoutes calculates and persists `resume_at`. Later calendar changes affect only waits that begin later; the stored `resume_at` remains authoritative for progress already waiting.
+
+Process Highway continues to read and present the ordinary persisted Wait Point. It does not receive a special lead-in-delay node type or mutation authority.
+
 FlowRoute preset sync requires referenced Campaign definitions to exist by stable key. An inactive or archived Campaign is a valid dormant reference; runtime enrollment skips it as `campaign_inactive` until the Campaign returns to `active`.
 
 Status-triggered FlowRoutes also assume required ContactStatus definitions already exist.
@@ -728,7 +757,7 @@ duplicate a Route
 activate/deactivate a Route
 change a Route trigger
 clone a Point from another Route
-business-day/business-hour wait authoring
+business-hour wait authoring
 simple future point eligibility / route-continuation rules
 contextual Automation Opportunity suggestion UX
 manual status-change consequence warning UX

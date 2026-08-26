@@ -2,18 +2,22 @@
 
 namespace App\Modules\Core\Validation;
 
+use App\Modules\Core\Models\BusinessCalendar;
+use App\Modules\Core\Models\BusinessCalendarExclusion;
 use App\Modules\Core\Services\Contacts\ContactImportProfileRegistry;
 use App\Support\Presets\Enums\PresetDomain;
 use App\Support\Presets\PresetCompositionResolver;
 use App\Support\Presets\PresetPackageResolver;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
+use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class CoreSetupValidationContributor implements SetupValidationContributor
 {
     private const SOURCE = 'preset_composition.contact_statuses';
     private const IMPORT_PROFILE_SOURCE = 'contact_imports.profiles';
+    private const BUSINESS_CALENDAR_SOURCE = 'core.business_calendar';
     private const MODULE = 'core';
 
     private const CLIENT_FACING_NOUNS = [
@@ -48,8 +52,71 @@ class CoreSetupValidationContributor implements SetupValidationContributor
 
     public function findings(): iterable
     {
+        yield from $this->validateBusinessCalendar();
         yield from $this->validateContactImportProfiles();
         yield from $this->validateContactStatusPresets();
+    }
+
+    /**
+     * @return iterable<int, SetupValidationFinding>
+     */
+    private function validateBusinessCalendar(): iterable
+    {
+        if (! Schema::hasTable('business_calendars')) {
+            return;
+        }
+
+        $calendar = BusinessCalendar::query()
+            ->defaultCalendar()
+            ->orderBy('id')
+            ->with('exclusions')
+            ->first();
+
+        if (! $calendar instanceof BusinessCalendar) {
+            yield $this->error(
+                code: 'core.business_calendar.default_missing',
+                message: 'Core requires one default business calendar.',
+                path: self::BUSINESS_CALENDAR_SOURCE,
+                source: self::BUSINESS_CALENDAR_SOURCE,
+            );
+
+            return;
+        }
+
+        if (count($calendar->skippedWeekdays()) === 7) {
+            yield $this->error(
+                code: 'core.business_calendar.no_counted_weekdays',
+                message: 'The default business calendar must count at least one weekday.',
+                path: self::BUSINESS_CALENDAR_SOURCE.'.skipped_weekdays',
+                source: self::BUSINESS_CALENDAR_SOURCE,
+            );
+        }
+
+        foreach ($calendar->exclusions as $exclusion) {
+            $valid = match ($exclusion->recurrence) {
+                BusinessCalendarExclusion::RECURRENCE_ANNUAL => checkdate(
+                    (int) $exclusion->month,
+                    (int) $exclusion->day,
+                    2000,
+                ),
+                BusinessCalendarExclusion::RECURRENCE_ONCE => $exclusion->exact_date !== null,
+                default => false,
+            };
+
+            if ($valid) {
+                continue;
+            }
+
+            yield $this->error(
+                code: 'core.business_calendar.exclusion_invalid',
+                message: "Business calendar exclusion [{$exclusion->name}] is invalid.",
+                path: self::BUSINESS_CALENDAR_SOURCE.'.exclusions.'.(string) $exclusion->key,
+                context: [
+                    'exclusion_key' => (string) $exclusion->key,
+                ],
+                source: self::BUSINESS_CALENDAR_SOURCE,
+            );
+        }
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Modules\FlowRoutes\Services;
 
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRouteCapability;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
@@ -154,6 +155,112 @@ class FlowRoutePointAuthoringService
             $this->markRouteCustomized($route);
 
             return $point->refresh();
+        });
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     */
+    public function updateLeadInDelay(FlowRoute $route, array $input): void
+    {
+        $this->ensureRouteCanBeChanged($route);
+
+        $activePoints = $route->activeFlowRoutePoints()
+            ->orderBy('sort_order')
+            ->get();
+        $firstPoint = $activePoints->first();
+        $leadInWait = $firstPoint instanceof FlowRoutePoint
+            && $firstPoint->type === FlowRoutePointType::Wait->value
+                ? $firstPoint
+                : null;
+
+        if (($input['start_timing'] ?? 'immediate') === 'immediate') {
+            if ($leadInWait instanceof FlowRoutePoint) {
+                $this->deactivate($route, $leadInWait);
+            }
+
+            return;
+        }
+
+        if ($activePoints->isEmpty()) {
+            throw ValidationException::withMessages([
+                'start_timing' => 'Add the first action before adding a delay.',
+            ]);
+        }
+
+        $authoringInput = [
+            'wait_mode' => (string) ($input['wait_mode'] ?? 'duration'),
+            'duration_value' => $input['duration_value'] ?? null,
+            'duration_unit' => $input['duration_unit'] ?? null,
+            'resume_at' => $input['resume_at'] ?? null,
+        ];
+
+        if ($leadInWait instanceof FlowRoutePoint) {
+            $this->update($route, $leadInWait, $authoringInput);
+
+            return;
+        }
+
+        $capability = FlowRouteCapability::query()
+            ->active()
+            ->where('point_type', FlowRoutePointType::Wait->value)
+            ->first();
+
+        if (! $capability instanceof FlowRouteCapability) {
+            throw ValidationException::withMessages([
+                'start_timing' => 'A start delay is not currently available.',
+            ]);
+        }
+
+        $this->ensureCapabilityIsAuthorable($capability);
+        $context = $this->authoringContext($route, capability: $capability);
+
+        if (! $this->authoring->available(FlowRoutePointType::Wait->value, $context)) {
+            throw ValidationException::withMessages([
+                'start_timing' => 'A start delay is not currently available for this Route.',
+            ]);
+        }
+
+        DB::transaction(function () use ($route, $capability, $context, $authoringInput, $activePoints): void {
+            $definition = $this->authoring->buildDefinition(
+                FlowRoutePointType::Wait->value,
+                $authoringInput,
+                $context,
+            );
+            $name = 'Wait before first action';
+            $point = new FlowRoutePoint([
+                'flow_route_id' => $route->getKey(),
+                'flow_route_capability_id' => $capability->getKey(),
+                'key' => $this->uniquePointKey($route, $name),
+                'type' => FlowRoutePointType::Wait->value,
+                'name' => $name,
+                'description' => null,
+                'sort_order' => ((int) $route->flowRoutePoints()->max('sort_order')) + 10,
+                'is_start' => false,
+                'is_active' => true,
+                'next_flow_route_point_id' => null,
+                'definition' => $definition,
+                'settings' => [],
+                'cancel_conditions' => [],
+                'source_version' => null,
+                'is_customized' => true,
+                'customized_at' => now(),
+                'meta' => [
+                    'authoring' => [
+                        'source' => 'crm',
+                        'created_at' => now()->toISOString(),
+                    ],
+                ],
+            ]);
+            $proposedOrder = collect([$point])
+                ->concat($activePoints)
+                ->values();
+
+            $this->placementPolicy->assertValidSequence($proposedOrder, 'add');
+
+            $point->save();
+            $this->markRouteCustomized($route);
+            $this->rebuildSequence($route, $proposedOrder);
         });
     }
 

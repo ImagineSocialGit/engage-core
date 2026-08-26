@@ -256,6 +256,8 @@ For each finding, choose one disposition:
 ```text
 keep visible
 rename/translate
+keep and explain visibly below the decision
+keep as a secondary help term with accessible hover/focus/tap/click help
 derive automatically
 generate automatically
 move to Advanced
@@ -266,6 +268,16 @@ remove from the client surface
 Do not solve implementation leakage by weakening a sound backend boundary.
 
 Prefer translating the backend into a simpler surface model.
+
+When a necessary term cannot be replaced, verify that its explanation answers all three questions:
+
+```text
+What does this mean?
+Why would I use it?
+What happens if I change it?
+```
+
+If understanding the term matters to the current decision, the explanation must remain visible below the control. Secondary or repeated terms may use a clearly signaled help affordance, but it must work by hover, keyboard focus, and tap/click. A hover-only tooltip fails the review.
 
 ---
 
@@ -473,6 +485,7 @@ Score each category:
 | First setup action is obvious | /2 |
 | Setup sequence is obvious | /2 |
 | Common terminology is understandable | /2 |
+| Necessary terms are explained accessibly and in place | /2 |
 | Internal concepts are appropriately hidden | /2 |
 | Common create/action flow is short | /2 |
 | Defaults reduce unnecessary decisions | /2 |
@@ -485,15 +498,15 @@ Score each category:
 | Consequences are understandable before action | /2 |
 | Core scenario passes the 5–10 minute test | /2 |
 
-Maximum: **30**.
+Maximum: **32**.
 
 Interpretation:
 
 ```text
-27–30  strong client-ready UX
-23–26  usable; targeted polish remains
-18–22  operator-assisted; not convincingly self-serve
-0–17   architecture is leaking heavily into the product surface
+29–32  strong client-ready UX
+25–28  usable; targeted polish remains
+20–24  operator-assisted; not convincingly self-serve
+0–19   architecture is leaking heavily into the product surface
 ```
 
 A high total does not excuse a zero in a critical category such as first-use orientation, readiness, or the core scenario.

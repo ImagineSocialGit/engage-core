@@ -3,6 +3,7 @@
 use App\Http\Controllers\CRM\DashboardController;
 use App\Http\Controllers\CRM\ProjectStateController;
 use App\Http\Controllers\CRM\ProcessHighwayController;
+use App\Modules\Core\Controllers\BusinessCalendarController;
 use App\Modules\Core\Controllers\ContactController;
 use App\Modules\Core\Controllers\ContactImportBatchController;
 use App\Modules\Core\Controllers\ContactLookupController;
@@ -17,6 +18,11 @@ Route::post('/dashboard/acknowledgements', [DashboardController::class, 'acknowl
 Route::get('/process-highway', ProcessHighwayController::class)
     ->name('crm.process-highway.index');
 
+Route::get('/business-days', [BusinessCalendarController::class, 'edit'])
+    ->name('crm.business-calendar.edit');
+
+Route::put('/business-days', [BusinessCalendarController::class, 'update'])
+    ->name('crm.business-calendar.update');
 
 Route::get('/project-state', [ProjectStateController::class, 'index'])
     ->name('crm.project-state.index');

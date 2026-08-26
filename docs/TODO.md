@@ -29,7 +29,7 @@ The Routes-specific suggestion experience belongs in `modules/flow-routes/TODO.m
 ## Shared CRM / UX infrastructure
 
 - [ ] Add a shared available-field insertion pattern for message/template/config authoring that consumes the real token/field registries and preserves cursor/focus.
-- [ ] Add a reusable hover/focus hint pattern for confusing fields/settings; hints explain behavior in business language and do not replace consequence previews.
+- [ ] Add a reusable hover/focus/tap/click hint pattern for secondary confusing terms; important decision guidance remains visible below the control, hints explain behavior in business language, and hints do not replace consequence previews.
 - [ ] Apply preserve-context/AJAX interaction patterns to row/panel/modal workflows when reloads materially frustrate operators; keep ownership in the affected module rather than creating a central mutation layer.
 
 ## Client self-serve readiness

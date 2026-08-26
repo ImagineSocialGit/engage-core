@@ -4,6 +4,7 @@ namespace App\Modules\FlowRoutes\Data\Points;
 
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Closure;
 use Throwable;
 
 class WaitPointDefinition
@@ -27,13 +28,14 @@ class WaitPointDefinition
         array $definition,
         array $settings = [],
         ?CarbonInterface $now = null,
+        ?Closure $businessDayCalculator = null,
     ): self {
         $now = $now
             ? CarbonImmutable::instance($now)->utc()
             : CarbonImmutable::now('UTC');
 
-        $timezone = self::stringValue($definition, $settings, 'timezone')
-            ?? (string) config('app.timezone', 'UTC');
+        $configuredTimezone = self::stringValue($definition, $settings, 'timezone');
+        $timezone = $configuredTimezone ?? (string) config('app.timezone', 'UTC');
 
         $resumeAt = self::stringValue($definition, $settings, 'resume_at');
 
@@ -58,6 +60,69 @@ class WaitPointDefinition
                         'value' => $resumeAt,
                     ],
                     invalidReason: 'invalid_wait_resume_at_datetime',
+                );
+            }
+        }
+
+        $businessDays = self::numericValue($definition, $settings, 'business_days');
+
+        if ($businessDays !== null) {
+            $timezone = $configuredTimezone ?? (string) config(
+                'client.timezone',
+                config('app.timezone', 'UTC'),
+            );
+
+            if ($businessDays < 0) {
+                return new self(
+                    resumeAt: null,
+                    mode: 'business_days',
+                    timezone: $timezone,
+                    source: [
+                        'business_days' => $businessDays,
+                    ],
+                    invalidReason: 'wait_business_days_cannot_be_negative',
+                );
+            }
+
+            if (! $businessDayCalculator instanceof Closure) {
+                return new self(
+                    resumeAt: null,
+                    mode: 'business_days',
+                    timezone: $timezone,
+                    source: [
+                        'business_days' => $businessDays,
+                    ],
+                );
+            }
+
+            try {
+                $calculatedResumeAt = $businessDayCalculator(
+                    $businessDays,
+                    $now,
+                    $timezone,
+                );
+
+                if (! $calculatedResumeAt instanceof CarbonInterface) {
+                    throw new \UnexpectedValueException('Business-day calculator returned an invalid date.');
+                }
+
+                return new self(
+                    resumeAt: CarbonImmutable::instance($calculatedResumeAt)->utc(),
+                    mode: 'business_days',
+                    timezone: $timezone,
+                    source: [
+                        'business_days' => $businessDays,
+                    ],
+                );
+            } catch (Throwable) {
+                return new self(
+                    resumeAt: null,
+                    mode: 'business_days',
+                    timezone: $timezone,
+                    source: [
+                        'business_days' => $businessDays,
+                    ],
+                    invalidReason: 'business_day_wait_calculation_failed',
                 );
             }
         }
@@ -98,7 +163,8 @@ class WaitPointDefinition
 
     public function isValid(): bool
     {
-        return $this->invalidReason === null && $this->resumeAt instanceof CarbonImmutable;
+        return $this->invalidReason === null
+            && ($this->resumeAt instanceof CarbonImmutable || $this->mode === 'business_days');
     }
 
     public function isImmediate(?CarbonInterface $now = null): bool

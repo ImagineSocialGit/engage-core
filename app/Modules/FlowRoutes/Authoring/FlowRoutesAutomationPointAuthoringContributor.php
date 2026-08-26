@@ -47,6 +47,7 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
             tip: 'Use a Wait when the next step should happen later, not immediately. When added, it is placed before the current final Point so something always happens afterward.',
             useCases: [
                 'Wait 7 days before checking whether follow-up is still needed.',
+                'Wait 2 business days before the first follow-up action.',
                 'Pause until a specific scheduled date.',
             ],
             typeLabel: 'Wait',
@@ -91,7 +92,7 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
             'wait' => [
                 'wait_mode' => ['nullable', 'in:duration,resume_at'],
                 'duration_value' => ['nullable', 'integer', 'min:0', 'max:100000'],
-                'duration_unit' => ['nullable', 'in:minutes,hours,days,weeks'],
+                'duration_unit' => ['nullable', 'in:minutes,hours,days,business_days,weeks'],
                 'resume_at' => ['nullable', 'date'],
             ],
             'branch_evaluate' => [
@@ -521,7 +522,7 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
         $unit = 'days';
         $value = 1;
 
-        foreach (['weeks', 'days', 'hours', 'minutes'] as $candidate) {
+        foreach (['weeks', 'business_days', 'days', 'hours', 'minutes'] as $candidate) {
             if (is_numeric($definition[$candidate] ?? null)) {
                 $unit = $candidate;
                 $value = (int) $definition[$candidate];
@@ -555,13 +556,23 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
                 'name' => 'duration_unit',
                 'label' => 'Unit',
                 'value' => $unit,
+                'state' => true,
                 'options' => [
                     ['value' => 'minutes', 'label' => 'Minutes'],
                     ['value' => 'hours', 'label' => 'Hours'],
                     ['value' => 'days', 'label' => 'Days'],
+                    ['value' => 'business_days', 'label' => 'Business days'],
                     ['value' => 'weeks', 'label' => 'Weeks'],
                 ],
                 'show_when' => ['field' => 'wait_mode', 'equals' => 'duration'],
+            ],
+            [
+                'type' => 'resource',
+                'title' => 'How business days are counted',
+                'body' => 'Business-day waits skip the weekdays and dates selected for this business. Changing that calendar affects waits that begin later, not people who are already waiting.',
+                'action_url' => route('crm.business-calendar.edit'),
+                'action_label' => 'Manage business days',
+                'show_when' => ['field' => 'duration_unit', 'equals' => 'business_days'],
             ],
             [
                 'type' => 'datetime-local',
@@ -670,10 +681,14 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
     /** @param array<string, mixed> $definition */
     private function waitSummary(array $definition): string
     {
-        foreach (['weeks', 'days', 'hours', 'minutes', 'seconds'] as $unit) {
+        foreach (['weeks', 'business_days', 'days', 'hours', 'minutes', 'seconds'] as $unit) {
             $value = $definition[$unit] ?? null;
 
             if (is_numeric($value)) {
+                if ($unit === 'business_days') {
+                    return 'Wait '.$this->quantity((int) $value, 'business day').'.';
+                }
+
                 return 'Wait '.$this->quantity((int) $value, rtrim($unit, 's')).'.';
             }
         }

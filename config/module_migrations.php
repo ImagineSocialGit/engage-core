@@ -38,7 +38,7 @@ return [
     'modules' => [
         'core' => [
             'path' => 'database/migrations/modules/core',
-            'schema_version' => 3,
+            'schema_version' => 4,
             'migrations' => [
                 '2026_04_15_195800_create_contact_statuses_table.php',
                 '2026_04_15_195849_create_contact_import_batches_table.php',
@@ -48,6 +48,7 @@ return [
                 '2026_07_13_120000_create_site_settings_table.php',
                 '2026_08_19_161800_create_contact_import_occurrences_table.php',
                 '2026_08_22_113500_add_birthday_to_contacts_table.php',
+                '2026_08_26_145500_create_business_calendars_table.php',
             ],
         ],
 

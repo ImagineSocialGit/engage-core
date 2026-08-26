@@ -16,8 +16,29 @@ Core owns:
 - generic contact CRM pages/controllers
 - contact show extension registries
 - module-safe contact-facing extension points
+- the shared business calendar used by modules that count business days
 
 ContactStatus preset sync may be run directly through Core tooling, but normal new-project setup should be orchestrated by the app-level `presets:sync` command.
+
+## Shared business calendar
+
+Core owns the client-managed definition of a business day so modules do not invent separate weekday and holiday rules.
+
+The default calendar stores:
+
+```text
+weekdays that do not count
+annual month/day exclusions
+one-time exact-date exclusions
+```
+
+The calendar uses the existing client timezone. It does not own a second timezone setting.
+
+Modules may ask Core to add a number of business days to a timestamp. The calculation preserves the local time of day while advancing through counted local dates. FlowRoutes is the first consumer; Tasks, Scheduling, Campaigns, and other modules may reuse the same Core service later without moving calendar ownership.
+
+Changing the calendar affects calculations performed after the change. Any consumer that begins a wait must persist its calculated result and treat that result as authoritative; calendar changes must not silently move work that is already waiting.
+
+`business_calendars` and `business_calendar_exclusions` are Core-owned Project State. They are client-managed durable state, not deployment config or preset data.
 
 
 ## Canonical contact terminology and client-facing aliases

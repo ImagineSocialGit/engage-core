@@ -859,7 +859,7 @@ activate/deactivate
 trigger changes
 clone Point from another Route
 task assignment/default authoring
-business-day/business-hour waits
+business-hour waits
 simple future Point eligibility / Route continuation rules
 manual status-change consequence confirmation
 contextual Automation Opportunity suggestions
@@ -1528,12 +1528,31 @@ This is UX first, but it may require a real shared available-field/token registr
 
 Use contextual hints to help operators understand what a field, setting, or navigation item does without turning the screen into documentation.
 
+Apply this hierarchy in order:
+
+```text
+1. Replace the technical term with normal business language whenever possible.
+
+2. If the term genuinely has to remain:
+   - explain it visibly below the control when understanding it matters to the
+     decision being made;
+   - use a clearly signaled help term, such as a dotted underline, for
+     secondary or repeated concepts.
+
+3. Every explanation answers:
+   - What does this mean?
+   - Why would I use it?
+   - What happens if I change it?
+```
+
+Do not add a tooltip merely because a label sounds technical. Simplify the label first. Do not hide information the user must understand before making an important or consequential decision inside a tooltip; put that explanation directly below the control.
+
 Preferred behavior:
 
 ```text
 A small hint icon, dotted underline, or subtle help affordance appears near the label.
-Hovering or focusing for a brief moment shows one plain-language explanation.
-Keyboard focus should reveal the same help as hover.
+Hover, keyboard focus, and tap/click reveal the same plain-language explanation.
+The help can be dismissed without moving the user away from the current task.
 ```
 
 Hints should answer:
@@ -1545,6 +1564,17 @@ What happens if I change it?
 ```
 
 Hints should not expose schema names, raw config keys, event keys, class names, or implementation details as the primary explanation.
+
+Examples:
+
+```text
+Booking buffer
+Extra time kept free before or after an appointment so another booking cannot
+be placed too close to it.
+
+Capacity ceiling [secondary help term]
+The maximum number of appointments that can happen at the same time.
+```
 
 Good:
 
@@ -1559,7 +1589,7 @@ Bad:
 Manage FlowRouteTriggerBinding records for automation_event and contact_status triggers.
 ```
 
-Hints are not a replacement for consequence previews. If changing a setting triggers messages, tasks, status changes, route execution, campaign enrollment, or cancellation, show a clear preview before save.
+Hints are not a replacement for visible decision guidance or consequence previews. If changing a setting triggers messages, tasks, status changes, route execution, campaign enrollment, or cancellation, explain the consequence in place and show a clear preview before save.
 
 ## Preserve context for inline CRM actions
 
