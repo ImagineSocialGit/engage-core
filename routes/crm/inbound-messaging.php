@@ -1,8 +1,26 @@
 <?php
 
 use App\Modules\InboundMessaging\Controllers\CRM\ContactConversationReplyController;
+use App\Modules\InboundMessaging\Controllers\CRM\InboundEmailRouteController;
 use App\Modules\InboundMessaging\Controllers\CRM\InboundReplyProfileController;
 use Illuminate\Support\Facades\Route;
+
+Route::middleware('module:inbound_messaging')
+    ->prefix('reply-handling/inbound-addresses')
+    ->name('crm.inbound-messaging.email-routes.')
+    ->group(function (): void {
+        Route::get('/', [InboundEmailRouteController::class, 'index'])
+            ->name('index');
+
+        Route::post('/', [InboundEmailRouteController::class, 'store'])
+            ->name('store');
+
+        Route::patch('/{inboundEmailRoute}', [InboundEmailRouteController::class, 'update'])
+            ->name('update');
+
+        Route::patch('/{inboundEmailRoute}/state', [InboundEmailRouteController::class, 'state'])
+            ->name('state');
+    });
 
 Route::middleware('module:inbound_messaging')
     ->prefix('reply-handling')

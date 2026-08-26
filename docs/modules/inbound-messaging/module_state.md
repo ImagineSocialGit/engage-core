@@ -16,6 +16,10 @@ Normal replies may carry narrow first-class correlation evidence back to the ori
 
 InboundMessaging also owns durable semantic mailbox routes for inbound email that does not correlate to an Engage-originated ScheduledMessage. The database table `inbound_email_routes` is runtime authority. `INBOUND_EMAIL_DOMAIN` remains deployment/DNS infrastructure; route rows own only the local-part and business context.
 
+The CRM **Inbound Addresses** workspace is the authoritative human editor for these rows. Operators may create routes, edit their local-part/label/source/context, and enable or disable them. Route `key` is immutable after creation because it is durable semantic identity. The configured receiving domain is displayed read-only and remains deployment configuration.
+
+The `reply+` local-part namespace is reserved for signed Engage Reply-To identities and may not be used by semantic inbound routes. Runtime route resolution also ignores that namespace defensively, so a direct/imported row cannot shadow exact signed reply correlation.
+
 Example:
 
 ```text

@@ -144,6 +144,16 @@ final class InboundMessagingSetupValidationContributor implements SetupValidatio
                 );
             }
 
+            if ($this->emailRouteResolver->isReservedLocalPart($route->local_part)) {
+                yield $this->error(
+                    code: 'inbound_messaging.email_routes.local_part_reserved',
+                    message: "Inbound email route [{$route->key}] uses the reserved signed Reply-To namespace [reply+].",
+                    source: 'inbound_email_routes',
+                    path: "inbound_email_routes.{$route->key}.local_part",
+                    context: ['route_key' => $route->key],
+                );
+            }
+
             if (! is_string($route->source) || trim($route->source) === '') {
                 yield $this->error(
                     code: 'inbound_messaging.email_routes.source_missing',

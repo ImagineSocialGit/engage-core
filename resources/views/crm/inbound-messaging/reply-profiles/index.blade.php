@@ -38,6 +38,15 @@
             </div>
         @endif
 
+        <div class="flex justify-end">
+            <a
+                href="{{ route('crm.inbound-messaging.email-routes.index') }}"
+                class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 hover:text-slate-950"
+            >
+                Inbound addresses
+            </a>
+        </div>
+
         <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
             <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div class="max-w-3xl">

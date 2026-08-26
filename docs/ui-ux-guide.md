@@ -2,6 +2,20 @@
 
 This guide turns Engage Core's product principles into practical interface rules.
 
+This document is the **canonical UI/UX standard** for Engage Core. It defines how client-facing and operator-facing interfaces should behave, communicate, organize information, expose complexity, and guide users through work.
+
+Use `docs/module-ui-ux-review-playbook.md` when reviewing a real module against this standard. The distinction is:
+
+```text
+UI/UX Guide
+    What good Engage Core UI should be.
+
+Module UI/UX Review Playbook
+    How to audit, redesign, implement, and verify one module against that standard.
+```
+
+Do not duplicate permanent UI rules in the playbook. General product/UI lessons discovered during module reviews belong here when they apply across modules. Module-specific findings belong in the owning module's `TODO.md` or `module_state.md`. Improvements to the review procedure itself belong in the playbook.
+
 Use this document when designing, reviewing, or refactoring CRM/admin/client-facing screens. Use `product-principles.md` for the product posture, `module-boundaries.md` for ownership and dependency rules, `configuration/config-authoring-guide.md` for config/template rules, and the owning module/configuration `TODO.md` for disposable backlog; use root `TODO.md` only for truly platform-wide work.
 
 ## Core UX standard

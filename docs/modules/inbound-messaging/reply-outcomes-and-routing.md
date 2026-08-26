@@ -63,6 +63,10 @@ Resolution order is deliberate:
 3. ordinary uncorrelated inbound email
 ```
 
+`reply+...` is a reserved local-part namespace owned by signed Engage Reply-To identities. The CRM Inbound Addresses workspace prevents operators from creating semantic routes in that namespace, and runtime resolution ignores it defensively.
+
+The CRM workspace edits only durable route identity and context. `INBOUND_EMAIL_DOMAIN` remains read-only deployment/DNS configuration and is never stored or authored as part of a route row.
+
 A resolved route is snapshotted on the `InboundMessage` as `inbound_email_route_key`, `inbound_email_route_source`, and `inbound_email_route_context`. The neutral `inbound_email.route_received` automation event exposes those same compact values and may have a null Contact ID. This lets a provider/domain adapter consume the route first, then resolve or create business identity without making InboundMessaging depend on that external system.
 
 The inbound body remains canonical on `inbound_messages`; it is not copied into the route automation event.

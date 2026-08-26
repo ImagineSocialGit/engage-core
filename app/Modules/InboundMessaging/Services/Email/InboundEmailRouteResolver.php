@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Schema;
 
 class InboundEmailRouteResolver
 {
+    private const SIGNED_REPLY_LOCAL_PREFIX = 'reply+';
+
     /** @param array<int, string> $toAddresses */
     public function resolve(array $toAddresses): ?ResolvedInboundEmailRoute
     {
@@ -26,7 +28,9 @@ class InboundEmailRouteResolver
 
             [$localPart, $addressDomain] = explode('@', $normalizedAddress, 2);
 
-            if ($addressDomain !== $domain) {
+            if ($addressDomain !== $domain
+                || $this->isReservedLocalPart($localPart)
+            ) {
                 continue;
             }
 
@@ -80,6 +84,17 @@ class InboundEmailRouteResolver
         }
 
         return $value;
+    }
+
+    public function isReservedLocalPart(mixed $value): bool
+    {
+        $localPart = $this->normalizeLocalPart($value);
+
+        return $localPart !== null
+            && str_starts_with(
+                $localPart,
+                self::SIGNED_REPLY_LOCAL_PREFIX,
+            );
     }
 
     private function normalizeAddress(mixed $value): ?string
