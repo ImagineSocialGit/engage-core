@@ -3,15 +3,19 @@
 namespace App\Modules\InboundMessaging\Providers;
 
 use App\Modules\InboundMessaging\Console\Commands\SyncInboundReplyProfilesCommand;
+use App\Modules\InboundMessaging\Events\InboundMessageReceived;
+use App\Modules\InboundMessaging\Listeners\ConsumeRoutedInboundMessage;
 use App\Modules\InboundMessaging\Services\ContactShow\ContactConversationShowDataProvider;
 use App\Modules\InboundMessaging\Services\Dashboard\LeadRepliesDashboardPanelProvider;
 use App\Modules\InboundMessaging\Services\Email\EmailWebhookHandlerResolver;
+use App\Modules\InboundMessaging\Services\Email\RoutedInboundMessageConsumerRegistry;
 use App\Modules\InboundMessaging\Services\ReplyProfiles\InboundReplyProfilePresentationProvider;
 use App\Modules\InboundMessaging\Services\Sms\SmsWebhookHandlerResolver;
 use App\Modules\InboundMessaging\Validation\InboundMessagingSetupValidationContributor;
 use App\Support\Dashboard\DashboardPanelRegistry;
 use App\Support\ReplyHandling\ReplyProfileDependencyRegistry;
 use App\Support\ReplyHandling\ReplyProfilePresentationRegistry;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
 class InboundMessagingModuleServiceProvider extends ServiceProvider
@@ -23,6 +27,16 @@ class InboundMessagingModuleServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(EmailWebhookHandlerResolver::class);
+
+        $this->app->singleton(
+            RoutedInboundMessageConsumerRegistry::class,
+            fn ($app): RoutedInboundMessageConsumerRegistry =>
+                new RoutedInboundMessageConsumerRegistry(
+                    $app->tagged(
+                        RoutedInboundMessageConsumerRegistry::CONSUMER_TAG,
+                    ),
+                ),
+        );
 
         $this->app->singleton(
             ReplyProfileDependencyRegistry::class,
@@ -57,6 +71,11 @@ class InboundMessagingModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Event::listen(
+            InboundMessageReceived::class,
+            ConsumeRoutedInboundMessage::class,
+        );
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 SyncInboundReplyProfilesCommand::class,

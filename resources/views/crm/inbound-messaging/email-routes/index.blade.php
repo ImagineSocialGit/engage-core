@@ -210,6 +210,20 @@
                             <p class="mt-2 break-all text-sm font-semibold text-slate-700">
                                 {{ $row['address'] }}
                             </p>
+
+                            <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                                    What happens
+                                </p>
+                                <div class="mt-1 flex flex-wrap items-center gap-2">
+                                    <p class="text-sm font-semibold {{ $row['handling']['status'] === 'problem' ? 'text-amber-800' : 'text-slate-900' }}">
+                                        {{ $row['handling']['label'] }}
+                                    </p>
+                                </div>
+                                <p class="mt-1 text-xs leading-5 text-slate-500">
+                                    {{ $row['handling']['description'] }}
+                                </p>
+                            </div>
                         </div>
 
                         <form

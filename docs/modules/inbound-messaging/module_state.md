@@ -31,6 +31,45 @@ Signed Engage Reply-To correlation always wins. Only a non-correlated recipient 
 
 A resolved route emits the compact neutral `inbound_email.route_received` automation event. It may have no Contact yet; provider/domain integration code may use the internal route context to parse the normalized inbound message and establish Contact/business state later. The event never copies the inbound body or raw provider payload.
 
+## Routed-message consumer seam
+
+Named inbound addresses may optionally be connected to one owning business process through the provider-neutral `RoutedInboundMessageConsumer` seam.
+
+The seam is deliberately additive to the Inbox:
+
+```text
+named inbound address
+    -> normalized InboundMessage
+    -> Inbox
+    -> zero or one routed-message consumer
+```
+
+Zero consumers is valid. The address is **Inbox only** and remains useful for human review.
+
+One consumer means the owning module/integration may interpret the normalized message, establish its own business identity, optionally return a related Contact, record its own durable truth, and emit its own neutral business event.
+
+More than one consumer for the same active address is invalid. Setup validation reports the conflict, and runtime resolution fails closed rather than executing multiple business processes for one message.
+
+Consumers claim durable internal route identity, not sender/body heuristics. A consumer may match the stable route key or other route identity it owns through configuration. Any operator-facing integration setup should present named inbound addresses by their plain-language labels and store the internal route identity invisibly; users must never be asked to type route keys.
+
+`RoutedInboundMessageConsumeResult::handled()` means the owning consumer completed its business processing. InboundMessaging then records `processed_at` and may associate the returned Contact through `related_contact_id`. It does not change Inbox triage state; automation remains additive to human visibility.
+
+`RoutedInboundMessageConsumeResult::unresolved()` means the consumer owns the address but could not establish enough business identity from that valid message. The message remains unprocessed and visible as ordinary Inbox work. Consumers should throw only for retryable/system failures so the canonical webhook inbox can retry the provider callback.
+
+Consumer implementations must be idempotent for the `InboundMessage` primary key because provider retries may re-enter normalized processing after a failure.
+
+Provider-specific parsing and domain mutation stay outside InboundMessaging. Cross-module optional behavior should use an app-level integration adapter when importing the InboundMessaging contract directly would create an invalid module dependency.
+
+The Inbound Addresses workspace presents only human outcomes:
+
+```text
+Inbox only
+Connected to: <business-process label>
+Needs setup attention
+```
+
+It never exposes consumer keys or route identity to CRM operators.
+
 ## Inbox authority
 
 InboundMessaging owns a durable human-review Inbox for normalized inbound email and SMS. The Inbox is the baseline product behavior, not an automation fallback: every ordinary inbound reply or routed inbound email has a human-readable home even when FlowRoutes, Tasks, InternalNotifications, or a domain-specific integration are unavailable.

@@ -572,6 +572,7 @@
 │   │   │   │   ├── Email
 │   │   │   │   │   └── EmailWebhookHandler.php
 │   │   │   │   ├── InboundMessageHandler.php
+│   │   │   │   ├── RoutedInboundMessageConsumer.php
 │   │   │   │   └── Sms
 │   │   │   │       └── SmsWebhookHandler.php
 │   │   │   ├── Controllers
@@ -584,10 +585,14 @@
 │   │   │   │       ├── EmailWebhookController.php
 │   │   │   │       └── SmsWebhookController.php
 │   │   │   ├── Data
-│   │   │   │   └── Email
-│   │   │   │       └── ResolvedInboundEmailRoute.php
+│   │   │   │   ├── Email
+│   │   │   │   │   └── ResolvedInboundEmailRoute.php
+│   │   │   │   ├── InboundEmailRouteIdentity.php
+│   │   │   │   └── RoutedInboundMessageConsumeResult.php
 │   │   │   ├── Events
 │   │   │   │   └── InboundMessageReceived.php
+│   │   │   ├── Listeners
+│   │   │   │   └── ConsumeRoutedInboundMessage.php
 │   │   │   ├── Models
 │   │   │   │   ├── InboundEmailRoute.php
 │   │   │   │   ├── InboundMessage.php
@@ -609,7 +614,8 @@
 │   │   │   │   │   ├── EmailWebhookHandlerResolver.php
 │   │   │   │   │   ├── EmailWebhookPayload.php
 │   │   │   │   │   ├── InboundEmailRouteResolver.php
-│   │   │   │   │   └── InboundEmailRouteWorkspace.php
+│   │   │   │   │   ├── InboundEmailRouteWorkspace.php
+│   │   │   │   │   └── RoutedInboundMessageConsumerRegistry.php
 │   │   │   │   ├── InboundMessageRouter.php
 │   │   │   │   ├── Inbox
 │   │   │   │   │   └── InboundInboxWorkspace.php
@@ -2552,7 +2558,8 @@
 │   │   │   ├── ReplyProfileContextualUpdateTest.php
 │   │   │   ├── ReplyProfileDependencyContributorTest.php
 │   │   │   ├── ResendInboundReplyEndToEndTest.php
-│   │   │   └── ResendReceivedEmailClientTest.php
+│   │   │   ├── ResendReceivedEmailClientTest.php
+│   │   │   └── RoutedInboundMessageConsumerTest.php
 │   │   ├── Install
 │   │   │   ├── EngageInstallCommandTest.php
 │   │   │   └── EngageRefreshCommandTest.php
@@ -2885,4 +2892,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-690 directories, 2196 files
+691 directories, 2202 files

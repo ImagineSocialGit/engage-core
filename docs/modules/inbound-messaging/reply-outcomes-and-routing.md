@@ -36,6 +36,32 @@ Reply profiles may use:
 
 Use `exact` for dangerous short outcomes such as `NO`; do not classify the word `no` as a broad keyword.
 
+## Named-address business consumers
+
+The generic `inbound_email.route_received` automation event remains available as compact observation/automation evidence, but named-address business interpretation is owned by the routed-message consumer seam.
+
+A consumer claims an address by durable internal route identity and receives the canonical normalized `InboundMessage`. It may:
+
+- parse normalized subject/body fields;
+- resolve or create owning-module business identity;
+- return a related Contact for Inbox association;
+- persist owning-module state;
+- emit an owning-module neutral business event.
+
+It must not:
+
+- depend on raw provider envelopes;
+- hide the message from the Inbound Inbox;
+- make InboundMessaging own provider/domain parsing;
+- run multiple consumers for one named address;
+- require FlowRoutes or Tasks to be installed.
+
+No consumer is a valid configuration. In that case the named address remains an Inbox-only organizational tool.
+
+Consumer selection is not an operator-facing route-key workflow. An owning integration UI should offer a plain-language inbound-address selector and store the selected internal identity behind the scenes.
+
+A handled result marks normalized business processing complete but leaves Inbox triage unchanged. An unresolved result keeps the message available for human review. Retryable/system failures should throw so canonical webhook retry semantics remain authoritative.
+
 ## Authoritative Reply Handling workspace
 
 Reply profiles, intents, and recognition rules are durable InboundMessaging records. The CRM **Reply Handling** workspace is their authoritative editor. Campaign message carousels may host that authoritative update seam in context: they show the profile attached to a message, its exact/keyword rules, and dependent behavior, and they post rule edits back to InboundMessaging. Client config is bootstrap input, not runtime authority; the sync path preserves customized database rows unless force is requested.

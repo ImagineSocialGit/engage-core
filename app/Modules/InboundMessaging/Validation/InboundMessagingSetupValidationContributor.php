@@ -2,9 +2,11 @@
 
 namespace App\Modules\InboundMessaging\Validation;
 
+use App\Modules\InboundMessaging\Data\InboundEmailRouteIdentity;
 use App\Modules\InboundMessaging\Models\InboundEmailRoute;
 use App\Modules\InboundMessaging\Models\InboundReplyProfile;
 use App\Modules\InboundMessaging\Services\Email\InboundEmailRouteResolver;
+use App\Modules\InboundMessaging\Services\Email\RoutedInboundMessageConsumerRegistry;
 use App\Modules\InboundMessaging\Services\ReplyProfiles\ReplyProfileDefinitionNormalizer;
 use App\Support\ReplyHandling\Data\ReplyProfileDependency;
 use App\Support\ReplyHandling\ReplyProfileDependencyRegistry;
@@ -19,11 +21,13 @@ final class InboundMessagingSetupValidationContributor implements SetupValidatio
         private readonly ReplyProfileDefinitionNormalizer $normalizer,
         private readonly ReplyProfileDependencyRegistry $dependencies,
         private readonly InboundEmailRouteResolver $emailRouteResolver,
+        private readonly RoutedInboundMessageConsumerRegistry $routedMessageConsumers,
     ) {}
 
     public function findings(): iterable
     {
         yield from $this->emailRouteFindings();
+        yield from $this->routedMessageConsumerFindings();
 
         try {
             $configured = $this->normalizer->configured();
@@ -163,6 +167,75 @@ final class InboundMessagingSetupValidationContributor implements SetupValidatio
                     context: ['route_key' => $route->key],
                 );
             }
+        }
+    }
+
+    private function routedMessageConsumerFindings(): iterable
+    {
+        try {
+            foreach ($this->routedMessageConsumers->duplicateKeys() as $key) {
+                yield $this->error(
+                    code: 'inbound_messaging.email_routes.consumer_key_duplicate',
+                    message: "Routed inbound-message consumer key [{$key}] is registered more than once.",
+                    source: 'routed_message_consumers',
+                    path: $key,
+                    context: ['consumer_key' => $key],
+                );
+            }
+        } catch (Throwable $exception) {
+            yield $this->error(
+                code: 'inbound_messaging.email_routes.consumer_invalid',
+                message: $exception->getMessage(),
+                source: 'routed_message_consumers',
+            );
+
+            return;
+        }
+
+        if (! Schema::hasTable('inbound_email_routes')) {
+            return;
+        }
+
+        $routes = InboundEmailRoute::query()
+            ->active()
+            ->orderBy('key')
+            ->get();
+
+        foreach ($routes as $route) {
+            try {
+                $matches = $this->routedMessageConsumers->matching(
+                    InboundEmailRouteIdentity::fromRoute($route),
+                );
+            } catch (Throwable $exception) {
+                yield $this->error(
+                    code: 'inbound_messaging.email_routes.consumer_invalid',
+                    message: "Inbound address [{$route->label}] could not evaluate its connected business process: {$exception->getMessage()}",
+                    source: 'routed_message_consumers',
+                    path: "inbound_email_routes.{$route->key}",
+                    context: ['route_key' => $route->key],
+                );
+
+                continue;
+            }
+
+            if (count($matches) <= 1) {
+                continue;
+            }
+
+            yield $this->error(
+                code: 'inbound_messaging.email_routes.consumer_conflict',
+                message: "Inbound address [{$route->label}] is connected to more than one routed-message consumer.",
+                source: 'routed_message_consumers',
+                path: "inbound_email_routes.{$route->key}",
+                context: [
+                    'route_key' => $route->key,
+                    'consumer_keys' => array_map(
+                        fn ($consumer): string =>
+                            $this->routedMessageConsumers->consumerKey($consumer),
+                        $matches,
+                    ),
+                ],
+            );
         }
     }
 

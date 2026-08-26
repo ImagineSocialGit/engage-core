@@ -21,7 +21,10 @@ class ScheduleInboundMessageInternalNotification
     {
         $inboundMessage = $event->inboundMessage;
 
-        if ($this->classificationValue($inboundMessage) !== 'normal_reply') {
+        if (
+            $this->classificationValue($inboundMessage) !== 'normal_reply'
+            || filled($inboundMessage->inbound_email_route_key)
+        ) {
             return;
         }
 
