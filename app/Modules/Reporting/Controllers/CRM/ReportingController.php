@@ -5,6 +5,8 @@ namespace App\Modules\Reporting\Controllers\CRM;
 use App\Http\Controllers\Controller;
 use App\Modules\Reporting\Actions\ProjectReportingDailyMetricsAction;
 use App\Modules\Reporting\Services\ReportingWorkspaceReadService;
+use App\Modules\Reporting\Services\SchedulingReportingWorkspaceReadService;
+use App\Support\Modules\ModuleManager;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,14 +19,23 @@ final class ReportingController extends Controller
     public function index(
         Request $request,
         ReportingWorkspaceReadService $workspace,
+        SchedulingReportingWorkspaceReadService $schedulingWorkspace,
+        ModuleManager $modules,
     ): View {
         $days = $this->normalizedDays($request);
+
+        $schedulingReport = $schedulingWorkspace->publicBooking($days);
+        $showSchedulingReport = $modules->enabled('scheduling')
+            || $schedulingReport['has_data'];
 
         return view('crm.reporting.index', [
             'title' => 'Reporting',
             'heading' => 'Reporting',
             'subheading' => 'See where real visitors move forward, get stuck, or fail to complete public actions.',
             'report' => $workspace->webinarRegistration($days),
+            'schedulingReport' => $showSchedulingReport
+                ? $schedulingReport
+                : null,
             'rangeOptions' => self::RANGE_OPTIONS,
         ]);
     }

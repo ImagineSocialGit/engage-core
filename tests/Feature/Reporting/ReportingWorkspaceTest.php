@@ -75,6 +75,7 @@ class ReportingWorkspaceTest extends TestCase
             ->assertSee('Technical collection signals')
             ->assertSee('80.0%')
             ->assertSee('15.0%')
+            ->assertDontSee('data-report-surface="scheduling-public-booking"', false)
             ->assertDontSee('webinar.registration_conversion')
             ->assertDontSee('likely_human')
             ->assertDontSee('utm_source')
@@ -263,6 +264,107 @@ class ReportingWorkspaceTest extends TestCase
         $this->assertStringContainsString('Why traffic is still unknown', $view);
         $this->assertStringContainsString('classification_resolution', $service);
         $this->assertStringContainsString('mobile_webview_evidence', $service);
+    }
+
+    public function test_workspace_exposes_scheduling_funnel_attribution_and_service_contracts(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-16 20:00:00 UTC'));
+        config(['client.timezone' => 'America/Chicago']);
+
+        config()->set('modules.enabled', array_values(array_diff(
+            config('modules.enabled', []),
+            ['scheduling'],
+        )));
+
+        $this->assertFalse(app(ModuleManager::class)->enabled('scheduling'));
+
+        $this->seedSchedulingMetrics();
+        $this->seedExternalMeasurement();
+
+        $response = $this->actingAs(User::factory()->create())
+            ->get('http://crm.'.config('app.root_domain').'/reporting?days=30');
+
+        $response
+            ->assertOk()
+            ->assertSee('data-report-surface="scheduling-public-booking"', false)
+            ->assertSee('data-scheduling-funnel', false)
+            ->assertSee('data-scheduling-campaign-report', false)
+            ->assertSee('data-scheduling-service-report', false)
+            ->assertSee('data-scheduling-ad-comparison', false)
+            ->assertSee('data-scheduling-verification-report', false)
+            ->assertViewHas('schedulingReport', function (array $report): bool {
+                return $report['has_data']
+                    && $report['summary']['likely_human_sessions'] === 40
+                    && $report['summary']['public_appointments'] === 8
+                    && $report['summary']['booking_conversion']['percent'] === 20.0
+                    && $report['largest_drop']['from'] === 'Viewed availability'
+                    && $report['largest_drop']['to'] === 'Selected a time'
+                    && $report['campaigns'][0]['attributed_appointments'] === 4
+                    && $report['services'][0]['public_appointments'] === 8
+                    && $report['ad_platform_comparisons'][0]['exact_comparison']['cost_per_appointment'] === 25.0;
+            });
+    }
+
+    private function seedSchedulingMetrics(): void
+    {
+        $date = '2026-08-16';
+        $campaign = [
+            'slice' => 'campaign',
+            'utm_source' => 'meta',
+            'utm_medium' => 'paid_social',
+            'utm_campaign' => 'august_homebuyer',
+            'utm_content' => 'creative_a',
+            'utm_term' => 'first_time_buyers',
+            'external_platform' => 'meta',
+            'external_campaign_id' => 'cmp-100',
+            'external_group_id' => 'grp-200',
+            'external_creative_id' => 'ad-300',
+            'external_placement' => 'facebook_feed',
+        ];
+
+        foreach ([
+            ['scheduling.landing_sessions', ['slice' => 'all', 'traffic_class' => 'likely_human'], 40, null],
+            ['scheduling.landing_sessions', ['slice' => 'all', 'traffic_class' => 'unknown'], 10, null],
+            ['scheduling.funnel_sessions', ['slice' => 'all', 'traffic_class' => 'likely_human', 'step' => 'catalog'], 40, null],
+            ['scheduling.funnel_sessions', ['slice' => 'all', 'traffic_class' => 'likely_human', 'step' => 'service_selected'], 35, null],
+            ['scheduling.funnel_sessions', ['slice' => 'all', 'traffic_class' => 'likely_human', 'step' => 'availability_viewed'], 30, null],
+            ['scheduling.funnel_sessions', ['slice' => 'all', 'traffic_class' => 'likely_human', 'step' => 'time_selected'], 18, null],
+            ['scheduling.funnel_sessions', ['slice' => 'all', 'traffic_class' => 'likely_human', 'step' => 'details_started'], 15, null],
+            ['scheduling.funnel_sessions', ['slice' => 'all', 'traffic_class' => 'likely_human', 'step' => 'submit_attempt'], 12, null],
+            ['scheduling.booking_conversion', ['slice' => 'all', 'traffic_class' => 'likely_human'], 8, 40],
+            ['scheduling.validation_failure_rate', ['slice' => 'all', 'traffic_class' => 'likely_human'], 3, 12],
+            ['scheduling.validation_failures', ['slice' => 'all', 'field_key' => 'phone'], 2, null],
+            ['scheduling.availability_outcomes', ['slice' => 'all', 'outcome' => 'available'], 25, null],
+            ['scheduling.availability_outcomes', ['slice' => 'all', 'outcome' => 'empty'], 5, null],
+            ['scheduling.verification_channels', ['slice' => 'all', 'stage' => 'requested', 'channel' => 'email'], 10, null],
+            ['scheduling.verification_channels', ['slice' => 'all', 'stage' => 'completed', 'channel' => 'email'], 8, null],
+            ['scheduling.public_appointments', ['slice' => 'all'], 8, null],
+            ['scheduling.appointment_outcomes', ['slice' => 'all', 'outcome' => 'scheduled'], 8, null],
+            ['scheduling.booking_correlation_coverage', ['slice' => 'all'], 8, 8],
+            ['scheduling.attributed_appointments', ['slice' => 'all'], 8, null],
+            ['scheduling.booking_attribution_evidence', ['slice' => 'all', 'evidence' => 'meta_click_id'], 4, null],
+
+            ['scheduling.landing_sessions', [...$campaign, 'traffic_class' => 'likely_human'], 20, null],
+            ['scheduling.funnel_sessions', [...$campaign, 'traffic_class' => 'likely_human', 'step' => 'time_selected'], 10, null],
+            ['scheduling.funnel_sessions', [...$campaign, 'traffic_class' => 'likely_human', 'step' => 'submit_attempt'], 6, null],
+            ['scheduling.booking_conversion', [...$campaign, 'traffic_class' => 'likely_human'], 4, 20],
+            ['scheduling.attributed_appointments', $campaign, 4, null],
+            ['scheduling.booking_attribution_evidence', [...$campaign, 'evidence' => 'meta_click_id'], 4, null],
+
+            ['scheduling.landing_sessions', ['slice' => 'service', 'service_key' => 'strategy-call', 'traffic_class' => 'likely_human'], 40, null],
+            ['scheduling.funnel_sessions', ['slice' => 'service', 'service_key' => 'strategy-call', 'traffic_class' => 'likely_human', 'step' => 'time_selected'], 18, null],
+            ['scheduling.booking_conversion', ['slice' => 'service', 'service_key' => 'strategy-call', 'traffic_class' => 'likely_human'], 8, 40],
+            ['scheduling.validation_failure_rate', ['slice' => 'service', 'service_key' => 'strategy-call', 'traffic_class' => 'likely_human'], 3, 12],
+            ['scheduling.public_appointments', ['slice' => 'service', 'service_id' => '7', 'service_key' => 'strategy-call'], 8, null],
+        ] as [$metricKey, $dimensions, $numerator, $denominator]) {
+            $this->createMetric(
+                date: $date,
+                metricKey: $metricKey,
+                dimensions: $dimensions,
+                numerator: $numerator,
+                denominator: $denominator,
+            );
+        }
     }
 
     private function seedReportMetrics(): void

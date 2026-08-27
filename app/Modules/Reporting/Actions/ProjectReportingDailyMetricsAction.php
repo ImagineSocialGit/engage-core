@@ -17,13 +17,17 @@ final class ProjectReportingDailyMetricsAction
 {
     public const PROJECTOR_KEY = 'public_funnel';
 
-    public const PROJECTOR_VERSION = 3;
+    public const PROJECTOR_VERSION = 4;
 
     public const METRIC_VERSION = 2;
 
     private const WEBINAR_SURFACE = 'webinar_registration';
 
     private const WEBINAR_FACT = 'webinar.registration';
+
+    private const SCHEDULING_SURFACE = 'scheduling_public_booking';
+
+    private const SCHEDULING_FACT = 'scheduling.public_booking';
 
     private const OWNED_METRIC_KEYS = [
         'webinar.landing_sessions',
@@ -49,6 +53,19 @@ final class ProjectReportingDailyMetricsAction
         'webinar.attendance_rate',
         'webinar.attendance_outcomes',
         'webinar.question_answers',
+        'scheduling.landing_sessions',
+        'scheduling.traffic_classification_resolution',
+        'scheduling.funnel_sessions',
+        'scheduling.booking_conversion',
+        'scheduling.validation_failure_rate',
+        'scheduling.validation_failures',
+        'scheduling.availability_outcomes',
+        'scheduling.verification_channels',
+        'scheduling.public_appointments',
+        'scheduling.appointment_outcomes',
+        'scheduling.booking_correlation_coverage',
+        'scheduling.attributed_appointments',
+        'scheduling.booking_attribution_evidence',
     ];
 
     public function __construct(
@@ -157,6 +174,22 @@ final class ProjectReportingDailyMetricsAction
                     && $fact->version === 1
             )
             ->values();
+        $schedulingFacts = $facts
+            ->filter(fn (ReportingProjectionFact $fact): bool =>
+                $fact->key === self::SCHEDULING_FACT
+                    && $fact->version === 1
+            )
+            ->values();
+        $schedulingObservations = ReportingObservation::query()
+            ->with('session')
+            ->where('surface', self::SCHEDULING_SURFACE)
+            ->whereBetween('occurred_at', [
+                $window->startsAt,
+                $window->endsAt,
+            ])
+            ->orderBy('occurred_at')
+            ->orderBy('id')
+            ->get();
 
         $metrics = [];
         $profiles = $this->landingProfiles($observations);
@@ -171,6 +204,15 @@ final class ProjectReportingDailyMetricsAction
         $this->projectQuestionAnswers(
             metrics: $metrics,
             facts: $questionFacts,
+        );
+        $this->projectSchedulingBrowserFunnel(
+            metrics: $metrics,
+            observations: $schedulingObservations,
+        );
+        $this->projectDurableSchedulingOutcomes(
+            metrics: $metrics,
+            facts: $schedulingFacts,
+            observations: $schedulingObservations,
         );
 
         return collect($metrics)
@@ -810,6 +852,520 @@ final class ProjectReportingDailyMetricsAction
 
     /**
      * @param array<string, array<string, mixed>> $metrics
+     * @param Collection<int, ReportingObservation> $observations
+     */
+    private function projectSchedulingBrowserFunnel(
+        array &$metrics,
+        Collection $observations,
+    ): void {
+        $profiles = $this->schedulingProfiles($observations);
+        $stepMap = [
+            'scheduling.booking.service_selected' => 'service_selected',
+            'scheduling.booking.availability_viewed' => 'availability_viewed',
+            'scheduling.booking.time_selected' => 'time_selected',
+            'scheduling.booking.details_started' => 'details_started',
+            'scheduling.booking.submit_attempt' => 'submit_attempt',
+        ];
+        $stepSessions = [];
+        $submitSessions = [];
+        $validationSessions = [];
+        $availabilitySessions = [];
+        $verificationSessions = [];
+
+        foreach ($profiles as $sessionId => $profile) {
+            $this->incrementCount(
+                metrics: $metrics,
+                metricKey: 'scheduling.traffic_classification_resolution',
+                dimensions: [
+                    'slice' => 'all',
+                    'recorded_traffic_class' => $profile['recorded_traffic_class'],
+                    'effective_traffic_class' => $profile['traffic_class'],
+                    'reason' => $profile['traffic_resolution_reason'],
+                ],
+            );
+
+            foreach ($this->schedulingSessionSlices($profile) as $slice) {
+                $this->incrementCount(
+                    metrics: $metrics,
+                    metricKey: 'scheduling.landing_sessions',
+                    dimensions: [
+                        ...$slice,
+                        'traffic_class' => $profile['traffic_class'],
+                    ],
+                );
+
+                if ($profile['traffic_class'] === 'likely_human') {
+                    $this->incrementCount(
+                        metrics: $metrics,
+                        metricKey: 'scheduling.funnel_sessions',
+                        dimensions: [
+                            ...$slice,
+                            'traffic_class' => 'likely_human',
+                            'step' => 'catalog',
+                        ],
+                    );
+                }
+            }
+        }
+
+        foreach ($observations as $observation) {
+            $sessionId = $observation->reporting_session_id;
+
+            if ($sessionId === null || ! isset($profiles[$sessionId])) {
+                continue;
+            }
+
+            $profile = $profiles[$sessionId];
+
+            if ($profile['traffic_class'] !== 'likely_human') {
+                continue;
+            }
+
+            $properties = is_array($observation->properties)
+                ? $observation->properties
+                : [];
+            $serviceKey = is_string($properties['service_key'] ?? null)
+                && trim((string) $properties['service_key']) !== ''
+                    ? mb_substr(trim((string) $properties['service_key']), 0, 100)
+                    : ($profile['service_key'] ?? null);
+            $step = $stepMap[$observation->event_key] ?? null;
+
+            if ($step !== null) {
+                $stepSessions[$step][$sessionId] = $serviceKey;
+            }
+
+            if ($observation->event_key === 'scheduling.booking.submit_attempt') {
+                $submitSessions[$sessionId] = $serviceKey;
+            }
+
+            if ($observation->event_key === 'scheduling.booking.validation_failed') {
+                $validationSessions[$sessionId] = $serviceKey;
+                $fieldKeys = $properties['field_keys'] ?? [];
+
+                if (is_array($fieldKeys)) {
+                    foreach (array_unique($fieldKeys) as $fieldKey) {
+                        if (! is_string($fieldKey) || trim($fieldKey) === '') {
+                            continue;
+                        }
+
+                        foreach ($this->schedulingDiagnosticSlices($profile, $serviceKey) as $slice) {
+                            $this->incrementCount(
+                                metrics: $metrics,
+                                metricKey: 'scheduling.validation_failures',
+                                dimensions: [
+                                    ...$slice,
+                                    'field_key' => mb_substr(trim($fieldKey), 0, 80),
+                                ],
+                            );
+                        }
+                    }
+                }
+            }
+
+            if ($observation->event_key === 'scheduling.booking.availability_viewed') {
+                $state = is_string($properties['availability_state'] ?? null)
+                    ? trim((string) $properties['availability_state'])
+                    : '';
+
+                if ($state !== '') {
+                    $availabilitySessions[$state][$sessionId] = $serviceKey;
+                }
+            }
+
+            if (in_array($observation->event_key, [
+                'scheduling.booking.verification_requested',
+                'scheduling.booking.verification_completed',
+            ], true)) {
+                $channel = is_string($properties['channel'] ?? null)
+                    ? trim((string) $properties['channel'])
+                    : '';
+                $stage = $observation->event_key === 'scheduling.booking.verification_completed'
+                    ? 'completed'
+                    : 'requested';
+
+                if ($channel !== '') {
+                    $verificationSessions[$stage][$channel][$sessionId] = $serviceKey;
+                }
+            }
+        }
+
+        foreach ($stepSessions as $step => $sessionIds) {
+            foreach ($sessionIds as $sessionId => $serviceKey) {
+                $profile = $profiles[$sessionId] ?? null;
+
+                if (! is_array($profile)) {
+                    continue;
+                }
+
+                foreach ($this->schedulingSessionSlices($profile, $serviceKey) as $slice) {
+                    $this->incrementCount(
+                        metrics: $metrics,
+                        metricKey: 'scheduling.funnel_sessions',
+                        dimensions: [
+                            ...$slice,
+                            'traffic_class' => 'likely_human',
+                            'step' => $step,
+                        ],
+                    );
+                }
+            }
+        }
+
+        foreach ($profiles as $sessionId => $profile) {
+            if ($profile['traffic_class'] !== 'likely_human') {
+                continue;
+            }
+
+            $serviceKey = $submitSessions[$sessionId]
+                ?? $validationSessions[$sessionId]
+                ?? $profile['service_key']
+                ?? null;
+
+            if (! array_key_exists($sessionId, $submitSessions)
+                && ! array_key_exists($sessionId, $validationSessions)
+            ) {
+                continue;
+            }
+
+            foreach ($this->schedulingSessionSlices($profile, $serviceKey) as $slice) {
+                $this->incrementRatio(
+                    metrics: $metrics,
+                    metricKey: 'scheduling.validation_failure_rate',
+                    dimensions: [
+                        ...$slice,
+                        'traffic_class' => 'likely_human',
+                    ],
+                    numerator: array_key_exists($sessionId, $validationSessions) ? 1 : 0,
+                    denominator: array_key_exists($sessionId, $submitSessions) ? 1 : 0,
+                );
+            }
+        }
+
+        foreach ($availabilitySessions as $state => $sessionIds) {
+            foreach ($sessionIds as $sessionId => $serviceKey) {
+                $profile = $profiles[$sessionId] ?? null;
+
+                if (! is_array($profile)) {
+                    continue;
+                }
+
+                foreach ($this->schedulingDiagnosticSlices($profile, $serviceKey) as $slice) {
+                    $this->incrementCount(
+                        metrics: $metrics,
+                        metricKey: 'scheduling.availability_outcomes',
+                        dimensions: [...$slice, 'outcome' => mb_substr($state, 0, 80)],
+                    );
+                }
+            }
+        }
+
+        foreach ($verificationSessions as $stage => $channels) {
+            foreach ($channels as $channel => $sessionIds) {
+                foreach ($sessionIds as $sessionId => $serviceKey) {
+                    $profile = $profiles[$sessionId] ?? null;
+
+                    if (! is_array($profile)) {
+                        continue;
+                    }
+
+                    foreach ($this->schedulingDiagnosticSlices($profile, $serviceKey) as $slice) {
+                        $this->incrementCount(
+                            metrics: $metrics,
+                            metricKey: 'scheduling.verification_channels',
+                            dimensions: [
+                                ...$slice,
+                                'stage' => mb_substr($stage, 0, 80),
+                                'channel' => mb_substr($channel, 0, 80),
+                            ],
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $metrics
+     * @param Collection<int, ReportingProjectionFact> $facts
+     * @param Collection<int, ReportingObservation> $observations
+     */
+    private function projectDurableSchedulingOutcomes(
+        array &$metrics,
+        Collection $facts,
+        Collection $observations,
+    ): void {
+        $submitObservations = $this->correlatedSchedulingSubmitObservations($facts);
+        $convertedSessionIds = [];
+
+        foreach ($facts as $fact) {
+            $correlatedObservation = $fact->correlationId !== null
+                ? $submitObservations->get(strtolower($fact->correlationId))
+                : null;
+            $correlatedSessionId = $correlatedObservation instanceof ReportingObservation
+                ? $correlatedObservation->reporting_session_id
+                : null;
+            $serviceKey = is_string($fact->dimensions['service_key'] ?? null)
+                ? trim((string) $fact->dimensions['service_key'])
+                : null;
+
+            if ($correlatedSessionId !== null) {
+                $convertedSessionIds[$correlatedSessionId] = true;
+            }
+
+            if ($correlatedObservation instanceof ReportingObservation
+                && $correlatedObservation->session instanceof ReportingSession
+            ) {
+                $profile = $this->registrationAttributionProfile($correlatedObservation);
+                $profile['service_key'] = $serviceKey;
+
+                foreach ($this->schedulingSessionSlices($profile, $serviceKey) as $slice) {
+                    $this->incrementCount(
+                        metrics: $metrics,
+                        metricKey: 'scheduling.attributed_appointments',
+                        dimensions: $slice,
+                    );
+                    $this->incrementCount(
+                        metrics: $metrics,
+                        metricKey: 'scheduling.booking_attribution_evidence',
+                        dimensions: [...$slice, 'evidence' => 'session_correlation'],
+                    );
+
+                    if ($this->hasCampaignAttribution($profile)) {
+                        $this->incrementCount(
+                            metrics: $metrics,
+                            metricKey: 'scheduling.booking_attribution_evidence',
+                            dimensions: [...$slice, 'evidence' => 'campaign_attribution'],
+                        );
+                    }
+
+                    if (filled($profile['referrer_host'] ?? null)) {
+                        $this->incrementCount(
+                            metrics: $metrics,
+                            metricKey: 'scheduling.booking_attribution_evidence',
+                            dimensions: [...$slice, 'evidence' => 'referrer_host'],
+                        );
+                    }
+
+                    if ($this->hasMetaClickEvidence($profile)) {
+                        $this->incrementCount(
+                            metrics: $metrics,
+                            metricKey: 'scheduling.booking_attribution_evidence',
+                            dimensions: [...$slice, 'evidence' => 'meta_click_id'],
+                        );
+                    }
+                }
+            }
+
+            foreach ($this->schedulingProducerSlices($fact) as $slice) {
+                $this->incrementCount(
+                    metrics: $metrics,
+                    metricKey: 'scheduling.public_appointments',
+                    dimensions: $slice,
+                );
+                $this->incrementCount(
+                    metrics: $metrics,
+                    metricKey: 'scheduling.appointment_outcomes',
+                    dimensions: [
+                        ...$slice,
+                        'outcome' => $this->factString($fact, 'appointment_status', 'unknown'),
+                    ],
+                );
+                $this->incrementRatio(
+                    metrics: $metrics,
+                    metricKey: 'scheduling.booking_correlation_coverage',
+                    dimensions: $slice,
+                    numerator: $correlatedSessionId !== null ? 1 : 0,
+                    denominator: 1,
+                );
+            }
+        }
+
+        $profiles = $this->schedulingProfiles($observations);
+
+        foreach ($profiles as $sessionId => $profile) {
+            if ($profile['traffic_class'] !== 'likely_human') {
+                continue;
+            }
+
+            foreach ($this->schedulingSessionSlices($profile) as $slice) {
+                $this->incrementRatio(
+                    metrics: $metrics,
+                    metricKey: 'scheduling.booking_conversion',
+                    dimensions: [
+                        ...$slice,
+                        'traffic_class' => 'likely_human',
+                    ],
+                    numerator: isset($convertedSessionIds[$sessionId]) ? 1 : 0,
+                    denominator: 1,
+                );
+            }
+        }
+    }
+
+    /** @return Collection<string, ReportingObservation> */
+    private function correlatedSchedulingSubmitObservations(Collection $facts): Collection
+    {
+        $correlationIds = $facts
+            ->map(fn (ReportingProjectionFact $fact): ?string =>
+                is_string($fact->correlationId) && trim($fact->correlationId) !== ''
+                    ? trim($fact->correlationId)
+                    : null
+            )
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($correlationIds->isEmpty()) {
+            return collect();
+        }
+
+        return ReportingObservation::query()
+            ->with('session')
+            ->where('surface', self::SCHEDULING_SURFACE)
+            ->where('event_key', 'scheduling.booking.submit_attempt')
+            ->whereIn('event_id', $correlationIds->all())
+            ->get()
+            ->keyBy(fn (ReportingObservation $observation): string =>
+                strtolower((string) $observation->event_id)
+            );
+    }
+
+    /**
+     * @param Collection<int, ReportingObservation> $observations
+     * @return array<int, array<string, mixed>>
+     */
+    private function schedulingProfiles(Collection $observations): array
+    {
+        $profiles = [];
+        $observationsBySession = $observations
+            ->filter(fn (ReportingObservation $observation): bool =>
+                $observation->reporting_session_id !== null
+            )
+            ->groupBy(fn (ReportingObservation $observation): int =>
+                (int) $observation->reporting_session_id
+            );
+
+        foreach ($observations
+            ->where('event_key', 'scheduling.booking.page_view')
+            ->sortBy([
+                ['occurred_at', 'asc'],
+                ['id', 'asc'],
+            ]) as $observation) {
+            $session = $observation->session;
+
+            if ($session === null || isset($profiles[$session->getKey()])) {
+                continue;
+            }
+
+            $sessionId = (int) $session->getKey();
+            $sessionObservations = $observationsBySession->get($sessionId, collect());
+            $classification = $this->effectiveTrafficClassification(
+                session: $session,
+                observations: $sessionObservations,
+            );
+            $properties = is_array($observation->properties)
+                ? $observation->properties
+                : [];
+            $serviceObservation = $sessionObservations->first(function (ReportingObservation $candidate): bool {
+                $candidateProperties = is_array($candidate->properties)
+                    ? $candidate->properties
+                    : [];
+
+                return is_string($candidateProperties['service_key'] ?? null)
+                    && trim((string) $candidateProperties['service_key']) !== '';
+            });
+            $serviceProperties = $serviceObservation instanceof ReportingObservation
+                && is_array($serviceObservation->properties)
+                    ? $serviceObservation->properties
+                    : [];
+
+            $profiles[$sessionId] = [
+                'path' => $session->landing_path ?: $observation->path,
+                'recorded_traffic_class' => $classification['recorded_class'],
+                'traffic_class' => $classification['effective_class'],
+                'traffic_resolution_reason' => $classification['reason'],
+                'referrer_host' => $session->referrer_host,
+                'utm_source' => $session->utm_source,
+                'utm_medium' => $session->utm_medium,
+                'utm_campaign' => $session->utm_campaign,
+                'utm_content' => $session->utm_content,
+                'utm_term' => $session->utm_term,
+                'external_platform' => $session->external_platform,
+                'external_campaign_id' => $session->external_campaign_id,
+                'external_group_id' => $session->external_group_id,
+                'external_creative_id' => $session->external_creative_id,
+                'external_placement' => $session->external_placement,
+                'page_revision' => $properties['page_revision'] ?? null,
+                'presentation' => null,
+                'device_class' => $session->device_class,
+                'service_key' => is_string($serviceProperties['service_key'] ?? null)
+                    ? mb_substr(trim((string) $serviceProperties['service_key']), 0, 100)
+                    : null,
+            ];
+        }
+
+        return $profiles;
+    }
+
+    /** @return array<int, array<string, scalar|null>> */
+    private function schedulingSessionSlices(
+        array $profile,
+        ?string $serviceKey = null,
+    ): array {
+        $slices = $this->sessionSlices($profile);
+        $serviceKey = filled($serviceKey)
+            ? $serviceKey
+            : ($profile['service_key'] ?? null);
+
+        if (is_string($serviceKey) && trim($serviceKey) !== '') {
+            $slices[] = [
+                'slice' => 'service',
+                'service_key' => mb_substr(trim($serviceKey), 0, 100),
+            ];
+        }
+
+        return $slices;
+    }
+
+    /** @return array<int, array<string, scalar|null>> */
+    private function schedulingDiagnosticSlices(
+        array $profile,
+        ?string $serviceKey = null,
+    ): array {
+        $slices = [['slice' => 'all']];
+        $serviceKey = filled($serviceKey)
+            ? $serviceKey
+            : ($profile['service_key'] ?? null);
+
+        if (is_string($serviceKey) && trim($serviceKey) !== '') {
+            $slices[] = [
+                'slice' => 'service',
+                'service_key' => mb_substr(trim($serviceKey), 0, 100),
+            ];
+        }
+
+        return $slices;
+    }
+
+    /** @return array<int, array<string, scalar|null>> */
+    private function schedulingProducerSlices(ReportingProjectionFact $fact): array
+    {
+        $slices = [['slice' => 'all']];
+        $serviceKey = $fact->dimensions['service_key'] ?? null;
+
+        if (is_string($serviceKey) && trim($serviceKey) !== '') {
+            $slices[] = [
+                'slice' => 'service',
+                'service_id' => $fact->dimensions['service_id'] ?? null,
+                'service_key' => mb_substr(trim($serviceKey), 0, 100),
+            ];
+        }
+
+        return $slices;
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $metrics
      * @param Collection<int, ReportingProjectionFact> $facts
      */
     private function projectQuestionAnswers(
@@ -1015,8 +1571,9 @@ final class ProjectReportingDailyMetricsAction
         }
 
         $interactiveSubmit = $observations->contains(function (ReportingObservation $observation): bool {
-            return $observation->event_key === 'webinar.form.submit_attempt'
-                && data_get($observation->properties, 'bot_interacted') === true;
+            return ($observation->event_key === 'webinar.form.submit_attempt'
+                    && data_get($observation->properties, 'bot_interacted') === true)
+                || $observation->event_key === 'scheduling.booking.submit_attempt';
         });
 
         if ($interactiveSubmit) {
@@ -1053,7 +1610,12 @@ final class ProjectReportingDailyMetricsAction
 
         $formInteracted = $observations->contains(
             fn (ReportingObservation $observation): bool =>
-                $observation->event_key === 'webinar.form.start'
+                in_array($observation->event_key, [
+                    'webinar.form.start',
+                    'scheduling.booking.service_selected',
+                    'scheduling.booking.time_selected',
+                    'scheduling.booking.details_started',
+                ], true)
         );
 
         if ($formInteracted) {

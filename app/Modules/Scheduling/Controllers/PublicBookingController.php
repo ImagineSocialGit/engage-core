@@ -145,11 +145,13 @@ class PublicBookingController extends Controller
         SchedulingLocationSnapshotResolver $locationSnapshots,
     ): RedirectResponse {
         $service = $this->publicService($serviceKey);
-        $location = $this->availabilityLocation(
-            request: $request,
-            service: $service,
-            locationSnapshots: $locationSnapshots,
-        );
+        $location = $service->location_type === BookableService::LOCATION_TYPE_CUSTOMER_SITE
+            ? $this->availabilityLocation(
+                request: $request,
+                service: $service,
+                locationSnapshots: $locationSnapshots,
+            )
+            : null;
 
         if ($service->location_type === BookableService::LOCATION_TYPE_CUSTOMER_SITE
             && ! $location instanceof SchedulingLocationSnapshot
@@ -182,9 +184,11 @@ class PublicBookingController extends Controller
                 endsAt: $endsAt,
                 location: $location,
             );
-        } catch (DomainException $exception) {
+        } catch (DomainException) {
             throw ValidationException::withMessages([
-                $service->usesRangeDuration() ? 'range_ends_at' : 'starts_at' => $exception->getMessage(),
+                ($service->usesRangeDuration() ? 'range_ends_at' : 'starts_at') => $service->usesRangeDuration()
+                    ? 'That appointment range could not be reserved. Check the dates and try again.'
+                    : 'That appointment time could not be reserved. Choose an available time and try again.',
             ]);
         }
 

@@ -1032,7 +1032,8 @@
 │   │   │   │   ├── ReportingBrowserRequestClassifier.php
 │   │   │   │   ├── ReportingPublicCollectionPolicy.php
 │   │   │   │   ├── ReportingSessionResolver.php
-│   │   │   │   └── ReportingWorkspaceReadService.php
+│   │   │   │   ├── ReportingWorkspaceReadService.php
+│   │   │   │   └── SchedulingReportingWorkspaceReadService.php
 │   │   │   ├── Support
 │   │   │   └── Validation
 │   │   │       └── ReportingSetupValidationContributor.php
@@ -2279,7 +2280,9 @@
 │       │   │   ├── imports
 │       │   │   │   ├── create.blade.php
 │       │   │   │   └── preview.blade.php
-│       │   │   └── index.blade.php
+│       │   │   ├── index.blade.php
+│       │   │   └── partials
+│       │   │       └── scheduling-public-booking.blade.php
 │       │   ├── scheduling
 │       │   │   ├── availability.blade.php
 │       │   │   ├── configuration.blade.php
@@ -2752,7 +2755,8 @@
 │   │   │   ├── ReportingObservationFoundationTest.php
 │   │   │   ├── ReportingProjectionFactRegistryTest.php
 │   │   │   ├── ReportingPublicTransportTest.php
-│   │   │   └── ReportingWorkspaceTest.php
+│   │   │   ├── ReportingWorkspaceTest.php
+│   │   │   └── SchedulingDailyProjectionTest.php
 │   │   ├── Scheduling
 │   │   │   ├── AppointmentLifecycleActionTest.php
 │   │   │   ├── BookableSlotOfferAndBookingHoldActionTest.php
@@ -2907,4 +2911,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-694 directories, 2214 files
+695 directories, 2217 files

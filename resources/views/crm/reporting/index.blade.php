@@ -23,15 +23,19 @@
             <div class="p-5 sm:p-8">
                 <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                     <div>
-                        <p class="text-sm font-semibold uppercase tracking-[0.16em] text-slate-600">
-                            Webinar Registration
-                        </p>
+                        <p class="text-sm font-semibold uppercase tracking-[0.16em] text-slate-600">Public journey reports</p>
                         <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                            See where visitors stop before they register
+                            See where visitors move forward or stop
                         </h2>
                         <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-700">
-                            This report follows privacy-safe landing and form behavior, separates likely human traffic from automation, and connects browser activity to authoritative registration outcomes.
+                            Compare privacy-safe browser activity with authoritative appointments and registrations. Each journey keeps its own eligible population and outcomes.
                         </p>
+                        <nav class="mt-4 flex flex-wrap gap-2" aria-label="Public journey reports">
+                            @if($schedulingReport)
+                                <a href="#scheduling-booking-report" class="inline-flex min-h-10 items-center rounded-xl border border-teal-200 bg-teal-50 px-4 text-sm font-semibold text-teal-900">Appointment booking</a>
+                            @endif
+                            <a href="#webinar-registration-report" class="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800">Webinar Registration</a>
+                        </nav>
                     </div>
 
                     <div>
@@ -79,6 +83,18 @@
                     @endif
                 </div>
             </div>
+        </section>
+
+        @if($schedulingReport)
+            @include('crm.reporting.partials.scheduling-public-booking', [
+                'schedulingReport' => $schedulingReport,
+            ])
+        @endif
+
+        <section id="webinar-registration-report" class="scroll-mt-6 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm sm:p-8" data-report-surface="webinar-registration">
+            <p class="text-sm font-semibold uppercase tracking-[0.16em] text-slate-600">Webinar Registration</p>
+            <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">See where visitors stop before they register</h2>
+            <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-700">This report separates likely-human traffic from automation and connects browser activity to authoritative registration outcomes.</p>
         </section>
 
         @if($report['has_data'])

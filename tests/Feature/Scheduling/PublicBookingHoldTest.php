@@ -33,7 +33,13 @@ class PublicBookingHoldTest extends TestCase
         CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
         $this->registerPublicSurface('https://schedule.test');
 
-        $service = $this->publicService('consultation');
+        $service = $this->publicService('consultation', [
+            'location_type' => BookableService::LOCATION_TYPE_PHONE,
+            'location_details' => [
+                'label' => 'Phone appointment',
+                'instructions' => 'We will call the number provided with the booking.',
+            ],
+        ]);
         $firstHost = SchedulingHost::factory()->create([
             'name' => 'Hidden First Host',
             'timezone' => 'UTC',
@@ -77,6 +83,8 @@ class PublicBookingHoldTest extends TestCase
 
         $this->assertSame($service->id, $offer->bookable_service_id);
         $this->assertSame($firstHost->id, $offer->scheduling_host_id);
+        $this->assertSame(BookableService::LOCATION_TYPE_PHONE, $offer->location_type);
+        $this->assertEquals($service->location_details, $offer->location_details);
         $this->assertDatabaseCount('bookable_slot_offers', 1);
         $this->assertDatabaseCount('booking_holds', 0);
 
