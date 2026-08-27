@@ -3,6 +3,7 @@
 ## Message/readiness follow-up
 
 - [x] UX Phase / 23B1 Webinar workspace hierarchy: make the actual Webinar Workspace the primary CRM surface, keep upcoming sessions in a compact side panel with message/event quick actions, and move series refresh, setup, and testing controls behind task-oriented management.
+- [x] UX Phase / 23B1A occurrence removal and message-plan clarity: separate operator visibility from provider lifecycle, permanently remove dependency-free occurrences with durable provider suppression, hide history-bearing occurrences without breaking references, and separate Zoom setup, Message plan, and Message content in series management.
 - [x] Make Webinar message copy editable directly in the canonical Messaging carousel, including automatic series copy-on-write for shared defaults, published/edit mode at the top, click/tap gutters, touch swipe, and return-to-Webinar editing context.
 
 - [ ] Verify generated Webinar URL schemes through the current public URL/token resolution path.

@@ -33,6 +33,8 @@ class WebinarFactory extends Factory
             'timezone' => 'America/Chicago',
             'join_url' => fake()->url(),
             'registration_url' => fake()->url(),
+            'hidden_at' => null,
+            'hidden_reason' => null,
             'meta' => [],
         ];
     }

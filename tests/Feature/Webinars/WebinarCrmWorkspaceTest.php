@@ -158,23 +158,24 @@ class WebinarCrmWorkspaceTest extends TestCase
             ));
     }
 
-    public function test_operator_can_keep_provider_missing_occurrence_for_history(): void
+    public function test_workspace_exposes_remove_control_for_missing_occurrence_and_separates_series_setup_concerns(): void
     {
         $user = User::factory()->create();
+        $series = WebinarSeries::factory()->create();
         $missing = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
             'provider_lifecycle_status' => WebinarProviderLifecycleStatus::Missing->value,
             'provider_missing_at' => now(),
         ]);
 
-        $this->actingAs($user)
-            ->post(route('crm.webinars.archive-missing', $missing))
-            ->assertRedirect(route('crm.webinar-series.index', ['archived' => 1]))
-            ->assertSessionHas('success');
+        $response = $this->actingAs($user)
+            ->get(route('crm.webinar-series.index', ['attention' => 1]));
 
-        $this->assertDatabaseHas('webinars', [
-            'id' => $missing->getKey(),
-            'provider_lifecycle_status' => WebinarProviderLifecycleStatus::Archived->value,
-        ]);
-        $this->assertNotNull($missing->refresh()->provider_archived_at);
+        $response
+            ->assertOk()
+            ->assertSee('data-webinar-remove-control="'.$missing->getKey().'"', false)
+            ->assertSee('data-series-zoom-setup="'.$series->getKey().'"', false)
+            ->assertSee('data-series-message-plan="'.$series->getKey().'"', false)
+            ->assertSee('data-series-message-content="'.$series->getKey().'"', false);
     }
 }

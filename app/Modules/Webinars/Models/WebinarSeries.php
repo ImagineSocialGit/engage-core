@@ -79,6 +79,11 @@ class WebinarSeries extends Model
         return $this->hasMany(Webinar::class, 'webinar_series_id');
     }
 
+    public function occurrenceSuppressions(): HasMany
+    {
+        return $this->hasMany(WebinarOccurrenceSuppression::class);
+    }
+
     public function webinarScheduleProfile(): BelongsTo
     {
         return $this->belongsTo(WebinarScheduleProfile::class);

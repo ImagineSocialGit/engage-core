@@ -122,7 +122,7 @@
                     {{ count(session('sync_missing')) === 1 ? 'occurrence' : 'occurrences' }}.
                 </p>
                 <p class="mt-1 text-amber-900">
-                    {{ count(session('sync_missing')) === 1 ? 'It was' : 'They were' }} removed from the active schedule and kept for history. Review the next step under Needs attention.
+                    {{ count(session('sync_missing')) === 1 ? 'It was' : 'They were' }} removed from the active schedule and kept in Engage Core while you decide whether to replace or remove {{ count(session('sync_missing')) === 1 ? 'it' : 'them' }}. Review the next step under Needs attention.
                 </p>
                 <a
                     href="{{ route('crm.webinar-series.index', ['attention' => 1]) }}"
@@ -431,8 +431,8 @@
             : 'No active profile';
         $profileSourceLabel = match ($messageProfile['source'] ?? 'default') {
             'occurrence' => 'Occurrence override',
-            'series' => 'Series profile',
-            default => 'Default profile',
+            'series' => 'Series plan',
+            default => 'Default plan',
         };
     @endphp
 
@@ -476,7 +476,7 @@
                         @method('PATCH')
 
                         <label class="block text-[11px] font-extrabold uppercase tracking-[0.14em] text-slate-500">
-                            Webinar profile
+                            Message plan
                         </label>
 
                         <div class="mt-2 flex flex-col gap-2 sm:flex-row">
@@ -611,7 +611,7 @@
                             href="{{ route('crm.webinar-series.index', ['archived' => 1]) }}"
                             class="{{ $showArchived && ! $showAttention ? 'text-slate-950' : 'text-slate-600' }} underline hover:text-slate-900"
                         >
-                            Archived
+                            History
                         </a>
                     </div>
                 </div>
@@ -641,6 +641,7 @@
                                     ?? collect();
                                 $providerMissing = $webinar->isProviderMissing();
                                 $providerArchived = $webinar->isProviderArchived();
+                                $hidden = $webinar->isHidden();
                                 $replacementRegistrations = $webinar->registrations->filter(
                                     fn ($registration): bool => $registration->replacement_of_registration_id !== null,
                                 );
@@ -745,13 +746,19 @@
                                             Zoom {{ $eventTypeLabel }}
                                         </span>
 
+                                        @if($hidden)
+                                            <span class="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700 ring-1 ring-slate-200">
+                                                Hidden from new registrations
+                                            </span>
+                                        @endif
+
                                         @if($providerMissing)
                                             <span class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-200">
                                                 Removed from Zoom
                                             </span>
                                         @elseif($providerArchived)
                                             <span class="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700 ring-1 ring-slate-200">
-                                                Kept for history
+                                                History
                                             </span>
                                         @endif
 
@@ -865,9 +872,9 @@
                                             <p class="font-semibold">This event no longer exists in Zoom and is no longer active or registerable.</p>
                                             <p class="mt-1 text-amber-900">
                                                 @if($webinar->registrations->isNotEmpty())
-                                                    It has registrations. Choose a synced replacement below so active registrants can be moved safely, or keep the record for history.
+                                                    It has registrations. Choose a synced replacement below so active registrants can be moved safely, or remove it from new registrations while preserving those registrations and their history.
                                                 @else
-                                                    Choose a synced replacement below, or keep the record for history.
+                                                    Choose a synced replacement below, or remove the event from Engage Core.
                                                 @endif
                                             </p>
                                         </div>
@@ -945,20 +952,27 @@
                                         </details>
                                     @endif
 
-                                    @if($providerMissing)
-                                        <form
-                                            method="POST"
-                                            action="{{ route('crm.webinars.archive-missing', $webinar) }}"
-                                            class="mt-3"
-                                        >
-                                            @csrf
-                                            <button
-                                                type="submit"
-                                                class="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+                                    @if(! $hidden)
+                                        <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3" data-webinar-remove-control="{{ $webinar->getKey() }}">
+                                            <form
+                                                method="POST"
+                                                action="{{ route('crm.webinars.destroy', $webinar) }}"
+                                                onsubmit="return confirm('Remove this webinar event? Engage Core will preserve it when existing history still depends on it.');"
                                             >
-                                                Keep for history
-                                            </button>
-                                        </form>
+                                                @csrf
+                                                @method('DELETE')
+                                                <button
+                                                    type="submit"
+                                                    class="inline-flex items-center rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                                >
+                                                    Remove event
+                                                </button>
+                                            </form>
+
+                                            <p class="mt-2 text-xs leading-5 text-slate-600">
+                                                If nothing depends on this event, Engage Core will remove it permanently and remember not to import the same Zoom event again. If registrations, message history, or replacement history depend on it, Engage Core will hide it from new registrations while preserving those references.
+                                            </p>
+                                        </div>
                                     @endif
 
                                     @if($finalizationFailures->isNotEmpty())
@@ -1549,7 +1563,7 @@
                         <div>
                             <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">Operator setup</p>
                             <h2 class="mt-1 text-lg font-black text-slate-950">Manage webinar setup</h2>
-                            <p class="mt-1 text-sm text-slate-600">Add webinar series, refresh dates from Zoom, choose message schedules, and open testing tools when they are available.</p>
+                            <p class="mt-1 text-sm text-slate-600">Add webinar series, refresh dates from Zoom, choose message plans, and open testing tools when they are available.</p>
                         </div>
                         <span class="text-sm font-extrabold text-slate-700">Open setup</span>
                     </div>
@@ -1697,7 +1711,7 @@
                                                     Zoom {{ $providerEventTypeOptions[$seriesItem->providerEventTypeKey()] ?? \Illuminate\Support\Str::headline($seriesItem->providerEventTypeKey()) }}
                                                 </span>
                                                 <span class="text-slate-500">
-                                                    Message schedule: {{ $seriesItem->webinarScheduleProfile?->name ?? (($scheduleProfiles ?? collect())->firstWhere('is_default', true)?->name ?? 'Default') }}
+                                                    Message plan: {{ $seriesItem->webinarScheduleProfile?->name ?? (($scheduleProfiles ?? collect())->firstWhere('is_default', true)?->name ?? 'Default') }}
                                                 </span>
                                             </div>
                                         </div>
@@ -1725,90 +1739,111 @@
                                             ->isNotEmpty();
                                     @endphp
 
-                                    <div class="mt-3 flex flex-col items-start gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                                        <span class="text-xs font-semibold {{ $hasCustomMessageChains ? 'text-indigo-700' : 'text-slate-600' }}">
-                                            {{ $hasCustomMessageChains ? 'Custom message sequence' : 'Uses default message sequence' }}
-                                        </span>
-
-                                        <a
-                                            href="{{ route('crm.webinar-series.message-chains.show', $seriesItem) }}"
-                                            class="text-xs font-extrabold text-indigo-700 hover:text-indigo-900"
-                                        >
-                                            {{ $hasCustomMessageChains ? 'Edit series messages' : 'Customize series messages' }}
-                                        </a>
-                                    </div>
-
-                                    <form
-                                        method="POST"
-                                        action="{{ route('crm.webinar-series.provider-event-type.update', $seriesItem) }}"
-                                        class="mt-3 space-y-2"
-                                    >
-                                        @csrf
-                                        @method('PATCH')
-
-                                        <div class="flex flex-col gap-2 sm:flex-row">
-                                            <select
-                                                name="provider_event_type"
-                                                class="w-full min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-0"
-                                                aria-label="Zoom event type for {{ $seriesItem->title }}"
-                                                required
-                                            >
-                                                @foreach($providerEventTypeOptions as $eventType => $eventTypeLabel)
-                                                    <option
-                                                        value="{{ $eventType }}"
-                                                        @selected($seriesItem->providerEventTypeKey() === $eventType)
-                                                    >
-                                                        Zoom {{ $eventTypeLabel }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
-
-                                            <button
-                                                type="submit"
-                                                class="w-full rounded-lg border border-indigo-300 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 sm:w-auto"
-                                            >
-                                                Save Zoom type
-                                            </button>
+                                    <div class="mt-3 space-y-3 rounded-xl border border-slate-200 bg-white p-3" data-series-zoom-setup="{{ $seriesItem->getKey() }}">
+                                        <div>
+                                            <p class="text-xs font-extrabold uppercase tracking-wide text-slate-500">Zoom setup</p>
+                                            <p class="mt-1 text-xs text-slate-600">Choose whether future refreshes look for a Zoom Meeting or Zoom Webinar. Existing events keep their recorded type.</p>
                                         </div>
 
-                                        <p class="text-[11px] leading-4 text-slate-500">
-                                            This affects future Zoom refreshes only. Existing events keep their recorded type.
-                                        </p>
-                                    </form>
-
-                                    @if(($scheduleProfiles ?? collect())->isNotEmpty())
                                         <form
                                             method="POST"
-                                            action="{{ route('crm.webinar-series.schedule-profile.update', $seriesItem) }}"
-                                            class="mt-3 flex flex-col gap-2 sm:flex-row"
+                                            action="{{ route('crm.webinar-series.provider-event-type.update', $seriesItem) }}"
+                                            class="space-y-2"
                                         >
                                             @csrf
                                             @method('PATCH')
 
-                                            <select
-                                                name="webinar_schedule_profile_id"
-                                                class="w-full min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-0"
-                                                aria-label="Message schedule for {{ $seriesItem->title }}"
-                                            >
-                                                <option value="">Use default message schedule</option>
-                                                @foreach($scheduleProfiles as $scheduleProfile)
-                                                    <option
-                                                        value="{{ $scheduleProfile->getKey() }}"
-                                                        @selected((int) $seriesItem->webinar_schedule_profile_id === (int) $scheduleProfile->getKey())
+                                            <label class="grid gap-1 text-xs font-semibold text-slate-800">
+                                                Zoom event type
+                                                <div class="flex flex-col gap-2 sm:flex-row">
+                                                    <select
+                                                        name="provider_event_type"
+                                                        class="w-full min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-0"
+                                                        aria-label="Zoom event type for {{ $seriesItem->title }}"
+                                                        required
                                                     >
-                                                        {{ $scheduleProfile->name }}{{ $scheduleProfile->is_default ? ' (default)' : '' }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
+                                                        @foreach($providerEventTypeOptions as $eventType => $eventTypeLabel)
+                                                            <option
+                                                                value="{{ $eventType }}"
+                                                                @selected($seriesItem->providerEventTypeKey() === $eventType)
+                                                            >
+                                                                Zoom {{ $eventTypeLabel }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
 
-                                            <button
-                                                type="submit"
-                                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto"
-                                            >
-                                                Save schedule
-                                            </button>
+                                                    <button
+                                                        type="submit"
+                                                        class="w-full rounded-lg border border-indigo-300 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 sm:w-auto"
+                                                    >
+                                                        Save Zoom type
+                                                    </button>
+                                                </div>
+                                            </label>
                                         </form>
-                                    @endif
+                                    </div>
+
+                                    <div class="mt-3 space-y-3 rounded-xl border border-indigo-100 bg-indigo-50/40 p-3" data-series-message-plan="{{ $seriesItem->getKey() }}">
+                                        <div>
+                                            <p class="text-xs font-extrabold uppercase tracking-wide text-indigo-700">Messages</p>
+                                            <p class="mt-1 text-xs text-slate-600">The message plan controls which confirmations, reminders, and follow-ups run and when. Message content controls what those messages say.</p>
+                                        </div>
+
+                                        @if(($scheduleProfiles ?? collect())->isNotEmpty())
+                                            <form
+                                                method="POST"
+                                                action="{{ route('crm.webinar-series.schedule-profile.update', $seriesItem) }}"
+                                                class="space-y-2"
+                                            >
+                                                @csrf
+                                                @method('PATCH')
+
+                                                <label class="grid gap-1 text-xs font-semibold text-slate-800">
+                                                    Message plan
+                                                    <div class="flex flex-col gap-2 sm:flex-row">
+                                                        <select
+                                                            name="webinar_schedule_profile_id"
+                                                            class="w-full min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-0"
+                                                            aria-label="Message plan for {{ $seriesItem->title }}"
+                                                        >
+                                                            <option value="">Use default message plan</option>
+                                                            @foreach($scheduleProfiles as $scheduleProfile)
+                                                                <option
+                                                                    value="{{ $scheduleProfile->getKey() }}"
+                                                                    @selected((int) $seriesItem->webinar_schedule_profile_id === (int) $scheduleProfile->getKey())
+                                                                >
+                                                                    {{ $scheduleProfile->name }}{{ $scheduleProfile->is_default ? ' (default)' : '' }}
+                                                                </option>
+                                                            @endforeach
+                                                        </select>
+
+                                                        <button
+                                                            type="submit"
+                                                            class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto"
+                                                        >
+                                                            Save message plan
+                                                        </button>
+                                                    </div>
+                                                </label>
+                                            </form>
+                                        @endif
+
+                                        <div class="flex flex-col items-start gap-2 rounded-xl border border-indigo-100 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between" data-series-message-content="{{ $seriesItem->getKey() }}">
+                                            <div>
+                                                <p class="text-xs font-bold text-slate-900">Message content</p>
+                                                <p class="mt-0.5 text-[11px] text-slate-500">
+                                                    {{ $hasCustomMessageChains ? 'This series uses customized message copy.' : 'This series uses the default message copy.' }}
+                                                </p>
+                                            </div>
+
+                                            <a
+                                                href="{{ route('crm.webinar-series.message-chains.show', $seriesItem) }}"
+                                                class="text-xs font-extrabold text-indigo-700 hover:text-indigo-900"
+                                            >
+                                                {{ $hasCustomMessageChains ? 'Edit message content' : 'Customize message content' }}
+                                            </a>
+                                        </div>
+                                    </div>
                                 </div>
                             @endforeach
                         </div>

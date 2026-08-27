@@ -3,10 +3,10 @@
 namespace App\Modules\Webinars\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Webinars\Actions\ArchiveMissingWebinarOccurrenceAction;
 use App\Modules\Webinars\Actions\DeleteWebinarSeriesAction;
 use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
 use App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction;
+use App\Modules\Webinars\Actions\RemoveWebinarOccurrenceAction;
 use App\Modules\Webinars\Actions\ReplaceWebinarOccurrenceAction;
 use App\Modules\Webinars\Actions\SyncWebinarSeriesFromProviderAction;
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
@@ -68,6 +68,7 @@ class WebinarController extends Controller
             ->withCount('registrations')
             ->where('ends_at', '>', now())
             ->providerActive()
+            ->visible()
             ->matchingCurrentSeriesProvider()
             ->orderBy('starts_at')
             ->orderBy('id')
@@ -160,6 +161,7 @@ class WebinarController extends Controller
             ->with('webinarSeries')
             ->withCount('registrations')
             ->providerMissing()
+            ->visible()
             ->orderByRaw('starts_at IS NULL')
             ->orderBy('starts_at')
             ->orderBy('id')
@@ -191,10 +193,14 @@ class WebinarController extends Controller
         if ($showAttention) {
             $query->where(function ($query): void {
                 $query
-                    ->where(
-                        'provider_lifecycle_status',
-                        WebinarProviderLifecycleStatus::Missing->value,
-                    )
+                    ->where(function ($missingQuery): void {
+                        $missingQuery
+                            ->where(
+                                'provider_lifecycle_status',
+                                WebinarProviderLifecycleStatus::Missing->value,
+                            )
+                            ->whereNull('hidden_at');
+                    })
                     ->orWhereHas('registrations', fn ($query) => $query
                         ->where(function ($query): void {
                             $query
@@ -212,6 +218,7 @@ class WebinarController extends Controller
             $query
                 ->where('ends_at', '>', now())
                 ->providerActive()
+                ->visible()
                 ->matchingCurrentSeriesProvider();
         }
 
@@ -290,13 +297,18 @@ class WebinarController extends Controller
                 ->with('zoom_sync_error', 'Unable to connect to Zoom.');
         }
 
+        $suppressedCount = (int) ($result['suppressed'] ?? 0);
+        $syncSummary = "Sync complete: {$result['created']} created, {$result['updated']} updated, "
+            .count($result['missing']).' removed from the active Zoom schedule.';
+
+        if ($suppressedCount > 0) {
+            $syncSummary .= ' '.number_format($suppressedCount).' intentionally removed '
+                .Str::plural('event', $suppressedCount).' kept out.';
+        }
+
         $redirect = redirect()
             ->route('crm.webinar-series.index')
-            ->with(
-                'success',
-                "Sync complete: {$result['created']} created, {$result['updated']} updated, "
-                .count($result['missing']).' removed from the active Zoom schedule.'
-            )
+            ->with('success', $syncSummary)
             ->with('sync_conflicts', $result['conflicts'])
             ->with('sync_missing', $result['missing']);
 
@@ -385,23 +397,26 @@ class WebinarController extends Controller
             ]);
     }
 
-    public function archiveMissingOccurrence(
+    public function removeOccurrence(
         Webinar $webinar,
-        ArchiveMissingWebinarOccurrenceAction $archiveMissingOccurrence,
+        RemoveWebinarOccurrenceAction $removeWebinarOccurrence,
     ): RedirectResponse {
-        try {
-            $archiveMissingOccurrence->handle($webinar);
-        } catch (LogicException $exception) {
+        $result = $removeWebinarOccurrence->handle($webinar);
+
+        if ($result['outcome'] === 'deleted') {
             return redirect()
-                ->route('crm.webinar-series.index', ['attention' => 1])
-                ->with('error', $exception->getMessage());
+                ->route('crm.webinar-series.index')
+                ->with(
+                    'success',
+                    'The event was permanently removed from Engage Core and will stay removed after future Zoom refreshes.',
+                );
         }
 
         return redirect()
             ->route('crm.webinar-series.index', ['archived' => 1])
             ->with(
                 'success',
-                'The occurrence is preserved in Webinar history and remains unavailable for registration.',
+                'The event was hidden from new registrations while its existing registrations and history were preserved.',
             );
     }
 
@@ -415,7 +430,7 @@ class WebinarController extends Controller
 
         return redirect()
             ->route('crm.webinar-series.index')
-            ->with('success', 'Webinar schedule profile updated.');
+            ->with('success', 'Webinar message plan updated.');
     }
 
     public function updateWebinarScheduleProfile(
@@ -432,7 +447,7 @@ class WebinarController extends Controller
             ->route('crm.webinar-series.index', [
                 'messages' => $webinar->getKey(),
             ])
-            ->with('success', 'Webinar schedule profile updated.');
+            ->with('success', 'Webinar message plan updated.');
     }
 
     public function destroySeries(
@@ -519,7 +534,7 @@ class WebinarController extends Controller
                             return false;
                         }
 
-                        if (! $candidate->isProviderActive()) {
+                        if (! $candidate->isProviderActive() || $candidate->isHidden()) {
                             return false;
                         }
 

@@ -173,4 +173,30 @@ class ResolveRegisterableWebinarActionTest extends TestCase
 
         $this->assertTrue($action->getForSeries($series)?->is($next));
     }
+
+    public function test_hidden_occurrence_is_not_registerable_and_cached_resolution_rolls_forward(): void
+    {
+        Carbon::setTestNow('2026-07-17 12:00:00');
+
+        $series = WebinarSeries::factory()->create(['status' => 'active']);
+        $hidden = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+            'starts_at' => now()->addMinutes(15),
+            'hidden_at' => now(),
+            'hidden_reason' => 'operator_removed',
+        ]);
+        $next = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+            'starts_at' => now()->addMinutes(30),
+        ]);
+
+        $resolver = app(ResolveRegisterableWebinarAction::class);
+        $upcoming = app(GetNextUpcomingWebinarAction::class);
+
+        $this->assertNull($resolver->findForSeries($series, $hidden->getKey()));
+        $this->assertFalse($resolver->isRegisterable($hidden->load('webinarSeries')));
+        $this->assertTrue($resolver->getForSeries($series)?->is($next));
+        $this->assertTrue($upcoming->getForSeries($series)?->is($next));
+    }
+
 }

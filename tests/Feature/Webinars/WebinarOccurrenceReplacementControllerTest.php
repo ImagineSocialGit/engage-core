@@ -161,7 +161,7 @@ class WebinarOccurrenceReplacementControllerTest extends TestCase
             'replacement_of_webinar_id' => $source->getKey(),
         ])->save();
 
-        WebinarRegistration::factory()
+        $replacementRegistration = WebinarRegistration::factory()
             ->for($sourceRegistration->contact)
             ->for($replacement)
             ->create([
@@ -185,7 +185,13 @@ class WebinarOccurrenceReplacementControllerTest extends TestCase
         $response->assertSeeText('Zoom Meeting');
         $response->assertSeeText('Replaces #'.$source->getKey());
         $response->assertSeeText('1 replacement needs attention');
-        $response->assertSeeText('Registration finalization needs attention');
+        $response->assertSee(
+            route(
+                'crm.webinar-registrations.finalization.retry',
+                $replacementRegistration,
+            ),
+            false,
+        );
     }
 
     /** @return array{0: Webinar, 1: Webinar} */

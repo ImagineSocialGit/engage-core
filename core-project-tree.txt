@@ -1214,7 +1214,6 @@
 │   │   ├── Webinars
 │   │   │   ├── Actions
 │   │   │   │   ├── AddRegistrantToWebinarProviderAction.php
-│   │   │   │   ├── ArchiveMissingWebinarOccurrenceAction.php
 │   │   │   │   ├── CancelWebinarRegistrationAction.php
 │   │   │   │   ├── CancelWebinarRegistrationWithProviderAction.php
 │   │   │   │   ├── CreateWebinarRegistrationAction.php
@@ -1241,6 +1240,7 @@
 │   │   │   │   │   └── ReviewWebinarPostEventAction.php
 │   │   │   │   ├── QueueWebinarProviderCancellationAction.php
 │   │   │   │   ├── QueueWebinarRegistrationFinalizationAction.php
+│   │   │   │   ├── RemoveWebinarOccurrenceAction.php
 │   │   │   │   ├── ReplaceWebinarOccurrenceAction.php
 │   │   │   │   ├── ResolveRegisterableWebinarAction.php
 │   │   │   │   ├── ResolveWebinarJoinUrlAction.php
@@ -1324,6 +1324,7 @@
 │   │   │   │   ├── RecoverWebinarRegistrationFinalizationsJob.php
 │   │   │   │   └── SyncWebinarRegistrationToProviderJob.php
 │   │   │   ├── Models
+│   │   │   │   ├── WebinarOccurrenceSuppression.php
 │   │   │   │   ├── Webinar.php
 │   │   │   │   ├── WebinarRegistration.php
 │   │   │   │   ├── WebinarRegistrationResponse.php
@@ -1950,7 +1951,8 @@
 │   │   │   │   ├── 2026_07_22_160000_create_webinar_registration_responses_table.php
 │   │   │   │   ├── 2026_07_31_210000_create_webinar_schedule_profile_chain_bindings_table.php
 │   │   │   │   ├── 2026_08_01_023600_create_webinar_series_message_chain_bindings_table.php
-│   │   │   │   └── 2026_08_27_120000_add_provider_lifecycle_to_webinars_table.php
+│   │   │   │   ├── 2026_08_27_120000_add_provider_lifecycle_to_webinars_table.php
+│   │   │   │   └── 2026_08_27_194500_add_occurrence_visibility_and_suppressions.php
 │   │   │   └── workflow
 │   │   │       └── 2026_04_15_195900_create_contact_workflow_profiles_table.php
 │   │   ├── platform
@@ -2084,6 +2086,7 @@
 │   │   ├── crm-user-administration.md
 │   │   ├── deployment-command-workflow.md
 │   │   ├── deployment-safety-and-troubleshooting.md
+│   │   ├── launch-client-environment.example.conf
 │   │   ├── observability
 │   │   │   └── README.md
 │   │   └── project-state-transfer-runbook.md
@@ -2386,6 +2389,7 @@
 │   ├── operations
 │   │   ├── configure-client-logging.sh
 │   │   ├── install-observability.sh
+│   │   ├── launch-client-environment.sh
 │   │   ├── lib
 │   │   │   ├── patch_nginx_site.py
 │   │   │   └── patch_php_fpm_pool.py
@@ -2770,6 +2774,7 @@
 │   │   │   ├── BookingHoldConversionAndReleaseActionTest.php
 │   │   │   ├── CreateAppointmentActionTest.php
 │   │   │   ├── FindBookableAvailabilityActionTest.php
+│   │   │   ├── PublicAppointmentSummaryPresentationTest.php
 │   │   │   ├── PublicBookingCompletionTest.php
 │   │   │   ├── PublicBookingDestinationVerificationEnforcementTest.php
 │   │   │   ├── PublicBookingDestinationVerificationServiceTest.php
@@ -2867,6 +2872,7 @@
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
 │   │   │   ├── WebinarMessageTemplateSetConfigTest.php
+│   │   │   ├── WebinarOccurrenceRemovalTest.php
 │   │   │   ├── WebinarOccurrenceReplacementControllerTest.php
 │   │   │   ├── WebinarOccurrenceReplacementTest.php
 │   │   │   ├── WebinarOutcomeContactFilterCriterionTest.php
@@ -2919,4 +2925,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-696 directories, 2224 files
+696 directories, 2230 files

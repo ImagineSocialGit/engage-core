@@ -245,7 +245,7 @@ return [
 
         'webinars' => [
             'path' => 'database/migrations/modules/webinars',
-            'schema_version' => 2,
+            'schema_version' => 3,
             'migrations' => [
                 '2026_06_18_203546_create_webinar_schedule_profiles_table.php',
                 '2026_06_18_203547_create_webinar_series_table.php',
@@ -256,6 +256,7 @@ return [
                 '2026_07_31_210000_create_webinar_schedule_profile_chain_bindings_table.php',
                 '2026_08_01_023600_create_webinar_series_message_chain_bindings_table.php',
                 '2026_08_27_120000_add_provider_lifecycle_to_webinars_table.php',
+                '2026_08_27_194500_add_occurrence_visibility_and_suppressions.php',
             ],
         ],
 

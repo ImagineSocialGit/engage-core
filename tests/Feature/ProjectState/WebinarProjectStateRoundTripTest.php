@@ -32,7 +32,7 @@ class WebinarProjectStateRoundTripTest extends TestCase
         $document = $projectState->export();
 
         $this->assertSame((int) config('project_state.version'), $document['version']);
-        $this->assertSame(2, $document['sections']['webinars']['version']);
+        $this->assertSame(3, $document['sections']['webinars']['version']);
         $this->assertCount(
             1,
             $document['sections']['webinars']['tables']['webinar_schedule_profiles'],
@@ -40,6 +40,10 @@ class WebinarProjectStateRoundTripTest extends TestCase
         $this->assertCount(
             2,
             $document['sections']['webinars']['tables']['webinars'],
+        );
+        $this->assertCount(
+            1,
+            $document['sections']['webinars']['tables']['webinar_occurrence_suppressions'],
         );
         $this->assertCount(
             2,
@@ -97,6 +101,19 @@ class WebinarProjectStateRoundTripTest extends TestCase
             'webinar_schedule_profile_id' => 400,
             'slug' => 'production-webinar-original',
             'provider_lifecycle_status' => 'missing',
+            'hidden_reason' => 'operator_removed',
+        ]);
+        $this->assertNotNull(
+            DB::table('webinars')->where('id', 320)->value('hidden_at'),
+        );
+        $this->assertDatabaseHas('webinar_occurrence_suppressions', [
+            'id' => 319,
+            'webinar_series_id' => 310,
+            'platform' => 'zoom',
+            'provider_event_type' => 'webinar',
+            'external_id' => 'zoom-suppressed-production',
+            'external_uuid' => 'uuid-suppressed-production',
+            'reason' => 'operator_removed',
         ]);
         $this->assertDatabaseHas('webinars', [
             'id' => 321,
@@ -282,6 +299,20 @@ class WebinarProjectStateRoundTripTest extends TestCase
             ),
         ]);
 
+        DB::table('webinar_occurrence_suppressions')->insert([
+            'id' => 319,
+            'webinar_series_id' => 310,
+            'platform' => 'zoom',
+            'provider_event_type' => 'webinar',
+            'external_id' => 'zoom-suppressed-production',
+            'external_uuid' => 'uuid-suppressed-production',
+            'reason' => 'operator_removed',
+            'suppressed_at' => $now,
+            'meta' => json_encode(['owner' => 'production']),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
         DB::table('webinar_registrations')->insert([
             [
                 'id' => 330,
@@ -462,6 +493,7 @@ class WebinarProjectStateRoundTripTest extends TestCase
         DB::table('webinar_registration_responses')->delete();
         DB::table('webinar_waitlist_signups')->delete();
         DB::table('webinar_registrations')->delete();
+        DB::table('webinar_occurrence_suppressions')->delete();
         DB::table('webinars')->delete();
         DB::table('webinar_series')->delete();
         DB::table('webinar_schedule_profile_items')->delete();
@@ -728,6 +760,8 @@ class WebinarProjectStateRoundTripTest extends TestCase
             'provider_lifecycle_status' => $id === 320 ? 'missing' : 'active',
             'provider_missing_at' => $id === 320 ? $now : null,
             'provider_archived_at' => null,
+            'hidden_at' => $id === 320 ? $now : null,
+            'hidden_reason' => $id === 320 ? 'operator_removed' : null,
             'join_url' => 'https://example.test/join/'.$id,
             'registration_url' => 'https://example.test/register/'.$id,
             'playback_token' => 'playback-'.$id,

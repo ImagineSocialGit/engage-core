@@ -18,6 +18,8 @@ class Webinar extends Model
 {
     use HasFactory;
 
+    public const HIDDEN_REASON_OPERATOR_REMOVED = 'operator_removed';
+
     protected static function newFactory(): WebinarFactory
     {
         return WebinarFactory::new();
@@ -36,6 +38,8 @@ class Webinar extends Model
         'provider_lifecycle_status',
         'provider_missing_at',
         'provider_archived_at',
+        'hidden_at',
+        'hidden_reason',
         'join_url',
         'registration_url',
         'playback_token',
@@ -54,6 +58,7 @@ class Webinar extends Model
         'ends_at' => 'datetime',
         'provider_missing_at' => 'datetime',
         'provider_archived_at' => 'datetime',
+        'hidden_at' => 'datetime',
         'meta' => 'array',
         'provider_settings' => 'array',
     ];
@@ -91,6 +96,8 @@ class Webinar extends Model
                     'provider_lifecycle_status',
                     'provider_missing_at',
                     'provider_archived_at',
+                    'hidden_at',
+                    'hidden_reason',
                     'registration_url',
                     'join_url',
                     'timezone',
@@ -179,6 +186,16 @@ class Webinar extends Model
         );
     }
 
+    public function scopeVisible(Builder $query): Builder
+    {
+        return $query->whereNull('hidden_at');
+    }
+
+    public function scopeHidden(Builder $query): Builder
+    {
+        return $query->whereNotNull('hidden_at');
+    }
+
     public function matchesSeriesProviderIdentity(?WebinarSeries $series = null): bool
     {
         $series ??= $this->relationLoaded('webinarSeries')
@@ -232,6 +249,11 @@ class Webinar extends Model
     public function isProviderArchived(): bool
     {
         return $this->providerLifecycleStatus() === WebinarProviderLifecycleStatus::Archived;
+    }
+
+    public function isHidden(): bool
+    {
+        return $this->hidden_at !== null;
     }
 
     public function getTimezoneAttribute(mixed $value): string

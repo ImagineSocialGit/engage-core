@@ -8,6 +8,7 @@ use App\Modules\Webinars\Data\ProviderWebinarSnapshot;
 use App\Modules\Webinars\Enums\WebinarProviderLifecycleStatus;
 use App\Modules\Webinars\Jobs\NotifyWebinarWaitlistJob;
 use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Models\WebinarOccurrenceSuppression;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use App\Modules\Webinars\Services\WebinarProviderManager;
@@ -35,18 +36,33 @@ class SyncWebinarSeriesFromProviderAction
         $snapshot = $this->providerSnapshot(
             $webinarProvider->listWebinarsByTitle($series->title),
         );
-        $fetchedWebinars = collect($snapshot->webinars)->values();
+        $providerWebinars = collect($snapshot->webinars)->values();
+
+        $fetchedExternalIds = $providerWebinars
+            ->map(fn (ProviderWebinarData $webinar) => $webinar->externalId)
+            ->filter()
+            ->values()
+            ->all();
+
+        $suppressedExternalIds = $this->suppressedExternalIds(
+            series: $series,
+            provider: $provider,
+            providerEventType: $providerEventType,
+            fetchedExternalIds: $fetchedExternalIds,
+        );
+
+        $fetchedWebinars = $providerWebinars
+            ->reject(fn (ProviderWebinarData $webinar): bool => in_array(
+                $webinar->externalId,
+                $suppressedExternalIds,
+                true,
+            ))
+            ->values();
 
         $created = 0;
         $updated = 0;
         $createdWebinarIds = [];
         $missing = [];
-
-        $fetchedExternalIds = $fetchedWebinars
-            ->map(fn (ProviderWebinarData $webinar) => $webinar->externalId)
-            ->filter()
-            ->values()
-            ->all();
 
         $fetchedWebinars->each(function (ProviderWebinarData $fetchedWebinar) use (
             $series,
@@ -166,6 +182,7 @@ class SyncWebinarSeriesFromProviderAction
             'updated' => $updated,
             'deleted' => 0,
             'removed_from_provider' => count($missing),
+            'suppressed' => count($suppressedExternalIds),
             'conflicts' => [],
             'missing' => $missing,
             'reconciliation' => [
@@ -228,6 +245,32 @@ class SyncWebinarSeriesFromProviderAction
             ->where('webinar_series_id', $series->getKey())
             ->eligibleForNotification(WebinarWaitlistSignup::NOTIFICATION_MODE_RECURRING)
             ->exists();
+    }
+
+
+    /**
+     * @param array<int, string> $fetchedExternalIds
+     * @return array<int, string>
+     */
+    private function suppressedExternalIds(
+        WebinarSeries $series,
+        string $provider,
+        string $providerEventType,
+        array $fetchedExternalIds,
+    ): array {
+        if ($fetchedExternalIds === []) {
+            return [];
+        }
+
+        return WebinarOccurrenceSuppression::query()
+            ->where('webinar_series_id', $series->getKey())
+            ->where('platform', $provider)
+            ->where('provider_event_type', $providerEventType)
+            ->whereIn('external_id', $fetchedExternalIds)
+            ->pluck('external_id')
+            ->filter(fn (mixed $value): bool => is_string($value) && $value !== '')
+            ->values()
+            ->all();
     }
 
     protected function missingWebinars(

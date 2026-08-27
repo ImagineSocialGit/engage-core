@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 2,
+    'version' => 3,
     'tables' => [
         'webinar_schedule_profiles' => [
             'mode' => 'upsert',
@@ -118,6 +118,8 @@ return [
                 'provider_lifecycle_status',
                 'provider_missing_at',
                 'provider_archived_at',
+                'hidden_at',
+                'hidden_reason',
                 'join_url',
                 'registration_url',
                 'playback_token',
@@ -142,6 +144,29 @@ return [
             ],
             'deferred_references' => [
                 'replacement_of_webinar_id' => 'webinars',
+            ],
+        ],
+
+        'webinar_occurrence_suppressions' => [
+            'mode' => 'insert_empty',
+            'preserve_id' => true,
+            'order_by' => ['id'],
+            'columns' => [
+                'id',
+                'webinar_series_id',
+                'platform',
+                'provider_event_type',
+                'external_id',
+                'external_uuid',
+                'reason',
+                'suppressed_at',
+                'meta',
+                'created_at',
+                'updated_at',
+            ],
+            'json_columns' => ['meta'],
+            'references' => [
+                'webinar_series_id' => 'webinar_series',
             ],
         ],
 

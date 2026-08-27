@@ -148,24 +148,47 @@ Malformed or incomplete provider pagination is also non-authoritative.
 A non-authoritative snapshot may import valid returned webinars, but it must not
 identify local webinars as missing. An authoritative snapshot moves a previously
 active local occurrence that is absent from the provider result to the first-class
-`missing` lifecycle state. That transition immediately removes the occurrence from
-upcoming and public-registration resolution while preserving the occurrence,
+`missing` provider lifecycle state. That transition immediately removes the occurrence
+from upcoming and public-registration resolution while preserving the occurrence,
 registrations, Messaging history, attendance evidence, and replacement links.
 
-Provider synchronization must never delete or archive a local occurrence automatically.
-The CRM Needs attention surface explains that the event was removed from Zoom and offers
-two explicit outcomes: replace the occurrence with another active synced occurrence, or
-move it to the `archived` lifecycle state as retained history. If the same provider event
-appears in a later authoritative or non-authoritative fetch, synchronization restores it
-to `active` and clears the provider-missing/archive timestamps.
-
-The durable lifecycle contract is:
+Provider synchronization and operator visibility are separate contracts. Provider
+synchronization must never delete or hide a local occurrence automatically. The provider
+lifecycle remains compatibility evidence about what Zoom reported:
 
 ```text
-active   -> eligible for upcoming/registerable resolution
+active   -> present as an active provider occurrence
 missing  -> absent from an authoritative provider snapshot; operator decision required
-archived -> explicitly kept for history; never registerable
+archived -> legacy retained-history provider state; never registerable
 ```
+
+Operator removal is represented separately:
+
+```text
+hidden_at = null     -> normal operator/public visibility, subject to provider lifecycle
+hidden_at is set     -> excluded from new registration, Upcoming, and normal event lists
+                        while the Webinar row remains resolvable for registrations/history
+```
+
+The CRM uses one `Remove event` action for active or provider-missing occurrences. If an
+occurrence has no registrations, no occurrence-replacement dependency, and no Messaging
+MessageChainEnrollment that retains the Webinar as its origin, the local Webinar row may
+be deleted permanently. Before that delete, Webinars stores a small
+durable provider-occurrence suppression keyed by WebinarSeries, provider family, provider
+event type, and external ID. Future provider refreshes skip that identity so an operator's
+explicit removal does not appear to undo itself by re-importing the same Zoom event.
+
+If an occurrence has registrations, Messaging origin history, or participates in a
+replacement chain, removal hides it instead of deleting it. The Webinar row, registrations,
+Contact history, Messaging references, attendance evidence, and replacement links remain
+resolvable. Removing an occurrence cancels any still-open waitlist-notification MessageChain
+enrollments for that occurrence so a hidden event is not advertised after removal. It does
+not silently cancel or rewrite existing registrations or their registration/reminder chains;
+those attendee lifecycle decisions remain explicit operator work.
+
+If a provider-missing occurrence later reappears in a provider fetch, synchronization may
+restore its provider lifecycle to `active`, but it must not clear `hidden_at`. Provider
+refresh therefore updates provider truth without overriding an operator visibility choice.
 
 Provider-owned metadata belongs under this namespace:
 
@@ -878,7 +901,9 @@ Marketing nurture remains Campaign-owned and starts through Campaign/FlowRoutes 
 
 ## Webinar workspace and message review UX
 
-The normal CRM surface is workspace-first. The top-level Webinar Workspace owns the primary operator hierarchy: current attention/recovery work is the main panel, while upcoming sessions are a compact side panel. Series creation, Zoom refresh, message-schedule selection, and testing controls are secondary management tasks and stay below the normal operating surface.
+The normal CRM surface is workspace-first. The top-level Webinar Workspace owns the primary operator hierarchy: current attention/recovery work is the main panel, while upcoming sessions are a compact side panel. Series creation, Zoom refresh, message-plan selection, and testing controls are secondary management tasks and stay below the normal operating surface.
+
+Series setup must not visually group unrelated configuration merely because it lives on the same database row. `Zoom event type` is provider setup. `Message plan` selects the Webinar schedule profile and explains which confirmation/reminder/follow-up sequence runs and when. `Message content` is a separate action/state that opens the canonical Messaging-backed sequence editor and explains what those messages say. The CRM should use those business labels instead of the ambiguous standalone term `schedule`.
 
 The workspace should answer, in order:
 

@@ -13,6 +13,7 @@ use App\Modules\Webinars\Jobs\NotifyWebinarWaitlistJob;
 use App\Modules\Core\Models\Contact;
 use App\Models\User;
 use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Models\WebinarOccurrenceSuppression;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Support\Caching\CacheKey;
 use Carbon\Carbon;
@@ -358,6 +359,58 @@ class WebinarSyncTest extends TestCase
 
         $this->assertCount(1, $missing);
         $this->assertSame('Missing Webinar', $missing[0]['title']);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_sync_restores_provider_state_without_unhiding_operator_removed_occurrence(): void
+    {
+        $this->freezeTime();
+
+        $user = User::factory()->create();
+        $series = WebinarSeries::query()->create([
+            'title' => 'Hidden Home Buyer Game Plan',
+        ]);
+        $hiddenAt = now()->subHour()->startOfSecond();
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+            'platform' => 'zoom',
+            'provider_event_type' => WebinarProviderEventType::Webinar->value,
+            'external_id' => 'zoom-hidden-1001',
+            'title' => 'Hidden Home Buyer Game Plan',
+            'provider_lifecycle_status' => WebinarProviderLifecycleStatus::Missing->value,
+            'provider_missing_at' => now()->subHours(2),
+            'hidden_at' => $hiddenAt,
+            'hidden_reason' => 'operator_removed',
+        ]);
+
+        $zoomWebinarService = Mockery::mock(ZoomWebinarService::class);
+        $zoomWebinarService->shouldReceive('listWebinarsByTitle')
+            ->once()
+            ->with('Hidden Home Buyer Game Plan')
+            ->andReturn(ProviderWebinarSnapshot::authoritative([
+                $this->providerWebinar(
+                    externalId: 'zoom-hidden-1001',
+                    title: 'Hidden Home Buyer Game Plan',
+                    startsAt: now()->addWeek(),
+                    endsAt: now()->addWeek()->addHour(),
+                ),
+            ]));
+
+        $this->app->instance(ZoomWebinarService::class, $zoomWebinarService);
+
+        $this->actingAs($user)
+            ->post(route('crm.webinar-series.sync'), [
+                'webinar_series_id' => $series->getKey(),
+            ])
+            ->assertRedirect(route('crm.webinar-series.index'));
+
+        $webinar->refresh();
+
+        $this->assertTrue($webinar->isProviderActive());
+        $this->assertNull($webinar->provider_missing_at);
+        $this->assertSame('operator_removed', $webinar->hidden_reason);
+        $this->assertTrue($webinar->hidden_at?->equalTo($hiddenAt));
 
         Carbon::setTestNow();
     }
@@ -730,6 +783,58 @@ class WebinarSyncTest extends TestCase
             'provider_event_type' => WebinarProviderEventType::Meeting->value,
             'external_id' => 'zoom-meeting-1001',
             'title' => 'Weekly Planning Session',
+        ]);
+
+        Carbon::setTestNow();
+    }
+
+
+    public function test_sync_does_not_recreate_an_operator_suppressed_provider_occurrence(): void
+    {
+        $this->freezeTime();
+
+        $user = User::factory()->create();
+        $series = WebinarSeries::factory()->create([
+            'title' => 'Suppressed Home Buyer Game Plan',
+        ]);
+
+        WebinarOccurrenceSuppression::query()->create([
+            'webinar_series_id' => $series->getKey(),
+            'platform' => $series->providerKey(),
+            'provider_event_type' => $series->providerEventTypeKey(),
+            'external_id' => 'zoom-suppressed-1001',
+            'reason' => 'operator_removed',
+            'suppressed_at' => now(),
+        ]);
+
+        $zoomWebinarService = Mockery::mock(ZoomWebinarService::class);
+        $zoomWebinarService->shouldReceive('listWebinarsByTitle')
+            ->once()
+            ->with('Suppressed Home Buyer Game Plan')
+            ->andReturn(ProviderWebinarSnapshot::authoritative([
+                $this->providerWebinar(
+                    externalId: 'zoom-suppressed-1001',
+                    title: 'Suppressed Home Buyer Game Plan',
+                    startsAt: now()->addWeek(),
+                    endsAt: now()->addWeek()->addHour(),
+                ),
+            ]));
+
+        $this->app->instance(ZoomWebinarService::class, $zoomWebinarService);
+
+        $this->actingAs($user)
+            ->post(route('crm.webinar-series.sync'), [
+                'webinar_series_id' => $series->getKey(),
+            ])
+            ->assertRedirect(route('crm.webinar-series.index'));
+
+        $this->assertDatabaseMissing('webinars', [
+            'webinar_series_id' => $series->getKey(),
+            'external_id' => 'zoom-suppressed-1001',
+        ]);
+        $this->assertDatabaseHas('webinar_occurrence_suppressions', [
+            'webinar_series_id' => $series->getKey(),
+            'external_id' => 'zoom-suppressed-1001',
         ]);
 
         Carbon::setTestNow();
