@@ -8,16 +8,16 @@ class CompletePublicBookingRequest extends FormRequest
 {
     protected function prepareForValidation(): void
     {
-        $name = $this->input('name');
-        $email = $this->input('email');
-        $phone = $this->input('phone');
-
         $this->merge([
-            'name' => is_string($name) ? trim($name) : $name,
-            'email' => is_string($email) ? strtolower(trim($email)) : $email,
-            'phone' => is_string($phone) && trim($phone) !== ''
-                ? trim($phone)
-                : null,
+            'first_name' => $this->trimmed('first_name'),
+            'last_name' => $this->trimmed('last_name'),
+            'email' => is_string($this->input('email'))
+                ? strtolower(trim($this->input('email')))
+                : $this->input('email'),
+            'phone' => $this->normalizedPhone($this->input('phone')),
+            'public_submission_attempt_id' => $this->nullableTrimmed(
+                'public_submission_attempt_id',
+            ),
         ]);
     }
 
@@ -29,9 +29,12 @@ class CompletePublicBookingRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['bail', 'required', 'string', 'max:255'],
+            'first_name' => ['bail', 'required', 'string', 'max:120'],
+            'last_name' => ['bail', 'required', 'string', 'max:120'],
             'email' => ['bail', 'required', 'string', 'email:rfc', 'max:255'],
-            'phone' => ['bail', 'nullable', 'string', 'max:255'],
+            'phone' => ['bail', 'nullable', 'string', 'regex:/^\+[1-9]\d{6,14}$/D'],
+            'public_submission_attempt_id' => ['bail', 'nullable', 'uuid'],
+            'name' => ['prohibited'],
             'contact_id' => ['prohibited'],
             'appointment_id' => ['prohibited'],
             'bookable_service_id' => ['prohibited'],
@@ -49,9 +52,19 @@ class CompletePublicBookingRequest extends FormRequest
         ];
     }
 
+    public function attendeeFirstName(): string
+    {
+        return trim((string) $this->validated('first_name'));
+    }
+
+    public function attendeeLastName(): string
+    {
+        return trim((string) $this->validated('last_name'));
+    }
+
     public function attendeeName(): string
     {
-        return trim((string) $this->validated('name'));
+        return trim($this->attendeeFirstName().' '.$this->attendeeLastName());
     }
 
     public function attendeeEmail(): string
@@ -66,5 +79,53 @@ class CompletePublicBookingRequest extends FormRequest
         return is_string($phone) && trim($phone) !== ''
             ? trim($phone)
             : null;
+    }
+
+    public function publicSubmissionAttemptId(): ?string
+    {
+        $attemptId = $this->validated('public_submission_attempt_id');
+
+        return is_string($attemptId) && trim($attemptId) !== ''
+            ? strtolower(trim($attemptId))
+            : null;
+    }
+
+    private function trimmed(string $key): mixed
+    {
+        $value = $this->input($key);
+
+        return is_string($value) ? trim($value) : $value;
+    }
+
+    private function nullableTrimmed(string $key): mixed
+    {
+        $value = $this->input($key);
+
+        return is_string($value) && trim($value) !== ''
+            ? trim($value)
+            : null;
+    }
+
+    private function normalizedPhone(mixed $value): mixed
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $value);
+
+        if (! is_string($digits) || $digits === '') {
+            return $value;
+        }
+
+        if (strlen($digits) === 10) {
+            return '+1'.$digits;
+        }
+
+        if (strlen($digits) >= 7 && strlen($digits) <= 15) {
+            return '+'.$digits;
+        }
+
+        return $value;
     }
 }

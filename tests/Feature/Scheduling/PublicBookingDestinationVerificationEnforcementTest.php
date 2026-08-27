@@ -119,6 +119,27 @@ class PublicBookingDestinationVerificationEnforcementTest extends TestCase
             $first->headers->get('Location'),
         );
 
+        $this->get('https://schedule.test/book/'.$hold->hold_id)
+            ->assertOk()
+            ->assertSee('value="person@example.test"', false)
+            ->assertSee('Verified email')
+            ->assertSee('name="email"', false)
+            ->assertSee('readonly', false)
+            ->assertDontSee('name="name"', false)
+            ->assertSee('name="first_name"', false)
+            ->assertSee('name="last_name"', false);
+
+        $this->from('https://schedule.test/book/'.$hold->hold_id)
+            ->post('https://schedule.test/book/'.$hold->hold_id, [
+                'first_name' => 'Changed',
+                'last_name' => 'Address',
+                'email' => 'changed@example.test',
+            ])
+            ->assertRedirect('https://schedule.test/book/'.$hold->hold_id)
+            ->assertSessionHasErrors('email');
+
+        $this->assertDatabaseCount('appointments', 0);
+
         $this->post($offerUrl.'/hold', [
             'idempotency_key' => $idempotencyKey,
         ])->assertRedirect('https://schedule.test/book/'.$hold->hold_id);

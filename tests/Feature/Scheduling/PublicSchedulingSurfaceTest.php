@@ -165,6 +165,8 @@ class PublicSchedulingSurfaceTest extends TestCase
             ->assertSee('9:00 AM–10:00 AM')
             ->assertSee('10:00 AM–11:00 AM')
             ->assertSee('11:00 AM–12:00 PM')
+            ->assertSee('data-day-period="morning"', false)
+            ->assertSee('<summary>9:00 AM</summary>', false)
             ->assertDontSee('Private Host Identity')
             ->assertDontSee('scheduling_host_id')
             ->assertDontSee('remaining_capacity')
@@ -219,6 +221,36 @@ class PublicSchedulingSurfaceTest extends TestCase
         );
     }
 
+    public function test_public_surface_uses_plain_language_and_client_theme_overrides(): void
+    {
+        CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
+        $this->registerPublicSurface('https://schedule.test');
+        config()->set('scheduling.public.presentation.brand_name', 'Example Client');
+        config()->set('scheduling.public.presentation.primary_color', '#123456');
+
+        $service = BookableService::factory()->create([
+            'key' => 'plain-language',
+            'name' => 'Plain Language',
+            'timezone' => 'UTC',
+            'is_public' => true,
+        ]);
+
+        $response = $this->get('https://schedule.test/');
+
+        $response
+            ->assertOk()
+            ->assertSee('Example Client')
+            ->assertSee('--booking-primary: #123456', false)
+            ->assertSee('data-report-service-selected', false)
+            ->assertDontSee('Step 1');
+
+        $this->get('https://schedule.test/services/'.$service->key)
+            ->assertOk()
+            ->assertSee('id="scheduling-public-booking-config"', false)
+            ->assertDontSee('opaque offer')
+            ->assertDontSee('authoritative availability');
+    }
+
     public function test_private_unknown_and_out_of_range_service_requests_are_rejected(): void
     {
         CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
@@ -254,7 +286,7 @@ class PublicSchedulingSurfaceTest extends TestCase
 
         $this->get('https://schedule.test/')
             ->assertOk()
-            ->assertSee('No public services are available.');
+            ->assertSee('data-booking-empty-state="services"', false);
 
         BookableService::factory()->create([
             'key' => 'unavailable-service',
@@ -267,7 +299,7 @@ class PublicSchedulingSurfaceTest extends TestCase
             'https://schedule.test/services/unavailable-service?date=2026-07-23',
         )
             ->assertOk()
-            ->assertSee('No appointment times are currently available for this date.');
+            ->assertSee('data-booking-empty-state="times"', false);
     }
 
     public function test_unconfigured_or_invalid_public_configuration_registers_no_routes(): void

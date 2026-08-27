@@ -8,6 +8,8 @@
 - [x] Phase 7F: project authoritative registration attribution from submit-attempt correlation independently of traffic classification, carry first-touch campaign or referrer-host attribution through the correlated session, retain hashed Meta `fbclid` evidence, use attributed registrations for exact stable-ID acquisition comparisons, and add bounded active-time/scroll evidence without raw interaction streams.
 - [x] Phase 8A: add a bounded first-investigation summary, explicit measurement/ad-attribution context, denominator clarity in comparison tables, and an authenticated recent-data refresh action.
 - [x] Phase 8B: add guarded directional comparisons across source, campaign, ad group, creative, placement, landing page, page/presentation, and device dimensions where retained slices provide directly comparable likely-human registration conversion.
+- [x] Scheduling collection foundation: register bounded public-booking event definitions and a producer-owned durable Appointment fact contributor without adding a Reporting runtime dependency to Scheduling or collecting contact values.
+- [ ] Scheduling report surface: add report-owned projection metrics and a focused CRM view for public booking funnel steps, validation/drop-off points, attributed completed appointments, and supported ad/source dimensions.
 - [ ] Add additional external-platform adapters only when a concrete client export/API workflow exists; keep provider normalization inside Reporting rather than adding vendor columns to the shared schema.
 
 - [ ] Phase 8C: extend decision-useful acquisition economics across additional imported platform adapters only after concrete TikTok/Google exports are available, and consider richer comparison confidence only if a client workflow proves the need.

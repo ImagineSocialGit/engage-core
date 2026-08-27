@@ -53,6 +53,25 @@ return [
         'availability_max_days' => 31,
         'reservation_rate_limit_per_minute' => 12,
         'hold_review_rate_limit_per_minute' => 60,
+        'reporting_enabled' => true,
+
+        /*
+         * Client config may override any presentation value. Null colors fall
+         * back to the selected client theme and then the neutral defaults.
+         */
+        'presentation' => [
+            'brand_name' => null,
+            'logo_url' => null,
+            'heading' => 'Schedule an appointment',
+            'intro' => 'Choose a service and a time that works for you.',
+            'primary_color' => null,
+            'accent_color' => null,
+            'surface_color' => '#ffffff',
+            'background_color' => '#f6f7f8',
+            'page_revision' => 'scheduling-public-v2',
+            'disclosure_version' => '1',
+            'consent_text' => null,
+        ],
 
         'destination_verification' => [
             'code_digits' => 6,

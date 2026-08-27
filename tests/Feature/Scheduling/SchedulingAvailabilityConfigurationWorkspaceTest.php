@@ -912,6 +912,8 @@ class SchedulingAvailabilityConfigurationWorkspaceTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('data-availability-preview', false)
+            ->assertSee('id="availability-preview"', false)
+            ->assertSee('#availability-preview', false)
             ->assertSee('data-preview-range-first="2026-08-10T09:00:00.000000Z"', false)
             ->assertSee('data-preview-range-first="2026-08-10T11:00:00.000000Z"', false)
             ->assertDontSee('data-preview-range-first="2026-08-10T10:00:00.000000Z"', false)

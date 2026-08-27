@@ -42,14 +42,17 @@ class PublicBookingCompletionTest extends TestCase
         $this->get($holdUrl)
             ->assertOk()
             ->assertSee('Complete booking')
-            ->assertSee('name="name"', false)
+            ->assertSee('name="first_name"', false)
+            ->assertSee('name="last_name"', false)
             ->assertSee('name="email"', false)
             ->assertSee('name="phone"', false);
 
         $response = $this->post($holdUrl, [
-            'name' => '  Jamie Visitor  ',
+            'first_name' => '  Jamie  ',
+            'last_name' => '  Visitor  ',
             'email' => '  JAMIE@EXAMPLE.TEST  ',
-            'phone' => '  +15555550123  ',
+            'phone' => '  (555) 555-0123  ',
+            'public_submission_attempt_id' => '2bc92de0-55fe-4dbd-9287-58c77d684a2f',
         ]);
 
         $response->assertRedirect($holdUrl);
@@ -60,6 +63,8 @@ class PublicBookingCompletionTest extends TestCase
         $hold->refresh();
 
         $this->assertSame('jamie@example.test', $contact->email);
+        $this->assertSame('Jamie', $contact->first_name);
+        $this->assertSame('Visitor', $contact->last_name);
         $this->assertSame('Jamie Visitor', $contact->name);
         $this->assertSame('+15555550123', $contact->phone);
         $this->assertSame('public_booking', $contact->source);
@@ -70,6 +75,15 @@ class PublicBookingCompletionTest extends TestCase
         $this->assertSame($contact->id, $appointment->contact_id);
         $this->assertSame(Appointment::STATUS_SCHEDULED, $appointment->status);
         $this->assertSame('public_booking', $appointment->source);
+        $this->assertSame(
+            '2bc92de0-55fe-4dbd-9287-58c77d684a2f',
+            data_get($appointment->meta, 'reporting.public_submission_attempt_id'),
+        );
+        $this->assertSame(
+            'scheduling.public_booking.communications',
+            data_get($appointment->meta, 'public_booking_disclosure.key'),
+        );
+        $this->assertNotNull(data_get($appointment->meta, 'public_booking_disclosure.accepted_at'));
 
         $this->assertSame($appointment->id, $attendee->appointment_id);
         $this->assertSame($contact->id, $attendee->contact_id);
@@ -89,7 +103,8 @@ class PublicBookingCompletionTest extends TestCase
 
         $this->get($holdUrl)
             ->assertOk()
-            ->assertDontSee('name="name"', false)
+            ->assertDontSee('name="first_name"', false)
+            ->assertDontSee('name="last_name"', false)
             ->assertDontSee('name="email"', false)
             ->assertDontSee('name="phone"', false)
             ->assertDontSee('jamie@example.test')
@@ -113,7 +128,8 @@ class PublicBookingCompletionTest extends TestCase
         $holdUrl = 'https://schedule.test/book/'.$hold->hold_id;
 
         $this->post($holdUrl, [
-            'name' => 'Pending Visitor',
+            'first_name' => 'Pending',
+            'last_name' => 'Visitor',
             'email' => 'pending@example.test',
         ])->assertRedirect($holdUrl);
 
@@ -126,7 +142,8 @@ class PublicBookingCompletionTest extends TestCase
 
         $this->get($holdUrl)
             ->assertOk()
-            ->assertDontSee('name="name"', false)
+            ->assertDontSee('name="first_name"', false)
+            ->assertDontSee('name="last_name"', false)
             ->assertDontSee('name="email"', false)
             ->assertDontSee('name="phone"', false)
             ->assertDontSee('Pending Visitor')
@@ -155,7 +172,8 @@ class PublicBookingCompletionTest extends TestCase
         $holdUrl = 'https://schedule.test/book/'.$hold->hold_id;
 
         $this->post($holdUrl, [
-            'name' => 'Submitted Snapshot Name',
+            'first_name' => 'Submitted Snapshot',
+            'last_name' => 'Name',
             'email' => ' EXISTING@EXAMPLE.TEST ',
             'phone' => '+15555559999',
         ])->assertRedirect($holdUrl);
@@ -188,14 +206,16 @@ class PublicBookingCompletionTest extends TestCase
         $holdUrl = 'https://schedule.test/book/'.$hold->hold_id;
 
         $this->post($holdUrl, [
-            'name' => 'First Visitor',
+            'first_name' => 'First',
+            'last_name' => 'Visitor',
             'email' => 'first@example.test',
         ])->assertRedirect($holdUrl);
 
         $firstAppointmentId = Appointment::query()->sole()->id;
 
         $this->post($holdUrl, [
-            'name' => 'Replay Visitor',
+            'first_name' => 'Replay',
+            'last_name' => 'Visitor',
             'email' => 'second@example.test',
             'phone' => '+15555558888',
         ])->assertRedirect($holdUrl);
@@ -221,7 +241,8 @@ class PublicBookingCompletionTest extends TestCase
 
         $this->from($releasedUrl)
             ->post($releasedUrl, [
-                'name' => 'Released Visitor',
+                'first_name' => 'Released',
+                'last_name' => 'Visitor',
                 'email' => 'released@example.test',
             ])
             ->assertRedirect($releasedUrl)
@@ -236,7 +257,8 @@ class PublicBookingCompletionTest extends TestCase
 
         $this->from($elapsedUrl)
             ->post($elapsedUrl, [
-                'name' => 'Elapsed Visitor',
+                'first_name' => 'Elapsed',
+                'last_name' => 'Visitor',
                 'email' => 'elapsed@example.test',
             ])
             ->assertRedirect($elapsedUrl)
@@ -260,7 +282,9 @@ class PublicBookingCompletionTest extends TestCase
 
         $this->from($holdUrl)
             ->post($holdUrl, [
-                'name' => ' ',
+                'first_name' => ' ',
+                'last_name' => ' ',
+                'name' => 'Forged Combined Name',
                 'email' => 'not-an-email',
                 'phone' => str_repeat('1', 256),
                 'contact_id' => 999,
@@ -275,6 +299,8 @@ class PublicBookingCompletionTest extends TestCase
             ])
             ->assertRedirect($holdUrl)
             ->assertSessionHasErrors([
+                'first_name',
+                'last_name',
                 'name',
                 'email',
                 'phone',
@@ -304,7 +330,8 @@ class PublicBookingCompletionTest extends TestCase
         $hold = $this->activeHold($service, '2026-07-25 16:00:00 UTC');
 
         $this->post('https://example.test/book/'.$hold->hold_id, [
-            'name' => 'Wrong Host',
+            'first_name' => 'Wrong',
+            'last_name' => 'Host',
             'email' => 'wrong-host@example.test',
         ])->assertNotFound();
 

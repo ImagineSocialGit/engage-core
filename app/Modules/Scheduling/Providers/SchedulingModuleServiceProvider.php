@@ -3,7 +3,9 @@
 namespace App\Modules\Scheduling\Providers;
 
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
+use App\Modules\Scheduling\EventDefinitions\SchedulingPublicBookingEventDefinitionContributor;
 use App\Modules\Scheduling\Jobs\ExpireBookingHoldsJob;
+use App\Modules\Scheduling\ReadModels\SchedulingBookingFunnelFactContributor;
 use App\Modules\Scheduling\Services\ContactShow\SchedulingContactPanelProvider;
 use App\Modules\Scheduling\Validation\SchedulingSetupValidationContributor;
 use Illuminate\Console\Scheduling\Schedule;
@@ -17,6 +19,16 @@ class SchedulingModuleServiceProvider extends ServiceProvider
         $this->app->tag(
             SchedulingSetupValidationContributor::class,
             'setup.validation_contributors',
+        );
+
+        $this->app->tag(
+            SchedulingPublicBookingEventDefinitionContributor::class,
+            'reporting.event_definition_contributors',
+        );
+
+        $this->app->tag(
+            SchedulingBookingFunnelFactContributor::class,
+            'reporting.projection_fact_contributors',
         );
     }
 

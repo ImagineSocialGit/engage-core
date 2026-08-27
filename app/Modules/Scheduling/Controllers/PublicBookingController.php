@@ -241,7 +241,7 @@ class PublicBookingController extends Controller
             );
         } catch (DomainException|InvalidArgumentException $exception) {
             throw ValidationException::withMessages([
-                'destination' => $exception->getMessage(),
+                'destination' => 'Enter a valid email address or mobile phone number and try again.',
             ]);
         }
 
@@ -250,6 +250,7 @@ class PublicBookingController extends Controller
             [
                 'challenge_id' => $challenge->challengeId,
                 'channel' => $challenge->channel,
+                'destination' => $challenge->destination,
                 'masked_destination' => $challenge->maskedDestination,
                 'challenge_expires_at' => $challenge->expiresAt->toISOString(),
                 'resend_available_at' => $challenge->resendAvailableAt->toISOString(),
@@ -288,7 +289,7 @@ class PublicBookingController extends Controller
             );
         } catch (DomainException|InvalidArgumentException $exception) {
             throw ValidationException::withMessages([
-                'code' => $exception->getMessage(),
+                'code' => 'The code is incorrect or has expired. Request a new code and try again.',
             ]);
         }
 
@@ -297,6 +298,7 @@ class PublicBookingController extends Controller
             [
                 'proof_token' => $proof->token,
                 'verified_channel' => $proof->channel,
+                'destination' => $proof->destination,
                 'masked_destination' => is_string($state['masked_destination'] ?? null)
                     ? $state['masked_destination']
                     : null,
@@ -337,7 +339,7 @@ class PublicBookingController extends Controller
             );
         } catch (DomainException|InvalidArgumentException $exception) {
             throw ValidationException::withMessages([
-                'verification' => $exception->getMessage(),
+                'verification' => 'We could not send another code yet. Wait a moment and try again.',
             ]);
         }
 
@@ -346,6 +348,7 @@ class PublicBookingController extends Controller
             [
                 'challenge_id' => $challenge->challengeId,
                 'channel' => $challenge->channel,
+                'destination' => $challenge->destination,
                 'masked_destination' => $challenge->maskedDestination,
                 'challenge_expires_at' => $challenge->expiresAt->toISOString(),
                 'resend_available_at' => $challenge->resendAvailableAt->toISOString(),
@@ -378,8 +381,33 @@ class PublicBookingController extends Controller
             );
         } catch (DomainException|InvalidArgumentException $exception) {
             throw ValidationException::withMessages([
-                'booking' => $exception->getMessage(),
+                'booking' => 'We could not reserve this time. Confirm your code again or choose another time.',
             ]);
+        }
+
+        $verifiedChannel = is_string($state['verified_channel'] ?? null)
+            ? trim($state['verified_channel'])
+            : null;
+        $verifiedDestination = is_string($state['destination'] ?? null)
+            ? trim($state['destination'])
+            : null;
+
+        if (in_array($verifiedChannel, ['email', 'sms'], true)
+            && $verifiedDestination !== null
+            && $verifiedDestination !== ''
+        ) {
+            $request->session()->put(
+                $this->holdContactPrefillSessionKey($hold),
+                [
+                    'verified_channel' => $verifiedChannel,
+                    'email' => $verifiedChannel === 'email'
+                        ? $verifiedDestination
+                        : null,
+                    'phone' => $verifiedChannel === 'sms'
+                        ? $verifiedDestination
+                        : null,
+                ],
+            );
         }
 
         $this->forgetDestinationVerificationState($request, $offer);
@@ -390,7 +418,7 @@ class PublicBookingController extends Controller
         );
     }
 
-    public function review(string $holdId): View
+    public function review(Request $request, string $holdId): View
     {
         $hold = $this->publicHold($holdId);
         $service = BookableService::withTrashed()
@@ -401,6 +429,7 @@ class PublicBookingController extends Controller
 
         return view('scheduling.public.index', $this->pageData([
             'holdSummary' => $this->holdSummary($hold, $service),
+            'contactPrefill' => $this->holdContactPrefill($request, $hold),
         ]));
     }
 
@@ -410,19 +439,50 @@ class PublicBookingController extends Controller
         CompletePublicBookingAction $completePublicBooking,
     ): RedirectResponse {
         $hold = $this->publicHold($holdId);
+        $contactPrefill = $this->holdContactPrefill($request, $hold);
+
+        if ($contactPrefill['verified_channel'] === 'email'
+            && (! is_string($contactPrefill['email'])
+                || ! hash_equals(
+                    strtolower(trim($contactPrefill['email'])),
+                    $request->attendeeEmail(),
+                ))
+        ) {
+            throw ValidationException::withMessages([
+                'email' => 'Use the email address that was confirmed for this booking.',
+            ]);
+        }
+
+        if ($contactPrefill['verified_channel'] === 'sms'
+            && (! is_string($contactPrefill['phone'])
+                || ! is_string($request->attendeePhone())
+                || ! hash_equals(
+                    preg_replace('/\D+/', '', $contactPrefill['phone']) ?? '',
+                    preg_replace('/\D+/', '', $request->attendeePhone()) ?? '',
+                ))
+        ) {
+            throw ValidationException::withMessages([
+                'phone' => 'Use the mobile phone number that was confirmed for this booking.',
+            ]);
+        }
 
         try {
             $completePublicBooking->handle(
                 holdId: $hold->hold_id,
-                name: $request->attendeeName(),
+                firstName: $request->attendeeFirstName(),
+                lastName: $request->attendeeLastName(),
                 email: $request->attendeeEmail(),
                 phone: $request->attendeePhone(),
+                publicSubmissionAttemptId: $request->publicSubmissionAttemptId(),
+                disclosure: $this->publicBookingDisclosure(),
             );
         } catch (DomainException) {
             throw ValidationException::withMessages([
                 'booking' => 'This reservation can no longer be completed. Choose another appointment time.',
             ]);
         }
+
+        $request->session()->forget($this->holdContactPrefillSessionKey($hold));
 
         return redirect()->route(
             'scheduling.public.holds.show',
@@ -444,6 +504,7 @@ class PublicBookingController extends Controller
             'availableTimes' => [],
             'maximumDate' => null,
             'preparedLocation' => null,
+            'publicPresentation' => $this->publicPresentation(),
             'requiresCustomerSitePreparation' => false,
             'offerSummary' => null,
             'destinationVerification' => [
@@ -457,6 +518,11 @@ class PublicBookingController extends Controller
                 'resend_available_at' => null,
             ],
             'holdSummary' => null,
+            'contactPrefill' => [
+                'verified_channel' => null,
+                'email' => null,
+                'phone' => null,
+            ],
         ], $overrides);
     }
 
@@ -597,19 +663,26 @@ class PublicBookingController extends Controller
      */
     private function locationPresentation(?SchedulingLocationSnapshot $location): ?array
     {
-        if (! $location instanceof SchedulingLocationSnapshot
-            || ! $location->isCustomerSite()
-        ) {
+        if (! $location instanceof SchedulingLocationSnapshot) {
             return null;
         }
 
-        $address = data_get($location->details, 'address');
-
-        if (! is_array($address)) {
-            return null;
-        }
+        $details = is_array($location->details) ? $location->details : [];
+        $address = is_array($details['address'] ?? null)
+            ? $details['address']
+            : [];
 
         return [
+            'type' => $location->type,
+            'label' => is_string($details['label'] ?? null)
+                ? $details['label']
+                : null,
+            'instructions' => is_string($details['instructions'] ?? null)
+                ? $details['instructions']
+                : null,
+            'url' => is_string($details['url'] ?? null)
+                ? $details['url']
+                : null,
             'formatted_address' => is_string($address['formatted_address'] ?? null)
                 ? $address['formatted_address']
                 : null,
@@ -816,7 +889,7 @@ class PublicBookingController extends Controller
 
     /**
      * @param array<int, BookableSlot> $slots
-     * @return array<int, array{starts_at: string, label: string}>
+     * @return array<int, array{starts_at: string, start_label: string, end_label: string, full_label: string, period: string}>
      */
     private function publicTimes(array $slots, string $displayTimezone): array
     {
@@ -833,7 +906,14 @@ class PublicBookingController extends Controller
 
             $times[$key] = [
                 'starts_at' => $slot->startsAt->toISOString(),
-                'label' => $startsAt->format('g:i A').'–'.$endsAt->format('g:i A'),
+                'start_label' => $startsAt->format('g:i A'),
+                'end_label' => $endsAt->format('g:i A'),
+                'full_label' => $startsAt->format('g:i A').'–'.$endsAt->format('g:i A'),
+                'period' => match (true) {
+                    (int) $startsAt->format('G') < 12 => 'morning',
+                    (int) $startsAt->format('G') < 17 => 'afternoon',
+                    default => 'evening',
+                },
             ];
         }
 
@@ -871,6 +951,13 @@ class PublicBookingController extends Controller
                 .' – '
                 .$endsAt->format('D, M j, Y \a\t g:i A'),
             'timezone' => $timezone,
+            'location_type' => $offer->location_type,
+            'location_label' => is_string($locationDetails['label'] ?? null)
+                ? $locationDetails['label']
+                : null,
+            'location_instructions' => is_string($locationDetails['instructions'] ?? null)
+                ? $locationDetails['instructions']
+                : null,
             'location_address' => is_string(data_get($locationDetails, 'address.formatted_address'))
                 ? data_get($locationDetails, 'address.formatted_address')
                 : null,
@@ -924,11 +1011,190 @@ class PublicBookingController extends Controller
             'location_label' => is_string($locationDetails['label'] ?? null)
                 ? $locationDetails['label']
                 : null,
+            'location_instructions' => is_string($locationDetails['instructions'] ?? null)
+                ? $locationDetails['instructions']
+                : null,
             'location_address' => is_string(data_get($locationDetails, 'address.formatted_address'))
                 ? data_get($locationDetails, 'address.formatted_address')
                 : null,
             'appointment_status' => $appointmentStatus,
             'confirmation_pending' => $appointmentStatus === Appointment::STATUS_PENDING,
+            'public_submission_attempt_id' => $appointment instanceof Appointment
+                && is_string(data_get($appointment->meta, 'reporting.public_submission_attempt_id'))
+                    ? data_get($appointment->meta, 'reporting.public_submission_attempt_id')
+                    : null,
         ];
+    }
+
+    /** @return array<string, mixed> */
+    private function holdContactPrefill(Request $request, BookingHold $hold): array
+    {
+        $stored = $request->session()->get($this->holdContactPrefillSessionKey($hold));
+
+        if (! is_array($stored)) {
+            return [
+                'verified_channel' => null,
+                'email' => null,
+                'phone' => null,
+            ];
+        }
+
+        return [
+            'verified_channel' => in_array($stored['verified_channel'] ?? null, ['email', 'sms'], true)
+                ? $stored['verified_channel']
+                : null,
+            'email' => is_string($stored['email'] ?? null)
+                ? $stored['email']
+                : null,
+            'phone' => is_string($stored['phone'] ?? null)
+                ? $stored['phone']
+                : null,
+        ];
+    }
+
+    private function holdContactPrefillSessionKey(BookingHold $hold): string
+    {
+        return 'scheduling.public.hold_contact_prefill.'.(string) $hold->hold_id;
+    }
+
+    /** @return array<string, mixed> */
+    private function publicPresentation(): array
+    {
+        $primary = $this->hexColor(
+            config('scheduling.public.presentation.primary_color'),
+            config('theme.colors.primary'),
+            '#0f766e',
+        );
+        $accent = $this->hexColor(
+            config('scheduling.public.presentation.accent_color'),
+            config('theme.colors.accent'),
+            $primary,
+        );
+
+        return [
+            'brand_name' => $this->presentationString(
+                config('scheduling.public.presentation.brand_name'),
+                config('client.name'),
+                'Appointments',
+            ),
+            'heading' => $this->presentationString(
+                config('scheduling.public.presentation.heading'),
+                null,
+                'Schedule an appointment',
+            ),
+            'intro' => $this->presentationString(
+                config('scheduling.public.presentation.intro'),
+                null,
+                'Choose a service and a time that works for you.',
+            ),
+            'primary_color' => $primary,
+            'accent_color' => $accent,
+            'surface_color' => $this->hexColor(
+                config('scheduling.public.presentation.surface_color'),
+                null,
+                '#ffffff',
+            ),
+            'background_color' => $this->hexColor(
+                config('scheduling.public.presentation.background_color'),
+                null,
+                '#f6f7f8',
+            ),
+            'logo_url' => $this->safePublicUrl(
+                config('scheduling.public.presentation.logo_url'),
+            ),
+            'page_revision' => $this->presentationString(
+                config('scheduling.public.presentation.page_revision'),
+                null,
+                'scheduling-public-v2',
+            ),
+            'reporting_enabled' => (bool) config(
+                'scheduling.public.reporting_enabled',
+                true,
+            ),
+            'consent_text' => $this->publicBookingDisclosureText(),
+        ];
+    }
+
+    /** @return array<string, string> */
+    private function publicBookingDisclosure(): array
+    {
+        $text = $this->publicBookingDisclosureText();
+
+        return [
+            'key' => 'scheduling.public_booking.communications',
+            'version' => $this->presentationString(
+                config('scheduling.public.presentation.disclosure_version'),
+                null,
+                '1',
+            ),
+            'text_hash' => hash('sha256', $text),
+        ];
+    }
+
+    private function publicBookingDisclosureText(): string
+    {
+        $client = $this->presentationString(
+            config('scheduling.public.presentation.brand_name'),
+            config('client.name'),
+            'the business',
+        );
+
+        return $this->presentationString(
+            config('scheduling.public.presentation.consent_text'),
+            null,
+            "By completing this booking, you agree that {$client} may send appointment confirmations, reminders, and follow-ups through the contact information you provide. Message and data rates may apply. Reply STOP to opt out of texts.",
+        );
+    }
+
+    private function presentationString(
+        mixed $preferred,
+        mixed $fallback,
+        string $default,
+    ): string {
+        foreach ([$preferred, $fallback, $default] as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return mb_substr(trim($value), 0, 1000);
+            }
+        }
+
+        return $default;
+    }
+
+    private function hexColor(mixed $preferred, mixed $fallback, string $default): string
+    {
+        foreach ([$preferred, $fallback, $default] as $value) {
+            if (is_string($value)
+                && preg_match('/^#[0-9a-fA-F]{6}$/D', trim($value)) === 1
+            ) {
+                return strtolower(trim($value));
+            }
+        }
+
+        return $default;
+    }
+
+    private function safePublicUrl(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $value = trim($value);
+
+        if (str_starts_with($value, '/')
+            && ! str_starts_with($value, '//')
+            && preg_match('/[\x00-\x1F\x7F]/', $value) !== 1
+        ) {
+            return mb_substr($value, 0, 2048);
+        }
+
+        $parts = parse_url($value);
+
+        return is_array($parts)
+            && in_array(strtolower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true)
+            && is_string($parts['host'] ?? null)
+            && trim($parts['host']) !== ''
+                ? mb_substr($value, 0, 2048)
+                : null;
     }
 }

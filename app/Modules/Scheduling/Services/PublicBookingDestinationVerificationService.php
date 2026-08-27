@@ -138,6 +138,7 @@ final class PublicBookingDestinationVerificationService
         return new DestinationVerificationChallenge(
             challengeId: $challengeId,
             channel: $channel,
+            destination: $destination,
             maskedDestination: $this->maskedDestination($channel, $destination),
             expiresAt: $expiresAt,
             resendAvailableAt: $resendAvailableAt->lessThan($expiresAt)
@@ -250,6 +251,7 @@ final class PublicBookingDestinationVerificationService
                 return new DestinationVerificationChallenge(
                     challengeId: $challengeId,
                     channel: $channel,
+                    destination: $destination,
                     maskedDestination: $this->maskedDestination($channel, $destination),
                     expiresAt: $expiresAt,
                     resendAvailableAt: $nextResendAt->lessThan($expiresAt)
@@ -328,6 +330,7 @@ final class PublicBookingDestinationVerificationService
                 return new DestinationVerificationProof(
                     token: $proofToken,
                     channel: (string) $state['channel'],
+                    destination: (string) $state['destination'],
                     verifiedAt: $now,
                     expiresAt: $proofExpiresAt,
                 );

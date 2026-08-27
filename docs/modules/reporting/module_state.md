@@ -35,7 +35,7 @@ Which configured answer choices were selected?
 How do first-party outcomes compare with externally reported campaign measurements?
 ```
 
-The first committed report is the Webinar traffic and conversion funnel.
+The first committed report is the Webinar traffic and conversion funnel. Scheduling now contributes collection definitions and authoritative public-booking facts through the same neutral seams; its report-owned projection and CRM summary are the next bounded report surface.
 
 Reporting should favor a small number of trustworthy, explainable measures over a large dashboard of ambiguous counters. Its primary product job is conversion and public-experience diagnosis: identify where likely-human traffic enters, where it drops, where validation or completion fails, and whether downstream registration/booking outcomes actually completed. Bot/crawler separation supports denominator trust. Malicious-traffic indicators may remain lightweight diagnostics, but Reporting is not a SIEM or attack-monitoring product.
 
@@ -189,6 +189,8 @@ Campaign enrollment or conversion outcomes introduced later
 Those facts are projected through neutral `App\Support\Reporting` fact contracts implemented in producer-owned read areas such as `ReadModels/` or through equivalent public read seams. Do not create `Reporting/` subdirectories inside Webinars, Messaging, Scheduling, Forms, Commerce, or another producer merely to feed Reporting.
 
 The first implementation uses `app/Modules/Webinars/ReadModels/WebinarFunnelFactContributor.php`. Because Webinars already depends on Messaging and owns the registration-message meaning, that read model may consume Messaging's durable `ScheduledMessage` terminal authority without copying delivery payload/meta or modifying Messaging. Messaging does not gain a Reporting-specific contributor or directory.
+
+Scheduling uses the same direction of dependency. `SchedulingPublicBookingEventDefinitionContributor` declares bounded same-origin public funnel events, and `SchedulingBookingFunnelFactContributor` yields authoritative completed public Appointment facts. Scheduling does not import Reporting runtime models, and Reporting does not query Scheduling tables directly. The retained observations/facts intentionally precede the Scheduling report projection so the redesigned flow begins collecting attribution and drop-off evidence immediately.
 
 This keeps the report tied to authoritative domain state rather than copied historical payloads.
 

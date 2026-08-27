@@ -101,6 +101,9 @@ GET  /services/{serviceKey}
 POST /services/{serviceKey}/prepare
 POST /services/{serviceKey}/offers
 GET  /offers/{offerId}
+POST /offers/{offerId}/verification
+POST /offers/{offerId}/verification/verify
+POST /offers/{offerId}/verification/resend
 POST /offers/{offerId}/hold
 GET  /book/{holdId}
 POST /book/{holdId}
@@ -110,7 +113,13 @@ They are registered only on the configured host while the Scheduling module is e
 
 A displayed fixed-duration time submits only its UTC `starts_at` value. Range-duration services submit local check-in/check-out wall times under the closed duration policy. The server revalidates the selection and issues an opaque, short-lived `BookableSlotOffer` without consuming capacity. A separate offer POST accepts only a UUID hold idempotency key and creates the real `BookingHold` after revalidating the exact service, location, host, travel, capacity, and resource state. The visitor cannot nominate a host, authoritative end time, normalized location, duration, capacity, offer provenance, or rule provenance.
 
-The opaque hold page accepts attendee name, email, and optional phone only while the hold remains effective. `CompletePublicBookingAction` resolves the Contact through the Core-owned `ResolveContactByEmailAction`, supplies immutable attendee snapshots, and converts the hold through `ConvertBookingHoldToAppointmentAction`. An existing Contact is returned unchanged; public input never overwrites established Contact fields or metadata. Reservation, completion, and hold-review routes are rate limited through `config/scheduling.php`.
+The hold page accepts first name, last name, email, and optional phone only while the hold remains effective. A verified email address or phone number is carried forward through server-owned session state and cannot be silently replaced after verification. `CompletePublicBookingAction` resolves the Contact through the Core-owned `ResolveContactByEmailAction`, fills first/last name only on a newly created Contact, supplies immutable attendee snapshots, records the configured communications disclosure identity/hash/acceptance time, and converts the hold through `ConvertBookingHoldToAppointmentAction`. An existing Contact is returned unchanged; public input never overwrites established Contact fields or metadata. Reservation, completion, and hold-review routes are rate limited through `config/scheduling.php`.
+
+The default public presentation is deliberately simple and mobile-first. The catalog has one service-choice surface without duplicated step labels. Fixed-duration availability is grouped into Morning, Afternoon, and Evening, shows start times initially, and reveals the full appointment interval plus the continue action only after selection. Verification uses plain email/phone language, phone inputs receive a lightweight US display mask while the server normalizes accepted values, and the final converted-hold page is confirmation-only. Location type, address, and preparation instructions come from the service-owned canonical location snapshot; when a detail is not configured, the public surface says that the team will provide it instead of inventing a delivery promise.
+
+Client presentation overrides live under `scheduling.public.presentation`. They may set brand name/logo, heading/intro copy, bounded CSS colors, disclosure text/version, and page-revision identity without forking the Blade template. The server validates color and public-URL shapes before rendering them.
+
+Scheduling contributes bounded browser event definitions for catalog, availability, time selection, verification, details, validation, and submit-attempt stages. The public script uses Reporting's same-origin client and never includes contact field values in event properties. Completed public Appointments contribute `scheduling.public_booking` durable facts, correlated to the submit-attempt UUID when JavaScript was available. Reporting owns later aggregation and display; Scheduling remains functional when Reporting is disabled.
 
 All public booking, cancellation, and reschedule URLs should resolve from the configured base URL.
 
@@ -215,6 +224,7 @@ service-specific prerequisite collection before authoritative customer-site avai
 non-blocking public slot offers with deterministic hidden-host selection and immutable location commitment snapshots
 separate authoritative public offer-to-hold conversion with full capacity/resource/travel revalidation
 public attendee capture, safe Contact resolution, and replay-safe hold-to-Appointment completion
+privacy-safe public booking funnel observations and producer-owned durable completion facts
 ```
 
 Scheduling does not own message delivery, consent, task lifecycle, portal accounts, form definitions, commerce records, reusable Location identity, address/geocoding provider contracts, or provider adapter internals outside Scheduling-owned calendar, meeting, and travel-resolution contracts.

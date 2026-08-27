@@ -460,7 +460,7 @@
                     </div>
                 </section>
 
-                <x-ui.card class="space-y-4" data-availability-preview>
+                <x-ui.card id="availability-preview" class="space-y-4 scroll-mt-6" data-availability-preview>
                     <div>
                         <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
                             Test availability
@@ -473,7 +473,7 @@
                         </p>
                     </div>
 
-                    <form method="GET" action="{{ route('crm.scheduling.configuration.availability.index') }}" class="grid gap-4 md:grid-cols-2">
+                    <form method="GET" action="{{ route('crm.scheduling.configuration.availability.index').'#availability-preview' }}" class="grid gap-4 md:grid-cols-2">
                         <input type="hidden" name="service_id" value="{{ $selectedService->id }}">
 
                         <label class="{{ $labelClass }}">
