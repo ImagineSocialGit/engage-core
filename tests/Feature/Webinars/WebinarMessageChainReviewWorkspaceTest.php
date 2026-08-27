@@ -32,7 +32,7 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
         );
     }
 
-    public function test_upcoming_webinar_leads_the_workspace_and_opens_channel_first_message_review(): void
+    public function test_workspace_shell_keeps_upcoming_message_review_available(): void
     {
         [$profile] = $this->profileAndChain();
         $series = WebinarSeries::factory()->create([
@@ -105,7 +105,10 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
                     && (int) ($profileData['inherited_profile_id'] ?? 0) === (int) $profile->getKey()
                     && ($profileData['source'] ?? null) === 'series';
             })
+            ->assertSee('data-webinar-workspace-shell', false)
+            ->assertSee('data-webinar-workspace-main', false)
             ->assertSee('data-upcoming-webinars', false)
+            ->assertSee('data-upcoming-webinars-side-panel', false)
             ->assertSee('data-webinar-message-review-button', false)
             ->assertSee(
                 'data-webinar-message-review-modal="'.$webinar->getKey().'"',
@@ -121,12 +124,15 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
             ->assertSee('data-webinar-message-purpose-panel="transactional"', false);
 
         $html = $response->getContent();
-        $upcomingPosition = strpos($html, 'data-upcoming-webinars');
-        $workspacePosition = strpos($html, 'data-webinar-workspace-intro');
+        $workspacePosition = strpos($html, 'data-webinar-workspace-shell');
+        $workspaceMainPosition = strpos($html, 'data-webinar-workspace-main');
+        $upcomingPosition = strpos($html, 'data-upcoming-webinars-side-panel');
 
-        $this->assertNotFalse($upcomingPosition);
         $this->assertNotFalse($workspacePosition);
-        $this->assertLessThan($workspacePosition, $upcomingPosition);
+        $this->assertNotFalse($workspaceMainPosition);
+        $this->assertNotFalse($upcomingPosition);
+        $this->assertLessThan($workspaceMainPosition, $workspacePosition);
+        $this->assertLessThan($upcomingPosition, $workspaceMainPosition);
     }
 
     public function test_occurrence_profile_controls_the_effective_message_review(): void

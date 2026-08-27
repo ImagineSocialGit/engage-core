@@ -2,7 +2,7 @@
 
 ## Message/readiness follow-up
 
-- [x] Make upcoming Webinars the primary CRM workspace section and add channel-first effective MessageChain review/editing with one message visible at a time.
+- [x] UX Phase / 23B1 Webinar workspace hierarchy: make the actual Webinar Workspace the primary CRM surface, keep upcoming sessions in a compact side panel with message/event quick actions, and move series refresh, setup, and testing controls behind task-oriented management.
 - [x] Make Webinar message copy editable directly in the canonical Messaging carousel, including automatic series copy-on-write for shared defaults, published/edit mode at the top, click/tap gutters, touch swipe, and return-to-Webinar editing context.
 
 - [ ] Verify generated Webinar URL schemes through the current public URL/token resolution path.

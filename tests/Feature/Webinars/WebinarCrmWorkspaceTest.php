@@ -88,7 +88,11 @@ class WebinarCrmWorkspaceTest extends TestCase
                     && (int) $webinar->registrations_count === 1;
             })
             ->assertViewHas('registrationAttentionCount', 0)
-            ->assertViewHas('attentionCount', 1);
+            ->assertViewHas('attentionCount', 1)
+            ->assertSee('data-webinar-workspace-shell', false)
+            ->assertSee('data-webinar-workspace-main', false)
+            ->assertSee('data-webinar-workspace-attention', false)
+            ->assertSee('data-upcoming-webinars-side-panel', false);
     }
 
     public function test_workspace_exposes_registration_recovery_as_attention_state(): void
@@ -144,16 +148,14 @@ class WebinarCrmWorkspaceTest extends TestCase
             ))
             ->assertViewHas('providerMissingCount', 1)
             ->assertViewHas('attentionCount', 1)
-            ->assertSee('data-provider-missing-occurrence="'.$missing->getKey().'"', false)
-            ->assertSee('Removed from Zoom');
+            ->assertSee('data-provider-missing-occurrence="'.$missing->getKey().'"', false);
 
         $this->actingAs($user)
             ->get(route('crm.webinar-series.index', ['attention' => 1]))
             ->assertOk()
             ->assertViewHas('webinars', fn (Collection $webinars): bool => $webinars->contains(
                 fn (Webinar $candidate): bool => $candidate->is($missing),
-            ))
-            ->assertSee('This event no longer exists in Zoom');
+            ));
     }
 
     public function test_operator_can_keep_provider_missing_occurrence_for_history(): void

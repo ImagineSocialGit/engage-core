@@ -876,26 +876,39 @@ scope = webinar
 
 Marketing nurture remains Campaign-owned and starts through Campaign/FlowRoutes integration rather than being mislabeled as a transactional Webinar chain.
 
-## Webinar message review UX
+## Webinar workspace and message review UX
 
-The normal Webinar workspace is upcoming-session first.
+The normal CRM surface is workspace-first. The top-level Webinar Workspace owns the primary operator hierarchy: current attention/recovery work is the main panel, while upcoming sessions are a compact side panel. Series creation, Zoom refresh, message-schedule selection, and testing controls are secondary management tasks and stay below the normal operating surface.
+
+The workspace should answer, in order:
+
+```text
+What needs my attention?
+What is coming up next?
+Can I review the messages for that session?
+Where do I inspect event details or history?
+Where do I manage series/setup when I actually need to?
+```
 
 For each upcoming Webinar, operators should be able to review the effective published message sequence without leaving the workspace. Webinars resolves the effective series/profile MessageChain bindings, then consumes Messaging's generic chain presentation seam.
 
 The Webinar review/edit pattern is:
 
 ```text
-Upcoming Webinar
-    -> View messages
-        -> Email / SMS
-        -> Published copy / Edit copy at the top
-        -> one current published message at a time
-        -> human-readable timing and business area
-        -> previous / next plus large click/tap gutters and touch swipe
-        -> Edit replaces the published preview with populated fields
-        -> Save & publish / Cancel
-        -> optional Message Templates or full-sequence link
+Webinar Workspace
+    -> Upcoming session side panel
+        -> View messages
+            -> Email / SMS
+            -> Published copy / Edit copy at the top
+            -> one current published message at a time
+            -> human-readable timing and business area
+            -> previous / next plus large click/tap gutters and touch swipe
+            -> Edit replaces the published preview with populated fields
+            -> Save & publish / Cancel
+            -> optional Message Templates or full-sequence link
 ```
+
+The side panel keeps event-details and registration-page quick access for the same upcoming occurrence. Deep registration recovery, occurrence replacement, and provider-history mechanics remain in the detailed event surface; the workspace summarizes only the decision the operator needs to make.
 
 The series message page uses the same canonical Messaging carousel/editor for both shared defaults and series-owned custom chains.
 

@@ -133,92 +133,281 @@
             </div>
         @endif
 
-        <section data-upcoming-webinars class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <h2 class="text-xl font-black tracking-tight text-slate-950">Upcoming webinars</h2>
-                    <p class="mt-1 text-sm leading-6 text-slate-600">The next sessions currently eligible to run for their series.</p>
+        <section
+            data-webinar-workspace-shell
+            class="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(22rem,0.85fr)] xl:items-start"
+        >
+            <div
+                data-webinar-workspace-main
+                class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
+            >
+                <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="max-w-3xl">
+                        <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
+                            Webinar workspace
+                        </p>
+                        <h2 class="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                            Run webinars from one place.
+                        </h2>
+                        <p class="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
+                            Review anything that needs a decision, check the next sessions, and open the message sequence without digging through setup controls.
+                        </p>
+                    </div>
+
+                    <div class="grid gap-2 sm:flex sm:flex-wrap lg:justify-end">
+                        @if(function_exists('module_enabled') && module_enabled('messaging') && \Illuminate\Support\Facades\Route::has('crm.webinars.message-templates.index'))
+                            <a
+                                href="{{ route('crm.webinars.message-templates.index') }}"
+                                class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-5 text-center text-sm font-extrabold text-white transition hover:bg-slate-800 sm:w-auto"
+                            >
+                                Registration & follow-up messages
+                            </a>
+                        @endif
+
+                        <a
+                            href="#advanced-webinar-setup"
+                            class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-center text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
+                        >
+                            Manage webinar setup
+                        </a>
+                    </div>
                 </div>
+
+                <div class="mt-6 grid gap-3 sm:grid-cols-3">
+                    <div class="rounded-2xl border {{ ($attentionCount ?? 0) > 0 ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50' }} px-4 py-4">
+                        <p class="text-xs font-extrabold uppercase tracking-[0.14em] {{ ($attentionCount ?? 0) > 0 ? 'text-amber-700' : 'text-emerald-700' }}">
+                            Needs attention
+                        </p>
+                        <p class="mt-1 text-2xl font-black {{ ($attentionCount ?? 0) > 0 ? 'text-amber-950' : 'text-emerald-950' }}">
+                            {{ $attentionCount ?? 0 }}
+                        </p>
+                        <p class="mt-1 text-xs leading-5 {{ ($attentionCount ?? 0) > 0 ? 'text-amber-800' : 'text-emerald-800' }}">
+                            {{ ($attentionCount ?? 0) > 0 ? 'Review before normal delivery continues.' : 'Nothing is waiting on you.' }}
+                        </p>
+                    </div>
+
+                    <div class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4">
+                        <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-sky-700">Next sessions shown</p>
+                        <p class="mt-1 text-2xl font-black text-sky-950">{{ ($upcomingWebinars ?? collect())->count() }}</p>
+                        <p class="mt-1 text-xs leading-5 text-sky-800">The next active sessions listed here.</p>
+                    </div>
+
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                        <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-600">Webinar series</p>
+                        <p class="mt-1 text-2xl font-black text-slate-950">{{ ($series ?? collect())->count() }}</p>
+                        <p class="mt-1 text-xs leading-5 text-slate-600">Series available to refresh or manage.</p>
+                    </div>
+                </div>
+
+                <div data-webinar-workspace-attention class="mt-7 border-t border-slate-200 pt-6">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h3 class="text-lg font-black tracking-tight text-slate-950">What needs your attention</h3>
+                                <span class="rounded-full {{ ($attentionCount ?? 0) > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' }} px-2.5 py-1 text-xs font-extrabold">
+                                    {{ $attentionCount ?? 0 }} {{ ($attentionCount ?? 0) === 1 ? 'item' : 'items' }}
+                                </span>
+                            </div>
+                            <p class="mt-1 text-sm leading-6 text-slate-600">
+                                Only work that needs a decision or recovery action appears here.
+                            </p>
+                        </div>
+
+                        @if(($registrationAttentionCount ?? 0) > 0)
+                            <a
+                                href="{{ route('crm.webinar-series.index', ['attention' => 1]) }}"
+                                class="text-sm font-extrabold text-amber-800 underline decoration-amber-300 underline-offset-4 hover:text-amber-950"
+                            >
+                                Open registration recovery
+                            </a>
+                        @endif
+                    </div>
+
+                    @if(($attentionCount ?? 0) === 0)
+                        <div class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-900">
+                            <p class="font-bold">Everything is clear right now.</p>
+                            <p class="mt-1 text-emerald-800">The next webinar can continue on its configured schedule.</p>
+                        </div>
+                    @else
+                        <div class="mt-4 grid gap-3 lg:grid-cols-2">
+                            @foreach(($providerMissingOccurrences ?? collect()) as $missingWebinar)
+                                <article
+                                    data-provider-missing-occurrence="{{ $missingWebinar->getKey() }}"
+                                    class="rounded-2xl border border-amber-200 bg-amber-50/70 p-4"
+                                >
+                                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                                        <div>
+                                            <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-700">Removed from Zoom</p>
+                                            <h4 class="mt-1 text-base font-black text-slate-950">{{ $missingWebinar->title }}</h4>
+                                            <p class="mt-1 text-sm text-slate-600">
+                                                {{ $missingWebinar->starts_at?->copy()->setTimezone($missingWebinar->timezone)->format('M j, Y · g:i A T') ?? 'Start time unavailable' }}
+                                                · {{ (int) ($missingWebinar->registrations_count ?? 0) }} {{ (int) ($missingWebinar->registrations_count ?? 0) === 1 ? 'registration' : 'registrations' }}
+                                            </p>
+                                        </div>
+                                        <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-800">Decision needed</span>
+                                    </div>
+
+                                    <p class="mt-3 text-sm leading-6 text-slate-600">
+                                        This event is no longer on the Zoom schedule. Choose a replacement for active registrants, or keep it for history.
+                                    </p>
+                                    <a
+                                        href="{{ route('crm.webinar-series.index', ['attention' => 1]).'#webinar-'.$missingWebinar->getKey() }}"
+                                        class="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-full bg-amber-700 px-4 text-center text-sm font-extrabold text-white transition hover:bg-amber-600 sm:w-auto"
+                                    >
+                                        Review next step
+                                    </a>
+                                </article>
+                            @endforeach
+
+                            @foreach(($pendingPostEventReviews ?? collect()) as $reviewWebinar)
+                                <article class="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+                                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                                        <div>
+                                            <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-700">Follow-up review</p>
+                                            <h4 class="mt-1 text-base font-black text-slate-950">{{ $reviewWebinar->title }}</h4>
+                                            <p class="mt-1 text-sm text-slate-600">
+                                                {{ (int) ($reviewWebinar->attended_registrations_count ?? 0) }} attended · {{ (int) ($reviewWebinar->missed_registrations_count ?? 0) }} missed
+                                            </p>
+                                        </div>
+                                        <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-800">Waiting</span>
+                                    </div>
+
+                                    <p class="mt-3 text-sm leading-6 text-slate-600">
+                                        Confirm the replay plan before replay-dependent follow-ups continue.
+                                    </p>
+                                    <a
+                                        href="{{ route('crm.webinars.post-event-review.show', $reviewWebinar) }}"
+                                        class="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-full bg-amber-700 px-4 text-center text-sm font-extrabold text-white transition hover:bg-amber-600 sm:w-auto"
+                                    >
+                                        Review follow-ups
+                                    </a>
+                                </article>
+                            @endforeach
+
+                            @if(($registrationAttentionCount ?? 0) > 0)
+                                <article class="rounded-2xl border border-red-200 bg-red-50/70 p-4">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-red-700">Registration recovery</p>
+                                            <h4 class="mt-1 text-base font-black text-slate-950">
+                                                {{ $registrationAttentionCount }} {{ $registrationAttentionCount === 1 ? 'registration needs' : 'registrations need' }} review
+                                            </h4>
+                                        </div>
+                                        <span class="rounded-full bg-red-100 px-2.5 py-1 text-xs font-extrabold text-red-800">Action needed</span>
+                                    </div>
+                                    <p class="mt-3 text-sm leading-6 text-slate-600">
+                                        These registrations did not finish cleanly in Zoom and need a decision before normal confirmation can continue.
+                                    </p>
+                                    <a
+                                        href="{{ route('crm.webinar-series.index', ['attention' => 1]) }}"
+                                        class="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-full bg-red-700 px-4 text-center text-sm font-extrabold text-white transition hover:bg-red-600 sm:w-auto"
+                                    >
+                                        Review registrations
+                                    </a>
+                                </article>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            <aside
+                data-upcoming-webinars
+                data-upcoming-webinars-side-panel
+                class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+            >
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-sky-700">Next on the calendar</p>
+                        <h2 class="mt-1 text-xl font-black tracking-tight text-slate-950">Upcoming webinars</h2>
+                        <p class="mt-1 text-sm leading-6 text-slate-600">Open messages or event details without leaving the workspace.</p>
+                    </div>
+                    <span class="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-extrabold text-sky-700 ring-1 ring-sky-200">
+                        {{ ($upcomingWebinars ?? collect())->count() }}
+                    </span>
+                </div>
+
+                <div class="mt-5 space-y-3">
+                    @forelse(($upcomingWebinars ?? collect()) as $upcomingWebinar)
+                        @php
+                            $upcomingRegistrationUrl = filled($upcomingWebinar->webinarSeries?->slug)
+                                ? route('webinar.show', ['seriesSlug' => $upcomingWebinar->webinarSeries->slug])
+                                : null;
+                            $isLive = $upcomingWebinar->starts_at?->lte(now()) && $upcomingWebinar->ends_at?->gt(now());
+                            $registrationCount = (int) ($upcomingWebinar->registrations_count ?? 0);
+                            $messagePurposeReviews = $upcomingMessagePurposeReviews[$upcomingWebinar->getKey()] ?? [];
+                            $hasMessageReview = collect($messagePurposeReviews)->contains(
+                                fn ($review): bool => is_array($review)
+                                    && (int) ($review['message_count'] ?? 0) > 0,
+                            );
+                        @endphp
+
+                        <article class="rounded-2xl border {{ $isLive ? 'border-emerald-200 bg-emerald-50/70' : 'border-slate-200 bg-slate-50' }} p-4">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="text-[11px] font-extrabold uppercase tracking-[0.14em] {{ $isLive ? 'text-emerald-700' : 'text-slate-500' }}">
+                                        {{ $isLive ? 'Live now' : 'Upcoming' }}
+                                    </p>
+                                    <h3 class="mt-1 truncate text-sm font-black text-slate-950" title="{{ $upcomingWebinar->title }}">
+                                        {{ $upcomingWebinar->title }}
+                                    </h3>
+                                    <p class="mt-1 text-xs text-slate-500">{{ $upcomingWebinar->webinarSeries?->title ?? 'Webinar series' }}</p>
+                                </div>
+                                <span class="shrink-0 rounded-full bg-white px-2 py-1 text-[11px] font-extrabold text-slate-700 ring-1 ring-slate-200">
+                                    {{ $registrationCount }}
+                                </span>
+                            </div>
+
+                            <p class="mt-3 text-sm font-bold text-slate-900">
+                                {{ $upcomingWebinar->starts_at?->copy()->setTimezone($upcomingWebinar->timezone)->format('M j · g:i A T') ?? 'Start time pending' }}
+                            </p>
+
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                @if($hasMessageReview)
+                                    <button
+                                        type="button"
+                                        data-webinar-message-review-button
+                                        x-on:click="openMessageReview({{ $upcomingWebinar->getKey() }})"
+                                        class="inline-flex min-h-8 items-center justify-center rounded-full bg-slate-950 px-3 text-[11px] font-extrabold text-white hover:bg-slate-800"
+                                    >
+                                        View messages
+                                    </button>
+                                @endif
+
+                                <a
+                                    href="#webinar-{{ $upcomingWebinar->getKey() }}"
+                                    class="inline-flex min-h-8 items-center justify-center rounded-full border border-slate-300 bg-white px-3 text-[11px] font-extrabold text-slate-700 hover:bg-slate-100"
+                                >
+                                    Event details
+                                </a>
+
+                                @if($upcomingRegistrationUrl)
+                                    <a
+                                        href="{{ $upcomingRegistrationUrl }}"
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="inline-flex min-h-8 items-center justify-center rounded-full border border-slate-300 bg-white px-3 text-[11px] font-extrabold text-slate-700 hover:bg-slate-100"
+                                    >
+                                        Registration page
+                                    </a>
+                                @endif
+                            </div>
+                        </article>
+                    @empty
+                        <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center">
+                            <p class="font-bold text-slate-900">No upcoming webinars are scheduled.</p>
+                            <p class="mt-1 text-sm text-slate-600">Open webinar setup when you are ready to add or refresh the next series.</p>
+                        </div>
+                    @endforelse
+                </div>
+
                 <a
                     href="#event-operations"
-                    class="text-sm font-extrabold text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
+                    class="mt-4 inline-flex text-sm font-extrabold text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
                 >
-                    View event details & recovery
+                    See all event details
                 </a>
-            </div>
-
-            <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                @forelse(($upcomingWebinars ?? collect()) as $upcomingWebinar)
-                    @php
-                        $upcomingRegistrationUrl = filled($upcomingWebinar->webinarSeries?->slug)
-                            ? route('webinar.show', ['seriesSlug' => $upcomingWebinar->webinarSeries->slug])
-                            : null;
-                        $isLive = $upcomingWebinar->starts_at?->lte(now()) && $upcomingWebinar->ends_at?->gt(now());
-                        $registrationCount = (int) ($upcomingWebinar->registrations_count ?? 0);
-                        $messagePurposeReviews = $upcomingMessagePurposeReviews[$upcomingWebinar->getKey()] ?? [];
-                        $hasMessageReview = collect($messagePurposeReviews)->contains(
-                            fn ($review): bool => is_array($review)
-                                && (int) ($review['message_count'] ?? 0) > 0,
-                        );
-                    @endphp
-
-                    <article class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                            <div>
-                                <p class="text-xs font-extrabold uppercase tracking-[0.14em] {{ $isLive ? 'text-emerald-700' : 'text-slate-500' }}">
-                                    {{ $isLive ? 'Live now' : 'Upcoming' }}
-                                </p>
-                                <h3 class="mt-1 text-base font-black text-slate-950">{{ $upcomingWebinar->title }}</h3>
-                                <p class="mt-1 text-sm text-slate-500">{{ $upcomingWebinar->webinarSeries?->title ?? 'Webinar series' }}</p>
-                            </div>
-                            <span class="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-slate-700 ring-1 ring-slate-200">
-                                {{ $registrationCount }} {{ $registrationCount === 1 ? 'registration' : 'registrations' }}
-                            </span>
-                        </div>
-
-                        <p class="mt-4 text-sm font-bold text-slate-900">
-                            {{ $upcomingWebinar->starts_at?->copy()->setTimezone($upcomingWebinar->timezone)->format('M j, Y · g:i A') ?? 'Start time pending' }}
-                        </p>
-                        <p class="mt-1 text-xs text-slate-500">{{ $upcomingWebinar->timezone }}</p>
-
-                        <div class="mt-4 flex flex-wrap gap-2">
-                            @if($hasMessageReview)
-                                <button
-                                    type="button"
-                                    data-webinar-message-review-button
-                                    x-on:click="openMessageReview({{ $upcomingWebinar->getKey() }})"
-                                    class="inline-flex min-h-9 items-center justify-center rounded-full bg-slate-950 px-3 text-xs font-extrabold text-white hover:bg-slate-800"
-                                >
-                                    View messages
-                                </button>
-                            @endif
-
-                            <a
-                                href="#webinar-{{ $upcomingWebinar->getKey() }}"
-                                class="inline-flex min-h-9 items-center justify-center rounded-full border border-slate-300 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
-                            >
-                                Event details
-                            </a>
-
-                            @if($upcomingRegistrationUrl)
-                                <a
-                                    href="{{ $upcomingRegistrationUrl }}"
-                                    target="_blank"
-                                    rel="noopener"
-                                    class="inline-flex min-h-9 items-center justify-center rounded-full border border-slate-300 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
-                                >
-                                    Registration page
-                                </a>
-                            @endif
-                        </div>
-                    </article>
-                @empty
-                    <div class="md:col-span-2 xl:col-span-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
-                        <p class="font-bold text-slate-900">No upcoming webinars are scheduled.</p>
-                        <p class="mt-1 text-sm text-slate-600">Use Advanced setup when you are ready to add or sync the next occurrence.</p>
-                    </div>
-                @endforelse
-            </div>
+            </aside>
         </section>
 
 @foreach(($upcomingWebinars ?? collect()) as $upcomingWebinar)
@@ -396,154 +585,11 @@
     @endif
 @endforeach
 
-        <section data-webinar-workspace-intro class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-            <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                <div class="max-w-3xl">
-                    <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
-                        Webinar workspace
-                    </p>
-                    <h2 class="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                        Run the next webinar. Review what needs you. Leave the machinery in the background.
-                    </h2>
-                    <p class="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
-                        Upcoming sessions, follow-up reviews, and registration recovery are surfaced first. Provider setup, series maintenance, and testing tools are available below when you actually need them.
-                    </p>
-                </div>
-
-                <div class="grid gap-2 sm:flex sm:flex-wrap">
-                    @if(function_exists('module_enabled') && module_enabled('messaging') && \Illuminate\Support\Facades\Route::has('crm.webinars.message-templates.index'))
-                        <a
-                            href="{{ route('crm.webinars.message-templates.index') }}"
-                            class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-5 text-center text-sm font-extrabold text-white transition hover:bg-slate-800 sm:w-auto"
-                        >
-                            Registration & follow-up messages
-                        </a>
-                    @endif
-
-                    <a
-                        href="#advanced-webinar-setup"
-                        class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-center text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
-                    >
-                        Advanced setup
-                    </a>
-                </div>
-            </div>
-        </section>
-
-        <section class="rounded-3xl border {{ ($attentionCount ?? 0) > 0 ? 'border-amber-200 bg-amber-50/70' : 'border-emerald-200 bg-emerald-50/60' }} p-6 shadow-sm">
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <h2 class="text-xl font-black tracking-tight text-slate-950">Needs attention</h2>
-                        <span class="rounded-full {{ ($attentionCount ?? 0) > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' }} px-2.5 py-1 text-xs font-extrabold">
-                            {{ $attentionCount ?? 0 }} {{ ($attentionCount ?? 0) === 1 ? 'item' : 'items' }}
-                        </span>
-                    </div>
-                    <p class="mt-1 text-sm leading-6 text-slate-600">
-                        Decisions and recovery work that can block confirmations or post-webinar follow-up.
-                    </p>
-                </div>
-
-                @if(($registrationAttentionCount ?? 0) > 0)
-                    <a
-                        href="{{ route('crm.webinar-series.index', ['attention' => 1]) }}"
-                        class="text-sm font-extrabold text-amber-800 underline decoration-amber-300 underline-offset-4 hover:text-amber-950"
-                    >
-                        Open registration recovery
-                    </a>
-                @endif
-            </div>
-
-            @if(($attentionCount ?? 0) === 0)
-                <div class="mt-5 rounded-2xl border border-emerald-200 bg-white/80 px-4 py-4 text-sm text-emerald-900">
-                    <p class="font-bold">Nothing is waiting on you right now.</p>
-                    <p class="mt-1 text-emerald-800">Upcoming webinar delivery can continue on its configured schedule.</p>
-                </div>
-            @else
-                <div class="mt-5 grid gap-3 lg:grid-cols-2">
-                    @foreach(($providerMissingOccurrences ?? collect()) as $missingWebinar)
-                        <article
-                            data-provider-missing-occurrence="{{ $missingWebinar->getKey() }}"
-                            class="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm"
-                        >
-                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                                <div>
-                                    <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-700">Removed from Zoom</p>
-                                    <h3 class="mt-1 text-base font-black text-slate-950">{{ $missingWebinar->title }}</h3>
-                                    <p class="mt-1 text-sm text-slate-600">
-                                        {{ $missingWebinar->starts_at?->copy()->setTimezone($missingWebinar->timezone)->format('M j, Y · g:i A') ?? 'Start time unavailable' }}
-                                        · {{ (int) ($missingWebinar->registrations_count ?? 0) }} {{ (int) ($missingWebinar->registrations_count ?? 0) === 1 ? 'registration' : 'registrations' }}
-                                    </p>
-                                </div>
-                                <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-800">Decision needed</span>
-                            </div>
-
-                            <p class="mt-3 text-sm leading-6 text-slate-600">
-                                This event can no longer accept registrations. Choose a synced replacement, or keep the occurrence for history.
-                            </p>
-                            <a
-                                href="{{ route('crm.webinar-series.index', ['attention' => 1]).'#webinar-'.$missingWebinar->getKey() }}"
-                                class="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-full bg-amber-700 px-4 text-center text-sm font-extrabold text-white transition hover:bg-amber-600 sm:w-auto"
-                            >
-                                Resolve occurrence
-                            </a>
-                        </article>
-                    @endforeach
-
-                    @foreach(($pendingPostEventReviews ?? collect()) as $reviewWebinar)
-                        <article class="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm">
-                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                                <div>
-                                    <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-700">Follow-up review</p>
-                                    <h3 class="mt-1 text-base font-black text-slate-950">{{ $reviewWebinar->title }}</h3>
-                                    <p class="mt-1 text-sm text-slate-600">
-                                        {{ (int) ($reviewWebinar->attended_registrations_count ?? 0) }} attended · {{ (int) ($reviewWebinar->missed_registrations_count ?? 0) }} missed
-                                    </p>
-                                    <p class="mt-2 text-sm leading-6 text-slate-600">
-                                        Confirm the replay plan before replay-dependent follow-ups continue.
-                                    </p>
-                                </div>
-
-                                <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-800">Waiting</span>
-                            </div>
-
-                            <a
-                                href="{{ route('crm.webinars.post-event-review.show', $reviewWebinar) }}"
-                                class="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-full bg-amber-700 px-4 text-center text-sm font-extrabold text-white transition hover:bg-amber-600 sm:w-auto"
-                            >
-                                Review follow-ups
-                            </a>
-                        </article>
-                    @endforeach
-
-                    @if(($registrationAttentionCount ?? 0) > 0)
-                        <article class="rounded-2xl border border-red-200 bg-white p-5 shadow-sm">
-                            <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-red-700">Registration recovery</p>
-                            <h3 class="mt-1 text-base font-black text-slate-950">
-                                {{ $registrationAttentionCount }} {{ $registrationAttentionCount === 1 ? 'registration needs' : 'registrations need' }} review
-                            </h3>
-                            <p class="mt-2 text-sm leading-6 text-slate-600">
-                                These registrations have a failed or ambiguous provider finalization and need an operator decision before normal confirmation can continue.
-                            </p>
-                            <a
-                                href="{{ route('crm.webinar-series.index', ['attention' => 1]) }}"
-                                class="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-full bg-red-700 px-4 text-center text-sm font-extrabold text-white transition hover:bg-red-600 sm:w-auto"
-                            >
-                                Resolve registrations
-                            </a>
-                        </article>
-                    @endif
-                </div>
-            @endif
-        </section>
-
-
-
         <div id="event-operations" class="space-y-6">
             <div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <h2 class="text-sm font-semibold text-slate-900">
-                        {{ $showAttention ? 'Registration recovery' : ($showArchived ? 'Webinar history' : 'Event details & recovery') }}
+                        {{ $showAttention ? 'Registrations that need review' : ($showArchived ? 'Webinar history' : 'Upcoming event details') }}
                     </h2>
 
                     <div class="flex flex-wrap items-center gap-3 text-sm font-medium">
@@ -773,31 +819,31 @@
 
                                         @if($finalizationFailures->isNotEmpty())
                                             <span class="rounded-full bg-red-50 px-2 py-0.5 font-semibold text-red-700 ring-1 ring-red-200">
-                                                {{ $finalizationFailures->count() }} registration finalization {{ $finalizationFailures->count() === 1 ? 'failure' : 'failures' }}
+                                                {{ $finalizationFailures->count() }} registration {{ $finalizationFailures->count() === 1 ? 'problem' : 'problems' }}
                                             </span>
                                         @endif
 
                                         @if($finalizationReconciliations->isNotEmpty())
                                             <span class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-200">
-                                                {{ $finalizationReconciliations->count() }} provider {{ $finalizationReconciliations->count() === 1 ? 'verification' : 'verifications' }} required
+                                                {{ $finalizationReconciliations->count() }} Zoom {{ $finalizationReconciliations->count() === 1 ? 'check' : 'checks' }} needed
                                             </span>
                                         @endif
 
                                         @if($finalizationsPending->isNotEmpty())
                                             <span class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-200">
-                                                {{ $finalizationsPending->count() }} registration {{ $finalizationsPending->count() === 1 ? 'finalization' : 'finalizations' }} pending
+                                                {{ $finalizationsPending->count() }} registration {{ $finalizationsPending->count() === 1 ? 'setup' : 'setups' }} pending
                                             </span>
                                         @endif
 
                                         @if($providerCancellationFailures->isNotEmpty())
                                             <span class="rounded-full bg-red-50 px-2 py-0.5 font-semibold text-red-700 ring-1 ring-red-200">
-                                                {{ $providerCancellationFailures->count() }} provider cancellation {{ $providerCancellationFailures->count() === 1 ? 'failure' : 'failures' }}
+                                                {{ $providerCancellationFailures->count() }} Zoom cancellation {{ $providerCancellationFailures->count() === 1 ? 'problem' : 'problems' }}
                                             </span>
                                         @endif
 
                                         @if($providerCancellationsPending->isNotEmpty())
                                             <span class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-200">
-                                                {{ $providerCancellationsPending->count() }} provider {{ $providerCancellationsPending->count() === 1 ? 'cancellation' : 'cancellations' }} pending
+                                                {{ $providerCancellationsPending->count() }} Zoom {{ $providerCancellationsPending->count() === 1 ? 'cancellation' : 'cancellations' }} pending
                                             </span>
                                         @endif
 
@@ -918,8 +964,8 @@
                                     @if($finalizationFailures->isNotEmpty())
                                         <div class="mt-3 space-y-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900">
                                             <div>
-                                                <p class="font-semibold">Registration finalization needs attention</p>
-                                                <p class="mt-1 text-red-800">These failures are safe to retry because no ambiguous provider submission remains unresolved.</p>
+                                                <p class="font-semibold">Registration setup needs attention</p>
+                                                <p class="mt-1 text-red-800">These registrations did not finish correctly and can be retried safely.</p>
                                             </div>
 
                                             @foreach($finalizationFailures as $failedRegistration)
@@ -937,7 +983,7 @@
                                                             type="submit"
                                                             class="inline-flex items-center rounded-md bg-red-700 px-2.5 py-1.5 font-semibold text-white hover:bg-red-600"
                                                         >
-                                                            Retry finalization
+                                                            Retry registration
                                                         </button>
                                                     </form>
                                                 </div>
@@ -948,8 +994,8 @@
                                     @if($finalizationReconciliations->isNotEmpty())
                                         <div class="mt-3 space-y-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
                                             <div>
-                                                <p class="font-semibold">Provider verification required</p>
-                                                <p class="mt-1 text-amber-900">Check the provider’s registrant list first. Do not authorize resubmission until you have confirmed the registration is absent.</p>
+                                                <p class="font-semibold">Check Zoom before retrying</p>
+                                                <p class="mt-1 text-amber-900">Check this registration in Zoom first. Only retry if the person is not already registered there.</p>
                                             </div>
 
                                             @foreach($finalizationReconciliations as $reconciliationRegistration)
@@ -965,7 +1011,7 @@
                                                         <input type="hidden" name="decision" value="provider_exists">
 
                                                         <label class="grid gap-1 font-semibold text-emerald-950">
-                                                            Provider registrant ID
+                                                            Zoom registrant ID
                                                             <input
                                                                 type="text"
                                                                 name="provider_registrant_id"
@@ -976,7 +1022,7 @@
                                                         </label>
 
                                                         <label class="grid gap-1 font-semibold text-emerald-950">
-                                                            Provider join URL
+                                                            Zoom join link
                                                             <input
                                                                 type="url"
                                                                 name="provider_join_url"
@@ -994,7 +1040,7 @@
 
                                                         <div class="sm:col-span-2">
                                                             <button type="submit" class="rounded-md bg-emerald-700 px-2.5 py-1.5 font-semibold text-white hover:bg-emerald-600">
-                                                                Confirm provider registration exists
+                                                                Confirm registration exists in Zoom
                                                             </button>
                                                         </div>
                                                     </form>
@@ -1021,7 +1067,7 @@
 
                                     @if($providerCancellationFailures->isNotEmpty())
                                         <div class="mt-3 space-y-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900">
-                                            <p class="font-semibold">Provider cancellation needs attention</p>
+                                            <p class="font-semibold">Zoom cancellation needs attention</p>
 
                                             @foreach($providerCancellationFailures as $failedRegistration)
                                                 <div class="flex flex-wrap items-center justify-between gap-2">
@@ -1036,7 +1082,7 @@
                                                             type="submit"
                                                             class="inline-flex items-center rounded-md bg-red-700 px-2.5 py-1.5 font-semibold text-white hover:bg-red-600"
                                                         >
-                                                            Retry provider cancellation
+                                                            Retry Zoom cancellation
                                                         </button>
                                                     </form>
                                                 </div>
@@ -1502,8 +1548,8 @@
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">Operator setup</p>
-                            <h2 class="mt-1 text-lg font-black text-slate-950">Advanced setup & provider tools</h2>
-                            <p class="mt-1 text-sm text-slate-600">Create or sync series, change provider type or schedule profiles, and access dev/staging testing controls.</p>
+                            <h2 class="mt-1 text-lg font-black text-slate-950">Manage webinar setup</h2>
+                            <p class="mt-1 text-sm text-slate-600">Add webinar series, refresh dates from Zoom, choose message schedules, and open testing tools when they are available.</p>
                         </div>
                         <span class="text-sm font-extrabold text-slate-700">Open setup</span>
                     </div>
@@ -1511,15 +1557,15 @@
 
                 @if($webinarDevEnabled ?? $webinarSmokeEnabled ?? false)
                     <div class="mt-5 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
-                        <p class="font-semibold">Dev/staging webinar testing is enabled.</p>
-                        <p class="mt-1 text-indigo-800">Testing buttons on event rows expose forced sends, join simulation, attendance outcomes, replay URLs, and post-event follow-up controls.</p>
+                        <p class="font-semibold">Webinar testing tools are available in this environment.</p>
+                        <p class="mt-1 text-indigo-800">Testing buttons on event rows let you rehearse messages, joins, attendance outcomes, replay links, and follow-up behavior without changing the normal workspace.</p>
                     </div>
                 @endif
 
                 <div class="mt-5 grid gap-6 xl:grid-cols-3">
                     <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
                         <h2 class="text-base font-semibold text-slate-900">
-                            Add Series
+                            Add a webinar series
                         </h2>
 
                     <form method="POST" action="{{ route('crm.webinar-series.store') }}" class="mt-4 space-y-4">
@@ -1527,7 +1573,7 @@
 
                         <div>
                             <label for="title" class="block text-sm font-medium text-slate-700">
-                                Series Title
+                                Series name
                             </label>
 
                             <input
@@ -1574,21 +1620,21 @@
                         </div>
 
                         <p class="text-xs leading-5 text-slate-500">
-                            This selects the provider adapter used for future synchronization. Existing occurrences are never retyped automatically.
+                            Choose whether this series uses Zoom Webinar or Zoom Meeting. This affects future schedule refreshes only; existing events keep their recorded type.
                         </p>
 
                         <button
                             type="submit"
                             class="inline-flex w-full items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 sm:w-auto"
                         >
-                            Add Series
+                            Add a webinar series
                         </button>
                     </form>
                 </div>
 
                 <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
                     <h2 class="text-base font-semibold text-slate-900">
-                        Sync Series
+                        Refresh webinar dates
                     </h2>
 
                     <form method="POST" action="{{ route('crm.webinar-series.sync') }}" class="mt-4 space-y-4">
@@ -1596,7 +1642,7 @@
 
                         <div>
                             <label for="webinar_series_id" class="block text-sm font-medium text-slate-700">
-                                Webinar Series
+                                Which series?
                             </label>
 
                             <select
@@ -1629,7 +1675,7 @@
                             type="submit"
                             class="inline-flex w-full items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 sm:w-auto"
                         >
-                            Sync from Zoom
+                            Refresh from Zoom
                         </button>
                     </form>
                 </div>
@@ -1637,7 +1683,7 @@
                 @if($series->isNotEmpty())
                     <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
                         <h2 class="text-base font-semibold text-slate-900">
-                            Series
+                            Manage existing series
                         </h2>
 
                         <div class="mt-4 space-y-2">
@@ -1651,7 +1697,7 @@
                                                     Zoom {{ $providerEventTypeOptions[$seriesItem->providerEventTypeKey()] ?? \Illuminate\Support\Str::headline($seriesItem->providerEventTypeKey()) }}
                                                 </span>
                                                 <span class="text-slate-500">
-                                                    Schedule: {{ $seriesItem->webinarScheduleProfile?->name ?? (($scheduleProfiles ?? collect())->firstWhere('is_default', true)?->name ?? 'Default profile') }}
+                                                    Message schedule: {{ $seriesItem->webinarScheduleProfile?->name ?? (($scheduleProfiles ?? collect())->firstWhere('is_default', true)?->name ?? 'Default') }}
                                                 </span>
                                             </div>
                                         </div>
@@ -1681,7 +1727,7 @@
 
                                     <div class="mt-3 flex flex-col items-start gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                                         <span class="text-xs font-semibold {{ $hasCustomMessageChains ? 'text-indigo-700' : 'text-slate-600' }}">
-                                            {{ $hasCustomMessageChains ? 'Custom message chain' : 'Uses profile message chain' }}
+                                            {{ $hasCustomMessageChains ? 'Custom message sequence' : 'Uses default message sequence' }}
                                         </span>
 
                                         <a
@@ -1721,12 +1767,12 @@
                                                 type="submit"
                                                 class="w-full rounded-lg border border-indigo-300 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 sm:w-auto"
                                             >
-                                                Save type
+                                                Save Zoom type
                                             </button>
                                         </div>
 
                                         <p class="text-[11px] leading-4 text-slate-500">
-                                            Changes future provider sync only. Existing occurrences remain historically typed.
+                                            This affects future Zoom refreshes only. Existing events keep their recorded type.
                                         </p>
                                     </form>
 
@@ -1742,9 +1788,9 @@
                                             <select
                                                 name="webinar_schedule_profile_id"
                                                 class="w-full min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-0"
-                                                aria-label="Webinar schedule profile for {{ $seriesItem->title }}"
+                                                aria-label="Message schedule for {{ $seriesItem->title }}"
                                             >
-                                                <option value="">Use default profile</option>
+                                                <option value="">Use default message schedule</option>
                                                 @foreach($scheduleProfiles as $scheduleProfile)
                                                     <option
                                                         value="{{ $scheduleProfile->getKey() }}"
@@ -1759,7 +1805,7 @@
                                                 type="submit"
                                                 class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto"
                                             >
-                                                Save
+                                                Save schedule
                                             </button>
                                         </form>
                                     @endif
