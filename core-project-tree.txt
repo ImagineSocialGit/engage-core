@@ -494,7 +494,8 @@
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
-│   │   │   │   │   └── FormsController.php
+│   │   │   │   │   ├── FormsController.php
+│   │   │   │   │   └── FormSubmissionController.php
 │   │   │   │   └── External
 │   │   │   │       ├── ExternalFormIntakeController.php
 │   │   │   │       └── ExternalPublishedFormController.php
@@ -533,6 +534,7 @@
 │   │   │   │   ├── FormsSurfaceReadService.php
 │   │   │   │   ├── FormSubmissionConsentIntentResolver.php
 │   │   │   │   ├── FormSubmissionContactMapper.php
+│   │   │   │   ├── FormSubmissionReadService.php
 │   │   │   │   ├── FormSubmissionValidator.php
 │   │   │   │   ├── FormSubmissionVerificationPolicy.php
 │   │   │   │   └── PublishedFormResolver.php
@@ -2257,7 +2259,10 @@
 │       │   │       ├── navigation.blade.php
 │       │   │       └── point-fields.blade.php
 │       │   ├── forms
-│       │   │   └── index.blade.php
+│       │   │   ├── index.blade.php
+│       │   │   └── submissions
+│       │   │       ├── index.blade.php
+│       │   │       └── show.blade.php
 │       │   ├── inbound-messaging
 │       │   │   ├── email-routes
 │       │   │   │   └── index.blade.php
@@ -2552,6 +2557,7 @@
 │   │   │   ├── FormSubmissionConsentIntentResolverTest.php
 │   │   │   ├── FormSubmissionMessagingConsentBridgeTest.php
 │   │   │   ├── FormSubmissionVerificationTest.php
+│   │   │   ├── FormSubmissionWorkspaceTest.php
 │   │   │   ├── IssueExternalFormIntakeSecretCommandTest.php
 │   │   │   └── PublishedFormRuntimeTest.php
 │   │   ├── InboundMessaging
@@ -2911,4 +2917,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-695 directories, 2217 files
+696 directories, 2222 files

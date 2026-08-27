@@ -119,6 +119,16 @@
                                 </ol>
                             </section>
                         </div>
+
+                        <div class="mt-6 border-t border-slate-100 pt-5">
+                            <a
+                                href="{{ route('crm.forms.submissions.index', ['formDefinition' => $form['key']]) }}"
+                                class="inline-flex items-center rounded-xl px-4 py-2 text-sm font-semibold ring-1 transition {{ module_tone('forms', 'badge') }} hover:brightness-95"
+                                data-form-submissions-link="{{ $form['key'] }}"
+                            >
+                                View submissions
+                            </a>
+                        </div>
                     </article>
                 @endforeach
             </section>
