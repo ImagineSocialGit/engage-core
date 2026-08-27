@@ -43,7 +43,7 @@ class LoginController extends Controller
         $request->session()->regenerate();
 
         return redirect()->intended(
-            'https://crm.'.config('app.root_domain')
+            (string) config('app.crm_url')
         );
     }
 
