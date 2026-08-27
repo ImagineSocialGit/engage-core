@@ -2,6 +2,8 @@
 
 namespace App\Modules\Scheduling\Requests;
 
+use App\Modules\Scheduling\Models\BookableService;
+use App\Modules\Scheduling\Models\BookingHold;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CompletePublicBookingRequest extends FormRequest
@@ -32,7 +34,12 @@ class CompletePublicBookingRequest extends FormRequest
             'first_name' => ['bail', 'required', 'string', 'max:120'],
             'last_name' => ['bail', 'required', 'string', 'max:120'],
             'email' => ['bail', 'required', 'string', 'email:rfc', 'max:255'],
-            'phone' => ['bail', 'nullable', 'string', 'regex:/^\+[1-9]\d{6,14}$/D'],
+            'phone' => [
+                'bail',
+                $this->requiresPhoneForAppointment() ? 'required' : 'nullable',
+                'string',
+                'regex:/^\+[1-9]\d{6,14}$/D',
+            ],
             'public_submission_attempt_id' => ['bail', 'nullable', 'uuid'],
             'name' => ['prohibited'],
             'contact_id' => ['prohibited'],
@@ -49,6 +56,16 @@ class CompletePublicBookingRequest extends FormRequest
             'confirmed_at' => ['prohibited'],
             'capacity' => ['prohibited'],
             'offer_id' => ['prohibited'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'phone.required' => 'Enter the phone number to use for this phone appointment.',
         ];
     }
 
@@ -88,6 +105,21 @@ class CompletePublicBookingRequest extends FormRequest
         return is_string($attemptId) && trim($attemptId) !== ''
             ? strtolower(trim($attemptId))
             : null;
+    }
+
+    private function requiresPhoneForAppointment(): bool
+    {
+        $holdId = $this->route('holdId');
+
+        if (! is_string($holdId) || trim($holdId) === '') {
+            return false;
+        }
+
+        return BookingHold::query()
+            ->where('hold_id', trim($holdId))
+            ->where('status', BookingHold::STATUS_ACTIVE)
+            ->where('location_type', BookableService::LOCATION_TYPE_PHONE)
+            ->exists();
     }
 
     private function trimmed(string $key): mixed

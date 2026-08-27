@@ -834,6 +834,37 @@ class PublicBookingController extends Controller
             : 'UTC';
     }
 
+    private function publicTimezoneLabel(string $timezone): string
+    {
+        return match ($timezone) {
+            'UTC', 'Etc/UTC' => 'UTC',
+            'America/New_York',
+            'America/Detroit',
+            'America/Indiana/Indianapolis',
+            'America/Kentucky/Louisville' => 'Eastern Time',
+            'America/Chicago',
+            'America/Indiana/Knox',
+            'America/Menominee',
+            'America/North_Dakota/Center' => 'Central Time',
+            'America/Denver',
+            'America/Boise' => 'Mountain Time',
+            'America/Phoenix' => 'Arizona Time',
+            'America/Los_Angeles' => 'Pacific Time',
+            'America/Anchorage' => 'Alaska Time',
+            'Pacific/Honolulu' => 'Hawaii Time',
+            default => str_replace('_', ' ', $timezone),
+        };
+    }
+
+    private function publicAppointmentMethodLabel(?string $locationType): ?string
+    {
+        return match ($locationType) {
+            BookableService::LOCATION_TYPE_PHONE => 'Phone call',
+            BookableService::LOCATION_TYPE_VIRTUAL => 'Virtual meeting',
+            default => null,
+        };
+    }
+
     private function maximumPublicDate(
         BookableService $service,
         CarbonImmutable $today,
@@ -960,9 +991,8 @@ class PublicBookingController extends Controller
                 .' – '
                 .$endsAt->format('D, M j, Y \a\t g:i A'),
             'timezone' => $timezone,
-            'appointment_format' => $service->resolvedAppointmentConfiguration()['appointment_format'],
-            'appointment_format_label' => $service->appointmentFormatLabel(),
-            'appointment_method_label' => $service->appointmentMethodLabel(),
+            'timezone_label' => $this->publicTimezoneLabel($timezone),
+            'appointment_method_label' => $this->publicAppointmentMethodLabel($offer->location_type),
             'location_type' => $offer->location_type,
             'location_label' => is_string($locationDetails['label'] ?? null)
                 ? $locationDetails['label']
@@ -1019,9 +1049,8 @@ class PublicBookingController extends Controller
                 .' – '
                 .$endsAt->format('D, M j, Y \a\t g:i A'),
             'timezone' => $timezone,
-            'appointment_format' => $service->resolvedAppointmentConfiguration()['appointment_format'],
-            'appointment_format_label' => $service->appointmentFormatLabel(),
-            'appointment_method_label' => $service->appointmentMethodLabel(),
+            'timezone_label' => $this->publicTimezoneLabel($timezone),
+            'appointment_method_label' => $this->publicAppointmentMethodLabel($hold->location_type),
             'location_type' => $hold->location_type,
             'location_label' => is_string($locationDetails['label'] ?? null)
                 ? $locationDetails['label']

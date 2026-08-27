@@ -321,6 +321,57 @@ class PublicBookingCompletionTest extends TestCase
         $this->assertSame(BookingHold::STATUS_ACTIVE, $hold->fresh()->status);
     }
 
+    public function test_phone_appointments_require_a_phone_number_for_public_completion(): void
+    {
+        CarbonImmutable::setTestNow('2026-07-24 12:00:00 UTC');
+        $this->registerPublicSurface('https://schedule.test');
+
+        $service = BookableService::factory()->create([
+            'key' => 'phone-consultation',
+            'name' => 'Phone Consultation',
+            'duration_minutes' => 60,
+            'slot_interval_minutes' => 60,
+            'booking_horizon_days' => 10,
+            'timezone' => 'UTC',
+            'appointment_format' => BookableService::APPOINTMENT_FORMAT_REMOTE,
+            'in_person_arrangement' => null,
+            'remote_method' => BookableService::REMOTE_METHOD_PHONE,
+            'location_type' => BookableService::LOCATION_TYPE_PHONE,
+            'capacity' => 1,
+            'requires_confirmation' => false,
+            'is_public' => true,
+        ]);
+        $hold = $this->activeHold($service, '2026-07-25 15:00:00 UTC');
+        $holdUrl = 'https://schedule.test/book/'.$hold->hold_id;
+
+        $this->get($holdUrl)
+            ->assertOk()
+            ->assertSee('data-phone-required="true"', false);
+
+        $this->from($holdUrl)
+            ->post($holdUrl, [
+                'first_name' => 'Phone',
+                'last_name' => 'Visitor',
+                'email' => 'phone@example.test',
+            ])
+            ->assertRedirect($holdUrl)
+            ->assertSessionHasErrors('phone');
+
+        $this->assertDatabaseCount('contacts', 0);
+        $this->assertDatabaseCount('appointments', 0);
+        $this->assertSame(BookingHold::STATUS_ACTIVE, $hold->fresh()->status);
+
+        $this->post($holdUrl, [
+            'first_name' => 'Phone',
+            'last_name' => 'Visitor',
+            'email' => 'phone@example.test',
+            'phone' => '(555) 555-0167',
+        ])->assertRedirect($holdUrl);
+
+        $this->assertSame('+15555550167', Contact::query()->sole()->phone);
+        $this->assertSame(BookingHold::STATUS_CONVERTED, $hold->fresh()->status);
+    }
+
     public function test_public_completion_route_is_isolated_to_the_configured_host(): void
     {
         CarbonImmutable::setTestNow('2026-07-24 12:00:00 UTC');
@@ -351,6 +402,10 @@ class PublicBookingCompletionTest extends TestCase
             'slot_interval_minutes' => 60,
             'booking_horizon_days' => 10,
             'timezone' => 'UTC',
+            'appointment_format' => BookableService::APPOINTMENT_FORMAT_REMOTE,
+            'in_person_arrangement' => null,
+            'remote_method' => BookableService::REMOTE_METHOD_VIRTUAL_MEETING,
+            'location_type' => BookableService::LOCATION_TYPE_VIRTUAL,
             'capacity' => 1,
             'requires_confirmation' => $requiresConfirmation,
             'is_public' => true,

@@ -202,8 +202,11 @@
                             @error('email')<span class="error">{{ $message }}</span>@enderror
                         </label>
                         <label class="field" for="phone">
-                            Mobile phone <span class="muted">(optional)</span>
-                            <input id="phone" name="phone" type="tel" value="{{ old('phone', $contactPrefill['phone']) }}" autocomplete="tel" inputmode="tel" maxlength="24" placeholder="(555) 555-0123" data-phone-mask @readonly($contactPrefill['verified_channel'] === 'sms')>
+                            Phone number
+                            @if(($holdSummary['location_type'] ?? null) !== 'phone')
+                                <span class="muted">(optional)</span>
+                            @endif
+                            <input id="phone" name="phone" type="tel" value="{{ old('phone', $contactPrefill['phone']) }}" autocomplete="tel" inputmode="tel" maxlength="24" placeholder="(555) 555-0123" data-phone-mask data-phone-required="{{ ($holdSummary['location_type'] ?? null) === 'phone' ? 'true' : 'false' }}" @required(($holdSummary['location_type'] ?? null) === 'phone') @readonly($contactPrefill['verified_channel'] === 'sms')>
                             @if($contactPrefill['verified_channel'] === 'sms')<span class="verified-note">Verified phone number</span>@endif
                             @error('phone')<span class="error">{{ $message }}</span>@enderror
                         </label>

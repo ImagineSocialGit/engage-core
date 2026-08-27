@@ -320,6 +320,10 @@ class PublicBookingDestinationVerificationEnforcementTest extends TestCase
             'slot_interval_minutes' => 60,
             'booking_horizon_days' => 10,
             'timezone' => 'UTC',
+            'appointment_format' => BookableService::APPOINTMENT_FORMAT_REMOTE,
+            'in_person_arrangement' => null,
+            'remote_method' => BookableService::REMOTE_METHOD_VIRTUAL_MEETING,
+            'location_type' => BookableService::LOCATION_TYPE_VIRTUAL,
             'capacity' => 1,
             'is_public' => true,
         ]);

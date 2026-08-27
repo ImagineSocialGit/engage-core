@@ -15,33 +15,34 @@
     @endunless
     <div>
         <dt>Time zone</dt>
-        <dd>{{ str_replace('_', ' ', $summary['timezone']) }}</dd>
+        <dd data-appointment-timezone="{{ $summary['timezone'] }}">{{ $summary['timezone_label'] ?? str_replace('_', ' ', $summary['timezone']) }}</dd>
     </div>
-    <div>
-        <dt>Format</dt>
-        <dd>{{ $summary['appointment_format_label'] ?? 'Appointment' }}</dd>
-    </div>
-    <div>
-        <dt>{{ ($summary['appointment_format'] ?? null) === 'in_person' ? 'Where you’ll meet' : 'How you’ll meet' }}</dt>
-        <dd>{{ $summary['appointment_method_label'] ?? 'Details provided after booking' }}</dd>
-    </div>
-    <div class="wide">
-        <dt>{{ ($summary['location_label'] ?? null) ?: 'What to expect' }}</dt>
-        <dd>
-            @if($summary['location_address'])
-                {{ $summary['location_address'] }}
-            @elseif($summary['location_type'] === 'phone')
-                At the scheduled time, the team will call the phone number you provide.
-            @elseif($summary['location_type'] === 'virtual')
-                Online meeting details will be provided by the team.
-            @elseif($summary['location_type'] === 'customer_site')
-                The appointment will take place at the address you provided.
-            @else
-                Location details will be provided by the team.
-            @endif
-            @if($summary['location_instructions'] ?? null)
-                <br><span class="muted">{{ $summary['location_instructions'] }}</span>
-            @endif
-        </dd>
-    </div>
+
+    @if(in_array($summary['location_type'] ?? null, ['fixed', 'customer_site'], true))
+        <div class="wide" data-appointment-summary="meeting" data-appointment-meeting-method="in_person">
+            <dt>Where you’ll meet</dt>
+            <dd data-appointment-location-address>
+                {{ $summary['location_address'] ?? 'Location details will be provided by the team.' }}
+            </dd>
+        </div>
+    @else
+        <div class="wide" data-appointment-summary="meeting" data-appointment-meeting-method="{{ $summary['location_type'] ?? 'unknown' }}">
+            <dt>How you’ll meet</dt>
+            <dd>
+                {{ $summary['appointment_method_label'] ?? 'Details provided after booking' }}
+                @if(($summary['location_type'] ?? null) === 'phone')
+                    <br><span class="muted">At the scheduled time, the team will call the phone number you provide.</span>
+                @elseif(($summary['location_type'] ?? null) === 'virtual')
+                    <br><span class="muted">Online meeting details will be provided by the team.</span>
+                @endif
+            </dd>
+        </div>
+    @endif
+
+    @if($summary['location_instructions'] ?? null)
+        <div class="wide" data-appointment-summary="preparation">
+            <dt>Before your appointment</dt>
+            <dd>{{ $summary['location_instructions'] }}</dd>
+        </div>
+    @endif
 </dl>
