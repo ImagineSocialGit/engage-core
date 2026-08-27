@@ -146,9 +146,26 @@ non-authoritative because it does not prove that the provider series is empty.
 Malformed or incomplete provider pagination is also non-authoritative.
 
 A non-authoritative snapshot may import valid returned webinars, but it must not
-identify local webinars as missing. An authoritative snapshot may report missing
-candidates for operator review, but provider synchronization must never delete or
-archive local webinars automatically. Removal is a separate, explicit workflow.
+identify local webinars as missing. An authoritative snapshot moves a previously
+active local occurrence that is absent from the provider result to the first-class
+`missing` lifecycle state. That transition immediately removes the occurrence from
+upcoming and public-registration resolution while preserving the occurrence,
+registrations, Messaging history, attendance evidence, and replacement links.
+
+Provider synchronization must never delete or archive a local occurrence automatically.
+The CRM Needs attention surface explains that the event was removed from Zoom and offers
+two explicit outcomes: replace the occurrence with another active synced occurrence, or
+move it to the `archived` lifecycle state as retained history. If the same provider event
+appears in a later authoritative or non-authoritative fetch, synchronization restores it
+to `active` and clears the provider-missing/archive timestamps.
+
+The durable lifecycle contract is:
+
+```text
+active   -> eligible for upcoming/registerable resolution
+missing  -> absent from an authoritative provider snapshot; operator decision required
+archived -> explicitly kept for history; never registerable
+```
 
 Provider-owned metadata belongs under this namespace:
 

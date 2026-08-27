@@ -5,6 +5,7 @@ namespace Tests\Feature\ProjectState;
 use App\Modules\Core\Models\Contact;
 use App\Support\ProjectState\ProjectStateContractRegistry;
 use App\Support\ProjectState\ProjectStateManager;
+use App\Support\Webhooks\Models\WebhookInboxReceipt;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Schema\Builder as SchemaBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -149,63 +150,63 @@ class ProjectStateCoverageContractTest extends TestCase
         app(ProjectStateManager::class)->export();
     }
 
-    public function test_export_is_blocked_when_operational_receipts_are_not_terminal(): void
+    public function test_export_is_blocked_when_webhook_receipts_are_not_terminal(): void
     {
         $now = now()->startOfSecond();
 
-        DB::table('inbound_message_receipts')->insert([
-            'inbound_message_id' => null,
+        WebhookInboxReceipt::query()->create([
             'client_key' => 'test-client',
             'provider' => 'telnyx',
             'provider_event_id' => 'event-1',
-            'provider_message_id' => null,
-            'provider_event_key' => hash('sha256', 'event-1'),
-            'provider_message_key' => null,
-            'status' => 'processing',
+            'signature_fingerprint' => null,
+            'receipt_key' => hash('sha256', 'test-client|telnyx|event|event-1'),
+            'event_type' => 'message.received',
+            'payload_fingerprint' => hash('sha256', 'event-1-payload'),
+            'payload' => ['event_id' => 'event-1'],
+            'status' => WebhookInboxReceipt::STATUS_PROCESSING,
             'attempts' => 1,
-            'response_message' => null,
+            'claim_token' => 'claim-event-1',
+            'claim_expires_at' => $now->copy()->addMinutes(5),
             'last_error' => null,
             'last_attempted_at' => $now,
             'completed_at' => null,
-            'created_at' => $now,
-            'updated_at' => $now,
         ]);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'Project-state export is blocked because [inbound_message_receipts] contains 1 nonterminal row(s) in [status].'
+            'Project-state export is blocked because [webhook_inbox_receipts] contains 1 nonterminal row(s) in [status].'
         );
 
         app(ProjectStateManager::class)->export();
     }
 
-    public function test_terminal_operational_receipts_do_not_block_export(): void
+    public function test_terminal_webhook_receipts_do_not_block_export(): void
     {
         $now = now()->startOfSecond();
 
-        DB::table('inbound_message_receipts')->insert([
-            'inbound_message_id' => null,
+        WebhookInboxReceipt::query()->create([
             'client_key' => 'test-client',
             'provider' => 'telnyx',
             'provider_event_id' => 'event-2',
-            'provider_message_id' => null,
-            'provider_event_key' => hash('sha256', 'event-2'),
-            'provider_message_key' => null,
-            'status' => 'completed',
+            'signature_fingerprint' => null,
+            'receipt_key' => hash('sha256', 'test-client|telnyx|event|event-2'),
+            'event_type' => 'message.received',
+            'payload_fingerprint' => hash('sha256', 'event-2-payload'),
+            'payload' => ['event_id' => 'event-2'],
+            'status' => WebhookInboxReceipt::STATUS_COMPLETED,
             'attempts' => 1,
-            'response_message' => null,
+            'claim_token' => null,
+            'claim_expires_at' => null,
             'last_error' => null,
             'last_attempted_at' => $now,
             'completed_at' => $now,
-            'created_at' => $now,
-            'updated_at' => $now,
         ]);
 
         $document = app(ProjectStateManager::class)->export();
 
         $this->assertSame((int) config('project_state.version'), $document['version']);
         $this->assertArrayNotHasKey(
-            'inbound_message_receipts',
+            'webhook_inbox_receipts',
             $document['sections']['core']['tables'],
         );
     }

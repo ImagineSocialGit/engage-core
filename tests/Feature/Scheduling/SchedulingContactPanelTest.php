@@ -231,6 +231,7 @@ class SchedulingContactPanelTest extends TestCase
 
         $response = $this->actingAs($user)
             ->post(route('crm.scheduling.appointments.store'), [
+                'attendee_mode' => 'contact',
                 'contact_id' => $contact->id,
                 'bookable_service_id' => $service->id,
                 'scheduling_host_id' => null,

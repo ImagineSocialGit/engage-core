@@ -80,12 +80,6 @@ return [
     ],
 
 
-    'inbound_message_receipts' => [
-        'mode' => 'terminal_only',
-        'column' => 'status',
-        'values' => ['completed'],
-        'reason' => 'Inbound receipt processing must be fully completed before export.',
-    ],
     'webhook_inbox_receipts' => [
         'mode' => 'terminal_only',
         'column' => 'status',

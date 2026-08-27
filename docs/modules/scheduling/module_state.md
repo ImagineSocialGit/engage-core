@@ -37,8 +37,8 @@ Developer/operator-facing setup may own the more complex work:
 
 ```text
 Define bookable services.
-Assign hosts.
-Configure availability and blackout rules.
+Assign hosts when explicit staff/provider assignment is needed.
+Configure advanced staff/resource/capacity scheduling policy when needed.
 Connect external calendar providers.
 Wire reminders and follow-up behavior.
 ```
@@ -64,9 +64,11 @@ SchedulingHost remains the internal model name, but normal client-facing setup u
 
 Resources remain an advanced capability for rooms, equipment, or other limited shared items and should not dominate basic Scheduling setup.
 
-The availability engine remains generalized and authoritative. Its CRM authoring surface is the next dedicated UX pass: normal users should primarily express normal hours, exceptions, and unavailable times rather than reason about rule shape, union/intersection, or raw capacity mechanics.
+The availability engine remains generalized and authoritative, but the normal CRM authoring surface no longer asks users to think in generalized rule-engine terms. The service-first availability workspace now centers on regular weekly hours, one-off special hours, and whole/partial time off. Multiple time ranges per day are supported, one-off changes may be removed so regular hours apply again, and the live test surface resolves actual bookable times through the authoritative engine. For fixed-duration services, consecutive valid appointment starts are summarized as start-time ranges while the exact underlying slot instants remain authoritative and selectable.
 
-Any specialized term that must remain visible follows the shared UI/UX rule: explain it visibly below the control when understanding is important to the current decision, or use an accessible hover/focus/tap help affordance for secondary repeated terminology.
+Advanced rule authoring remains available behind progressive disclosure for staff-specific availability, capacity overrides, provider/system diagnosis, and uncommon scheduling policies. Normal Scheduling setup does not expose the engine's union/intersection precedence model.
+
+Any specialized term that must remain visible follows the shared UI/UX rule: explain it visibly below the control when understanding is important to the current decision, or use an accessible hover/focus/tap/click help affordance for secondary repeated terminology.
 
 ## Universal public booking surface
 
@@ -976,32 +978,33 @@ Direct creation derives phone, virtual, and fixed snapshots from locked service 
 
 `SchedulingReadService` provides the first read-side boundary for CRM Scheduling. It returns active services, active assigned hosts, bounded date availability, and upcoming operational Appointments without placing Scheduling query rules in the controller or Blade view.
 
-The authenticated `/scheduling` workspace is guarded by `module:scheduling` and appears through the module-driven CRM navigation registry. It presents upcoming `pending`, `scheduled`, and `confirmed` Appointments, highlights the pending-confirmation count, and provides a quick creation flow for an existing Contact.
+The authenticated `/scheduling` workspace is guarded by `module:scheduling` and appears through the module-driven CRM navigation registry. It presents upcoming `pending`, `scheduled`, and `confirmed` Appointments, highlights the pending-confirmation count, and provides a quick creation flow that does not require an attendee to already exist as a Contact.
 
-The creation flow is:
+The operator explicitly chooses one attendee mode:
 
 ```text
-choose Contact
-choose active service
-choose explicit active assigned host when the service has assignments
-for customer_site, enter the booking-specific raw service address
+Existing Contact
+    search and select an existing Core Contact
 
-fixed duration:
-    choose a date
-    choose a currently available start time
+New person
+    enter name + email and optional phone
+    resolve the normalized email through Core ResolveContactByEmailAction
+    reuse an existing Contact when that email already exists
+    otherwise create the Contact with source=crm and subsource=scheduling
 
-range duration:
-    enter local check-in
-    enter local check-out
-
-create through CreateAppointmentAction
+Do not add to Contacts
+    require an attendee name
+    allow optional email, phone, and appointment context
+    create the Appointment with a snapshot-only primary attendee and no Contact identity
 ```
 
-`StoreAppointmentRequest` requires those address fields only for `customer_site`, prohibits them for other service modes, and rejects caller-authored normalized/enrichment fields. Fixed services accept only the existing server-issued UTC `starts_at` slot. Range services prohibit that fixed-slot field and require exact local `range_starts_at` / `range_ends_at` values. `SchedulingLocalDateTimeResolver` resolves those wall times in the service timezone and rejects nonexistent or ambiguous DST values. `SchedulingController` normalizes any customer-site address through the Scheduling-owned resolver and supplies the canonical snapshot in `AppointmentBookingData`; `CreateAppointmentAction` remains authoritative for the final commitment and availability revalidation.
+Selecting **New person** does not grant Messaging consent or imply marketing permission. Contact creation/resolution and Appointment creation run inside one CRM transaction so a newly created Contact does not survive when the Appointment fails final availability or business-rule validation. Snapshot-only booking is a supported operator workflow; it intentionally lacks Contact-linked CRM history and communication until a later explicit linking workflow exists.
 
-The browser submits only Contact, service, optional host, the mode-appropriate time input, UUID idempotency key, and the raw customer-site address when applicable. Service duration policy, canonical UTC interval, canonical location snapshot, capacity, status, source, attendee state, and lifecycle output remain server-owned. The controller converts domain conflicts into validation feedback and never writes Scheduling records directly.
+The creation flow then chooses the active service, explicit active assigned host when required, and any booking-specific customer-site address. Fixed-duration services choose a date and one exact server-issued start instant. Consecutive available starts are summarized into human-readable ranges such as `9:00 AM–11:30 AM, every 15 minutes`, but the browser still submits one exact authoritative `starts_at`. Range-duration services continue to submit exact local check-in/check-out values.
 
-Contact selection uses the existing Core Contact lookup endpoint. The workspace does not create or update Contacts, and it does not silently assign a host. A service with exactly one active eligible host may be preselected for convenience, but that explicit host identity is still submitted and revalidated by `CreateAppointmentAction`.
+`StoreAppointmentRequest` validates the explicit attendee mode, requires a selected Contact only for existing-Contact mode, requires name + email for new-person Contact creation, and requires at least a name for snapshot-only booking. It also retains the closed service/host/time/address contracts. `SchedulingController` resolves attendee identity through Core when needed and supplies the resulting Contact or attendee snapshot to `AppointmentBookingData`; `CreateAppointmentAction` remains authoritative for final commitment and availability revalidation.
+
+Snapshot-only idempotency compares the persisted primary attendee name/email/phone as part of replay identity when no Contact or polymorphic primary attendee exists. Reusing the same appointment idempotency key for a different snapshot attendee is rejected rather than silently returning another person's Appointment. A service with exactly one active eligible host may still be preselected for convenience, but that host identity remains explicit and is revalidated by `CreateAppointmentAction`.
 
 The workspace links each operational row to an authenticated Appointment detail page. `SchedulingReadService::appointmentDetail()` composes the service, host, Contact, attendee snapshots, creator, reschedule lineage, and chronological lifecycle history so the controller and Blade view do not rebuild Scheduling queries.
 
@@ -1081,29 +1084,46 @@ Assignment synchronization is transactional. Existing assignment rows omitted fr
 
 The host/service workspace links to a separate availability-rule workspace. Calendar visualization, provider synchronization, and reminder management remain deferred.
 
-### CRM availability and blackout workspace
+### CRM availability workspace
 
-The authenticated `/scheduling/configuration/availability` workspace manages manual `scheduling_availability_windows` through `SchedulingAvailabilityConfigurationWriter`. The writer is the only CRM mutation boundary for these rows. It creates server-owned manual rules with null metadata, locks every target and rule before mutation, verifies optimistic `updated_at` versions, and never hard-deletes a rule.
-
-The editor supports the existing closed rule contract:
+The authenticated `/scheduling/configuration/availability` workspace uses a service-first business authoring layer over the existing generalized `scheduling_availability_windows` runtime. A normal operator chooses the service whose hours are being managed and works with three concepts:
 
 ```text
-available or blackout
-service-wide, host-wide, or service-host-specific scope
-weekly recurring or absolute shape
-rule timezone
-optional overall capacity ceiling
+Regular hours
+    recurring weekly booking hours for the service
+
+Special hours
+    one date whose booking hours intentionally replace the normal weekly schedule
+
+Time off
+    one whole date or one part of a date that must be unavailable
 ```
 
-Weekly rules persist `weekday`, `start_time`, and `end_time` as recurring wall-clock values in the selected timezone. They do not persist converted UTC clock times, so the resolver continues to apply the intended local schedule across daylight-saving changes.
+Regular hours support zero or more ranges per weekday, including split days such as `09:00-12:00` and `13:00-17:00`. The normal flow derives the service timezone and server-owned Scheduling rule fields instead of asking the operator to choose rule scope, rule shape, source ownership, sort identity, or raw precedence mechanics.
 
-Absolute forms submit local `YYYY-MM-DDTHH:MM` values plus an IANA timezone. The writer resolves those inputs to authoritative UTC `starts_at` and `ends_at` values. Nonexistent spring-forward values and ambiguous repeated-hour values are rejected rather than normalized or guessed. The browser cannot submit raw UTC instants, `source`, `meta`, deletion timestamps, or synchronization identity.
+`SchedulingAvailabilityConfigurationWriter` remains the sole CRM mutation boundary. Its business authoring methods synchronize only the simple manual service-wide rows represented by the normal UI. Existing row identities are reused when possible, unchanged rows are not rewritten, and only surplus rows are soft-archived. This prevents ordinary edits from creating unbounded replacement-row history while preserving the existing non-destructive configuration model.
 
-A manual rule may target a manual, system-owned, or provider-owned service or host without changing that target's ownership. A service-host-specific rule requires a durable `bookable_service_hosts` row for that pair. The assignment may be inactive so configuration can be retained for later reactivation, but an unrelated pair cannot receive a misleading combined rule.
+Special hours are true date-specific replacements rather than additive positive windows. The writer represents the requested local hours with complementary service-wide absolute unavailable windows for the rest of that local date. The existing availability resolver therefore continues to produce the intended result without adding a second precedence engine to the CRM layer. Saving new special hours for the same date reuses the existing simple absolute rows where possible and archives only surplus rows.
 
-Provider- and system-owned availability rows are listed for diagnosis but are read-only. Manual rows may be updated, soft-deleted as archived, and restored. Restore revalidates target existence and the combined assignment before making the rule active again. Archived rows remain durable and are excluded automatically by the existing resolver query.
+Whole-day time off is represented as one local-date unavailable interval. Partial time off adds a bounded unavailable interval for that date. Removing a one-off date change soft-archives the simple manual absolute rows for that date so the recurring weekly schedule becomes authoritative again.
 
-The workspace also provides a bounded live preview by service, optional actively assigned host, and local date. Preview slots come directly from `SchedulingReadService::availabilityForDate()` and `FindBookableAvailabilityAction`; the Blade page does not reproduce precedence or capacity calculations. Preview output therefore includes current notice and horizon boundaries, active Appointment and hold occupancy, effective capacity, source scopes, and source-window identities from the actual engine.
+Local authoring remains strict around wall-clock correctness. Weekly hours remain recurring wall-clock values in the service timezone. Absolute special-hours/time-off input is resolved through `SchedulingLocalDateTimeResolver` to authoritative UTC instants; nonexistent spring-forward values and ambiguous repeated-hour values continue to fail rather than being guessed or normalized.
+
+The workspace lists upcoming one-off changes in business terms and provides a **Test availability** surface. The test uses `SchedulingReadService::availabilityForDate()` and the existing `FindBookableAvailabilityAction`; it does not recreate availability logic in Blade or in the controller. Results therefore reflect the actual runtime combination of hours, one-off changes, staff assignments, capacity, resource occupancy, existing Appointments/holds, notice/horizon policy, and other active constraints. Fixed-duration results are grouped only for presentation: consecutive start instants with the same service/host/timezone/capacity context become one visible start-time range, and gaps or capacity changes split the ranges. The underlying `BookableSlot` values remain intact for exact booking.
+
+The generalized raw rule editor remains available under an Advanced disclosure for capabilities that the simple service schedule does not replace, including staff-specific rules, service-host-specific rules, explicit capacity overrides, provider/system-owned diagnosis, and unusual scheduling policies. Provider- and system-owned rows remain visible but read-only. Manual advanced rows retain optimistic `updated_at` mutation guards, soft archive/restore behavior, durable service-host assignment validation, and strict local absolute-time handling.
+
+The underlying executable availability contract is unchanged:
+
+```text
+positive rules union inside one scope
+present positive scopes intersect
+all applicable unavailable windows subtract
+occupancy/capacity/resource/travel policy then constrains resolved slots
+```
+
+Those mechanics remain an internal/runtime contract. They are not normal client-facing authoring vocabulary.
+
 
 ## Appointment lifecycle state machine
 

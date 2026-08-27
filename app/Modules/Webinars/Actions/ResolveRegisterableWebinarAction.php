@@ -55,6 +55,7 @@ class ResolveRegisterableWebinarAction
 
         return Webinar::query()
             ->forSeriesProviderIdentity($series)
+            ->providerActive()
             ->where('starts_at', '>', now())
             ->orderBy('starts_at')
             ->first();
@@ -63,6 +64,7 @@ class ResolveRegisterableWebinarAction
     public function isRegisterable(Webinar $webinar): bool
     {
         return $webinar->webinar_series_id !== null
+            && $webinar->isProviderActive()
             && $webinar->starts_at !== null
             && $webinar->starts_at->greaterThanOrEqualTo($this->lateJoinCutoff())
             && $webinar->webinarSeries?->status === 'active'
@@ -74,6 +76,7 @@ class ResolveRegisterableWebinarAction
         WebinarSeries $series,
     ): bool {
         return $series->status === 'active'
+            && $webinar->isProviderActive()
             && $webinar->webinar_series_id === $series->getKey()
             && $webinar->matchesSeriesProviderIdentity($series)
             && $webinar->starts_at !== null
@@ -86,6 +89,7 @@ class ResolveRegisterableWebinarAction
     private function registerableQuery(): Builder
     {
         return Webinar::query()
+            ->providerActive()
             ->where('starts_at', '>=', $this->lateJoinCutoff());
     }
 

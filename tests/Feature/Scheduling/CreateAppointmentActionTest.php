@@ -511,6 +511,76 @@ class CreateAppointmentActionTest extends TestCase
         $this->assertSame(1, Appointment::query()->count());
     }
 
+    public function test_snapshot_only_booking_persists_primary_attendee_and_replays_same_identity(): void
+    {
+        [$service, $host] = $this->hostedService();
+        $startsAt = CarbonImmutable::parse('2026-08-04 09:00:00', 'UTC');
+        $this->absoluteAvailability($service, $host, $startsAt, $startsAt->addHour());
+        $data = new AppointmentCreationData(
+            service: $service,
+            host: $host,
+            startsAt: $startsAt,
+            booking: new AppointmentBookingData(
+                name: 'Snapshot Guest',
+                email: 'snapshot@example.test',
+                phone: '15555550000',
+                source: 'crm',
+            ),
+            idempotencyKey: 'snapshot-only-replay',
+        );
+
+        $first = app(CreateAppointmentAction::class)->handle($data);
+        $second = app(CreateAppointmentAction::class)->handle($data);
+        $attendee = AppointmentAttendee::query()->sole();
+
+        $this->assertSame($first->id, $second->id);
+        $this->assertNull($first->contact_id);
+        $this->assertNull($first->primary_attendee_type);
+        $this->assertNull($first->primary_attendee_id);
+        $this->assertNull($attendee->contact_id);
+        $this->assertSame('Snapshot Guest', $attendee->name);
+        $this->assertSame('snapshot@example.test', $attendee->email);
+        $this->assertSame('15555550000', $attendee->phone);
+        $this->assertDatabaseCount('appointments', 1);
+        $this->assertDatabaseCount('appointment_attendees', 1);
+        $this->assertDatabaseCount('appointment_lifecycle_events', 1);
+    }
+
+    public function test_snapshot_only_idempotency_key_rejects_different_attendee_identity(): void
+    {
+        [$service, $host] = $this->hostedService();
+        $startsAt = CarbonImmutable::parse('2026-08-04 09:00:00', 'UTC');
+        $this->absoluteAvailability($service, $host, $startsAt, $startsAt->addHour());
+        $key = 'snapshot-only-conflict';
+
+        app(CreateAppointmentAction::class)->handle(new AppointmentCreationData(
+            service: $service,
+            host: $host,
+            startsAt: $startsAt,
+            booking: new AppointmentBookingData(
+                name: 'First Guest',
+                email: 'first@example.test',
+                source: 'crm',
+            ),
+            idempotencyKey: $key,
+        ));
+
+        $this->assertIdempotencyConflict(new AppointmentCreationData(
+            service: $service,
+            host: $host,
+            startsAt: $startsAt,
+            booking: new AppointmentBookingData(
+                name: 'Second Guest',
+                email: 'second@example.test',
+                source: 'crm',
+            ),
+            idempotencyKey: $key,
+        ));
+
+        $this->assertDatabaseCount('appointments', 1);
+        $this->assertDatabaseCount('appointment_attendees', 1);
+    }
+
     public function test_inactive_services_are_rejected_without_partial_records(): void
     {
         [$service, $host] = $this->hostedService();

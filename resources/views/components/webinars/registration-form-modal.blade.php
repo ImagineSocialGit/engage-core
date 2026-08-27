@@ -544,10 +544,30 @@
                         {{ $message }}
                     </div>
                 @enderror
+
+                @if($errors->any() && ! $errors->has('registration_form'))
+                    <div
+                        id="webinar-registration-validation-summary"
+                        role="alert"
+                        aria-labelledby="webinar-registration-validation-summary-title"
+                        class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                    >
+                        <p id="webinar-registration-validation-summary-title" class="font-bold">
+                            Please review your registration
+                        </p>
+                        <p class="mt-1">Correct the highlighted fields and try again.</p>
+                    </div>
+                @endif
+
+                <p class="text-xs font-medium text-slate-500">
+                    Fields marked <span aria-hidden="true" class="font-bold text-red-600">*</span> are required.
+                </p>
+
                 <div class="{{ $fieldGridClass }}">
                     <div>
                         <x-ui.form.label for="first_name">
                             {{ $page['fields']['first_name']['label'] ?? 'First Name' }}
+                            <span aria-hidden="true" class="text-red-600">*</span><span class="sr-only">Required</span>
                         </x-ui.form.label>
 
                         <x-ui.form.input
@@ -597,6 +617,7 @@
                     <div>
                         <x-ui.form.label for="email">
                             {{ $page['fields']['email']['label'] ?? 'Email Address' }}
+                            <span aria-hidden="true" class="text-red-600">*</span><span class="sr-only">Required</span>
                         </x-ui.form.label>
 
                         <x-ui.form.input
@@ -661,7 +682,7 @@
 
                         @if($smsAvailable)
                             <p id="phone_sms_helper" class="mt-1 text-xs font-medium leading-5 text-slate-500">
-                                {{ $page['fields']['phone']['helper'] ?? 'Required to receive SMS.' }}
+                                {{ $page['fields']['phone']['helper'] ?? 'A mobile number is required only when you choose text messages.' }}
                             </p>
                         @endif
 

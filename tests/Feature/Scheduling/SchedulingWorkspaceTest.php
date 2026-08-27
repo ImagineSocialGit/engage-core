@@ -141,7 +141,7 @@ class SchedulingWorkspaceTest extends TestCase
             ->assertOk()
             ->assertSee('Strategy Session')
             ->assertSee($host->name)
-            ->assertSee('9:00 AM–10:00 AM');
+            ->assertViewHas('availableStartRanges', fn (array $ranges): bool => count($ranges) === 1);
 
         $key = (string) Str::uuid();
 
@@ -152,6 +152,7 @@ class SchedulingWorkspaceTest extends TestCase
                 'date' => '2026-08-04',
             ]))
             ->post(route('crm.scheduling.appointments.store'), [
+                'attendee_mode' => 'contact',
                 'contact_id' => $contact->id,
                 'bookable_service_id' => $service->id,
                 'scheduling_host_id' => $host->id,
@@ -207,6 +208,7 @@ class SchedulingWorkspaceTest extends TestCase
             ->assertSee('name="address_line_1"', false);
 
         $base = [
+            'attendee_mode' => 'contact',
             'contact_id' => $contact->id,
             'bookable_service_id' => $service->id,
             'scheduling_host_id' => null,
@@ -321,6 +323,7 @@ class SchedulingWorkspaceTest extends TestCase
         $response = $this->actingAs($user)
             ->from($workspace)
             ->post(route('crm.scheduling.appointments.store'), [
+                'attendee_mode' => 'contact',
                 'contact_id' => $contact->id,
                 'bookable_service_id' => $service->id,
                 'scheduling_host_id' => null,
@@ -366,6 +369,7 @@ class SchedulingWorkspaceTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('crm.scheduling.appointments.store'), [
+                'attendee_mode' => 'contact',
                 'contact_id' => $contact->id,
                 'bookable_service_id' => $pendingService->id,
                 'scheduling_host_id' => null,
@@ -408,6 +412,7 @@ class SchedulingWorkspaceTest extends TestCase
         $this->actingAs($user)
             ->from(route('crm.scheduling.index'))
             ->post(route('crm.scheduling.appointments.store'), [
+                'attendee_mode' => 'contact',
                 'contact_id' => $contact->id,
                 'bookable_service_id' => $service->id,
                 'scheduling_host_id' => $otherHost->id,
@@ -422,6 +427,7 @@ class SchedulingWorkspaceTest extends TestCase
         $this->actingAs($user)
             ->from(route('crm.scheduling.index'))
             ->post(route('crm.scheduling.appointments.store'), [
+                'attendee_mode' => 'contact',
                 'contact_id' => $contact->id,
                 'bookable_service_id' => $service->id,
                 'scheduling_host_id' => $assignedHost->id,
@@ -443,6 +449,7 @@ class SchedulingWorkspaceTest extends TestCase
         $this->availability($service, null, $startsAt, $startsAt->addHour());
         $key = (string) Str::uuid();
         $payload = [
+            'attendee_mode' => 'contact',
             'contact_id' => $contact->id,
             'bookable_service_id' => $service->id,
             'scheduling_host_id' => null,
@@ -469,6 +476,131 @@ class SchedulingWorkspaceTest extends TestCase
         $this->assertSame(Appointment::STATUS_SCHEDULED, $appointment->status);
         $this->assertTrue($appointment->ends_at->equalTo($startsAt->addHour()));
         $this->assertSame('crm', $appointment->source);
+    }
+
+    public function test_workspace_requires_an_explicit_attendee_choice_and_surfaces_missing_contact_validation(): void
+    {
+        $user = User::factory()->create();
+        $service = $this->service();
+        $startsAt = CarbonImmutable::parse('2026-08-04 14:00:00 UTC');
+        $this->availability($service, null, $startsAt, $startsAt->addHour());
+
+        $workspace = route('crm.scheduling.index', [
+            'bookable_service_id' => $service->id,
+            'date' => '2026-08-04',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->followingRedirects()
+            ->from($workspace)
+            ->post(route('crm.scheduling.appointments.store'), [
+                'attendee_mode' => 'contact',
+                'bookable_service_id' => $service->id,
+                'starts_at' => $startsAt->toIso8601String(),
+                'idempotency_key' => (string) Str::uuid(),
+            ]);
+
+        $response
+            ->assertOk()
+            ->assertSee('data-scheduling-validation-summary', false)
+            ->assertSee('data-scheduling-attendee-mode', false);
+
+        $this->assertDatabaseCount('appointments', 0);
+    }
+
+    public function test_workspace_can_create_or_resolve_a_contact_while_booking(): void
+    {
+        $user = User::factory()->create();
+        $service = $this->service();
+        $startsAt = CarbonImmutable::parse('2026-08-04 15:00:00 UTC');
+        $this->availability($service, null, $startsAt, $startsAt->addHour());
+
+        $this->actingAs($user)
+            ->post(route('crm.scheduling.appointments.store'), [
+                'attendee_mode' => 'new_contact',
+                'attendee_name' => 'New Scheduling Person',
+                'attendee_email' => 'new-scheduling@example.test',
+                'attendee_phone' => '15555550123',
+                'attendee_context' => 'Asked about the premium option.',
+                'bookable_service_id' => $service->id,
+                'starts_at' => $startsAt->toIso8601String(),
+                'idempotency_key' => (string) Str::uuid(),
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $contact = Contact::query()->where('email', 'new-scheduling@example.test')->sole();
+        $appointment = Appointment::query()->sole();
+        $attendee = AppointmentAttendee::query()->sole();
+
+        $this->assertSame('crm', $contact->source);
+        $this->assertSame('scheduling', $contact->subsource);
+        $this->assertSame($contact->id, $appointment->contact_id);
+        $this->assertSame('Asked about the premium option.', $appointment->description);
+        $this->assertSame($contact->id, $attendee->contact_id);
+        $this->assertSame('new-scheduling@example.test', $attendee->email);
+    }
+
+    public function test_workspace_reuses_existing_contact_by_email_for_new_person_mode(): void
+    {
+        $user = User::factory()->create();
+        $existing = Contact::factory()->create([
+            'name' => 'Existing Person',
+            'email' => 'existing-scheduling@example.test',
+        ]);
+        $service = $this->service();
+        $startsAt = CarbonImmutable::parse('2026-08-04 16:00:00 UTC');
+        $this->availability($service, null, $startsAt, $startsAt->addHour());
+
+        $this->actingAs($user)
+            ->post(route('crm.scheduling.appointments.store'), [
+                'attendee_mode' => 'new_contact',
+                'attendee_name' => 'Typed Different Name',
+                'attendee_email' => 'EXISTING-SCHEDULING@example.test',
+                'bookable_service_id' => $service->id,
+                'starts_at' => $startsAt->toIso8601String(),
+                'idempotency_key' => (string) Str::uuid(),
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('contacts', 1);
+        $this->assertSame($existing->id, Appointment::query()->sole()->contact_id);
+    }
+
+    public function test_workspace_can_book_snapshot_only_attendee_without_creating_contact(): void
+    {
+        $user = User::factory()->create();
+        $service = $this->service();
+        $startsAt = CarbonImmutable::parse('2026-08-04 17:00:00 UTC');
+        $this->availability($service, null, $startsAt, $startsAt->addHour());
+
+        $this->actingAs($user)
+            ->post(route('crm.scheduling.appointments.store'), [
+                'attendee_mode' => 'guest',
+                'attendee_name' => 'Walk-in Guest',
+                'attendee_email' => 'walk-in@example.test',
+                'attendee_phone' => '15555550999',
+                'attendee_context' => 'Walk-in consultation; not adding to CRM yet.',
+                'bookable_service_id' => $service->id,
+                'starts_at' => $startsAt->toIso8601String(),
+                'idempotency_key' => (string) Str::uuid(),
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $appointment = Appointment::query()->sole();
+        $attendee = AppointmentAttendee::query()->sole();
+
+        $this->assertDatabaseCount('contacts', 0);
+        $this->assertNull($appointment->contact_id);
+        $this->assertNull($appointment->primary_attendee_type);
+        $this->assertNull($appointment->primary_attendee_id);
+        $this->assertSame('Walk-in consultation; not adding to CRM yet.', $appointment->description);
+        $this->assertNull($attendee->contact_id);
+        $this->assertSame('Walk-in Guest', $attendee->name);
+        $this->assertSame('walk-in@example.test', $attendee->email);
+        $this->assertSame('15555550999', $attendee->phone);
     }
 
     private function enableScheduling(): void

@@ -112,7 +112,7 @@ class FlowRouteControllerTest extends TestCase
             ->get('http://crm.'.config('app.root_domain').'/flow-routes')
             ->assertOk()
             ->assertSee($route->name)
-            ->assertSee('Wait one week')
+            ->assertSee('Wait 1 week')
             ->assertSee('Create follow-up task')
             ->assertSee('aria-label="Route flow"', false)
             ->assertSee('data-module="tasks"', false)

@@ -5,6 +5,7 @@ namespace App\Modules\Webinars\Actions;
 use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
 use App\Modules\Webinars\Data\ProviderWebinarData;
 use App\Modules\Webinars\Data\ProviderWebinarSnapshot;
+use App\Modules\Webinars\Enums\WebinarProviderLifecycleStatus;
 use App\Modules\Webinars\Jobs\NotifyWebinarWaitlistJob;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
@@ -72,6 +73,9 @@ class SyncWebinarSeriesFromProviderAction
                 'ends_at' => $fetchedWebinar->endsAt,
                 'timezone' => $fetchedWebinar->timezone,
                 'description' => $fetchedWebinar->description,
+                'provider_lifecycle_status' => WebinarProviderLifecycleStatus::Active->value,
+                'provider_missing_at' => null,
+                'provider_archived_at' => null,
                 'meta' => $this->mergeProviderMeta(
                     webinar: $webinar,
                     provider: $provider,
@@ -110,6 +114,12 @@ class SyncWebinarSeriesFromProviderAction
                 providerEventType: $providerEventType,
                 fetchedExternalIds: $fetchedExternalIds,
             ) as $missingWebinar) {
+                $missingWebinar->forceFill([
+                    'provider_lifecycle_status' => WebinarProviderLifecycleStatus::Missing->value,
+                    'provider_missing_at' => now(),
+                    'provider_archived_at' => null,
+                ])->save();
+
                 $missing[] = [
                     'webinar_id' => $missingWebinar->getKey(),
                     'external_id' => $missingWebinar->external_id,
@@ -117,6 +127,7 @@ class SyncWebinarSeriesFromProviderAction
                     'provider_event_type' => $missingWebinar->providerEventTypeKey(),
                     'title' => $missingWebinar->title,
                     'has_registrations' => $missingWebinar->registrations()->exists(),
+                    'provider_missing_at' => $missingWebinar->provider_missing_at?->toISOString(),
                 ];
             }
         }
@@ -154,6 +165,7 @@ class SyncWebinarSeriesFromProviderAction
             'created' => $created,
             'updated' => $updated,
             'deleted' => 0,
+            'removed_from_provider' => count($missing),
             'conflicts' => [],
             'missing' => $missing,
             'reconciliation' => [
@@ -227,6 +239,12 @@ class SyncWebinarSeriesFromProviderAction
         return $series->webinars()
             ->where('platform', $provider)
             ->where('provider_event_type', $providerEventType)
+            ->providerActive()
+            ->where(function ($query): void {
+                $query
+                    ->whereNull('ends_at')
+                    ->orWhere('ends_at', '>', now());
+            })
             ->when(
                 filled($fetchedExternalIds),
                 fn ($query) => $query->whereNotIn('external_id', $fetchedExternalIds),

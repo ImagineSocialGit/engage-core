@@ -38,6 +38,19 @@ Route::middleware('module:scheduling')
         Route::get('/configuration/availability', [SchedulingAvailabilityController::class, 'index'])
             ->name('configuration.availability.index');
 
+        Route::put('/configuration/availability/services/{bookableService}/regular-hours', [SchedulingAvailabilityController::class, 'saveRegularHours'])
+            ->name('configuration.availability.regular-hours');
+
+        Route::put('/configuration/availability/services/{bookableService}/special-hours', [SchedulingAvailabilityController::class, 'saveSpecialHours'])
+            ->name('configuration.availability.special-hours');
+
+        Route::post('/configuration/availability/services/{bookableService}/time-off', [SchedulingAvailabilityController::class, 'storeTimeOff'])
+            ->name('configuration.availability.time-off');
+
+        Route::delete('/configuration/availability/services/{bookableService}/date-changes/{date}', [SchedulingAvailabilityController::class, 'clearDateChanges'])
+            ->where('date', '\\d{4}-\\d{2}-\\d{2}')
+            ->name('configuration.availability.date-changes.destroy');
+
         Route::post('/configuration/availability', [SchedulingAvailabilityController::class, 'store'])
             ->name('configuration.availability.store');
 

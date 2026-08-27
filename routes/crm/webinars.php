@@ -78,6 +78,9 @@ Route::middleware('module:webinars')->group(function () {
     Route::post('/webinars/{webinar}/replacement', [WebinarController::class, 'replaceOccurrence'])
         ->name('crm.webinars.replacements.store');
 
+    Route::post('/webinars/{webinar}/archive-missing', [WebinarController::class, 'archiveMissingOccurrence'])
+        ->name('crm.webinars.archive-missing');
+
     Route::delete('/webinar-series/{series}', [WebinarController::class, 'destroySeries'])
         ->name('crm.webinar-series.destroy');
 

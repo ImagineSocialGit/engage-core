@@ -36,6 +36,12 @@ class WebinarRegistrationFrontendContractTest extends TestCase
         $this->assertStringContainsString('autocomplete="family-name"', $formView);
         $this->assertStringContainsString('autocomplete="email"', $formView);
         $this->assertStringContainsString('autocomplete="tel-national"', $formView);
+        $this->assertStringContainsString('id="webinar-registration-validation-summary"', $formView);
+        $this->assertStringContainsString(
+            'aria-labelledby="webinar-registration-validation-summary-title"',
+            $formView,
+        );
+        $this->assertSame(4, substr_count($formView, '<span class="sr-only">Required</span>'));
 
         foreach ([
             'name="company_website"',

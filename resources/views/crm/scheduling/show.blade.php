@@ -92,7 +92,7 @@
 
                     <dl class="grid gap-4 border-t border-slate-200 pt-5 sm:grid-cols-2">
                         <div>
-                            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Contact</dt>
+                            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Person</dt>
                             <dd class="mt-1 break-words text-sm text-slate-900">
                                 @if($appointment->contact)
                                     <a
@@ -101,8 +101,10 @@
                                     >
                                         {{ $appointment->contact->name ?: $appointment->contact->email }}
                                     </a>
+                                    <span class="mt-1 block text-xs text-slate-500">Linked to Contacts</span>
                                 @else
-                                    {{ $primaryAttendee?->name ?: $primaryAttendee?->email ?: 'No linked contact' }}
+                                    <span class="font-semibold">{{ $primaryAttendee?->name ?: $primaryAttendee?->email ?: 'Unidentified attendee' }}</span>
+                                    <span class="mt-1 block text-xs font-medium text-amber-700" data-appointment-unlinked-attendee>Not linked to Contacts</span>
                                 @endif
                             </dd>
                         </div>
@@ -164,7 +166,7 @@
                 <x-ui.card class="space-y-5">
                     <div>
                         <h2 class="text-lg font-semibold tracking-tight text-slate-900">Attendees</h2>
-                        <p class="mt-1 text-sm text-slate-500">Stored snapshots remain unchanged when the linked Contact changes later.</p>
+                        <p class="mt-1 text-sm text-slate-500">Stored attendee details remain tied to this appointment. When a Contact is linked, later Contact edits do not rewrite the booking-time snapshot.</p>
                     </div>
 
                     @forelse($appointment->attendees as $attendee)

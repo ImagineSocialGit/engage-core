@@ -98,6 +98,30 @@ class SchedulingAppointmentWorkspaceTest extends TestCase
             ->assertDontSee('Mark No-show');
     }
 
+    public function test_snapshot_only_appointment_detail_identifies_unlinked_attendee_without_calling_them_a_contact(): void
+    {
+        $appointment = Appointment::factory()->create([
+            'contact_id' => null,
+            'primary_attendee_type' => null,
+            'primary_attendee_id' => null,
+            'description' => 'Walk-in context.',
+        ]);
+        AppointmentAttendee::factory()->create([
+            'appointment_id' => $appointment->id,
+            'contact_id' => null,
+            'name' => 'Walk-in Guest',
+            'email' => 'walk-in@example.test',
+            'role' => 'primary',
+        ]);
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('crm.scheduling.appointments.show', $appointment))
+            ->assertOk()
+            ->assertSee('Walk-in Guest')
+            ->assertSee('Walk-in context.')
+            ->assertSee('data-appointment-unlinked-attendee', false);
+    }
+
     public function test_crm_confirmation_is_idempotent_and_records_actor_provenance(): void
     {
         $user = User::factory()->create();

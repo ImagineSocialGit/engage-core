@@ -354,6 +354,9 @@ class CreateAppointmentAction
                 expectedType: $primaryAttendee?->getMorphClass(),
                 expectedId: $primaryAttendee?->getKey(),
             )
+            || ($primaryAttendee === null
+                && $data->booking->contact === null
+                && ! $this->sameSnapshotAttendee($appointment, $data))
             || ($data->booking->location !== null
                 && ! $appointment->locationSnapshot()?->hasSameCommitmentIdentity($data->booking->location))
         ) {
@@ -363,6 +366,42 @@ class CreateAppointmentAction
         }
 
         return $appointment;
+    }
+
+
+    private function sameSnapshotAttendee(
+        Appointment $appointment,
+        AppointmentCreationData $data,
+    ): bool {
+        $attendee = AppointmentAttendee::withTrashed()
+            ->where('appointment_id', $appointment->getKey())
+            ->where('role', 'primary')
+            ->orderBy('id')
+            ->first();
+
+        if (! $attendee instanceof AppointmentAttendee) {
+            return false;
+        }
+
+        return $this->sameNullableString($attendee->name, $data->booking->attendeeName())
+            && $this->sameNullableString($attendee->email, $data->booking->attendeeEmail(), true)
+            && $this->sameNullableString($attendee->phone, $data->booking->attendeePhone());
+    }
+
+    private function sameNullableString(
+        mixed $left,
+        ?string $right,
+        bool $caseInsensitive = false,
+    ): bool {
+        $left = is_string($left) && trim($left) !== '' ? trim($left) : null;
+        $right = is_string($right) && trim($right) !== '' ? trim($right) : null;
+
+        if ($caseInsensitive) {
+            $left = $left !== null ? mb_strtolower($left) : null;
+            $right = $right !== null ? mb_strtolower($right) : null;
+        }
+
+        return $left === $right;
     }
 
     private function sameMorphIdentity(

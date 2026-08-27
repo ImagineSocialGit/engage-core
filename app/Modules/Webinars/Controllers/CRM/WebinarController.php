@@ -3,12 +3,14 @@
 namespace App\Modules\Webinars\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Webinars\Actions\ArchiveMissingWebinarOccurrenceAction;
 use App\Modules\Webinars\Actions\DeleteWebinarSeriesAction;
 use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
 use App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction;
 use App\Modules\Webinars\Actions\ReplaceWebinarOccurrenceAction;
 use App\Modules\Webinars\Actions\SyncWebinarSeriesFromProviderAction;
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
+use App\Modules\Webinars\Enums\WebinarProviderLifecycleStatus;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Models\WebinarRegistration;
@@ -65,6 +67,7 @@ class WebinarController extends Controller
             ])
             ->withCount('registrations')
             ->where('ends_at', '>', now())
+            ->providerActive()
             ->matchingCurrentSeriesProvider()
             ->orderBy('starts_at')
             ->orderBy('id')
@@ -153,6 +156,15 @@ class WebinarController extends Controller
             })
             ->count();
 
+        $providerMissingOccurrences = Webinar::query()
+            ->with('webinarSeries')
+            ->withCount('registrations')
+            ->providerMissing()
+            ->orderByRaw('starts_at IS NULL')
+            ->orderBy('starts_at')
+            ->orderBy('id')
+            ->get();
+
         $showArchived = $request->boolean('archived');
         $showAttention = $request->boolean('attention');
         $allOccurrences = Webinar::query()
@@ -177,21 +189,29 @@ class WebinarController extends Controller
             ]);
 
         if ($showAttention) {
-            $query->whereHas('registrations', fn ($query) => $query
-                ->where(function ($query): void {
-                    $query
-                        ->whereIn('meta->registration_finalization->status', [
-                            'failed',
-                            'reconciliation_required',
-                        ])
-                        ->orWhere(
-                            'meta->provider_sync->status',
-                            'reconciliation_required',
-                        );
-                }));
+            $query->where(function ($query): void {
+                $query
+                    ->where(
+                        'provider_lifecycle_status',
+                        WebinarProviderLifecycleStatus::Missing->value,
+                    )
+                    ->orWhereHas('registrations', fn ($query) => $query
+                        ->where(function ($query): void {
+                            $query
+                                ->whereIn('meta->registration_finalization->status', [
+                                    'failed',
+                                    'reconciliation_required',
+                                ])
+                                ->orWhere(
+                                    'meta->provider_sync->status',
+                                    'reconciliation_required',
+                                );
+                        }));
+            });
         } elseif (! $showArchived) {
             $query
                 ->where('ends_at', '>', now())
+                ->providerActive()
                 ->matchingCurrentSeriesProvider();
         }
 
@@ -216,7 +236,11 @@ class WebinarController extends Controller
             'upcomingMessageProfiles' => $upcomingMessageProfiles,
             'pendingPostEventReviews' => $pendingPostEventReviews,
             'registrationAttentionCount' => $registrationAttentionCount,
-            'attentionCount' => $pendingPostEventReviews->count() + $registrationAttentionCount,
+            'providerMissingOccurrences' => $providerMissingOccurrences,
+            'providerMissingCount' => $providerMissingOccurrences->count(),
+            'attentionCount' => $pendingPostEventReviews->count()
+                + $registrationAttentionCount
+                + $providerMissingOccurrences->count(),
             'showArchived' => $showArchived,
             'showAttention' => $showAttention,
             'providerEventTypeOptions' => $this->providerEventTypeOptions(),
@@ -270,8 +294,8 @@ class WebinarController extends Controller
             ->route('crm.webinar-series.index')
             ->with(
                 'success',
-                "Sync complete: {$result['created']} created, {$result['updated']} updated, {$result['deleted']} deleted, "
-                .count($result['missing']).' missing preserved.'
+                "Sync complete: {$result['created']} created, {$result['updated']} updated, "
+                .count($result['missing']).' removed from the active Zoom schedule.'
             )
             ->with('sync_conflicts', $result['conflicts'])
             ->with('sync_missing', $result['missing']);
@@ -359,6 +383,26 @@ class WebinarController extends Controller
                 'replacement_title' => $replacement->title,
                 'queue_status_counts' => $queueStatusCounts,
             ]);
+    }
+
+    public function archiveMissingOccurrence(
+        Webinar $webinar,
+        ArchiveMissingWebinarOccurrenceAction $archiveMissingOccurrence,
+    ): RedirectResponse {
+        try {
+            $archiveMissingOccurrence->handle($webinar);
+        } catch (LogicException $exception) {
+            return redirect()
+                ->route('crm.webinar-series.index', ['attention' => 1])
+                ->with('error', $exception->getMessage());
+        }
+
+        return redirect()
+            ->route('crm.webinar-series.index', ['archived' => 1])
+            ->with(
+                'success',
+                'The occurrence is preserved in Webinar history and remains unavailable for registration.',
+            );
     }
 
     public function updateSeriesScheduleProfile(
@@ -472,6 +516,10 @@ class WebinarController extends Controller
                         }
 
                         if (! filled($candidate->external_id)) {
+                            return false;
+                        }
+
+                        if (! $candidate->isProviderActive()) {
                             return false;
                         }
 

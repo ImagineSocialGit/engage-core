@@ -4,6 +4,7 @@ namespace App\Modules\Webinars\Models;
 
 use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
+use App\Modules\Webinars\Enums\WebinarProviderLifecycleStatus;
 use App\Modules\Webinars\Services\WebinarTimezoneResolver;
 use Database\Factories\WebinarFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -32,6 +33,9 @@ class Webinar extends Model
         'provider_event_type',
         'external_id',
         'host_account_key',
+        'provider_lifecycle_status',
+        'provider_missing_at',
+        'provider_archived_at',
         'join_url',
         'registration_url',
         'playback_token',
@@ -48,6 +52,8 @@ class Webinar extends Model
     protected $casts = [
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
+        'provider_missing_at' => 'datetime',
+        'provider_archived_at' => 'datetime',
         'meta' => 'array',
         'provider_settings' => 'array',
     ];
@@ -65,6 +71,10 @@ class Webinar extends Model
                     ?? $webinar->webinarSeries?->providerEventTypeKey()
                     ?? config('webinars.provider_event_type'),
             );
+
+            $webinar->provider_lifecycle_status = WebinarProviderLifecycleStatus::normalize(
+                $webinar->provider_lifecycle_status,
+            );
         });
 
         static::saved(function (Webinar $webinar): void {
@@ -78,6 +88,9 @@ class Webinar extends Model
                     'webinar_schedule_profile_id',
                     'platform',
                     'provider_event_type',
+                    'provider_lifecycle_status',
+                    'provider_missing_at',
+                    'provider_archived_at',
                     'registration_url',
                     'join_url',
                     'timezone',
@@ -142,6 +155,30 @@ class Webinar extends Model
         );
     }
 
+    public function scopeProviderActive(Builder $query): Builder
+    {
+        return $query->where(
+            'provider_lifecycle_status',
+            WebinarProviderLifecycleStatus::Active->value,
+        );
+    }
+
+    public function scopeProviderMissing(Builder $query): Builder
+    {
+        return $query->where(
+            'provider_lifecycle_status',
+            WebinarProviderLifecycleStatus::Missing->value,
+        );
+    }
+
+    public function scopeProviderArchived(Builder $query): Builder
+    {
+        return $query->where(
+            'provider_lifecycle_status',
+            WebinarProviderLifecycleStatus::Archived->value,
+        );
+    }
+
     public function matchesSeriesProviderIdentity(?WebinarSeries $series = null): bool
     {
         $series ??= $this->relationLoaded('webinarSeries')
@@ -171,6 +208,30 @@ class Webinar extends Model
             $this->provider_event_type
                 ?? config('webinars.provider_event_type'),
         );
+    }
+
+    public function providerLifecycleStatus(): WebinarProviderLifecycleStatus
+    {
+        return WebinarProviderLifecycleStatus::from(
+            WebinarProviderLifecycleStatus::normalize(
+                $this->provider_lifecycle_status,
+            ),
+        );
+    }
+
+    public function isProviderActive(): bool
+    {
+        return $this->providerLifecycleStatus() === WebinarProviderLifecycleStatus::Active;
+    }
+
+    public function isProviderMissing(): bool
+    {
+        return $this->providerLifecycleStatus() === WebinarProviderLifecycleStatus::Missing;
+    }
+
+    public function isProviderArchived(): bool
+    {
+        return $this->providerLifecycleStatus() === WebinarProviderLifecycleStatus::Archived;
     }
 
     public function getTimezoneAttribute(mixed $value): string

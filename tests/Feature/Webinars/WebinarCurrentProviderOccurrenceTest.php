@@ -7,6 +7,7 @@ use App\Modules\Webinars\Actions\DispatchWebinarWaitlistMessagesAction;
 use App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction;
 use App\Modules\Webinars\Actions\ResolveRegisterableWebinarAction;
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
+use App\Modules\Webinars\Enums\WebinarProviderLifecycleStatus;
 use App\Modules\Webinars\Jobs\NotifyWebinarWaitlistJob;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
@@ -211,5 +212,28 @@ class WebinarCurrentProviderOccurrenceTest extends TestCase
                 return $webinars->contains(fn (Webinar $webinar): bool => $webinar->is($meeting))
                     && $webinars->contains(fn (Webinar $webinar): bool => $webinar->is($oldWebinar));
             });
+    }
+
+    public function test_provider_missing_occurrence_is_not_upcoming_or_registerable(): void
+    {
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+        ]);
+        $missing = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+            'provider_lifecycle_status' => WebinarProviderLifecycleStatus::Missing->value,
+            'provider_missing_at' => now(),
+            'starts_at' => now()->addHour(),
+            'ends_at' => now()->addHours(2),
+        ]);
+
+        $resolver = app(ResolveRegisterableWebinarAction::class);
+
+        $this->assertNull($resolver->getForSeries($series));
+        $this->assertNull($resolver->findForSeries($series, $missing->getKey()));
+        $this->assertFalse($resolver->isRegisterable($missing->load('webinarSeries')));
+        $this->assertNull(
+            app(GetNextUpcomingWebinarAction::class)->getForSeries($series),
+        );
     }
 }

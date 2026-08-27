@@ -12,6 +12,10 @@ use InvalidArgumentException;
 
 class StoreAppointmentRequest extends FormRequest
 {
+    public const ATTENDEE_MODE_CONTACT = 'contact';
+    public const ATTENDEE_MODE_NEW_CONTACT = 'new_contact';
+    public const ATTENDEE_MODE_GUEST = 'guest';
+
     private ?bool $customerSite = null;
     private ?BookableService $resolvedService = null;
     private bool $serviceResolved = false;
@@ -24,9 +28,16 @@ class StoreAppointmentRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $hostId = $this->input('scheduling_host_id');
+        $contactId = $this->input('contact_id');
 
         $this->merge([
+            'attendee_mode' => trim((string) $this->input('attendee_mode')),
+            'contact_id' => $contactId === '' ? null : $contactId,
             'scheduling_host_id' => $hostId === '' ? null : $hostId,
+            'attendee_name' => $this->trimmedInput('attendee_name'),
+            'attendee_email' => (($email = $this->trimmedInput('attendee_email')) !== null ? strtolower($email) : null),
+            'attendee_phone' => $this->trimmedInput('attendee_phone'),
+            'attendee_context' => $this->trimmedInput('attendee_context'),
             'idempotency_key' => trim((string) $this->input('idempotency_key')),
         ]);
     }
@@ -40,12 +51,55 @@ class StoreAppointmentRequest extends FormRequest
         $notCustomerSite = fn (): bool => ! $this->requiresCustomerSiteAddress();
         $range = fn (): bool => $this->usesRangeDuration();
         $fixed = fn (): bool => ! $this->usesRangeDuration();
+        $contactMode = fn (): bool => $this->attendeeModeInput() === self::ATTENDEE_MODE_CONTACT;
+        $notContactMode = fn (): bool => $this->attendeeModeInput() !== self::ATTENDEE_MODE_CONTACT;
+        $newContactMode = fn (): bool => $this->attendeeModeInput() === self::ATTENDEE_MODE_NEW_CONTACT;
+        $snapshotMode = fn (): bool => in_array(
+            $this->attendeeModeInput(),
+            [self::ATTENDEE_MODE_NEW_CONTACT, self::ATTENDEE_MODE_GUEST],
+            true,
+        );
 
         return [
-            'contact_id' => [
+            'attendee_mode' => [
                 'required',
+                Rule::in([
+                    self::ATTENDEE_MODE_CONTACT,
+                    self::ATTENDEE_MODE_NEW_CONTACT,
+                    self::ATTENDEE_MODE_GUEST,
+                ]),
+            ],
+            'contact_id' => [
+                Rule::requiredIf($contactMode),
+                Rule::prohibitedIf($notContactMode),
+                'nullable',
                 'integer',
                 Rule::exists('contacts', 'id'),
+            ],
+            'attendee_name' => [
+                Rule::requiredIf($snapshotMode),
+                Rule::prohibitedIf($contactMode),
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'attendee_email' => [
+                Rule::requiredIf($newContactMode),
+                Rule::prohibitedIf($contactMode),
+                'nullable',
+                'email:rfc',
+                'max:255',
+            ],
+            'attendee_phone' => [
+                Rule::prohibitedIf($contactMode),
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'attendee_context' => [
+                'nullable',
+                'string',
+                'max:5000',
             ],
             'bookable_service_id' => [
                 'required',
@@ -135,6 +189,31 @@ class StoreAppointmentRequest extends FormRequest
         ];
     }
 
+    public function attendeeMode(): string
+    {
+        return (string) $this->validated('attendee_mode');
+    }
+
+    public function attendeeName(): ?string
+    {
+        return $this->nullableValidatedString('attendee_name');
+    }
+
+    public function attendeeEmail(): ?string
+    {
+        return $this->nullableValidatedString('attendee_email');
+    }
+
+    public function attendeePhone(): ?string
+    {
+        return $this->nullableValidatedString('attendee_phone');
+    }
+
+    public function attendeeContext(): ?string
+    {
+        return $this->nullableValidatedString('attendee_context');
+    }
+
     public function startsAt(): CarbonImmutable
     {
         if ($this->usesRangeDuration()) {
@@ -189,12 +268,17 @@ class StoreAppointmentRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'contact_id.required' => 'Choose a contact for the appointment.',
-            'contact_id.exists' => 'The selected contact could not be found.',
+            'attendee_mode.required' => 'Choose who this appointment is for.',
+            'attendee_mode.in' => 'Choose a valid attendee option.',
+            'contact_id.required' => 'Choose a Contact from the search results.',
+            'contact_id.exists' => 'The selected Contact could not be found.',
+            'attendee_name.required' => 'Enter the attendee name.',
+            'attendee_email.required' => 'Enter an email address so the new person can be added to Contacts.',
+            'attendee_email.email' => 'Enter a valid attendee email address.',
             'bookable_service_id.required' => 'Choose a service.',
             'bookable_service_id.exists' => 'The selected service is not available.',
-            'scheduling_host_id.exists' => 'The selected host is not available.',
-            'starts_at.required' => 'Choose an available appointment time.',
+            'scheduling_host_id.exists' => 'The selected staff member or provider is not available.',
+            'starts_at.required' => 'Choose an available appointment start time.',
             'starts_at.date' => 'The selected appointment time is invalid.',
             'range_starts_at.required' => 'Enter the check-in date and time.',
             'range_starts_at.regex' => 'The check-in date and time is invalid.',
@@ -207,6 +291,11 @@ class StoreAppointmentRequest extends FormRequest
             'postal_code.required' => 'Enter the service postal code.',
             'country.required' => 'Enter the two-letter service country code.',
         ];
+    }
+
+    private function attendeeModeInput(): string
+    {
+        return trim((string) $this->input('attendee_mode'));
     }
 
     private function usesRangeDuration(): bool
@@ -260,6 +349,19 @@ class StoreAppointmentRequest extends FormRequest
         return app(SchedulingLocalDateTimeResolver::class);
     }
 
+    private function trimmedInput(string $field): ?string
+    {
+        $value = $this->input($field);
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
+    }
+
     private function nullableValidatedString(string $field): ?string
     {
         $value = $this->validated($field);
@@ -268,6 +370,6 @@ class StoreAppointmentRequest extends FormRequest
             return null;
         }
 
-        return trim($value) !== '' ? $value : null;
+        return trim($value) !== '' ? trim($value) : null;
     }
 }

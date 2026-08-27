@@ -1121,6 +1121,7 @@
 │   │   │   │   │   └── SchedulingContactPanelProvider.php
 │   │   │   │   ├── PublicBookingDestinationVerificationService.php
 │   │   │   │   ├── SchedulingAvailabilityConfigurationWriter.php
+│   │   │   │   ├── SchedulingAvailableStartRangeBuilder.php
 │   │   │   │   ├── SchedulingConfigurationWriter.php
 │   │   │   │   ├── SchedulingDurationResolver.php
 │   │   │   │   ├── SchedulingLocalDateTimeResolver.php
@@ -1206,6 +1207,7 @@
 │   │   ├── Webinars
 │   │   │   ├── Actions
 │   │   │   │   ├── AddRegistrantToWebinarProviderAction.php
+│   │   │   │   ├── ArchiveMissingWebinarOccurrenceAction.php
 │   │   │   │   ├── CancelWebinarRegistrationAction.php
 │   │   │   │   ├── CancelWebinarRegistrationWithProviderAction.php
 │   │   │   │   ├── CreateWebinarRegistrationAction.php
@@ -1299,6 +1301,7 @@
 │   │   │   │   └── WebinarRegistrationResult.php
 │   │   │   ├── Enums
 │   │   │   │   ├── WebinarProviderEventType.php
+│   │   │   │   ├── WebinarProviderLifecycleStatus.php
 │   │   │   │   └── WebinarTag.php
 │   │   │   ├── EventDefinitions
 │   │   │   │   └── WebinarBehaviorEventDefinitionContributor.php
@@ -1938,7 +1941,8 @@
 │   │   │   │   ├── 2026_06_20_155410_create_webinar_waitlist_signups_table.php
 │   │   │   │   ├── 2026_07_22_160000_create_webinar_registration_responses_table.php
 │   │   │   │   ├── 2026_07_31_210000_create_webinar_schedule_profile_chain_bindings_table.php
-│   │   │   │   └── 2026_08_01_023600_create_webinar_series_message_chain_bindings_table.php
+│   │   │   │   ├── 2026_08_01_023600_create_webinar_series_message_chain_bindings_table.php
+│   │   │   │   └── 2026_08_27_120000_add_provider_lifecycle_to_webinars_table.php
 │   │   │   └── workflow
 │   │   │       └── 2026_04_15_195900_create_contact_workflow_profiles_table.php
 │   │   ├── platform
@@ -2759,6 +2763,7 @@
 │   │   │   ├── SchedulingAppointmentWorkspaceTest.php
 │   │   │   ├── SchedulingAvailabilityConfigurationWorkspaceTest.php
 │   │   │   ├── SchedulingAvailabilityWindowFoundationTest.php
+│   │   │   ├── SchedulingAvailableStartRangeBuilderTest.php
 │   │   │   ├── SchedulingConfigurationWorkspaceTest.php
 │   │   │   ├── SchedulingContactPanelTest.php
 │   │   │   ├── SchedulingDestinationVerificationMessagingBridgeTest.php
@@ -2892,4 +2897,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-691 directories, 2202 files
+691 directories, 2207 files

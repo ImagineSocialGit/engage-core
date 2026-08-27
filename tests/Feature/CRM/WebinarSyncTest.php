@@ -7,6 +7,7 @@ use App\Integrations\Webinars\Zoom\ZoomEventService;
 use App\Modules\Webinars\Data\ProviderWebinarData;
 use App\Modules\Webinars\Data\ProviderWebinarSnapshot;
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
+use App\Modules\Webinars\Enums\WebinarProviderLifecycleStatus;
 use App\Integrations\Webinars\Zoom\ZoomWebinarService;
 use App\Modules\Webinars\Jobs\NotifyWebinarWaitlistJob;
 use App\Modules\Core\Models\Contact;
@@ -67,7 +68,7 @@ class WebinarSyncTest extends TestCase
         ]);
 
         $response->assertRedirect(route('crm.webinar-series.index'));
-        $response->assertSessionHas('success', 'Sync complete: 2 created, 0 updated, 0 deleted, 0 missing preserved.');
+        $response->assertSessionHas('success', 'Sync complete: 2 created, 0 updated, 0 removed from the active Zoom schedule.');
 
         $this->assertDatabaseCount('webinars', 2);
 
@@ -155,6 +156,8 @@ class WebinarSyncTest extends TestCase
             'ends_at' => Carbon::parse('2026-05-01 19:00:00', 'America/Chicago')->utc(),
             'timezone' => 'America/Chicago',
             'description' => 'Old description',
+            'provider_lifecycle_status' => WebinarProviderLifecycleStatus::Missing->value,
+            'provider_missing_at' => now()->subHour(),
             'meta' => [
                 'zoom_uuid' => 'old-uuid',
                 'normalized' => [
@@ -198,7 +201,7 @@ class WebinarSyncTest extends TestCase
         ]);
 
         $response->assertRedirect(route('crm.webinar-series.index'));
-        $response->assertSessionHas('success', 'Sync complete: 0 created, 1 updated, 0 deleted, 0 missing preserved.');
+        $response->assertSessionHas('success', 'Sync complete: 0 created, 1 updated, 0 removed from the active Zoom schedule.');
 
         $webinar->refresh();
 
@@ -208,6 +211,9 @@ class WebinarSyncTest extends TestCase
         $this->assertSame('https://example.com/old-register', $webinar->registration_url);
         $this->assertSame('America/Chicago', $webinar->timezone);
         $this->assertSame('Updated description', $webinar->description);
+        $this->assertTrue($webinar->isProviderActive());
+        $this->assertNull($webinar->provider_missing_at);
+        $this->assertNull($webinar->provider_archived_at);
         $this->assertSame(
             '2026-05-01T20:30:00Z',
             data_get($webinar->meta, 'normalized.post_event.attendance_recorded_at'),
@@ -244,8 +250,8 @@ class WebinarSyncTest extends TestCase
             'slug' => 'missing-webinar',
             'join_url' => 'https://example.com/join-missing',
             'registration_url' => 'https://example.com/register-missing',
-            'starts_at' => Carbon::parse('2026-05-15 19:00:00', 'America/Chicago')->utc(),
-            'ends_at' => Carbon::parse('2026-05-15 20:00:00', 'America/Chicago')->utc(),
+            'starts_at' => Carbon::now()->addWeek(),
+            'ends_at' => Carbon::now()->addWeek()->addHour(),
             'timezone' => 'America/Chicago',
             'description' => 'Must be preserved for review',
             'meta' => [
@@ -266,11 +272,13 @@ class WebinarSyncTest extends TestCase
         ]);
 
         $response->assertRedirect(route('crm.webinar-series.index'));
-        $response->assertSessionHas('success', 'Sync complete: 0 created, 0 updated, 0 deleted, 1 missing preserved.');
+        $response->assertSessionHas('success', 'Sync complete: 0 created, 0 updated, 1 removed from the active Zoom schedule.');
 
         $this->assertDatabaseHas('webinars', [
             'id' => $missingWebinar->id,
+            'provider_lifecycle_status' => WebinarProviderLifecycleStatus::Missing->value,
         ]);
+        $this->assertNotNull($missingWebinar->refresh()->provider_missing_at);
 
         $missing = session('sync_missing', []);
 
@@ -300,8 +308,8 @@ class WebinarSyncTest extends TestCase
             'slug' => 'missing-webinar',
             'join_url' => 'https://example.com/join-active',
             'registration_url' => 'https://example.com/register-active',
-            'starts_at' => Carbon::parse('2026-05-15 19:00:00', 'America/Chicago')->utc(),
-            'ends_at' => Carbon::parse('2026-05-15 20:00:00', 'America/Chicago')->utc(),
+            'starts_at' => Carbon::now()->addWeek(),
+            'ends_at' => Carbon::now()->addWeek()->addHour(),
             'timezone' => 'America/Chicago',
             'description' => 'Should be preserved',
             'meta' => [
@@ -339,10 +347,11 @@ class WebinarSyncTest extends TestCase
         ]);
 
         $response->assertRedirect(route('crm.webinar-series.index'));
-        $response->assertSessionHas('success', 'Sync complete: 0 created, 0 updated, 0 deleted, 1 missing preserved.');
+        $response->assertSessionHas('success', 'Sync complete: 0 created, 0 updated, 1 removed from the active Zoom schedule.');
 
         $this->assertDatabaseHas('webinars', [
             'id' => $missingWebinar->id,
+            'provider_lifecycle_status' => WebinarProviderLifecycleStatus::Missing->value,
         ]);
 
         $missing = session('sync_missing', []);
@@ -386,7 +395,7 @@ class WebinarSyncTest extends TestCase
         ]);
 
         $response->assertRedirect(route('crm.webinar-series.index'));
-        $response->assertSessionHas('success', 'Sync complete: 0 created, 0 updated, 0 deleted, 0 missing preserved.');
+        $response->assertSessionHas('success', 'Sync complete: 0 created, 0 updated, 0 removed from the active Zoom schedule.');
         $response->assertSessionHas(
             'error',
             'Zoom returned a non-authoritative Webinar result. Returned events were imported, but missing-event reconciliation was skipped and no local events were removed.',
@@ -394,7 +403,48 @@ class WebinarSyncTest extends TestCase
 
         $this->assertDatabaseHas('webinars', [
             'id' => $webinar->getKey(),
+            'provider_lifecycle_status' => WebinarProviderLifecycleStatus::Active->value,
         ]);
+        $this->assertSame([], session('sync_missing', []));
+
+        Carbon::setTestNow();
+    }
+
+    public function test_authoritative_sync_does_not_move_completed_history_to_missing_state(): void
+    {
+        $this->freezeTime();
+
+        $user = User::factory()->create();
+        $series = WebinarSeries::query()->create([
+            'title' => 'Home Buyer Game Plan',
+        ]);
+        $completed = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+            'platform' => 'zoom',
+            'provider_event_type' => WebinarProviderEventType::Webinar->value,
+            'external_id' => 'zoom-completed',
+            'starts_at' => now()->subDays(2),
+            'ends_at' => now()->subDay(),
+        ]);
+
+        $zoomWebinarService = Mockery::mock(ZoomWebinarService::class);
+        $zoomWebinarService->shouldReceive('listWebinarsByTitle')
+            ->once()
+            ->with('Home Buyer Game Plan')
+            ->andReturn(ProviderWebinarSnapshot::authoritative([]));
+        $this->app->instance(ZoomWebinarService::class, $zoomWebinarService);
+
+        $this->actingAs($user)
+            ->post(route('crm.webinar-series.sync'), [
+                'webinar_series_id' => $series->getKey(),
+            ])
+            ->assertRedirect(route('crm.webinar-series.index'))
+            ->assertSessionHas(
+                'success',
+                'Sync complete: 0 created, 0 updated, 0 removed from the active Zoom schedule.',
+            );
+
+        $this->assertTrue($completed->refresh()->isProviderActive());
         $this->assertSame([], session('sync_missing', []));
 
         Carbon::setTestNow();
@@ -671,7 +721,7 @@ class WebinarSyncTest extends TestCase
         $response->assertRedirect(route('crm.webinar-series.index'));
         $response->assertSessionHas(
             'success',
-            'Sync complete: 1 created, 0 updated, 0 deleted, 0 missing preserved.',
+            'Sync complete: 1 created, 0 updated, 0 removed from the active Zoom schedule.',
         );
 
         $this->assertDatabaseHas('webinars', [

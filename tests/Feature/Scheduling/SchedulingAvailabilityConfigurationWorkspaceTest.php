@@ -45,10 +45,13 @@ class SchedulingAvailabilityConfigurationWorkspaceTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_workspace_exposes_structural_routes_rules_and_configuration_entry_point(): void
+    public function test_workspace_exposes_business_hours_special_dates_preview_and_advanced_rules(): void
     {
         $user = User::factory()->create();
-        $service = BookableService::factory()->create();
+        $service = BookableService::factory()->create([
+            'status' => BookableService::STATUS_ACTIVE,
+            'timezone' => 'UTC',
+        ]);
         $host = SchedulingHost::factory()->create();
         $window = SchedulingAvailabilityWindow::factory()
             ->forServiceAndHost($service, $host)
@@ -58,14 +61,50 @@ class SchedulingAvailabilityConfigurationWorkspaceTest extends TestCase
             'bookable_service_id' => $service->id,
             'scheduling_host_id' => $host->id,
         ]);
+        SchedulingAvailabilityWindow::factory()
+            ->absolute(
+                CarbonImmutable::parse('2026-08-10 12:00:00 UTC'),
+                CarbonImmutable::parse('2026-08-10 13:00:00 UTC'),
+            )
+            ->serviceWide($service)
+            ->create([
+                'timezone' => 'UTC',
+                'capacity' => null,
+                'is_available' => false,
+            ]);
 
         $this->actingAs($user)
-            ->get(route('crm.scheduling.configuration.availability.index'))
+            ->get(route('crm.scheduling.configuration.availability.index', [
+                'service_id' => $service->id,
+            ]))
             ->assertOk()
             ->assertSee('data-scheduling-availability-configuration', false)
-            ->assertSee('data-availability-create', false)
+            ->assertSee('data-availability-service-selector', false)
+            ->assertSee('data-availability-regular-hours', false)
+            ->assertSee('data-availability-special-hours', false)
+            ->assertSee('data-availability-time-off', false)
             ->assertSee('data-availability-preview', false)
+            ->assertSee('data-availability-advanced', false)
             ->assertSee('data-availability-window-id="'.$window->id.'"', false)
+            ->assertSee(
+                route('crm.scheduling.configuration.availability.regular-hours', $service),
+                false,
+            )
+            ->assertSee(
+                route('crm.scheduling.configuration.availability.special-hours', $service),
+                false,
+            )
+            ->assertSee(
+                route('crm.scheduling.configuration.availability.time-off', $service),
+                false,
+            )
+            ->assertSee(
+                route(
+                    'crm.scheduling.configuration.availability.date-changes.destroy',
+                    [$service, '2026-08-10'],
+                ),
+                false,
+            )
             ->assertSee(
                 route('crm.scheduling.configuration.availability.store'),
                 false,
@@ -74,9 +113,11 @@ class SchedulingAvailabilityConfigurationWorkspaceTest extends TestCase
                 route('crm.scheduling.configuration.availability.update', $window),
                 false,
             )
-            ->assertSee(
-                route('crm.scheduling.configuration.availability.archive', $window),
-                false,
+            ->assertViewHas('previewRequiresHost', true)
+            ->assertViewHas(
+                'previewHost',
+                fn ($value): bool => $value instanceof SchedulingHost
+                    && $value->id === $host->id,
             );
 
         $this->actingAs($user)
@@ -87,6 +128,439 @@ class SchedulingAvailabilityConfigurationWorkspaceTest extends TestCase
                 route('crm.scheduling.configuration.availability.index'),
                 false,
             );
+    }
+
+    public function test_regular_hours_business_flow_syncs_simple_service_schedule_without_overwriting_advanced_rows(): void
+    {
+        $user = User::factory()->create();
+        $service = BookableService::factory()->create([
+            'status' => BookableService::STATUS_ACTIVE,
+            'timezone' => 'UTC',
+        ]);
+        $simple = SchedulingAvailabilityWindow::factory()
+            ->serviceWide($service)
+            ->weekly(1, '09:00:00', '17:00:00')
+            ->create([
+                'timezone' => 'UTC',
+                'capacity' => null,
+            ]);
+        $advanced = SchedulingAvailabilityWindow::factory()
+            ->serviceWide($service)
+            ->weekly(2, '10:00:00', '14:00:00')
+            ->create([
+                'timezone' => 'UTC',
+                'capacity' => 2,
+            ]);
+
+        $payload = $this->regularHoursPayload([
+            1 => [
+                ['start' => '08:00', 'end' => '12:00'],
+                ['start' => '13:00', 'end' => '17:00'],
+            ],
+            3 => [
+                ['start' => '10:00', 'end' => '15:00'],
+            ],
+        ]);
+
+        $this->actingAs($user)
+            ->put(
+                route('crm.scheduling.configuration.availability.regular-hours', $service),
+                $payload,
+            )
+            ->assertRedirect(route(
+                'crm.scheduling.configuration.availability.index',
+                ['service_id' => $service->id],
+            ))
+            ->assertSessionHasNoErrors();
+
+        $simpleRows = SchedulingAvailabilityWindow::query()
+            ->where('bookable_service_id', $service->id)
+            ->whereNull('scheduling_host_id')
+            ->where('is_available', true)
+            ->whereNull('capacity')
+            ->where('window_type', SchedulingAvailabilityWindowType::Weekly->value)
+            ->orderBy('weekday')
+            ->orderBy('start_time')
+            ->get();
+
+        $this->assertCount(3, $simpleRows);
+        $this->assertSame($simple->id, $simpleRows[0]->id);
+        $this->assertSame(1, $simpleRows[0]->weekday);
+        $this->assertSame('08:00:00', $simpleRows[0]->start_time);
+        $this->assertSame('12:00:00', $simpleRows[0]->end_time);
+        $this->assertSame(1, $simpleRows[1]->weekday);
+        $this->assertSame('13:00:00', $simpleRows[1]->start_time);
+        $this->assertSame('17:00:00', $simpleRows[1]->end_time);
+        $this->assertSame(3, $simpleRows[2]->weekday);
+        $this->assertSame('10:00:00', $simpleRows[2]->start_time);
+        $this->assertSame('15:00:00', $simpleRows[2]->end_time);
+
+        $advanced->refresh();
+        $this->assertFalse($advanced->trashed());
+        $this->assertSame(2, $advanced->capacity);
+        $this->assertSame('10:00:00', $advanced->start_time);
+        $this->assertSame(4, SchedulingAvailabilityWindow::withTrashed()->count());
+
+        $ids = $simpleRows->pluck('id')->all();
+
+        $this->actingAs($user)
+            ->put(
+                route('crm.scheduling.configuration.availability.regular-hours', $service),
+                [
+                    ...$payload,
+                    'source' => SchedulingAvailabilityWindow::SOURCE_PROVIDER,
+                ],
+            )
+            ->assertSessionHasErrors('availability');
+
+        $this->actingAs($user)
+            ->put(
+                route('crm.scheduling.configuration.availability.regular-hours', $service),
+                $payload,
+            )
+            ->assertSessionHasNoErrors();
+
+        $this->assertEquals(
+            $ids,
+            SchedulingAvailabilityWindow::query()
+                ->where('bookable_service_id', $service->id)
+                ->whereNull('scheduling_host_id')
+                ->where('is_available', true)
+                ->whereNull('capacity')
+                ->where('window_type', SchedulingAvailabilityWindowType::Weekly->value)
+                ->orderBy('weekday')
+                ->orderBy('start_time')
+                ->pluck('id')
+                ->all(),
+        );
+        $this->assertSame(4, SchedulingAvailabilityWindow::withTrashed()->count());
+    }
+
+    public function test_special_hours_replace_the_regular_schedule_for_one_date(): void
+    {
+        $user = User::factory()->create();
+        $service = BookableService::factory()->create([
+            'status' => BookableService::STATUS_ACTIVE,
+            'timezone' => 'UTC',
+            'duration_minutes' => 60,
+            'slot_interval_minutes' => 60,
+            'minimum_notice_minutes' => 0,
+            'booking_horizon_days' => 30,
+        ]);
+
+        SchedulingAvailabilityWindow::factory()
+            ->serviceWide($service)
+            ->weekly(1, '09:00:00', '17:00:00')
+            ->create([
+                'timezone' => 'UTC',
+                'capacity' => null,
+            ]);
+
+        $this->actingAs($user)
+            ->put(
+                route('crm.scheduling.configuration.availability.special-hours', $service),
+                [
+                    'date' => '2026-08-10',
+                    'ranges' => [
+                        ['start' => '10:00', 'end' => '12:00'],
+                        ['start' => '13:00', 'end' => '15:00'],
+                    ],
+                ],
+            )
+            ->assertSessionHasNoErrors();
+
+        $starts = array_map(
+            static fn ($slot): string => $slot->startsAt->format('H:i'),
+            app(SchedulingReadService::class)->availabilityForDate(
+                service: $service,
+                date: CarbonImmutable::parse('2026-08-10 00:00:00 UTC'),
+            ),
+        );
+
+        $this->assertEquals(['10:00', '11:00', '13:00', '14:00'], $starts);
+
+        $dateRows = SchedulingAvailabilityWindow::query()
+            ->where('bookable_service_id', $service->id)
+            ->where('window_type', SchedulingAvailabilityWindowType::Absolute->value)
+            ->orderBy('starts_at')
+            ->get();
+
+        $this->assertCount(5, $dateRows);
+        $this->assertFalse($dateRows[0]->is_available);
+        $this->assertTrue($dateRows[1]->is_available);
+        $this->assertFalse($dateRows[2]->is_available);
+        $this->assertTrue($dateRows[3]->is_available);
+        $this->assertFalse($dateRows[4]->is_available);
+
+        $existingIds = $dateRows->pluck('id')->all();
+
+        $this->actingAs($user)
+            ->put(
+                route('crm.scheduling.configuration.availability.special-hours', $service),
+                [
+                    'date' => '2026-08-10',
+                    'ranges' => [
+                        ['start' => '11:00', 'end' => '14:00'],
+                    ],
+                ],
+            )
+            ->assertSessionHasNoErrors();
+
+        $activeDateRows = SchedulingAvailabilityWindow::query()
+            ->where('bookable_service_id', $service->id)
+            ->where('window_type', SchedulingAvailabilityWindowType::Absolute->value)
+            ->orderBy('starts_at')
+            ->get();
+
+        $this->assertCount(3, $activeDateRows);
+        $this->assertEquals(
+            array_slice($existingIds, 0, 3),
+            $activeDateRows->pluck('id')->all(),
+        );
+        $this->assertSame(
+            5,
+            SchedulingAvailabilityWindow::withTrashed()
+                ->where('bookable_service_id', $service->id)
+                ->where('window_type', SchedulingAvailabilityWindowType::Absolute->value)
+                ->count(),
+        );
+
+        $this->actingAs($user)
+            ->put(
+                route('crm.scheduling.configuration.availability.special-hours', $service),
+                [
+                    'date' => '2026-08-10',
+                    'ranges' => [
+                        ['start' => '10:00', 'end' => '12:00'],
+                        ['start' => '13:00', 'end' => '15:00'],
+                    ],
+                ],
+            )
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(
+            5,
+            SchedulingAvailabilityWindow::withTrashed()
+                ->where('bookable_service_id', $service->id)
+                ->where('window_type', SchedulingAvailabilityWindowType::Absolute->value)
+                ->count(),
+        );
+        $this->assertSame(
+            5,
+            SchedulingAvailabilityWindow::query()
+                ->where('bookable_service_id', $service->id)
+                ->where('window_type', SchedulingAvailabilityWindowType::Absolute->value)
+                ->count(),
+        );
+    }
+
+    public function test_special_date_summary_reflects_additional_time_off(): void
+    {
+        $user = User::factory()->create();
+        $service = BookableService::factory()->create([
+            'status' => BookableService::STATUS_ACTIVE,
+            'timezone' => 'UTC',
+        ]);
+
+        $this->actingAs($user)
+            ->put(
+                route('crm.scheduling.configuration.availability.special-hours', $service),
+                [
+                    'date' => '2026-08-10',
+                    'ranges' => [
+                        ['start' => '10:00', 'end' => '12:00'],
+                        ['start' => '13:00', 'end' => '15:00'],
+                    ],
+                ],
+            )
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($user)
+            ->post(
+                route('crm.scheduling.configuration.availability.time-off', $service),
+                [
+                    'date' => '2026-08-10',
+                    'all_day' => false,
+                    'start_time' => '11:00',
+                    'end_time' => '11:30',
+                ],
+            )
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($user)
+            ->get(route('crm.scheduling.configuration.availability.index', [
+                'service_id' => $service->id,
+            ]))
+            ->assertOk()
+            ->assertViewHas('dateChanges', function (array $changes): bool {
+                $this->assertCount(1, $changes);
+                $this->assertSame('2026-08-10', $changes[0]['date']);
+                $this->assertSame('special_hours', $changes[0]['type']);
+                $this->assertEquals([
+                    ['start' => '10:00', 'end' => '11:00'],
+                    ['start' => '11:30', 'end' => '12:00'],
+                    ['start' => '13:00', 'end' => '15:00'],
+                ], $changes[0]['ranges']);
+
+                return true;
+            });
+    }
+
+    public function test_time_off_can_block_part_or_all_of_a_regular_day(): void
+    {
+        $user = User::factory()->create();
+        $service = BookableService::factory()->create([
+            'status' => BookableService::STATUS_ACTIVE,
+            'timezone' => 'UTC',
+            'duration_minutes' => 60,
+            'slot_interval_minutes' => 60,
+            'minimum_notice_minutes' => 0,
+            'booking_horizon_days' => 30,
+        ]);
+
+        SchedulingAvailabilityWindow::factory()
+            ->serviceWide($service)
+            ->weekly(1, '09:00:00', '17:00:00')
+            ->create([
+                'timezone' => 'UTC',
+                'capacity' => null,
+            ]);
+
+        $this->actingAs($user)
+            ->post(
+                route('crm.scheduling.configuration.availability.time-off', $service),
+                [
+                    'date' => '2026-08-10',
+                    'all_day' => false,
+                    'start_time' => '12:00',
+                    'end_time' => '13:00',
+                ],
+            )
+            ->assertSessionHasNoErrors();
+
+        $starts = array_map(
+            static fn ($slot): string => $slot->startsAt->format('H:i'),
+            app(SchedulingReadService::class)->availabilityForDate(
+                service: $service,
+                date: CarbonImmutable::parse('2026-08-10 00:00:00 UTC'),
+            ),
+        );
+
+        $this->assertEquals(
+            ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00'],
+            $starts,
+        );
+
+        $this->actingAs($user)
+            ->post(
+                route('crm.scheduling.configuration.availability.time-off', $service),
+                [
+                    'date' => '2026-08-17',
+                    'all_day' => true,
+                ],
+            )
+            ->assertSessionHasNoErrors();
+
+        $this->assertEmpty(app(SchedulingReadService::class)->availabilityForDate(
+            service: $service,
+            date: CarbonImmutable::parse('2026-08-17 00:00:00 UTC'),
+        ));
+    }
+
+    public function test_clearing_one_off_change_restores_regular_hours_without_deleting_history(): void
+    {
+        $user = User::factory()->create();
+        $service = BookableService::factory()->create([
+            'status' => BookableService::STATUS_ACTIVE,
+            'timezone' => 'UTC',
+            'duration_minutes' => 60,
+            'slot_interval_minutes' => 60,
+            'minimum_notice_minutes' => 0,
+            'booking_horizon_days' => 30,
+        ]);
+
+        SchedulingAvailabilityWindow::factory()
+            ->serviceWide($service)
+            ->weekly(1, '09:00:00', '17:00:00')
+            ->create([
+                'timezone' => 'UTC',
+                'capacity' => null,
+            ]);
+
+        $this->actingAs($user)
+            ->post(
+                route('crm.scheduling.configuration.availability.time-off', $service),
+                [
+                    'date' => '2026-08-10',
+                    'all_day' => true,
+                ],
+            )
+            ->assertSessionHasNoErrors();
+
+        $dateChange = SchedulingAvailabilityWindow::query()
+            ->where('bookable_service_id', $service->id)
+            ->where('window_type', SchedulingAvailabilityWindowType::Absolute->value)
+            ->sole();
+
+        $this->assertEmpty(app(SchedulingReadService::class)->availabilityForDate(
+            service: $service,
+            date: CarbonImmutable::parse('2026-08-10 00:00:00 UTC'),
+        ));
+
+        $this->actingAs($user)
+            ->delete(route(
+                'crm.scheduling.configuration.availability.date-changes.destroy',
+                [$service, '2026-08-10'],
+            ))
+            ->assertRedirect(route(
+                'crm.scheduling.configuration.availability.index',
+                ['service_id' => $service->id],
+            ))
+            ->assertSessionHasNoErrors();
+
+        $starts = array_map(
+            static fn ($slot): string => $slot->startsAt->format('H:i'),
+            app(SchedulingReadService::class)->availabilityForDate(
+                service: $service,
+                date: CarbonImmutable::parse('2026-08-10 00:00:00 UTC'),
+            ),
+        );
+
+        $this->assertEquals(
+            ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'],
+            $starts,
+        );
+        $this->assertSame(
+            1,
+            SchedulingAvailabilityWindow::withTrashed()
+                ->where('id', $dateChange->id)
+                ->count(),
+        );
+        $this->assertTrue($dateChange->refresh()->trashed());
+
+        $this->actingAs($user)
+            ->post(
+                route('crm.scheduling.configuration.availability.time-off', $service),
+                [
+                    'date' => '2026-08-10',
+                    'all_day' => true,
+                ],
+            )
+            ->assertSessionHasNoErrors();
+
+        $restored = SchedulingAvailabilityWindow::query()
+            ->where('bookable_service_id', $service->id)
+            ->where('window_type', SchedulingAvailabilityWindowType::Absolute->value)
+            ->sole();
+
+        $this->assertSame($dateChange->id, $restored->id);
+        $this->assertSame(
+            1,
+            SchedulingAvailabilityWindow::withTrashed()
+                ->where('bookable_service_id', $service->id)
+                ->where('window_type', SchedulingAvailabilityWindowType::Absolute->value)
+                ->count(),
+        );
     }
 
     public function test_manual_weekly_and_absolute_rules_persist_closed_server_owned_shapes(): void
@@ -430,7 +904,7 @@ class SchedulingAvailabilityConfigurationWorkspaceTest extends TestCase
         $response = $this->actingAs($user)->get(route(
             'crm.scheduling.configuration.availability.index',
             [
-                'preview_service_id' => $service->id,
+                'service_id' => $service->id,
                 'preview_date' => '2026-08-10',
             ],
         ));
@@ -438,15 +912,19 @@ class SchedulingAvailabilityConfigurationWorkspaceTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('data-availability-preview', false)
-            ->assertSee('data-preview-slot-start="2026-08-10T09:00:00.000000Z"', false)
-            ->assertSee('data-preview-slot-start="2026-08-10T11:00:00.000000Z"', false)
-            ->assertDontSee('data-preview-slot-start="2026-08-10T10:00:00.000000Z"', false)
-            ->assertSee('data-preview-slot-capacity="2"', false)
-            ->assertSee('data-preview-slot-source-window-ids="'.$available->id.'"', false)
+            ->assertSee('data-preview-range-first="2026-08-10T09:00:00.000000Z"', false)
+            ->assertSee('data-preview-range-first="2026-08-10T11:00:00.000000Z"', false)
+            ->assertDontSee('data-preview-range-first="2026-08-10T10:00:00.000000Z"', false)
+            ->assertSee('data-availability-preview-ready', false)
             ->assertViewHas('previewSlots', fn (array $slots): bool =>
                 count($slots) === 2
                 && $slots[0]->capacity === 2
                 && $slots[1]->capacity === 2
+            )
+            ->assertViewHas('previewStartRanges', fn (array $ranges): bool =>
+                count($ranges) === 2
+                && $ranges[0]['slot_count'] === 1
+                && $ranges[1]['slot_count'] === 1
             );
     }
 
@@ -460,6 +938,24 @@ class SchedulingAvailabilityConfigurationWorkspaceTest extends TestCase
         if (! $this->app->getProvider(SchedulingModuleServiceProvider::class)) {
             $this->app->register(SchedulingModuleServiceProvider::class);
         }
+    }
+
+    /**
+     * @param array<int, array<int, array{start: string, end: string}>> $rangesByWeekday
+     * @return array<string, mixed>
+     */
+    private function regularHoursPayload(array $rangesByWeekday): array
+    {
+        $days = [];
+
+        for ($weekday = 0; $weekday <= 6; $weekday++) {
+            $days[$weekday] = [
+                'weekday' => $weekday,
+                'ranges' => $rangesByWeekday[$weekday] ?? [],
+            ];
+        }
+
+        return ['regular_hours' => $days];
     }
 
     /**

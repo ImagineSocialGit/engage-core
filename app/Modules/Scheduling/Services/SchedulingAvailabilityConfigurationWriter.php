@@ -130,6 +130,252 @@ class SchedulingAvailabilityConfigurationWriter
         });
     }
 
+    /**
+     * Replace the simple service-wide weekly schedule authored by the normal CRM
+     * availability screen. Advanced weekly rows with capacity overrides, staff
+     * targeting, or non-manual ownership are deliberately left alone.
+     *
+     * @param array<int, array{weekday: mixed, start_time: mixed, end_time: mixed}> $ranges
+     */
+    public function replaceRegularHours(
+        BookableService $service,
+        array $ranges,
+    ): int {
+        return DB::transaction(function () use ($service, $ranges): int {
+            $lockedService = $this->lockedService($service);
+            $normalized = $this->normalizedDayRanges($ranges, includeWeekday: true);
+
+            $existing = SchedulingAvailabilityWindow::withTrashed()
+                ->where('bookable_service_id', $lockedService->getKey())
+                ->whereNull('scheduling_host_id')
+                ->where('source', SchedulingAvailabilityWindow::SOURCE_MANUAL)
+                ->where(
+                    'window_type',
+                    SchedulingAvailabilityWindowType::Weekly->value,
+                )
+                ->where('is_available', true)
+                ->whereNull('capacity')
+                ->orderByRaw('deleted_at is not null')
+                ->orderBy('weekday')
+                ->orderBy('start_time')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            $definitions = array_map(
+                fn (array $range): array => [
+                    ...$this->windowAttributes([
+                        'scope' => self::SCOPE_SERVICE,
+                        'bookable_service_id' => $lockedService->getKey(),
+                        'scheduling_host_id' => null,
+                        'window_type' => SchedulingAvailabilityWindowType::Weekly->value,
+                        'timezone' => $lockedService->timezone,
+                        'weekday' => $range['weekday'],
+                        'start_time' => $range['start_time'],
+                        'end_time' => $range['end_time'],
+                        'capacity' => null,
+                        'is_available' => true,
+                    ], $lockedService, null),
+                    'source' => SchedulingAvailabilityWindow::SOURCE_MANUAL,
+                    'meta' => null,
+                ],
+                $normalized,
+            );
+
+            $this->syncSimpleWindows($existing, $definitions);
+
+            return count($definitions);
+        });
+    }
+
+    /**
+     * Replace one service-wide local date with explicit hours.
+     *
+     * Positive absolute windows add the requested hours to the normal weekly
+     * layer. Complementary blackout windows cover the rest of that local day,
+     * so the final resolved result is a true date-specific replacement rather
+     * than merely extra availability.
+     *
+     * An empty range list means closed all day.
+     *
+     * @param array<int, array{start_time: mixed, end_time: mixed}> $ranges
+     */
+    public function replaceSpecialHours(
+        BookableService $service,
+        string $date,
+        array $ranges,
+    ): int {
+        return DB::transaction(function () use ($service, $date, $ranges): int {
+            $lockedService = $this->lockedService($service);
+            $timezone = (string) $lockedService->timezone;
+            [$dayStart, $dayEnd, $nextDate] = $this->localDayBounds(
+                $date,
+                $timezone,
+            );
+            $normalized = $this->normalizedDayRanges($ranges, includeWeekday: false);
+
+            $existing = $this->simpleAbsoluteWindowsForDay(
+                service: $lockedService,
+                timezone: $timezone,
+                dayStart: $dayStart,
+                dayEnd: $dayEnd,
+            );
+            $definitions = [];
+
+            if ($normalized === []) {
+                $definitions[] = $this->simpleAbsoluteDefinition(
+                    service: $lockedService,
+                    timezone: $timezone,
+                    localStartsAt: "{$date}T00:00",
+                    localEndsAt: "{$nextDate}T00:00",
+                    available: false,
+                );
+
+                $this->syncSimpleWindows($existing, $definitions);
+
+                return 1;
+            }
+
+            $cursor = '00:00:00';
+
+            foreach ($normalized as $range) {
+                $start = $range['start_time'];
+                $end = $range['end_time'];
+
+                if ($this->timeInSeconds($cursor) < $this->timeInSeconds($start)) {
+                    $definitions[] = $this->simpleAbsoluteDefinition(
+                        service: $lockedService,
+                        timezone: $timezone,
+                        localStartsAt: "{$date}T".substr($cursor, 0, 5),
+                        localEndsAt: "{$date}T".substr($start, 0, 5),
+                        available: false,
+                    );
+                }
+
+                $definitions[] = $this->simpleAbsoluteDefinition(
+                    service: $lockedService,
+                    timezone: $timezone,
+                    localStartsAt: "{$date}T".substr($start, 0, 5),
+                    localEndsAt: "{$date}T".substr($end, 0, 5),
+                    available: true,
+                );
+                $cursor = $end;
+            }
+
+            if ($this->timeInSeconds($cursor) < 86400) {
+                $definitions[] = $this->simpleAbsoluteDefinition(
+                    service: $lockedService,
+                    timezone: $timezone,
+                    localStartsAt: "{$date}T".substr($cursor, 0, 5),
+                    localEndsAt: "{$nextDate}T00:00",
+                    available: false,
+                );
+            }
+
+            $this->syncSimpleWindows($existing, $definitions);
+
+            return count($definitions);
+        });
+    }
+
+    public function createTimeOff(
+        BookableService $service,
+        string $date,
+        string $startTime,
+        string $endTime,
+    ): SchedulingAvailabilityWindow {
+        return DB::transaction(function () use (
+            $service,
+            $date,
+            $startTime,
+            $endTime,
+        ): SchedulingAvailabilityWindow {
+            $lockedService = $this->lockedService($service);
+            $start = $this->weeklyTime($startTime, 'time-off start time');
+            $end = $this->weeklyTime($endTime, 'time-off end time');
+
+            if ($this->timeInSeconds($start) >= $this->timeInSeconds($end)) {
+                throw new InvalidArgumentException(
+                    'Time off requires a start time before the end time.',
+                );
+            }
+
+            $timezone = (string) $lockedService->timezone;
+            $definition = $this->simpleAbsoluteDefinition(
+                service: $lockedService,
+                timezone: $timezone,
+                localStartsAt: "{$date}T".substr($start, 0, 5),
+                localEndsAt: "{$date}T".substr($end, 0, 5),
+                available: false,
+            );
+            $existing = SchedulingAvailabilityWindow::withTrashed()
+                ->where('bookable_service_id', $lockedService->getKey())
+                ->whereNull('scheduling_host_id')
+                ->where('source', SchedulingAvailabilityWindow::SOURCE_MANUAL)
+                ->where(
+                    'window_type',
+                    SchedulingAvailabilityWindowType::Absolute->value,
+                )
+                ->where('timezone', $timezone)
+                ->whereNull('capacity')
+                ->where('is_available', false)
+                ->where('starts_at', $definition['starts_at'])
+                ->where('ends_at', $definition['ends_at'])
+                ->orderByRaw('deleted_at is not null')
+                ->orderByDesc('updated_at')
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing instanceof SchedulingAvailabilityWindow) {
+                $existing->forceFill([
+                    ...$definition,
+                    'deleted_at' => null,
+                ]);
+
+                if ($existing->isDirty()) {
+                    $this->saveWithVersionBump($existing);
+                }
+
+                return $existing->refresh();
+            }
+
+            return SchedulingAvailabilityWindow::query()
+                ->create($definition)
+                ->refresh();
+        });
+    }
+
+    public function clearDateChanges(
+        BookableService $service,
+        string $date,
+    ): int {
+        return DB::transaction(function () use ($service, $date): int {
+            $lockedService = $this->lockedService($service);
+            $timezone = (string) $lockedService->timezone;
+            [$dayStart, $dayEnd] = $this->localDayBounds($date, $timezone);
+            $existing = $this->simpleAbsoluteWindowsForDay(
+                service: $lockedService,
+                timezone: $timezone,
+                dayStart: $dayStart,
+                dayEnd: $dayEnd,
+            );
+            $archived = 0;
+
+            foreach ($existing as $window) {
+                if (! $window instanceof SchedulingAvailabilityWindow
+                    || $window->trashed()
+                ) {
+                    continue;
+                }
+
+                $this->archiveLocked($window);
+                $archived++;
+            }
+
+            return $archived;
+        });
+    }
+
     public function windowIsEditable(SchedulingAvailabilityWindow $window): bool
     {
         return $window->source === SchedulingAvailabilityWindow::SOURCE_MANUAL;
@@ -325,6 +571,253 @@ class SchedulingAvailabilityConfigurationWriter
             'starts_at' => $startsAt,
             'ends_at' => $endsAt,
         ];
+    }
+
+    private function lockedService(BookableService $service): BookableService
+    {
+        $locked = BookableService::withTrashed()
+            ->whereKey($service->getKey())
+            ->lockForUpdate()
+            ->first();
+
+        if (! $locked instanceof BookableService || $locked->trashed()) {
+            throw new DomainException(
+                'The selected bookable service no longer exists.',
+            );
+        }
+
+        if ($locked->status !== BookableService::STATUS_ACTIVE) {
+            throw new DomainException(
+                'The selected service is no longer active.',
+            );
+        }
+
+        return $locked;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $ranges
+     * @return array<int, array{weekday?: int, start_time: string, end_time: string}>
+     */
+    private function normalizedDayRanges(
+        array $ranges,
+        bool $includeWeekday,
+    ): array {
+        $normalized = [];
+
+        foreach ($ranges as $range) {
+            if (! is_array($range)) {
+                throw new InvalidArgumentException(
+                    'Availability hours must be submitted as time ranges.',
+                );
+            }
+
+            $start = $this->weeklyTime(
+                $range['start_time'] ?? null,
+                'availability start time',
+            );
+            $end = $this->weeklyTime(
+                $range['end_time'] ?? null,
+                'availability end time',
+            );
+
+            if ($this->timeInSeconds($start) >= $this->timeInSeconds($end)) {
+                throw new InvalidArgumentException(
+                    'Availability hours require a start time before the end time.',
+                );
+            }
+
+            $entry = [
+                'start_time' => $start,
+                'end_time' => $end,
+            ];
+
+            if ($includeWeekday) {
+                $entry['weekday'] = $this->integerBetween(
+                    $range['weekday'] ?? null,
+                    0,
+                    6,
+                    'weekday',
+                );
+            }
+
+            $normalized[] = $entry;
+        }
+
+        usort(
+            $normalized,
+            function (array $left, array $right) use ($includeWeekday): int {
+                if ($includeWeekday) {
+                    $weekday = ($left['weekday'] ?? 0) <=> ($right['weekday'] ?? 0);
+
+                    if ($weekday !== 0) {
+                        return $weekday;
+                    }
+                }
+
+                return $this->timeInSeconds($left['start_time'])
+                    <=> $this->timeInSeconds($right['start_time']);
+            },
+        );
+
+        $lastByDay = [];
+
+        foreach ($normalized as $range) {
+            $day = $includeWeekday ? (int) $range['weekday'] : 0;
+            $previousEnd = $lastByDay[$day] ?? null;
+
+            if (is_string($previousEnd)
+                && $this->timeInSeconds($range['start_time'])
+                    < $this->timeInSeconds($previousEnd)
+            ) {
+                throw new InvalidArgumentException(
+                    'Availability hours for the same day cannot overlap.',
+                );
+            }
+
+            $lastByDay[$day] = $range['end_time'];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable, 2: string}
+     */
+    private function localDayBounds(string $date, string $timezone): array
+    {
+        $date = trim($date);
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
+            throw new InvalidArgumentException(
+                'Special dates must use YYYY-MM-DD format.',
+            );
+        }
+
+        $dayStart = $this->localDateTimes->resolve(
+            "{$date}T00:00",
+            $timezone,
+            'special-date start',
+        );
+        $nextDate = $dayStart
+            ->setTimezone($timezone)
+            ->addDay()
+            ->toDateString();
+        $dayEnd = $this->localDateTimes->resolve(
+            "{$nextDate}T00:00",
+            $timezone,
+            'special-date end',
+        );
+
+        return [$dayStart, $dayEnd, $nextDate];
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Collection<int, SchedulingAvailabilityWindow>
+     */
+    private function simpleAbsoluteWindowsForDay(
+        BookableService $service,
+        string $timezone,
+        CarbonImmutable $dayStart,
+        CarbonImmutable $dayEnd,
+    ): \Illuminate\Database\Eloquent\Collection {
+        return SchedulingAvailabilityWindow::withTrashed()
+            ->where('bookable_service_id', $service->getKey())
+            ->whereNull('scheduling_host_id')
+            ->where('source', SchedulingAvailabilityWindow::SOURCE_MANUAL)
+            ->where(
+                'window_type',
+                SchedulingAvailabilityWindowType::Absolute->value,
+            )
+            ->where('timezone', $timezone)
+            ->whereNull('capacity')
+            ->where('starts_at', '>=', $dayStart)
+            ->where('starts_at', '<', $dayEnd)
+            ->where('ends_at', '<=', $dayEnd)
+            ->orderByRaw('deleted_at is not null')
+            ->orderBy('starts_at')
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+    }
+
+    /**
+     * @param \Illuminate\Database\Eloquent\Collection<int, SchedulingAvailabilityWindow> $existing
+     * @param array<int, array<string, mixed>> $definitions
+     */
+    private function syncSimpleWindows(
+        \Illuminate\Database\Eloquent\Collection $existing,
+        array $definitions,
+    ): void {
+        $existing = $existing->values();
+
+        foreach ($definitions as $index => $definition) {
+            $window = $existing->get($index);
+
+            if ($window instanceof SchedulingAvailabilityWindow) {
+                $window->forceFill([
+                    ...$definition,
+                    'deleted_at' => null,
+                ]);
+
+                if ($window->isDirty()) {
+                    $this->saveWithVersionBump($window);
+                }
+
+                continue;
+            }
+
+            SchedulingAvailabilityWindow::query()->create($definition);
+        }
+
+        for ($index = count($definitions); $index < $existing->count(); $index++) {
+            $window = $existing->get($index);
+
+            if ($window instanceof SchedulingAvailabilityWindow) {
+                $this->archiveLocked($window);
+            }
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function simpleAbsoluteDefinition(
+        BookableService $service,
+        string $timezone,
+        string $localStartsAt,
+        string $localEndsAt,
+        bool $available,
+    ): array {
+        return [
+            ...$this->windowAttributes([
+                'scope' => self::SCOPE_SERVICE,
+                'bookable_service_id' => $service->getKey(),
+                'scheduling_host_id' => null,
+                'window_type' => SchedulingAvailabilityWindowType::Absolute->value,
+                'timezone' => $timezone,
+                'local_starts_at' => $localStartsAt,
+                'local_ends_at' => $localEndsAt,
+                'capacity' => null,
+                'is_available' => $available,
+            ], $service, null),
+            'source' => SchedulingAvailabilityWindow::SOURCE_MANUAL,
+            'meta' => null,
+        ];
+    }
+
+    private function archiveLocked(SchedulingAvailabilityWindow $window): void
+    {
+        if ($window->trashed()) {
+            return;
+        }
+
+        $next = $this->nextVersion($window);
+
+        $window->forceFill([
+            'deleted_at' => $next,
+            'updated_at' => $next,
+        ])->saveQuietly();
     }
 
     private function assertEditable(SchedulingAvailabilityWindow $window): void

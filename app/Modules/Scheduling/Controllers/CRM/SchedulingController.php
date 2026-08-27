@@ -3,6 +3,7 @@
 namespace App\Modules\Scheduling\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Actions\Contacts\ResolveContactByEmailAction;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Scheduling\Actions\CreateAppointmentAction;
 use App\Modules\Scheduling\Data\AppointmentBookingData;
@@ -12,6 +13,7 @@ use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Requests\StoreAppointmentRequest;
+use App\Modules\Scheduling\Services\SchedulingAvailableStartRangeBuilder;
 use App\Modules\Scheduling\Services\SchedulingLocationSnapshotResolver;
 use App\Modules\Scheduling\Services\SchedulingReadService;
 use App\Modules\Scheduling\Services\SchedulingSetupReadiness;
@@ -19,6 +21,7 @@ use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -31,6 +34,7 @@ class SchedulingController extends Controller
         Request $request,
         SchedulingReadService $read,
         SchedulingSetupReadiness $setupReadiness,
+        SchedulingAvailableStartRangeBuilder $startRanges,
     ): View {
         $query = $request->validate([
             'contact_id' => ['nullable', 'integer', 'exists:contacts,id'],
@@ -100,6 +104,13 @@ class SchedulingController extends Controller
                     host: $selectedHost,
                 )
                 : [];
+        $availableStartRanges = $selectedService instanceof BookableService
+            && $selectedService->usesFixedDuration()
+                ? $startRanges->build(
+                    slots: $slots,
+                    intervalMinutes: max(1, (int) $selectedService->slot_interval_minutes),
+                )
+                : [];
         $upcomingAppointments = $read->upcomingAppointments();
         $requestedContactId = $this->oldOrQueryInteger(
             request: $request,
@@ -126,6 +137,7 @@ class SchedulingController extends Controller
             'dateMaximum' => $dateMaximum,
             'dateInRange' => $dateInRange,
             'slots' => $slots,
+            'availableStartRanges' => $availableStartRanges,
             'upcomingAppointments' => $upcomingAppointments,
             'pendingCount' => $upcomingAppointments
                 ->where('status', Appointment::STATUS_PENDING)
@@ -144,9 +156,9 @@ class SchedulingController extends Controller
         StoreAppointmentRequest $request,
         CreateAppointmentAction $createAppointment,
         SchedulingLocationSnapshotResolver $locationSnapshots,
+        ResolveContactByEmailAction $resolveContactByEmail,
     ): RedirectResponse {
         $validated = $request->validated();
-        $contact = Contact::query()->findOrFail($validated['contact_id']);
         $service = BookableService::query()
             ->where('status', BookableService::STATUS_ACTIVE)
             ->findOrFail($validated['bookable_service_id']);
@@ -186,62 +198,141 @@ class SchedulingController extends Controller
         }
 
         try {
-            $appointment = $createAppointment->handle(new AppointmentCreationData(
-                service: $service,
-                host: $host,
-                startsAt: $startsAt,
-                endsAt: $endsAt,
-                idempotencyKey: $validated['idempotency_key'],
-                booking: new AppointmentBookingData(
-                    contact: $contact,
-                    primaryAttendee: $contact,
-                    name: $contact->name,
-                    email: $contact->email,
-                    phone: $contact->phone,
-                    location: $location,
-                    createdBy: $request->user(),
-                    source: 'crm',
-                    appointmentMeta: [
-                        'creation' => [
+            $appointment = DB::transaction(function () use (
+                $request,
+                $validated,
+                $service,
+                $host,
+                $location,
+                $startsAt,
+                $endsAt,
+                $createAppointment,
+                $resolveContactByEmail,
+            ): Appointment {
+                $attendee = $this->resolveBookingAttendee(
+                    request: $request,
+                    validated: $validated,
+                    resolveContactByEmail: $resolveContactByEmail,
+                );
+
+                return $createAppointment->handle(new AppointmentCreationData(
+                    service: $service,
+                    host: $host,
+                    startsAt: $startsAt,
+                    endsAt: $endsAt,
+                    idempotencyKey: $validated['idempotency_key'],
+                    booking: new AppointmentBookingData(
+                        contact: $attendee['contact'],
+                        primaryAttendee: $attendee['contact'],
+                        name: $attendee['name'],
+                        email: $attendee['email'],
+                        phone: $attendee['phone'],
+                        description: $request->attendeeContext(),
+                        location: $location,
+                        createdBy: $request->user(),
+                        source: 'crm',
+                        appointmentMeta: [
+                            'creation' => [
+                                'surface' => 'crm_scheduling',
+                            ],
+                        ],
+                        attendeeMeta: [
+                            'creation' => [
+                                'surface' => 'crm_scheduling',
+                            ],
+                        ],
+                    ),
+                    lifecycle: new AppointmentLifecycleContext(
+                        actor: $request->user(),
+                        source: 'crm',
+                        reason: 'crm_manual_create',
+                        context: [
                             'surface' => 'crm_scheduling',
                         ],
-                    ],
-                    attendeeMeta: [
-                        'creation' => [
-                            'surface' => 'crm_scheduling',
-                        ],
-                    ],
-                ),
-                lifecycle: new AppointmentLifecycleContext(
-                    actor: $request->user(),
-                    source: 'crm',
-                    reason: 'crm_manual_create',
-                    context: [
-                        'surface' => 'crm_scheduling',
-                    ],
-                ),
-            ));
+                    ),
+                ));
+            });
         } catch (DomainException|InvalidArgumentException|LogicException $exception) {
             throw ValidationException::withMessages([
                 $service->usesRangeDuration() ? 'range_ends_at' : 'starts_at' => $exception->getMessage(),
             ]);
         }
 
+        $success = $appointment->status === Appointment::STATUS_PENDING
+            ? 'Appointment created and awaiting confirmation.'
+            : 'Appointment scheduled.';
+
+        if ($request->attendeeMode() === StoreAppointmentRequest::ATTENDEE_MODE_GUEST) {
+            $success .= ' The attendee was not added to Contacts.';
+        }
+
         return redirect()
             ->route('crm.scheduling.index', array_filter([
-                'contact_id' => $contact->getKey(),
+                'contact_id' => $appointment->contact_id,
                 'bookable_service_id' => $service->getKey(),
                 'scheduling_host_id' => $host?->getKey(),
                 'date' => $appointment->starts_at
                     ->setTimezone($service->timezone)
                     ->toDateString(),
             ], static fn (mixed $value): bool => $value !== null))
-            ->with(
-                'success',
-                $appointment->status === Appointment::STATUS_PENDING
-                    ? 'Appointment created and awaiting confirmation.'
-                    : 'Appointment scheduled.',
-            );
+            ->with('success', $success);
+    }
+
+    /**
+     * @param array<string, mixed> $validated
+     * @return array{contact: Contact|null, name: string|null, email: string|null, phone: string|null}
+     */
+    private function resolveBookingAttendee(
+        StoreAppointmentRequest $request,
+        array $validated,
+        ResolveContactByEmailAction $resolveContactByEmail,
+    ): array {
+        if ($request->attendeeMode() === StoreAppointmentRequest::ATTENDEE_MODE_CONTACT) {
+            $contact = Contact::query()->find($validated['contact_id']);
+
+            if (! $contact instanceof Contact) {
+                throw ValidationException::withMessages([
+                    'contact_id' => 'The selected Contact could not be found.',
+                ]);
+            }
+
+            return [
+                'contact' => $contact,
+                'name' => $contact->name,
+                'email' => $contact->email,
+                'phone' => $contact->phone,
+            ];
+        }
+
+        if ($request->attendeeMode() === StoreAppointmentRequest::ATTENDEE_MODE_NEW_CONTACT) {
+            try {
+                $contact = $resolveContactByEmail->handle(
+                    email: (string) $request->attendeeEmail(),
+                    name: $request->attendeeName(),
+                    phone: $request->attendeePhone(),
+                    source: 'crm',
+                    subsource: 'scheduling',
+                );
+            } catch (InvalidArgumentException $exception) {
+                throw ValidationException::withMessages([
+                    'attendee_email' => $exception->getMessage(),
+                ]);
+            }
+
+            return [
+                'contact' => $contact,
+                'name' => $contact->name,
+                'email' => $contact->email,
+                'phone' => $contact->phone,
+            ];
+        }
+
+        return [
+            'contact' => null,
+            'name' => $request->attendeeName(),
+            'email' => $request->attendeeEmail(),
+            'phone' => $request->attendeePhone(),
+        ];
     }
 
     private function contactLabel(Contact $contact): string

@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 1,
+    'version' => 2,
     'tables' => [
         'webinar_schedule_profiles' => [
             'mode' => 'upsert',
@@ -115,6 +115,9 @@ return [
                 'provider_event_type',
                 'external_id',
                 'host_account_key',
+                'provider_lifecycle_status',
+                'provider_missing_at',
+                'provider_archived_at',
                 'join_url',
                 'registration_url',
                 'playback_token',

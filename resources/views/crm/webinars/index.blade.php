@@ -116,19 +116,20 @@
         @endif
 
         @if(session('sync_missing') && count(session('sync_missing')))
-            <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                <p class="font-medium">Missing provider events preserved (not deleted).</p>
-
-                <ul class="mt-2 space-y-1 text-sm">
-                    @foreach(session('sync_missing') as $item)
-                        <li>
-                            {{ $item['title'] }}
-                            @if($item['has_registrations'])
-                                — has registrations
-                            @endif
-                        </li>
-                    @endforeach
-                </ul>
+            <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                <p class="font-semibold">
+                    Zoom no longer includes {{ count(session('sync_missing')) }}
+                    {{ count(session('sync_missing')) === 1 ? 'occurrence' : 'occurrences' }}.
+                </p>
+                <p class="mt-1 text-amber-900">
+                    {{ count(session('sync_missing')) === 1 ? 'It was' : 'They were' }} removed from the active schedule and kept for history. Review the next step under Needs attention.
+                </p>
+                <a
+                    href="{{ route('crm.webinar-series.index', ['attention' => 1]) }}"
+                    class="mt-2 inline-flex font-extrabold text-amber-950 underline decoration-amber-300 underline-offset-4 hover:text-amber-700"
+                >
+                    Review removed occurrences
+                </a>
             </div>
         @endif
 
@@ -460,6 +461,35 @@
                 </div>
             @else
                 <div class="mt-5 grid gap-3 lg:grid-cols-2">
+                    @foreach(($providerMissingOccurrences ?? collect()) as $missingWebinar)
+                        <article
+                            data-provider-missing-occurrence="{{ $missingWebinar->getKey() }}"
+                            class="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm"
+                        >
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                                <div>
+                                    <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-700">Removed from Zoom</p>
+                                    <h3 class="mt-1 text-base font-black text-slate-950">{{ $missingWebinar->title }}</h3>
+                                    <p class="mt-1 text-sm text-slate-600">
+                                        {{ $missingWebinar->starts_at?->copy()->setTimezone($missingWebinar->timezone)->format('M j, Y · g:i A') ?? 'Start time unavailable' }}
+                                        · {{ (int) ($missingWebinar->registrations_count ?? 0) }} {{ (int) ($missingWebinar->registrations_count ?? 0) === 1 ? 'registration' : 'registrations' }}
+                                    </p>
+                                </div>
+                                <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-800">Decision needed</span>
+                            </div>
+
+                            <p class="mt-3 text-sm leading-6 text-slate-600">
+                                This event can no longer accept registrations. Choose a synced replacement, or keep the occurrence for history.
+                            </p>
+                            <a
+                                href="{{ route('crm.webinar-series.index', ['attention' => 1]).'#webinar-'.$missingWebinar->getKey() }}"
+                                class="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-full bg-amber-700 px-4 text-center text-sm font-extrabold text-white transition hover:bg-amber-600 sm:w-auto"
+                            >
+                                Resolve occurrence
+                            </a>
+                        </article>
+                    @endforeach
+
                     @foreach(($pendingPostEventReviews ?? collect()) as $reviewWebinar)
                         <article class="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
@@ -563,6 +593,8 @@
                                     ?? \Illuminate\Support\Str::headline($webinar->providerEventTypeKey());
                                 $replacementCandidates = $replacementCandidatesBySourceId[$webinar->getKey()]
                                     ?? collect();
+                                $providerMissing = $webinar->isProviderMissing();
+                                $providerArchived = $webinar->isProviderArchived();
                                 $replacementRegistrations = $webinar->registrations->filter(
                                     fn ($registration): bool => $registration->replacement_of_registration_id !== null,
                                 );
@@ -666,6 +698,16 @@
                                         <span class="rounded-full bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-700 ring-1 ring-indigo-200">
                                             Zoom {{ $eventTypeLabel }}
                                         </span>
+
+                                        @if($providerMissing)
+                                            <span class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-200">
+                                                Removed from Zoom
+                                            </span>
+                                        @elseif($providerArchived)
+                                            <span class="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700 ring-1 ring-slate-200">
+                                                Kept for history
+                                            </span>
+                                        @endif
 
                                         @if($webinar->replacementOf)
                                             <span class="rounded-full bg-sky-50 px-2 py-0.5 font-semibold text-sky-700 ring-1 ring-sky-200">
@@ -772,6 +814,19 @@
                                         @endif
                                     </div>
 
+                                    @if($providerMissing)
+                                        <div class="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+                                            <p class="font-semibold">This event no longer exists in Zoom and is no longer active or registerable.</p>
+                                            <p class="mt-1 text-amber-900">
+                                                @if($webinar->registrations->isNotEmpty())
+                                                    It has registrations. Choose a synced replacement below so active registrants can be moved safely, or keep the record for history.
+                                                @else
+                                                    Choose a synced replacement below, or keep the record for history.
+                                                @endif
+                                            </p>
+                                        </div>
+                                    @endif
+
                                     @if($webinar->replacement)
                                         <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
                                             <p class="font-semibold">
@@ -842,6 +897,22 @@
                                                 </button>
                                             </form>
                                         </details>
+                                    @endif
+
+                                    @if($providerMissing)
+                                        <form
+                                            method="POST"
+                                            action="{{ route('crm.webinars.archive-missing', $webinar) }}"
+                                            class="mt-3"
+                                        >
+                                            @csrf
+                                            <button
+                                                type="submit"
+                                                class="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+                                            >
+                                                Keep for history
+                                            </button>
+                                        </form>
                                     @endif
 
                                     @if($finalizationFailures->isNotEmpty())

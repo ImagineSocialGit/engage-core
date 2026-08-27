@@ -32,6 +32,7 @@ class WebinarProjectStateRoundTripTest extends TestCase
         $document = $projectState->export();
 
         $this->assertSame((int) config('project_state.version'), $document['version']);
+        $this->assertSame(2, $document['sections']['webinars']['version']);
         $this->assertCount(
             1,
             $document['sections']['webinars']['tables']['webinar_schedule_profiles'],
@@ -95,6 +96,7 @@ class WebinarProjectStateRoundTripTest extends TestCase
             'webinar_series_id' => 310,
             'webinar_schedule_profile_id' => 400,
             'slug' => 'production-webinar-original',
+            'provider_lifecycle_status' => 'missing',
         ]);
         $this->assertDatabaseHas('webinars', [
             'id' => 321,
@@ -723,6 +725,9 @@ class WebinarProjectStateRoundTripTest extends TestCase
             'provider_event_type' => 'webinar',
             'external_id' => 'zoom-'.$id,
             'host_account_key' => 'primary',
+            'provider_lifecycle_status' => $id === 320 ? 'missing' : 'active',
+            'provider_missing_at' => $id === 320 ? $now : null,
+            'provider_archived_at' => null,
             'join_url' => 'https://example.test/join/'.$id,
             'registration_url' => 'https://example.test/register/'.$id,
             'playback_token' => 'playback-'.$id,

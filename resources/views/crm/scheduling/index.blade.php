@@ -1,3 +1,4 @@
+
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
@@ -368,36 +369,48 @@
                             <h2 class="text-lg font-semibold tracking-tight text-slate-900">
                                 {{ $selectedService->usesRangeDuration() ? 'Schedule the stay' : 'Schedule the appointment' }}
                             </h2>
-
                             <p class="mt-1 text-sm text-slate-500">
-                                {{ $selectedService->usesRangeDuration()
-                                    ? 'Select an existing contact and enter the authoritative check-in/check-out interval.'
-                                    : 'Select an existing contact and one currently available time.' }}
+                                Tell us who this is for, then choose an available time.
                             </p>
                         </div>
+
+                        @if($errors->any())
+                            <div data-scheduling-validation-summary>
+                                <x-ui.feedback.alert type="error">
+                                    We couldn't schedule this yet. Check the highlighted information below and try again.
+                                </x-ui.feedback.alert>
+                            </div>
+                        @endif
 
                         <form
                             method="POST"
                             action="{{ route('crm.scheduling.appointments.store') }}"
                             class="space-y-5"
                             x-data="{
+                                attendeeMode: @js(old('attendee_mode', $selectedContact ? 'contact' : 'contact')),
                                 query: @js(old('contact_search', $selectedContactLabel)),
                                 selectedId: @js((string) old('contact_id', $selectedContact?->id ?? '')),
+                                attendeeName: @js(old('attendee_name', '')),
+                                attendeeEmail: @js(old('attendee_email', '')),
+                                attendeePhone: @js(old('attendee_phone', '')),
+                                selectedStart: @js(old('starts_at', '')),
+                                rangeStartsAt: @js(old('range_starts_at', '')),
+                                rangeEndsAt: @js(old('range_ends_at', '')),
                                 results: [],
                                 loading: false,
                                 open: false,
+                                fixedDuration: @js($selectedService->usesFixedDuration()),
+                                hostReady: @js(! $requiresHost || $selectedHost !== null),
+                                fixedTimesAvailable: @js($slots !== []),
                                 async search() {
                                     this.selectedId = '';
                                     const value = this.query.trim();
-
                                     if (value.length < 2) {
                                         this.results = [];
                                         this.open = false;
                                         return;
                                     }
-
                                     this.loading = true;
-
                                     try {
                                         const response = await fetch(
                                             @js(route('crm.contacts.lookup')) + '?q=' + encodeURIComponent(value),
@@ -416,6 +429,19 @@
                                     this.results = [];
                                     this.open = false;
                                 },
+                                personReady() {
+                                    if (this.attendeeMode === 'contact') return this.selectedId !== '';
+                                    if (this.attendeeMode === 'new_contact') return this.attendeeName.trim() !== '' && this.attendeeEmail.trim() !== '';
+                                    if (this.attendeeMode === 'guest') return this.attendeeName.trim() !== '';
+                                    return false;
+                                },
+                                timeReady() {
+                                    if (this.fixedDuration) return this.fixedTimesAvailable && this.selectedStart !== '';
+                                    return this.rangeStartsAt !== '' && this.rangeEndsAt !== '';
+                                },
+                                canSubmit() {
+                                    return this.hostReady && this.personReady() && this.timeReady();
+                                },
                             }"
                             x-on:click.outside="open = false"
                         >
@@ -425,13 +451,32 @@
                             <input type="hidden" name="scheduling_host_id" value="{{ $selectedHost?->id }}">
                             <input type="hidden" name="date" value="{{ $selectedDate->toDateString() }}">
                             <input type="hidden" name="idempotency_key" value="{{ $idempotencyKey }}">
-                            <input type="hidden" name="contact_id" x-model="selectedId">
+                            <input type="hidden" name="contact_id" x-model="selectedId" x-bind:disabled="attendeeMode !== 'contact'">
 
-                            <div class="relative">
-                                <x-ui.form.label for="contact_search">
-                                    Contact
-                                </x-ui.form.label>
+                            <fieldset class="space-y-3" data-scheduling-attendee-mode>
+                                <legend class="text-sm font-semibold text-slate-900">Who is this appointment for?</legend>
+                                <div class="grid gap-2 sm:grid-cols-3">
+                                    <label class="cursor-pointer rounded-xl border border-slate-200 p-3 has-[:checked]:border-teal-500 has-[:checked]:bg-teal-50">
+                                        <input type="radio" name="attendee_mode" value="contact" class="sr-only" x-model="attendeeMode">
+                                        <span class="block text-sm font-semibold text-slate-900">Existing Contact</span>
+                                        <span class="mt-1 block text-xs text-slate-500">Find someone already in Engage Core.</span>
+                                    </label>
+                                    <label class="cursor-pointer rounded-xl border border-slate-200 p-3 has-[:checked]:border-teal-500 has-[:checked]:bg-teal-50">
+                                        <input type="radio" name="attendee_mode" value="new_contact" class="sr-only" x-model="attendeeMode">
+                                        <span class="block text-sm font-semibold text-slate-900">New person</span>
+                                        <span class="mt-1 block text-xs text-slate-500">Add or match them in Contacts while booking.</span>
+                                    </label>
+                                    <label class="cursor-pointer rounded-xl border border-slate-200 p-3 has-[:checked]:border-teal-500 has-[:checked]:bg-teal-50">
+                                        <input type="radio" name="attendee_mode" value="guest" class="sr-only" x-model="attendeeMode">
+                                        <span class="block text-sm font-semibold text-slate-900">Don't add to Contacts</span>
+                                        <span class="mt-1 block text-xs text-slate-500">Keep attendee details only on this appointment.</span>
+                                    </label>
+                                </div>
+                                <x-ui.form.error name="attendee_mode" />
+                            </fieldset>
 
+                            <div x-show="attendeeMode === 'contact'" x-cloak class="relative">
+                                <x-ui.form.label for="contact_search">Existing Contact</x-ui.form.label>
                                 <x-ui.form.input
                                     id="contact_search"
                                     name="contact_search"
@@ -439,13 +484,18 @@
                                     autocomplete="off"
                                     placeholder="Search by name, email, or phone"
                                     x-model="query"
+                                    x-bind:disabled="attendeeMode !== 'contact'"
                                     x-on:input.debounce.250ms="search()"
                                     x-on:focus="query.trim().length >= 2 && (open = true)"
                                 />
 
-                                <p x-show="loading" class="mt-2 text-xs text-slate-500">
-                                    Searching contacts…
+                                <p x-show="selectedId" class="mt-2 text-xs font-semibold text-teal-700" data-scheduling-contact-selected>
+                                    Contact selected.
                                 </p>
+                                <p x-show="query.trim().length > 0 && !selectedId && !loading" class="mt-2 text-xs font-semibold text-amber-700" data-scheduling-contact-unselected>
+                                    Choose a Contact from the search results before scheduling.
+                                </p>
+                                <p x-show="loading" class="mt-2 text-xs text-slate-500">Searching contacts…</p>
 
                                 <div
                                     x-show="open"
@@ -453,151 +503,135 @@
                                     class="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg"
                                 >
                                     <template x-for="contact in results" :key="contact.id">
-                                        <button
-                                            type="button"
-                                            class="block w-full break-words rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100"
-                                            x-on:click="choose(contact)"
-                                        >
+                                        <button type="button" class="block w-full break-words rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100" x-on:click="choose(contact)">
                                             <span class="font-medium text-slate-900" x-text="contact.label"></span>
                                         </button>
                                     </template>
+                                    <p x-show="!loading && results.length === 0" class="px-3 py-2 text-sm text-slate-500">No matching Contacts found.</p>
+                                </div>
+                                <x-ui.form.error name="contact_id" />
+                            </div>
 
-                                    <p
-                                        x-show="!loading && results.length === 0"
-                                        class="px-3 py-2 text-sm text-slate-500"
-                                    >
-                                        No matching contacts found.
-                                    </p>
+                            <div x-show="attendeeMode !== 'contact'" x-cloak class="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <div x-show="attendeeMode === 'new_contact'" class="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+                                    If this email already belongs to a Contact, Engage Core will use that Contact instead of creating a duplicate. Booking someone does not grant marketing consent.
+                                </div>
+                                <div x-show="attendeeMode === 'guest'" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                                    This person will not be added to Contacts. Contact-linked history, communication, and CRM follow-up will not be available unless the appointment is connected to a Contact later.
                                 </div>
 
-                                <x-ui.form.error name="contact_id" />
+                                <div class="grid gap-4 sm:grid-cols-2">
+                                    <div class="sm:col-span-2">
+                                        <x-ui.form.label for="attendee_name">Name</x-ui.form.label>
+                                        <x-ui.form.input id="attendee_name" name="attendee_name" value="" x-model="attendeeName" x-bind:disabled="attendeeMode === 'contact'" />
+                                        <x-ui.form.error name="attendee_name" />
+                                    </div>
+                                    <div>
+                                        <x-ui.form.label for="attendee_email">
+                                            Email <span x-show="attendeeMode === 'new_contact'" class="text-slate-500">(required)</span>
+                                        </x-ui.form.label>
+                                        <x-ui.form.input id="attendee_email" name="attendee_email" type="email" value="" x-model="attendeeEmail" x-bind:required="attendeeMode === 'new_contact'" x-bind:disabled="attendeeMode === 'contact'" autocomplete="email" />
+                                        <x-ui.form.error name="attendee_email" />
+                                    </div>
+                                    <div>
+                                        <x-ui.form.label for="attendee_phone">Phone</x-ui.form.label>
+                                        <x-ui.form.input id="attendee_phone" name="attendee_phone" value="" x-model="attendeePhone" x-bind:disabled="attendeeMode === 'contact'" autocomplete="tel" />
+                                        <x-ui.form.error name="attendee_phone" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <x-ui.form.label for="attendee_context">Appointment context <span class="text-slate-500">(optional)</span></x-ui.form.label>
+                                <textarea id="attendee_context" name="attendee_context" rows="3" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200">{{ old('attendee_context') }}</textarea>
+                                <p class="mt-1 text-xs text-slate-500">Add anything the person handling the appointment should know.</p>
+                                <x-ui.form.error name="attendee_context" />
                             </div>
 
                             @if($selectedService->location_type === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_CUSTOMER_SITE)
                                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
                                     <h3 class="text-sm font-semibold text-slate-900">Customer service address</h3>
-                                    <p class="mt-1 break-words text-xs text-slate-500">
-                                        Enter the address where this appointment will take place. Scheduling normalizes it into the Appointment snapshot.
-                                    </p>
-
+                                    <p class="mt-1 break-words text-xs text-slate-500">Enter the address where this appointment will take place.</p>
                                     <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                                        <div class="sm:col-span-2">
-                                            <x-ui.form.label for="address_line_1">Address line 1</x-ui.form.label>
-                                            <x-ui.form.input id="address_line_1" name="address_line_1" value="{{ old('address_line_1') }}" autocomplete="address-line1" />
-                                            <x-ui.form.error name="address_line_1" />
-                                        </div>
-                                        <div class="sm:col-span-2">
-                                            <x-ui.form.label for="address_line_2">Address line 2</x-ui.form.label>
-                                            <x-ui.form.input id="address_line_2" name="address_line_2" value="{{ old('address_line_2') }}" autocomplete="address-line2" />
-                                            <x-ui.form.error name="address_line_2" />
-                                        </div>
-                                        <div>
-                                            <x-ui.form.label for="city">City</x-ui.form.label>
-                                            <x-ui.form.input id="city" name="city" value="{{ old('city') }}" autocomplete="address-level2" />
-                                            <x-ui.form.error name="city" />
-                                        </div>
-                                        <div>
-                                            <x-ui.form.label for="region">State / region</x-ui.form.label>
-                                            <x-ui.form.input id="region" name="region" value="{{ old('region') }}" autocomplete="address-level1" />
-                                            <x-ui.form.error name="region" />
-                                        </div>
-                                        <div>
-                                            <x-ui.form.label for="postal_code">Postal code</x-ui.form.label>
-                                            <x-ui.form.input id="postal_code" name="postal_code" value="{{ old('postal_code') }}" autocomplete="postal-code" />
-                                            <x-ui.form.error name="postal_code" />
-                                        </div>
-                                        <div>
-                                            <x-ui.form.label for="country">Country code</x-ui.form.label>
-                                            <x-ui.form.input id="country" name="country" value="{{ old('country', 'US') }}" maxlength="2" autocomplete="country" />
-                                            <x-ui.form.error name="country" />
-                                        </div>
+                                        <div class="sm:col-span-2"><x-ui.form.label for="address_line_1">Address line 1</x-ui.form.label><x-ui.form.input id="address_line_1" name="address_line_1" value="{{ old('address_line_1') }}" autocomplete="address-line1" /><x-ui.form.error name="address_line_1" /></div>
+                                        <div class="sm:col-span-2"><x-ui.form.label for="address_line_2">Address line 2</x-ui.form.label><x-ui.form.input id="address_line_2" name="address_line_2" value="{{ old('address_line_2') }}" autocomplete="address-line2" /><x-ui.form.error name="address_line_2" /></div>
+                                        <div><x-ui.form.label for="city">City</x-ui.form.label><x-ui.form.input id="city" name="city" value="{{ old('city') }}" autocomplete="address-level2" /><x-ui.form.error name="city" /></div>
+                                        <div><x-ui.form.label for="region">State / region</x-ui.form.label><x-ui.form.input id="region" name="region" value="{{ old('region') }}" autocomplete="address-level1" /><x-ui.form.error name="region" /></div>
+                                        <div><x-ui.form.label for="postal_code">Postal code</x-ui.form.label><x-ui.form.input id="postal_code" name="postal_code" value="{{ old('postal_code') }}" autocomplete="postal-code" /><x-ui.form.error name="postal_code" /></div>
+                                        <div><x-ui.form.label for="country">Country code</x-ui.form.label><x-ui.form.input id="country" name="country" value="{{ old('country', 'US') }}" maxlength="2" autocomplete="country" /><x-ui.form.error name="country" /></div>
                                     </div>
                                 </div>
                             @endif
 
                             <div>
                                 @if($selectedService->usesRangeDuration())
-                                    <span class="block text-sm font-medium text-slate-700">
-                                        Stay interval
-                                    </span>
-
+                                    <span class="block text-sm font-medium text-slate-700">Stay interval</span>
                                     @if($requiresHost && ! $selectedHost)
-                                        <p class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                                            Choose assigned staff or a provider before entering the stay interval.
-                                        </p>
+                                        <p class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Choose assigned staff or a provider before entering the stay interval.</p>
                                     @else
                                         <div class="mt-2 grid gap-4 sm:grid-cols-2">
                                             <div>
                                                 <x-ui.form.label for="range_starts_at">Check-in</x-ui.form.label>
-                                                <x-ui.form.input
-                                                    id="range_starts_at"
-                                                    name="range_starts_at"
-                                                    type="datetime-local"
-                                                    value="{{ old('range_starts_at') }}"
-                                                />
+                                                <x-ui.form.input id="range_starts_at" name="range_starts_at" type="datetime-local" value="{{ old('range_starts_at') }}" x-model="rangeStartsAt" />
                                                 <x-ui.form.error name="range_starts_at" />
                                             </div>
                                             <div>
                                                 <x-ui.form.label for="range_ends_at">Check-out</x-ui.form.label>
-                                                <x-ui.form.input
-                                                    id="range_ends_at"
-                                                    name="range_ends_at"
-                                                    type="datetime-local"
-                                                    value="{{ old('range_ends_at') }}"
-                                                />
+                                                <x-ui.form.input id="range_ends_at" name="range_ends_at" type="datetime-local" value="{{ old('range_ends_at') }}" x-model="rangeEndsAt" />
                                                 <x-ui.form.error name="range_ends_at" />
                                             </div>
                                         </div>
-                                        <p class="mt-2 text-xs text-slate-500">
-                                            Times are interpreted in {{ $selectedService->timezone }}. Allowed duration: {{ $selectedService->minimumDurationMinutes() }}–{{ $selectedService->maximumDurationMinutes() }} minutes.
-                                        </p>
+                                        <p class="mt-2 text-xs text-slate-500">Times are interpreted in {{ $selectedService->timezone }}. Allowed duration: {{ $selectedService->minimumDurationMinutes() }}–{{ $selectedService->maximumDurationMinutes() }} minutes.</p>
                                     @endif
                                 @else
-                                    <span class="block text-sm font-medium text-slate-700">
-                                        Available time
-                                    </span>
-
+                                    <span class="block text-sm font-medium text-slate-700">Available appointment start times</span>
                                     @if($requiresHost && ! $selectedHost)
-                                        <p class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                                            Choose assigned staff or a provider before selecting a time.
-                                        </p>
-                                    @elseif($slots === [])
-                                        <p class="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                                            No appointment times are currently available for this date.
-                                        </p>
+                                        <p class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Choose assigned staff or a provider before selecting a time.</p>
+                                    @elseif($availableStartRanges === [])
+                                        <p class="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">No appointment start times are currently available for this date.</p>
                                     @else
-                                        <div class="mt-2 grid gap-2 sm:grid-cols-2">
-                                            @foreach($slots as $slot)
+                                        <div class="mt-2 space-y-2" data-scheduling-start-ranges>
+                                            @foreach($availableStartRanges as $range)
                                                 @php
-                                                    $slotValue = $slot->startsAt->toIso8601String();
-                                                    $slotLabel = $slot->startsAt
-                                                        ->setTimezone($selectedService->timezone)
-                                                        ->format('g:i A')
-                                                        .'–'
-                                                        .$slot->endsAt
-                                                            ->setTimezone($selectedService->timezone)
-                                                            ->format('g:i A');
+                                                    $rangeStart = $range['starts_at']->setTimezone($range['display_timezone']);
+                                                    $rangeEnd = $range['last_start_at']->setTimezone($range['display_timezone']);
                                                 @endphp
-
-                                                <label class="cursor-pointer rounded-xl border border-slate-200 p-3 hover:border-slate-400 has-[:checked]:border-teal-500 has-[:checked]:bg-teal-50">
-                                                    <input
-                                                        type="radio"
-                                                        name="starts_at"
-                                                        value="{{ $slotValue }}"
-                                                        class="sr-only"
-                                                        @checked(old('starts_at') === $slotValue)
-                                                    >
-                                                    <span class="block text-sm font-semibold text-slate-900">
-                                                        {{ $slotLabel }}
-                                                    </span>
-                                                    <span class="mt-1 block text-xs text-slate-500">
-                                                        {{ $selectedService->timezone }}
-                                                    </span>
-                                                </label>
+                                                <div class="flex flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between" data-start-range-first="{{ $range['starts_at']->toISOString() }}" data-start-range-last="{{ $range['last_start_at']->toISOString() }}">
+                                                    <div>
+                                                        <p class="text-sm font-semibold text-slate-900">
+                                                            {{ $rangeStart->format('g:i A') }}{{ $range['slot_count'] > 1 ? '–'.$rangeEnd->format('g:i A') : '' }}
+                                                        </p>
+                                                        <p class="mt-1 text-xs text-slate-500">
+                                                            {{ $range['slot_count'] > 1 ? 'Start every '.$range['interval_minutes'].' minutes' : 'One available start' }} · {{ $range['display_timezone'] }}
+                                                        </p>
+                                                    </div>
+                                                    <span class="text-xs font-semibold text-slate-600">{{ $range['remaining_capacity'] }} open {{ $range['remaining_capacity'] === 1 ? 'spot' : 'spots' }} per start</span>
+                                                </div>
                                             @endforeach
                                         </div>
-                                    @endif
 
+                                        <div class="mt-4">
+                                            <x-ui.form.label for="starts_at">Choose exact start time</x-ui.form.label>
+                                            <x-ui.form.select id="starts_at" name="starts_at" x-model="selectedStart">
+                                                <option value="">Choose a start time</option>
+                                                @foreach($availableStartRanges as $range)
+                                                    @php
+                                                        $groupStart = $range['starts_at']->setTimezone($range['display_timezone']);
+                                                        $groupEnd = $range['last_start_at']->setTimezone($range['display_timezone']);
+                                                        $groupLabel = $groupStart->format('g:i A').($range['slot_count'] > 1 ? '–'.$groupEnd->format('g:i A') : '');
+                                                    @endphp
+                                                    <optgroup label="{{ $groupLabel }}">
+                                                        @foreach($range['slots'] as $slot)
+                                                            @php $slotValue = $slot->startsAt->toIso8601String(); @endphp
+                                                            <option value="{{ $slotValue }}" @selected(old('starts_at') === $slotValue)>
+                                                                {{ $slot->localStartsAt()->format('g:i A') }}
+                                                            </option>
+                                                        @endforeach
+                                                    </optgroup>
+                                                @endforeach
+                                            </x-ui.form.select>
+                                        </div>
+                                    @endif
                                     <x-ui.form.error name="starts_at" />
                                 @endif
 
@@ -606,13 +640,12 @@
                                 <x-ui.form.error name="idempotency_key" />
                             </div>
 
-                            <x-ui.button
-                                type="submit"
-                                class="w-full justify-center"
-                                :disabled="($requiresHost && ! $selectedHost) || ($selectedService->usesFixedDuration() && $slots === [])"
-                            >
+                            <x-ui.button type="submit" class="w-full justify-center" x-bind:disabled="!canSubmit()">
                                 {{ $selectedService->usesRangeDuration() ? 'Schedule Stay' : 'Schedule Appointment' }}
                             </x-ui.button>
+                            <p x-show="!canSubmit()" class="text-center text-xs text-slate-500" data-scheduling-submit-help>
+                                Choose who this is for and a valid time before scheduling.
+                            </p>
                         </form>
                     </x-ui.card>
                 @endif
