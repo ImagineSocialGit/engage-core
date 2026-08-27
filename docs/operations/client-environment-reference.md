@@ -39,19 +39,43 @@ until an override is intentionally needed.
 
 The updated `.env.example` follows this rule for fallback-based variables.
 
+## Environment-file filesystem permissions
+
+The supported server deployment path expects both the deployment/Artisan user and PHP-FPM to read the root and selected-client environment files. Protect secrets without making them unreadable to the web runtime.
+
+For the common deployment shape where the checkout is owned by `<DEPLOY_USER>` and PHP-FPM runs in `<WEB_GROUP>` (commonly `www-data`), use:
+
+```bash
+sudo chown <DEPLOY_USER>:<WEB_GROUP> .env client/<CLIENT_KEY>/.env
+sudo chmod 640 .env client/<CLIENT_KEY>/.env
+```
+
+Verify both identities can read the files without printing their contents:
+
+```bash
+test -r .env && test -r client/<CLIENT_KEY>/.env
+sudo -u <WEB_USER> test -r .env
+sudo -u <WEB_USER> test -r client/<CLIENT_KEY>/.env
+```
+
+Do not default these files to `0600` when PHP-FPM runs as another user and reads the files directly. That produces a split-brain failure where CLI/Artisan sees the intended environment while web requests fall back to missing/default environment values; symptoms can include `MissingAppKeyException`, unexpected `production` logging context, or host-specific routes returning 404 even though `route:list` is correct from the CLI.
+
+`0600` is valid only when the web runtime does not need filesystem read access to these files or runs as the same owning identity.
+
 ---
 
 # 1. Application identity and environment
 
-Core variables:
+Root/process application variables:
 
 ```env
 APP_NAME="EngageCore"
 APP_ENV=local
 APP_KEY=
 APP_DEBUG=true
-APP_URL=https://DOMAIN.com
 ```
+
+`APP_URL` is selected-client deployment state and belongs in `client/[CLIENT_KEY]/.env`; do not duplicate it in root `.env`, because root/process values are loaded before the selected-client environment and can defeat the intended client override.
 
 Staging:
 
@@ -92,7 +116,7 @@ The selected client then contributes:
 
 ```text
 client/[CLIENT_KEY]/.env
-    client deployment/runtime values
+    client deployment/runtime values accepted by ClientEnvironmentLoader
 
 client/[CLIENT_KEY]/config/client.php
     client identity, selected preset, stable client timezone
@@ -126,6 +150,17 @@ client/[CLIENT_KEY]/config/client.php
 
 'timezone' => 'America/Denver',
 ```
+
+The selected-client `.env` is a strict allowlist, not an arbitrary second Laravel environment file. `ClientEnvironmentLoader` rejects root-owned or unsupported keys. Keep process-wide values in root `.env` even when they are related to a client-facing provider. In particular:
+
+```text
+FILESYSTEM_DISK
+RESEND_WEBHOOK_TIMESTAMP_DRIFT_SECONDS
+```
+
+remain root/process-owned, while client-varying storage credentials, bucket identity, sender identities, provider API keys, webhook secrets, and Forms external-client credentials remain selected-client-owned.
+
+When a fresh bootstrap fails before Laravel finishes registering configuration, an early client-environment contract exception may be obscured by a secondary `Target class [config] does not exist` reporting failure. Use the troubleshooting runbook's direct `ClientEnvironmentLoader` diagnostic before changing application code.
 
 ---
 
@@ -583,12 +618,17 @@ Use prefixes and/or DB isolation deliberately. Never assume an unprefixed raw Re
 
 # 13. DigitalOcean Spaces
 
-These values are selected-client deployment values and belong in `client/[CLIENT_KEY]/.env`.
+Disk/backend selection is root/process-owned; client-varying Spaces identity, credentials, bucket, and CDN values belong in `client/[CLIENT_KEY]/.env`.
 
-Canonical variables:
+Root/process selection:
 
 ```env
 FILESYSTEM_DISK=spaces
+```
+
+Selected-client storage identity and credentials:
+
+```env
 DO_SPACES_KEY=
 DO_SPACES_SECRET=
 DO_SPACES_ENDPOINT=https://nyc3.digitaloceanspaces.com
@@ -623,11 +663,16 @@ FROM_EMAIL_MARKETING=
 FROM_NAME_MARKETING=
 ```
 
-Resend credentials/webhook:
+Selected-client Resend credentials/webhook secret:
 
 ```env
 RESEND_API_KEY=
 RESEND_WEBHOOK_SECRET=
+```
+
+Root/process webhook verification tolerance:
+
+```env
 RESEND_WEBHOOK_TIMESTAMP_DRIFT_SECONDS=300
 ```
 
@@ -955,7 +1000,10 @@ Before deleting an existing live environment variable, search the full repositor
 [ ] APP_ENV correct
 [ ] APP_DEBUG false outside local
 [ ] APP_KEY set and preserved
+[ ] root and client `.env` files are owned/readable by the deploy and PHP-FPM identities without being world-readable
+[ ] client `.env` contains only ClientEnvironmentLoader-owned keys; root/process keys were not copied there for symmetry
 [ ] URLs correct
+[ ] `CRM_APP_URL` resolves to the actual registered CRM route host (including `app.` deployments)
 [ ] DB correct
 [ ] Redis DB/prefix isolation correct
 [ ] Cache prefix unique

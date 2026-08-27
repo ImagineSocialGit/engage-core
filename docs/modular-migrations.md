@@ -557,7 +557,7 @@ controlled Project State clean rebuild
 
 After the final path-selection cutover, plain `migrate` and `migrate:fresh` do not reconstruct optional module schema. They operate on the platform migration path registered at runtime.
 
-A future automated deploy script should call these existing commands rather than duplicate dependency planning, path selection, ledger transitions, preset composition, or validation logic.
+The repository's new-environment launch helper should call these existing commands rather than duplicate dependency planning, path selection, ledger transitions, preset composition, or validation logic. The current helper is `scripts/operations/launch-client-environment.sh`; `engage:install` remains the schema/preset/validation authority.
 
 ## Cross-thread deployment context dump
 
@@ -823,6 +823,6 @@ only in tests whose permanent contract genuinely requires it.
 
 The modular migration workstream now has explicit ownership, installation state, selective execution, reconciliation, setup validation, runtime/test path separation, new-client orchestration, and an operator deployment workflow. The deployment-context dump provides a compact handoff artifact for future threads.
 
-Client configuration generation or mutation remains separate from `engage:install`; the installer consumes configured runtime intent rather than rewriting it. A future automated deploy script should orchestrate the documented commands rather than reimplementing module migration logic.
+Client configuration generation or mutation remains separate from `engage:install`; the installer consumes configured runtime intent rather than rewriting it. Deployment helpers should orchestrate the documented commands rather than reimplementing module migration logic; `scripts/operations/launch-client-environment.sh` follows that boundary.
 
 The known Messaging migration rollback-order defect remains a separate cleanup item. It does not block forward installation or deployment, but its `down()` path should be corrected before rollback behavior is treated as supported.

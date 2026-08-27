@@ -27,6 +27,7 @@ Spaces bucket strategy:
 Resend account/domain:
 Telnyx account/numbers/profiles:
 Zoom account/app:
+Cloudflare Turnstile account/widget, when public forms use it:
 ```
 
 For each service, classify environment isolation:
@@ -79,10 +80,12 @@ Typical Engage Core production topology:
 
 ```text
 <ROOT_DOMAIN>
-crm.<ROOT_DOMAIN>
+<CORE_ADMIN_HOST>    commonly crm.<ROOT_DOMAIN> or app.<ROOT_DOMAIN>
 webinar.<ROOT_DOMAIN>
 webhooks.<ROOT_DOMAIN>
 ```
+
+`CRM_APP_URL` is the canonical Core admin URL; do not treat the literal `crm` label as part of the platform contract.
 
 Staging may use a separate domain or subdomain hierarchy.
 
@@ -108,11 +111,38 @@ Do not assume a wildcard certificate exists or covers every required hostname.
 
 ---
 
-# 3. DigitalOcean Spaces
+# 3. Cloudflare Turnstile, when public forms use it
+
+Turnstile is an Artist Sites/public-form protection service, not a requirement for Engage Core itself and not a requirement to move DNS/reverse proxying to Cloudflare.
+
+For the current `artist_updates` reference flow:
+
+- [ ] Widget/account ownership is assigned to the organization/client rather than an individual developer account.
+- [ ] MFA/recovery/offboarding access is documented.
+- [ ] Widget allows the exact staging and production Artist Sites hostnames that will render the form.
+- [ ] Each deployed Artist runtime validates only its own exact hostname(s); do not use wildcard application-side hostname acceptance.
+- [ ] Staging/production site key and secret inventory is recorded securely.
+- [ ] Site key may be public; secret key is server-only.
+- [ ] No secret is committed to source control, Site State, logs, or ordinary deployment artifacts.
+
+Current Artist Sites deployment variables are:
+
+```env
+FORMS_HUMAN_VERIFICATION_PROVIDER=turnstile
+TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=
+TURNSTILE_EXPECTED_HOSTNAMES=
+```
+
+A shared Cloudflare widget may authorize both staging and production hostnames, but each runtime's `TURNSTILE_EXPECTED_HOSTNAMES` should remain narrow. Run Artist Sites `php artisan site:check` after installing credentials before Core is changed to require verification.
+
+---
+
+# 4. DigitalOcean Spaces
 
 Current Core storage path supports DigitalOcean Spaces through the Laravel S3 driver.
 
-Required values:
+Required values span root/process selection plus selected-client credentials. `FILESYSTEM_DISK` remains root/process-owned; the remaining Spaces values are selected-client deployment values.
 
 ```env
 FILESYSTEM_DISK=spaces
@@ -140,7 +170,7 @@ Do not reuse a production write credential in staging without a deliberate reaso
 
 ---
 
-# 4. Resend
+# 5. Resend
 
 Current canonical email path is Laravel's `resend` transport plus Messaging's Resend provider integration.
 
@@ -208,7 +238,7 @@ Production must not point to the staging webhook endpoint.
 
 ---
 
-# 5. Telnyx
+# 6. Telnyx
 
 Current primary SMS provider is Telnyx.
 
@@ -285,7 +315,7 @@ A valid Telnyx API key is not sufficient proof that a client-facing SMS option s
 
 ---
 
-# 6. Twilio, only when intentionally used
+# 7. Twilio, only when intentionally used
 
 Current Core still contains Twilio configuration support, but Telnyx is the canonical primary SMS path.
 
@@ -304,7 +334,7 @@ Do not populate these for a Telnyx-only client merely because the variables exis
 
 ---
 
-# 7. Zoom Server-to-Server OAuth
+# 8. Zoom Server-to-Server OAuth
 
 Webinars uses Zoom Meeting and Webinar API operations through one Server-to-Server OAuth app.
 The same provider family supports both Zoom Webinars and Zoom Meetings; each Webinar
@@ -509,13 +539,14 @@ webhook subscription, or replacement-recovery problem.
 
 ---
 
-# 8. Final external-services handoff gate
+# 9. Final external-services handoff gate
 
 ```text
 [ ] GitHub Core access works from server
 [ ] GitHub client-repo access works from server
 [ ] All DNS records resolve to intended environment
-[ ] SSL plan/certificates cover required hostnames
+[ ] SSL plan/certificates cover required hostnames, including the configured CRM_APP_URL host and webhooks host
+[ ] Turnstile widget/credentials/hostname policy verified when public forms require human verification
 [ ] Spaces credentials work
 [ ] Spaces/CDN isolation deliberate
 [ ] Resend domain verified when email enabled

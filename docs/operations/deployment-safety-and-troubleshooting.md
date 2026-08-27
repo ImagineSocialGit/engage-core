@@ -297,7 +297,89 @@ Do not leave queue behavior dependent on one hand-maintained historical `.env` f
 
 ---
 
-# 5A. Shared runtime directories look writable but cross-user writes fail
+# 5A. CLI works but PHP-FPM cannot read `.env`
+
+## Failure mode
+
+A fresh deployment can appear healthy from Artisan while web requests behave as if required environment values are missing.
+
+Typical symptoms:
+
+```text
+php artisan reports APP_ENV=staging and the expected client
+route:list shows the configured CRM host
+web requests log as production/default context
+MissingAppKeyException appears only through HTTP
+CRM host returns 404 even though the CLI route matcher succeeds
+```
+
+A common cause is setting root/client `.env` files to `0600` owned by the deploy user while PHP-FPM runs as `www-data` or another separate identity.
+
+## Required protection
+
+For the common deployment shape:
+
+```bash
+sudo chown <DEPLOY_USER>:<WEB_GROUP> .env client/<CLIENT_KEY>/.env
+sudo chmod 640 .env client/<CLIENT_KEY>/.env
+
+test -r .env
+sudo -u <WEB_USER> test -r .env
+sudo -u <WEB_USER> test -r client/<CLIENT_KEY>/.env
+```
+
+Do not print environment contents merely to prove readability. After correcting permissions:
+
+```bash
+php artisan optimize:clear
+sudo systemctl reload php8.3-fpm
+```
+
+Then repeat the HTTP smoke.
+
+---
+
+# 5B. Client `.env` contains root-owned or unsupported keys
+
+## Failure mode
+
+`ClientEnvironmentLoader` strictly rejects keys outside the selected-client ownership contract. Copying a process-wide setting into the client `.env` can fail during very early application bootstrap. Because that exception can occur before Laravel's config repository is fully registered, exception reporting itself may emit a misleading secondary error such as:
+
+```text
+Target class [config] does not exist
+```
+
+Known process-owned examples that must remain in root `.env` include:
+
+```text
+FILESYSTEM_DISK
+RESEND_WEBHOOK_TIMESTAMP_DRIFT_SECONDS
+```
+
+## Direct diagnostic
+
+When Artisan cannot expose the original error, run the loader directly without Laravel's exception handler:
+
+```bash
+php -r '
+require __DIR__."/vendor/autoload.php";
+Dotenv\Dotenv::createImmutable(__DIR__)->safeLoad();
+
+try {
+    (new App\Support\Clients\ClientEnvironmentLoader())->load(__DIR__);
+    echo "CLIENT ENV OK\n";
+} catch (Throwable $e) {
+    fwrite(STDERR, get_class($e).": ".$e->getMessage().PHP_EOL);
+    exit(1);
+}
+'
+```
+
+Fix the ownership/source of the offending key; do not broaden the loader merely to make a stale client example pass.
+
+---
+
+# 5C. Shared runtime directories look writable but cross-user writes fail
 
 ## Failure mode
 
@@ -348,7 +430,7 @@ Do not solve this with recurring broad `chmod 777`, blanket ownership changes, o
 
 ---
 
-# 5B. Server build memory pressure
+# 5D. Server build memory pressure
 
 Composer, npm, and Vite can create short-lived memory spikes even when normal PHP request/worker memory is healthy.
 
@@ -400,6 +482,12 @@ webhooks
 The current application derives the webhooks host from `ROOT_DOMAIN`; `WEBHOOKS_APP_URL` is not the active app environment contract. Operators must still verify `webhooks.<root domain>` for DNS, Nginx, SSL, route registration, and provider webhook configuration.
 
 Also verify Nginx points every hostname at the intended new checkout, not only the root domain.
+
+If `CRM_APP_URL` uses `app.<ROOT_DOMAIN>`, verify that exact host appears in `route:list`; do not substitute the historical `crm.` label. A CLI route match plus an HTTP 404 can indicate the PHP-FPM process is loading a different/unreadable environment, especially when `.env` permissions differ between deploy and web identities.
+
+Do not use `https://webhooks.<ROOT_DOMAIN>/` as a generic health check; the webhooks host may intentionally have no root route. For external Forms, an unsigned GET to `/forms/<FORM_KEY>` should reach the route and return `401 authentication_failed`. That is a successful transport/routing smoke, not an application failure.
+
+When changing an admin hostname such as `crm.` to `app.`, verify certificate SANs as well as Nginx `server_name`; a valid certificate for the old hostname does not cover the new one automatically.
 
 ---
 
@@ -773,6 +861,8 @@ Before launch or a live Webinar event:
 [ ] Actual Horizon process path verified
 [ ] Explicit queue list covers executable queues
 [ ] Laravel Scheduler cron exists exactly once for this client and `schedule:list` is understood
+[ ] Root/client `.env` files are readable by deploy + PHP-FPM identities and not world-readable
+[ ] Selected-client `.env` passes the strict ClientEnvironmentLoader ownership contract
 [ ] Runtime writable directories pass cross-user create/update checks for the actual process identities
 [ ] Build host has adequate memory/disk/swap posture for the chosen deployment strategy
 [ ] Redis prefixes understood

@@ -197,6 +197,8 @@ warnings must be understood and intentionally accepted.
 - [ ] Deployment branch/tag/commit identified.
 - [ ] No uncommitted local-only config is required for the deployment to work.
 
+Staging and production are deployment targets, not source-editing environments. Make application/client config changes in development, test them there, commit/push them, and deploy by pulling the approved revision. Direct server edits are reserved for environment files, server/process configuration, secrets, and emergency operational recovery—not normal PHP/config/source changes.
+
 ---
 
 # Phase 1 — Third-party services
@@ -225,6 +227,8 @@ Staging and production must not accidentally share provider webhook endpoints, c
 # Phase 2 — Staging server deployment
 
 Staging is a first-class deployment gate. Do not treat production as the first realistic integration test.
+
+For repeatable new-environment provisioning after the Core checkout exists, `scripts/operations/launch-client-environment.sh` may automate the repository/dependency/env-permission/install/runtime checks in phased steps using `docs/operations/launch-client-environment.example.conf`. The helper does not own secrets, DNS, Nginx, TLS, provider accounts, or database-user creation; the detailed checklist below remains authoritative.
 
 ## 6. Provision the staging application path
 
@@ -268,7 +272,21 @@ Example pattern:
 git clone git@<GITHUB_SSH_HOST_ALIAS>:<GITHUB_ORG>/<ENGAGE_CORE_REPO>.git <APP_PATH>
 ```
 
-Install or clone the client package in the location expected by Engage Core.
+Install or clone the client package in the location expected by Engage Core. When the client directory is its own repository, verify Core and the client repository independently; a clean/current Core checkout does not prove the nested client checkout is current.
+
+```bash
+cd <APP_PATH>
+git status
+git branch --show-current
+git log -1 --oneline --decorate
+git remote -v
+
+cd client/<CLIENT_KEY>
+git status
+git branch --show-current
+git log -1 --oneline --decorate
+git remote -v
+```
 
 Before syncing presets, verify effective client identity:
 
@@ -294,6 +312,17 @@ npm run build
 Use the project's actual supported deployment commands if they differ.
 
 ## 10. Set permissions
+
+Keep application source owned by the ordinary deployment user. Do not recursively give the checkout to the web server.
+
+The root and selected-client `.env` files must be readable by both the deployment/Artisan identity and PHP-FPM without being world-readable. For the common `<DEPLOY_USER>` + `www-data` deployment:
+
+```bash
+sudo chown <DEPLOY_USER>:<WEB_GROUP> <APP_PATH>/.env <APP_PATH>/client/<CLIENT_KEY>/.env
+sudo chmod 640 <APP_PATH>/.env <APP_PATH>/client/<CLIENT_KEY>/.env
+```
+
+Do not use `0600` merely because the files contain secrets when PHP-FPM runs as another user and loads them directly. CLI success does not prove the web runtime can read the same environment.
 
 Verify every process identity that must create or update runtime files can write where required:
 
@@ -325,6 +354,16 @@ Use the server's deliberate shared-write policy—such as shared groups with inh
 
 Do not blindly copy ownership/ACL commands between servers. Confirm the actual deployment, web, Scheduler, and worker users first.
 
+A robust baseline when the checkout owner is `<DEPLOY_USER>` and PHP-FPM/Horizon use `<WEB_GROUP>` is:
+
+```bash
+sudo chown -R <DEPLOY_USER>:<WEB_GROUP> storage bootstrap/cache
+sudo find storage bootstrap/cache -type d -exec chmod 2775 {} \;
+sudo find storage bootstrap/cache -type f -exec chmod 0664 {} \;
+```
+
+The setgid directory bit keeps newly created runtime files in the shared group. A recursive `775` policy may also work on an existing tree but gives execute permission to ordinary files and does not by itself prove future cross-user group inheritance. Keep the two-way write test as the authority.
+
 ## 11. Create the staging root and client environments
 
 Start from the root `.env.example` and the selected client's `.env.example`.
@@ -348,7 +387,7 @@ Redis host/port/database indexes
 queue/process tuning
 logging
 staging access
-initial-user bootstrap values
+process-wide storage/provider controls such as FILESYSTEM_DISK and webhook timestamp tolerances
 ```
 
 Use `client/{CLIENT_KEY}/.env` for:
@@ -367,6 +406,16 @@ other selected-client deployment values
 ```
 
 Do not leave placeholder values such as `DOMAIN`, `CHANGE_ME`, empty required sender addresses, or blank provider secrets in an environment intended for handoff testing.
+
+The selected-client environment is strictly validated. Do not copy root/process keys into `client/{CLIENT_KEY}/.env` merely because they relate to the client. A root/client ownership mismatch can fail during very early bootstrap before Laravel's normal exception reporting is fully available.
+
+After creating the files, verify read access without printing secrets:
+
+```bash
+test -r .env && test -r client/<CLIENT_KEY>/.env
+sudo -u <WEB_USER> test -r .env
+sudo -u <WEB_USER> test -r client/<CLIENT_KEY>/.env
+```
 
 ## 12. Generate the staging application key
 
@@ -497,7 +546,24 @@ php artisan optimize:clear
 php artisan route:list
 ```
 
-Confirm route hosts are correct.
+Confirm route hosts are correct. In particular, the CRM route domain must match the hostname from `CRM_APP_URL`; do not assume it is always `crm.<ROOT_DOMAIN>`.
+
+After SSL is valid, use real application routes for HTTP smoke checks:
+
+```bash
+curl -sS -D - -o /dev/null https://<CORE_ADMIN_HOST>/
+curl -sS -D - -o /dev/null https://<CORE_ADMIN_HOST>/login
+```
+
+A guest redirect to login/staging access is healthy. For the webhooks host, `/` may legitimately be 404 because no root route exists. When external Forms is enabled, the useful unsigned transport smoke is:
+
+```bash
+curl -sS -o /tmp/forms-smoke.json -w '%{http_code}\n' \
+  -H 'Accept: application/json' \
+  https://webhooks.<ROOT_DOMAIN>/forms/<FORM_KEY>
+```
+
+A `401` `authentication_failed` response proves DNS, SSL, Nginx, PHP-FPM, Laravel host routing, the Forms route, and its authentication middleware are all being reached.
 
 ## 17. Configure Supervisor/Horizon
 
@@ -746,20 +812,19 @@ A successful probe is not a POST-readiness proof. Before changing `NEWSLETTER_DE
 Once the Sites sender matches the published contract:
 
 ```text
-1. Ensure Artist Sites Turnstile is configured for action artist_updates.
-2. Change the staging Artist Sites destination to engage_core.
-3. Clear the Artist Sites cached configuration.
-4. Submit ONE controlled real public artist_updates form.
-5. Verify Core created/reused the intended Contact.
-6. Verify Core stored FormSubmission + pinned FormVersion + typed FormSubmissionValues.
-7. Verify expected interest:* Contact tags.
-8. Verify accepted email/SMS marketing fields produced channel + purpose Messaging consent only when those fields were explicitly true.
-9. Verify normalized Turnstile evidence is present when the Sites sender supplied it.
-10. Verify no raw Turnstile token/provider payload was persisted.
-11. Replay the same external UUID only as an explicit idempotency check; it must not duplicate the submission or consent grant.
+1. Change the staging Artist Sites destination to engage_core and clear its cached configuration.
+2. Ensure the public newsletter/intake surface itself is active; selecting a destination does not activate a disabled site surface.
+3. Submit ONE controlled real public artist_updates form while Core verification remains optional. Turnstile may already be configured, but it is not required for this first transport proof.
+4. Verify Core created/reused the intended Contact.
+5. Verify Core stored FormSubmission + pinned FormVersion + typed FormSubmissionValues.
+6. Verify expected interest:* Contact tags.
+7. Verify accepted email/SMS marketing fields produced channel + purpose Messaging consent only when those fields were explicitly true.
+8. If Artist Sites supplied normalized Turnstile evidence, verify it is present and verify no raw Turnstile token/provider payload was persisted.
+9. Replay the same external UUID only as an explicit idempotency check; it must not duplicate the submission or consent grant.
+10. Configure Artist Sites human verification (Turnstile for the current reference implementation), run `site:check`, and verify the exact staging hostname is allowed.
 ```
 
-Only after that controlled staging POST succeeds should the selected Core client promote verification to required with:
+Only after the controlled transport POST succeeds and the Artist Sites human-verification check is green should the selected Core client promote verification to required with:
 
 ```text
 client/{client-key}/config/presets/modules/forms/forms.php
@@ -773,7 +838,7 @@ php artisan presets:sync
 php artisan setup:validate
 ```
 
-Confirm a new immutable current FormVersion was published, rerun the Artist Sites read-only probe, then perform one more controlled real submission and confirm the required-verification path succeeds.
+Confirm a new immutable current FormVersion was published, rerun the Artist Sites read-only probe, then perform one more controlled real submission. Confirm the Turnstile widget is present in the browser and the required-verification path succeeds end to end.
 
 ## 22. Create the initial CRM user when required
 
@@ -1045,6 +1110,8 @@ CDN/storage URLs
 - [ ] Core commit/tag recorded.
 - [ ] Client commit/tag recorded.
 - [ ] Correct repositories checked out.
+- [ ] Both Core and any nested client repository are clean and on the approved revisions.
+- [ ] No source/config change was made directly on staging/production; deployment state came from approved commits.
 - [ ] No legacy application path in Nginx or Supervisor.
 
 ## 35. Build and cache carefully
@@ -1353,6 +1420,8 @@ Import rules:
 [ ] APP_ENV=production
 [ ] APP_DEBUG=false
 [ ] APP_KEY unique and preserved
+[ ] Root/client `.env` permissions allow the deploy user and PHP-FPM to read them and deny world access
+[ ] Selected-client `.env` contains only client-owned keys
 [ ] No placeholder environment values
 [ ] Production DB verified
 [ ] Installed module migration scopes reviewed with `modules:status`

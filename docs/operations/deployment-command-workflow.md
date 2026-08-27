@@ -1,4 +1,3 @@
-
 # Engage Core — Deployment Command Workflow
 
 ## Purpose
@@ -10,6 +9,10 @@ Use it alongside:
 - `client-staging-production-setup-checklist.md` for full server/client rollout steps;
 - `deployment-safety-and-troubleshooting.md` for worker, Redis, reset, and incident safety;
 - `project-state-transfer-runbook.md` for an approved Project State clean rebuild.
+
+## Source/deployment boundary
+
+Staging and production consume approved source; they are not normal editing environments. Application code and version-controlled client configuration must be changed/tested in development, committed/pushed, then pulled/deployed to the target. Environment files, secrets, Nginx/Supervisor/cron configuration, and other host-owned runtime state remain target-environment concerns.
 
 Normal application startup never runs migrations. Normal runtime bootstrap registers only the platform migration path. Optional module schema is selected explicitly by the module migration commands.
 
@@ -206,7 +209,38 @@ Do not mark ledger rows manually merely to clear an error. Do not run optional m
 
 ## Deployment-script integration contract
 
-A future automated deploy script should orchestrate these commands rather than duplicate their internals. In particular, it should not implement its own module dependency traversal, migration path discovery, installation-ledger writes, preset composition, or validation rules.
+`scripts/operations/launch-client-environment.sh` is the supported helper for repeatable new-environment rollout after the Core checkout exists. It orchestrates the existing commands and server checks; it must not implement its own module dependency traversal, migration path discovery, installation-ledger writes, preset composition, or validation rules.
+
+The helper is intentionally phased so secrets and external infrastructure can remain operator-controlled:
+
+```text
+prepare
+    verify/pull clean Core + client repos
+    install dependencies/build assets
+    create/update non-secret environment shape
+    enforce FPM-readable env permissions
+    validate client-environment ownership
+
+install
+    generate APP_KEY only when absent
+    clear caches
+    verify resolved client/database
+    call engage:install --force --no-create-user
+    run modules:status + setup:validate
+
+runtime
+    configure/verify runtime-directory permissions
+    optionally install the Supervisor Horizon program and Scheduler cron
+
+verify
+    verify module/setup/Horizon/schedule state
+    verify configured CRM route host
+    run safe HTTP smoke checks when DNS/SSL are already live
+```
+
+Start from `docs/operations/launch-client-environment.example.conf` and keep that launch config free of secrets.
+
+The script does not create database users, DNS records, TLS certificates, provider accounts, or provider secrets. External Forms signing secrets and third-party secrets remain manual environment handoffs. Rerunning `install` after filling a missing Forms secret is safe because `engage:install` is idempotent.
 
 The normal existing-client deployment integration points are:
 
@@ -222,7 +256,7 @@ checkout/dependencies/assets/environment
     -> production-safe smoke checks
 ```
 
-The new-client integration point is `engage:install --force` after configuration and dependencies are complete.
+The new-client integration point remains `engage:install --force` after configuration and dependencies are complete. The launch helper calls that command rather than replacing its responsibilities.
 
 ## Cross-thread deployment context dump
 
