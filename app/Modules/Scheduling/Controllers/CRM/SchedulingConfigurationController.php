@@ -442,15 +442,27 @@ class SchedulingConfigurationController extends Controller
                 'string',
                 Rule::in(timezone_identifiers_list()),
             ],
+            'appointment_format' => [
+                'nullable',
+                'string',
+                Rule::in(BookableService::APPOINTMENT_FORMATS),
+            ],
+            'in_person_arrangement' => [
+                'nullable',
+                'string',
+                Rule::in(BookableService::IN_PERSON_ARRANGEMENTS),
+            ],
+            'remote_method' => [
+                'nullable',
+                'string',
+                Rule::in(BookableService::REMOTE_METHODS),
+            ],
+            // Backward-compatible request boundary only. The CRM surface no
+            // longer authors this internal runtime classification directly.
             'location_type' => [
                 'nullable',
                 'string',
-                Rule::in([
-                    BookableService::LOCATION_TYPE_PHONE,
-                    BookableService::LOCATION_TYPE_VIRTUAL,
-                    BookableService::LOCATION_TYPE_FIXED,
-                    BookableService::LOCATION_TYPE_CUSTOMER_SITE,
-                ]),
+                Rule::in(BookableService::LOCATION_TYPES),
             ],
             'location_label' => ['nullable', 'string', 'max:255'],
             'location_instructions' => ['nullable', 'string', 'max:5000'],
@@ -458,46 +470,46 @@ class SchedulingConfigurationController extends Controller
                 'nullable',
                 'url:http,https',
                 'max:2048',
-                'prohibited_unless:location_type,'.BookableService::LOCATION_TYPE_VIRTUAL,
+                Rule::prohibitedIf(fn (): bool => ! $this->requestUsesVirtualMeeting()),
             ],
             'location_address_line_1' => [
                 'nullable',
-                'required_if:location_type,'.BookableService::LOCATION_TYPE_FIXED,
-                'prohibited_unless:location_type,'.BookableService::LOCATION_TYPE_FIXED,
+                Rule::requiredIf(fn (): bool => $this->requestUsesBusinessLocation()),
+                Rule::prohibitedIf(fn (): bool => ! $this->requestUsesBusinessLocation()),
                 'string',
                 'max:255',
             ],
             'location_address_line_2' => [
                 'nullable',
-                'prohibited_unless:location_type,'.BookableService::LOCATION_TYPE_FIXED,
+                Rule::prohibitedIf(fn (): bool => ! $this->requestUsesBusinessLocation()),
                 'string',
                 'max:255',
             ],
             'location_city' => [
                 'nullable',
-                'required_if:location_type,'.BookableService::LOCATION_TYPE_FIXED,
-                'prohibited_unless:location_type,'.BookableService::LOCATION_TYPE_FIXED,
+                Rule::requiredIf(fn (): bool => $this->requestUsesBusinessLocation()),
+                Rule::prohibitedIf(fn (): bool => ! $this->requestUsesBusinessLocation()),
                 'string',
                 'max:255',
             ],
             'location_region' => [
                 'nullable',
-                'required_if:location_type,'.BookableService::LOCATION_TYPE_FIXED,
-                'prohibited_unless:location_type,'.BookableService::LOCATION_TYPE_FIXED,
+                Rule::requiredIf(fn (): bool => $this->requestUsesBusinessLocation()),
+                Rule::prohibitedIf(fn (): bool => ! $this->requestUsesBusinessLocation()),
                 'string',
                 'max:255',
             ],
             'location_postal_code' => [
                 'nullable',
-                'required_if:location_type,'.BookableService::LOCATION_TYPE_FIXED,
-                'prohibited_unless:location_type,'.BookableService::LOCATION_TYPE_FIXED,
+                Rule::requiredIf(fn (): bool => $this->requestUsesBusinessLocation()),
+                Rule::prohibitedIf(fn (): bool => ! $this->requestUsesBusinessLocation()),
                 'string',
                 'max:255',
             ],
             'location_country' => [
                 'nullable',
-                'required_if:location_type,'.BookableService::LOCATION_TYPE_FIXED,
-                'prohibited_unless:location_type,'.BookableService::LOCATION_TYPE_FIXED,
+                Rule::requiredIf(fn (): bool => $this->requestUsesBusinessLocation()),
+                Rule::prohibitedIf(fn (): bool => ! $this->requestUsesBusinessLocation()),
                 'string',
                 'size:2',
                 'regex:/^[A-Za-z]{2}$/',
@@ -530,6 +542,9 @@ class SchedulingConfigurationController extends Controller
             'cancellation_notice_minutes',
             'reschedule_notice_minutes',
             'timezone',
+            'appointment_format',
+            'in_person_arrangement',
+            'remote_method',
             'location_type',
             'location_label',
             'location_instructions',
@@ -545,6 +560,30 @@ class SchedulingConfigurationController extends Controller
             'is_public',
             'sort_order',
         ];
+    }
+
+    private function requestUsesVirtualMeeting(): bool
+    {
+        $legacyLocationType = request()->input('location_type');
+
+        if (is_string($legacyLocationType) && trim($legacyLocationType) !== '') {
+            return $legacyLocationType === BookableService::LOCATION_TYPE_VIRTUAL;
+        }
+
+        return request()->input('appointment_format') === BookableService::APPOINTMENT_FORMAT_REMOTE
+            && request()->input('remote_method') === BookableService::REMOTE_METHOD_VIRTUAL_MEETING;
+    }
+
+    private function requestUsesBusinessLocation(): bool
+    {
+        $legacyLocationType = request()->input('location_type');
+
+        if (is_string($legacyLocationType) && trim($legacyLocationType) !== '') {
+            return $legacyLocationType === BookableService::LOCATION_TYPE_FIXED;
+        }
+
+        return request()->input('appointment_format') === BookableService::APPOINTMENT_FORMAT_IN_PERSON
+            && request()->input('in_person_arrangement') === BookableService::IN_PERSON_ARRANGEMENT_BUSINESS_LOCATION;
     }
 
     /**

@@ -79,7 +79,15 @@
                     action="{{ route('crm.scheduling.configuration.services.store') }}"
                     class="grid gap-4 md:grid-cols-2"
                     data-configuration-service-create
-                    x-data="{ locationType: @js(old('location_type', '')) }"
+                    x-data="{
+                        appointmentFormat: @js(old('appointment_format', '')),
+                        inPersonArrangement: @js(old('in_person_arrangement', '')),
+                        remoteMethod: @js(old('remote_method', '')),
+                        formatComplete() {
+                            return (this.appointmentFormat === 'in_person' && ['business_location', 'customer_address'].includes(this.inPersonArrangement))
+                                || (this.appointmentFormat === 'remote' && ['phone', 'virtual_meeting'].includes(this.remoteMethod));
+                        }
+                    }"
                 >
                     @csrf
 
@@ -99,72 +107,93 @@
                     </label>
 
                     <label class="{{ $labelClass }}">
-                        Where does it happen?
-                        <select class="{{ $inputClass }}" name="location_type" x-model="locationType">
+                        Appointment format
+                        <select class="{{ $inputClass }}" name="appointment_format" x-model="appointmentFormat">
                             <option value="">Decide later</option>
-                            <option value="{{ \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_PHONE }}" @selected(old('location_type') === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_PHONE)>Phone</option>
-                            <option value="{{ \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_VIRTUAL }}" @selected(old('location_type') === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_VIRTUAL)>Online / virtual</option>
-                            <option value="{{ \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_FIXED }}" @selected(old('location_type') === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_FIXED)>A fixed location</option>
-                            <option value="{{ \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_CUSTOMER_SITE }}" @selected(old('location_type') === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_CUSTOMER_SITE)>At the customer’s location</option>
+                            <option value="in_person">In person</option>
+                            <option value="remote">Remote</option>
+                        </select>
+                        <span class="mt-1 block text-xs font-normal text-slate-500">
+                            Start with the big question: will the person meet you somewhere, or connect remotely?
+                        </span>
+                    </label>
+
+                    <label class="{{ $labelClass }}" x-show="appointmentFormat === 'in_person'" x-cloak>
+                        Where will you meet?
+                        <select class="{{ $inputClass }}" name="in_person_arrangement" x-model="inPersonArrangement" x-bind:disabled="appointmentFormat !== 'in_person'">
+                            <option value="">Choose one</option>
+                            <option value="business_location">At a business location</option>
+                            <option value="customer_address">At an address the customer provides</option>
                         </select>
                     </label>
 
-                    <label class="{{ $labelClass }}" x-show="locationType !== ''" x-cloak>
-                        Location name <span class="font-normal text-slate-400">(optional)</span>
-                        <input class="{{ $inputClass }}" name="location_label" value="{{ old('location_label') }}" placeholder="Main office" x-bind:disabled="locationType === ''">
+                    <label class="{{ $labelClass }}" x-show="appointmentFormat === 'remote'" x-cloak>
+                        How will the appointment happen?
+                        <select class="{{ $inputClass }}" name="remote_method" x-model="remoteMethod" x-bind:disabled="appointmentFormat !== 'remote'">
+                            <option value="">Choose one</option>
+                            <option value="phone">Phone call</option>
+                            <option value="virtual_meeting">Virtual meeting</option>
+                        </select>
                     </label>
 
-                    <label class="{{ $labelClass }} md:col-span-2" x-show="locationType === 'virtual'" x-cloak>
+                    <div class="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 md:col-span-2" x-show="appointmentFormat === 'remote' && remoteMethod === 'phone'" x-cloak>
+                        At the scheduled time, {{ config('client.name', 'the team') }} will call the phone number the customer provides.
+                    </div>
+
+                    <div class="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 md:col-span-2" x-show="appointmentFormat === 'in_person' && inPersonArrangement === 'customer_address'" x-cloak>
+                        The customer will enter the appointment address before available times are calculated.
+                    </div>
+
+                    <label class="{{ $labelClass }}" x-show="formatComplete()" x-cloak>
+                        Display name <span class="font-normal text-slate-400">(optional)</span>
+                        <input class="{{ $inputClass }}" name="location_label" value="{{ old('location_label') }}" placeholder="Main office" x-bind:disabled="!formatComplete()">
+                    </label>
+
+                    <label class="{{ $labelClass }} md:col-span-2" x-show="appointmentFormat === 'remote' && remoteMethod === 'virtual_meeting'" x-cloak>
                         Meeting link <span class="font-normal text-slate-400">(optional)</span>
-                        <input class="{{ $inputClass }}" type="url" name="location_url" value="{{ old('location_url') }}" placeholder="https://…" x-bind:disabled="locationType !== 'virtual'">
+                        <input class="{{ $inputClass }}" type="url" name="location_url" value="{{ old('location_url') }}" placeholder="https://…" x-bind:disabled="appointmentFormat !== 'remote' || remoteMethod !== 'virtual_meeting'">
                     </label>
 
-                    <div class="grid gap-4 md:col-span-2 md:grid-cols-2" x-show="locationType === 'fixed'" x-cloak>
+                    <div class="grid gap-4 md:col-span-2 md:grid-cols-2" x-show="appointmentFormat === 'in_person' && inPersonArrangement === 'business_location'" x-cloak>
                         <label class="{{ $labelClass }} md:col-span-2">
                             Street address
-                            <input class="{{ $inputClass }}" name="location_address_line_1" value="{{ old('location_address_line_1') }}" x-bind:disabled="locationType !== 'fixed'">
+                            <input class="{{ $inputClass }}" name="location_address_line_1" value="{{ old('location_address_line_1') }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
                         </label>
                         <label class="{{ $labelClass }} md:col-span-2">
                             Address line 2 <span class="font-normal text-slate-400">(optional)</span>
-                            <input class="{{ $inputClass }}" name="location_address_line_2" value="{{ old('location_address_line_2') }}" x-bind:disabled="locationType !== 'fixed'">
+                            <input class="{{ $inputClass }}" name="location_address_line_2" value="{{ old('location_address_line_2') }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
                         </label>
                         <label class="{{ $labelClass }}">
                             City
-                            <input class="{{ $inputClass }}" name="location_city" value="{{ old('location_city') }}" x-bind:disabled="locationType !== 'fixed'">
+                            <input class="{{ $inputClass }}" name="location_city" value="{{ old('location_city') }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
                         </label>
                         <label class="{{ $labelClass }}">
                             State / region
-                            <input class="{{ $inputClass }}" name="location_region" value="{{ old('location_region') }}" x-bind:disabled="locationType !== 'fixed'">
+                            <input class="{{ $inputClass }}" name="location_region" value="{{ old('location_region') }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
                         </label>
                         <label class="{{ $labelClass }}">
                             Postal code
-                            <input class="{{ $inputClass }}" name="location_postal_code" value="{{ old('location_postal_code') }}" x-bind:disabled="locationType !== 'fixed'">
+                            <input class="{{ $inputClass }}" name="location_postal_code" value="{{ old('location_postal_code') }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
                         </label>
                         <label class="{{ $labelClass }}">
                             Country code
-                            <input class="{{ $inputClass }}" name="location_country" value="{{ old('location_country', 'US') }}" maxlength="2" x-bind:disabled="locationType !== 'fixed'">
-                            <span class="mt-1 block text-xs font-normal text-slate-500">
-                                Use the two-letter country code, such as US or CA.
-                            </span>
+                            <input class="{{ $inputClass }}" name="location_country" value="{{ old('location_country', 'US') }}" maxlength="2" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
+                            <span class="mt-1 block text-xs font-normal text-slate-500">Use the two-letter country code, such as US or CA.</span>
                         </label>
                     </div>
 
-                    <label class="{{ $labelClass }} md:col-span-2" x-show="locationType !== ''" x-cloak>
-                        Location instructions <span class="font-normal text-slate-400">(optional)</span>
-                        <textarea class="{{ $inputClass }}" name="location_instructions" rows="2" x-bind:disabled="locationType === ''">{{ old('location_instructions') }}</textarea>
+                    <label class="{{ $labelClass }} md:col-span-2" x-show="formatComplete()" x-cloak>
+                        What should the person know before the appointment? <span class="font-normal text-slate-400">(optional)</span>
+                        <textarea class="{{ $inputClass }}" name="location_instructions" rows="2" x-bind:disabled="!formatComplete()">{{ old('location_instructions') }}</textarea>
                     </label>
-
-                    <p class="text-sm text-slate-500 md:col-span-2" x-show="locationType === 'customer_site'" x-cloak>
-                        The customer will provide the address when the appointment is booked.
-                    </p>
 
                     <div class="space-y-3 md:col-span-2">
                         <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-3 text-sm text-slate-700">
                             <input type="hidden" name="is_public" value="0">
-                            <input class="mt-0.5" type="checkbox" name="is_public" value="1" @checked(old('is_public'))>
+                            <input class="mt-0.5" type="checkbox" name="is_public" value="1" @checked(old('is_public')) x-bind:disabled="!formatComplete()">
                             <span>
                                 <span class="block font-semibold text-slate-900">Let customers book this themselves</span>
-                                <span class="mt-0.5 block text-slate-500">Makes this service eligible for the public booking page when public Scheduling is enabled.</span>
+                                <span class="mt-0.5 block text-slate-500">Choose a complete appointment format first. Then this service can appear on the public booking page when public Scheduling is enabled.</span>
                             </span>
                         </label>
 
@@ -196,6 +225,7 @@
                         $assignmentByHost = $service->hostAssignments->keyBy('scheduling_host_id');
                         $locationDetails = is_array($service->location_details) ? $service->location_details : [];
                         $locationAddress = is_array($locationDetails['address'] ?? null) ? $locationDetails['address'] : [];
+                        $appointmentConfiguration = $service->resolvedAppointmentConfiguration();
                     @endphp
 
                     <div
@@ -230,8 +260,8 @@
                                 </dd>
                             </div>
                             <div>
-                                <dt class="text-slate-500">Availability rules</dt>
-                                <dd class="font-medium text-slate-900">{{ $service->availability_windows_count }}</dd>
+                                <dt class="text-slate-500">Appointment format</dt>
+                                <dd class="font-medium text-slate-900">{{ $service->appointmentFormatLabel() ?? 'Not configured' }}</dd>
                             </div>
                         </dl>
 
@@ -246,7 +276,16 @@
                                     action="{{ route('crm.scheduling.configuration.services.update', $service) }}"
                                     class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
                                     data-configuration-service-update="{{ $service->id }}"
-                                    x-data="{ locationType: @js($service->location_type ?? ''), durationMode: @js($service->duration_mode ?? 'fixed') }"
+                                    x-data="{
+                                        appointmentFormat: @js($appointmentConfiguration['appointment_format'] ?? ''),
+                                        inPersonArrangement: @js($appointmentConfiguration['in_person_arrangement'] ?? ''),
+                                        remoteMethod: @js($appointmentConfiguration['remote_method'] ?? ''),
+                                        durationMode: @js($service->duration_mode ?? 'fixed'),
+                                        formatComplete() {
+                                            return (this.appointmentFormat === 'in_person' && ['business_location', 'customer_address'].includes(this.inPersonArrangement))
+                                                || (this.appointmentFormat === 'remote' && ['phone', 'virtual_meeting'].includes(this.remoteMethod));
+                                        }
+                                    }"
                                 >
                                     @csrf
                                     @method('PATCH')
@@ -350,61 +389,81 @@
                                     <input type="hidden" name="sort_order" value="{{ $service->sort_order }}">
 
                                     <label class="{{ $labelClass }}">
-                                        Location type
-                                        <select class="{{ $inputClass }}" name="location_type" x-model="locationType">
-                                            <option value="">Not specified</option>
-                                            <option value="phone">Phone</option>
-                                            <option value="virtual">Virtual</option>
-                                            <option value="fixed">Fixed location</option>
-                                            <option value="customer_site">Customer site</option>
+                                        Appointment format
+                                        <select class="{{ $inputClass }}" name="appointment_format" x-model="appointmentFormat">
+                                            <option value="">Not configured</option>
+                                            <option value="in_person">In person</option>
+                                            <option value="remote">Remote</option>
                                         </select>
                                     </label>
 
-                                    <label class="{{ $labelClass }}">
-                                        Location label
-                                        <input class="{{ $inputClass }}" name="location_label" value="{{ $locationDetails['label'] ?? '' }}" x-bind:disabled="locationType === ''">
+                                    <label class="{{ $labelClass }}" x-show="appointmentFormat === 'in_person'" x-cloak>
+                                        Where will you meet?
+                                        <select class="{{ $inputClass }}" name="in_person_arrangement" x-model="inPersonArrangement" x-bind:disabled="appointmentFormat !== 'in_person'">
+                                            <option value="">Choose one</option>
+                                            <option value="business_location">At a business location</option>
+                                            <option value="customer_address">At an address the customer provides</option>
+                                        </select>
                                     </label>
 
-                                    <label class="{{ $labelClass }} md:col-span-2 xl:col-span-4">
-                                        Location instructions
-                                        <textarea class="{{ $inputClass }}" name="location_instructions" rows="2" x-bind:disabled="locationType === ''">{{ $locationDetails['instructions'] ?? '' }}</textarea>
+                                    <label class="{{ $labelClass }}" x-show="appointmentFormat === 'remote'" x-cloak>
+                                        How will the appointment happen?
+                                        <select class="{{ $inputClass }}" name="remote_method" x-model="remoteMethod" x-bind:disabled="appointmentFormat !== 'remote'">
+                                            <option value="">Choose one</option>
+                                            <option value="phone">Phone call</option>
+                                            <option value="virtual_meeting">Virtual meeting</option>
+                                        </select>
                                     </label>
 
-                                    <label class="{{ $labelClass }} md:col-span-2 xl:col-span-4" x-show="locationType === 'virtual'" x-cloak>
-                                        Virtual meeting URL
-                                        <input class="{{ $inputClass }}" type="url" name="location_url" value="{{ $locationDetails['url'] ?? '' }}" x-bind:disabled="locationType !== 'virtual'">
+                                    <label class="{{ $labelClass }}" x-show="formatComplete()" x-cloak>
+                                        Display name <span class="font-normal text-slate-400">(optional)</span>
+                                        <input class="{{ $inputClass }}" name="location_label" value="{{ $locationDetails['label'] ?? '' }}" x-bind:disabled="!formatComplete()">
                                     </label>
 
-                                    <div class="grid gap-4 md:col-span-2 md:grid-cols-2 xl:col-span-4 xl:grid-cols-4" x-show="locationType === 'fixed'" x-cloak>
+                                    <div class="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 md:col-span-2 xl:col-span-4" x-show="appointmentFormat === 'remote' && remoteMethod === 'phone'" x-cloak>
+                                        At the scheduled time, {{ config('client.name', 'the team') }} will call the phone number the customer provides.
+                                    </div>
+
+                                    <div class="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 md:col-span-2 xl:col-span-4" x-show="appointmentFormat === 'in_person' && inPersonArrangement === 'customer_address'" x-cloak>
+                                        The customer will provide the appointment address before available times are calculated.
+                                    </div>
+
+                                    <label class="{{ $labelClass }} md:col-span-2 xl:col-span-4" x-show="appointmentFormat === 'remote' && remoteMethod === 'virtual_meeting'" x-cloak>
+                                        Meeting link <span class="font-normal text-slate-400">(optional)</span>
+                                        <input class="{{ $inputClass }}" type="url" name="location_url" value="{{ $locationDetails['url'] ?? '' }}" x-bind:disabled="appointmentFormat !== 'remote' || remoteMethod !== 'virtual_meeting'">
+                                    </label>
+
+                                    <div class="grid gap-4 md:col-span-2 md:grid-cols-2 xl:col-span-4 xl:grid-cols-4" x-show="appointmentFormat === 'in_person' && inPersonArrangement === 'business_location'" x-cloak>
                                         <label class="{{ $labelClass }} md:col-span-2">
-                                            Address line 1
-                                            <input class="{{ $inputClass }}" name="location_address_line_1" value="{{ $locationAddress['address_line_1'] ?? '' }}" x-bind:disabled="locationType !== 'fixed'">
+                                            Street address
+                                            <input class="{{ $inputClass }}" name="location_address_line_1" value="{{ $locationAddress['address_line_1'] ?? '' }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
                                         </label>
                                         <label class="{{ $labelClass }} md:col-span-2">
-                                            Address line 2
-                                            <input class="{{ $inputClass }}" name="location_address_line_2" value="{{ $locationAddress['address_line_2'] ?? '' }}" x-bind:disabled="locationType !== 'fixed'">
+                                            Address line 2 <span class="font-normal text-slate-400">(optional)</span>
+                                            <input class="{{ $inputClass }}" name="location_address_line_2" value="{{ $locationAddress['address_line_2'] ?? '' }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
                                         </label>
                                         <label class="{{ $labelClass }}">
                                             City
-                                            <input class="{{ $inputClass }}" name="location_city" value="{{ $locationAddress['city'] ?? '' }}" x-bind:disabled="locationType !== 'fixed'">
+                                            <input class="{{ $inputClass }}" name="location_city" value="{{ $locationAddress['city'] ?? '' }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
                                         </label>
                                         <label class="{{ $labelClass }}">
                                             State / region
-                                            <input class="{{ $inputClass }}" name="location_region" value="{{ $locationAddress['region'] ?? '' }}" x-bind:disabled="locationType !== 'fixed'">
+                                            <input class="{{ $inputClass }}" name="location_region" value="{{ $locationAddress['region'] ?? '' }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
                                         </label>
                                         <label class="{{ $labelClass }}">
                                             Postal code
-                                            <input class="{{ $inputClass }}" name="location_postal_code" value="{{ $locationAddress['postal_code'] ?? '' }}" x-bind:disabled="locationType !== 'fixed'">
+                                            <input class="{{ $inputClass }}" name="location_postal_code" value="{{ $locationAddress['postal_code'] ?? '' }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
                                         </label>
                                         <label class="{{ $labelClass }}">
                                             Country code
-                                            <input class="{{ $inputClass }}" name="location_country" value="{{ $locationAddress['country'] ?? 'US' }}" maxlength="2" x-bind:disabled="locationType !== 'fixed'">
+                                            <input class="{{ $inputClass }}" name="location_country" value="{{ $locationAddress['country'] ?? 'US' }}" maxlength="2" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
                                         </label>
                                     </div>
 
-                                    <p class="text-xs text-slate-500 md:col-span-2 xl:col-span-4" x-show="locationType === 'customer_site'" x-cloak>
-                                        Customer-site services collect the service address from each booking. Only the optional label and instructions are stored on the service.
-                                    </p>
+                                    <label class="{{ $labelClass }} md:col-span-2 xl:col-span-4" x-show="formatComplete()" x-cloak>
+                                        What should the person know before the appointment? <span class="font-normal text-slate-400">(optional)</span>
+                                        <textarea class="{{ $inputClass }}" name="location_instructions" rows="2" x-bind:disabled="!formatComplete()">{{ $locationDetails['instructions'] ?? '' }}</textarea>
+                                    </label>
 
                                     <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-5 md:col-span-2 xl:col-span-4">
                                         <label class="inline-flex items-start gap-2 text-sm font-medium text-slate-700">
@@ -415,7 +474,7 @@
 
                                         <label class="inline-flex items-start gap-2 text-sm font-medium text-slate-700">
                                             <input type="hidden" name="is_public" value="0">
-                                            <input type="checkbox" name="is_public" value="1" @checked($service->is_public)>
+                                            <input type="checkbox" name="is_public" value="1" @checked($service->is_public) x-bind:disabled="!formatComplete()">
                                             Publicly bookable
                                         </label>
                                     </div>

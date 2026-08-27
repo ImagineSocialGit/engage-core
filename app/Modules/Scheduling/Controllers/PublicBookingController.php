@@ -271,6 +271,7 @@ class PublicBookingController extends Controller
         VerifyPublicBookingDestinationVerificationRequest $request,
         string $offerId,
         PublicBookingDestinationVerificationService $destinationVerification,
+        CreatePublicBookingHoldAction $createPublicBookingHold,
     ): RedirectResponse {
         $offer = $this->publicOffer($offerId);
         $state = $this->storedDestinationVerificationState($request, $offer);
@@ -291,29 +292,34 @@ class PublicBookingController extends Controller
                 challengeId: $challengeId,
                 code: $request->code(),
             );
+
+            $hold = $createPublicBookingHold->handle(
+                offerId: $offer->offer_id,
+                idempotencyKey: (string) Str::uuid(),
+                sessionId: $this->bookingSessionId($request),
+                verificationProofToken: $proof->token,
+            );
         } catch (DomainException|InvalidArgumentException $exception) {
             throw ValidationException::withMessages([
-                'code' => 'The code is incorrect or has expired. Request a new code and try again.',
+                'code' => 'The code is incorrect, expired, or this time is no longer available. Choose another time if needed and try again.',
             ]);
         }
 
-        $request->session()->put(
-            $this->destinationVerificationSessionKey($offer),
-            [
-                'proof_token' => $proof->token,
-                'verified_channel' => $proof->channel,
-                'destination' => $proof->destination,
-                'masked_destination' => is_string($state['masked_destination'] ?? null)
-                    ? $state['masked_destination']
-                    : null,
-                'verified_at' => $proof->verifiedAt->toISOString(),
-                'proof_expires_at' => $proof->expiresAt->toISOString(),
-            ],
+        $this->storeHoldContactPrefill(
+            request: $request,
+            hold: $hold,
+            verifiedChannel: $proof->channel,
+            verifiedDestination: $proof->destination,
         );
+        $request->session()->flash(
+            'scheduling.public.verification_completed_channel',
+            $proof->channel,
+        );
+        $this->forgetDestinationVerificationState($request, $offer);
 
         return redirect()->route(
-            'scheduling.public.offers.show',
-            ['offerId' => $offer->offer_id],
+            'scheduling.public.holds.show',
+            ['holdId' => $hold->hold_id],
         );
     }
 
@@ -389,30 +395,16 @@ class PublicBookingController extends Controller
             ]);
         }
 
-        $verifiedChannel = is_string($state['verified_channel'] ?? null)
-            ? trim($state['verified_channel'])
-            : null;
-        $verifiedDestination = is_string($state['destination'] ?? null)
-            ? trim($state['destination'])
-            : null;
-
-        if (in_array($verifiedChannel, ['email', 'sms'], true)
-            && $verifiedDestination !== null
-            && $verifiedDestination !== ''
-        ) {
-            $request->session()->put(
-                $this->holdContactPrefillSessionKey($hold),
-                [
-                    'verified_channel' => $verifiedChannel,
-                    'email' => $verifiedChannel === 'email'
-                        ? $verifiedDestination
-                        : null,
-                    'phone' => $verifiedChannel === 'sms'
-                        ? $verifiedDestination
-                        : null,
-                ],
-            );
-        }
+        $this->storeHoldContactPrefill(
+            request: $request,
+            hold: $hold,
+            verifiedChannel: is_string($state['verified_channel'] ?? null)
+                ? trim($state['verified_channel'])
+                : null,
+            verifiedDestination: is_string($state['destination'] ?? null)
+                ? trim($state['destination'])
+                : null,
+        );
 
         $this->forgetDestinationVerificationState($request, $offer);
 
@@ -434,6 +426,9 @@ class PublicBookingController extends Controller
         return view('scheduling.public.index', $this->pageData([
             'holdSummary' => $this->holdSummary($hold, $service),
             'contactPrefill' => $this->holdContactPrefill($request, $hold),
+            'verificationCompletedChannel' => $request->session()->pull(
+                'scheduling.public.verification_completed_channel',
+            ),
         ]));
     }
 
@@ -527,6 +522,7 @@ class PublicBookingController extends Controller
                 'email' => null,
                 'phone' => null,
             ],
+            'verificationCompletedChannel' => null,
         ], $overrides);
     }
 
@@ -541,7 +537,11 @@ class PublicBookingController extends Controller
             ->orderBy('sort_order')
             ->orderBy('name')
             ->orderBy('id')
-            ->get();
+            ->get()
+            ->filter(
+                fn (BookableService $service): bool => $service->hasCompleteAppointmentFormat(),
+            )
+            ->values();
     }
 
     private function publicService(string $serviceKey): BookableService
@@ -558,7 +558,11 @@ class PublicBookingController extends Controller
             ->where('is_public', true)
             ->first();
 
-        abort_unless($service instanceof BookableService, 404);
+        abort_unless(
+            $service instanceof BookableService
+                && $service->hasCompleteAppointmentFormat(),
+            404,
+        );
 
         return $service;
     }
@@ -580,7 +584,8 @@ class PublicBookingController extends Controller
         abort_unless($offer instanceof BookableSlotOffer, 404);
         abort_unless(
             $offer->bookableService instanceof BookableService
-                && $offer->bookableService->is_public,
+                && $offer->bookableService->is_public
+                && $offer->bookableService->hasCompleteAppointmentFormat(),
             404,
         );
 
@@ -955,6 +960,9 @@ class PublicBookingController extends Controller
                 .' – '
                 .$endsAt->format('D, M j, Y \a\t g:i A'),
             'timezone' => $timezone,
+            'appointment_format' => $service->resolvedAppointmentConfiguration()['appointment_format'],
+            'appointment_format_label' => $service->appointmentFormatLabel(),
+            'appointment_method_label' => $service->appointmentMethodLabel(),
             'location_type' => $offer->location_type,
             'location_label' => is_string($locationDetails['label'] ?? null)
                 ? $locationDetails['label']
@@ -1011,6 +1019,9 @@ class PublicBookingController extends Controller
                 .' – '
                 .$endsAt->format('D, M j, Y \a\t g:i A'),
             'timezone' => $timezone,
+            'appointment_format' => $service->resolvedAppointmentConfiguration()['appointment_format'],
+            'appointment_format_label' => $service->appointmentFormatLabel(),
+            'appointment_method_label' => $service->appointmentMethodLabel(),
             'location_type' => $hold->location_type,
             'location_label' => is_string($locationDetails['label'] ?? null)
                 ? $locationDetails['label']
@@ -1028,6 +1039,35 @@ class PublicBookingController extends Controller
                     ? data_get($appointment->meta, 'reporting.public_submission_attempt_id')
                     : null,
         ];
+    }
+
+    private function storeHoldContactPrefill(
+        Request $request,
+        BookingHold $hold,
+        ?string $verifiedChannel,
+        ?string $verifiedDestination,
+    ): void {
+        if (! in_array($verifiedChannel, ['email', 'sms'], true)
+            || $verifiedDestination === null
+            || trim($verifiedDestination) === ''
+        ) {
+            return;
+        }
+
+        $verifiedDestination = trim($verifiedDestination);
+
+        $request->session()->put(
+            $this->holdContactPrefillSessionKey($hold),
+            [
+                'verified_channel' => $verifiedChannel,
+                'email' => $verifiedChannel === 'email'
+                    ? $verifiedDestination
+                    : null,
+                'phone' => $verifiedChannel === 'sms'
+                    ? $verifiedDestination
+                    : null,
+            ],
+        );
     }
 
     /** @return array<string, mixed> */
@@ -1109,7 +1149,7 @@ class PublicBookingController extends Controller
             'page_revision' => $this->presentationString(
                 config('scheduling.public.presentation.page_revision'),
                 null,
-                'scheduling-public-v2',
+                'scheduling-public-v3',
             ),
             'reporting_enabled' => (bool) config(
                 'scheduling.public.reporting_enabled',
@@ -1146,7 +1186,7 @@ class PublicBookingController extends Controller
         return $this->presentationString(
             config('scheduling.public.presentation.consent_text'),
             null,
-            "By completing this booking, you agree that {$client} may send appointment confirmations, reminders, and follow-ups through the contact information you provide. Message and data rates may apply. Reply STOP to opt out of texts.",
+            "By completing this booking, you agree that {$client} may contact you about this appointment through the contact information you provide. Message and data rates may apply. Reply STOP to opt out of texts.",
         );
     }
 

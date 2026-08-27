@@ -17,15 +17,31 @@
         <dt>Time zone</dt>
         <dd>{{ str_replace('_', ' ', $summary['timezone']) }}</dd>
     </div>
+    <div>
+        <dt>Format</dt>
+        <dd>{{ $summary['appointment_format_label'] ?? 'Appointment' }}</dd>
+    </div>
+    <div>
+        <dt>{{ ($summary['appointment_format'] ?? null) === 'in_person' ? 'Where you’ll meet' : 'How you’ll meet' }}</dt>
+        <dd>{{ $summary['appointment_method_label'] ?? 'Details provided after booking' }}</dd>
+    </div>
     <div class="wide">
-            <dt>{{ ($summary['location_label'] ?? null) ?: match($summary['location_type'] ?? null) { 'phone' => 'Phone appointment', 'virtual' => 'Online appointment', 'fixed' => 'Meeting location', 'customer_site' => 'Your location', default => 'How you’ll meet' } }}</dt>
-            <dd>
-                @if($summary['location_address']){{ $summary['location_address'] }}
-                @elseif($summary['location_type'] === 'phone')At the scheduled time, the team will call the phone number you provide.
-                @elseif($summary['location_type'] === 'virtual')Online meeting details will be provided by the team.
-                @elseLocation details will be provided by the team.
-                @endif
-                @if($summary['location_instructions'] ?? null)<br><span class="muted">{{ $summary['location_instructions'] }}</span>@endif
-            </dd>
-        </div>
+        <dt>{{ ($summary['location_label'] ?? null) ?: 'What to expect' }}</dt>
+        <dd>
+            @if($summary['location_address'])
+                {{ $summary['location_address'] }}
+            @elseif($summary['location_type'] === 'phone')
+                At the scheduled time, the team will call the phone number you provide.
+            @elseif($summary['location_type'] === 'virtual')
+                Online meeting details will be provided by the team.
+            @elseif($summary['location_type'] === 'customer_site')
+                The appointment will take place at the address you provided.
+            @else
+                Location details will be provided by the team.
+            @endif
+            @if($summary['location_instructions'] ?? null)
+                <br><span class="muted">{{ $summary['location_instructions'] }}</span>
+            @endif
+        </dd>
+    </div>
 </dl>

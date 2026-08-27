@@ -71,6 +71,38 @@ class SchedulingSetupReadinessTest extends TestCase
         $this->assertTrue($ready['internal_ready']);
     }
 
+    public function test_incomplete_public_appointment_format_fails_public_readiness_closed(): void
+    {
+        config()->set('scheduling.public.enabled', true);
+
+        $service = BookableService::factory()->create([
+            'status' => BookableService::STATUS_ACTIVE,
+            'is_public' => true,
+            'appointment_format' => BookableService::APPOINTMENT_FORMAT_REMOTE,
+            'in_person_arrangement' => null,
+            'remote_method' => null,
+            'location_type' => BookableService::LOCATION_TYPE_PHONE,
+        ]);
+
+        SchedulingAvailabilityWindow::factory()
+            ->absolute(
+                CarbonImmutable::parse('2026-08-27 14:00:00 UTC'),
+                CarbonImmutable::parse('2026-08-27 15:00:00 UTC'),
+            )
+            ->serviceWide($service)
+            ->create([
+                'is_available' => true,
+                'timezone' => 'UTC',
+            ]);
+
+        $summary = app(SchedulingSetupReadiness::class)->summary();
+
+        $this->assertTrue($summary['internal_ready']);
+        $this->assertFalse($summary['has_public_service']);
+        $this->assertTrue($summary['has_incomplete_public_service']);
+        $this->assertFalse($summary['public_ready']);
+    }
+
     public function test_inactive_or_blackout_only_configuration_does_not_report_ready(): void
     {
         $service = BookableService::factory()->create([

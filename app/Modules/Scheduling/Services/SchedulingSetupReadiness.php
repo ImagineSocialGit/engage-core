@@ -20,6 +20,7 @@ final class SchedulingSetupReadiness
      *     public_ready: bool,
      *     public_surface_enabled: bool,
      *     has_public_service: bool,
+     *     has_incomplete_public_service: bool,
      *     active_service_count: int,
      *     active_host_count: int,
      *     upcoming_appointment_count: int
@@ -29,7 +30,14 @@ final class SchedulingSetupReadiness
     {
         $activeServices = BookableService::query()
             ->where('status', BookableService::STATUS_ACTIVE)
-            ->get(['id', 'is_public']);
+            ->get([
+                'id',
+                'is_public',
+                'appointment_format',
+                'in_person_arrangement',
+                'remote_method',
+                'location_type',
+            ]);
         $activeHosts = SchedulingHost::query()
             ->where('status', SchedulingHost::STATUS_ACTIVE)
             ->get(['id']);
@@ -71,9 +79,15 @@ final class SchedulingSetupReadiness
                 ->exists();
         $internalReady = $hasService && $hasAvailability;
         $publicSurfaceEnabled = (bool) config('scheduling.public.enabled', false);
-        $hasPublicService = $activeServices->contains(
+        $publicServices = $activeServices->filter(
             fn (BookableService $service): bool => (bool) $service->is_public,
         );
+        $completePublicServices = $publicServices->filter(
+            fn (BookableService $service): bool => $service->hasCompleteAppointmentFormat(),
+        );
+        $hasPublicService = $completePublicServices->isNotEmpty();
+        $hasIncompletePublicService = $publicServices->count()
+            !== $completePublicServices->count();
         $upcomingAppointmentCount = Appointment::query()
             ->whereIn('status', [
                 Appointment::STATUS_PENDING,
@@ -91,9 +105,11 @@ final class SchedulingSetupReadiness
             'internal_ready' => $internalReady,
             'public_ready' => $internalReady
                 && $publicSurfaceEnabled
-                && $hasPublicService,
+                && $hasPublicService
+                && ! $hasIncompletePublicService,
             'public_surface_enabled' => $publicSurfaceEnabled,
             'has_public_service' => $hasPublicService,
+            'has_incomplete_public_service' => $hasIncompletePublicService,
             'active_service_count' => $activeServices->count(),
             'active_host_count' => $activeHosts->count(),
             'upcoming_appointment_count' => $upcomingAppointmentCount,

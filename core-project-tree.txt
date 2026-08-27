@@ -1935,7 +1935,8 @@
 │   │   │   │   ├── 2026_04_15_195865_create_appointment_lifecycle_events_table.php
 │   │   │   │   ├── 2026_07_21_180100_create_bookable_slot_offers_table.php
 │   │   │   │   ├── 2026_07_21_180101_create_booking_holds_table.php
-│   │   │   │   └── 2026_08_03_190000_create_scheduling_resource_occupancy_tables.php
+│   │   │   │   ├── 2026_08_03_190000_create_scheduling_resource_occupancy_tables.php
+│   │   │   │   └── 2026_08_27_161500_add_appointment_format_to_bookable_services_table.php
 │   │   │   ├── tasks
 │   │   │   │   ├── 2026_04_15_203543_create_task_templates_table.php
 │   │   │   │   ├── 2026_04_15_203544_create_tasks_table.php
@@ -2778,6 +2779,7 @@
 │   │   │   ├── RescheduleAppointmentActionTest.php
 │   │   │   ├── RescheduleSlotOfferAndBookingHoldActionTest.php
 │   │   │   ├── ResourceAwareOccupancyTest.php
+│   │   │   ├── SchedulingAppointmentFormatTest.php
 │   │   │   ├── SchedulingAppointmentRescheduleWorkspaceTest.php
 │   │   │   ├── SchedulingAppointmentWorkspaceTest.php
 │   │   │   ├── SchedulingAvailabilityConfigurationWorkspaceTest.php
@@ -2917,4 +2919,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-696 directories, 2222 files
+696 directories, 2224 files

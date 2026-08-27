@@ -56,9 +56,9 @@ The Scheduling CRM workspace distinguishes first-use setup from routine scheduli
 4. Book a test appointment
 ```
 
-`SchedulingSetupReadiness` derives setup state from current Scheduling-owned runtime facts. Internal readiness requires at least one active service and at least one applicable positive availability window. An active SchedulingHost is intentionally not required because hostless services are valid runtime behavior. Public readiness additionally requires the public Scheduling surface to be enabled and at least one active public service.
+`SchedulingSetupReadiness` derives setup state from current Scheduling-owned runtime facts. Internal readiness requires at least one active service and at least one applicable positive availability window. An active SchedulingHost is intentionally not required because hostless services are valid runtime behavior. Public readiness additionally requires the public Scheduling surface to be enabled, at least one active public service with a complete appointment format, and no active public service left in an incomplete format state.
 
-The first-use service create path asks for business inputs and generates or defaults technical values such as stable keys, status, timezone, capacity, slot interval, booking horizon, and sort order. Existing advanced service settings remain available after creation for uncommon policy needs such as variable-length/range bookings, buffers, notice windows, capacity policy, and detailed location behavior.
+The first-use service create path asks for business inputs and generates or defaults technical values such as stable keys, status, timezone, capacity, slot interval, booking horizon, and sort order. Service-facing meeting setup uses a first-class appointment format hierarchy: In person → business location or customer-provided address; Remote → phone call or virtual meeting. Existing advanced service settings remain available after creation for uncommon policy needs such as variable-length/range bookings, buffers, notice windows, and capacity policy.
 
 SchedulingHost remains the internal model name, but normal client-facing setup uses staff/provider language. The UI should not require a client to understand internal host, provenance, key, source-ownership, or sort-order terminology to add a person who can handle appointments.
 
@@ -109,17 +109,17 @@ GET  /book/{holdId}
 POST /book/{holdId}
 ```
 
-They are registered only on the configured host while the Scheduling module is enabled. The catalog returns active services with `is_public = true`. Service pages progressively collect only the prerequisites required by the selected service before the relevant authoritative availability decision. Fixed-duration pages accept one bounded local date, calculate live availability through `FindBookableAvailabilityAction`, show times in the service timezone, and omit host identity, capacity, occupancy, availability-window identity, and other trusted booking details. Identical times produced by multiple eligible hosts are presented once.
+They are registered only on the configured host while the Scheduling module is enabled. The catalog returns active services with `is_public = true` only when their appointment-format configuration is complete and internally consistent. Service pages progressively collect only the prerequisites required by the selected service before the relevant authoritative availability decision. Fixed-duration pages accept one bounded local date, calculate live availability through `FindBookableAvailabilityAction`, show times in the service timezone, and omit host identity, capacity, occupancy, availability-window identity, and other trusted booking details. Identical times produced by multiple eligible hosts are presented once.
 
-A displayed fixed-duration time submits only its UTC `starts_at` value. Range-duration services submit local check-in/check-out wall times under the closed duration policy. The server revalidates the selection and issues an opaque, short-lived `BookableSlotOffer` without consuming capacity. A separate offer POST accepts only a UUID hold idempotency key and creates the real `BookingHold` after revalidating the exact service, location, host, travel, capacity, and resource state. The visitor cannot nominate a host, authoritative end time, normalized location, duration, capacity, offer provenance, or rule provenance.
+A displayed fixed-duration time submits only its UTC `starts_at` value. Range-duration services submit local check-in/check-out wall times under the closed duration policy. The server revalidates the selection and issues an opaque, short-lived `BookableSlotOffer` without consuming capacity. When destination verification is available, successful code confirmation immediately invokes the authoritative offer-to-hold transaction and redirects to attendee details; there is no extra browser-authored continuation step. When verification is unavailable, the existing offer POST accepts only a UUID hold idempotency key. Both paths create the real `BookingHold` only after revalidating the exact service, location, host, travel, capacity, and resource state. The visitor cannot nominate a host, authoritative end time, normalized location, duration, capacity, offer provenance, or rule provenance.
 
 The hold page accepts first name, last name, email, and optional phone only while the hold remains effective. A verified email address or phone number is carried forward through server-owned session state and cannot be silently replaced after verification. `CompletePublicBookingAction` resolves the Contact through the Core-owned `ResolveContactByEmailAction`, fills first/last name only on a newly created Contact, supplies immutable attendee snapshots, records the configured communications disclosure identity/hash/acceptance time, and converts the hold through `ConvertBookingHoldToAppointmentAction`. An existing Contact is returned unchanged; public input never overwrites established Contact fields or metadata. Reservation, completion, and hold-review routes are rate limited through `config/scheduling.php`.
 
-The default public presentation is deliberately simple and mobile-first. The catalog has one service-choice surface without duplicated step labels. Fixed-duration availability is grouped into Morning, Afternoon, and Evening, shows start times initially, and reveals the full appointment interval plus the continue action only after selection. Verification uses plain email/phone language, phone inputs receive a lightweight US display mask while the server normalizes accepted values, and the final converted-hold page is confirmation-only. Location type, address, and preparation instructions come from the service-owned canonical location snapshot; when a detail is not configured, the public surface says that the team will provide it instead of inventing a delivery promise.
+The default public presentation is deliberately simple and mobile-first. The catalog has one service-choice surface without duplicated step labels. Fixed-duration availability is grouped into Morning, Afternoon, and Evening, shows start times initially, and reveals the full appointment interval plus the continue action only after selection. Verification uses plain email/phone language, phone inputs receive a lightweight US display mask while the server normalizes accepted values, and successful verification proceeds directly into the hold/contact-details step. The final converted-hold page is confirmation-only. Public summaries present the business-facing appointment format separately from the internal location commitment snapshot; address and preparation instructions come from that canonical snapshot, and when a detail is not configured the surface says that the team will provide it instead of inventing a delivery promise.
 
 Client presentation overrides live under `scheduling.public.presentation`. They may set brand name/logo, heading/intro copy, bounded CSS colors, disclosure text/version, and page-revision identity without forking the Blade template. The server validates color and public-URL shapes before rendering them.
 
-Scheduling contributes bounded browser event definitions for catalog, availability, time selection, verification, details, validation, and submit-attempt stages. The public script uses Reporting's same-origin client and never includes contact field values in event properties. Completed public Appointments contribute `scheduling.public_booking` durable facts, correlated to the submit-attempt UUID when JavaScript was available. Reporting owns the daily projection and CRM presentation for the booking funnel, validation/drop-off, availability and optional verification activity, service results, first-party campaign/source attribution, Meta-click evidence, and exact stable-ID ad-spend comparison. Scheduling remains functional when Reporting is disabled. Appointment-format/location dimensions are intentionally deferred until Scheduling replaces the current overloaded location-type model.
+Scheduling contributes bounded browser event definitions for catalog, availability, time selection, verification, details, validation, and submit-attempt stages. The public script uses Reporting's same-origin client and never includes contact field values in event properties. Completed public Appointments contribute `scheduling.public_booking` durable facts, correlated to the submit-attempt UUID when JavaScript was available. Reporting owns the daily projection and CRM presentation for the booking funnel, validation/drop-off, availability and optional verification activity, service results, first-party campaign/source attribution, Meta-click evidence, and exact stable-ID ad-spend comparison. Scheduling remains functional when Reporting is disabled. The first-class appointment-format model is now stable, but this batch deliberately does not add new Reporting dimensions; Reporting may consume those dimensions in a later bounded change.
 
 All public booking, cancellation, and reschedule URLs should resolve from the configured base URL.
 
@@ -142,16 +142,16 @@ The implemented flow begins with appointment type because the selected service d
 
 Blade may present these steps as progressively revealed pages, and Alpine may later add sliding animation. Presentation does not establish authority. Each transition that changes trusted state is server validated, and later pages do not trust hidden browser-authored service, host, duration, normalized location, verification, offer provenance, or capacity fields.
 
-Service location policy determines the details step:
+Appointment format determines the details step while the existing location type remains an internal commitment classification:
 
 ```text
-phone or virtual service
+Remote → phone call or virtual meeting
     no customer location prerequisite
 
-fixed-location service
-    use the configured fixed location
+In person → business location
+    use the configured fixed business location
 
-customer-site service
+In person → customer-provided address
     collect and normalize the service address before calculating availability
 ```
 
@@ -165,7 +165,7 @@ Delivery crosses a neutral app-level `DestinationVerificationTransport` contract
 
 22E2B completes that boundary. The public offer review surface exposes issue, verify, and resend transitions only when at least one eligible verification channel is currently deliverable. The browser submits the requested channel/destination and later the one-time code, but never receives the challenge ID or proof token as booking authority. Laravel session state keeps the challenge/proof handle under the opaque offer identity, and `CreatePublicBookingHoldRequest` explicitly prohibits caller-authored challenge IDs, proof tokens, `verified` flags, and other verification authority.
 
-`CreatePublicBookingHoldAction` independently checks whether verification is currently required, validates the server-owned proof against the locked ordinary public offer and current booking session, consumes that proof exactly once, and only then delegates to `CreateBookingHoldAction`. The real hold action remains authoritative for current service/public status, location commitment, host assignment, resources, capacity, exact interval, and travel fit. A proof therefore cannot reserve capacity by itself or bypass a race that makes the slot unavailable. An idempotent replay of an already-created hold remains replayable after the original proof has been consumed. When no eligible verification transport exists, the direct offer-to-hold path remains available.
+`CreatePublicBookingHoldAction` independently checks whether verification is currently required, validates the server-owned proof against the locked ordinary public offer and current booking session, consumes that proof exactly once, and only then delegates to `CreateBookingHoldAction`. Successful code verification now calls that action immediately, so verification and authoritative hold creation are one server-directed transition from the visitor's perspective. The real hold action remains authoritative for current service/public status, location commitment, host assignment, resources, capacity, exact interval, and travel fit. A proof therefore cannot bypass a race that makes the slot unavailable. An idempotent replay of an already-created hold remains replayable after the original proof has been consumed. When no eligible verification transport exists, the direct offer-to-hold path remains available.
 
 Project State now treats Scheduling as an optional schema-activated section. Durable Scheduling configuration, availability, Appointments, attendees, lifecycle history, and Appointment-owned resource occupancy survive a controlled clean rebuild. `bookable_slot_offers` and `booking_holds` remain transient export blockers, and destination-verification challenges/proofs remain cache/session state rather than Project State data.
 
@@ -207,6 +207,8 @@ Scheduling also owns:
 
 ```text
 service duration, interval, notice, horizon, buffer, capacity, and confirmation policy
+first-class appointment format: In person / Remote plus the applicable arrangement or method
+internal location commitment projection retained for offers, holds, appointments, travel, and history
 host identity and capacity
 service-to-host eligibility
 availability and blackout rule evaluation

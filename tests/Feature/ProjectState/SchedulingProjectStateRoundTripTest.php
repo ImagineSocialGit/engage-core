@@ -65,6 +65,9 @@ class SchedulingProjectStateRoundTripTest extends TestCase
             'minimum_duration_minutes' => 30,
             'maximum_duration_minutes' => 120,
             'timezone' => 'America/Chicago',
+            'appointment_format' => BookableService::APPOINTMENT_FORMAT_IN_PERSON,
+            'in_person_arrangement' => BookableService::IN_PERSON_ARRANGEMENT_CUSTOMER_ADDRESS,
+            'remote_method' => null,
             'location_type' => BookableService::LOCATION_TYPE_CUSTOMER_SITE,
             'location_details' => [
                 'address' => [
@@ -299,6 +302,9 @@ class SchedulingProjectStateRoundTripTest extends TestCase
         $this->assertSame(BookableService::DURATION_MODE_RANGE, $restoredService->duration_mode);
         $this->assertSame(30, $restoredService->minimum_duration_minutes);
         $this->assertSame(120, $restoredService->maximum_duration_minutes);
+        $this->assertSame(BookableService::APPOINTMENT_FORMAT_IN_PERSON, $restoredService->appointment_format);
+        $this->assertSame(BookableService::IN_PERSON_ARRANGEMENT_CUSTOMER_ADDRESS, $restoredService->in_person_arrangement);
+        $this->assertNull($restoredService->remote_method);
         $this->assertEquals(
             ['address' => ['formatted' => '100 Main St, Chicago, IL']],
             $restoredService->location_details,

@@ -340,8 +340,16 @@ class SchedulingConfigurationWriter
         ?BookableService $existing = null,
     ): array {
         $status = $this->serviceStatus($attributes['status'] ?? null);
-        $locationType = $this->locationType($attributes['location_type'] ?? null);
+        $appointment = $this->appointmentConfiguration($attributes, $existing);
         $durationPolicy = $this->durationPolicy($attributes, $existing);
+        $isPublic = $status === BookableService::STATUS_ACTIVE
+            && (bool) ($attributes['is_public'] ?? false);
+
+        if ($isPublic && ! $appointment['complete']) {
+            throw new InvalidArgumentException(
+                'Choose how this appointment happens before making it publicly bookable.',
+            );
+        }
 
         return [
             'name' => $this->requiredString($attributes['name'] ?? null, 'service name'),
@@ -356,23 +364,21 @@ class SchedulingConfigurationWriter
             'cancellation_notice_minutes' => $this->nonNegativeInteger($attributes['cancellation_notice_minutes'] ?? 0, 'cancellation notice'),
             'reschedule_notice_minutes' => $this->nonNegativeInteger($attributes['reschedule_notice_minutes'] ?? 0, 'reschedule notice'),
             'timezone' => $this->timezone($attributes['timezone'] ?? null),
-            'location_type' => $locationType,
+            'appointment_format' => $appointment['appointment_format'],
+            'in_person_arrangement' => $appointment['in_person_arrangement'],
+            'remote_method' => $appointment['remote_method'],
+            'location_type' => $appointment['location_type'],
             'location_details' => $this->locationDetails(
                 attributes: $attributes,
-                locationType: $locationType,
+                locationType: $appointment['location_type'],
             ),
             'capacity' => $this->positiveInteger($attributes['capacity'] ?? null, 'service capacity'),
             'requires_confirmation' => (bool) ($attributes['requires_confirmation'] ?? false),
-            'is_public' => $status === BookableService::STATUS_ACTIVE
-                && (bool) ($attributes['is_public'] ?? false),
+            'is_public' => $isPublic,
             'sort_order' => $this->nonNegativeInteger($attributes['sort_order'] ?? 0, 'service sort order'),
         ];
     }
 
-    /**
-     * @param array<string, mixed> $attributes
-     * @return array<string, mixed>|null
-     */
     /**
      * @param array<string, mixed> $attributes
      * @return array{duration_mode: string, duration_minutes: int, minimum_duration_minutes: int|null, maximum_duration_minutes: int|null}
@@ -460,6 +466,122 @@ class SchedulingConfigurationWriter
         }
 
         return $value;
+    }
+
+    /**
+     * Service authoring uses business-language appointment fields. The legacy
+     * location_type input remains accepted only as a compatibility boundary for
+     * older tests/importers and is projected into the new hierarchy here.
+     *
+     * @param array<string, mixed> $attributes
+     * @return array{appointment_format: string|null, in_person_arrangement: string|null, remote_method: string|null, location_type: string|null, complete: bool}
+     */
+    private function appointmentConfiguration(
+        array $attributes,
+        ?BookableService $existing = null,
+    ): array {
+        $usesNewFields = array_key_exists('appointment_format', $attributes)
+            || array_key_exists('in_person_arrangement', $attributes)
+            || array_key_exists('remote_method', $attributes);
+
+        if (! $usesNewFields) {
+            $legacyType = $this->locationType(
+                $attributes['location_type'] ?? $existing?->location_type,
+            );
+            $legacy = BookableService::appointmentConfigurationForLocationType($legacyType);
+
+            return [
+                ...$legacy,
+                'location_type' => $legacyType,
+                'complete' => $legacyType !== null,
+            ];
+        }
+
+        $format = $this->nullableString($attributes['appointment_format'] ?? null);
+        $inPersonArrangement = $this->nullableString(
+            $attributes['in_person_arrangement'] ?? null,
+        );
+        $remoteMethod = $this->nullableString($attributes['remote_method'] ?? null);
+
+        if ($format !== null && ! in_array($format, BookableService::APPOINTMENT_FORMATS, true)) {
+            throw new InvalidArgumentException(
+                "Bookable service appointment format [{$format}] is invalid.",
+            );
+        }
+
+        if ($inPersonArrangement !== null
+            && ! in_array($inPersonArrangement, BookableService::IN_PERSON_ARRANGEMENTS, true)
+        ) {
+            throw new InvalidArgumentException(
+                "Bookable service in-person arrangement [{$inPersonArrangement}] is invalid.",
+            );
+        }
+
+        if ($remoteMethod !== null
+            && ! in_array($remoteMethod, BookableService::REMOTE_METHODS, true)
+        ) {
+            throw new InvalidArgumentException(
+                "Bookable service remote method [{$remoteMethod}] is invalid.",
+            );
+        }
+
+        if ($format === null) {
+            if ($inPersonArrangement !== null || $remoteMethod !== null) {
+                throw new InvalidArgumentException(
+                    'Choose an appointment format before choosing how the appointment happens.',
+                );
+            }
+
+            return [
+                'appointment_format' => null,
+                'in_person_arrangement' => null,
+                'remote_method' => null,
+                'location_type' => null,
+                'complete' => false,
+            ];
+        }
+
+        if ($format === BookableService::APPOINTMENT_FORMAT_IN_PERSON) {
+            if ($remoteMethod !== null) {
+                throw new InvalidArgumentException(
+                    'In-person appointments cannot use a remote meeting method.',
+                );
+            }
+
+            $locationType = BookableService::locationTypeForAppointmentConfiguration(
+                appointmentFormat: $format,
+                inPersonArrangement: $inPersonArrangement,
+                remoteMethod: null,
+            );
+
+            return [
+                'appointment_format' => $format,
+                'in_person_arrangement' => $inPersonArrangement,
+                'remote_method' => null,
+                'location_type' => $locationType,
+                'complete' => $locationType !== null,
+            ];
+        }
+
+        if ($inPersonArrangement !== null) {
+            throw new InvalidArgumentException(
+                'Remote appointments cannot use an in-person arrangement.',
+            );
+        }
+
+        $locationType = BookableService::locationTypeForAppointmentConfiguration(
+            appointmentFormat: $format,
+            inPersonArrangement: null,
+            remoteMethod: $remoteMethod,
+        );
+
+        return [
+            'appointment_format' => $format,
+            'in_person_arrangement' => null,
+            'remote_method' => $remoteMethod,
+            'location_type' => $locationType,
+            'complete' => $locationType !== null,
+        ];
     }
 
     private function locationDetails(

@@ -26,9 +26,7 @@
         'state' => $pageState,
         'serviceKey' => $reportingServiceKey,
         'availabilityState' => $availabilityState,
-        'verificationCompletedChannel' => $destinationVerification['verified']
-            ? $destinationVerification['verified_channel']
-            : null,
+        'verificationCompletedChannel' => $verificationCompletedChannel,
         'validationFields' => array_values(array_slice($errors->keys(), 0, 16)),
     ];
     $locationSummary = $holdSummary ?: $offerSummary;
@@ -244,17 +242,7 @@
                 </p>
 
                 @if($destinationVerification['required'])
-                    @if($destinationVerification['verified'])
-                        <div class="notice" data-destination-verification="verified">
-                            <strong>Code confirmed</strong>
-                            {{ $destinationVerification['masked_destination'] }}
-                        </div>
-                        <form method="POST" action="{{ route('scheduling.public.offers.hold', ['offerId' => $offerSummary['offer_id']], false) }}">
-                            @csrf
-                            <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', (string) \Illuminate\Support\Str::uuid()) }}">
-                            <button type="submit">Continue</button>
-                        </form>
-                    @elseif($destinationVerification['challenge_active'])
+                    @if($destinationVerification['challenge_active'])
                         <div class="notice" data-destination-verification="challenge">
                             <strong>Enter the code we sent</strong>
                             Sent to {{ $destinationVerification['masked_destination'] }}
@@ -266,7 +254,7 @@
                                 <input id="verification_code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="{{ min(8, max(4, (int) config('scheduling.public.destination_verification.code_digits', 6))) }}" required autofocus>
                                 @error('code')<span class="error">{{ $message }}</span>@enderror
                             </label>
-                            <div class="actions"><button type="submit">Verify code</button></div>
+                            <div class="actions"><button type="submit">Confirm code</button></div>
                         </form>
                         <form method="POST" action="{{ route('scheduling.public.offers.verification.resend', ['offerId' => $offerSummary['offer_id']], false) }}" style="margin-top:.65rem">
                             @csrf

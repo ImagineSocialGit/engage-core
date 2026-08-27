@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 1,
+    'version' => 2,
     'optional' => true,
     'activation_tables' => [
         'scheduling_hosts',
@@ -72,6 +72,9 @@ return [
                 'cancellation_notice_minutes',
                 'reschedule_notice_minutes',
                 'timezone',
+                'appointment_format',
+                'in_person_arrangement',
+                'remote_method',
                 'location_type',
                 'location_details',
                 'capacity',

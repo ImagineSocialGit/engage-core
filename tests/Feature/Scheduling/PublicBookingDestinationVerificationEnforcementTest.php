@@ -96,31 +96,20 @@ class PublicBookingDestinationVerificationEnforcementTest extends TestCase
         $this->assertCount(2, $transport->sent);
         $this->assertSame($transport->sent[0]['code'], $transport->sent[1]['code']);
 
-        $this->post($offerUrl.'/verification/verify', [
+        $verification = $this->post($offerUrl.'/verification/verify', [
             'code' => $transport->sent[1]['code'],
-        ])->assertRedirect($offerUrl);
-
-        $this->get($offerUrl)
-            ->assertOk()
-            ->assertSee('data-destination-verification="verified"', false)
-            ->assertSee('action="/offers/'.$offer->offer_id.'/hold"', false);
-
-        $idempotencyKey = (string) Str::uuid();
-        $first = $this->post($offerUrl.'/hold', [
-            'idempotency_key' => $idempotencyKey,
         ]);
 
-        $first->assertRedirect();
         $hold = BookingHold::query()->sole();
 
+        $verification
+            ->assertRedirect('https://schedule.test/book/'.$hold->hold_id)
+            ->assertSessionHasNoErrors();
         $this->assertNotNull($offer->refresh()->consumed_at);
-        $this->assertSame(
-            'https://schedule.test/book/'.$hold->hold_id,
-            $first->headers->get('Location'),
-        );
 
         $this->get('https://schedule.test/book/'.$hold->hold_id)
             ->assertOk()
+            ->assertSee('"verificationCompletedChannel":"email"', false)
             ->assertSee('value="person@example.test"', false)
             ->assertSee('Verified email')
             ->assertSee('name="email"', false)
@@ -140,10 +129,8 @@ class PublicBookingDestinationVerificationEnforcementTest extends TestCase
 
         $this->assertDatabaseCount('appointments', 0);
 
-        $this->post($offerUrl.'/hold', [
-            'idempotency_key' => $idempotencyKey,
-        ])->assertRedirect('https://schedule.test/book/'.$hold->hold_id);
-
+        $this->get($offerUrl)
+            ->assertRedirect('https://schedule.test/book/'.$hold->hold_id);
         $this->assertDatabaseCount('booking_holds', 1);
     }
 
@@ -225,19 +212,6 @@ class PublicBookingDestinationVerificationEnforcementTest extends TestCase
             ->assertOk()
             ->assertSee('data-destination-verification="challenge"', false);
 
-        $this->post($offerUrl.'/verification/verify', [
-            'code' => $transport->sent[0]['code'],
-        ])
-            ->assertRedirect($offerUrl)
-            ->assertSessionHasNoErrors();
-
-        $this->get($offerUrl)
-            ->assertOk()
-            ->assertSee('data-destination-verification="verified"', false);
-
-        $this->assertDatabaseCount('booking_holds', 0);
-        $this->assertNull($offer->refresh()->consumed_at);
-
         Appointment::factory()->create([
             'bookable_service_id' => $service->id,
             'scheduling_host_id' => $host->id,
@@ -247,19 +221,14 @@ class PublicBookingDestinationVerificationEnforcementTest extends TestCase
         ]);
 
         $this->from($offerUrl)
-            ->post($offerUrl.'/hold', [
-                'idempotency_key' => (string) Str::uuid(),
+            ->post($offerUrl.'/verification/verify', [
+                'code' => $transport->sent[0]['code'],
             ])
             ->assertRedirect($offerUrl)
-            ->assertSessionHasErrors('booking');
+            ->assertSessionHasErrors('code');
 
         $this->assertDatabaseCount('booking_holds', 0);
         $this->assertNull($offer->refresh()->consumed_at);
-
-        $this->get($offerUrl)
-            ->assertOk()
-            ->assertSee('data-destination-verification="required"', false)
-            ->assertDontSee('data-destination-verification="verified"', false);
     }
 
     public function test_expired_offer_cannot_complete_verification_or_create_a_hold(): void
