@@ -11,7 +11,7 @@
     <div
         class="space-y-6"
         x-data="{
-            addLeadOpen: @js($errors->has('first_name') || $errors->has('last_name') || $errors->has('email') || $errors->has('phone') || $errors->has('contact_status_id')),
+            addLeadOpen: @js($errors->has('first_name') || $errors->has('last_name') || $errors->has('email') || $errors->has('phone') || $errors->has('contact_status_id') || $errors->has('existing_relationship_confirmed')),
         }"
     >
         @if (session('success'))
@@ -165,6 +165,35 @@
                         </x-ui.form.select>
 
                         <x-ui.form.error name="contact_status_id" />
+                    </div>
+                @endif
+
+                @if($messagingAvailable)
+                    <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4">
+                        <p class="text-sm font-semibold text-amber-950">
+                            Only add people who already have a relationship with your organization or have expressed interest in hearing from you.
+                        </p>
+
+                        <p class="mt-1 text-sm text-amber-800">
+                            Engage is not intended for unsolicited marketing. Do not add someone for the purpose of sending marketing email or text unless they have previously contacted you, requested information, done business with you, or otherwise expressed interest.
+                        </p>
+
+                        <label class="mt-4 flex items-start gap-3 text-sm text-amber-950">
+                            <input
+                                type="checkbox"
+                                name="existing_relationship_confirmed"
+                                value="1"
+                                class="mt-0.5 h-4 w-4 rounded border-amber-300 text-slate-900 focus:ring-slate-500"
+                                @checked(old('existing_relationship_confirmed'))
+                                required
+                            >
+
+                            <span>
+                                I confirm this person has an existing relationship with us or has expressed interest in hearing from us. Creating a new contact will record transactional and marketing permission for their saved contact methods supported by Messaging. Any later opt-out remains authoritative.
+                            </span>
+                        </label>
+
+                        <x-ui.form.error name="existing_relationship_confirmed" />
                     </div>
                 @endif
 

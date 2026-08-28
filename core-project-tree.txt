@@ -89,9 +89,12 @@
 │   │   │   │   └── UpdateBroadcastRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── BroadcastAudiencePreviewService.php
+│   │   │   │   ├── BroadcastMessageTokenValidator.php
 │   │   │   │   ├── BroadcastRecipientResolver.php
 │   │   │   │   └── BroadcastScheduledMessageResultRecorder.php
-│   │   │   └── Support
+│   │   │   ├── Support
+│   │   │   └── TokenContracts
+│   │   │       └── BroadcastTokenContextProvider.php
 │   │   ├── Campaigns
 │   │   │   ├── Actions
 │   │   │   │   ├── ActivateCampaignAction.php
@@ -229,6 +232,7 @@
 │   │   ├── Core
 │   │   │   ├── Actions
 │   │   │   │   ├── Contacts
+│   │   │   │   │   ├── CreateManualContactAction.php
 │   │   │   │   │   ├── CreateOrUpdateContactAction.php
 │   │   │   │   │   ├── RecordContactFilterFactsChangedAction.php
 │   │   │   │   │   ├── ResolveContactByEmailAction.php
@@ -283,7 +287,8 @@
 │   │   │   ├── Enums
 │   │   │   │   └── TagType.php
 │   │   │   ├── Events
-│   │   │   │   └── ContactFilterFactsChanged.php
+│   │   │   │   ├── ContactFilterFactsChanged.php
+│   │   │   │   └── ManualContactCreated.php
 │   │   │   ├── Import
 │   │   │   │   └── Treatments
 │   │   │   │       ├── ContactStatusImportTreatmentTarget.php
@@ -803,6 +808,7 @@
 │   │   │   │   └── SendScheduledMessageJob.php
 │   │   │   ├── Listeners
 │   │   │   │   ├── AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal.php
+│   │   │   │   ├── GrantManualContactCreatedConsents.php
 │   │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailed.php
 │   │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped.php
 │   │   │   │   └── MarkClaimedPermissionInvitationSentAfterScheduledMessageSent.php
@@ -2251,6 +2257,7 @@
 │       │   │   ├── index.blade.php
 │       │   │   ├── partials
 │       │   │   │   ├── audience-builder.blade.php
+│       │   │   │   ├── message-personalization.blade.php
 │       │   │   │   └── reusable-message-picker.blade.php
 │       │   │   └── show.blade.php
 │       │   ├── business-calendar
@@ -2440,6 +2447,7 @@
 │   │   │   ├── BroadcastMessageReuseTest.php
 │   │   │   ├── BroadcastModelTest.php
 │   │   │   ├── BroadcastResolvedMessageDispatchOwnershipTest.php
+│   │   │   ├── BroadcastTokenPersonalizationTest.php
 │   │   │   ├── CancelBroadcastActionTest.php
 │   │   │   ├── MarkBroadcastRecipientSentTest.php
 │   │   │   ├── MarkBroadcastRecipientTerminalStatusTest.php
@@ -2661,6 +2669,7 @@
 │   │   │   ├── InternalNotificationChannelResolverTest.php
 │   │   │   ├── InternalNotificationGateTest.php
 │   │   │   ├── LegacyPendingMessageConsolidationRemovalTest.php
+│   │   │   ├── ManualContactCreationConsentTest.php
 │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailedTest.php
 │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest.php
 │   │   │   ├── MarkClaimedPermissionInvitationSentAfterScheduledMessageSentTest.php
@@ -2960,4 +2969,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-704 directories, 2257 files
+705 directories, 2265 files

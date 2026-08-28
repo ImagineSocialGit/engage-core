@@ -2,6 +2,7 @@
 
 namespace App\Modules\Messaging\Providers;
 
+use App\Modules\Core\Events\ManualContactCreated;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Automation\MessagingAutomationPointAuthoringContributor;
 use App\Modules\Messaging\Automation\MessagingAutomationPointDefinitionContributor;
@@ -20,6 +21,7 @@ use App\Modules\Messaging\Jobs\ProcessDueMessageChainEnrollmentsJob;
 use App\Modules\Messaging\Jobs\PruneScheduledMessageCtaEngagementsJob;
 use App\Modules\Messaging\Jobs\PublishScheduledMessageOutboxEventsJob;
 use App\Modules\Messaging\Jobs\RecoverStaleScheduledMessageClaimsJob;
+use App\Modules\Messaging\Listeners\GrantManualContactCreatedConsents;
 use App\Modules\Messaging\Listeners\AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal;
 use App\Modules\Messaging\Listeners\MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailed;
 use App\Modules\Messaging\Listeners\MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped;
@@ -155,6 +157,11 @@ class MessagingModuleServiceProvider extends ServiceProvider
                     ->daily()
                     ->withoutOverlapping();
             },
+        );
+
+        Event::listen(
+            ManualContactCreated::class,
+            GrantManualContactCreatedConsents::class,
         );
 
         Event::listen(

@@ -42,6 +42,8 @@ class ContactControllerTest extends TestCase
         $response->assertSee('Create '.str(config('contacts.labels.singular'))->title());
         $response->assertSee('name="email"', false);
         $response->assertSee('name="contact_status_id"', false);
+        $response->assertSee('Engage is not intended for unsolicited marketing.');
+        $response->assertSee('name="existing_relationship_confirmed"', false);
 
         $this->assertSame($contact->id, Contact::query()->firstWhere('email', 'jane@example.test')->id);
     }
@@ -65,6 +67,7 @@ class ContactControllerTest extends TestCase
                 'name' => 'Jane Lead',
                 'email' => 'jane@example.test',
                 'phone' => '5551112222',
+                'existing_relationship_confirmed' => '1',
                 'source' => 'manual',
                 'subsource' => 'walk_in',
             ]);
@@ -98,6 +101,7 @@ class ContactControllerTest extends TestCase
                 'first_name' => 'Jane',
                 'last_name' => 'Lead',
                 'email' => 'jane@example.test',
+                'existing_relationship_confirmed' => '1',
                 'contact_status_id' => $status->id,
             ]);
 
@@ -136,6 +140,7 @@ class ContactControllerTest extends TestCase
                 'first_name' => 'Jane',
                 'last_name' => 'Lead',
                 'email' => 'jane@example.test',
+                'existing_relationship_confirmed' => '1',
             ]);
 
         $contact = Contact::query()->where('email', 'jane@example.test')->firstOrFail();

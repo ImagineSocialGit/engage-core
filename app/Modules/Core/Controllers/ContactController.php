@@ -3,7 +3,7 @@
 namespace App\Modules\Core\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Core\Actions\Contacts\CreateOrUpdateContactAction;
+use App\Modules\Core\Actions\Contacts\CreateManualContactAction;
 use App\Modules\Core\Contracts\Contacts\UpdatesContactStatus;
 use App\Modules\Core\Data\Contacts\ContactImportContext;
 use App\Modules\Core\Models\Contact;
@@ -17,6 +17,7 @@ use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportTreatmentRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Core\Support\Contacts\ContactShowDataRegistry;
+use App\Support\Modules\ModuleManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -46,20 +47,36 @@ class ContactController extends Controller
             ->ordered()
             ->get(['id', 'name']);
 
-        return view('crm.contacts.index', compact('contacts', 'contactStatuses'));
+        $messagingAvailable = in_array(
+            'messaging',
+            app(ModuleManager::class)->enabledKeysWithDependencies(),
+            true,
+        );
+
+        return view('crm.contacts.index', compact(
+            'contacts',
+            'contactStatuses',
+            'messagingAvailable',
+        ));
     }
 
     public function store(
         StoreContactRequest $request,
-        CreateOrUpdateContactAction $createOrUpdateContact,
+        CreateManualContactAction $createManualContact,
     ): RedirectResponse {
-        $contact = $createOrUpdateContact->handle(
+        $validated = $request->validated();
+        unset($validated['existing_relationship_confirmed']);
+
+        $contact = $createManualContact->handle(
             data: [
-                ...$request->validated(),
-                'source' => $request->validated('source') ?? 'crm',
+                ...$validated,
+                'source' => $validated['source'] ?? 'crm',
             ],
             statusKey: module_enabled('workflow') ? config('contacts.default_workflow_status_key') : null,
-            statusChangeReason: 'crm_manual_create',
+            existingRelationshipConfirmed: $request->boolean('existing_relationship_confirmed'),
+            actorUserId: $request->user()?->getKey(),
+            ipAddress: $request->ip(),
+            userAgent: $request->userAgent(),
         );
 
         return redirect()
