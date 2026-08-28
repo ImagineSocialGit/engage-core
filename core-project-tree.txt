@@ -323,6 +323,7 @@
 │   │   │   │   ├── Contacts
 │   │   │   │   │   ├── ContactFilterResolver.php
 │   │   │   │   │   ├── ContactImportProfileRegistry.php
+│   │   │   │   │   ├── ContactIndexFilterService.php
 │   │   │   │   │   └── Filters
 │   │   │   │   │       ├── ImportBatchContactFilterCriterion.php
 │   │   │   │   │       ├── SourceContactFilterCriterion.php
@@ -2524,6 +2525,7 @@
 │   │   │   ├── ContactImportProvenanceTest.php
 │   │   │   ├── ContactImportTreatmentControllerTest.php
 │   │   │   ├── ContactImportTreatmentRegistryTest.php
+│   │   │   ├── ContactIndexFilterTest.php
 │   │   │   ├── ContactLookupControllerTest.php
 │   │   │   ├── ContactStatusImportTreatmentTest.php
 │   │   │   ├── ContactTagAutomationTest.php
@@ -2969,4 +2971,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-705 directories, 2265 files
+705 directories, 2267 files

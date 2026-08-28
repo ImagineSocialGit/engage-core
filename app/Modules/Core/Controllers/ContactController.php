@@ -12,6 +12,7 @@ use App\Modules\Core\Models\ContactImportOccurrence;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Core\Requests\StoreContactRequest;
 use App\Modules\Core\Services\Contacts\ContactImportProfileRegistry;
+use App\Modules\Core\Services\Contacts\ContactIndexFilterService;
 use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportTreatmentRegistry;
@@ -30,17 +31,24 @@ class ContactController extends Controller
     private const IMPORT_MODE_ADD = 'add';
     private const IMPORT_MODE_UPDATE = 'update';
 
-    public function index(): View
-    {
-        $contactsQuery = Contact::query();
+    public function index(
+        Request $request,
+        ContactIndexFilterService $contactIndexFilters,
+    ): View {
+        $contactFilters = $contactIndexFilters->state($request->query());
+        $contactsQuery = $contactIndexFilters->query($contactFilters);
 
         if (module_enabled('workflow')) {
             $contactsQuery->with('workflowProfile.contactStatus');
         }
 
         $contacts = $contactsQuery
+            ->reorder()
             ->latest()
-            ->paginate(20);
+            ->paginate(20)
+            ->withQueryString();
+
+        $totalContacts = Contact::query()->count();
 
         $contactStatuses = ContactStatus::query()
             ->active()
@@ -55,6 +63,8 @@ class ContactController extends Controller
 
         return view('crm.contacts.index', compact(
             'contacts',
+            'totalContacts',
+            'contactFilters',
             'contactStatuses',
             'messagingAvailable',
         ));

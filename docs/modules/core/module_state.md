@@ -296,6 +296,15 @@ Core `ContactController` may ask registries for module-provided data.
 Core `ContactController` must not directly import module-specific models/services such as Tasks, Messaging, InboundMessaging, InternalNotifications, Webinars, Campaigns, Mortgage, or FlowRoutes.
 
 
+## Contact index discovery and filtering
+
+The Core Contacts index is a fast discovery surface, not a report/query builder. It combines one free-text search across Contact name, first/last name, email, and phone with the shared Contact filter criterion registry. Status, Relationship, and Source are promoted as primary filters when those criteria are available; other contributed criteria remain behind a secondary “More filters” disclosure.
+
+The index consumes criterion definitions through the Core registry rather than hard-coding Workflow, Relationships, Webinar, or other module rules. Optional-module filters therefore appear only when their module contributes the criterion. Selected criteria are combined with AND across categories using the same resolver semantics used by Broadcasts/Campaigns; the index UI intentionally authors one value per category to keep routine lookup simple.
+
+Filters are GET/query-string state. Pagination preserves the current search/filter query, active filters are removable individually, and the surface distinguishes filtered-empty results from a genuinely empty CRM. No filter selection is persisted to Contact metadata or another table.
+
+
 ## Automation opportunity producer boundary
 
 Core may host manual CRM entry points that provide causal context for Automation Opportunities, but Core does not own cross-module Automation Opportunities infrastructure.

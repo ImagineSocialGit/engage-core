@@ -12,6 +12,7 @@
         class="space-y-6"
         x-data="{
             addLeadOpen: @js($errors->has('first_name') || $errors->has('last_name') || $errors->has('email') || $errors->has('phone') || $errors->has('contact_status_id') || $errors->has('existing_relationship_confirmed')),
+            moreFiltersOpen: @js(($contactFilters['secondary_active_count'] ?? 0) > 0),
         }"
     >
         @if (session('success'))
@@ -213,12 +214,134 @@
             </form>
         </x-ui.card>
 
+        <x-ui.card class="space-y-4">
+            <form method="GET" action="{{ route('crm.contacts.index') }}" class="space-y-4">
+                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5 xl:items-end">
+                    <div class="sm:col-span-2 xl:col-span-1">
+                        <x-ui.form.label for="contact_search">
+                            Search {{ $leadPlural }}
+                        </x-ui.form.label>
+
+                        <x-ui.form.input
+                            id="contact_search"
+                            name="search"
+                            value="{{ $contactFilters['search'] }}"
+                            placeholder="Name, email, or phone"
+                            autocomplete="off"
+                        />
+                    </div>
+
+                    @foreach($contactFilters['primary'] as $filter)
+                        <div>
+                            <x-ui.form.label for="contact_filter_{{ $filter['key'] }}">
+                                {{ $filter['label'] }}
+                            </x-ui.form.label>
+
+                            <x-ui.form.select
+                                id="contact_filter_{{ $filter['key'] }}"
+                                name="{{ $filter['key'] }}"
+                                x-on:change="$el.form.submit()"
+                            >
+                                <option value="">Any {{ str($filter['label'])->lower() }}</option>
+
+                                @foreach($filter['options'] as $option)
+                                    <option
+                                        value="{{ $option['value'] }}"
+                                        @selected(($filter['selected']['value'] ?? null) === $option['value'])
+                                    >
+                                        {{ $option['label'] }}
+                                    </option>
+                                @endforeach
+                            </x-ui.form.select>
+                        </div>
+                    @endforeach
+
+                    <div class="flex flex-wrap gap-2">
+                        <x-ui.button type="submit" variant="secondary">
+                            Search
+                        </x-ui.button>
+
+                        @if($contactFilters['secondary'] !== [])
+                            <button
+                                type="button"
+                                class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                                x-on:click="moreFiltersOpen = ! moreFiltersOpen"
+                                x-bind:aria-expanded="moreFiltersOpen.toString()"
+                            >
+                                More filters{{ $contactFilters['secondary_active_count'] > 0 ? ' ('.$contactFilters['secondary_active_count'].')' : '' }}
+                            </button>
+                        @endif
+                    </div>
+                </div>
+
+                @if($contactFilters['secondary'] !== [])
+                    <div
+                        x-cloak
+                        x-show="moreFiltersOpen"
+                        class="grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2 lg:grid-cols-3"
+                    >
+                        @foreach($contactFilters['secondary'] as $filter)
+                            <div>
+                                <x-ui.form.label for="contact_filter_{{ $filter['key'] }}">
+                                    {{ $filter['label'] }}
+                                </x-ui.form.label>
+
+                                <x-ui.form.select
+                                    id="contact_filter_{{ $filter['key'] }}"
+                                    name="{{ $filter['key'] }}"
+                                    x-on:change="$el.form.submit()"
+                                >
+                                    <option value="">Any {{ str($filter['label'])->lower() }}</option>
+
+                                    @foreach($filter['options'] as $option)
+                                        <option
+                                            value="{{ $option['value'] }}"
+                                            @selected(($filter['selected']['value'] ?? null) === $option['value'])
+                                        >
+                                            {{ $option['label'] }}
+                                        </option>
+                                    @endforeach
+                                </x-ui.form.select>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </form>
+
+            @if($contactFilters['has_filters'])
+                <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-4">
+                    @foreach($contactFilters['active'] as $activeFilter)
+                        @php
+                            $removeFilterQuery = request()->query();
+                            unset($removeFilterQuery[$activeFilter['key']], $removeFilterQuery['page']);
+                        @endphp
+
+                        <a
+                            href="{{ route('crm.contacts.index', $removeFilterQuery) }}"
+                            class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                            aria-label="Remove {{ $activeFilter['label'] }} filter"
+                        >
+                            <span>{{ $activeFilter['label'] }}: {{ $activeFilter['value_label'] }}</span>
+                            <span aria-hidden="true">×</span>
+                        </a>
+                    @endforeach
+
+                    <a
+                        href="{{ route('crm.contacts.index') }}"
+                        class="text-xs font-semibold text-slate-500 hover:text-slate-900"
+                    >
+                        Clear all
+                    </a>
+                </div>
+            @endif
+        </x-ui.card>
+
         <x-ui.card padding="none" class="overflow-hidden">
             <div class="border-b border-slate-200 px-4 py-4 sm:px-6">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h3 class="text-lg font-semibold tracking-tight text-slate-950 capitalize">
-                            All {{ $leadPlural }}
+                            {{ $contactFilters['has_filters'] ? 'Matching '.$leadPlural : 'All '.$leadPlural }}
                         </h3>
 
                         <p class="mt-1 text-sm text-slate-500">
@@ -227,7 +350,11 @@
                     </div>
 
                     <div class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                        {{ $contacts->total() }} total
+                        @if($contactFilters['has_filters'])
+                            {{ number_format($contacts->total()) }} matching · {{ number_format($totalContacts) }} total
+                        @else
+                            {{ number_format($totalContacts) }} total
+                        @endif
                     </div>
                 </div>
             </div>
@@ -236,14 +363,16 @@
                 @forelse ($contacts as $contact)
                     @php
                         $displayName = $contact->name ?: trim($contact->first_name.' '.$contact->last_name) ?: $contact->email ?: str($leadSingular)->title().' #'.$contact->id;
-                        $statusName = $contact->workflowProfile?->contactStatus?->name;
+                        $statusName = module_enabled('workflow')
+                            ? $contact->workflowProfile?->contactStatus?->name
+                            : null;
                     @endphp
 
                     <a
                         href="{{ route('crm.contacts.show', $contact) }}"
                         class="block px-4 py-4 transition hover:bg-slate-50 sm:px-6"
                     >
-                        <div class="grid gap-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(8rem,auto)] md:items-center">
+                        <div class="grid gap-4 {{ module_enabled('workflow') ? 'md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(8rem,auto)]' : 'md:grid-cols-[minmax(0,1fr)_minmax(8rem,auto)]' }} md:items-center">
                             <div>
                                 <p class="font-semibold text-slate-950">
                                     {{ $displayName }}
@@ -254,15 +383,17 @@
                                 </p>
                             </div>
 
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                                    Current status
-                                </p>
+                            @if(module_enabled('workflow'))
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                        Current status
+                                    </p>
 
-                                <p class="mt-1 text-sm font-medium text-slate-800">
-                                    {{ $statusName ?: 'No status' }}
-                                </p>
-                            </div>
+                                    <p class="mt-1 text-sm font-medium text-slate-800">
+                                        {{ $statusName ?: 'No status' }}
+                                    </p>
+                                </div>
+                            @endif
 
                             <div class="md:text-right">
                                 <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
@@ -273,13 +404,29 @@
                     </a>
                 @empty
                     <div class="px-4 py-10 text-center sm:px-6">
-                        <p class="text-sm font-medium text-slate-900 capitalize">
-                            No {{ $leadPlural }} yet.
-                        </p>
+                        @if($contactFilters['has_filters'])
+                            <p class="text-sm font-medium text-slate-900">
+                                No {{ $leadPlural }} match these filters.
+                            </p>
 
-                        <p class="mt-1 text-sm text-slate-500">
-                            Add one manually or import a CSV list to get started.
-                        </p>
+                            <p class="mt-1 text-sm text-slate-500">
+                                Change a search or filter, or clear everything to see all {{ $leadPlural }}.
+                            </p>
+
+                            <div class="mt-4">
+                                <x-ui.button href="{{ route('crm.contacts.index') }}" variant="secondary">
+                                    Clear filters
+                                </x-ui.button>
+                            </div>
+                        @else
+                            <p class="text-sm font-medium text-slate-900 capitalize">
+                                No {{ $leadPlural }} yet.
+                            </p>
+
+                            <p class="mt-1 text-sm text-slate-500">
+                                Add one manually or import a CSV list to get started.
+                            </p>
+                        @endif
                     </div>
                 @endforelse
             </div>
