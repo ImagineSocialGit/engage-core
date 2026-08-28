@@ -44,6 +44,7 @@ return [
                 'internal_notifications' => true,
                 'route_send_message_points' => true,
                 'scheduling_public_booking' => true,
+                'scheduling_appointments' => true,
             ],
 
             'purpose_scopes' => [
@@ -65,6 +66,7 @@ return [
                 'internal_notifications' => false,
                 'route_send_message_points' => true,
                 'scheduling_public_booking' => true,
+                'scheduling_appointments' => true,
             ],
 
             'purpose_scopes' => [

@@ -44,6 +44,23 @@ if ($publicUrlConfigured && is_string($publicUrl)) {
 
 return [
 
+    'consent_domains' => [
+        'scheduling_appointments' => [
+            'topic' => 'appointment confirmations, reminders, scheduling updates, and appointment-related follow-up',
+            'scopes' => [
+                'scheduling_appointments',
+            ],
+            'scope_prefixes' => [],
+            'opt_in' => [],
+        ],
+    ],
+
+    'communications' => [
+        'chain_key' => 'scheduling_appointment_communications',
+        'default_subject' => 'Appointment reminder',
+        'default_message' => "Hello {first_name}! You have an appointment on:\n\n{appointment_date} at {appointment_time_with_timezone}.\n\n{appointment_location_or_method}\n\nThank you!",
+    ],
+
     'public' => [
         'configured' => $publicUrlConfigured,
         'enabled' => $normalizedPublicUrl !== null,
@@ -69,8 +86,8 @@ return [
             'surface_color' => '#ffffff',
             'background_color' => '#f6f7f8',
             'page_revision' => 'scheduling-public-v2',
-            'disclosure_version' => '1',
-            'consent_text' => null,
+            'disclosure_version' => '2',
+            'consent_text' => 'By providing your email address or phone number, you agree to receive appointment confirmations, reminders, scheduling updates, and other messages related to this appointment. Message and data rates may apply. Reply STOP to opt out of texts or HELP for help.',
         ],
 
         'destination_verification' => [

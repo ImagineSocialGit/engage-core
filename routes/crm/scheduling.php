@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Scheduling\Controllers\CRM\AppointmentCommunicationsController;
 use App\Modules\Scheduling\Controllers\CRM\AppointmentController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingAvailabilityController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingConfigurationController;
@@ -19,6 +20,15 @@ Route::middleware('module:scheduling')
 
         Route::get('/configuration', [SchedulingConfigurationController::class, 'index'])
             ->name('configuration.index');
+
+        Route::get('/configuration/communications', [AppointmentCommunicationsController::class, 'index'])
+            ->name('configuration.communications.index');
+
+        Route::post('/configuration/communications/generate', [AppointmentCommunicationsController::class, 'generate'])
+            ->name('configuration.communications.generate');
+
+        Route::put('/configuration/communications', [AppointmentCommunicationsController::class, 'update'])
+            ->name('configuration.communications.update');
 
         Route::get('/configuration/resources', [SchedulingResourceController::class, 'index'])
             ->name('configuration.resources.index');

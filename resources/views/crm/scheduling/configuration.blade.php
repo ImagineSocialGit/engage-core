@@ -56,6 +56,29 @@
             @endforeach
         </datalist>
 
+        <x-ui.card class="space-y-4" data-scheduling-communications-entry>
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
+                        Appointment Communications
+                    </div>
+                    <h2 class="mt-3 text-lg font-semibold text-slate-900">
+                        Confirm appointments and remind people automatically
+                    </h2>
+                    <p class="mt-1 max-w-2xl text-sm text-slate-500">
+                        Generate a sensible starting schedule, then change the timing, channels, or message whenever you need to.
+                    </p>
+                </div>
+
+                <a
+                    href="{{ route('crm.scheduling.configuration.communications.index') }}"
+                    class="inline-flex w-full items-center justify-center rounded-lg border border-teal-600 bg-white px-4 py-2 text-sm font-semibold text-teal-700 shadow-sm hover:bg-teal-50 sm:w-auto"
+                >
+                    Manage appointment messages
+                </a>
+            </div>
+        </x-ui.card>
+
         <section class="space-y-5" id="services" data-configuration-section="services">
             <div>
                 <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">

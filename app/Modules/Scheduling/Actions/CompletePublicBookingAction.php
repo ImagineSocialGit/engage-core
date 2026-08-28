@@ -5,6 +5,7 @@ namespace App\Modules\Scheduling\Actions;
 use App\Modules\Core\Actions\Contacts\ResolveContactByEmailAction;
 use App\Modules\Scheduling\Data\AppointmentBookingData;
 use App\Modules\Scheduling\Models\Appointment;
+use App\Support\ModuleIntegrations\Scheduling\Contracts\AppointmentCommunications;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -14,6 +15,7 @@ class CompletePublicBookingAction
     public function __construct(
         private readonly ConvertBookingHoldToAppointmentAction $convertHold,
         private readonly ResolveContactByEmailAction $resolveContact,
+        private readonly AppointmentCommunications $appointmentCommunications,
     ) {}
 
     /** @param array<string, string> $disclosure */
@@ -25,6 +27,8 @@ class CompletePublicBookingAction
         ?string $phone = null,
         ?string $publicSubmissionAttemptId = null,
         array $disclosure = [],
+        ?string $sourceIp = null,
+        ?string $userAgent = null,
     ): Appointment {
         $holdId = $this->requiredString($holdId, 'booking hold ID', 36);
         $firstName = $this->requiredString($firstName, 'attendee first name', 120);
@@ -35,7 +39,7 @@ class CompletePublicBookingAction
         $publicSubmissionAttemptId = $this->attemptId($publicSubmissionAttemptId);
         $disclosure = $this->disclosure($disclosure);
 
-        return $this->convertHold->handle(
+        $appointment = $this->convertHold->handle(
             holdId: $holdId,
             booking: function () use (
                 $firstName,
@@ -79,6 +83,14 @@ class CompletePublicBookingAction
                 );
             },
         );
+
+        $this->appointmentCommunications->publicBookingCompleted(
+            appointment: $appointment,
+            sourceIp: $sourceIp,
+            userAgent: $userAgent,
+        );
+
+        return $appointment;
     }
 
     private function normalizedEmail(string $email): string

@@ -1189,6 +1189,47 @@ Automation payloads contain structural identities, statuses, times, and provenan
 
 Scheduling owns appointment communication timing and intent. Messaging owns templates, consent, suppression, channel eligibility, delivery, retries, and evidence.
 
+### Appointment communications
+
+The CRM Scheduling configuration workspace exposes a business-facing **Appointment Communications** surface. Operators do not need to understand Messaging `MessageChain`, immutable version, anchor, or renderer terminology. When no plan exists, **Generate schedule** creates an editable starting plan:
+
+```text
+Appointment confirmation — immediately
+3-day reminder — 3 days before
+24-hour reminder — 24 hours before
+1-hour reminder — 1 hour before
+```
+
+The generated copy is intentionally plain and reusable:
+
+```text
+Hello {first_name}! You have an appointment on:
+
+{appointment_date} at {appointment_time_with_timezone}.
+
+{appointment_location_or_method}
+
+Thank you!
+```
+
+`first_name` carries an explicit `there` fallback. The appointment date/time and location-or-method fields are Scheduling-owned computed tokens resolved from the durable Appointment snapshot. Physical appointments render the committed business/customer-site location details; remote appointments render the committed phone/online method and available instructions/link details.
+
+Operators may add/remove messages, switch between immediate/before/after timing, change the offset, select currently authorable email/SMS channels, and edit subject/body copy. Scheduling presents provider readiness separately from authorability so temporary provider configuration does not become consent or content authority. Saving publishes new immutable Messaging template and chain versions for future enrollments; existing enrollments remain pinned to the version on which they started.
+
+The integration crosses the app-level `AppointmentCommunications` contract. Scheduling itself does not import Messaging. When both modules are enabled, `AppServiceProvider` binds the Messaging implementation and contributes appointment token/execution-context providers. Without Messaging, the unavailable implementation is a no-op and Scheduling remains usable.
+
+Message timing is anchored to `appointment.starts_at`. Reminder windows already in the past are not sent late merely because a booking was made on short notice; Messaging's expired anchored-step behavior advances past them. Rescheduling cancels the old Appointment enrollment and starts a replacement against the replacement Appointment. Cancellation and no-show terminate remaining pending appointment communication. Completion terminates the booking/reminder enrollment and, when one or more positive-offset messages are configured, starts a separate completion-driven follow-up enrollment at the first after-appointment step. A missed follow-up window becomes due immediately at completion; subsequent old windows may be skipped rather than producing a burst of stale messages.
+
+Appointment-related confirmations, reminders, scheduling updates, and practical post-appointment follow-up use transactional purpose with the `scheduling_appointments` consent domain. Promotional nurture remains marketing and must use separate marketing consent.
+
+Public booking does **not** show a reminder-consent checkbox. The contact-details/submit surface presents a plain disclosure that providing an email address or phone number authorizes appointment-related transactional messages. The completed booking records disclosure key, version, text hash, acceptance time, request IP, and user agent through Messaging consent provenance. Email transactional permission is recorded for the submitted Contact email. SMS transactional permission is recorded only when the phone snapshot submitted for the Appointment matches the Contact's current normalized phone, preventing an existing Contact's unrelated/stale phone from being authorized accidentally. Public booking never creates marketing permission.
+
+Destination-verification codes remain a narrower transactional exception: requesting the code itself authorizes only that verification send, so the verification transport neither requires nor creates durable Contact consent.
+
+The Appointment detail workspace reads Messaging enrollment/scheduled-message state through the same integration contract and shows configured/not-configured, next action, and sent/skipped/failed/pending evidence without copying delivery state into Scheduling.
+
+Messaging Project State owns the generated templates, chains, enrollments, ScheduledMessages, and consent records. Messaging section version 5 adds deferred Appointment targets for chain context/origin and ScheduledMessage context so appointment communications remap safely after the Scheduling section restores Appointment IDs.
+
 Push notification support belongs to Messaging as another delivery channel. Scheduling must not hard-code email and SMS as the only possible channels.
 
 ### Public destination verification
@@ -1306,12 +1347,6 @@ RescheduleAppointmentRequest
 CRM Scheduling creation, detail, lifecycle, reschedule, Contact-panel, host/service configuration, availability-rule, and resource-configuration workspaces
 ```
 
-Planned:
-
-```text
-AppointmentReminderScheduler
-```
-
 Public actions should exist before another module or surface directly creates or mutates Scheduling records.
 
 ## FlowRoutes integration
@@ -1340,7 +1375,7 @@ calendar views
 provider connection and synchronization persistence
 external free/busy adapters
 meeting-link generation
-appointment reminder scheduling
+Phase 23A3D — COMPLETE: appointment confirmation/reminder/follow-up authoring and Messaging-backed lifecycle delivery with public transactional-consent evidence and Project State-safe Appointment references
 paid booking integration
 round-robin or weighted host routing
 Reporting dashboards

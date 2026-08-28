@@ -15,6 +15,7 @@ use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Requests\CancelAppointmentRequest;
 use App\Modules\Scheduling\Requests\RescheduleAppointmentRequest;
 use App\Modules\Scheduling\Services\SchedulingReadService;
+use App\Support\ModuleIntegrations\Scheduling\Contracts\AppointmentCommunications;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
@@ -36,11 +37,15 @@ class AppointmentController extends Controller
     public function show(
         Appointment $appointment,
         SchedulingReadService $read,
+        AppointmentCommunications $communications,
     ): View {
+        $appointment = $read->appointmentDetail($appointment);
+
         return view('crm.scheduling.show', [
             'title' => $appointment->title ?: 'Appointment',
             'heading' => 'Appointment details',
-            'appointment' => $read->appointmentDetail($appointment),
+            'appointment' => $appointment,
+            'appointmentCommunications' => $communications->appointmentStatus($appointment),
         ]);
     }
 

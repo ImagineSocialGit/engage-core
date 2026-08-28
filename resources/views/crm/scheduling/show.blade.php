@@ -23,6 +23,10 @@
     $canReschedule = $isActive
         && ! $replacement
         && $appointment->bookableService?->status === \App\Modules\Scheduling\Models\BookableService::STATUS_ACTIVE;
+    $communicationAvailable = (bool) ($appointmentCommunications['available'] ?? false);
+    $communicationConfigured = (bool) ($appointmentCommunications['configured'] ?? false);
+    $communicationEnrollments = collect($appointmentCommunications['enrollments'] ?? []);
+    $communicationMessages = collect($appointmentCommunications['messages'] ?? []);
     $statusClasses = match($appointment->status) {
         \App\Modules\Scheduling\Models\Appointment::STATUS_PENDING => 'bg-amber-100 text-amber-800',
         \App\Modules\Scheduling\Models\Appointment::STATUS_CONFIRMED => 'bg-emerald-100 text-emerald-800',
@@ -162,6 +166,79 @@
                         </div>
                     @endif
                 </x-ui.card>
+
+                @if($communicationAvailable)
+                    <x-ui.card class="space-y-5" data-appointment-communications>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <h2 class="text-lg font-semibold tracking-tight text-slate-900">Appointment messages</h2>
+                                <p class="mt-1 text-sm text-slate-500">
+                                    Messaging owns delivery status. Scheduling recalculates future reminders when an appointment is rescheduled and stops pending reminders when it is canceled.
+                                </p>
+                            </div>
+
+                            <a
+                                href="{{ route('crm.scheduling.configuration.communications.index') }}"
+                                class="text-sm font-semibold text-teal-700 hover:text-teal-900 hover:underline"
+                            >
+                                Manage schedule
+                            </a>
+                        </div>
+
+                        @if(! $communicationConfigured)
+                            <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                                Appointment communications have not been set up yet.
+                            </div>
+                        @elseif($communicationEnrollments->isEmpty() && $communicationMessages->isEmpty())
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                                No appointment messages are currently scheduled for this appointment.
+                            </div>
+                        @else
+                            @php
+                                $currentEnrollment = $communicationEnrollments->first();
+                            @endphp
+
+                            @if($currentEnrollment)
+                                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <span class="font-semibold text-slate-900">
+                                            Schedule {{ str($currentEnrollment['status'])->replace('_', ' ')->title() }}
+                                        </span>
+                                        @if($currentEnrollment['next_action_at'])
+                                            <span class="text-xs text-slate-500">
+                                                Next: {{ $currentEnrollment['next_action_at']->setTimezone($displayTimezone)->format('M j, g:i A T') }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endif
+
+                            <div class="divide-y divide-slate-200 rounded-xl border border-slate-200">
+                                @forelse($communicationMessages as $message)
+                                    <div class="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                            <p class="text-sm font-semibold text-slate-900">
+                                                {{ str($message['message_type'])->replace('_', ' ')->title() }}
+                                            </p>
+                                            <p class="mt-1 text-xs text-slate-500">
+                                                {{ strtoupper($message['channel']) }}
+                                                ·
+                                                {{ $message['send_at']?->setTimezone($displayTimezone)->format('M j, g:i A T') }}
+                                            </p>
+                                        </div>
+                                        <span class="inline-flex self-start rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                                            {{ str($message['status'])->replace('_', ' ')->title() }}
+                                        </span>
+                                    </div>
+                                @empty
+                                    <div class="p-4 text-sm text-slate-600">
+                                        The schedule is active, but no individual messages have been materialized yet.
+                                    </div>
+                                @endforelse
+                            </div>
+                        @endif
+                    </x-ui.card>
+                @endif
 
                 <x-ui.card class="space-y-5">
                     <div>

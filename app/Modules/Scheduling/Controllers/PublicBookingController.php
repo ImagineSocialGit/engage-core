@@ -474,6 +474,8 @@ class PublicBookingController extends Controller
                 phone: $request->attendeePhone(),
                 publicSubmissionAttemptId: $request->publicSubmissionAttemptId(),
                 disclosure: $this->publicBookingDisclosure(),
+                sourceIp: $request->ip(),
+                userAgent: $request->userAgent(),
             );
         } catch (DomainException) {
             throw ValidationException::withMessages([

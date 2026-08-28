@@ -17,7 +17,13 @@ use App\Support\ModuleIntegrations\Forms\FormSubmissionConsentBridge;
 use App\Support\ModuleIntegrations\Forms\Messaging\GrantFormSubmissionMessagingConsent;
 use App\Support\DestinationVerification\Contracts\DestinationVerificationTransport;
 use App\Support\DestinationVerification\UnavailableDestinationVerificationTransport;
+use App\Support\ModuleIntegrations\Scheduling\Contracts\AppointmentCommunications;
+use App\Support\ModuleIntegrations\Scheduling\UnavailableAppointmentCommunications;
+use App\Support\ModuleIntegrations\Scheduling\Messaging\MessagingAppointmentCommunications;
 use App\Support\ModuleIntegrations\Scheduling\Messaging\MessagingSchedulingDestinationVerificationTransport;
+use App\Support\ModuleIntegrations\Scheduling\Messaging\SchedulingAppointmentMessageChainExecutionContextProvider;
+use App\Support\ModuleIntegrations\Scheduling\Messaging\SchedulingAppointmentTokenContextProvider;
+use App\Support\ModuleIntegrations\Scheduling\Messaging\SchedulingAppointmentTokenSourceProvider;
 use App\Support\ModuleIntegrations\Scheduling\Messaging\SchedulingDestinationVerificationRecipientGate;
 use App\Support\ModuleIntegrations\InternalNotifications\InboundMessaging\ScheduleInboundMessageInternalNotification;
 use App\Support\ModuleIntegrations\InternalNotifications\Tasks\InternalNotificationTaskScheduler;
@@ -111,6 +117,22 @@ class AppServiceProvider extends ServiceProvider
                 return $app->make(
                     UnavailableDestinationVerificationTransport::class,
                 );
+            },
+        );
+
+        $this->app->singleton(
+            AppointmentCommunications::class,
+            function ($app): AppointmentCommunications {
+                $enabled = $app->make(ModuleManager::class)
+                    ->enabledKeysWithDependencies();
+
+                if (in_array('scheduling', $enabled, true)
+                    && in_array('messaging', $enabled, true)
+                ) {
+                    return $app->make(MessagingAppointmentCommunications::class);
+                }
+
+                return $app->make(UnavailableAppointmentCommunications::class);
             },
         );
 
@@ -230,6 +252,21 @@ class AppServiceProvider extends ServiceProvider
             $this->app->tag(
                 SchedulingDestinationVerificationRecipientGate::class,
                 'messaging.message_recipient_gates',
+            );
+
+            $this->app->tag(
+                SchedulingAppointmentMessageChainExecutionContextProvider::class,
+                'messaging.message_chain_execution_context_providers',
+            );
+
+            $this->app->tag(
+                SchedulingAppointmentTokenSourceProvider::class,
+                'token.source_providers',
+            );
+
+            $this->app->tag(
+                SchedulingAppointmentTokenContextProvider::class,
+                'token.context_providers',
             );
         }
 

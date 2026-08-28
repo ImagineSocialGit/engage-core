@@ -9,6 +9,7 @@ use App\Modules\Scheduling\Models\AppointmentLifecycleEvent;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Support\AutomationEvents\Data\AutomationEventData;
 use App\Support\AutomationEvents\Services\AutomationEventOutbox;
+use App\Support\ModuleIntegrations\Scheduling\Contracts\AppointmentCommunications;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -48,6 +49,7 @@ class TransitionAppointmentStatusAction
 
     public function __construct(
         private readonly AutomationEventOutbox $automationEvents,
+        private readonly AppointmentCommunications $appointmentCommunications,
     ) {}
 
     public function handle(
@@ -109,6 +111,18 @@ class TransitionAppointmentStatusAction
                 additionalContext: $additionalContext,
             );
 
+            if ($toStatus === Appointment::STATUS_CANCELED) {
+                $this->appointmentCommunications->appointmentCancelled($locked);
+            }
+
+            if ($toStatus === Appointment::STATUS_COMPLETED) {
+                $this->appointmentCommunications->appointmentCompleted($locked);
+            }
+
+            if ($toStatus === Appointment::STATUS_NO_SHOW) {
+                $this->appointmentCommunications->appointmentNoShow($locked);
+            }
+
             return $locked->refresh();
         });
     }
@@ -147,6 +161,8 @@ class TransitionAppointmentStatusAction
                     context: $context,
                 );
             }
+
+            $this->appointmentCommunications->appointmentCreated($locked);
 
             return $locked->refresh();
         });
@@ -248,6 +264,11 @@ class TransitionAppointmentStatusAction
                     additionalContext: $additionalContext,
                 );
             }
+
+            $this->appointmentCommunications->appointmentRescheduled(
+                original: $lockedOriginal,
+                replacement: $lockedReplacement,
+            );
 
             return $lockedReplacement->refresh();
         });

@@ -4,6 +4,7 @@ namespace App\Modules\Core\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Actions\Contacts\CreateManualContactAction;
+use App\Modules\Core\Actions\Contacts\CreateOrUpdateContactAction;
 use App\Modules\Core\Contracts\Contacts\UpdatesContactStatus;
 use App\Modules\Core\Data\Contacts\ContactImportContext;
 use App\Modules\Core\Models\Contact;
