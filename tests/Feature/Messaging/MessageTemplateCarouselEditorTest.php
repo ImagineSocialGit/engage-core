@@ -24,7 +24,7 @@ class MessageTemplateCarouselEditorTest extends TestCase
         $first = $this->emailPreset(
             key: 'email.transactional.fixture.carousel.first',
             name: 'First Email',
-            subject: 'Published first subject',
+            subject: 'Published first subject {first_name}',
             body: 'Published first body.',
             order: 10,
         );
@@ -53,7 +53,7 @@ class MessageTemplateCarouselEditorTest extends TestCase
                     && count($messages) === 2
                     && ($messages[0]['preset_id'] ?? null) === $first->getKey()
                     && ($messages[1]['preset_id'] ?? null) === $second->getKey()
-                    && ($messages[0]['payload']['subject'] ?? null) === 'Published first subject'
+                    && ($messages[0]['payload']['subject'] ?? null) === 'Published first subject {first_name}'
                     && ($messages[1]['payload']['subject'] ?? null) === 'Published second subject';
             })
             ->assertSee('data-message-editor-carousel', false)
@@ -61,7 +61,10 @@ class MessageTemplateCarouselEditorTest extends TestCase
             ->assertSee('data-message-editor-channel="email"', false)
             ->assertSee('data-message-editor-published-preview', false)
             ->assertSee('data-message-editor-form', false)
-            ->assertSee('Published first subject')
+            ->assertSee('Published first subject {first_name}')
+            ->assertSee('data-message-token-fallback-summary', false)
+            ->assertSee('data-message-token-fallbacks', false)
+            ->assertSee('name="payload[token_fallbacks][0][missing_behavior]"', false)
             ->assertSee('Published second subject')
             ->assertSee('Save &amp; publish', false)
             ->assertDontSee('payload_class');
@@ -74,6 +77,21 @@ class MessageTemplateCarouselEditorTest extends TestCase
         string $body,
         int $order,
     ): MessageTemplatePreset {
+        $payload = [
+            'subject' => $subject,
+            'body' => $body,
+        ];
+        $tokens = [];
+
+        if (str_contains($subject, '{first_name}') || str_contains($body, '{first_name}')) {
+            $payload['token_fallbacks'] = [[
+                'token' => 'first_name',
+                'missing_behavior' => 'fallback_value',
+                'fallback' => 'there',
+            ]];
+            $tokens[] = 'first_name';
+        }
+
         $preset = MessageTemplatePreset::factory()->create([
             'key' => $key,
             'name' => $name,
@@ -84,11 +102,8 @@ class MessageTemplateCarouselEditorTest extends TestCase
             'payload_class' => EmailPayload::class,
             'queue' => 'confirmation_messages',
             'dispatch_keys' => ['fixture_dispatched'],
-            'payload' => [
-                'subject' => $subject,
-                'body' => $body,
-            ],
-            'tokens' => [],
+            'payload' => $payload,
+            'tokens' => $tokens,
             'source_config_path' => 'messaging.email.definitions.transactional.fixture.carousel.'.$order,
         ]);
 
@@ -119,10 +134,7 @@ class MessageTemplateCarouselEditorTest extends TestCase
 
         app(PublishMessageTemplateVersionAction::class)->handle(
             messageTemplate: $template,
-            payload: [
-                'subject' => $subject,
-                'body' => $body,
-            ],
+            payload: $payload,
         );
 
         return $preset;

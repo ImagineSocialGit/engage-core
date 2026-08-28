@@ -4,6 +4,7 @@
     'emptyMessage' => 'No messages are configured for this group.',
     'initialMessageId' => null,
     'formContext' => [],
+    'tokenFallbacksEditable' => false,
 ])
 
 @php
@@ -296,6 +297,22 @@
                                             && ($dependency['module_key'] ?? null) !== 'messaging',
                                     ))
                                     : [];
+                            $tokenValidator = app(\App\Modules\Messaging\Services\MessageTemplateTokenValidator::class);
+                            $tokenFallbackResolver = app(\App\Modules\Messaging\Services\MessageTokenFallbackResolver::class);
+                            $submittedEditPayload = $failedThisMessage && is_array(old('payload'))
+                                ? array_replace_recursive($editPayload, old('payload'))
+                                : $editPayload;
+                            $dynamicFields = $tokenValidator->resolvableTokensFromPayload($submittedEditPayload);
+                            $fallbackPolicyPayload = $failedThisMessage
+                                ? ['token_fallbacks' => old('payload.token_fallbacks', $editPayload['token_fallbacks'] ?? [])]
+                                : $editPayload;
+                            $fallbackPolicies = collect($tokenFallbackResolver->policies($fallbackPolicyPayload))
+                                ->keyBy('token')
+                                ->all();
+                            $publishedDynamicFields = $tokenValidator->resolvableTokensFromPayload($payload);
+                            $publishedFallbackPolicies = collect($tokenFallbackResolver->policies($payload))
+                                ->keyBy('token')
+                                ->all();
                         @endphp
 
                         <article
@@ -419,8 +436,35 @@
                                 @endif
 
                                 <p class="mt-5 text-xs leading-5 text-slate-500">
-                                    Exact published preview. Dynamic tokens stay visible here and resolve when the message is prepared for a recipient.
+                                    Exact published preview. Dynamic fields stay visible here and resolve when the message is prepared for a recipient.
                                 </p>
+
+                                @if($publishedDynamicFields !== [])
+                                    <section data-message-token-fallback-summary class="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                        <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-500">If a field is missing</p>
+                                        <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                                            @foreach($publishedDynamicFields as $publishedToken)
+                                                @php
+                                                    $publishedPolicy = $publishedFallbackPolicies[$publishedToken] ?? [
+                                                        'missing_behavior' => \App\Modules\Messaging\Services\MessageTokenFallbackResolver::BEHAVIOR_REQUIRED,
+                                                    ];
+                                                    $publishedBehavior = $publishedPolicy['missing_behavior'];
+                                                    $publishedLabel = \Illuminate\Support\Str::headline(str_replace(['.', '_'], ' ', $publishedToken));
+                                                @endphp
+                                                <div data-message-token-fallback-summary-item="{{ $publishedToken }}" class="rounded-xl bg-white px-3 py-2.5 ring-1 ring-slate-200">
+                                                    <p class="text-xs font-bold text-slate-900">{{ $publishedLabel }}</p>
+                                                    @if($publishedBehavior === \App\Modules\Messaging\Services\MessageTokenFallbackResolver::BEHAVIOR_FALLBACK_VALUE)
+                                                        <p class="mt-0.5 text-xs text-slate-600">Use “{{ $publishedPolicy['fallback'] ?? '' }}” instead.</p>
+                                                    @elseif($publishedBehavior === \App\Modules\Messaging\Services\MessageTokenFallbackResolver::BEHAVIOR_REPLACE_SEGMENT)
+                                                        <p class="mt-0.5 text-xs text-slate-600">Replace the configured phrase when this field is unavailable.</p>
+                                                    @else
+                                                        <p class="mt-0.5 text-xs text-slate-600">Do not send if this field is unavailable.</p>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </section>
+                                @endif
 
                                 @if($canAssignReplyHandling || $replyHandling !== null || $replyHandlingUsages !== [])
                                     <section data-message-reply-handling class="mt-6 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 sm:p-5">
@@ -758,6 +802,107 @@
                                             >{{ $failedThisMessage ? old('payload.message', $editPayload['message'] ?? '') : ($editPayload['message'] ?? '') }}</textarea>
                                             @if($failedThisMessage) @error('payload.message')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror @endif
                                         </div>
+                                    @endif
+
+                                    @if($tokenFallbacksEditable && ($dynamicFields !== [] || array_key_exists('token_fallbacks', $editPayload)))
+                                        <section data-message-token-fallbacks class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                                            <input type="hidden" name="payload[token_fallbacks_present]" value="1">
+
+                                            <div>
+                                                <h4 class="text-sm font-black text-slate-950">If a field is missing</h4>
+                                                <p class="mt-1 text-xs leading-5 text-slate-600">
+                                                    Dynamic fields are names, dates, links, or other details filled in for each recipient. Choose what this message should do when one is unavailable.
+                                                </p>
+                                            </div>
+
+                                            @if($dynamicFields === [])
+                                                <p class="mt-4 rounded-xl bg-white px-3 py-3 text-xs leading-5 text-slate-600 ring-1 ring-slate-200">
+                                                    This edited copy no longer uses a dynamic field. Saving will remove its old missing-field rules.
+                                                </p>
+                                            @else
+                                                <div class="mt-4 space-y-3">
+                                                    @foreach($dynamicFields as $fallbackIndex => $dynamicField)
+                                                        @php
+                                                            $fallbackPolicy = $fallbackPolicies[$dynamicField] ?? [
+                                                                'token' => $dynamicField,
+                                                                'missing_behavior' => \App\Modules\Messaging\Services\MessageTokenFallbackResolver::BEHAVIOR_REQUIRED,
+                                                                'fallback' => '',
+                                                                'segment' => '',
+                                                            ];
+                                                            $fallbackBehavior = $fallbackPolicy['missing_behavior'] ?? \App\Modules\Messaging\Services\MessageTokenFallbackResolver::BEHAVIOR_REQUIRED;
+                                                            $dynamicFieldLabel = \Illuminate\Support\Str::headline(str_replace(['.', '_'], ' ', $dynamicField));
+                                                        @endphp
+
+                                                        <div
+                                                            data-message-token-fallback="{{ $dynamicField }}"
+                                                            x-data="{ behavior: @js($fallbackBehavior) }"
+                                                            class="rounded-xl border border-slate-200 bg-white p-3 sm:p-4"
+                                                        >
+                                                            <input type="hidden" name="payload[token_fallbacks][{{ $fallbackIndex }}][token]" value="{{ $dynamicField }}">
+
+                                                            <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.8fr)] lg:items-end">
+                                                                <div>
+                                                                    <p class="text-sm font-extrabold text-slate-900">{{ $dynamicFieldLabel }}</p>
+                                                                    <p class="mt-0.5 font-mono text-[11px] text-slate-500">{{ '{'.$dynamicField.'}' }}</p>
+                                                                </div>
+                                                                <div>
+                                                                    <label class="mb-1 block text-xs font-bold text-slate-700">When it’s missing</label>
+                                                                    <select
+                                                                        name="payload[token_fallbacks][{{ $fallbackIndex }}][missing_behavior]"
+                                                                        x-model="behavior"
+                                                                        class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900"
+                                                                    >
+                                                                        <option value="required">Don’t send this message</option>
+                                                                        <option value="fallback_value">Use another value</option>
+                                                                        <option value="replace_segment">Replace this phrase</option>
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+
+                                                            <div x-show="behavior === 'fallback_value'" x-cloak class="mt-3">
+                                                                <label class="mb-1 block text-xs font-bold text-slate-700">Use this value instead</label>
+                                                                <input
+                                                                    name="payload[token_fallbacks][{{ $fallbackIndex }}][fallback]"
+                                                                    x-bind:disabled="behavior !== 'fallback_value'"
+                                                                    value="{{ $fallbackPolicy['fallback'] ?? '' }}"
+                                                                    placeholder="For example: there"
+                                                                    class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900"
+                                                                >
+                                                                @if($failedThisMessage)
+                                                                    @error('payload.token_fallbacks.'.$fallbackIndex.'.fallback')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                                                                @endif
+                                                            </div>
+
+                                                            <div x-show="behavior === 'replace_segment'" x-cloak class="mt-3 grid gap-3 sm:grid-cols-2">
+                                                                <div>
+                                                                    <label class="mb-1 block text-xs font-bold text-slate-700">Exact phrase to replace</label>
+                                                                    <textarea
+                                                                        name="payload[token_fallbacks][{{ $fallbackIndex }}][segment]"
+                                                                        x-bind:disabled="behavior !== 'replace_segment'"
+                                                                        rows="3"
+                                                                        placeholder="Hey {{ '{'.$dynamicField.'}' }}, "
+                                                                        class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm leading-5 text-slate-900"
+                                                                    >{{ $fallbackPolicy['segment'] ?? '' }}</textarea>
+                                                                    @if($failedThisMessage)
+                                                                        @error('payload.token_fallbacks.'.$fallbackIndex.'.segment')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                                                                    @endif
+                                                                </div>
+                                                                <div>
+                                                                    <label class="mb-1 block text-xs font-bold text-slate-700">Replacement text</label>
+                                                                    <textarea
+                                                                        name="payload[token_fallbacks][{{ $fallbackIndex }}][fallback]"
+                                                                        x-bind:disabled="behavior !== 'replace_segment'"
+                                                                        rows="3"
+                                                                        placeholder="Leave blank to remove the phrase"
+                                                                        class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm leading-5 text-slate-900"
+                                                                    >{{ $fallbackPolicy['fallback'] ?? '' }}</textarea>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                        </section>
                                     @endif
 
                                     @if(filled($message['edit_note'] ?? null))

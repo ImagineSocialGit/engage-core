@@ -17,7 +17,7 @@ readonly class MessageData
      */
     public function toArray(): array
     {
-        $firstName = $this->stringValue($this->contact->first_name, 'there');
+        $firstName = $this->stringValue($this->contact->first_name);
         $lastName = $this->stringValue($this->contact->last_name);
         $name = $this->stringValue($this->contact->name);
         $email = $this->stringValue($this->contact->email);
@@ -26,7 +26,7 @@ readonly class MessageData
         $subsource = $this->stringValue($this->contact->subsource);
 
         if ($name === '') {
-            $name = trim(implode(' ', array_filter([$firstName !== 'there' ? $firstName : null, $lastName])));
+            $name = trim(implode(' ', array_filter([$firstName, $lastName])));
         }
 
         $contact = [

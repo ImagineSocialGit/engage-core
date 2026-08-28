@@ -297,10 +297,18 @@ class SendScheduledMessageJob implements ShouldQueue
             return [];
         }
 
-        preg_match_all('/\{[a-zA-Z_][a-zA-Z0-9_.:-]*\}/', $value, $matches);
+        preg_match_all('/\{[a-zA-Z_][a-zA-Z0-9_.:-]*\}/', $value, $bracedMatches);
+        preg_match_all(
+            '/(?<![a-zA-Z0-9_]):[a-zA-Z_][a-zA-Z0-9_-]*(?:\.[a-zA-Z_][a-zA-Z0-9_-]*)*/',
+            $value,
+            $colonMatches,
+        );
 
-        foreach ($matches[0] ?? [] as $token) {
-            if (in_array($token, $ignoredTokens, true)) {
+        foreach ([
+            ...($bracedMatches[0] ?? []),
+            ...($colonMatches[0] ?? []),
+        ] as $token) {
+            if (! is_string($token) || in_array($token, $ignoredTokens, true)) {
                 continue;
             }
 

@@ -195,4 +195,53 @@ class MessageTemplateCompositionTest extends TestCase
             ],
         );
     }
+
+    public function test_message_override_scope_accepts_missing_field_behavior(): void
+    {
+        $template = MessageTemplate::query()->create([
+            'key' => 'email.transactional.fixture.missing-field-policy',
+            'name' => 'Missing Field Policy Fixture',
+            'channel' => 'email',
+            'status' => MessageTemplate::STATUS_ACTIVE,
+        ]);
+
+        $layer = app(UpsertMessageTemplateCompositionLayerAction::class)->handle(
+            scopeType: MessageTemplateCompositionLayer::SCOPE_MESSAGE,
+            channel: 'email',
+            messageTemplate: $template,
+            payload: [
+                'token_fallbacks' => [[
+                    'token' => 'first_name',
+                    'missing_behavior' => 'fallback_value',
+                    'fallback' => 'there',
+                ]],
+            ],
+        );
+
+        $this->assertEquals([
+            [
+                'token' => 'first_name',
+                'missing_behavior' => 'fallback_value',
+                'fallback' => 'there',
+            ],
+        ], $layer->payload['token_fallbacks']);
+    }
+
+    public function test_shared_composition_scope_rejects_message_specific_missing_field_behavior(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        app(UpsertMessageTemplateCompositionLayerAction::class)->handle(
+            scopeType: MessageTemplateCompositionLayer::SCOPE_CLIENT,
+            channel: 'email',
+            clientKey: 'example-client',
+            payload: [
+                'token_fallbacks' => [[
+                    'token' => 'first_name',
+                    'missing_behavior' => 'required',
+                ]],
+            ],
+        );
+    }
+
 }

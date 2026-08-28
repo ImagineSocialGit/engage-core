@@ -120,7 +120,7 @@ class MessageTemplateTokenValidatorTest extends TestCase
     {
         $tokens = app(MessageTemplateTokenValidator::class)->tokensFromPayload([
             'subject' => 'Hello {first_name}',
-            'body' => 'Again {first_name}. Join {webinar_join_url}.',
+            'body' => 'Again :first_name. Join {webinar_join_url}.',
             'cta' => [
                 'label' => 'Join',
                 'url' => '{webinar_join_url}',
@@ -184,6 +184,97 @@ class MessageTemplateTokenValidatorTest extends TestCase
 
         $this->assertCount(1, $issues);
         $this->assertStringContainsString('not available for dispatch context [flow_route_send_message]', $issues[0]['message']);
+    }
+
+
+    public function test_it_accepts_explicit_fallback_value_and_replace_segment_rules(): void
+    {
+        $validator = app(MessageTemplateTokenValidator::class);
+
+        $fallbackIssues = $validator->validatePayload(
+            payload: [
+                'subject' => 'Hello {first_name}',
+                'body' => 'Your registration is ready.',
+                'token_fallbacks' => [[
+                    'token' => 'first_name',
+                    'missing_behavior' => 'fallback_value',
+                    'fallback' => 'there',
+                ]],
+            ],
+            dispatchKeys: ['registration_created'],
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+            surface: 'webinar_registrations',
+        );
+
+        $segmentIssues = $validator->validatePayload(
+            payload: [
+                'subject' => 'Registration update',
+                'body' => 'Hey {first_name}, your registration is ready.',
+                'token_fallbacks' => [[
+                    'token' => 'first_name',
+                    'missing_behavior' => 'replace_segment',
+                    'segment' => 'Hey {first_name}, ',
+                    'fallback' => '',
+                ]],
+            ],
+            dispatchKeys: ['registration_created'],
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+            surface: 'webinar_registrations',
+        );
+
+        $this->assertEquals([], $fallbackIssues);
+        $this->assertEquals([], $segmentIssues);
+    }
+
+    public function test_replace_segment_must_cover_every_use_of_the_optional_field(): void
+    {
+        $issues = app(MessageTemplateTokenValidator::class)->validatePayload(
+            payload: [
+                'subject' => 'Hello {first_name}',
+                'body' => 'Hey {first_name}, your registration is ready.',
+                'token_fallbacks' => [[
+                    'token' => 'first_name',
+                    'missing_behavior' => 'replace_segment',
+                    'segment' => 'Hey {first_name}, ',
+                    'fallback' => '',
+                ]],
+            ],
+            dispatchKeys: ['registration_created'],
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+            surface: 'webinar_registrations',
+        );
+
+        $this->assertSame('error', $issues[0]['level']);
+        $this->assertSame('payload.token_fallbacks.0.segment', $issues[0]['path']);
+    }
+
+    public function test_missing_field_rule_must_reference_a_field_used_by_the_message(): void
+    {
+        $issues = app(MessageTemplateTokenValidator::class)->validatePayload(
+            payload: [
+                'subject' => 'Registration update',
+                'body' => 'Your registration is ready.',
+                'token_fallbacks' => [[
+                    'token' => 'first_name',
+                    'missing_behavior' => 'fallback_value',
+                    'fallback' => 'there',
+                ]],
+            ],
+            dispatchKeys: ['registration_created'],
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+            surface: 'webinar_registrations',
+        );
+
+        $this->assertSame('error', $issues[0]['level']);
+        $this->assertSame('payload.token_fallbacks.0.token', $issues[0]['path']);
     }
 
 }

@@ -51,6 +51,14 @@ class MessageTemplateCompositionSchema
             messageTemplateId: $messageTemplateId,
         );
 
+        if (array_key_exists('token_fallbacks', $payload)
+            && $scopeType !== MessageTemplateCompositionLayer::SCOPE_MESSAGE
+        ) {
+            throw new InvalidArgumentException(
+                'Missing-field behavior is message-specific and may only be stored on a message override.',
+            );
+        }
+
         $payload = $this->validatePayload($channel, $payload);
 
         return [
@@ -77,8 +85,8 @@ class MessageTemplateCompositionSchema
         }
 
         $allowed = $channel === 'email'
-            ? ['subject', 'body', 'footer', 'cta', 'ctas', 'secondary_link']
-            : ['message'];
+            ? ['subject', 'body', 'footer', 'cta', 'ctas', 'secondary_link', 'token_fallbacks']
+            : ['message', 'token_fallbacks'];
 
         foreach ($payload as $key => $value) {
             if (! is_string($key) || ! in_array($key, $allowed, true)) {
@@ -107,6 +115,12 @@ class MessageTemplateCompositionSchema
                 continue;
             }
 
+            if ($key === 'token_fallbacks') {
+                $this->assertTokenFallbacks($value);
+
+                continue;
+            }
+
             if ($key === 'ctas') {
                 if (! is_array($value) || ! array_is_list($value)) {
                     throw new InvalidArgumentException(
@@ -121,6 +135,65 @@ class MessageTemplateCompositionSchema
         }
 
         return $payload;
+    }
+
+    private function assertTokenFallbacks(mixed $value): void
+    {
+        if (! is_array($value) || ! array_is_list($value)) {
+            throw new InvalidArgumentException(
+                'Composition field [token_fallbacks] must be a list of missing-field rules.',
+            );
+        }
+
+        foreach ($value as $index => $policy) {
+            if (! is_array($policy) || array_is_list($policy)) {
+                throw new InvalidArgumentException(
+                    "Composition field [token_fallbacks.{$index}] must be a keyed rule.",
+                );
+            }
+
+            $unsupported = array_diff(
+                array_keys($policy),
+                ['token', 'missing_behavior', 'fallback', 'segment'],
+            );
+
+            if ($unsupported !== []) {
+                throw new InvalidArgumentException(
+                    "Composition field [token_fallbacks.{$index}] contains unsupported key [{$unsupported[0]}].",
+                );
+            }
+
+            foreach (['token', 'missing_behavior'] as $required) {
+                if (! is_string($policy[$required] ?? null)
+                    || trim((string) $policy[$required]) === ''
+                ) {
+                    throw new InvalidArgumentException(
+                        "Composition field [token_fallbacks.{$index}.{$required}] must be non-empty text.",
+                    );
+                }
+            }
+
+            if (! in_array(
+                trim((string) $policy['missing_behavior']),
+                MessageTokenFallbackResolver::BEHAVIORS,
+                true,
+            )) {
+                throw new InvalidArgumentException(
+                    "Composition field [token_fallbacks.{$index}.missing_behavior] is invalid.",
+                );
+            }
+
+            foreach (['fallback', 'segment'] as $optional) {
+                if (array_key_exists($optional, $policy)
+                    && $policy[$optional] !== null
+                    && ! is_string($policy[$optional])
+                ) {
+                    throw new InvalidArgumentException(
+                        "Composition field [token_fallbacks.{$index}.{$optional}] must be text or null.",
+                    );
+                }
+            }
+        }
     }
 
     private function assertScopeSelectors(

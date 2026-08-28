@@ -53,6 +53,10 @@ final class PublishMessageTemplatePresetOverrideAction
             $messageTemplate,
             $sourcePayload,
         );
+        $submittedPayload = $this->preserveTokenFallbacks(
+            baseline: $messageTemplate->currentPayload(),
+            submitted: $submittedPayload,
+        );
         $submittedPayload = $this->preserveTrackingKeys(
             baseline: $messageTemplate->currentPayload(),
             submitted: $submittedPayload,
@@ -133,6 +137,27 @@ final class PublishMessageTemplatePresetOverrideAction
         }
 
         return $delta;
+    }
+
+    /**
+     * Callers that have not adopted missing-field authoring yet must not erase
+     * an existing message-specific policy just by editing ordinary copy. An
+     * explicit token_fallbacks key, including an empty list, always wins.
+     *
+     * @param array<string, mixed> $baseline
+     * @param array<string, mixed> $submitted
+     * @return array<string, mixed>
+     */
+    private function preserveTokenFallbacks(array $baseline, array $submitted): array
+    {
+        if (! array_key_exists('token_fallbacks', $submitted)
+            && array_key_exists('token_fallbacks', $baseline)
+            && is_array($baseline['token_fallbacks'])
+        ) {
+            $submitted['token_fallbacks'] = $baseline['token_fallbacks'];
+        }
+
+        return $submitted;
     }
 
     /**

@@ -19,6 +19,7 @@ class ScheduledMessagePayloadResolver
         private readonly ScheduledMessagePayloadCanonicalizer $payloadCanonicalizer,
         private readonly MessageChainExecutionContextResolver $chainExecutionContextResolver,
         private readonly ScheduledMessageComponentComposer $componentComposer,
+        private readonly MessageTokenFallbackResolver $tokenFallbackResolver,
     ) {}
 
     public function resolve(
@@ -53,10 +54,14 @@ class ScheduledMessagePayloadResolver
         if ($renderContext instanceof ScheduledMessageRenderContext) {
             return $this->withOperationalFields(
                 scheduledMessage: $scheduledMessage,
-                payload: $this->mergeFrozenRenderContext(
-                    templatePayload: $templatePayload,
-                    runtimePayload: $runtimePayload,
-                    values: $renderContext->values,
+                payload: $this->tokenFallbackResolver->apply(
+                    $this->mergeFrozenRenderContext(
+                        templatePayload: $templatePayload,
+                        runtimePayload: $runtimePayload,
+                        values: is_array($renderContext->values)
+                            ? $renderContext->values
+                            : [],
+                    ),
                 ),
             );
         }
@@ -90,6 +95,8 @@ class ScheduledMessagePayloadResolver
             );
         }
 
+        $resolved = $this->tokenFallbackResolver->apply($resolved);
+
         $canonical = $this->payloadCanonicalizer->forPersistence(
             payloadClass: (string) $scheduledMessage->payload_class,
             payload: $resolved,
@@ -102,11 +109,16 @@ class ScheduledMessagePayloadResolver
                 : [],
         );
 
+        // The immutable template policy has already been applied. Do not let
+        // canonical config fallback reintroduce current control data into the
+        // provider-ready payload for a pinned historical version.
+        unset($canonical['token_fallbacks']);
+
         $values = is_array($canonical['tokens'] ?? null)
             ? $canonical['tokens']
             : [];
 
-        if ($values !== []) {
+        if ($values !== [] || $this->tokenFallbackResolver->hasTokenReferences($templatePayload)) {
             $renderContext = ScheduledMessageRenderContext::query()->firstOrCreate(
                 ['scheduled_message_id' => $scheduledMessage->getKey()],
                 [
@@ -190,7 +202,7 @@ class ScheduledMessagePayloadResolver
 
         return $this->withProviderIdempotencyKey(
             scheduledMessage: $scheduledMessage,
-            payload: $payload,
+            payload: $this->tokenFallbackResolver->apply($payload),
         );
     }
 

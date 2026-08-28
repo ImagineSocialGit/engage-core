@@ -192,9 +192,11 @@ class ScheduledMessagePayloadCanonicalizer
                 'footer',
                 'unsubscribe_url',
                 'transactional_opt_out_url',
+                'token_fallbacks',
             ],
             self::KIND_SMS => [
                 'message',
+                'token_fallbacks',
             ],
             default => [],
         };
@@ -334,6 +336,11 @@ class ScheduledMessagePayloadCanonicalizer
             'transactional_opt_out_url',
             $payload['transactional_opt_out_url'] ?? null,
         );
+        $this->copyList(
+            $canonical,
+            'token_fallbacks',
+            $payload['token_fallbacks'] ?? null,
+        );
         $this->copyNullableString(
             $canonical,
             'source_ip',
@@ -366,6 +373,11 @@ class ScheduledMessagePayloadCanonicalizer
                 ?? $payload['body']
                 ?? $payload['message_body']
                 ?? null,
+        );
+        $this->copyList(
+            $canonical,
+            'token_fallbacks',
+            $payload['token_fallbacks'] ?? null,
         );
         $this->copyNullableString(
             $canonical,
@@ -408,6 +420,7 @@ class ScheduledMessagePayloadCanonicalizer
         $this->copyStringMap($canonical, 'details', $payload['details'] ?? null);
         $this->copyArray($canonical, 'cta', $payload['cta'] ?? null);
         $this->copyNullableString($canonical, 'footer', $payload['footer'] ?? null);
+        $this->copyList($canonical, 'token_fallbacks', $payload['token_fallbacks'] ?? null);
         $this->copyNullableString(
             $canonical,
             'source_ip',
@@ -437,6 +450,7 @@ class ScheduledMessagePayloadCanonicalizer
                 ?? $payload['message']
                 ?? null,
         );
+        $this->copyList($canonical, 'token_fallbacks', $payload['token_fallbacks'] ?? null);
         $this->copyNullableString(
             $canonical,
             'source_ip',
@@ -469,6 +483,7 @@ class ScheduledMessagePayloadCanonicalizer
         }
 
         $this->copyList($canonical, 'ctas', $payload['ctas'] ?? null);
+        $this->copyList($canonical, 'token_fallbacks', $payload['token_fallbacks'] ?? null);
     }
 
     /**
@@ -536,6 +551,7 @@ class ScheduledMessagePayloadCanonicalizer
             'runtime_context',
             'context',
             'tokens',
+            'token_fallbacks',
         ];
 
         return Arr::except($payload, $reservedKeys);
@@ -583,6 +599,8 @@ class ScheduledMessagePayloadCanonicalizer
      */
     private function referencedTokenPaths(array $payload): array
     {
+        unset($payload['token_fallbacks']);
+
         $tokens = [];
 
         foreach (Arr::dot($payload) as $value) {

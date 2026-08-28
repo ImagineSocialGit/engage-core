@@ -367,6 +367,37 @@ class ScheduledMessagePayloadCanonicalizerTest extends TestCase
         );
     }
 
+    public function test_it_preserves_missing_field_policy_without_treating_policy_text_as_runtime_token_usage(): void
+    {
+        $canonical = $this->canonicalizer()->canonicalize(
+            EmailPayload::class,
+            [
+                'to' => 'lead@example.test',
+                'subject' => 'Birthday message',
+                'body' => 'Happy birthday!',
+                'token_fallbacks' => [[
+                    'token' => 'first_name',
+                    'missing_behavior' => 'replace_segment',
+                    'segment' => 'Hey {first_name}, ',
+                    'fallback' => '',
+                ]],
+                'tokens' => [
+                    'first_name' => 'Unused by rendered copy',
+                ],
+            ],
+        );
+
+        $this->assertEquals([
+            [
+                'token' => 'first_name',
+                'missing_behavior' => 'replace_segment',
+                'segment' => 'Hey {first_name}, ',
+                'fallback' => '',
+            ],
+        ], $canonical['token_fallbacks']);
+        $this->assertArrayNotHasKey('tokens', $canonical);
+    }
+
     private function canonicalizer(): ScheduledMessagePayloadCanonicalizer
     {
         return new ScheduledMessagePayloadCanonicalizer;

@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\ConfigContracts;
 
 use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Services\MessageTokenFallbackResolver;
 use App\Support\ConfigContracts\Data\ConfigField;
 use App\Support\ConfigContracts\Data\ConfigSchema;
 
@@ -38,6 +39,18 @@ class MessageDefinitionSchema
             'dispatch_key' => ConfigField::optional(ConfigSchema::string()),
             'dispatch_keys' => ConfigField::optional(ConfigSchema::listOf(ConfigSchema::string())),
         ], atLeastOne: [['dispatch_key', 'dispatch_keys']]);
+    }
+
+    public static function tokenFallbacks(): ConfigSchema
+    {
+        return ConfigSchema::listOf(ConfigSchema::object([
+            'token' => ConfigField::required(ConfigSchema::string()),
+            'missing_behavior' => ConfigField::required(ConfigSchema::string(
+                allowedValues: MessageTokenFallbackResolver::BEHAVIORS,
+            )),
+            'fallback' => ConfigField::optional(ConfigSchema::mixed()),
+            'segment' => ConfigField::optional(ConfigSchema::string(nullable: true)),
+        ]));
     }
 
     public static function link(): ConfigSchema

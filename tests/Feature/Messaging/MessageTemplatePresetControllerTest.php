@@ -341,6 +341,18 @@ class MessageTemplatePresetControllerTest extends TestCase
                         'url' => '{webinar_join_url}',
                     ],
                     'footer' => 'Footer copy.',
+                    'token_fallbacks_present' => '1',
+                    'token_fallbacks' => [
+                        [
+                            'token' => 'first_name',
+                            'missing_behavior' => 'fallback_value',
+                            'fallback' => 'there',
+                        ],
+                        [
+                            'token' => 'webinar_join_url',
+                            'missing_behavior' => 'required',
+                        ],
+                    ],
                 ],
             ])
             ->assertRedirect(route('crm.messaging.message-templates.index', [
@@ -365,7 +377,22 @@ class MessageTemplatePresetControllerTest extends TestCase
         $this->assertSame('New body for {first_name}.', $override->payload['body']);
         $this->assertSame('Join Now', $override->payload['cta']['label']);
         $this->assertSame('Footer copy.', $override->payload['footer']);
+        $this->assertEquals([
+            [
+                'token' => 'first_name',
+                'missing_behavior' => 'fallback_value',
+                'fallback' => 'there',
+            ],
+            [
+                'token' => 'webinar_join_url',
+                'missing_behavior' => 'required',
+            ],
+        ], $override->payload['token_fallbacks']);
         $this->assertSame('New subject {first_name}', $template->currentVersion->payload()['subject']);
+        $this->assertEquals(
+            $override->payload['token_fallbacks'],
+            $template->currentVersion->payload()['token_fallbacks'],
+        );
         $this->assertEqualsCanonicalizing(['first_name', 'webinar_join_url'], $preset->tokens);
     }
 

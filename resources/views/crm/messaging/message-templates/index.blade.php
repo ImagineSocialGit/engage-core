@@ -159,6 +159,7 @@
                         <x-messaging.message-editor-carousel
                             :presentation="$messageLibrary"
                             :editable="true"
+                            :token-fallbacks-editable="true"
                             :initial-message-id="'preset:'.$selectedPreset->getKey()"
                             empty-message="No messages are available in this family."
                         />

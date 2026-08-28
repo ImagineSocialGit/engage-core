@@ -119,6 +119,44 @@ class MessagingConfigContractTest extends TestCase
         $this->assertEquals(['unknown_field'], $this->codes($violations));
     }
 
+    public function test_email_and_sms_contracts_accept_explicit_missing_field_behavior(): void
+    {
+        $registry = app(ConfigContractRegistry::class);
+
+        $emailViolations = $registry->get('messaging.email_definition')->schema()->validate([
+            'dispatch_key' => 'registration_created',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'confirmation_messages',
+            'payload' => [
+                'subject' => 'Hello {first_name}',
+                'body' => 'Your registration is ready.',
+                'token_fallbacks' => [[
+                    'token' => 'first_name',
+                    'missing_behavior' => 'fallback_value',
+                    'fallback' => 'there',
+                ]],
+            ],
+        ], 'messaging.email.definitions.transactional.fixture');
+
+        $smsViolations = $registry->get('messaging.sms_definition')->schema()->validate([
+            'dispatch_key' => 'registration_created',
+            'payload_class' => \App\Modules\Messaging\Payloads\SmsPayload::class,
+            'queue' => 'confirmation_messages',
+            'payload' => [
+                'message' => 'Hey {first_name}, your registration is ready.',
+                'token_fallbacks' => [[
+                    'token' => 'first_name',
+                    'missing_behavior' => 'replace_segment',
+                    'segment' => 'Hey {first_name}, ',
+                    'fallback' => '',
+                ]],
+            ],
+        ], 'messaging.sms.definitions.transactional.fixture');
+
+        $this->assertEquals([], $emailViolations);
+        $this->assertEquals([], $smsViolations);
+    }
+
     /** @param array<int, object> $violations */
     private function codes(array $violations): array
     {

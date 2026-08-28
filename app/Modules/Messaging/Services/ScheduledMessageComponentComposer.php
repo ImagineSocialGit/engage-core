@@ -47,6 +47,68 @@ class ScheduledMessageComponentComposer
     }
 
     /**
+     * Preserve component-owned missing-field behavior when a component adds
+     * copy to the provider-ready message. A primary-message policy wins if the
+     * same dynamic field is governed in both places.
+     *
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $componentPayload
+     * @return array<string, mixed>
+     */
+    private function mergeTokenFallbacks(
+        array $payload,
+        array $componentPayload,
+    ): array {
+        $primary = is_array($payload['token_fallbacks'] ?? null)
+            && array_is_list($payload['token_fallbacks'])
+                ? $payload['token_fallbacks']
+                : [];
+        $component = is_array($componentPayload['token_fallbacks'] ?? null)
+            && array_is_list($componentPayload['token_fallbacks'])
+                ? $componentPayload['token_fallbacks']
+                : [];
+
+        if ($component === []) {
+            return $payload;
+        }
+
+        $seen = [];
+
+        foreach ($primary as $policy) {
+            if (is_array($policy)
+                && is_string($policy['token'] ?? null)
+                && trim($policy['token']) !== ''
+            ) {
+                $seen[trim($policy['token'])] = true;
+            }
+        }
+
+        foreach ($component as $policy) {
+            if (! is_array($policy)
+                || ! is_string($policy['token'] ?? null)
+                || trim($policy['token']) === ''
+            ) {
+                continue;
+            }
+
+            $token = trim($policy['token']);
+
+            if (isset($seen[$token])) {
+                continue;
+            }
+
+            $primary[] = $policy;
+            $seen[$token] = true;
+        }
+
+        if ($primary !== []) {
+            $payload['token_fallbacks'] = array_values($primary);
+        }
+
+        return $payload;
+    }
+
+    /**
      * @param array<string, mixed> $payload
      * @param array<string, mixed> $componentPayload
      * @return array<string, mixed>
@@ -56,6 +118,8 @@ class ScheduledMessageComponentComposer
         array $componentPayload,
         string $placementKey,
     ): array {
+        $payload = $this->mergeTokenFallbacks($payload, $componentPayload);
+
         [$payloadKey, $position] = match ($placementKey) {
             'email_body_append' => ['body', 'append'],
             'email_body_prepend' => ['body', 'prepend'],

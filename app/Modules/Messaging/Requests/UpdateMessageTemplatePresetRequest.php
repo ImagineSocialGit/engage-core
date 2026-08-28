@@ -6,6 +6,7 @@ use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
+use App\Modules\Messaging\Services\MessageTokenFallbackResolver;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -36,6 +37,22 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
             'payload.secondary_link' => ['nullable', 'array'],
             'payload.secondary_link.label' => ['nullable', 'string', 'max:255'],
             'payload.secondary_link.url' => ['nullable', 'string', 'max:1000'],
+            'payload.token_fallbacks_present' => ['nullable', 'boolean'],
+            'payload.token_fallbacks' => ['nullable', 'array', 'max:50'],
+            'payload.token_fallbacks.*' => ['required', 'array'],
+            'payload.token_fallbacks.*.token' => [
+                'required',
+                'string',
+                'max:191',
+                'regex:/^[a-zA-Z_][a-zA-Z0-9_.:-]*$/',
+            ],
+            'payload.token_fallbacks.*.missing_behavior' => [
+                'required',
+                'string',
+                Rule::in(MessageTokenFallbackResolver::BEHAVIORS),
+            ],
+            'payload.token_fallbacks.*.fallback' => ['nullable', 'string', 'max:2000'],
+            'payload.token_fallbacks.*.segment' => ['nullable', 'string', 'max:5000'],
         ];
     }
 
@@ -57,6 +74,10 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
                 is_array($preset->payload) ? $preset->payload : [],
                 $submittedPayload,
             );
+
+            if (array_key_exists('token_fallbacks', $submittedPayload)) {
+                $payload['token_fallbacks'] = $submittedPayload['token_fallbacks'];
+            }
 
             $surface = $preset->catalogEntries()
                 ->active()
@@ -83,7 +104,7 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
                     is_string($issue['path'] ?? null) && trim($issue['path']) !== '' ? $issue['path'] : 'payload',
                     is_string($issue['message'] ?? null) && trim($issue['message']) !== ''
                         ? $issue['message']
-                        : 'The message template contains an invalid token.',
+                        : 'The message template contains an invalid dynamic field.',
                 );
             }
         });
@@ -176,6 +197,96 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
             if ($cleanCtas !== []) {
                 $clean['ctas'] = $cleanCtas;
             }
+        }
+
+        if ($this->hasTokenFallbackSubmission($payload)) {
+            $clean['token_fallbacks'] = $this->cleanTokenFallbacks(
+                payload: $payload,
+                contentPayload: $clean,
+            );
+        }
+
+        return $clean;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function hasTokenFallbackSubmission(array $payload): bool
+    {
+        if (array_key_exists('token_fallbacks', $payload)) {
+            return true;
+        }
+
+        return in_array(
+            $payload['token_fallbacks_present'] ?? null,
+            [true, 1, '1', 'true', 'on'],
+            true,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $contentPayload
+     * @return array<int, array<string, string>>
+     */
+    private function cleanTokenFallbacks(
+        array $payload,
+        array $contentPayload,
+    ): array {
+        $raw = $payload['token_fallbacks'] ?? [];
+
+        if (! is_array($raw) || ! array_is_list($raw)) {
+            return [];
+        }
+
+        $usedTokens = app(MessageTemplateTokenValidator::class)
+            ->resolvableTokensFromPayload($contentPayload);
+        $clean = [];
+        $seen = [];
+
+        foreach ($raw as $policy) {
+            if (! is_array($policy)) {
+                continue;
+            }
+
+            $token = is_string($policy['token'] ?? null)
+                ? trim($policy['token'])
+                : '';
+            $behavior = is_string($policy['missing_behavior'] ?? null)
+                ? trim($policy['missing_behavior'])
+                : '';
+
+            if ($token === ''
+                || isset($seen[$token])
+                || ! in_array($token, $usedTokens, true)
+                || ! in_array($behavior, MessageTokenFallbackResolver::BEHAVIORS, true)
+            ) {
+                continue;
+            }
+
+            $normalized = [
+                'token' => $token,
+                'missing_behavior' => $behavior,
+            ];
+
+            if ($behavior === MessageTokenFallbackResolver::BEHAVIOR_FALLBACK_VALUE) {
+                $normalized['fallback'] = is_string($policy['fallback'] ?? null)
+                    ? trim($policy['fallback'])
+                    : '';
+            }
+
+            if ($behavior === MessageTokenFallbackResolver::BEHAVIOR_REPLACE_SEGMENT) {
+                $normalized['segment'] = is_string($policy['segment'] ?? null)
+                    ? $policy['segment']
+                    : '';
+                $normalized['fallback'] = is_string($policy['fallback'] ?? null)
+                    ? $policy['fallback']
+                    : '';
+            }
+
+            $clean[] = $normalized;
+            $seen[$token] = true;
         }
 
         return $clean;

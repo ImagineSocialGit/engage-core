@@ -144,6 +144,22 @@ Do not create a second token allowlist from template text, config reference file
 
 Client-facing aliases may normalize to canonical fields such as `contact.first_name`, but aliases do not create new runtime fields or schema.
 
+### Missing-field behavior
+
+Authorable template payloads may define message-specific `token_fallbacks` for dynamic fields used by that message. The supported behaviors are:
+
+```text
+required          -> leave the field unresolved so the normal pre-send safety check blocks delivery
+fallback_value    -> supply literal replacement text for the missing field
+replace_segment   -> replace one exact phrase containing the field, including with an empty string
+```
+
+A field with no explicit rule remains fail-safe required. Fallback text is literal and cannot introduce another dynamic field. A replace-segment rule must cover every use of that field in the message so partial personalization cannot escape unresolved. Both `{token}` and `:token` syntax use the same policy.
+
+Missing-field behavior is part of immutable message content. It may be authored in a source definition or a message-specific composition override, but not in shared platform/client/family/context composition layers. This keeps a phrase-level fallback attached to the exact copy it was written for.
+
+Runtime applies the policy only after recipient and execution-context values are assembled and before provider payload construction. When a pinned template uses dynamic fields, the render context freezes either the resolved/fallback values or the fact that a replace-segment fallback was chosen. Retries therefore do not gain later personalization merely because the Contact record changed after the first render.
+
 ## Definition availability and module ownership
 
 Messaging may store reusable copy for consuming modules, but globally loaded config is not automatically effective runtime configuration for every client.
@@ -652,7 +668,7 @@ timestamps
 
 The context contains only values required to reconstruct the pinned template and composed components for that logical delivery.
 
-Messages with no runtime token values need no render-context row. Retries reuse the same frozen values.
+Messages whose pinned content has no dynamic-field references need no render-context row. If dynamic fields are referenced, an empty `values` object is still meaningful when it freezes a missing-field/replace-segment decision. Retries reuse that same frozen render state.
 
 ### `scheduled_message_components`
 

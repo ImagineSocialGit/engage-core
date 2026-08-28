@@ -28,6 +28,7 @@ class SmsMessageDefinitionConfigContract implements ConfigContract
     {
         return MessageDefinitionSchema::forChannel('sms', ConfigSchema::object([
             'message' => ConfigField::required(ConfigSchema::string()),
+            'token_fallbacks' => ConfigField::optional(MessageDefinitionSchema::tokenFallbacks()),
         ]));
     }
 

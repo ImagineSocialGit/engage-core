@@ -1292,6 +1292,54 @@ Thanks.",
         Event::assertNotDispatched(ScheduledMessageSent::class);
     }
 
+    public function test_it_skips_email_before_send_when_payload_contains_unresolved_colon_token(): void
+    {
+        Event::fake([ScheduledMessageSent::class]);
+
+        $contact = Contact::factory()->create([
+            'email' => 'test@example.com',
+        ]);
+
+        $this->grantConsent($contact, 'email', 'transactional');
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'recipient_type' => Contact::class,
+            'recipient_id' => $contact->id,
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => EmailPayload::class,
+            'payload' => [
+                'to' => 'test@example.com',
+                'subject' => 'Hello :missing_token',
+                'body' => 'This message should not send.',
+            ],
+            'status' => ScheduledMessage::STATUS_PENDING,
+            'meta' => [
+                'conditions' => [],
+            ],
+        ]);
+
+        $emailService = Mockery::mock(EmailMessagingService::class);
+        $emailService->shouldNotReceive('send');
+
+        app()->instance(EmailMessagingService::class, $emailService);
+
+        $this->handleScheduledMessage($scheduledMessage);
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $scheduledMessage->status);
+        $this->assertStringContainsString(
+            'Message payload contains unresolved token(s): :missing_token.',
+            (string) $this->terminalAttempt($scheduledMessage)->reason,
+        );
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
+
+        Event::assertNotDispatched(ScheduledMessageSent::class);
+    }
+
     private function grantConsent(
         Contact $contact,
         string $channel,
