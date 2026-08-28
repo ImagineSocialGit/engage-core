@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Console\Commands\EngageDeploymentPlanCommand;
+use App\Console\Commands\EngageEnvironmentSyncCommand;
 use App\Console\Commands\SyncPresetsCommand;
 use App\Console\Commands\ValidateSetupCommand;
 use App\Modules\Core\Data\Contacts\ContactImportField;
@@ -34,6 +36,9 @@ use App\Support\ConfigContracts\Contracts\ModuleDefinitionConfigContract;
 use App\Support\ConfigContracts\Contracts\PresetPackageConfigContract;
 use App\Support\ConfigContracts\TargetProviders\AppConfigContractTargetProvider;
 use App\Support\ModuleIntegrations\RelationshipLocationAreaImportHandler;
+use App\Support\Deployment\DeploymentPlanResolver;
+use App\Support\Deployment\EnvironmentFileRepository;
+use App\Support\Deployment\EnvironmentFileSynchronizer;
 use App\Support\Modules\ModuleManager;
 use App\Support\Presets\Contracts\PresetContributor;
 use App\Support\Presets\PresetCompositionResolver;
@@ -60,6 +65,15 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(ModuleManager::class);
+        $this->app->singleton(EnvironmentFileRepository::class);
+        $this->app->singleton(EnvironmentFileSynchronizer::class);
+        $this->app->singleton(DeploymentPlanResolver::class, function ($app): DeploymentPlanResolver {
+            return new DeploymentPlanResolver(
+                contributors: $app->tagged('deployment.plan_contributors'),
+                environmentFiles: $app->make(EnvironmentFileRepository::class),
+                modules: $app->make(ModuleManager::class),
+            );
+        });
 
         $this->app->singleton(
             FormSubmissionConsentBridge::class,
@@ -326,6 +340,8 @@ class AppServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
+                EngageDeploymentPlanCommand::class,
+                EngageEnvironmentSyncCommand::class,
                 SyncPresetsCommand::class,
                 ValidateSetupCommand::class,
             ]);

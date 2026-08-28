@@ -11,6 +11,7 @@ use App\Modules\Core\ConfigContracts\ContactStatusConfigContractTargetProvider;
 use App\Modules\Core\ConfigContracts\ContactStatusDefinitionConfigContract;
 use App\Modules\Core\Console\Commands\SyncContactStatusPresetsCommand;
 use App\Modules\Core\Data\Contacts\ContactImportField;
+use App\Modules\Core\Deployment\CoreDeploymentPlanContributor;
 use App\Modules\Core\Import\Treatments\ContactStatusImportTreatmentTarget;
 use App\Modules\Core\Import\Treatments\ContactTagsImportTreatmentTarget;
 use App\Modules\Core\Models\Contact;
@@ -169,6 +170,11 @@ class CoreModuleServiceProvider extends ServiceProvider
         $this->app->tag(
             CoreSetupValidationContributor::class,
             'setup.validation_contributors',
+        );
+
+        $this->app->tag(
+            CoreDeploymentPlanContributor::class,
+            'deployment.plan_contributors',
         );
 
         $this->app->tag(

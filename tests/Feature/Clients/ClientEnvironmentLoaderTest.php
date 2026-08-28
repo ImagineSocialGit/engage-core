@@ -91,6 +91,22 @@ class ClientEnvironmentLoaderTest extends TestCase
         $this->assertSame('https://bravo.example.test', env('APP_URL'));
     }
 
+    public function test_selected_client_without_environment_file_clears_stale_client_owned_values(): void
+    {
+        $root = $this->makeTempDirectory();
+
+        mkdir($root.'/client/acme', 0777, true);
+
+        $this->setEnvironment('CLIENT_KEY', 'acme');
+        $this->setEnvironment('APP_URL', 'https://stale-root.example.test');
+        $this->setEnvironment('RESEND_API_KEY', 'stale-root-resend-key');
+
+        (new ClientEnvironmentLoader())->load($root);
+
+        $this->assertNull(env('APP_URL'));
+        $this->assertNull(env('RESEND_API_KEY'));
+    }
+
     public function test_client_environment_rejects_root_owned_or_unsupported_keys(): void
     {
         $root = $this->makeTempDirectory();

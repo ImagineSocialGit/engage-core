@@ -2,108 +2,13 @@
 
 namespace App\Support\Clients;
 
+use App\Support\Environment\EnvironmentVariableCatalog;
 use Dotenv\Dotenv;
 use Illuminate\Support\Env;
 use RuntimeException;
 
 final class ClientEnvironmentLoader
 {
-    /**
-     * Environment keys owned by the selected client deployment.
-     *
-     * Root .env owns CLIENT_KEY and machine/process infrastructure. Client
-     * .env owns deployment values that should follow the selected client.
-     *
-     * @var array<int, string>
-     */
-    private const CLIENT_OWNED_KEYS = [
-        'APP_URL',
-        'ROOT_DOMAIN',
-        'WEBINAR_APP_URL',
-        'CRM_APP_URL',
-        'SCHEDULING_APP_URL',
-
-        'DB_DATABASE',
-        'DB_USERNAME',
-        'DB_PASSWORD',
-
-        'CACHE_PREFIX',
-        'REDIS_PREFIX',
-        'HORIZON_PREFIX',
-        'SESSION_DOMAIN',
-
-        'DO_SPACES_KEY',
-        'DO_SPACES_SECRET',
-        'DO_SPACES_ENDPOINT',
-        'DO_SPACES_REGION',
-        'DO_SPACES_BUCKET',
-        'CDN_BASE_URL',
-
-        'MAIL_MAILER',
-        'MAIL_FROM_ADDRESS',
-        'MAIL_FROM_NAME',
-        'EMAIL_PROVIDER',
-
-        'FROM_EMAIL_TRANSACTIONAL',
-        'FROM_NAME_TRANSACTIONAL',
-        'FROM_EMAIL_MARKETING',
-        'FROM_NAME_MARKETING',
-
-        'RESEND_API_KEY',
-        'RESEND_WEBHOOK_SECRET',
-        'INBOUND_EMAIL_DOMAIN',
-
-        'RESEND_FROM_EMAIL_TRANSACTIONAL',
-        'RESEND_FROM_NAME_TRANSACTIONAL',
-        'RESEND_FROM_EMAIL_MARKETING',
-        'RESEND_FROM_NAME_MARKETING',
-
-
-        'PERMISSION_INVITATION_PUBLIC_URL',
-
-        'INTERNAL_NOTIFICATION_FROM_ADDRESS',
-        'INTERNAL_NOTIFICATION_FROM_NAME',
-        'INBOUND_REPLY_DEFAULT_TEAM_MEMBER_EMAIL',
-
-        'PROJECT_STATE_ADMIN_EMAIL',
-
-        'FORMS_EXTERNAL_INTAKE_ENABLED',
-        'FORMS_EXTERNAL_INTAKE_CLIENT_ID',
-        'FORMS_EXTERNAL_INTAKE_CLIENT_SECRET',
-        'FORMS_EXTERNAL_INTAKE_SOURCE',
-        'FORMS_EXTERNAL_INTAKE_PROVIDER',
-        'FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS',
-        'FORMS_EXTERNAL_INTAKE_DOMAINS',
-
-        'SMS_ENABLED',
-        'SMS_PROVIDER',
-
-        'TELNYX_API_KEY',
-        'TELNYX_FROM',
-        'TELNYX_FROM_TRANSACTIONAL',
-        'TELNYX_FROM_MARKETING',
-        'TELNYX_FROM_NOTIFICATIONS',
-        'TELNYX_WEBHOOK_PUBLIC_KEY',
-
-        'MESSAGING_SMS_MARKETING_PROFILE_ID',
-        'MESSAGING_SMS_TRANSACTIONAL_PROFILE_ID',
-
-        'TWILIO_SID',
-        'TWILIO_AUTH_TOKEN',
-        'TWILIO_FROM',
-        'TWILIO_FROM_TRANSACTIONAL',
-        'TWILIO_FROM_MARKETING',
-        'TWILIO_VIRTUAL_PHONE',
-
-        'WEBINAR_PROVIDER',
-        'WEBINAR_BOOKING_URL',
-
-        'ZOOM_ACCOUNT_ID',
-        'ZOOM_CLIENT_ID',
-        'ZOOM_CLIENT_SECRET',
-        'ZOOM_WEBHOOK_SECRET',
-    ];
-
     public function load(string $basePath): void
     {
         $clientKey = $this->clientKey();
@@ -116,6 +21,16 @@ final class ClientEnvironmentLoader
             throw new RuntimeException(
                 "CLIENT_KEY [{$clientKey}] contains invalid characters."
             );
+        }
+
+        /*
+         * Clear every legal client-owned key before looking for the selected
+         * client's environment file. This prevents stale root/process values or
+         * values from a previously selected client from leaking through even
+         * when the newly selected client does not have a .env file yet.
+         */
+        foreach (self::clientOwnedKeys() as $key) {
+            $this->clearEnvironmentValue($key);
         }
 
         $clientDirectory = rtrim($basePath, DIRECTORY_SEPARATOR)
@@ -135,7 +50,7 @@ final class ClientEnvironmentLoader
 
         $unsupportedKeys = array_values(array_diff(
             array_keys($values),
-            self::CLIENT_OWNED_KEYS,
+            self::clientOwnedKeys(),
         ));
 
         sort($unsupportedKeys);
@@ -148,27 +63,19 @@ final class ClientEnvironmentLoader
             ));
         }
 
-        /*
-         * Clear every client-owned key before applying the selected client.
-         *
-         * This prevents stale root .env values or values from a previously loaded
-         * client from leaking into the newly selected client's effective config.
-         */
-        foreach (self::CLIENT_OWNED_KEYS as $key) {
-            $this->clearEnvironmentValue($key);
-        }
-
         foreach ($values as $key => $value) {
             $this->setEnvironmentValue($key, $value);
         }
     }
 
     /**
+     * Bootstrap-safe client ownership authority.
+     *
      * @return array<int, string>
      */
     public static function clientOwnedKeys(): array
     {
-        return self::CLIENT_OWNED_KEYS;
+        return EnvironmentVariableCatalog::clientOwnedKeys();
     }
 
     private function clientKey(): ?string

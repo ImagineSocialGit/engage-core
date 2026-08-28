@@ -1,0 +1,120 @@
+# Engage Core selected-client environment catalog
+#
+# REFERENCE ONLY. Do not copy this file wholesale into client/[CLIENT_KEY]/.env.
+# The real runtime file should contain only values required by the current
+# committed client/module deployment plan plus deliberate optional overrides.
+#
+# Discover the current requirement set:
+#   php artisan engage:deployment-plan
+#
+# Add only missing required variable names:
+#   php artisan engage:environment:sync --write-missing
+#
+# Real secrets must never be committed.
+
+################################
+# URLS / HOSTS
+################################
+# APP_URL=
+# ROOT_DOMAIN=
+# CRM_APP_URL=
+# WEBINAR_APP_URL=
+# SCHEDULING_APP_URL=
+
+################################
+# DATABASE IDENTITY / CREDENTIALS
+################################
+# DB_DATABASE=
+# DB_USERNAME=
+# DB_PASSWORD=
+
+################################
+# CLIENT-SCOPED NAMESPACES
+################################
+# CACHE_PREFIX=
+# REDIS_PREFIX=
+# HORIZON_PREFIX=
+# SESSION_DOMAIN=
+
+################################
+# FILE STORAGE / DIGITALOCEAN SPACES
+################################
+# DO_SPACES_KEY=
+# DO_SPACES_SECRET=
+# DO_SPACES_ENDPOINT=
+# DO_SPACES_REGION=
+# DO_SPACES_BUCKET=
+# CDN_BASE_URL=
+
+################################
+# EMAIL / MESSAGING
+################################
+# MAIL_MAILER=
+# MAIL_FROM_ADDRESS=
+# MAIL_FROM_NAME=
+# EMAIL_PROVIDER=
+# FROM_EMAIL_TRANSACTIONAL=
+# FROM_NAME_TRANSACTIONAL=
+# FROM_EMAIL_MARKETING=
+# FROM_NAME_MARKETING=
+# RESEND_API_KEY=
+# RESEND_WEBHOOK_SECRET=
+# INBOUND_EMAIL_DOMAIN=
+# RESEND_FROM_EMAIL_TRANSACTIONAL=
+# RESEND_FROM_NAME_TRANSACTIONAL=
+# RESEND_FROM_EMAIL_MARKETING=
+# RESEND_FROM_NAME_MARKETING=
+# PERMISSION_INVITATION_PUBLIC_URL=
+# INTERNAL_NOTIFICATION_FROM_ADDRESS=
+# INTERNAL_NOTIFICATION_FROM_NAME=
+# INBOUND_REPLY_DEFAULT_TEAM_MEMBER_EMAIL=
+
+################################
+# PROJECT STATE OWNER
+################################
+# PROJECT_STATE_ADMIN_EMAIL=
+
+################################
+# EXTERNAL FORMS INTAKE
+################################
+# FORMS_EXTERNAL_INTAKE_ENABLED=
+# FORMS_EXTERNAL_INTAKE_CLIENT_ID=
+# FORMS_EXTERNAL_INTAKE_CLIENT_SECRET=
+# FORMS_EXTERNAL_INTAKE_SOURCE=
+# FORMS_EXTERNAL_INTAKE_PROVIDER=
+# FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS=
+# FORMS_EXTERNAL_INTAKE_DOMAINS=
+
+################################
+# SMS / TELNYX
+################################
+# SMS_ENABLED=
+# SMS_PROVIDER=
+# TELNYX_API_KEY=
+# TELNYX_FROM=
+# TELNYX_FROM_TRANSACTIONAL=
+# TELNYX_FROM_MARKETING=
+# TELNYX_FROM_NOTIFICATIONS=
+# TELNYX_WEBHOOK_PUBLIC_KEY=
+# MESSAGING_SMS_MARKETING_PROFILE_ID=
+# MESSAGING_SMS_TRANSACTIONAL_PROFILE_ID=
+
+################################
+# TWILIO ALTERNATE PROVIDER
+################################
+# TWILIO_SID=
+# TWILIO_AUTH_TOKEN=
+# TWILIO_FROM=
+# TWILIO_FROM_TRANSACTIONAL=
+# TWILIO_FROM_MARKETING=
+# TWILIO_VIRTUAL_PHONE=
+
+################################
+# WEBINARS / ZOOM
+################################
+# WEBINAR_PROVIDER=
+# WEBINAR_BOOKING_URL=
+# ZOOM_ACCOUNT_ID=
+# ZOOM_CLIENT_ID=
+# ZOOM_CLIENT_SECRET=
+# ZOOM_WEBHOOK_SECRET=

@@ -103,172 +103,19 @@ cat > "$TEMP_CLIENT_DIR/resources/images/manifest.json" <<'EOF_MANIFEST'
 {}
 EOF_MANIFEST
 
-cat > "$TEMP_CLIENT_DIR/.env.example" <<'EOF_ENV'
-# Engage Core client deployment environment
-#
-# This file contains runtime values that should follow the selected CLIENT_KEY.
-# Do not commit real secrets.
-#
-# Root .env owns:
-#   CLIENT_KEY
-#   APP_ENV / APP_DEBUG / APP_KEY
-#   logging
-#   queue connection and queue names
-#   Redis host/port/database indexes
-#   worker/process tuning
-#
-# Client PHP config owns:
-#   client name/key
-#   selected preset
-#   stable client timezone
-#   enabled runtime modules
-#   version-controlled product/business behavior
+ENV_TEMPLATE="$ROOT_DIR/docs/config-templates/client-environment.example"
 
-################################
-# URLS / HOSTS
-################################
+if [[ ! -f "$ENV_TEMPLATE" ]]; then
+  echo "Canonical client environment reference is missing: $ENV_TEMPLATE"
+  exit 1
+fi
 
-ROOT_DOMAIN=
-APP_URL=
-CRM_APP_URL=
-
-# Optional when the Webinars module is enabled.
-# WEBINAR_APP_URL=
-
-# Optional when the Scheduling public surface is enabled.
-# SCHEDULING_APP_URL=
-
-################################
-# DATABASE IDENTITY / CREDENTIALS
-################################
-
-# DB_CONNECTION / DB_HOST / DB_PORT stay in root .env.
-DB_DATABASE=
-DB_USERNAME=
-DB_PASSWORD=
-
-################################
-# CLIENT-SCOPED NAMESPACES
-################################
-
-# Keep these unique per client/environment when infrastructure is shared.
-CACHE_PREFIX=
-REDIS_PREFIX=
-HORIZON_PREFIX=
-
-# Set deliberately when the session cookie should span selected subdomains.
-# SESSION_DOMAIN=.example.com
-
-################################
-# FILE STORAGE / DIGITALOCEAN SPACES
-################################
-
-DO_SPACES_KEY=
-DO_SPACES_SECRET=
-DO_SPACES_ENDPOINT=https://nyc3.digitaloceanspaces.com
-DO_SPACES_REGION=nyc3
-DO_SPACES_BUCKET=
-
-# Optional public asset base. Leave commented to preserve the configured fallback.
-# CDN_BASE_URL=https://cdn.example.com/client-key
-
-################################
-# EMAIL / RESEND
-################################
-
-MAIL_MAILER=resend
-EMAIL_PROVIDER=resend
-
-MAIL_FROM_ADDRESS=
-MAIL_FROM_NAME="${APP_NAME}"
-
-FROM_EMAIL_TRANSACTIONAL=
-FROM_NAME_TRANSACTIONAL=
-
-FROM_EMAIL_MARKETING=
-FROM_NAME_MARKETING=
-
-RESEND_API_KEY=
-RESEND_WEBHOOK_SECRET=
-
-# Optional provider-specific sender overrides.
-# Leave commented to preserve normal FROM_* / MAIL_FROM_* fallbacks.
-# RESEND_FROM_EMAIL_TRANSACTIONAL=
-# RESEND_FROM_NAME_TRANSACTIONAL=
-# RESEND_FROM_EMAIL_MARKETING=
-# RESEND_FROM_NAME_MARKETING=
-
-################################
-# PERMISSION INVITATIONS
-################################
-
-# Optional override. Leave commented to preserve the APP_URL fallback.
-# PERMISSION_INVITATION_PUBLIC_URL=
-
-################################
-# PROJECT STATE
-################################
-
-# Optional owner authorization. Leave commented to keep Project State disabled.
-# PROJECT_STATE_ADMIN_EMAIL=
-
-################################
-# INTERNAL NOTIFICATIONS / INBOUND REPLIES
-################################
-
-# Optional overrides.
-# INTERNAL_NOTIFICATION_FROM_ADDRESS=
-# INTERNAL_NOTIFICATION_FROM_NAME=
-# INBOUND_REPLY_DEFAULT_TEAM_MEMBER_EMAIL=
-
-################################
-# SMS / TELNYX
-################################
-
-# Enable and populate only when Messaging SMS is part of the client package.
-SMS_ENABLED=false
-SMS_PROVIDER=telnyx
-
-# TELNYX_API_KEY=
-# TELNYX_FROM_TRANSACTIONAL=
-# TELNYX_FROM_MARKETING=
-# TELNYX_FROM_NOTIFICATIONS=
-# TELNYX_WEBHOOK_PUBLIC_KEY=
-# MESSAGING_SMS_MARKETING_PROFILE_ID=
-# MESSAGING_SMS_TRANSACTIONAL_PROFILE_ID=
-# TELNYX_FROM=
-
-################################
-# TWILIO ALTERNATE PROVIDER
-################################
-
-# TWILIO_SID=
-# TWILIO_AUTH_TOKEN=
-# TWILIO_FROM=
-# TWILIO_FROM_TRANSACTIONAL=
-# TWILIO_FROM_MARKETING=
-# TWILIO_VIRTUAL_PHONE=
-
-################################
-# WEBINARS / ZOOM
-################################
-
-# Enable and populate only when the Webinars module is part of the client package.
-# WEBINAR_PROVIDER=zoom
-
-# Optional client booking URL used by webinar copy when configured.
-# WEBINAR_BOOKING_URL=
-
-# ZOOM_ACCOUNT_ID=
-# ZOOM_CLIENT_ID=
-# ZOOM_CLIENT_SECRET=
-# ZOOM_WEBHOOK_SECRET=
-EOF_ENV
+cp "$ENV_TEMPLATE" "$TEMP_CLIENT_DIR/.env.example"
 
 cat > "$TEMP_CLIENT_DIR/README.md" <<EOF_README
 # $CLIENT_NAME
 
-Engage Core client configuration, content, views, and deployment-specific runtime environment.
+Engage Core client configuration, content, views, and deployment-reference environment documentation.
 
 This scaffold intentionally starts with the \`basic\` preset and the Tasks and Workflow modules. Add client-specific config contributions only when the client actually needs them.
 
@@ -282,31 +129,34 @@ This scaffold intentionally starts with the \`basic\` preset and the Tasks and W
 2. Review \`config/modules.php\` and enable only the modules the client needs.
 3. Decide which provider-backed features are required before adding credentials.
 
-## Local setup
+## Environment model
 
-1. Create the client environment with PHP-FPM-readable permissions:
+\`.env.example\` is an exhaustive selected-client reference. It is not a runtime template and must not be copied wholesale to \`.env\`.
 
-   \`\`\`bash
-   sudo install -o "\$(id -un)" -g "$WEB_GROUP" -m 640 \\
-     client/$CLIENT_KEY/.env.example \\
-     client/$CLIENT_KEY/.env
-   \`\`\`
+The committed client/module configuration determines the runtime requirement set. Select this client in the root runtime environment first. If root \`.env\` already contains another \`CLIENT_KEY\`, change that one runtime value deliberately before continuing. When root \`.env\` does not exist yet, an explicit process value can bootstrap the first sync:
 
-2. Populate \`client/$CLIENT_KEY/.env\` with client deployment values and secrets.
-3. Set this single value in the Core root \`.env\`:
+\`\`\`bash
+CLIENT_KEY=$CLIENT_KEY php artisan engage:environment:sync --write-missing
+\`\`\`
 
-   \`\`\`env
-   CLIENT_KEY=$CLIENT_KEY
-   \`\`\`
+That command adds only missing required variable names to the correct root/client environment file. It never invents secret values or overwrites existing values. A persisted \`CLIENT_KEY\` that disagrees with the selected client is reported as a blocking mismatch instead of being silently changed.
 
-4. Clear cached configuration and run the new-client installer:
+Populate the reported blank values. If \`APP_KEY\` was added blank, generate it first:
 
-   \`\`\`bash
-   php artisan optimize:clear
-   php artisan engage:install
-   php artisan modules:status
-   php artisan setup:validate
-   \`\`\`
+\`\`\`bash
+php artisan key:generate
+\`\`\`
+
+Then run:
+
+\`\`\`bash
+php artisan optimize:clear
+php artisan engage:deployment-plan
+php artisan engage:install
+php artisan modules:status
+\`\`\`
+
+\`engage:install\` already runs setup validation; a second standalone \`setup:validate\` is only needed when diagnosing setup state separately.
 
 ## File permissions
 
@@ -318,18 +168,20 @@ files:       0640
 group:       $WEB_GROUP
 \`\`\`
 
-The setgid directory bit keeps newly created files in the PHP-FPM group. When creating or replacing the client \`.env\`, preserve mode \`0640\` so PHP-FPM can read it without making secrets world-readable.
+The setgid directory bit keeps newly created files in the PHP-FPM group. Runtime \`.env\` files created by the environment synchronizer default to mode \`0640\`; deployment must also ensure the deploy user and PHP-FPM identity can read them without making secrets world-readable.
 
 ## Configuration ownership
 
 \`config/**\`
-: Stable client product behavior and version-controlled overrides.
+: Stable client product behavior and version-controlled overrides authored in development.
 
 Client \`.env\`
-: Client-specific deployment values, provider credentials, and secrets.
+: Deployment-specific client values and secrets required by the committed build.
 
 Root \`.env\`
 : Application/process infrastructure and the active \`CLIENT_KEY\`.
+
+Staging and production are deployment targets. Do not edit source/config there; deploy committed development changes and reconcile only runtime environment/host state.
 EOF_README
 
 php -l "$TEMP_CLIENT_DIR/config/client.php" >/dev/null
@@ -360,8 +212,6 @@ mv "$TEMP_CLIENT_DIR" "$CLIENT_DIR"
 TEMP_CLIENT_DIR=""
 trap - EXIT
 
-CURRENT_USER="$(id -un)"
-
 cat <<EOF_DONE
 Created client: $CLIENT_DIR
 Name: $CLIENT_NAME
@@ -371,13 +221,12 @@ Modules: tasks, workflow
 Permissions: directories 2750; files 0640; group $WEB_GROUP
 
 Next:
-  sudo install -o "$CURRENT_USER" -g "$WEB_GROUP" -m 640 \\
-    client/$CLIENT_KEY/.env.example \\
-    client/$CLIENT_KEY/.env
-  # Populate client/$CLIENT_KEY/.env
-  # Set CLIENT_KEY=$CLIENT_KEY in the root .env
+  # If root .env already selects another client, deliberately set CLIENT_KEY=$CLIENT_KEY there first.
+  CLIENT_KEY=$CLIENT_KEY php artisan engage:environment:sync --write-missing
+  # Populate the reported blank runtime values/secrets.
+  # If APP_KEY is blank: php artisan key:generate
   php artisan optimize:clear
+  php artisan engage:deployment-plan
   php artisan engage:install
   php artisan modules:status
-  php artisan setup:validate
 EOF_DONE
