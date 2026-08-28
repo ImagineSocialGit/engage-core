@@ -1053,6 +1053,18 @@ The panel shows the next operational Appointment, other upcoming `pending`, `sch
 
 The panel's Schedule Appointment action links to `/scheduling?contact_id={contact}`. `SchedulingController` validates that Contact identity, preserves it through service, host, and date selection, initializes the existing Core Contact autocomplete state, and keeps the Contact selected after successful creation. The browser still submits the ordinary `contact_id`; the query parameter grants no additional authority.
 
+### CRM dashboard appointment visibility
+
+Scheduling contributes two bounded dashboard providers through Core's generic `DashboardPanelRegistry`; Core does not import Scheduling models or learn appointment query rules. Both providers remain silent when Scheduling is disabled.
+
+`SchedulingDashboardAppointments` resolves client-local day boundaries, queries only operational `pending`, `scheduled`, and `confirmed` Appointments that overlap the requested day, loads the Contact/service/host/attendee context needed for presentation, and links every row to the authoritative Appointment detail workspace. Completed, canceled, and no-show records do not remain in the operational dashboard lists.
+
+The `scheduling.today` immediate-work panel shows remaining operational Appointments for the current client-local day in start-time order. Pending confirmation raises the panel's attention count and priority. When the panel wins an available dashboard slot, its primary action opens the next relevant Appointment and its secondary action opens Scheduling.
+
+The `scheduling.tomorrow` context panel is the preparation view for the next client-local day. It is hidden when tomorrow has no operational Appointments. Appointment descriptions are retained as preparation context when present, and pending confirmation can raise attention without turning the panel into a second Scheduling workspace.
+
+Dashboard placement is not Scheduling-owned state. Root/preset dashboard defaults live under `modules.dashboard`, while the selected client's final slot ordering, maxima, and priority overrides live under `client.dashboard.slots` in `client/{client-key}/config/client.php` and are applied after the preset. Those preferences only choose among providers whose modules are actually enabled; they do not enable Scheduling or duplicate appointment data.
+
 ### CRM Scheduling configuration workspace
 
 The authenticated `/scheduling/configuration` workspace provides the first CRM-owned setup surface for durable Scheduling identity and service policy. It manages manual `scheduling_hosts`, manual `bookable_services`, and `bookable_service_hosts` assignments without exposing raw metadata, provider identity, polymorphic host ownership, or synchronization fields.
@@ -1094,7 +1106,7 @@ Assignment synchronization is transactional. Existing assignment rows omitted fr
 
 `SchedulingReadService` supplies ordered configuration collections, source ownership, editability, assignment state, availability-window counts, and Appointment usage counts. Controllers and Blade views do not rebuild those Scheduling queries.
 
-The host/service workspace links to a separate availability-rule workspace. Calendar visualization, provider synchronization, and reminder management remain deferred.
+The host/service workspace links to a separate availability-rule workspace. Calendar visualization and provider synchronization remain deferred.
 
 ### CRM availability workspace
 

@@ -60,8 +60,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | Dashboard panels are selected by product slot, then by enabled modules.
-    | Presets/clients may reorder these lists without adding database-owned
-    | dashboard layout state. Actionable panels should stay above context.
+    | Presets may provide product defaults. Client-owned final slot/order/priority
+    | preferences live under client.dashboard.slots and are applied last. No
+    | database-owned dashboard layout state is required.
     |
     */
 
@@ -82,6 +83,7 @@ return [
                 'max' => 2,
                 'hide_when_empty' => true,
                 'panels' => [
+                    'scheduling.tomorrow',
                     'webinars.activity',
                     'campaigns.movement',
                     'broadcasts.recent',
@@ -98,11 +100,14 @@ return [
                         'panels' => [
                             'tasks.today',
                             'inbound_messaging.replies',
+                            'scheduling.today',
                         ],
                     ],
                     'context' => [
-                        'max' => 0,
-                        'panels' => [],
+                        'max' => 1,
+                        'panels' => [
+                            'scheduling.tomorrow',
+                        ],
                     ],
                 ],
             ],
@@ -114,11 +119,13 @@ return [
                         'panels' => [
                             'tasks.today',
                             'inbound_messaging.replies',
+                            'scheduling.today',
                         ],
                     ],
                     'context' => [
                         'max' => 2,
                         'panels' => [
+                            'scheduling.tomorrow',
                             'webinars.activity',
                             'campaigns.movement',
                             'broadcasts.recent',
@@ -134,15 +141,18 @@ return [
                         'panels' => [
                             'inbound_messaging.replies',
                             'tasks.today',
+                            'scheduling.today',
                         ],
                         'priorities' => [
                             'inbound_messaging.replies' => 130,
+                            'scheduling.today' => 115,
                             'tasks.today' => 100,
                         ],
                     ],
                     'context' => [
                         'max' => 2,
                         'panels' => [
+                            'scheduling.tomorrow',
                             'broadcasts.recent',
                             'campaigns.movement',
                             'webinars.activity',

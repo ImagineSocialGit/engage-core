@@ -97,6 +97,71 @@ return [
         'reporting',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Dashboard product defaults
+    |--------------------------------------------------------------------------
+    |
+    | Root modules config defines eligible panel keys and preset-level defaults.
+    | A panel still appears only when its owning module is enabled and its
+    | provider exists. Keep actionable work above context.
+    |
+    | Client-specific final ordering/priority does NOT belong in this block.
+    | Put that in client/{client-key}/config/client.php under:
+    |
+    | 'dashboard' => [
+    |     'slots' => [
+    |         'immediate_work' => [
+    |             'max' => 2,
+    |             'panels' => [
+    |                 'scheduling.today',
+    |                 'tasks.today',
+    |                 'inbound_messaging.replies',
+    |             ],
+    |             'priorities' => [
+    |                 'scheduling.today' => 125,
+    |             ],
+    |         ],
+    |         'context' => [
+    |             'max' => 2,
+    |             'panels' => [
+    |                 'scheduling.tomorrow',
+    |                 'webinars.activity',
+    |             ],
+    |         ],
+    |     ],
+    | ],
+    |
+    | Client slot overrides are applied after the selected dashboard preset.
+    |
+    */
+
+    'dashboard' => [
+        'slots' => [
+            'immediate_work' => [
+                'max' => 2,
+                'hide_when_empty' => false,
+                'panels' => [
+                    'tasks.today',
+                    'inbound_messaging.replies',
+                    'documents.review',
+                    'scheduling.today',
+                ],
+            ],
+            'context' => [
+                'max' => 2,
+                'hide_when_empty' => true,
+                'panels' => [
+                    'scheduling.tomorrow',
+                    'webinars.activity',
+                    'campaigns.movement',
+                    'broadcasts.recent',
+                    'portal.activity',
+                ],
+            ],
+        ],
+    ],
+
     'modules' => [
 
         'core' => [

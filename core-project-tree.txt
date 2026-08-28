@@ -760,6 +760,7 @@
 │   │   │   │   ├── MessageChainExecutionContextProvider.php
 │   │   │   │   ├── MessageRecipientGate.php
 │   │   │   │   ├── MessageRecipientPayloadProvider.php
+│   │   │   │   ├── MessageTemplatePublicationHook.php
 │   │   │   │   └── Sms
 │   │   │   │       ├── SmsMessage.php
 │   │   │   │       └── SmsProvider.php
@@ -903,6 +904,7 @@
 │   │   │   │   ├── MessageTemplateCompositionSchema.php
 │   │   │   │   ├── MessageTemplateDisplayLabelResolver.php
 │   │   │   │   ├── MessageTemplatePresetAssignmentResolver.php
+│   │   │   │   ├── MessageTemplatePublicationHookRegistry.php
 │   │   │   │   ├── MessageTemplateTokenValidator.php
 │   │   │   │   ├── MessageTemplateUsageResolver.php
 │   │   │   │   ├── MessageTokenFallbackResolver.php
@@ -1072,10 +1074,14 @@
 │   │   │   │   ├── RescheduleAppointmentAction.php
 │   │   │   │   ├── RescheduleAppointmentToSlotAction.php
 │   │   │   │   └── TransitionAppointmentStatusAction.php
+│   │   │   ├── Console
+│   │   │   │   └── Commands
+│   │   │   │       └── SyncAppointmentCommunicationsCatalogCommand.php
 │   │   │   ├── Contracts
 │   │   │   │   └── TravelTimeResolver.php
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
+│   │   │   │   │   ├── AppointmentCommunicationsController.php
 │   │   │   │   │   ├── AppointmentController.php
 │   │   │   │   │   ├── SchedulingAvailabilityController.php
 │   │   │   │   │   ├── SchedulingConfigurationController.php
@@ -1141,6 +1147,10 @@
 │   │   │   │   │   └── TravelFeasibilityResolver.php
 │   │   │   │   ├── ContactShow
 │   │   │   │   │   └── SchedulingContactPanelProvider.php
+│   │   │   │   ├── Dashboard
+│   │   │   │   │   ├── SchedulingDashboardAppointments.php
+│   │   │   │   │   ├── TodayAppointmentsDashboardPanelProvider.php
+│   │   │   │   │   └── TomorrowAppointmentsDashboardPanelProvider.php
 │   │   │   │   ├── PublicBookingDestinationVerificationService.php
 │   │   │   │   ├── SchedulingAvailabilityConfigurationWriter.php
 │   │   │   │   ├── SchedulingAvailableStartRangeBuilder.php
@@ -1554,9 +1564,18 @@
 │       │   ├── RelationshipLocationAreaBridge.php
 │       │   ├── RelationshipLocationAreaImportHandler.php
 │       │   └── Scheduling
-│       │       └── Messaging
-│       │           ├── MessagingSchedulingDestinationVerificationTransport.php
-│       │           └── SchedulingDestinationVerificationRecipientGate.php
+│       │       ├── Contracts
+│       │       │   └── AppointmentCommunications.php
+│       │       ├── Messaging
+│       │       │   ├── MessagingAppointmentCommunications.php
+│       │       │   ├── MessagingSchedulingDestinationVerificationTransport.php
+│       │       │   ├── SchedulingAppointmentComputedTokenValueProvider.php
+│       │       │   ├── SchedulingAppointmentMessageChainExecutionContextProvider.php
+│       │       │   ├── SchedulingAppointmentTemplatePublicationHook.php
+│       │       │   ├── SchedulingAppointmentTokenContextProvider.php
+│       │       │   ├── SchedulingAppointmentTokenSourceProvider.php
+│       │       │   └── SchedulingDestinationVerificationRecipientGate.php
+│       │       └── UnavailableAppointmentCommunications.php
 │       ├── Modules
 │       │   ├── Migrations
 │       │   │   ├── MigrationScopeDefinition.php
@@ -2328,6 +2347,7 @@
 │       │   │       └── scheduling-public-booking.blade.php
 │       │   ├── scheduling
 │       │   │   ├── availability.blade.php
+│       │   │   ├── communications.blade.php
 │       │   │   ├── configuration.blade.php
 │       │   │   ├── contact-panel.blade.php
 │       │   │   ├── index.blade.php
@@ -2490,6 +2510,7 @@
 │   │   ├── Clients
 │   │   │   ├── ArtisanTestEnvironmentBootstrapTest.php
 │   │   │   ├── ClientConfigFallbackTest.php
+│   │   │   ├── ClientDashboardLayoutConfigTest.php
 │   │   │   ├── ClientEnvironmentLoaderTest.php
 │   │   │   ├── ExternalFormsClientEnvironmentContractTest.php
 │   │   │   └── ProjectStateClientEnvironmentContractTest.php
@@ -2789,6 +2810,7 @@
 │   │   │   ├── ProjectStateValidationInfrastructureExtractionTest.php
 │   │   │   ├── RelationshipsProjectStateRoundTripTest.php
 │   │   │   ├── ReportingProjectStateRoundTripTest.php
+│   │   │   ├── SchedulingAppointmentMessagingProjectStateContractTest.php
 │   │   │   ├── SchedulingProjectStateRoundTripTest.php
 │   │   │   ├── TasksProjectStateRoundTripTest.php
 │   │   │   ├── WebinarProjectStateRoundTripTest.php
@@ -2815,12 +2837,15 @@
 │   │   │   ├── ReportingWorkspaceTest.php
 │   │   │   └── SchedulingDailyProjectionTest.php
 │   │   ├── Scheduling
+│   │   │   ├── AppointmentCommunicationsAuthoringTest.php
+│   │   │   ├── AppointmentCommunicationsLifecycleTest.php
 │   │   │   ├── AppointmentLifecycleActionTest.php
 │   │   │   ├── BookableSlotOfferAndBookingHoldActionTest.php
 │   │   │   ├── BookingHoldConversionAndReleaseActionTest.php
 │   │   │   ├── CreateAppointmentActionTest.php
 │   │   │   ├── FindBookableAvailabilityActionTest.php
 │   │   │   ├── PublicAppointmentSummaryPresentationTest.php
+│   │   │   ├── PublicBookingAppointmentCommunicationsConsentTest.php
 │   │   │   ├── PublicBookingCompletionTest.php
 │   │   │   ├── PublicBookingDestinationVerificationEnforcementTest.php
 │   │   │   ├── PublicBookingDestinationVerificationServiceTest.php
@@ -2838,6 +2863,7 @@
 │   │   │   ├── SchedulingAvailableStartRangeBuilderTest.php
 │   │   │   ├── SchedulingConfigurationWorkspaceTest.php
 │   │   │   ├── SchedulingContactPanelTest.php
+│   │   │   ├── SchedulingDashboardPanelTest.php
 │   │   │   ├── SchedulingDestinationVerificationMessagingBridgeTest.php
 │   │   │   ├── SchedulingFoundationTest.php
 │   │   │   ├── SchedulingHostAndServiceFoundationTest.php
@@ -2971,4 +2997,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-705 directories, 2267 files
+709 directories, 2289 files

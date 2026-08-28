@@ -83,6 +83,12 @@ class DashboardPanelRegistry
             $slots = $this->mergeDashboardSlots($slots, $presetConfig['slots'] ?? []);
         }
 
+        $clientSlots = config('client.dashboard.slots', []);
+
+        if (is_array($clientSlots)) {
+            $slots = $this->mergeDashboardSlots($slots, $clientSlots);
+        }
+
         return is_array($slots) ? $slots : [];
     }
 

@@ -8,7 +8,10 @@ use App\Modules\Scheduling\EventDefinitions\SchedulingPublicBookingEventDefiniti
 use App\Modules\Scheduling\Jobs\ExpireBookingHoldsJob;
 use App\Modules\Scheduling\ReadModels\SchedulingBookingFunnelFactContributor;
 use App\Modules\Scheduling\Services\ContactShow\SchedulingContactPanelProvider;
+use App\Modules\Scheduling\Services\Dashboard\TodayAppointmentsDashboardPanelProvider;
+use App\Modules\Scheduling\Services\Dashboard\TomorrowAppointmentsDashboardPanelProvider;
 use App\Modules\Scheduling\Validation\SchedulingSetupValidationContributor;
+use App\Support\Dashboard\DashboardPanelRegistry;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -31,6 +34,11 @@ class SchedulingModuleServiceProvider extends ServiceProvider
             SchedulingBookingFunnelFactContributor::class,
             'reporting.projection_fact_contributors',
         );
+
+        $this->app->tag([
+            TodayAppointmentsDashboardPanelProvider::class,
+            TomorrowAppointmentsDashboardPanelProvider::class,
+        ], DashboardPanelRegistry::providerTag());
     }
 
     public function boot(): void

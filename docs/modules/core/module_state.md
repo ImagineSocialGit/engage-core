@@ -70,6 +70,14 @@ The seen marker reuses `dashboard_acknowledgements` with a dedicated surface and
 FlowRoutes business-day waits are the first consumer. Core does not import or call FlowRoutes to provide the behavior.
 
 
+## Dashboard composition and client priority
+
+Core owns the generic CRM dashboard registry and rendering shell, but does not query module-owned business records to populate it. Modules contribute `DashboardPanelProvider` implementations through the shared `DashboardPanelRegistry` tag. The registry resolves only providers whose owning module is enabled.
+
+Dashboard layout remains deployment/client configuration rather than database-owned user state. The registry starts with root `modules.dashboard.slots`, applies the selected `modules.dashboard.presets.{preset}.slots` product default, then applies `client.dashboard.slots` last. Client-owned dashboard preferences therefore live naturally in `client/{client-key}/config/client.php` beside the client's preset/timezone choices and cannot be accidentally overwritten by the selected preset. Ordered `panels` lists decide eligibility/order within a slot, `max` caps visible panels, and optional `priorities` promote the few available panels that matter most to the client. Numeric panel lists replace inherited lists rather than being index-merged.
+
+This is intentionally a lightweight priority mechanism, not a drag-and-drop dashboard builder. A client preference never activates a disabled module and cannot manufacture a panel whose provider is unavailable. Module providers remain authoritative for counts, attention state, items, links, and empty-state behavior.
+
 ## Canonical contact terminology and client-facing aliases
 
 Core owns the canonical internal Contact identity.
