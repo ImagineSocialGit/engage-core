@@ -7,8 +7,7 @@ use App\Modules\Campaigns\Models\CampaignTouchDispatch;
 use App\Modules\Campaigns\Models\CampaignTouchProgram;
 use App\Modules\Campaigns\Models\CampaignTouchVariant;
 use App\Modules\Core\Models\Contact;
-use App\Modules\Core\Models\ContactStatus;
-use App\Modules\Core\Services\Contacts\ContactFilterResolver;
+use App\Modules\Campaigns\Services\CampaignAnnualTouchAudienceService;
 use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,7 +21,7 @@ class ProcessDueCampaignTouchDatesAction
     private const MAX_DISPATCHES_PER_RUN = 500;
 
     public function __construct(
-        private readonly ContactFilterResolver $contactFilterResolver,
+        private readonly CampaignAnnualTouchAudienceService $annualTouchAudience,
         private readonly DispatchMessageAction $dispatchMessage,
     ) {}
 
@@ -286,28 +285,7 @@ class ProcessDueCampaignTouchDatesAction
      */
     private function audienceQuery(CampaignTouchProgram $program): Builder
     {
-        if ($program->audience_type !== CampaignTouchProgram::AUDIENCE_CONTACT_STATUS
-            || ! is_string($program->audience_key)
-            || trim($program->audience_key) === ''
-        ) {
-            return Contact::query()->whereRaw('1 = 0');
-        }
-
-        $statusId = ContactStatus::query()
-            ->where('key', trim($program->audience_key))
-            ->where('is_active', true)
-            ->value('id');
-
-        if (! is_numeric($statusId)) {
-            return Contact::query()->whereRaw('1 = 0');
-        }
-
-        return $this->contactFilterResolver->query([
-            'type' => 'criteria',
-            'criteria' => [
-                'status' => [(string) ((int) $statusId)],
-            ],
-        ]);
+        return $this->annualTouchAudience->queryForProgram($program);
     }
 
     /**

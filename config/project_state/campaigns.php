@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 8,
+    'version' => 9,
     'tables' => [
         'campaigns' => [
             'mode' => 'upsert',
@@ -125,6 +125,7 @@ return [
                 'name',
                 'audience_type',
                 'audience_key',
+                'audience_filter',
                 'recurrence',
                 'repeat_years',
                 'starts_on',
@@ -133,7 +134,7 @@ return [
                 'created_at',
                 'updated_at',
             ],
-            'json_columns' => ['meta'],
+            'json_columns' => ['audience_filter', 'meta'],
             'references' => [
                 'campaign_id' => 'campaigns',
             ],

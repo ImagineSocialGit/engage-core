@@ -23,6 +23,8 @@ Route::middleware('module:campaigns')
                     ->name('store');
                 Route::post('/message-templates', [CampaignAnnualTouchController::class, 'storeMessageTemplate'])
                     ->name('message-templates.store');
+                Route::post('/audience-preview', [CampaignAnnualTouchController::class, 'previewAudience'])
+                    ->name('audience-preview');
                 Route::put('/{campaignTouchProgram}', [CampaignAnnualTouchController::class, 'update'])
                     ->name('update');
                 Route::delete('/{campaignTouchProgram}', [CampaignAnnualTouchController::class, 'destroy'])

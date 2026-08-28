@@ -11,6 +11,7 @@ Work these in order. Keep Campaigns independent from FlowRoutes, Webinars, Forms
 
 ## 2. Campaign lifecycle and launch safety
 
+- [x] Decouple Annual Touches from Workflow/mandatory Contact Status. Annual-touch programs now use the shared Contact-filter registry for optional conditions, support all/condition/specific-Contact audiences plus exclusions, preview the current match count, and fail closed when a saved optional criterion is unavailable.
 - [x] Add bounded bulk Campaign audience enrollment orchestration for Contact-import/operator-driven starts: import enrollment suppresses eager MessageChain progression and Messaging drains due enrollments through `BulkMessageDeliveryPolicy` on the `bulk_messages` queue.
 - [x] Define a generic Campaign entry/start contract: activation never implies audience selection, `EnrollContactInCampaignAction` remains the public single-Contact seam, and optional stable `entryKey` identity makes import/automation retries idempotent across terminal history.
 - [x] Author the Campaign Builder's `What starts this campaign?` stage through the shared Contact-filter criterion registry without introducing Campaigns -> producer-module coupling.

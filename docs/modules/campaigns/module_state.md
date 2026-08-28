@@ -43,6 +43,16 @@ runtime/surface batches.
 
 See `docs/modules/campaigns/eligibility.md`.
 
+## Annual Touches audience independence
+
+Annual Touches are standalone recurring programs and do not require Workflow, a Contact Status, or Campaign enrollment. Their durable audience is stored in `campaign_touch_programs.audience_filter` and can select all Contacts, contributed Contact-filter criteria, or explicit Contacts, with optional criterion/contact exclusions.
+
+The audience reuses Core's `ContactFilterCriterionRegistry`, so Status and Relationship remain optional contributed criteria instead of Campaigns dependencies. Saved criteria owned by an unavailable optional module are preserved and fail closed rather than silently widening the audience. Legacy `contact_status` programs are backfilled/readable through the same contract.
+
+Messaging remains authoritative for consent, suppression, destination/runtime/provider eligibility, reusable message copy, and explicit missing-token fallback behavior.
+
+See `docs/modules/campaigns/annual-touch-dates.md`.
+
 
 New Campaign enrollment creates a compact CampaignEnrollment wrapper, starts the selected immutable MessageChainVersion through Messaging, and stores `campaign_enrollments.message_chain_enrollment_id`. Explicit cancellation, Campaign deactivation, and enrollment pause/resume all delegate to Messaging-owned MessageChainEnrollment lifecycle actions. Campaign workspace/contact visibility and automation result metadata read progression/lifecycle facts from the linked MessageChainEnrollment. The old Campaign step scheduler, terminal-result progression listener, and duplicate CampaignEnrollment runtime columns have been removed.
 

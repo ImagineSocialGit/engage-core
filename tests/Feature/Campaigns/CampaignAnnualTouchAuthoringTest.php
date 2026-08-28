@@ -6,7 +6,8 @@ use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
 use App\Modules\Campaigns\Actions\ProcessDueCampaignTouchDatesAction;
 use App\Modules\Campaigns\Models\CampaignTouchProgram;
-use App\Modules\Core\Models\ContactStatus;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Models\ContactTag;
 use App\Modules\Messaging\Actions\CreateReusableMessageTemplateAction;
 use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
@@ -18,18 +19,11 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_standalone_annual_touch_program_is_authored_from_contact_status_and_messages(): void
+    public function test_standalone_annual_touch_program_is_authored_for_all_contacts_without_status_or_workflow(): void
     {
         config()->set('modules.enabled', ['campaigns', 'messaging']);
 
         $user = User::factory()->create();
-        ContactStatus::query()->create([
-            'key' => 'past_client',
-            'name' => 'Past Client',
-            'is_core' => true,
-            'is_active' => true,
-            'sort_order' => 10,
-        ]);
         $email = $this->reusablePreset('Birthday Email', 'email');
         $sms = $this->reusablePreset('Birthday SMS', 'sms');
         $campaignStepTemplate = MessageTemplatePreset::factory()->create([
@@ -48,7 +42,8 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
 
         $index
             ->assertOk()
-            ->assertViewHas('contactStatuses', fn ($statuses): bool => $statuses->contains('key', 'past_client'))
+            ->assertViewHas('audience', fn (array $audience): bool => isset($audience['modes']['all'])
+                && ($audience['mode'] ?? null) === 'all')
             ->assertViewHas('emailTemplates', fn ($templates): bool => $templates->contains('id', $email->getKey())
                 && ! $templates->contains('id', $campaignStepTemplate->getKey()))
             ->assertViewHas('smsTemplates', fn ($templates): bool => $templates->contains('id', $sms->getKey()))
@@ -57,7 +52,7 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
         $response = $this->actingAs($user)->post(
             route('crm.campaigns.annual-touches.store'),
             [
-                'audience_key' => 'past_client',
+                'audience_mode' => 'all',
                 'repeat_years' => 10,
                 'starts_on' => '2026-08-22',
                 'is_active' => 1,
@@ -87,7 +82,9 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
             route('crm.campaigns.annual-touches.index', ['edit' => $program->getKey()]),
         );
 
-        $this->assertSame('past_client', $program->audience_key);
+        $this->assertSame(CampaignTouchProgram::AUDIENCE_FILTER, $program->audience_type);
+        $this->assertNull($program->audience_key);
+        $this->assertSame('all', data_get($program->audience_filter, 'mode'));
         $this->assertSame(10, $program->repeat_years);
         $this->assertTrue($program->is_active);
         $this->assertSame(2, $program->touchDates()->where('is_active', true)->count());
@@ -139,6 +136,39 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
                     fn (array $field): bool => str_starts_with((string) ($field['token'] ?? ''), 'campaign.'),
                 );
             });
+    }
+
+    public function test_audience_preview_uses_registered_contact_filter_conditions(): void
+    {
+        config()->set('modules.enabled', ['campaigns', 'messaging']);
+
+        $user = User::factory()->create();
+        $matching = Contact::query()->create([
+            'first_name' => 'Matching',
+            'email' => 'matching@example.test',
+        ]);
+        Contact::query()->create([
+            'first_name' => 'Other',
+            'email' => 'other@example.test',
+        ]);
+        ContactTag::query()->create([
+            'contact_id' => $matching->getKey(),
+            'tag' => 'VIP',
+        ]);
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->postJson(route('crm.campaigns.annual-touches.audience-preview'), [
+                'audience_mode' => 'criteria',
+                'audience_criteria' => [
+                    'tag' => ['VIP'],
+                ],
+            ])
+            ->assertOk()
+            ->assertJson([
+                'matching_count' => 1,
+            ]);
     }
 
     public function test_annual_touch_surface_creates_standalone_contextual_message_templates(): void
@@ -237,13 +267,6 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
         config()->set('modules.enabled', ['campaigns', 'messaging']);
 
         $user = User::factory()->create();
-        ContactStatus::query()->create([
-            'key' => 'past_client',
-            'name' => 'Past Client',
-            'is_core' => true,
-            'is_active' => true,
-            'sort_order' => 10,
-        ]);
         $campaignStepTemplate = MessageTemplatePreset::factory()->create([
             'name' => 'Cold Lead Nurture — Step 7 Email',
             'channel' => 'email',
@@ -268,7 +291,7 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('crm.campaigns.annual-touches.store'), [
-                'audience_key' => 'past_client',
+                'audience_mode' => 'all',
                 'repeat_years' => 10,
                 'is_active' => 1,
                 'touches' => [[

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class CampaignTouchProgram extends Model
 {
     public const AUDIENCE_CONTACT_STATUS = 'contact_status';
+    public const AUDIENCE_FILTER = 'filter';
     public const RECURRENCE_ANNUAL = 'annual';
     public const MESSAGE_PURPOSE = 'marketing';
     public const MESSAGE_SCOPE = 'annual_touch';
@@ -17,6 +18,7 @@ class CampaignTouchProgram extends Model
         'name',
         'audience_type',
         'audience_key',
+        'audience_filter',
         'recurrence',
         'repeat_years',
         'starts_on',
@@ -27,6 +29,7 @@ class CampaignTouchProgram extends Model
     protected function casts(): array
     {
         return [
+            'audience_filter' => 'array',
             'repeat_years' => 'integer',
             'starts_on' => 'date',
             'is_active' => 'boolean',

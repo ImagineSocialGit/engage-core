@@ -5,7 +5,6 @@ namespace Tests\Feature\ProjectState;
 use App\Modules\Campaigns\Models\CampaignTouchDate;
 use App\Modules\Campaigns\Models\CampaignTouchProgram;
 use App\Modules\Campaigns\Models\CampaignTouchVariant;
-use App\Modules\Core\Models\ContactStatus;
 use App\Support\ProjectState\ProjectStateContractRegistry;
 use App\Support\ProjectState\ProjectStateManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -35,6 +34,7 @@ class CampaignAnnualTouchesProjectStateRoundTripTest extends TestCase
             'campaigns',
             $programs['references']['campaign_id'],
         );
+        $this->assertContains('audience_filter', $programs['json_columns']);
         $this->assertSame(
             (int) config('project_state.sections.campaigns.version'),
             $campaigns['version'],
@@ -43,19 +43,22 @@ class CampaignAnnualTouchesProjectStateRoundTripTest extends TestCase
 
     public function test_standalone_annual_touch_program_round_trips_with_child_identity_remapping(): void
     {
-        ContactStatus::query()->create([
-            'key' => 'past_client',
-            'name' => 'Past Client',
-            'is_core' => true,
-            'is_active' => true,
-            'sort_order' => 10,
-        ]);
-
         $program = CampaignTouchProgram::query()->create([
             'key' => 'past_client_annual_touches',
             'name' => 'Past Client annual touches',
-            'audience_type' => CampaignTouchProgram::AUDIENCE_CONTACT_STATUS,
-            'audience_key' => 'past_client',
+            'audience_type' => CampaignTouchProgram::AUDIENCE_FILTER,
+            'audience_key' => null,
+            'audience_filter' => [
+                'mode' => 'criteria',
+                'criteria' => [
+                    'tag' => ['VIP'],
+                ],
+                'contact_ids' => [],
+                'exclude' => [
+                    'criteria' => [],
+                    'contact_ids' => [],
+                ],
+            ],
             'recurrence' => CampaignTouchProgram::RECURRENCE_ANNUAL,
             'repeat_years' => 10,
             'starts_on' => '2026-01-01',
@@ -114,6 +117,10 @@ class CampaignAnnualTouchesProjectStateRoundTripTest extends TestCase
         $this->assertNull(
             $document['sections']['campaigns']['tables']['campaign_touch_programs'][0]['campaign_id'],
         );
+        $this->assertEquals(
+            $program->audience_filter,
+            $document['sections']['campaigns']['tables']['campaign_touch_programs'][0]['audience_filter'],
+        );
 
         CampaignTouchVariant::query()->delete();
         CampaignTouchDate::query()->delete();
@@ -122,8 +129,19 @@ class CampaignAnnualTouchesProjectStateRoundTripTest extends TestCase
         CampaignTouchProgram::query()->create([
             'key' => 'target_only_annual_touch_program',
             'name' => 'Target-only annual touch program',
-            'audience_type' => CampaignTouchProgram::AUDIENCE_CONTACT_STATUS,
-            'audience_key' => 'past_client',
+            'audience_type' => CampaignTouchProgram::AUDIENCE_FILTER,
+            'audience_key' => null,
+            'audience_filter' => [
+                'mode' => 'criteria',
+                'criteria' => [
+                    'tag' => ['VIP'],
+                ],
+                'contact_ids' => [],
+                'exclude' => [
+                    'criteria' => [],
+                    'contact_ids' => [],
+                ],
+            ],
             'recurrence' => CampaignTouchProgram::RECURRENCE_ANNUAL,
             'repeat_years' => 1,
             'starts_on' => '2026-01-01',
@@ -147,7 +165,18 @@ class CampaignAnnualTouchesProjectStateRoundTripTest extends TestCase
             (int) $restoredProgram->getKey(),
         );
         $this->assertNull($restoredProgram->getAttribute('campaign_id'));
-        $this->assertSame('past_client', $restoredProgram->audience_key);
+        $this->assertNull($restoredProgram->audience_key);
+        $this->assertEquals([
+            'mode' => 'criteria',
+            'criteria' => [
+                'tag' => ['VIP'],
+            ],
+            'contact_ids' => [],
+            'exclude' => [
+                'criteria' => [],
+                'contact_ids' => [],
+            ],
+        ], $restoredProgram->audience_filter);
         $this->assertSame(10, $restoredProgram->repeat_years);
         $this->assertTrue($restoredProgram->is_active);
 

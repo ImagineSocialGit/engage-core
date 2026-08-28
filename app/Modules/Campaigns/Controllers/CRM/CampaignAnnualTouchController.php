@@ -8,7 +8,7 @@ use App\Modules\Campaigns\Models\CampaignTouchProgram;
 use App\Modules\Campaigns\Actions\ProcessDueCampaignTouchDatesAction;
 use App\Modules\Campaigns\Models\CampaignTouchVariant;
 use App\Modules\Campaigns\Requests\CreateCampaignAnnualTouchMessageTemplateRequest;
-use App\Modules\Core\Models\ContactStatus;
+use App\Modules\Campaigns\Services\CampaignAnnualTouchAudienceService;
 use App\Modules\Messaging\Actions\CreateReusableMessageTemplateAction;
 use App\Modules\Messaging\Data\ReusableMessageTemplateAuthoringContext;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
@@ -30,6 +30,7 @@ class CampaignAnnualTouchController extends Controller
     public function __construct(
         private readonly ReusableMessageTemplateCatalog $reusableTemplates,
         private readonly MessageTemplateAuthoringFieldPresenter $authoringFields,
+        private readonly CampaignAnnualTouchAudienceService $annualTouchAudience,
     ) {}
 
     public function index(Request $request): View
@@ -54,10 +55,11 @@ class CampaignAnnualTouchController extends Controller
         return view('crm.campaigns.annual-touches.index', [
             'programs' => $programs,
             'editingProgram' => $editingProgram,
-            'contactStatuses' => ContactStatus::query()
-                ->active()
-                ->ordered()
-                ->get(),
+            'audience' => $this->annualTouchAudience->forProgram($editingProgram),
+            'programAudienceSummaries' => $programs
+                ->mapWithKeys(fn (CampaignTouchProgram $program): array => [
+                    (int) $program->getKey() => $this->annualTouchAudience->summaryForProgram($program),
+                ]),
             'emailTemplates' => $templates->get('email', collect())->values(),
             'smsTemplates' => $templates->get('sms', collect())->values(),
             'annualTouchAvailableFields' => $this->authoringFields->groupsForContext(
@@ -94,6 +96,44 @@ class CampaignAnnualTouchController extends Controller
         ], 201);
     }
 
+    public function previewAudience(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'program_id' => ['nullable', 'integer', 'min:1'],
+            'audience_mode' => ['required', Rule::in(CampaignAnnualTouchAudienceService::MODES)],
+            'audience_criteria' => ['nullable', 'array'],
+            'audience_criteria.*' => ['nullable', 'array'],
+            'audience_criteria.*.*' => ['string', 'max:191'],
+            'audience_contact_ids' => ['nullable', 'array', 'max:500'],
+            'audience_contact_ids.*' => ['integer', 'min:1'],
+            'audience_exclude_criteria' => ['nullable', 'array'],
+            'audience_exclude_criteria.*' => ['nullable', 'array'],
+            'audience_exclude_criteria.*.*' => ['string', 'max:191'],
+            'audience_exclude_contact_ids' => ['nullable', 'array', 'max:500'],
+            'audience_exclude_contact_ids.*' => ['integer', 'min:1'],
+        ]);
+
+        $program = isset($validated['program_id'])
+            ? CampaignTouchProgram::query()->find((int) $validated['program_id'])
+            : null;
+
+        $filter = $this->annualTouchAudience->normalize(
+            input: [
+                'mode' => $validated['audience_mode'],
+                'criteria' => $validated['audience_criteria'] ?? [],
+                'contact_ids' => $validated['audience_contact_ids'] ?? [],
+                'exclude_criteria' => $validated['audience_exclude_criteria'] ?? [],
+                'exclude_contact_ids' => $validated['audience_exclude_contact_ids'] ?? [],
+            ],
+            program: $program,
+        );
+
+        return response()->json([
+            'matching_count' => $this->annualTouchAudience->matchingCountForFilter($filter),
+            'summary' => $this->annualTouchAudience->summaryForFilter($filter),
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $validated = $this->validated($request);
@@ -102,8 +142,9 @@ class CampaignAnnualTouchController extends Controller
             $program = CampaignTouchProgram::query()->create([
                 'key' => $this->newProgramKey(),
                 'name' => 'Annual touch-base dates',
-                'audience_type' => CampaignTouchProgram::AUDIENCE_CONTACT_STATUS,
-                'audience_key' => $validated['audience_key'],
+                'audience_type' => CampaignTouchProgram::AUDIENCE_FILTER,
+                'audience_key' => null,
+                'audience_filter' => $validated['audience_filter'],
                 'recurrence' => CampaignTouchProgram::RECURRENCE_ANNUAL,
                 'repeat_years' => (int) $validated['repeat_years'],
                 'starts_on' => $validated['starts_on'] ?? null,
@@ -128,8 +169,9 @@ class CampaignAnnualTouchController extends Controller
 
         DB::transaction(function () use ($campaignTouchProgram, $validated): void {
             $campaignTouchProgram->forceFill([
-                'audience_type' => CampaignTouchProgram::AUDIENCE_CONTACT_STATUS,
-                'audience_key' => $validated['audience_key'],
+                'audience_type' => CampaignTouchProgram::AUDIENCE_FILTER,
+                'audience_key' => null,
+                'audience_filter' => $validated['audience_filter'],
                 'recurrence' => CampaignTouchProgram::RECURRENCE_ANNUAL,
                 'repeat_years' => (int) $validated['repeat_years'],
                 'starts_on' => $validated['starts_on'] ?? null,
@@ -161,14 +203,17 @@ class CampaignAnnualTouchController extends Controller
         ?CampaignTouchProgram $program = null,
     ): array {
         $rules = [
-            'audience_key' => [
-                'required',
-                'string',
-                'max:120',
-                Rule::exists('contact_statuses', 'key')->where(
-                    fn ($query) => $query->where('is_active', true),
-                ),
-            ],
+            'audience_mode' => ['required', Rule::in(CampaignAnnualTouchAudienceService::MODES)],
+            'audience_criteria' => ['nullable', 'array'],
+            'audience_criteria.*' => ['nullable', 'array'],
+            'audience_criteria.*.*' => ['string', 'max:191'],
+            'audience_contact_ids' => ['nullable', 'array', 'max:500'],
+            'audience_contact_ids.*' => ['integer', 'min:1'],
+            'audience_exclude_criteria' => ['nullable', 'array'],
+            'audience_exclude_criteria.*' => ['nullable', 'array'],
+            'audience_exclude_criteria.*.*' => ['string', 'max:191'],
+            'audience_exclude_contact_ids' => ['nullable', 'array', 'max:500'],
+            'audience_exclude_contact_ids.*' => ['integer', 'min:1'],
             'repeat_years' => ['required', 'integer', 'min:1', 'max:50'],
             'starts_on' => ['nullable', 'date'],
             'is_active' => ['nullable', 'boolean'],
@@ -184,6 +229,16 @@ class CampaignAnnualTouchController extends Controller
         ];
 
         $validated = $request->validate($rules);
+        $validated['audience_filter'] = $this->annualTouchAudience->normalize(
+            input: [
+                'mode' => $validated['audience_mode'],
+                'criteria' => $validated['audience_criteria'] ?? [],
+                'contact_ids' => $validated['audience_contact_ids'] ?? [],
+                'exclude_criteria' => $validated['audience_exclude_criteria'] ?? [],
+                'exclude_contact_ids' => $validated['audience_exclude_contact_ids'] ?? [],
+            ],
+            program: $program,
+        );
 
         foreach ($validated['touches'] as $index => $touch) {
             $field = 'touches.'.$index;

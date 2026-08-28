@@ -2,6 +2,8 @@
 ├── app
 │   ├── Console
 │   │   └── Commands
+│   │       ├── EngageDeploymentPlanCommand.php
+│   │       ├── EngageEnvironmentSyncCommand.php
 │   │       ├── EngageInstallCommand.php
 │   │       ├── EngageRefreshCommand.php
 │   │       ├── EngageUserAddCommand.php
@@ -183,6 +185,7 @@
 │   │   │   │   ├── UpdateCampaignScheduleRequest.php
 │   │   │   │   └── UpdateCampaignStepMessageTemplateRequest.php
 │   │   │   ├── Services
+│   │   │   │   ├── CampaignAnnualTouchAudienceService.php
 │   │   │   │   ├── CampaignEligibilityAuthoringService.php
 │   │   │   │   ├── CampaignEligibilityDependencyResolver.php
 │   │   │   │   ├── CampaignEligibilityEvaluator.php
@@ -275,6 +278,8 @@
 │   │   │   │       ├── ContactImportTreatmentResolution.php
 │   │   │   │       ├── ContactImportTreatmentSelection.php
 │   │   │   │       └── ContactPanel.php
+│   │   │   ├── Deployment
+│   │   │   │   └── CoreDeploymentPlanContributor.php
 │   │   │   ├── Enums
 │   │   │   │   └── TagType.php
 │   │   │   ├── Events
@@ -510,6 +515,8 @@
 │   │   │   │   ├── NormalizedFormSubmission.php
 │   │   │   │   ├── NormalizedFormSubmissionValue.php
 │   │   │   │   └── PublishedForm.php
+│   │   │   ├── Deployment
+│   │   │   │   └── FormsDeploymentPlanContributor.php
 │   │   │   ├── Exceptions
 │   │   │   │   ├── FormSubmissionReplayConflictException.php
 │   │   │   │   └── FormSubmissionValidationException.php
@@ -891,6 +898,7 @@
 │   │   │   │   ├── MessageTemplatePresetAssignmentResolver.php
 │   │   │   │   ├── MessageTemplateTokenValidator.php
 │   │   │   │   ├── MessageTemplateUsageResolver.php
+│   │   │   │   ├── MessageTokenFallbackResolver.php
 │   │   │   │   ├── PhoneNumberNormalizer.php
 │   │   │   │   ├── ProviderSubmissionLimiter.php
 │   │   │   │   ├── ReplyProfiles
@@ -1500,10 +1508,24 @@
 │       │   ├── Contracts
 │       │   │   └── DashboardPanelProvider.php
 │       │   └── DashboardPanelRegistry.php
+│       ├── Deployment
+│       │   ├── Contracts
+│       │   │   └── DeploymentPlanContributor.php
+│       │   ├── Data
+│       │   │   ├── DeploymentPlan.php
+│       │   │   ├── EnvironmentRequirement.php
+│       │   │   └── ResolvedEnvironmentRequirement.php
+│       │   ├── DeploymentPlanResolver.php
+│       │   ├── EnvironmentFileRepository.php
+│       │   └── EnvironmentFileSynchronizer.php
 │       ├── DestinationVerification
 │       │   ├── Contracts
 │       │   │   └── DestinationVerificationTransport.php
 │       │   └── UnavailableDestinationVerificationTransport.php
+│       ├── Environment
+│       │   ├── Data
+│       │   │   └── EnvironmentVariableDefinition.php
+│       │   └── EnvironmentVariableCatalog.php
 │       ├── Guidance
 │       │   └── FirstUseGuidance.php
 │       ├── ModuleIntegrations
@@ -1650,6 +1672,7 @@
 │           └── Services
 │               └── WebhookInbox.php
 ├── artisan
+├── BASH-AUDIT.md
 ├── bootstrap
 │   ├── app.php
 │   ├── cache
@@ -1847,7 +1870,8 @@
 │   │   │   │   ├── 2026_08_22_113501_create_campaign_touch_date_tables.php
 │   │   │   │   ├── 2026_08_22_114000_add_campaign_touch_runtime.php
 │   │   │   │   ├── 2026_08_23_203900_add_campaign_eligibility_foundation.php
-│   │   │   │   └── 2026_08_25_220000_decouple_campaign_touch_programs_from_campaigns.php
+│   │   │   │   ├── 2026_08_25_220000_decouple_campaign_touch_programs_from_campaigns.php
+│   │   │   │   └── 2026_08_27_213000_add_audience_filter_to_campaign_touch_programs_table.php
 │   │   │   ├── commerce
 │   │   │   │   ├── 2026_07_02_000005_create_commerce_customers_table.php
 │   │   │   │   ├── 2026_07_02_000006_create_commerce_products_table.php
@@ -1980,6 +2004,7 @@
 │   ├── automation-opportunities.md
 │   ├── config-templates
 │   │   ├── campaign-presets-template.php
+│   │   ├── client-environment.example
 │   │   ├── client-request-intake-template.md
 │   │   ├── contact-status-presets-template.php
 │   │   ├── flow-routes-template.php
@@ -2085,6 +2110,7 @@
 │   │   ├── client-third-party-services-checklist.md
 │   │   ├── crm-user-administration.md
 │   │   ├── deployment-command-workflow.md
+│   │   ├── deployment-plan-and-environment.md
 │   │   ├── deployment-safety-and-troubleshooting.md
 │   │   ├── launch-client-environment.example.conf
 │   │   ├── observability
@@ -2419,6 +2445,7 @@
 │   │   │   ├── MarkBroadcastRecipientTerminalStatusTest.php
 │   │   │   └── ScheduleBroadcastActionTest.php
 │   │   ├── Campaigns
+│   │   │   ├── CampaignAnnualTouchAudienceServiceTest.php
 │   │   │   ├── CampaignAnnualTouchAuthoringTest.php
 │   │   │   ├── CampaignAnnualTouchRuntimeTest.php
 │   │   │   ├── CampaignAutomaticEligibilityImportLaunchTest.php
@@ -2507,6 +2534,11 @@
 │   │   │   ├── UpdateContactStatusActionTest.php
 │   │   │   ├── WebinarSeriesAuthoringGuardTest.php
 │   │   │   └── WebinarSyncTest.php
+│   │   ├── Deployment
+│   │   │   ├── DeploymentPlanRegistrationTest.php
+│   │   │   ├── DeploymentPlanResolverTest.php
+│   │   │   ├── EnvironmentFileSynchronizerTest.php
+│   │   │   └── EnvironmentVariableCatalogTest.php
 │   │   ├── Documents
 │   │   │   └── DocumentsFoundationTest.php
 │   │   ├── Email
@@ -2556,6 +2588,7 @@
 │   │   │   ├── ExternalPublishedFormTest.php
 │   │   │   ├── FormConfigContractTest.php
 │   │   │   ├── FormPresetSyncTest.php
+│   │   │   ├── FormsDeploymentPlanContributorTest.php
 │   │   │   ├── FormsFoundationTest.php
 │   │   │   ├── FormsSetupValidationContributorTest.php
 │   │   │   ├── FormsSurfaceTest.php
@@ -2668,8 +2701,10 @@
 │   │   │   ├── MessageTemplateTokenValidatorTest.php
 │   │   │   ├── MessageTemplateUsageResolverTest.php
 │   │   │   ├── MessageTemplateVersionPersistenceTest.php
+│   │   │   ├── MessageTokenFallbackResolverTest.php
 │   │   │   ├── MessagingSetupValidationContributorTest.php
 │   │   │   ├── ProviderSubmissionLimiterTest.php
+│   │   │   ├── PublishMessageTemplatePresetOverrideActionTest.php
 │   │   │   ├── QueueContractTest.php
 │   │   │   ├── ReplyProfileSetupValidationTest.php
 │   │   │   ├── ResolvedMessageDispatchBuilderTest.php
@@ -2925,4 +2960,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-696 directories, 2230 files
+704 directories, 2257 files
