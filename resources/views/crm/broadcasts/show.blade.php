@@ -1,3 +1,6 @@
+@php
+    $clientTimezone = config('client.timezone', config('app.timezone', 'UTC'));
+@endphp
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
@@ -267,7 +270,7 @@
                                 <dl class="mt-3 grid grid-cols-2 gap-3 text-xs">
                                     <div>
                                         <dt class="font-semibold uppercase tracking-wide text-slate-400">Sent</dt>
-                                        <dd class="mt-1 text-sm text-slate-700">{{ $recipient->sent_at?->format('M j, Y g:i A') ?? '—' }}</dd>
+                                        <dd class="mt-1 text-sm text-slate-700">{{ $recipient->sent_at?->setTimezone($clientTimezone)->format('M j, Y g:i A') ?? '—' }}</dd>
                                     </div>
                                     <div>
                                         <dt class="font-semibold uppercase tracking-wide text-slate-400">Reason</dt>
@@ -326,7 +329,7 @@
                                         </td>
 
                                         <td class="px-6 py-4 text-slate-600">
-                                            {{ $recipient->sent_at?->format('M j, Y g:i A') ?? '—' }}
+                                            {{ $recipient->sent_at?->setTimezone($clientTimezone)->format('M j, Y g:i A') ?? '—' }}
                                         </td>
 
                                         <td class="px-6 py-4 text-slate-600">
@@ -379,7 +382,7 @@
 
                         <div class="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
                             <dt class="text-slate-500">Send At</dt>
-                            <dd class="break-words font-medium text-slate-900 sm:text-right">{{ $broadcast->send_at?->format('M j, Y g:i A') ?? 'Not scheduled' }}</dd>
+                            <dd class="break-words font-medium text-slate-900 sm:text-right">{{ $broadcast->send_at?->setTimezone($clientTimezone)->format('M j, Y g:i A') ?? 'Not scheduled' }}</dd>
                         </div>
 
                         <div class="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
@@ -409,7 +412,7 @@
 
                         <div class="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
                             <dt class="text-slate-500">Completed</dt>
-                            <dd class="break-words font-medium text-slate-900 sm:text-right">{{ $broadcast->completed_at?->format('M j, Y g:i A') ?? '—' }}</dd>
+                            <dd class="break-words font-medium text-slate-900 sm:text-right">{{ $broadcast->completed_at?->setTimezone($clientTimezone)->format('M j, Y g:i A') ?? '—' }}</dd>
                         </div>
                     </dl>
                 </x-ui.card>
@@ -448,7 +451,7 @@
                                             </div>
 
                                             <div class="mt-1 text-xs text-slate-500">
-                                                {{ $importBatch->imported_at?->format('M j, Y g:i A') ?? 'No import date' }}
+                                                {{ $importBatch->imported_at?->setTimezone($clientTimezone)->format('M j, Y g:i A') ?? 'No import date' }}
                                                 · {{ $importBatch->successful_count }} successful
                                                 · {{ $importBatch->failed_count }} failed
                                             </div>
@@ -520,7 +523,7 @@
                                 </div>
 
                                 <div class="mt-1 text-xs text-slate-500">
-                                    {{ $scheduledMessage->send_at?->format('M j, Y g:i A') }}
+                                    {{ $scheduledMessage->send_at?->setTimezone($clientTimezone)->format('M j, Y g:i A') }}
                                 </div>
                             </div>
                         @empty

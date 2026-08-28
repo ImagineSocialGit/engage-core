@@ -1,3 +1,6 @@
+@php
+    $clientTimezone = config('client.timezone', config('app.timezone', 'UTC'));
+@endphp
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
@@ -526,7 +529,7 @@
                                 </div>
                                 <div>
                                     <dt class="font-semibold uppercase tracking-wide text-slate-400">Send time</dt>
-                                    <dd class="mt-1 text-sm text-slate-700">{{ $broadcast->send_at?->format('M j, Y g:i A') ?? 'Not scheduled' }}</dd>
+                                    <dd class="mt-1 text-sm text-slate-700">{{ $broadcast->send_at?->setTimezone($clientTimezone)->format('M j, Y g:i A') ?? 'Not scheduled' }}</dd>
                                 </div>
                             </dl>
                         </a>
@@ -579,7 +582,7 @@
                                     </td>
 
                                     <td class="px-6 py-4 text-slate-600">
-                                        {{ $broadcast->send_at?->format('M j, Y g:i A') ?? 'Not scheduled' }}
+                                        {{ $broadcast->send_at?->setTimezone($clientTimezone)->format('M j, Y g:i A') ?? 'Not scheduled' }}
                                     </td>
                                 </tr>
                             @empty
@@ -633,7 +636,7 @@
                                 </div>
                                 <div>
                                     <dt class="font-semibold uppercase tracking-wide text-slate-400">Send time</dt>
-                                    <dd class="mt-1 text-sm text-slate-700">{{ $broadcast->send_at?->format('M j, Y g:i A') ?? 'Not scheduled' }}</dd>
+                                    <dd class="mt-1 text-sm text-slate-700">{{ $broadcast->send_at?->setTimezone($clientTimezone)->format('M j, Y g:i A') ?? 'Not scheduled' }}</dd>
                                 </div>
                             </dl>
                         </a>
@@ -682,7 +685,7 @@
                                     </td>
 
                                     <td class="px-6 py-4 text-slate-600">
-                                        {{ $broadcast->send_at?->format('M j, Y g:i A') ?? 'Not scheduled' }}
+                                        {{ $broadcast->send_at?->setTimezone($clientTimezone)->format('M j, Y g:i A') ?? 'Not scheduled' }}
                                     </td>
                                 </tr>
                             @empty
