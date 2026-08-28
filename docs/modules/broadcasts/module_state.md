@@ -19,6 +19,12 @@ The broader Broadcast content refactor remains future work. `broadcasts.payload`
 
 Current CRM authoring now supports explicit reusable-copy promotion without performing that persistence cutover. A regular Broadcast can be saved into Messaging's existing Message Templates catalog, which creates the canonical reusable `MessageTemplate` / immutable version and catalog presentation. Future Broadcasts may load a copy of the latest published reusable version into their current draft. The Broadcast still owns its current runtime `payload` until the separate persistence refactor is performed.
 
+Regular Broadcast authoring also has an executable `broadcast_send` token context. It exposes only Contact fields that the current Messaging recipient-payload path actually materializes for Broadcast delivery: first name, last name, full name, email, phone, source, and subsource. The CRM editor presents those registered fields, validates submitted copy through Messaging's `MessageTemplateTokenValidator`, and stores any explicit `token_fallbacks` beside the current Broadcast copy. Unknown or context-incompatible fields are rejected before the Broadcast can be scheduled.
+
+Personalization remains Messaging-owned at runtime. Broadcasts selects recipients and supplies the same tokenized payload to `DispatchMessageAction`; Messaging resolves Contact values independently for each recipient ScheduledMessage and applies the shared missing-field contract (`required`, `fallback_value`, or `replace_segment`) before provider rendering. A legacy/stale draft that somehow contains an invalid token is revalidated by `ScheduleBroadcastAction` before recipient snapshotting, so an unsafe draft cannot partially materialize a recipient set.
+
+The reusable-message seam preserves this behavior: saving a Broadcast to Message Templates carries its `token_fallbacks` into the immutable Messaging version, and `ReusableMessageTemplateCatalog` returns those rules when a later Broadcast starts from that saved message. Permission invitations remain a separate Messaging-owned special path and do not use the regular Broadcast token editor.
+
 ## Responsibility
 
 Broadcasts owns one-time and batch sends.

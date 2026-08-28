@@ -8,6 +8,8 @@ use App\Modules\Messaging\Actions\CreateReusableMessageTemplateAction;
 use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
+use App\Modules\Messaging\Services\MessageTokenFallbackResolver;
+use App\Modules\Messaging\Services\ReusableMessageTemplateCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -81,6 +83,54 @@ class BroadcastMessageReuseTest extends TestCase
             ->get(route('crm.broadcasts.index'))
             ->assertOk()
             ->assertSee('VA Realtor Myth — Reusable');
+    }
+
+    public function test_saved_broadcast_message_preserves_missing_field_behavior_when_loaded_for_reuse(): void
+    {
+        $user = User::factory()->create();
+        $broadcast = Broadcast::factory()->create([
+            'name' => 'Personalized Update',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'dispatch_key' => Broadcast::DEFAULT_DISPATCH_KEY,
+            'message_type' => Broadcast::DEFAULT_MESSAGE_TYPE,
+            'payload' => [
+                'subject' => 'A note for {first_name}',
+                'body' => 'Hey {first_name}, here is the update.',
+                'token_fallbacks' => [[
+                    'token' => 'first_name',
+                    'missing_behavior' => MessageTokenFallbackResolver::BEHAVIOR_FALLBACK_VALUE,
+                    'fallback' => 'there',
+                ]],
+            ],
+            'meta' => [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_REGULAR,
+            ],
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->post(route('crm.broadcasts.save-message-template', $broadcast), [
+                'name' => 'Personalized Reusable Update',
+            ])
+            ->assertRedirect(route('crm.broadcasts.show', $broadcast))
+            ->assertSessionHas('success');
+
+        $definition = collect(app(ReusableMessageTemplateCatalog::class)->definitions(
+            channels: ['email'],
+            purpose: 'marketing',
+            selectionContext: 'broadcasts',
+        ))->sole();
+
+        $this->assertEquals(
+            $broadcast->payload['token_fallbacks'],
+            $definition['payload']['token_fallbacks'],
+        );
+        $this->assertSame(
+            'Hey {first_name}, here is the update.',
+            $definition['payload']['body'],
+        );
     }
 
     public function test_make_new_broadcast_copies_message_but_resets_audience_and_send_state(): void

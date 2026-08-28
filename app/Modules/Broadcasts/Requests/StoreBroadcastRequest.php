@@ -4,13 +4,16 @@ namespace App\Modules\Broadcasts\Requests;
 
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
+use App\Modules\Broadcasts\Services\BroadcastMessageTokenValidator;
 use App\Modules\Core\Requests\Concerns\NormalizesContactFilter;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
+use App\Modules\Messaging\Services\MessageTokenFallbackResolver;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Validator;
 
 class StoreBroadcastRequest extends FormRequest
 {
@@ -48,6 +51,22 @@ class StoreBroadcastRequest extends FormRequest
                 'string',
                 'max:1600',
             ],
+            'token_fallbacks_present' => ['nullable', 'boolean'],
+            'token_fallbacks' => ['nullable', 'array', 'max:50'],
+            'token_fallbacks.*' => ['required', 'array'],
+            'token_fallbacks.*.token' => [
+                'required',
+                'string',
+                'max:191',
+                'regex:/^[a-zA-Z_][a-zA-Z0-9_.:-]*$/',
+            ],
+            'token_fallbacks.*.missing_behavior' => [
+                'required',
+                'string',
+                Rule::in(MessageTokenFallbackResolver::BEHAVIORS),
+            ],
+            'token_fallbacks.*.fallback' => ['nullable', 'string', 'max:2000'],
+            'token_fallbacks.*.segment' => ['nullable', 'string', 'max:5000'],
             'send_at' => ['nullable', 'date'],
             'exclude_broadcast_ids' => ['nullable', 'array'],
             'exclude_broadcast_ids.*' => ['integer', 'exists:broadcasts,id'],
@@ -62,6 +81,35 @@ class StoreBroadcastRequest extends FormRequest
             idsField: 'contact_ids',
             criteriaField: 'recipient_criteria',
         ));
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            if ($validator->errors()->isNotEmpty() || ! $this->isRegularBroadcastRequest()) {
+                return;
+            }
+
+            $channel = $this->regularBroadcastChannelInput();
+            $payload = $this->regularBroadcastPayloadFromInput($channel);
+            $issues = app(BroadcastMessageTokenValidator::class)->issues(
+                payload: $payload,
+                channel: $channel,
+            );
+
+            foreach ($issues as $issue) {
+                if (($issue['level'] ?? null) !== 'error') {
+                    continue;
+                }
+
+                $validator->errors()->add(
+                    $this->formErrorPath($issue['path'] ?? null),
+                    is_string($issue['message'] ?? null) && trim($issue['message']) !== ''
+                        ? trim($issue['message'])
+                        : 'The Broadcast message contains an invalid dynamic field.',
+                );
+            }
+        });
     }
 
     /**
@@ -284,16 +332,104 @@ class StoreBroadcastRequest extends FormRequest
     */
     private function regularBroadcastPayload(string $channel, array $validated): array
     {
-        if ($channel === 'sms') {
-            return [
-                'message' => $validated['message'],
+        $payload = $channel === 'sms'
+            ? ['message' => $validated['message']]
+            : [
+                'subject' => $validated['subject'],
+                'body' => $validated['body'],
             ];
+
+        if (! $this->hasTokenFallbackSubmission($validated)) {
+            return $payload;
         }
 
-        return [
-            'subject' => $validated['subject'],
-            'body' => $validated['body'],
-        ];
+        $candidate = $payload;
+        $candidate['token_fallbacks'] = array_values(
+            is_array($validated['token_fallbacks'] ?? null)
+                ? $validated['token_fallbacks']
+                : [],
+        );
+
+        $policies = app(MessageTokenFallbackResolver::class)->policies($candidate);
+
+        if ($policies !== []) {
+            $payload['token_fallbacks'] = $policies;
+        }
+
+        return $payload;
+    }
+
+    /** @return array<string, mixed> */
+    private function regularBroadcastPayloadFromInput(string $channel): array
+    {
+        $payload = $channel === 'sms'
+            ? ['message' => (string) $this->input('message', '')]
+            : [
+                'subject' => (string) $this->input('subject', ''),
+                'body' => (string) $this->input('body', ''),
+            ];
+
+        if ($this->hasTokenFallbackSubmission($this->all())) {
+            $payload['token_fallbacks'] = $this->tokenFallbackInputForValidation();
+        }
+
+        return $payload;
+    }
+
+    /** @return array<int, mixed> */
+    private function tokenFallbackInputForValidation(): array
+    {
+        $raw = $this->input('token_fallbacks', []);
+
+        if (! is_array($raw) || ! array_is_list($raw)) {
+            return is_array($raw) ? $raw : [];
+        }
+
+        return array_map(function (mixed $policy): mixed {
+            if (! is_array($policy)) {
+                return $policy;
+            }
+
+            $behavior = is_string($policy['missing_behavior'] ?? null)
+                ? trim($policy['missing_behavior'])
+                : null;
+
+            if (in_array($behavior, [
+                MessageTokenFallbackResolver::BEHAVIOR_FALLBACK_VALUE,
+                MessageTokenFallbackResolver::BEHAVIOR_REPLACE_SEGMENT,
+            ], true) && ! is_string($policy['fallback'] ?? null)) {
+                $policy['fallback'] = '';
+            }
+
+            return $policy;
+        }, $raw);
+    }
+
+    /** @param array<string, mixed> $values */
+    private function hasTokenFallbackSubmission(array $values): bool
+    {
+        if (array_key_exists('token_fallbacks', $values)) {
+            return true;
+        }
+
+        return in_array(
+            $values['token_fallbacks_present'] ?? null,
+            [true, 1, '1', 'true', 'on'],
+            true,
+        );
+    }
+
+    private function formErrorPath(mixed $path): string
+    {
+        if (! is_string($path) || trim($path) === '') {
+            return 'body';
+        }
+
+        $path = trim($path);
+
+        return str_starts_with($path, 'payload.')
+            ? substr($path, strlen('payload.'))
+            : $path;
     }
 
     /**

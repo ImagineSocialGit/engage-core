@@ -14,3 +14,4 @@
 - [x] Refine the guided authoring sequence: recipients -> preview -> channel/content -> duplicate protection/review -> schedule/send.
 - [x] Add `Make a new Broadcast from this` with a clean WHO/timing reset; do not persist clone lineage without a proven audit/product need.
 - [x] Let regular Broadcast copy be explicitly saved into Messaging's existing reusable Message Templates catalog and loaded into later Broadcast drafts.
+- [x] Add Contact-field personalization to regular Broadcast authoring through the registered `broadcast_send` token context, including 23C1 missing-field behavior and reusable-template preservation.

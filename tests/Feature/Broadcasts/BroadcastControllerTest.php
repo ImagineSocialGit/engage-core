@@ -256,6 +256,47 @@ class BroadcastControllerTest extends TestCase
         $this->assertEquals(['homebuyer'], $broadcast->recipient_filter['tags']);
     }
 
+    public function test_zero_message_schedule_is_not_reported_as_a_success(): void
+    {
+        $user = User::factory()->create();
+
+        $this->mock(ScheduleBroadcastAction::class)
+            ->shouldReceive('handle')
+            ->once()
+            ->andReturnUsing(function (Broadcast $broadcast): Broadcast {
+                $broadcast->forceFill([
+                    'status' => Broadcast::STATUS_COMPLETED,
+                    'recipient_count' => 1,
+                    'scheduled_count' => 0,
+                    'completed_at' => now(),
+                    'meta' => array_replace_recursive($broadcast->meta ?? [], [
+                        'scheduling' => [
+                            'outcome' => 'no_messages_scheduled',
+                        ],
+                    ]),
+                ])->save();
+
+                return $broadcast->refresh();
+            });
+
+        $response = $this
+            ->actingAs($user)
+            ->post(route('crm.broadcasts.store'), [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_REGULAR,
+                'intent' => 'schedule',
+                'name' => 'Blocked update',
+                'subject' => 'This week',
+                'body' => 'Here is the update.',
+                'recipient_filter_type' => 'all',
+            ]);
+
+        $broadcast = Broadcast::query()->sole();
+
+        $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
+        $response->assertSessionHas('error');
+        $response->assertSessionMissing('success');
+    }
+
     public function test_regular_broadcast_form_hides_sms_when_sms_is_not_visible_for_broadcasts(): void
     {
         $user = User::factory()->create();

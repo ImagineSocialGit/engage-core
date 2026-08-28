@@ -21,6 +21,7 @@ use App\Modules\Core\Support\Contacts\ContactFilterCriterionRegistry;
 use App\Modules\Messaging\Actions\CreateReusableMessageTemplateAction;
 use App\Modules\Messaging\Data\ReusableMessageTemplateAuthoringContext;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
+use App\Modules\Messaging\Services\MessageTemplateAuthoringFieldPresenter;
 use App\Modules\Messaging\Services\ReusableMessageTemplateCatalog;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
@@ -39,6 +40,7 @@ class BroadcastController extends Controller
         private readonly BroadcastAudiencePreviewService $broadcastAudiencePreview,
         private readonly MessageChannelAvailability $messageChannelAvailability,
         private readonly ReusableMessageTemplateCatalog $reusableMessageTemplates,
+        private readonly MessageTemplateAuthoringFieldPresenter $messageTemplateAuthoringFields,
     ) {}
 
     public function index(Request $request): View
@@ -57,6 +59,9 @@ class BroadcastController extends Controller
                 channels: $this->availableRegularBroadcastChannels(),
                 purpose: 'marketing',
                 selectionContext: 'broadcasts',
+            ),
+            'broadcastMessageFields' => $this->messageTemplateAuthoringFields->groupsForContext(
+                Broadcast::DEFAULT_DISPATCH_KEY,
             ),
             'audienceCriteria' => $this->contactFilterCriteria->definitions(),
             'permissionInvitationPreview' => $this->newPermissionInvitationPreview($request),
@@ -99,13 +104,15 @@ class BroadcastController extends Controller
                 }
             }
 
-            $broadcast = $scheduleBroadcastAction->handle($broadcast);
+            try {
+                $broadcast = $scheduleBroadcastAction->handle($broadcast);
+            } catch (InvalidArgumentException $exception) {
+                return redirect()
+                    ->route('crm.broadcasts.edit', $broadcast)
+                    ->with('error', $exception->getMessage());
+            }
 
-            return redirect()
-                ->route('crm.broadcasts.show', $broadcast)
-                ->with('success', $broadcast->isPermissionInvitation()
-                    ? 'Opt-in invitation scheduled. Each imported contact can only receive this invitation once.'
-                    : 'Broadcast scheduled. Immediate sends use a 5-minute safety buffer.');
+            return $this->scheduledBroadcastRedirect($broadcast);
         }
 
         return redirect()
@@ -224,6 +231,9 @@ class BroadcastController extends Controller
                 purpose: 'marketing',
                 selectionContext: 'broadcasts',
             ),
+            'broadcastMessageFields' => $broadcast->isRegularBroadcast()
+                ? $this->messageTemplateAuthoringFields->groupsForContext(Broadcast::DEFAULT_DISPATCH_KEY)
+                : [],
             'audienceCriteria' => $this->contactFilterCriteria->definitions(),
             'selectedRecipientContacts' => $this->selectedContactOptions(
                 session()->getOldInput('contact_ids', $broadcast->recipient_filter['contact_ids'] ?? []),
@@ -295,13 +305,15 @@ class BroadcastController extends Controller
             }
         }
 
-        $broadcast = $scheduleBroadcastAction->handle($broadcast);
+        try {
+            $broadcast = $scheduleBroadcastAction->handle($broadcast);
+        } catch (InvalidArgumentException $exception) {
+            return redirect()
+                ->route('crm.broadcasts.edit', $broadcast)
+                ->with('error', $exception->getMessage());
+        }
 
-        return redirect()
-            ->route('crm.broadcasts.show', $broadcast)
-            ->with('success', $broadcast->isPermissionInvitation()
-                ? 'Opt-in invitation scheduled. Each imported contact can only receive this invitation once.'
-                : 'Broadcast scheduled. Immediate sends use a 5-minute safety buffer.');
+        return $this->scheduledBroadcastRedirect($broadcast);
     }
 
     public function cancel(
@@ -498,6 +510,34 @@ class BroadcastController extends Controller
             selectionContexts: ['broadcasts', 'campaign_annual_touch'],
             description: 'Reusable CRM-authored Broadcast message.',
         );
+    }
+
+
+    private function scheduledBroadcastRedirect(Broadcast $broadcast): RedirectResponse
+    {
+        $redirect = redirect()->route('crm.broadcasts.show', $broadcast);
+
+        if ($broadcast->isPermissionInvitation()) {
+            return $redirect->with(
+                'success',
+                'Opt-in invitation scheduled. Each imported contact can only receive this invitation once.',
+            );
+        }
+
+        return match (data_get($broadcast->meta, 'scheduling.outcome')) {
+            'no_eligible_recipients' => $redirect->with(
+                'error',
+                'No recipients matched this Broadcast audience.',
+            ),
+            'no_messages_scheduled' => $redirect->with(
+                'error',
+                'No messages were scheduled. None of the selected recipients could receive this message. Review the recipient reasons below.',
+            ),
+            default => $redirect->with(
+                'success',
+                'Broadcast scheduled. Immediate sends use a 5-minute safety buffer.',
+            ),
+        };
     }
 
     /**

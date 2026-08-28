@@ -135,14 +135,21 @@
                         }
 
                         const payload = selected.payload || {};
+                        const announceTemplate = () => window.dispatchEvent(
+                            new CustomEvent('broadcast-message-template-applied', {
+                                detail: { tokenFallbacks: payload.token_fallbacks || [] },
+                            }),
+                        );
 
                         if (this.channel === 'sms') {
                             this.message = payload.message || '';
+                            queueMicrotask(announceTemplate);
                             return;
                         }
 
                         this.subject = payload.subject || '';
                         this.body = payload.body || '';
+                        queueMicrotask(announceTemplate);
                     },
                 }"
             >
@@ -174,7 +181,7 @@
                                 id="channel"
                                 name="channel"
                                 x-model="channel"
-                                x-on:change="selectedReusableMessageId = ''"
+                                x-on:change="selectedReusableMessageId = ''; window.dispatchEvent(new CustomEvent('broadcast-message-template-applied', { detail: { tokenFallbacks: [] } }))"
                             >
                                 @foreach($availableBroadcastChannels as $availableBroadcastChannel)
                                     <option
@@ -270,6 +277,13 @@
 
                         <x-ui.form.error name="message" />
                     </div>
+                @endif
+
+                @if(! $broadcast->isPermissionInvitation())
+                    @include('crm.broadcasts.partials.message-personalization', [
+                        'broadcastMessageFields' => $broadcastMessageFields,
+                        'initialTokenFallbacks' => old('token_fallbacks', $broadcast->payload['token_fallbacks'] ?? []),
+                    ])
                 @endif
 
                 @if($broadcast->isPermissionInvitation())

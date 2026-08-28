@@ -5,6 +5,7 @@ namespace App\Modules\Broadcasts\Actions;
 use App\Modules\Broadcasts\Jobs\ScheduleBroadcastChunkJob;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
+use App\Modules\Broadcasts\Services\BroadcastMessageTokenValidator;
 use App\Modules\Broadcasts\Services\BroadcastRecipientResolver;
 use App\Modules\Messaging\Services\BulkMessageDeliveryPolicy;
 use Illuminate\Support\Carbon;
@@ -18,6 +19,7 @@ class ScheduleBroadcastAction
         private readonly BroadcastRecipientResolver $recipientResolver,
         private readonly ScheduleBroadcastRecipientChunkAction $scheduleRecipientChunk,
         private readonly BulkMessageDeliveryPolicy $bulkDeliveryPolicy,
+        private readonly BroadcastMessageTokenValidator $messageTokenValidator,
     ) {}
 
     public function handle(Broadcast $broadcast): Broadcast
@@ -26,6 +28,8 @@ class ScheduleBroadcastAction
             $broadcast = Broadcast::query()
                 ->lockForUpdate()
                 ->findOrFail($broadcast->getKey());
+
+            $this->messageTokenValidator->assertBroadcastValid($broadcast);
 
             $sendAt = $this->resolveSendAt($broadcast);
             $eligibleRecipientCount = $this->recipientResolver->count($broadcast);

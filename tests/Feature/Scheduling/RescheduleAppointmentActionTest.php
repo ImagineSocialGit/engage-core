@@ -53,7 +53,7 @@ class RescheduleAppointmentActionTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_reschedule_atomically_replaces_the_appointment_and_preserves_vertical_identity(): void
+    public function test_reschedule_atomically_replaces_the_appointment_preserves_vertical_identity_and_uses_the_new_location(): void
     {
         [$service, $originalHost] = $this->hostedService([
             'requires_confirmation' => false,
@@ -89,8 +89,19 @@ class RescheduleAppointmentActionTest extends TestCase
             'status' => Appointment::STATUS_CONFIRMED,
             'title' => 'Pet consultation',
             'description' => 'Original appointment snapshot.',
-            'location_type' => 'onsite',
-            'location_details' => ['room' => 'A'],
+            'location_type' => BookableService::LOCATION_TYPE_FIXED,
+            'location_details' => [
+                'label' => 'Main office',
+                'address' => [
+                    'address_line_1' => '50 Office Plaza',
+                    'address_line_2' => null,
+                    'city' => 'Denver',
+                    'region' => 'CO',
+                    'postal_code' => '80205',
+                    'country' => 'US',
+                    'formatted_address' => '50 Office Plaza, Denver, CO 80205, US',
+                ],
+            ],
             'timezone' => 'America/Chicago',
             'starts_at' => CarbonImmutable::parse('2026-07-28 09:00:00', 'UTC'),
             'ends_at' => CarbonImmutable::parse('2026-07-28 10:00:00', 'UTC'),
@@ -130,6 +141,20 @@ class RescheduleAppointmentActionTest extends TestCase
             startsAt: '2026-07-28 11:00:00',
             idempotencyKey: 'atomic-reschedule',
         );
+        $this->assertSame(
+            BookableService::LOCATION_TYPE_FIXED,
+            $original->location_type,
+        );
+        $this->assertSame(
+            '50 Office Plaza, Denver, CO 80205, US',
+            data_get($original->location_details, 'address.formatted_address'),
+        );
+
+        $this->assertSame(
+            BookableService::LOCATION_TYPE_PHONE,
+            $hold->location_type,
+        );
+        $this->assertNull($hold->location_details);
         $occurredAt = CarbonImmutable::now('UTC');
         $data = new AppointmentRescheduleData(
             holdId: $hold->hold_id,
@@ -161,8 +186,11 @@ class RescheduleAppointmentActionTest extends TestCase
         $this->assertNull($replacement->confirmed_at);
         $this->assertSame('Pet consultation', $replacement->title);
         $this->assertSame('Original appointment snapshot.', $replacement->description);
-        $this->assertSame('onsite', $replacement->location_type);
-        $this->assertSame(['room' => 'A'], $replacement->location_details);
+        $this->assertSame(
+            BookableService::LOCATION_TYPE_PHONE,
+            $replacement->location_type,
+        );
+        $this->assertNull($replacement->location_details);
         $this->assertSame('America/Chicago', $replacement->timezone);
         $this->assertTrue($replacement->starts_at->equalTo(
             CarbonImmutable::parse('2026-07-28 11:00:00', 'UTC'),

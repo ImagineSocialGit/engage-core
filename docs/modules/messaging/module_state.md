@@ -1326,6 +1326,10 @@ allowlist. Owning modules continue to contribute `TokenSourceProvider` and
 Blade component and handle the emitted insertion event in their local editor. Creation and
 update paths must still validate submitted copy through `MessageTemplateTokenValidator`.
 
+Broadcasts registers `broadcast_send` as one of those executable contexts. The context is deliberately limited to Contact values already materialized by `MessageRecipientPayloadResolver`; the Broadcast editor does not expose a field merely because a wider Core token source exists. Regular Broadcast copy is still transitional inline payload, but it uses the same token validation and `MessageTokenFallbackResolver` semantics as immutable templates. Scheduling performs a final validation before Broadcast recipient snapshotting.
+
+`CreateReusableMessageTemplateAction` and `ReusableMessageTemplateCatalog` preserve `token_fallbacks` along with subject/body/message copy. This is required for Broadcast promotion/reuse: a saved personalized message must not lose the missing-field behavior that made its copy safe. The reusable template's immutable version remains the canonical copy for the library item; loading it into a Broadcast creates a draft copy and does not mutate the saved template.
+
 ## Completed refactor boundary and remaining work
 
 The 15A/15B implementation sequence is complete for the core Messaging persistence contract:

@@ -39,7 +39,7 @@ class MessageTokenFallbackResolverTest extends TestCase
             'token_fallbacks' => [[
                 'token' => 'first_name',
                 'missing_behavior' => MessageTokenFallbackResolver::BEHAVIOR_REPLACE_SEGMENT,
-                'segment' => 'Hey {first_name}, ',
+                'segment' => 'Hey {first_name},',
                 'fallback' => '',
             ]],
         ]);

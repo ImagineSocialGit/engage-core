@@ -264,7 +264,29 @@ class MessageTokenFallbackResolver
         string $replacement,
     ): mixed {
         if (is_string($value)) {
-            return str_replace($segment, $replacement, $value);
+            if ($replacement !== '') {
+                return str_replace($segment, $replacement, $value);
+            }
+
+            $quotedSegment = preg_quote($segment, '/');
+
+            if (preg_match('/[ \t]$/u', $segment) !== 1) {
+                $value = preg_replace(
+                    '/'.$quotedSegment.'[ \t]/u',
+                    '',
+                    $value,
+                ) ?? $value;
+            }
+
+            if (preg_match('/^[ \t]/u', $segment) !== 1) {
+                $value = preg_replace(
+                    '/[ \t]'.$quotedSegment.'/u',
+                    '',
+                    $value,
+                ) ?? $value;
+            }
+
+            return str_replace($segment, '', $value);
         }
 
         if (! is_array($value)) {

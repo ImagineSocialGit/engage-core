@@ -155,15 +155,19 @@ class ReusableMessageTemplateCatalog
      */
     private function payloadForChannel(string $channel, array $payload): array
     {
-        if ($channel === 'sms') {
-            return [
+        $normalized = $channel === 'sms'
+            ? [
                 'message' => is_string($payload['message'] ?? null) ? $payload['message'] : '',
+            ]
+            : [
+                'subject' => is_string($payload['subject'] ?? null) ? $payload['subject'] : '',
+                'body' => is_string($payload['body'] ?? null) ? $payload['body'] : '',
             ];
+
+        if (is_array($payload['token_fallbacks'] ?? null)) {
+            $normalized['token_fallbacks'] = array_values($payload['token_fallbacks']);
         }
 
-        return [
-            'subject' => is_string($payload['subject'] ?? null) ? $payload['subject'] : '',
-            'body' => is_string($payload['body'] ?? null) ? $payload['body'] : '',
-        ];
+        return $normalized;
     }
 }

@@ -8,6 +8,7 @@ use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
+use App\Modules\Messaging\Services\MessageTokenFallbackResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -19,6 +20,7 @@ class CreateReusableMessageTemplateAction
     public function __construct(
         private readonly PublishMessageTemplateVersionAction $publishMessageTemplateVersion,
         private readonly MessageTemplateTokenValidator $messageTemplateTokenValidator,
+        private readonly MessageTokenFallbackResolver $messageTokenFallbackResolver,
     ) {}
 
     /**
@@ -66,6 +68,16 @@ class CreateReusableMessageTemplateAction
             $message = $errors[0]['message'] ?? 'Reusable message template contains an invalid token.';
 
             throw new InvalidArgumentException(is_string($message) ? $message : 'Reusable message template contains an invalid token.');
+        }
+
+        if (array_key_exists('token_fallbacks', $payload)) {
+            $policies = $this->messageTokenFallbackResolver->policies($payload);
+
+            if ($policies === []) {
+                unset($payload['token_fallbacks']);
+            } else {
+                $payload['token_fallbacks'] = $policies;
+            }
         }
 
         return DB::transaction(function () use (
@@ -273,10 +285,16 @@ class CreateReusableMessageTemplateAction
                 throw new InvalidArgumentException('Reusable email templates require a subject and body.');
             }
 
-            return [
+            $normalized = [
                 'subject' => $subject,
                 'body' => $body,
             ];
+
+            if (array_key_exists('token_fallbacks', $payload)) {
+                $normalized['token_fallbacks'] = $payload['token_fallbacks'];
+            }
+
+            return $normalized;
         }
 
         if ($channel === 'sms') {
@@ -286,9 +304,15 @@ class CreateReusableMessageTemplateAction
                 throw new InvalidArgumentException('Reusable SMS templates require message copy.');
             }
 
-            return [
+            $normalized = [
                 'message' => $message,
             ];
+
+            if (array_key_exists('token_fallbacks', $payload)) {
+                $normalized['token_fallbacks'] = $payload['token_fallbacks'];
+            }
+
+            return $normalized;
         }
 
         throw new InvalidArgumentException("Reusable message template channel [{$channel}] is not supported.");

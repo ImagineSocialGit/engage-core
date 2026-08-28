@@ -228,6 +228,12 @@
                         <p class="mt-1 text-sm text-slate-500">
                             Showing the first 250 broadcast recipient records.
                         </p>
+
+                        @if($recipients->contains(fn ($recipient) => $recipient->terminal_reason === 'not_scheduled_by_messaging'))
+                            <p class="mt-2 text-sm leading-6 text-slate-600">
+                                A recipient marked “Not eligible to receive this message” did not pass one of the required checks: a usable email or phone for this channel, active permission for this type of message, or delivery suppression.
+                            </p>
+                        @endif
                     </div>
 
                     <div class="divide-y divide-slate-200 md:hidden">
@@ -267,7 +273,7 @@
                                         <dt class="font-semibold uppercase tracking-wide text-slate-400">Reason</dt>
                                         <dd class="mt-1 break-words text-sm text-slate-700">
                                             @php($reason = $recipient->terminal_reason)
-                                            {{ $reason ? str_replace('_', ' ', $reason) : '—' }}
+                                            {{ $reason === 'not_scheduled_by_messaging' ? 'Not eligible to receive this message' : ($reason ? str_replace('_', ' ', $reason) : '—') }}
                                         </dd>
                                     </div>
                                 </dl>
@@ -326,7 +332,7 @@
                                         <td class="px-6 py-4 text-slate-600">
                                             @php($reason = $recipient->terminal_reason)
 
-                                            {{ $reason ? str_replace('_', ' ', $reason) : '—' }}
+                                            {{ $reason === 'not_scheduled_by_messaging' ? 'Not eligible to receive this message' : ($reason ? str_replace('_', ' ', $reason) : '—') }}
                                         </td>
                                     </tr>
                                 @empty
