@@ -24,6 +24,7 @@ use App\Support\ModuleIntegrations\Scheduling\Messaging\MessagingSchedulingDesti
 use App\Support\ModuleIntegrations\Scheduling\Messaging\SchedulingAppointmentMessageChainExecutionContextProvider;
 use App\Support\ModuleIntegrations\Scheduling\Messaging\SchedulingAppointmentTokenContextProvider;
 use App\Support\ModuleIntegrations\Scheduling\Messaging\SchedulingAppointmentTokenSourceProvider;
+use App\Support\ModuleIntegrations\Scheduling\Messaging\SchedulingAppointmentTemplatePublicationHook;
 use App\Support\ModuleIntegrations\Scheduling\Messaging\SchedulingDestinationVerificationRecipientGate;
 use App\Support\ModuleIntegrations\InternalNotifications\InboundMessaging\ScheduleInboundMessageInternalNotification;
 use App\Support\ModuleIntegrations\InternalNotifications\Tasks\InternalNotificationTaskScheduler;
@@ -267,6 +268,11 @@ class AppServiceProvider extends ServiceProvider
             $this->app->tag(
                 SchedulingAppointmentTokenContextProvider::class,
                 'token.context_providers',
+            );
+
+            $this->app->tag(
+                SchedulingAppointmentTemplatePublicationHook::class,
+                'messaging.message_template_publication_hooks',
             );
         }
 

@@ -35,6 +35,7 @@ use App\Modules\Messaging\Services\Email\EmailProviderManager;
 use App\Modules\Messaging\Services\MessageChainExecutionContextResolver;
 use App\Modules\Messaging\Services\MessageRecipientGateRegistry;
 use App\Modules\Messaging\Services\MessageRecipientPayloadProviderRegistry;
+use App\Modules\Messaging\Services\MessageTemplatePublicationHookRegistry;
 use App\Modules\Messaging\Services\ReplyProfiles\MessagingReplyProfileDependencyContributor;
 use App\Modules\Messaging\Services\Sms\SmsProviderManager;
 use App\Modules\Messaging\TokenContracts\MessagingTokenContextProvider;
@@ -123,6 +124,12 @@ class MessagingModuleServiceProvider extends ServiceProvider
                 providers: $app->tagged(
                     'messaging.message_chain_execution_context_providers',
                 ),
+            );
+        });
+
+        $this->app->singleton(MessageTemplatePublicationHookRegistry::class, function ($app) {
+            return new MessageTemplatePublicationHookRegistry(
+                hooks: $app->tagged('messaging.message_template_publication_hooks'),
             );
         });
 

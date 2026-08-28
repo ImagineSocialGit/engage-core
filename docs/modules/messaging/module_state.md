@@ -308,6 +308,8 @@ The source MessageTemplatePreset payload remains partial and source-owned. Publi
 or message-level edits creates complete immutable MessageTemplateVersion records; already
 pinned ScheduledMessages are not rewritten.
 
+`MessageTemplatePublicationHookRegistry` is the generic post-publication seam for owner-specific derived runtime definitions. The Message Templates controller runs publication plus registered hooks inside one database transaction. A module integration may therefore republish a chain or other future-use definition that pins the newly published template version without teaching Messaging about that owning module. Hooks must never rewrite already-pinned ScheduledMessages or existing MessageChainEnrollments. Scheduling appointment communications use this seam so a copy edit in the generic library updates the current appointment MessageChain for future enrollments while existing appointments remain version-pinned.
+
 Normal message-copy review and editing uses the canonical Messaging carousel/editor rather
 than a permanent side-by-side preview/editor layout. A catalog family opens one message at a
 time, the top bar identifies the channel plus Published copy/Edit copy state, and Edit replaces

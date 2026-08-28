@@ -3,6 +3,7 @@
 namespace App\Modules\Scheduling\Providers;
 
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
+use App\Modules\Scheduling\Console\Commands\SyncAppointmentCommunicationsCatalogCommand;
 use App\Modules\Scheduling\EventDefinitions\SchedulingPublicBookingEventDefinitionContributor;
 use App\Modules\Scheduling\Jobs\ExpireBookingHoldsJob;
 use App\Modules\Scheduling\ReadModels\SchedulingBookingFunnelFactContributor;
@@ -37,6 +38,12 @@ class SchedulingModuleServiceProvider extends ServiceProvider
         $this->registerContactPanel();
         $this->registerBookingHoldExpiration();
         $this->registerPublicRoutes();
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                SyncAppointmentCommunicationsCatalogCommand::class,
+            ]);
+        }
     }
 
     private function registerContactPanel(): void

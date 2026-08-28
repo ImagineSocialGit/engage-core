@@ -21,6 +21,7 @@ use App\Modules\Messaging\Services\MessageTemplateCatalogCarouselPresenter;
 use App\Modules\Messaging\Services\MessageTemplateCompositionImpactResolver;
 use App\Modules\Messaging\Services\MessageTemplateCompositionResolver;
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
+use App\Modules\Messaging\Services\MessageTemplatePublicationHookRegistry;
 use App\Modules\Messaging\Services\MessageTemplateUsageResolver;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -142,13 +143,31 @@ class MessageTemplatePresetController extends Controller
         UpdateMessageTemplatePresetRequest $request,
         MessageTemplatePreset $messageTemplatePreset,
         PublishMessageTemplatePresetOverrideAction $publishOverride,
+        MessageTemplatePublicationHookRegistry $publicationHooks,
     ): RedirectResponse {
         $actor = $request->user();
-        $result = $publishOverride->handle(
-            preset: $messageTemplatePreset,
-            submittedPayload: $request->safePayload(),
-            createdBy: $actor instanceof User ? $actor : null,
-        );
+        $actor = $actor instanceof User ? $actor : null;
+        $result = DB::transaction(function () use (
+            $messageTemplatePreset,
+            $publishOverride,
+            $publicationHooks,
+            $request,
+            $actor,
+        ) {
+            $result = $publishOverride->handle(
+                preset: $messageTemplatePreset,
+                submittedPayload: $request->safePayload(),
+                createdBy: $actor,
+            );
+
+            $publicationHooks->afterPublish(
+                preset: $messageTemplatePreset,
+                version: $result->version,
+                actor: $actor,
+            );
+
+            return $result;
+        }, 3);
 
         $redirect = $this->safeReturnPath($request);
 
@@ -168,6 +187,7 @@ class MessageTemplatePresetController extends Controller
         MessageTemplateTokenValidator $messageTemplateTokenValidator,
         UpsertMessageTemplateCompositionLayerAction $upsertCompositionLayer,
         PublishMessageTemplateVersionAction $publishMessageTemplateVersion,
+        MessageTemplatePublicationHookRegistry $publicationHooks,
     ): RedirectResponse {
         $this->assertEditableSharedLayer($messageTemplateCompositionLayer);
 
@@ -211,6 +231,7 @@ class MessageTemplatePresetController extends Controller
         }
 
         $actor = $request->user();
+        $actor = $actor instanceof User ? $actor : null;
 
         DB::transaction(function () use (
             $messageTemplateCompositionLayer,
@@ -219,6 +240,7 @@ class MessageTemplatePresetController extends Controller
             $messageTemplateTokenValidator,
             $upsertCompositionLayer,
             $publishMessageTemplateVersion,
+            $publicationHooks,
             $actor,
         ): void {
             $updatedLayer = $upsertCompositionLayer->handle(
@@ -243,12 +265,18 @@ class MessageTemplatePresetController extends Controller
                 $version = $publishMessageTemplateVersion->handle(
                     messageTemplate: $template,
                     payload: is_array($preset->payload) ? $preset->payload : [],
-                    createdBy: $actor instanceof User ? $actor : null,
+                    createdBy: $actor,
                 );
 
                 $preset->forceFill([
                     'tokens' => $messageTemplateTokenValidator->tokensFromPayload($version->payload()),
                 ])->save();
+
+                $publicationHooks->afterPublish(
+                    preset: $preset,
+                    version: $version,
+                    actor: $actor,
+                );
             }
         });
 

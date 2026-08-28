@@ -7,7 +7,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\CancelMessageChainEnrollmentAction;
 use App\Modules\Messaging\Actions\GrantMessageConsentsAction;
 use App\Modules\Messaging\Actions\PublishMessageChainVersionAction;
-use App\Modules\Messaging\Actions\PublishMessageTemplateVersionAction;
+use App\Modules\Messaging\Actions\PublishMessageTemplatePresetOverrideAction;
 use App\Modules\Messaging\Actions\StartMessageChainEnrollmentAction;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
@@ -15,6 +15,8 @@ use App\Modules\Messaging\Models\MessageChain;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\MessageChainStep;
 use App\Modules\Messaging\Models\MessageTemplate;
+use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
+use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplateVersion;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
@@ -38,9 +40,12 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
     private const SCOPE = 'scheduling_appointments';
     private const SURFACE = 'scheduling_appointments';
     private const SOURCE = 'crm_scheduling';
+    private const TEMPLATE_GROUP_KEY = 'scheduling:appointment_communications';
+    private const TEMPLATE_GROUP_LABEL = 'Appointment Communications';
+    private const TEMPLATE_USAGE_TYPE = 'scheduling_appointment_communication';
 
     public function __construct(
-        private readonly PublishMessageTemplateVersionAction $publishTemplate,
+        private readonly PublishMessageTemplatePresetOverrideAction $publishTemplateOverride,
         private readonly PublishMessageChainVersionAction $publishChain,
         private readonly StartMessageChainEnrollmentAction $startEnrollment,
         private readonly CancelMessageChainEnrollmentAction $cancelEnrollment,
@@ -111,6 +116,7 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
             ])->save();
 
             $compiled = [];
+            $activeTemplateKeys = [];
 
             foreach ($steps as $sortOrder => $step) {
                 $variants = [];
@@ -119,8 +125,11 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
                     $templateVersion = $this->publishStepTemplate(
                         step: $step,
                         channel: $channel,
+                        itemOrder: (($sortOrder + 1) * 100) + (($variantSort + 1) * 10),
                         actor: $actor,
                     );
+                    $activeTemplateKeys[] = $templateVersion->messageTemplate?->key
+                        ?? $this->templateKey($step['key'], $channel);
 
                     $variants[] = [
                         'key' => $channel,
@@ -155,6 +164,8 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
                 ];
             }
 
+            $this->deactivateStaleAppointmentTemplates($activeTemplateKeys);
+
             $this->publishChain->handle(
                 messageChain: $chain,
                 steps: $compiled,
@@ -163,6 +174,68 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
         }, 3);
 
         return $this->plan();
+    }
+
+    public function refreshChainForPublishedTemplate(
+        MessageTemplatePreset $preset,
+        MessageTemplateVersion $version,
+        ?User $actor = null,
+    ): void {
+        if (! $this->ownsAppointmentTemplatePreset($preset)
+            || (int) $version->message_template_id < 1
+        ) {
+            return;
+        }
+
+        $chain = $this->chain();
+
+        if (! $chain instanceof MessageChain
+            || ! $chain->isActive()
+            || $chain->current_version_id === null
+        ) {
+            return;
+        }
+
+        $currentVersion = $chain->requireCurrentVersion();
+        $currentVersion->load('steps.variants.messageTemplateVersion.messageTemplate');
+        $steps = [];
+        $changed = false;
+
+        foreach ($currentVersion->steps as $step) {
+            $definition = $step->definition();
+
+            foreach ($step->variants as $index => $variant) {
+                $templateKey = $variant->messageTemplateVersion?->messageTemplate?->key;
+
+                if ($templateKey !== $preset->key) {
+                    continue;
+                }
+
+                if ((int) $definition['variants'][$index]['message_template_version_id']
+                    === (int) $version->getKey()
+                ) {
+                    continue;
+                }
+
+                $definition['variants'][$index]['message_template_version_id'] = $version->getKey();
+                $changed = true;
+            }
+
+            $steps[] = $definition;
+        }
+
+        if (! $changed) {
+            return;
+        }
+
+        $this->publishChain->handle(
+            messageChain: $chain,
+            steps: $steps,
+            exitConditions: is_array($currentVersion->exit_conditions)
+                ? $currentVersion->exit_conditions
+                : [],
+            createdBy: $actor,
+        );
     }
 
     public function appointmentCreated(Appointment $appointment): void
@@ -508,6 +581,7 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
     private function publishStepTemplate(
         array $step,
         string $channel,
+        int $itemOrder,
         ?User $actor,
     ): MessageTemplateVersion {
         $payload = $channel === MessageChannel::Email->value
@@ -519,12 +593,17 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
                 'message' => $step['message'],
             ];
 
-        if (str_contains($step['message'], '{first_name}')) {
+        if (str_contains($step['message'], '{first_name}')
+            || ($channel === MessageChannel::Email->value
+                && str_contains($step['subject'], '{first_name}'))
+        ) {
             $payload['token_fallbacks'] = [[
                 'token' => 'first_name',
                 'missing_behavior' => 'fallback_value',
                 'fallback' => 'there',
             ]];
+        } else {
+            $payload['token_fallbacks'] = [];
         }
 
         $issues = $this->tokenValidator->validatePayload(
@@ -545,18 +624,56 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
             ]);
         }
 
-        $templateKey = implode('_', [
-            $this->chainKey(),
-            $step['key'],
-            $channel,
+        $templateKey = $this->templateKey($step['key'], $channel);
+        $name = $step['name'].' · '.$this->channelLabel($channel);
+        $preset = MessageTemplatePreset::query()->firstOrNew([
+            'key' => $templateKey,
         ]);
+        $sourcePayload = $preset->exists && is_array($preset->payload)
+            ? $preset->payload
+            : $payload;
+
+        $preset->forceFill([
+            'name' => $name,
+            'description' => 'Appointment confirmation or reminder managed from Scheduling.',
+            'channel' => $channel,
+            'purpose' => self::PURPOSE,
+            'scope' => self::SCOPE,
+            'message_type' => $this->messageType($step),
+            'payload_class' => $channel === MessageChannel::Email->value
+                ? EmailPayload::class
+                : SmsPayload::class,
+            'queue' => $this->queue($step),
+            'dispatch_keys' => [self::DISPATCH_CONTEXT],
+            'payload' => $sourcePayload,
+            'tokens' => $this->tokenValidator->tokensFromPayload($payload),
+            'status' => MessageTemplatePreset::STATUS_ACTIVE,
+            'is_active' => true,
+            'source' => self::SOURCE,
+            'source_config_path' => null,
+            'source_version' => 1,
+            'is_customized' => true,
+            'customized_at' => $preset->customized_at ?? now(),
+            'last_synced_at' => null,
+            'meta' => [
+                'authoring' => [
+                    'context_key' => self::DISPATCH_CONTEXT,
+                    'selection_contexts' => [self::DISPATCH_CONTEXT],
+                ],
+                'scheduling' => [
+                    'appointment_communications' => true,
+                    'chain_key' => $this->chainKey(),
+                    'step_key' => $step['key'],
+                ],
+            ],
+        ])->save();
 
         $template = MessageTemplate::query()->firstOrNew([
             'key' => $templateKey,
         ]);
 
         $template->forceFill([
-            'name' => $step['name'].' · '.strtoupper($channel),
+            'name' => $name,
             'description' => 'Scheduling-owned appointment communication.',
             'channel' => $channel,
             'status' => MessageTemplate::STATUS_ACTIVE,
@@ -565,14 +682,93 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
             'source' => self::SOURCE,
             'source_version' => '23A3D',
             'is_customized' => true,
-            'customized_at' => now(),
+            'customized_at' => $template->customized_at ?? now(),
         ])->save();
 
-        return $this->publishTemplate->handle(
-            messageTemplate: $template,
-            payload: $payload,
+        $catalogEntry = MessageTemplateCatalogEntry::query()->firstOrNew([
+            'message_template_preset_id' => $preset->getKey(),
+            'item_key' => $templateKey,
+        ]);
+        $catalogEntry->forceFill([
+            'channel' => $channel,
+            'purpose' => self::PURPOSE,
+            'scope' => self::SCOPE,
+            'module_key' => 'scheduling',
+            'module_label' => 'Scheduling',
+            'surface' => self::SURFACE,
+            'group_key' => self::TEMPLATE_GROUP_KEY,
+            'group_label' => self::TEMPLATE_GROUP_LABEL,
+            'item_label' => $name,
+            'item_order' => $itemOrder,
+            'usage_type' => self::TEMPLATE_USAGE_TYPE,
+            'source' => self::SOURCE,
+            'source_config_path' => null,
+            'context_type' => null,
+            'context_id' => null,
+            'is_active' => true,
+            'meta' => [
+                'scheduling' => [
+                    'appointment_communications' => true,
+                    'chain_key' => $this->chainKey(),
+                    'step_key' => $step['key'],
+                ],
+            ],
+        ])->save();
+
+        $result = $this->publishTemplateOverride->handle(
+            preset: $preset,
+            submittedPayload: $payload,
             createdBy: $actor,
         );
+
+        return $result->version->load('messageTemplate');
+    }
+
+    /** @param array<int, string> $activeTemplateKeys */
+    private function deactivateStaleAppointmentTemplates(array $activeTemplateKeys): void
+    {
+        $activeTemplateKeys = array_values(array_unique($activeTemplateKeys));
+        $query = MessageTemplatePreset::query()
+            ->where('source', self::SOURCE)
+            ->where('meta->scheduling->appointment_communications', true);
+
+        if ($activeTemplateKeys !== []) {
+            $query->whereNotIn('key', $activeTemplateKeys);
+        }
+
+        $stale = $query->get();
+
+        foreach ($stale as $preset) {
+            $preset->forceFill([
+                'status' => MessageTemplatePreset::STATUS_INACTIVE,
+                'is_active' => false,
+            ])->save();
+
+            $preset->catalogEntries()->update([
+                'is_active' => false,
+            ]);
+        }
+    }
+
+    private function ownsAppointmentTemplatePreset(MessageTemplatePreset $preset): bool
+    {
+        return $preset->source === self::SOURCE
+            && (bool) data_get($preset->meta, 'scheduling.appointment_communications', false)
+            && data_get($preset->meta, 'scheduling.chain_key') === $this->chainKey();
+    }
+
+    private function templateKey(string $stepKey, string $channel): string
+    {
+        return implode('_', [
+            $this->chainKey(),
+            $stepKey,
+            $channel,
+        ]);
+    }
+
+    private function channelLabel(string $channel): string
+    {
+        return $channel === MessageChannel::Email->value ? 'Email' : 'SMS';
     }
 
     /** @param array<string, mixed> $step */
