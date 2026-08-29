@@ -5,6 +5,7 @@ namespace App\Modules\Broadcasts\Actions;
 use App\Modules\Broadcasts\Jobs\ScheduleBroadcastChunkJob;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
+use App\Modules\Broadcasts\Services\BroadcastMessageTemplateVersionService;
 use App\Modules\Broadcasts\Services\BroadcastMessageTokenValidator;
 use App\Modules\Broadcasts\Services\BroadcastRecipientResolver;
 use App\Modules\Messaging\Services\BulkMessageDeliveryPolicy;
@@ -20,6 +21,7 @@ class ScheduleBroadcastAction
         private readonly ScheduleBroadcastRecipientChunkAction $scheduleRecipientChunk,
         private readonly BulkMessageDeliveryPolicy $bulkDeliveryPolicy,
         private readonly BroadcastMessageTokenValidator $messageTokenValidator,
+        private readonly BroadcastMessageTemplateVersionService $messageTemplateVersions,
     ) {}
 
     public function handle(Broadcast $broadcast): Broadcast
@@ -57,6 +59,7 @@ class ScheduleBroadcastAction
                 return $broadcast->refresh();
             }
 
+            $this->messageTemplateVersions->pin($broadcast);
             $this->recipientResolver->snapshot($broadcast);
 
             $snapshottedRecipientCount = BroadcastRecipient::query()

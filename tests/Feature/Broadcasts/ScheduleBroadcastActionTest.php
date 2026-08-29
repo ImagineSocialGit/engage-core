@@ -139,18 +139,8 @@ class ScheduleBroadcastActionTest extends TestCase
                     fn (mixed $argument): bool => $argument instanceof Broadcast,
                 );
 
-                $meta = collect($arguments)->first(
-                    fn (mixed $argument): bool => is_array($argument)
-                        && array_key_exists('queue', $argument)
-                        && array_key_exists('broadcast_id', $argument),
-                );
-
-                $definitions = collect($arguments)->first(
-                    fn (mixed $argument): bool => is_array($argument)
-                        && isset($argument[0])
-                        && is_array($argument[0])
-                        && array_key_exists('dispatch_key', $argument[0]),
-                );
+                $meta = $arguments['meta'] ?? $arguments[9] ?? null;
+                $definitions = $arguments['definitions'] ?? $arguments[11] ?? null;
 
                 $this->assertInstanceOf(Broadcast::class, $broadcast);
                 $this->assertSame('sms', $channel);
@@ -162,8 +152,16 @@ class ScheduleBroadcastActionTest extends TestCase
 
                 $this->assertIsArray($meta);
                 $this->assertSame('marketing', $meta['queue']);
+                $this->assertEquals(
+                    [Broadcast::DEFAULT_DISPATCH_KEY],
+                    $meta['dispatch_keys'],
+                );
+                $this->assertArrayNotHasKey('broadcast_id', $meta);
+                $this->assertArrayNotHasKey('broadcast_recipient_id', $meta);
 
                 $this->assertIsArray($definitions);
+                $this->assertIsInt($definitions[0]['message_template_version_id']);
+                $this->assertGreaterThan(0, $definitions[0]['message_template_version_id']);
                 $this->assertSame(Broadcast::DEFAULT_DISPATCH_KEY, $definitions[0]['dispatch_key']);
                 $this->assertSame(Broadcast::DEFAULT_MESSAGE_TYPE, $definitions[0]['message_type']);
                 $this->assertSame('sms', $definitions[0]['channel']);

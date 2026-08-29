@@ -901,6 +901,14 @@ class SendScheduledMessageJobTest extends TestCase
         $this->assertSame('Copy this link', $capturedPayload->secondaryLink['label']);
         $this->assertSame($expectedUrl, $capturedPayload->secondaryLink['url']);
         $this->assertSame($expectedUrl, $capturedPayload->tokens['permission_invitation']['url']);
+
+        $this->assertArrayNotHasKey('cta', $scheduledMessage->payload ?? []);
+        $this->assertArrayNotHasKey('secondary_link', $scheduledMessage->payload ?? []);
+        $this->assertArrayNotHasKey('tokens', $scheduledMessage->payload ?? []);
+        $this->assertStringNotContainsString(
+            $expectedUrl,
+            json_encode($scheduledMessage->payload, JSON_THROW_ON_ERROR),
+        );
     }
 
 

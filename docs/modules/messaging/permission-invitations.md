@@ -41,7 +41,7 @@ Messaging owns:
 - public preference routes/controllers;
 - consent recording from the public form;
 - accepted channel tracking;
-- injection of public preference URLs into the invitation email payload;
+- transient injection of public preference URLs into the provider-ready invitation email payload without persisting those URLs into `scheduled_messages.payload`;
 - the Contact-import `marketing_permission` post-processor.
 
 Core owns:
@@ -63,7 +63,7 @@ rows or bypass Messaging eligibility, claim, consent, or delivery rules.
 4. The ScheduledMessage send job evaluates final send-time gates.
 5. The send job claims the one-time permission invitation before provider submission.
 6. Messaging creates the `contact_permission_invitations` row at claim time.
-7. Messaging injects the public preference URL into the email payload.
+7. Messaging injects the public preference URL transiently into the provider-ready email payload; it is not written back into `scheduled_messages.payload`.
 8. The contact opens the preference page and explicitly selects email, SMS, or both.
 9. Messaging creates normal marketing `MessageConsent` rows for selected channels.
 10. Messaging marks the invitation accepted and emits `permission_invitation.accepted`

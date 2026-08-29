@@ -24,22 +24,26 @@ class PublishMessageTemplateVersionAction
         array $payload,
         ?User $createdBy = null,
         string $rendererVersion = '1',
+        bool $resolveComposition = true,
     ): MessageTemplateVersion {
         return DB::transaction(function () use (
             $messageTemplate,
             $payload,
             $createdBy,
             $rendererVersion,
+            $resolveComposition,
         ): MessageTemplateVersion {
             $template = MessageTemplate::query()
                 ->whereKey($messageTemplate->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $payload = $this->compositionResolver->resolve(
-                messageTemplate: $template,
-                sourcePayload: $payload,
-            );
+            if ($resolveComposition) {
+                $payload = $this->compositionResolver->resolve(
+                    messageTemplate: $template,
+                    sourcePayload: $payload,
+                );
+            }
 
             $rendererKey = $this->rendererKey($template);
             $subject = $this->subject($payload);

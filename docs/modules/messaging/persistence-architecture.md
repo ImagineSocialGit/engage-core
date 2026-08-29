@@ -967,12 +967,13 @@ BroadcastRecipient has one bounded terminal_reason and no meta.delivery snapshot
 - versioned template content is not copied into payload;
 - payload retains only canonical runtime differences/operational values;
 - tokens move to the lazy render-context row;
+- send-time-only permission-invitation URL/CTA overlays remain transient and are not written back into ScheduledMessage payload;
 - metadata is canonical, bounded, and free of provider/terminal history and copied definitions.
 
 ### Deferred module targets
 
 - Campaign enrollment does not yet wrap generic MessageChainEnrollment;
-- Broadcast content is not yet pinned to a private immutable template version;
+- Broadcast scheduling now pins one private immutable template version per Broadcast; `broadcasts.payload` remains the transitional draft/source copy until the authoring schema is migrated;
 - BroadcastRecipient still uses `scheduled_message_ids` JSON;
 - inbound provider normalization remains separate work;
 - complete removal of ScheduledMessage compatibility JSON requires a future measured cutover, not a documentation-only declaration.

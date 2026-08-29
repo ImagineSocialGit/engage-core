@@ -4,6 +4,7 @@ namespace App\Modules\Broadcasts\Actions;
 
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
+use App\Modules\Broadcasts\Services\BroadcastMessageTemplateVersionService;
 use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\ScheduledMessage;
@@ -18,6 +19,7 @@ class ScheduleBroadcastRecipientChunkAction
         private readonly DispatchMessageAction $dispatchMessageAction,
         private readonly MessageChannelAvailability $messageChannelAvailability,
         private readonly BulkMessageDeliveryPolicy $bulkDeliveryPolicy,
+        private readonly BroadcastMessageTemplateVersionService $messageTemplateVersions,
     ) {}
 
     /**
@@ -45,6 +47,7 @@ class ScheduleBroadcastRecipientChunkAction
                 return $this->emptyResult();
             }
 
+            $messageTemplateVersion = $this->messageTemplateVersions->resolvePinned($broadcast);
             $bulkSettings = $this->bulkSettings($broadcast);
             $chunkSize = $bulk
                 ? $bulkSettings['chunk_size']
@@ -135,14 +138,11 @@ class ScheduleBroadcastRecipientChunkAction
                 $messageMeta = [
                     'queue' => $deliveryQueue,
                     'dispatch_keys' => [$broadcast->dispatch_key],
-                    'broadcast_id' => $broadcast->getKey(),
-                    'broadcast_recipient_id' => $recipient->getKey(),
                     'send_buffer_minutes' => ScheduleBroadcastAction::SEND_BUFFER_MINUTES,
                     'consent_policy' => $consentPolicy,
                 ];
                 $definitionMeta = [
                     'source' => 'broadcast',
-                    'broadcast_id' => $broadcast->getKey(),
                     'consent_policy' => $consentPolicy,
                 ];
 
@@ -168,6 +168,7 @@ class ScheduleBroadcastRecipientChunkAction
                             'scope' => $broadcast->scope,
                             'payload_class' => $broadcast->payload_class,
                             'queue' => $deliveryQueue,
+                            'message_template_version_id' => $messageTemplateVersion->getKey(),
                             'payload' => $broadcast->payload ?? [],
                             'consent_policy' => $consentPolicy,
                             'meta' => $definitionMeta,

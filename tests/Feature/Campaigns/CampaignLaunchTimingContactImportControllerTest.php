@@ -46,8 +46,12 @@ class CampaignLaunchTimingContactImportControllerTest extends TestCase
 
         $preview->assertOk();
         $preview->assertViewHas('postImportInputs', function (array $inputs): bool {
-            return ($inputs[0]['key'] ?? null) === 'campaign_launch_timing'
-                && ($inputs[0]['inputs'][0]['key'] ?? null) === 'first_message_at';
+            $launchTiming = collect($inputs)->firstWhere('key', 'campaign_launch_timing');
+
+            return is_array($launchTiming)
+                && collect($launchTiming['inputs'] ?? [])->contains(
+                    fn (array $input): bool => ($input['key'] ?? null) === 'first_message_at',
+                );
         });
         $preview->assertSee(
             'post_import_inputs[campaign_launch_timing][first_message_at]',

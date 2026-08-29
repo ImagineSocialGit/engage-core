@@ -107,16 +107,12 @@ class SendScheduledMessageJob implements ShouldQueue
                 return;
             }
 
-            if ($permissionInvitation) {
-                $this->applyPermissionInvitationPayload(
-                    scheduledMessage: $scheduledMessage,
-                    permissionInvitation: $permissionInvitation,
-                    permissionInvitationService: $permissionInvitationService,
-                );
-            }
+            $runtimePayloadOverlay = $permissionInvitation
+                ? $permissionInvitationService->publicEmailPayload($permissionInvitation)
+                : [];
 
             $payload = app(ScheduledMessagePayloadResolver::class)
-                ->resolve($scheduledMessage);
+                ->resolve($scheduledMessage, $runtimePayloadOverlay);
 
             if ($reason = $this->unresolvedTokenReason($payload)) {
                 $result = MessageSendResult::skipped(
@@ -468,19 +464,6 @@ class SendScheduledMessageJob implements ShouldQueue
         ContactPermissionInvitationService $permissionInvitationService,
     ): ?ContactPermissionInvitation {
         return $permissionInvitationService->claimForScheduledMessage($scheduledMessage);
-    }
-
-    private function applyPermissionInvitationPayload(
-        ScheduledMessage $scheduledMessage,
-        ContactPermissionInvitation $permissionInvitation,
-        ContactPermissionInvitationService $permissionInvitationService,
-    ): void {
-        $scheduledMessage->forceFill([
-            'payload' => array_replace_recursive(
-                $scheduledMessage->payload ?? [],
-                $permissionInvitationService->publicEmailPayload($permissionInvitation),
-            ),
-        ])->save();
     }
 
     private function markInvitationTerminalFailure(

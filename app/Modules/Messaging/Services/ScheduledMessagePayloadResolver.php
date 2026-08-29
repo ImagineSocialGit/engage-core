@@ -22,12 +22,16 @@ class ScheduledMessagePayloadResolver
         private readonly MessageTokenFallbackResolver $tokenFallbackResolver,
     ) {}
 
+    /**
+     * @param array<string, mixed> $runtimePayloadOverlay
+     */
     public function resolve(
         ScheduledMessage $scheduledMessage,
+        array $runtimePayloadOverlay = [],
     ): EmailMessage|SmsMessage {
         $payloadData = $scheduledMessage->message_template_version_id === null
-            ? $this->legacyPayloadData($scheduledMessage)
-            : $this->versionedPayloadData($scheduledMessage);
+            ? $this->legacyPayloadData($scheduledMessage, $runtimePayloadOverlay)
+            : $this->versionedPayloadData($scheduledMessage, $runtimePayloadOverlay);
 
         return $this->instantiatePayload(
             scheduledMessage: $scheduledMessage,
@@ -40,15 +44,20 @@ class ScheduledMessagePayloadResolver
      */
     private function versionedPayloadData(
         ScheduledMessage $scheduledMessage,
+        array $runtimePayloadOverlay,
     ): array {
         $version = $this->messageTemplateVersion($scheduledMessage);
         $templatePayload = $this->componentComposer->compose(
             scheduledMessage: $scheduledMessage,
             primaryPayload: $version->payload(),
         );
-        $runtimePayload = is_array($scheduledMessage->payload)
+        $persistedRuntimePayload = is_array($scheduledMessage->payload)
             ? $scheduledMessage->payload
             : [];
+        $runtimePayload = array_replace_recursive(
+            $persistedRuntimePayload,
+            $runtimePayloadOverlay,
+        );
         $renderContext = $this->renderContext($scheduledMessage);
 
         if ($renderContext instanceof ScheduledMessageRenderContext) {
@@ -141,7 +150,7 @@ class ScheduledMessagePayloadResolver
 
         $this->removePersistedTokens(
             scheduledMessage: $scheduledMessage,
-            runtimePayload: $runtimePayload,
+            runtimePayload: $persistedRuntimePayload,
         );
 
         return $this->withOperationalFields(
@@ -187,6 +196,7 @@ class ScheduledMessagePayloadResolver
      */
     private function legacyPayloadData(
         ScheduledMessage $scheduledMessage,
+        array $runtimePayloadOverlay,
     ): array {
         $payload = array_replace_recursive(
             [
@@ -198,6 +208,7 @@ class ScheduledMessagePayloadResolver
             is_array($scheduledMessage->payload)
                 ? $scheduledMessage->payload
                 : [],
+            $runtimePayloadOverlay,
         );
 
         return $this->withProviderIdempotencyKey(

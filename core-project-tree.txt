@@ -89,6 +89,7 @@
 │   │   │   │   └── UpdateBroadcastRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── BroadcastAudiencePreviewService.php
+│   │   │   │   ├── BroadcastMessageTemplateVersionService.php
 │   │   │   │   ├── BroadcastMessageTokenValidator.php
 │   │   │   │   ├── BroadcastRecipientResolver.php
 │   │   │   │   └── BroadcastScheduledMessageResultRecorder.php
@@ -1971,7 +1972,8 @@
 │   │   │   │   ├── 2026_07_01_000001_create_contact_permission_invitations_table.php
 │   │   │   │   ├── 2026_07_30_224000_create_message_template_and_chain_tables.php
 │   │   │   │   ├── 2026_07_30_224001_create_message_chain_runtime_support_tables.php
-│   │   │   │   └── 2026_08_20_203000_create_scheduled_message_cta_engagements_table.php
+│   │   │   │   ├── 2026_08_20_203000_create_scheduled_message_cta_engagements_table.php
+│   │   │   │   └── 2026_08_29_053500_prune_redundant_messaging_indexes.php
 │   │   │   ├── portal
 │   │   │   │   ├── 2026_04_15_195870_create_portal_users_table.php
 │   │   │   │   ├── 2026_04_15_195871_create_portal_contact_links_table.php
@@ -2475,6 +2477,7 @@
 │   │   │   ├── BroadcastResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── BroadcastShowDiagnosticsTest.php
 │   │   │   ├── BroadcastTokenPersonalizationTest.php
+│   │   │   ├── BroadcastVersionedPersistenceTest.php
 │   │   │   ├── CancelBroadcastActionTest.php
 │   │   │   ├── MarkBroadcastRecipientSentTest.php
 │   │   │   ├── MarkBroadcastRecipientTerminalStatusTest.php
@@ -2741,6 +2744,7 @@
 │   │   │   ├── MessageTemplateUsageResolverTest.php
 │   │   │   ├── MessageTemplateVersionPersistenceTest.php
 │   │   │   ├── MessageTokenFallbackResolverTest.php
+│   │   │   ├── MessagingIndexShapeTest.php
 │   │   │   ├── MessagingSetupValidationContributorTest.php
 │   │   │   ├── ProviderSubmissionLimiterTest.php
 │   │   │   ├── PublishMessageTemplatePresetOverrideActionTest.php
@@ -3004,4 +3008,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-710 directories, 2295 files
+710 directories, 2299 files
