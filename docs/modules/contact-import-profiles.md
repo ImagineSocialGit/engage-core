@@ -178,10 +178,11 @@ and business keys remain server-owned and are validated through the same profile
 used by `setup:validate`.
 
 A configured processor may optionally expose a bounded operator-input contract on the
-preview screen. Core renders only inputs declared by that already-configured processor
-and lets the processor validate/normalize submitted values. Browser input cannot add a
-new post-import processor or replace server-owned business identity such as a Campaign
-key.
+preview screen. A processor that implements Core's operator-config provider may also expose
+one import-wide decision even when no detected client profile configured that optional
+module behavior. The processor still owns the server-side defaults and validation; browser
+input cannot invent a processor or replace server-owned business identity such as a
+Campaign key.
 
 Row-level post-import behavior runs only after Core has persisted the Contact and
 `ContactImportOccurrence`, module-owned domain handlers have consumed the row, and
@@ -201,12 +202,14 @@ owning modules are enabled.
 
 Current reusable processors are:
 
-- `marketing_permission`: silently imports Marketing permission for explicitly
-  configured email/SMS channels and one operational scope. Messaging canonicalizes
-  that request through the current channel/purpose consent-domain policy. Active
-  consent is reused. A currently revoked channel is never reactivated merely because
-  the Contact appears in a later import; that requires a separate valid re-grant
-  event. A missing/invalid SMS destination does not prevent available email permission
+- `marketing_permission`: every add-import exposes an explicit operator decision when
+  Messaging is enabled. If prior marketing permission was already collected elsewhere,
+  the operator must select the channels that have permission and attest that the grant
+  already exists. Only those selected channels are imported. If the operator chooses
+  `No / I’m not sure`, this processor is removed from the durable post-import plan and
+  no marketing consent is created. Existing active consent is reused and a currently
+  revoked channel is never reactivated merely because the Contact appears in a later
+  import. A missing/invalid SMS destination does not prevent available email permission
   from being imported; the row records a partial/reviewable outcome.
 - `campaign_enrollment`: requests enrollment in one configured Campaign through the
   normal Campaign action. Existing open enrollment remains idempotent and Campaign
@@ -239,9 +242,10 @@ Example generic shape:
 ],
 ```
 
-Client profiles should enable these only when the intended Campaign and permission
-policy are actually defined. Do not add placeholder Campaign keys merely to make an
-import profile look complete.
+Client profiles should enable Campaign post-import behavior only when the intended
+Campaign policy is actually defined. A profile may constrain `marketing_permission`
+channels/scope, but the operator confirmation is still required at import time. Do not add
+placeholder Campaign keys merely to make an import profile look complete.
 
 ## Background processing and recovery
 

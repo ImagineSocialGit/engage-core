@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Import;
 
 use App\Modules\Core\Contracts\Contacts\ContactImportPostProcessor;
+use App\Modules\Core\Contracts\Contacts\ContactImportPostProcessorOperatorConfigProvider;
 use App\Modules\Core\Data\Contacts\ContactImportContext;
 use App\Modules\Core\Data\Contacts\ContactImportPostProcessResult;
 use App\Modules\Messaging\Actions\ImportMessageConsentAction;
@@ -10,11 +11,18 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Services\Consent\MessageConsentStateResolver;
 use App\Modules\Messaging\Services\PhoneNumberNormalizer;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
-final class MarketingPermissionContactImportPostProcessor implements ContactImportPostProcessor
+final class MarketingPermissionContactImportPostProcessor implements
+    ContactImportPostProcessor,
+    ContactImportPostProcessorOperatorConfigProvider
 {
     private const SCOPE_PATTERN = '/^[a-z0-9]+(?:_[a-z0-9]+)*$/';
+
+    private const DECISION_PENDING = 'pending';
+    private const DECISION_CONFIRMED = 'confirmed';
+    private const DECISION_NOT_CONFIRMED = 'not_confirmed';
 
     public function __construct(
         private readonly ImportMessageConsentAction $importMessageConsent,
@@ -39,7 +47,10 @@ final class MarketingPermissionContactImportPostProcessor implements ContactImpo
 
     public function normalizeConfig(array $config): array
     {
-        $unknown = array_values(array_diff(array_keys($config), ['channels', 'scope']));
+        $unknown = array_values(array_diff(
+            array_keys($config),
+            ['channels', 'scope', 'operator_decision', 'attested'],
+        ));
 
         if ($unknown !== []) {
             sort($unknown);
@@ -90,15 +101,79 @@ final class MarketingPermissionContactImportPostProcessor implements ContactImpo
             );
         }
 
+        $operatorDecision = $config['operator_decision'] ?? null;
+
+        if ($operatorDecision !== null) {
+            if (! is_string($operatorDecision)) {
+                throw new InvalidArgumentException(
+                    'Contact import marketing permission [operator_decision] must be a string when supplied.',
+                );
+            }
+
+            $operatorDecision = str_replace('-', '_', strtolower(trim($operatorDecision)));
+
+            if (! in_array($operatorDecision, [
+                self::DECISION_PENDING,
+                self::DECISION_CONFIRMED,
+                self::DECISION_NOT_CONFIRMED,
+            ], true)) {
+                throw new InvalidArgumentException(
+                    "Unsupported contact import marketing permission decision [{$operatorDecision}].",
+                );
+            }
+        }
+
         return [
             'channels' => array_values(array_unique($normalizedChannels)),
             'scope' => trim($scope),
+            'operator_decision' => $operatorDecision,
+            'attested' => (bool) ($config['attested'] ?? false),
         ];
+    }
+
+    public function operatorConfig(?array $configured): array
+    {
+        $base = $configured ?? [
+            'channels' => [
+                MessageChannel::Email->value,
+                MessageChannel::Sms->value,
+            ],
+            'scope' => 'contact_import',
+        ];
+        $base = $this->normalizeConfig($base);
+
+        return [
+            ...$base,
+            'operator_decision' => self::DECISION_PENDING,
+            'attested' => false,
+        ];
+    }
+
+    public function shouldProcess(array $config): bool
+    {
+        $config = $this->normalizeConfig($config);
+
+        if ($config['operator_decision'] === null) {
+            return true;
+        }
+
+        return $config['operator_decision'] === self::DECISION_CONFIRMED
+            && $config['attested'] === true
+            && $config['channels'] !== [];
     }
 
     public function summary(array $config): string
     {
         $config = $this->normalizeConfig($config);
+
+        if ($config['operator_decision'] === self::DECISION_PENDING) {
+            return 'Confirm whether these contacts already granted marketing permission before this import.';
+        }
+
+        if ($config['operator_decision'] === self::DECISION_NOT_CONFIRMED) {
+            return 'Import contacts without marketing permission.';
+        }
+
         $channels = array_map(
             static fn (string $channel): string => strtoupper($channel),
             $config['channels'],
@@ -111,15 +186,182 @@ final class MarketingPermissionContactImportPostProcessor implements ContactImpo
         );
     }
 
+    public function inputDefinitions(array $config): array
+    {
+        $config = $this->normalizeConfig($config);
+        $channelOptions = [];
+
+        foreach ($config['channels'] as $channel) {
+            $channelOptions[] = [
+                'value' => $channel,
+                'label' => $channel === MessageChannel::Email->value
+                    ? 'Email marketing'
+                    : 'SMS marketing',
+            ];
+        }
+
+        return [
+            [
+                'key' => 'permission_status',
+                'label' => 'Have these contacts already given permission to receive marketing messages?',
+                'type' => 'select',
+                'required' => true,
+                'full_width' => true,
+                'description' => 'Only confirm permission that was already collected through another platform or process.',
+                'options' => [
+                    [
+                        'value' => self::DECISION_CONFIRMED,
+                        'label' => 'Yes — permission was already collected elsewhere',
+                    ],
+                    [
+                        'value' => self::DECISION_NOT_CONFIRMED,
+                        'label' => 'No / I’m not sure',
+                    ],
+                ],
+            ],
+            [
+                'key' => 'channels',
+                'label' => 'Permission already exists for',
+                'type' => 'checkbox_group',
+                'required' => true,
+                'options' => $channelOptions,
+                'show_when' => [
+                    'field' => 'permission_status',
+                    'equals' => self::DECISION_CONFIRMED,
+                ],
+            ],
+            [
+                'key' => 'attestation',
+                'label' => 'I confirm these contacts previously agreed to receive marketing through the selected channels.',
+                'type' => 'checkbox',
+                'required' => true,
+                'full_width' => true,
+                'description' => 'This records imported permission; it does not send a permission request.',
+                'show_when' => [
+                    'field' => 'permission_status',
+                    'equals' => self::DECISION_CONFIRMED,
+                ],
+            ],
+        ];
+    }
+
+    public function withSubmittedInputs(
+        array $config,
+        array $submitted,
+    ): array {
+        $config = $this->normalizeConfig($config);
+        $unknown = array_values(array_diff(
+            array_keys($submitted),
+            ['permission_status', 'channels', 'attestation'],
+        ));
+
+        if ($unknown !== []) {
+            sort($unknown);
+
+            throw ValidationException::withMessages([
+                "post_import_inputs.{$this->key()}" => 'Marketing permission received unsupported operator input.',
+            ]);
+        }
+
+        $decision = $submitted['permission_status'] ?? null;
+
+        if (! is_string($decision) || trim($decision) === '') {
+            $decision = self::DECISION_NOT_CONFIRMED;
+        } else {
+            $decision = str_replace('-', '_', strtolower(trim($decision)));
+        }
+
+        if (! in_array($decision, [
+            self::DECISION_CONFIRMED,
+            self::DECISION_NOT_CONFIRMED,
+        ], true)) {
+            throw ValidationException::withMessages([
+                "post_import_inputs.{$this->key()}.permission_status" => 'Choose a valid marketing permission option.',
+            ]);
+        }
+
+        if ($decision === self::DECISION_NOT_CONFIRMED) {
+            return [
+                ...$config,
+                'operator_decision' => self::DECISION_NOT_CONFIRMED,
+                'attested' => false,
+            ];
+        }
+
+        $submittedChannels = $submitted['channels'] ?? [];
+
+        if (! is_array($submittedChannels) || ! array_is_list($submittedChannels)) {
+            throw ValidationException::withMessages([
+                "post_import_inputs.{$this->key()}.channels" => 'Choose the marketing channels that already have permission.',
+            ]);
+        }
+
+        $selectedChannels = [];
+
+        foreach ($submittedChannels as $channel) {
+            if (! is_string($channel)) {
+                continue;
+            }
+
+            $channel = str_replace('-', '_', strtolower(trim($channel)));
+
+            if (! in_array($channel, $config['channels'], true)) {
+                throw ValidationException::withMessages([
+                    "post_import_inputs.{$this->key()}.channels" => 'A selected marketing channel is not available for this import.',
+                ]);
+            }
+
+            $selectedChannels[] = $channel;
+        }
+
+        $selectedChannels = array_values(array_unique($selectedChannels));
+
+        if ($selectedChannels === []) {
+            throw ValidationException::withMessages([
+                "post_import_inputs.{$this->key()}.channels" => 'Choose at least one channel with existing marketing permission.',
+            ]);
+        }
+
+        $attested = in_array(
+            $submitted['attestation'] ?? null,
+            [true, 1, '1', 'on', 'yes'],
+            true,
+        );
+
+        if (! $attested) {
+            throw ValidationException::withMessages([
+                "post_import_inputs.{$this->key()}.attestation" => 'Confirm that the selected marketing permission was previously granted.',
+            ]);
+        }
+
+        return [
+            ...$config,
+            'channels' => $selectedChannels,
+            'operator_decision' => self::DECISION_CONFIRMED,
+            'attested' => true,
+        ];
+    }
+
     public function handle(
         ContactImportContext $context,
         array $config,
     ): ContactImportPostProcessResult {
         $config = $this->normalizeConfig($config);
+
+        if (! $this->shouldProcess($config)) {
+            return ContactImportPostProcessResult::skipped(
+                reasonCode: 'marketing_permission_not_confirmed',
+                message: 'Marketing permission was not imported because prior permission was not confirmed.',
+            );
+        }
+
         $channels = [];
         $applied = 0;
         $skipped = 0;
         $revoked = 0;
+        $evidence = $config['operator_decision'] === self::DECISION_CONFIRMED
+            ? 'operator_attested_existing_consent'
+            : 'server_configured_import_permission';
 
         foreach ($config['channels'] as $channel) {
             $destinationState = $this->destinationState($context, $channel);
@@ -185,6 +427,7 @@ final class MarketingPermissionContactImportPostProcessor implements ContactImpo
                     'contact_import_batch_id' => $context->batch->getKey(),
                     'contact_import_occurrence_id' => $context->occurrence->getKey(),
                     'contact_import_profile_key' => $context->profileKey,
+                    'permission_evidence' => $evidence,
                 ],
             );
 
@@ -199,6 +442,7 @@ final class MarketingPermissionContactImportPostProcessor implements ContactImpo
         $meta = [
             'purpose' => MessagePurpose::Marketing->value,
             'capture_scope' => $config['scope'],
+            'permission_evidence' => $evidence,
             'channels' => $channels,
         ];
 
@@ -224,7 +468,7 @@ final class MarketingPermissionContactImportPostProcessor implements ContactImpo
 
         return ContactImportPostProcessResult::applied(
             meta: $meta,
-            message: 'Configured marketing permission was imported.',
+            message: 'Confirmed marketing permission was imported.',
         );
     }
 

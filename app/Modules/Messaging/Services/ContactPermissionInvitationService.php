@@ -116,15 +116,18 @@ class ContactPermissionInvitationService
                     ],
                 ]);
             });
-        } catch (QueryException) {
+        } catch (QueryException $exception) {
             $existing = ContactPermissionInvitation::query()
                 ->where('contact_id', $contact->getKey())
                 ->where('channel', ContactPermissionInvitation::CHANNEL_EMAIL)
                 ->where('source', ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT)
                 ->first();
 
-            return $existing instanceof ContactPermissionInvitation
-                && (int) $existing->scheduled_message_id === (int) $scheduledMessage->getKey()
+            if (! $existing instanceof ContactPermissionInvitation) {
+                throw $exception;
+            }
+
+            return (int) $existing->scheduled_message_id === (int) $scheduledMessage->getKey()
                 && $existing->status === ContactPermissionInvitation::STATUS_CLAIMED
                     ? $existing
                     : null;

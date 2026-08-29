@@ -5,6 +5,7 @@ namespace App\Modules\Core\Support\Contacts;
 use App\Modules\Core\Contracts\Contacts\ContactImportPostProcessor;
 use App\Modules\Core\Contracts\Contacts\ContactImportPostProcessorBatchFinalizer;
 use App\Modules\Core\Contracts\Contacts\ContactImportPostProcessorInputProvider;
+use App\Modules\Core\Contracts\Contacts\ContactImportPostProcessorOperatorConfigProvider;
 use App\Modules\Core\Data\Contacts\ContactImportContext;
 use App\Modules\Core\Data\Contacts\ContactImportPostProcessResult;
 use App\Modules\Core\Models\ContactImportBatch;
@@ -97,6 +98,35 @@ final class ContactImportPostProcessorRegistry
         }
 
         return $normalized;
+    }
+
+    /**
+     * Add operator-wide processor configuration without requiring a client
+     * import profile to know about optional modules. Existing profile config
+     * remains the server-owned base when present.
+     *
+     * @param array<string, array<string, mixed>> $configured
+     * @return array<string, array<string, mixed>>
+     */
+    public function operatorInputConfig(array $configured): array
+    {
+        $configured = $this->normalizeConfig($configured);
+
+        foreach ($this->processors() as $processor) {
+            if (! $processor instanceof ContactImportPostProcessorOperatorConfigProvider) {
+                continue;
+            }
+
+            $existing = $configured[$processor->key()] ?? null;
+
+            $configured[$processor->key()] = $processor->normalizeConfig(
+                $processor->operatorConfig(
+                    is_array($existing) ? $existing : null,
+                ),
+            );
+        }
+
+        return $configured;
     }
 
     /**
@@ -203,12 +233,21 @@ final class ContactImportPostProcessorRegistry
                 ]);
             }
 
-            $configured[$key] = $processor->normalizeConfig(
+            $resolved = $processor->normalizeConfig(
                 $processor->withSubmittedInputs(
                     config: $config,
                     submitted: $processorSubmitted,
                 ),
             );
+
+            if ($processor instanceof ContactImportPostProcessorOperatorConfigProvider
+                && ! $processor->shouldProcess($resolved)
+            ) {
+                unset($configured[$key]);
+                continue;
+            }
+
+            $configured[$key] = $resolved;
         }
 
         return $configured;

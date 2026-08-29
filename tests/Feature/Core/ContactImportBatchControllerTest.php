@@ -5,10 +5,6 @@ namespace Tests\Feature\Core;
 use App\Models\User;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
-use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
-use App\Modules\Messaging\Models\ContactPermissionInvitation;
-use App\Modules\Messaging\Models\ScheduledMessage;
-use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -39,15 +35,15 @@ class ContactImportBatchControllerTest extends TestCase
             ->get(route('crm.contacts.import-batches.index'));
 
         $response->assertOk();
-        $response->assertSee('Import Batches');
-        $response->assertSee('June CSV Import');
-        $response->assertSee('june-leads.csv');
-        $response->assertSee('Crm Csv');
-        $response->assertSee('Completed');
-        $response->assertSee('12');
+        $response->assertViewHas('importBatches', fn ($batches): bool =>
+            $batches->contains(fn (ContactImportBatch $batch): bool =>
+                $batch->is($importBatch)
+                && (int) $batch->contacts_count === 2
+            )
+        );
     }
 
-    public function test_it_shows_a_contact_import_batch_with_contacts(): void
+    public function test_it_shows_only_contacts_from_the_selected_import_batch(): void
     {
         $user = User::factory()->create();
 
@@ -62,41 +58,24 @@ class ContactImportBatchControllerTest extends TestCase
         ]);
 
         $included = Contact::factory()->create([
-            'name' => 'Jane Lead',
             'email' => 'jane@example.test',
-            'phone' => '5551112222',
             'contact_import_batch_id' => $importBatch->id,
         ]);
 
         Contact::factory()->create([
-            'name' => 'Ignored Lead',
             'email' => 'ignored@example.test',
             'contact_import_batch_id' => null,
         ]);
-
-        ScheduledMessage::factory()
-            ->skipped('permission_invitation_cancelled')
-            ->create([
-                'recipient_type' => $included->getMorphClass(),
-                'recipient_id' => $included->getKey(),
-                'context_type' => $importBatch->getMorphClass(),
-                'context_id' => $importBatch->getKey(),
-                'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
-            ]);
 
         $response = $this
             ->actingAs($user)
             ->get(route('crm.contacts.import-batches.show', $importBatch));
 
         $response->assertOk();
-        $response->assertSee('June CSV Import');
-        $response->assertSee('june-leads.csv');
-        $response->assertSee('Jane Lead');
-        $response->assertSee('jane@example.test');
-        $response->assertSee('5551112222');
-        $response->assertDontSee('ignored@example.test');
-        $response->assertSee('Cancelled');
-        $response->assertSee('permission_invitation_cancelled');
+        $response->assertViewHas('contacts', function ($contacts) use ($included): bool {
+            return $contacts->count() === 1
+                && $contacts->first()?->is($included);
+        });
 
         $this->assertSame($importBatch->id, $included->refresh()->contact_import_batch_id);
     }
@@ -110,62 +89,6 @@ class ContactImportBatchControllerTest extends TestCase
             ->get(route('crm.contacts.index'));
 
         $response->assertOk();
-        $response->assertSee('View Imports');
         $response->assertSee(route('crm.contacts.import-batches.index'), false);
-    }
-
-    public function test_it_cancels_pending_permission_invitation_messages_for_an_import_batch(): void
-    {
-        $user = User::factory()->create();
-
-        $importBatch = ContactImportBatch::factory()->create();
-
-        $contact = Contact::factory()->create([
-            'email' => 'imported@example.test',
-            'source' => 'import',
-            'contact_import_batch_id' => $importBatch->id,
-        ]);
-
-        $scheduledMessage = ScheduledMessage::factory()->create([
-            'recipient_type' => $contact->getMorphClass(),
-            'recipient_id' => $contact->id,
-            'context_type' => $importBatch->getMorphClass(),
-            'context_id' => $importBatch->id,
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'permission_invitation',
-            'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
-            'status' => ScheduledMessage::STATUS_PENDING,
-            'meta' => [
-                'consent_policy' => [
-                    'permission_invitation' => [
-                        'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
-                        'one_time' => true,
-                    ],
-                ],
-            ],
-        ]);
-
-        $response = $this
-            ->actingAs($user)
-            ->delete(route('crm.contacts.import-batches.permission-invitations.destroy', $importBatch));
-
-        $response->assertRedirect(route('crm.contacts.import-batches.show', $importBatch));
-        $response->assertSessionHas('success', '1 pending permission invitation message(s) cancelled.');
-
-        $scheduledMessage->refresh();
-
-        $terminalResult = ScheduledMessageTerminalResult::fromScheduledMessage(
-            $scheduledMessage->load('terminalOutboxEvent.deliveryAttempt'),
-        );
-
-        $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $scheduledMessage->status);
-        $this->assertSame('permission_invitation_cancelled', $terminalResult->reason);
-
-        $this->assertDatabaseMissing('contact_permission_invitations', [
-            'contact_id' => $contact->id,
-            'channel' => ContactPermissionInvitation::CHANNEL_EMAIL,
-            'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
-        ]);
     }
 }

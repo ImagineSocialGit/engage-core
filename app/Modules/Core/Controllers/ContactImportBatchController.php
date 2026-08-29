@@ -37,18 +37,9 @@ class ContactImportBatchController extends Controller
             $contactImportBatch->importedContactsQuery()->count(),
         );
 
-        $contactsQuery = $contactImportBatch->importedContactsQuery()
-            ->latest();
-
-        if (module_enabled('messaging')) {
-            $contactsQuery->with([
-                'messageConsents',
-                'permissionInvitations',
-                'scheduledMessages.terminalOutboxEvent.deliveryAttempt',
-            ]);
-        }
-
-        $contacts = $contactsQuery->paginate(50);
+        $contacts = $contactImportBatch->importedContactsQuery()
+            ->latest()
+            ->paginate(50);
 
         return view('crm.contacts.import-batches.show', [
             'importBatch' => $contactImportBatch,

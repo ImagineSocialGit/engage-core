@@ -7,13 +7,19 @@ interface ContactImportPostProcessorInputProvider
     /**
      * Describe operator inputs owned by this configured post-import processor.
      *
+     * Supported presentation metadata may include select/checkbox options and
+     * simple conditional visibility. Runtime validation remains processor-owned.
+     *
      * @param array<string, mixed> $config
      * @return array<int, array{
      *     key: string,
      *     label: string,
      *     type: string,
      *     description?: string|null,
-     *     required?: bool
+     *     required?: bool,
+     *     full_width?: bool,
+     *     options?: array<int, array{value: string, label: string}>,
+     *     show_when?: array{field: string, equals: mixed}
      * }>
      */
     public function inputDefinitions(array $config): array;

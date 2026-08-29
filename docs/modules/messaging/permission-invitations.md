@@ -1,93 +1,77 @@
 # Imported Contact Permission Invitations
 
-Imported contact permission invitations are a Messaging-owned one-time consent flow for contacts imported from another system.
+Imported-contact permission invitations are a Messaging-owned one-time opt-in flow for
+contacts that do not already have confirmed marketing permission.
 
-The purpose is to send one email asking an imported contact to confirm whether they want to receive future messages through email, SMS, or both.
+They are not part of Contact import completion and they are not a general marketing
+consent bypass.
 
-This is not a general marketing consent bypass.
+## Import-time consent decision
+
+When Messaging is enabled, every add-import exposes a batch-wide Marketing permission
+decision before processing begins.
+
+The operator must choose one of:
+
+```text
+Yes — permission was already collected elsewhere
+No / I’m not sure
+```
+
+When prior permission is confirmed, the operator independently selects the channels that
+already have permission and attests that the selected permission was previously granted.
+Only those selected channels are imported as normal marketing consent.
+
+When prior permission is not confirmed, the Contact import proceeds without marketing
+permission. Import does not automatically schedule or send a permission invitation.
+
+The import-batch detail page is Core operational history only. It does not own a Messaging
+permission-invitation card, count, send button, or cancellation button.
+
+An operator who wants to request permission later uses the opt-in Broadcast workflow.
 
 ## Ownership
 
 Messaging owns:
 
-- `contact_permission_invitations`
-- invitation token generation
-- one-time send enforcement
-- import-batch permission invitation scheduling action
-- import-batch permission invitation eligibility checks
-- duplicate pending/sent scheduled invitation protection
-- public preference routes/controllers
-- consent recording from the public form
-- accepted channel tracking
-- injection of public preference URLs into the invitation email payload
+- `contact_permission_invitations`;
+- invitation token generation;
+- one-time send enforcement;
+- invitation eligibility and send-time claiming;
+- public preference routes/controllers;
+- consent recording from the public form;
+- accepted channel tracking;
+- injection of public preference URLs into the invitation email payload;
+- the Contact-import `marketing_permission` post-processor.
 
 Core owns:
 
-- Contact records
-- contact import batches
-- import batch CRM visibility
-- generic contact filter normalization/resolution
+- Contact records;
+- Contact import batches and runs;
+- the generic post-import processor/operator-input seams;
+- import-batch CRM visibility.
 
-Messaging owns the CRM action that schedules imported-contact permission invitation messages for an import batch.
+Broadcasts may provide the operator-facing opt-in invitation Broadcast and owns its normal
+Broadcast recipient bookkeeping. Broadcasts must not directly create permission-invitation
+rows or bypass Messaging eligibility, claim, consent, or delivery rules.
 
-Core owns the import batch records and import batch detail page.
+## Opt-in invitation runtime flow
 
-Core may display the Messaging-owned action when Messaging is enabled, but Core must not import Messaging models, actions, or services directly.
-
-Broadcasts may provide an operator-facing entry point for scheduling imported-contact permission invitations and may own Broadcast recipient bookkeeping for that batch operation.
-
-Messaging still owns the permission-invitation capability itself, including:
-
-- invitation one-time enforcement
-- invitation claim/token creation
-- consent creation
-- public preference token behavior
-- Messaging delivery gates
-- invitation lifecycle state
-
-Broadcasts must not directly create permission invitation records or bypass Messaging-owned claim, eligibility, consent, or delivery rules.
-
-## Runtime flow
-
-1. A client imports contacts.
-2. Contacts are marked as imported by one of:
-   - `source = import`
-   - `meta.imported = true`
-   - `meta.imported_at` present
-   - a present `contact_import_batch_id`
-3. An operator opens the Core-owned import batch detail page.
-4. If Messaging is enabled, the page exposes a Messaging-owned action to send permission invitations for that batch.
-5. The Messaging action evaluates imported contacts for eligibility.
-6. Contacts are skipped when they:
-   - are not imported
-   - have no email address
-   - already have active email marketing consent on the channel+purpose boundary
-   - already have an imported-contact email permission invitation row
-   - already have a pending or sent imported-contact permission invitation scheduled message
-7. Messaging schedules the canonical imported-contact permission invitation email message.
-8. The scheduled-message send job evaluates final send-time gates.
-9. The scheduled-message send job claims the permission invitation before provider send.
-10. Messaging creates the `contact_permission_invitations` row at claim/send time.
-11. Messaging injects the public preference URL into the email payload.
-12. The contact clicks the CTA/link.
-13. The public preference page lets the contact choose email, SMS, or both, depending on channel availability config.
-14. Messaging creates one normal marketing `MessageConsent` row for each explicitly selected channel.
-15. Messaging marks the invitation accepted and stores accepted channels.
-16. After the acceptance transaction succeeds, Messaging emits the neutral `permission_invitation.accepted` automation event exactly once for that invitation.
-
-## Import batch invitation visibility
-
-The import batch detail page may show operator-facing permission invitation status for the currently displayed page of contacts.
-
-This visibility is operational UI.
-
-It is not the final permission check.
-
-Messaging still owns eligibility checks, one-time enforcement, scheduled-message creation, send-time claiming, and consent creation.
+1. An operator creates/schedules an imported-contact opt-in Broadcast.
+2. Broadcasts resolves and snapshots the recipient audience.
+3. Messaging schedules the canonical imported-contact permission invitation email.
+4. The ScheduledMessage send job evaluates final send-time gates.
+5. The send job claims the one-time permission invitation before provider submission.
+6. Messaging creates the `contact_permission_invitations` row at claim time.
+7. Messaging injects the public preference URL into the email payload.
+8. The contact opens the preference page and explicitly selects email, SMS, or both.
+9. Messaging creates normal marketing `MessageConsent` rows for selected channels.
+10. Messaging marks the invitation accepted and emits `permission_invitation.accepted`
+    exactly once after the acceptance transaction succeeds.
 
 ## Required message identity
 
-Permission invitation emails must use:
+Permission invitation emails use:
 
 ```text
 channel = email
@@ -97,7 +81,7 @@ dispatch_key = imported_contact_permission_invitation
 message_type = imported_contact_permission_invitation
 ```
 
-The message must carry:
+The message carries:
 
 ```php
 'consent_policy' => [
@@ -110,27 +94,27 @@ The message must carry:
 
 ## One-time enforcement
 
-A contact may receive one imported-contact permission invitation per channel/source.
-
-The DB-level uniqueness rule is:
+A contact may consume one imported-contact permission invitation per channel/source.
+The DB-level uniqueness boundary is:
 
 ```text
 contact_id + channel + source
 ```
 
-Once a matching `contact_permission_invitations` row exists, Messaging should not send another invitation through the bypass.
+At send time, `ContactPermissionInvitationService::claimForScheduledMessage()` first checks
+for an existing matching invitation under a transaction/lock. If a concurrent insert causes
+a unique-key race, the service re-reads the persisted invitation and may return the claimed
+row for the same ScheduledMessage or `null` for a genuinely consumed invitation.
 
-This includes invitations that were claimed/sent before the public preference form was accepted.
-
-Because permission invitation rows are claimed at send time, eligibility also treats an existing pending or sent `ScheduledMessage` with `message_type = imported_contact_permission_invitation` as already invited.
-
-This prevents repeated operator clicks from scheduling duplicate invitation messages before the first message is sent.
+A `QueryException` is **not** proof that an invitation was already used. If the post-exception
+re-read finds no matching persisted invitation, the original exception must be rethrown so
+the ScheduledMessage job follows normal retry/failure behavior. Infrastructure failures must
+never be converted into the business reason `permission_invitation_already_used`.
 
 ## Consent behavior
 
-Accepted public preferences create normal `MessageConsent` records.
-
-The hard permission identity is:
+Accepted public preferences create normal `MessageConsent` records at the hard permission
+boundary:
 
 ```text
 channel + purpose
@@ -144,139 +128,32 @@ scope = permission_invitation
 source = imported_contact_permission_invitation
 ```
 
-One consent row is created per explicitly selected channel. The stored
-`permission_invitation` scope is capture provenance/context only; it does not limit the
-marketing permission to invitation-specific messages and it is not configurable as an
-accepted-scope list.
+The scope is capture provenance/context; it does not confine marketing permission to
+invitation-specific messages. A later channel+marketing revocation blocks marketing on that
+channel across scopes. Email and SMS remain independent.
 
-The invitation email itself remains transactional because it exists to ask for
-communication preferences, not to send normal marketing content.
-
-A later channel+marketing revocation blocks every marketing message scope on that channel.
-Revoking email marketing does not revoke SMS marketing, and vice versa.
+Import-time confirmed permission uses the same normal marketing-consent domain. Its consent
+metadata records that the permission was operator-attested as pre-existing; the import does
+not fabricate a new contact interaction as evidence.
 
 ## SMS behavior
 
-SMS must be explicit.
+SMS permission must be explicit. Do not infer it from:
 
-Do not infer SMS consent from:
+- imported status;
+- email permission;
+- receiving an invitation email;
+- opening the public preference page;
+- choosing email only.
 
-- imported contact status
-- email consent
-- receiving the invitation email
-- opening the public preference page
-- choosing email only
+If the public invitation accepts SMS, the form must collect or confirm a usable phone number.
 
-If the contact chooses SMS, the form must collect or confirm a phone number.
+## Cancellation, skip, failure, and retry
 
-SMS capabilities may exist in code while SMS options are hidden in UI by config.
+Permission invitation lifecycle state and ScheduledMessage delivery state are related but do
+not use identical vocabularies.
 
-## Config
-
-Default config lives at:
-
-```text
-config/messaging/permission_invitations.php
-```
-
-Client override path:
-
-```text
-client/{client-key}/config/messaging/permission_invitations.php
-```
-
-Expected top-level keys:
-
-```php
-return [
-    'public' => [],
-    'email' => [],
-    'content' => [],
-    'style' => [],
-];
-```
-
-`public` controls the public base URL override/fallback.
-
-`email` controls the invitation email subject/body and CTA labels.
-
-Accepted channels always create marketing consent at the channel+purpose boundary with
-`permission_invitation` retained as capture scope; there is no configurable consent-scope list.
-
-`content` controls public-page copy.
-
-`style` controls public-page class strings.
-
-## Email tokens and CTA
-
-Messaging injects:
-
-```text
-{permission_invitation.url}
-:permission_invitation.url
-```
-
-The email payload also receives:
-
-```text
-cta.label
-cta.url
-secondary_link.label
-secondary_link.url
-```
-
-For the default email view, place `{cta}` on its own line in the body to render the button inline.
-
-If `{cta}` is not present and the CTA exists, the default email view renders the button after the body.
-
-Do not hand-author public preference URLs in client copy.
-
-
-## Accepted automation event
-
-Accepted permission invitations emit the neutral automation event:
-
-```text
-permission_invitation.accepted
-```
-
-Messaging remains independent from downstream consumers.
-
-The acceptance path should:
-
-```text
-lock the invitation row
-recheck accepted state inside the transaction
-update the SMS phone number, when selected/provided
-create/update one marketing MessageConsent row per accepted channel
-mark the invitation accepted
-commit
-emit permission_invitation.accepted after the transaction succeeds
-```
-
-The event is contact-scoped and uses `ContactPermissionInvitation` as its subject.
-
-Payload includes compact invitation context such as:
-
-```text
-accepted_channels
-consent_purpose
-consent_scope
-accepted_at
-invitation source/status/channel
-context_type / context_id
-scheduled_message_id
-```
-
-The event must not be emitted again when an already accepted invitation is submitted again.
-
-Downstream behavior belongs to consumers such as FlowRoutes through the generic `AutomationEventRecorded` seam. Messaging must not import FlowRoutes, Campaigns, Tasks, Workflow, or vertical modules to react to acceptance.
-
-## Cancellation, skip, and failure lifecycle
-
-Permission invitation lifecycle state and scheduled-message delivery state are related, but they do not use identical vocabularies.
-
-Canonical permission invitation states remain:
+Canonical invitation states remain:
 
 ```text
 claimed
@@ -285,29 +162,29 @@ failed
 accepted
 ```
 
-Do not add `cancelled` or `skipped` invitation states unless a later workflow proves they are needed.
-
 Expected behavior:
 
 ```text
 Cancelled before send-time claim
     ScheduledMessage = skipped
     ContactPermissionInvitation = no row
-    BroadcastRecipient = cancelled, when Broadcast-owned
 
 Messaging gate denial before claim
     ScheduledMessage = skipped
     ContactPermissionInvitation = no row
-    BroadcastRecipient = skipped, when Broadcast-owned
 
 Duplicate invitation discovered at claim
     ScheduledMessage = skipped
     Existing ContactPermissionInvitation = unchanged
 
-Local preparation failure after claim, including unresolved tokens
+Database/transient failure while claiming, no invitation persisted
+    exception = rethrown
+    ScheduledMessage job = normal retry/failure path
+    ContactPermissionInvitation = no fabricated row/reason
+
+Local preparation failure after claim
     ScheduledMessage = skipped
     ContactPermissionInvitation = failed
-    invitation.failure_reason records the immutable ScheduledMessageTerminalResult reason
 
 Provider/runtime exception after claim
     ScheduledMessage = failed
@@ -318,35 +195,45 @@ Successful send followed by acceptance
     ContactPermissionInvitation = accepted
 ```
 
-A claimed invitation must never remain stuck in `claimed` after its scheduled message reaches a terminal skipped state. Messaging listens to `ScheduledMessageSkipped` and reconciles a matching claimed invitation to `failed`.
+A claimed invitation must not remain stuck in `claimed` after its ScheduledMessage reaches a
+terminal skipped/failed state. Existing reconciliation listeners remain scoped to the matching
+`scheduled_message_id` and `status = claimed`.
 
-The reconciliation is intentionally scoped by `scheduled_message_id` and `status = claimed`. Therefore:
+## Config and CTA
 
-- pre-claim skips create no invitation row;
-- an existing sent/failed/accepted invitation is not rewritten;
-- a duplicate scheduled attempt does not mutate the invitation that already consumed the one-time claim.
+Default config:
 
-Failed invitation rows continue to count as already invited for one-time enforcement. Do not automatically create a fresh invitation after failure. A future explicit retry/reissue workflow may revisit that policy with operator-visible audit semantics.
+```text
+config/messaging/permission_invitations.php
+```
+
+Client override:
+
+```text
+client/{client-key}/config/messaging/permission_invitations.php
+```
+
+Messaging injects the public preference URL through:
+
+```text
+{permission_invitation.url}
+:permission_invitation.url
+```
+
+and supplies canonical CTA/secondary-link payload values. Do not hand-author public
+preference URLs in client copy.
 
 ## Testing expectations
 
 Coverage should prove:
 
-- public invitation page renders from a valid token
-- invalid tokens return 404
-- email-only acceptance creates email consent records
-- SMS-only acceptance requires/stores phone and creates SMS consent records
-- email+SMS acceptance creates both sets of consent records
-- accepted invitations show the accepted state
-- already accepted invitations do not create duplicate consent rows
-- first acceptance emits exactly one `permission_invitation.accepted` automation event
-- already accepted invitations do not emit the acceptance event again
-- scheduled-send job injects the public preference URL before sending
-- SMS does not receive the email-only bypass
-- normal Broadcasts do not receive the imported-contact bypass
-- import-batch permission invitation scheduling only schedules eligible contacts from the selected import batch
-- running the import-batch scheduling action twice does not create duplicate pending/sent invitation messages
-- contacts with existing imported-contact email invitation rows are skipped
-- contacts with required marketing email consent are skipped
-- contacts without email addresses are skipped
-- contacts with `contact_import_batch_id` count as imported for final Messaging send-time enforcement
+- import add-mode requires an explicit marketing-permission decision when Messaging is enabled;
+- `No / I’m not sure` removes marketing-permission processing from the durable import plan;
+- confirmed permission requires at least one selected allowed channel plus attestation;
+- revoked marketing channels are not silently reactivated by import;
+- public invitation acceptance remains explicit per channel;
+- one-time invitation claiming remains race-safe;
+- a claim-time `QueryException` with no persisted invitation is rethrown for job retry;
+- a genuine already-consumed invitation remains a business-rule skip;
+- Broadcast recipient diagnostics resolve terminal reason/provider evidence from Messaging's
+  normalized terminal persistence rather than copying that data into BroadcastRecipient.

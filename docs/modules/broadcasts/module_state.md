@@ -342,6 +342,12 @@ Reconciliation is idempotent and strips any legacy `meta.delivery` snapshot whil
 
 Broadcast completes when every recipient is terminal. Provider execution detail remains available through the ScheduledMessage relationship, delivery attempts, and terminal outbox—not copied recipient metadata.
 
+The CRM Broadcast detail surface follows the same ownership boundary. Recipient rows are
+paginated in bounded pages and may be filtered by recipient status. The side diagnostic
+surface shows only skipped/failed recipients; selecting one resolves its ScheduledMessage
+terminal outbox event and delivery attempts on demand. It must not render a second generic
+list of ScheduledMessages that merely duplicates recipient status.
+
 ## Cancellation
 
 Broadcast cancellation should:

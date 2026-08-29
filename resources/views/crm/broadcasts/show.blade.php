@@ -223,18 +223,58 @@
                 </x-ui.card>
 
                 <x-ui.card class="overflow-hidden p-0">
+                    @php
+                        $recipientStatusOptions = [
+                            ['value' => null, 'label' => 'All', 'count' => $broadcast->recipients_count ?? 0],
+                            ['value' => \App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_PENDING, 'label' => 'Pending', 'count' => $broadcast->pending_recipients_count ?? 0],
+                            ['value' => \App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SCHEDULED, 'label' => 'Scheduled', 'count' => $broadcast->scheduled_recipients_count ?? 0],
+                            ['value' => \App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SENT, 'label' => 'Sent', 'count' => $broadcast->sent_recipients_count ?? 0],
+                            ['value' => \App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SKIPPED, 'label' => 'Skipped', 'count' => $broadcast->skipped_recipients_count ?? 0],
+                            ['value' => \App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_FAILED, 'label' => 'Failed', 'count' => $broadcast->failed_recipients_count ?? 0],
+                            ['value' => \App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_CANCELLED, 'label' => 'Cancelled', 'count' => $broadcast->cancelled_recipients_count ?? 0],
+                        ];
+                    @endphp
+
                     <div class="border-b border-slate-200 px-4 py-4 sm:px-6">
-                        <h2 class="text-lg font-semibold tracking-tight">
-                            Recipients
-                        </h2>
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                            <div>
+                                <h2 class="text-lg font-semibold tracking-tight">
+                                    Recipients
+                                </h2>
 
-                        <p class="mt-1 text-sm text-slate-500">
-                            Showing the first 250 broadcast recipient records.
-                        </p>
+                                <p class="mt-1 text-sm text-slate-500">
+                                    {{ number_format($broadcast->recipients_count ?? 0) }} recipient records. Results are paginated 50 at a time.
+                                </p>
+                            </div>
 
-                        @if($recipients->contains(fn ($recipient) => $recipient->terminal_reason === 'not_scheduled_by_messaging'))
-                            <p class="mt-2 text-sm leading-6 text-slate-600">
-                                A recipient marked “Not eligible to receive this message” did not pass one of the required checks: a usable email or phone for this channel, active permission for this type of message, or delivery suppression.
+                            <div class="flex flex-wrap gap-2" aria-label="Recipient status filter">
+                                @foreach ($recipientStatusOptions as $option)
+                                    @php
+                                        $statusValue = $option['value'];
+                                        $active = $recipientStatus === $statusValue;
+                                        $filterUrl = route('crm.broadcasts.show', array_filter([
+                                            'broadcast' => $broadcast,
+                                            'recipient_status' => $statusValue,
+                                            'delivery_issue' => request('delivery_issue'),
+                                        ], fn ($value) => $value !== null && $value !== ''));
+                                    @endphp
+
+                                    <a
+                                        href="{{ $filterUrl }}"
+                                        class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold {{ $active ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400' }}"
+                                    >
+                                        {{ $option['label'] }}
+                                        <span class="{{ $active ? 'text-slate-300' : 'text-slate-400' }}">
+                                            {{ number_format($option['count']) }}
+                                        </span>
+                                    </a>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        @if($recipients->contains('terminal_reason', 'not_scheduled_by_messaging'))
+                            <p class="mt-3 text-sm leading-6 text-slate-600">
+                                “Not eligible to receive this message” means the recipient did not pass a required Messaging check such as destination, permission, or suppression.
                             </p>
                         @endif
                     </div>
@@ -275,15 +315,16 @@
                                     <div>
                                         <dt class="font-semibold uppercase tracking-wide text-slate-400">Reason</dt>
                                         <dd class="mt-1 break-words text-sm text-slate-700">
-                                            @php($reason = $recipient->terminal_reason)
-                                            {{ $reason === 'not_scheduled_by_messaging' ? 'Not eligible to receive this message' : ($reason ? str_replace('_', ' ', $reason) : '—') }}
+                                            {{ $recipient->terminal_reason === 'not_scheduled_by_messaging'
+                                                ? 'Not eligible to receive this message'
+                                                : ($recipient->terminal_reason ? str_replace('_', ' ', $recipient->terminal_reason) : '—') }}
                                         </dd>
                                     </div>
                                 </dl>
                             </div>
                         @empty
                             <div class="p-4 text-sm text-slate-600">
-                                No recipients yet.
+                                No recipients match this filter.
                             </div>
                         @endforelse
                     </div>
@@ -333,21 +374,27 @@
                                         </td>
 
                                         <td class="px-6 py-4 text-slate-600">
-                                            @php($reason = $recipient->terminal_reason)
-
-                                            {{ $reason === 'not_scheduled_by_messaging' ? 'Not eligible to receive this message' : ($reason ? str_replace('_', ' ', $reason) : '—') }}
+                                            {{ $recipient->terminal_reason === 'not_scheduled_by_messaging'
+                                                ? 'Not eligible to receive this message'
+                                                : ($recipient->terminal_reason ? str_replace('_', ' ', $recipient->terminal_reason) : '—') }}
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
                                         <td colspan="5" class="px-6 py-6 text-sm text-slate-600">
-                                            No recipients yet.
+                                            No recipients match this filter.
                                         </td>
                                     </tr>
                                 @endforelse
                             </tbody>
                         </table>
                     </div>
+
+                    @if($recipients->hasPages())
+                        <div class="border-t border-slate-200 px-4 py-4 sm:px-6">
+                            {{ $recipients->links() }}
+                        </div>
+                    @endif
                 </x-ui.card>
             </div>
 
@@ -422,7 +469,9 @@
                         Recipient Filter
                     </h2>
 
-                    @php($recipientFilter = $broadcast->recipient_filter ?? [])
+                    @php
+                        $recipientFilter = $broadcast->recipient_filter ?? [];
+                    @endphp
 
                     <div class="mt-4 text-sm text-slate-700">
                         @if(($recipientFilter['type'] ?? 'all') === 'imported')
@@ -505,33 +554,139 @@
                 </x-ui.card>
 
                 <x-ui.card>
-                    <h2 class="text-lg font-semibold tracking-tight">
-                        Scheduled Messages
-                    </h2>
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-semibold tracking-tight">
+                                Delivery Issues
+                            </h2>
+                            <p class="mt-1 text-xs leading-5 text-slate-500">
+                                Only skipped or failed recipients appear here. Open one to inspect the authoritative Messaging reason and provider attempt details.
+                            </p>
+                        </div>
 
-                    <div class="mt-4 space-y-3">
-                        @forelse($scheduledMessages as $scheduledMessage)
-                            <div class="rounded-xl border border-slate-200 p-3 text-sm">
-                                <div class="flex flex-wrap justify-between gap-3">
-                                    <span class="font-medium text-slate-900">
-                                        #{{ $scheduledMessage->id }}
+                        <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                            {{ number_format(($broadcast->skipped_recipients_count ?? 0) + ($broadcast->failed_recipients_count ?? 0)) }}
+                        </span>
+                    </div>
+
+                    <div class="mt-4 space-y-2">
+                        @forelse($deliveryIssues as $issue)
+                            <a
+                                href="{{ request()->fullUrlWithQuery(['delivery_issue' => $issue->getKey()]) }}"
+                                class="block rounded-xl border p-3 text-sm {{ $selectedDeliveryIssue?->is($issue) ? 'border-slate-900 bg-slate-50' : 'border-slate-200 hover:border-slate-400' }}"
+                            >
+                                <div class="flex items-start justify-between gap-3">
+                                    <span class="min-w-0 break-words font-medium text-slate-900">
+                                        {{ $issue->contact?->name ?: trim(($issue->contact?->first_name ?? '').' '.($issue->contact?->last_name ?? '')) ?: ($issue->contact?->email ?? 'Contact #'.$issue->contact_id) }}
                                     </span>
-
-                                    <span class="text-slate-500">
-                                        {{ $scheduledMessage->status }}
+                                    <span class="shrink-0 text-xs font-semibold uppercase tracking-wide {{ $issue->status === 'failed' ? 'text-red-700' : 'text-amber-700' }}">
+                                        {{ $issue->status }}
                                     </span>
                                 </div>
 
-                                <div class="mt-1 text-xs text-slate-500">
-                                    {{ $scheduledMessage->send_at?->setTimezone($clientTimezone)->format('M j, Y g:i A') }}
-                                </div>
-                            </div>
+                                <p class="mt-1 text-xs leading-5 text-slate-500">
+                                    {{ $issue->terminal_reason ?: 'No business-level terminal reason was recorded.' }}
+                                </p>
+                            </a>
                         @empty
                             <p class="text-sm text-slate-500">
-                                No scheduled messages yet.
+                                No skipped or failed recipients.
                             </p>
                         @endforelse
                     </div>
+
+                    @if($selectedDeliveryIssue)
+                        <div class="mt-5 border-t border-slate-200 pt-5">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                        Selected recipient
+                                    </div>
+                                    <div class="mt-1 text-sm font-semibold text-slate-900">
+                                        {{ $selectedDeliveryIssue->contact?->name ?: trim(($selectedDeliveryIssue->contact?->first_name ?? '').' '.($selectedDeliveryIssue->contact?->last_name ?? '')) ?: ($selectedDeliveryIssue->contact?->email ?? 'Contact #'.$selectedDeliveryIssue->contact_id) }}
+                                    </div>
+                                </div>
+                                <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                                    {{ $selectedDeliveryIssue->status }}
+                                </span>
+                            </div>
+
+                            @if($selectedDeliveryIssue->terminal_reason)
+                                <div class="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700">
+                                    {{ $selectedDeliveryIssue->terminal_reason }}
+                                </div>
+                            @endif
+
+                            <div class="mt-4 space-y-3">
+                                @forelse($selectedDeliveryIssueMessages as $scheduledMessage)
+                                    @php
+                                        $terminalEvent = $scheduledMessage->terminalOutboxEvent;
+                                        $terminalAttempt = $terminalEvent?->deliveryAttempt;
+                                        $reasonCode = $terminalAttempt?->reason_code ?: $terminalEvent?->reason_code;
+                                        $reason = $terminalAttempt?->reason ?: $terminalEvent?->reason ?: $selectedDeliveryIssue->terminal_reason;
+                                    @endphp
+
+                                    <div class="rounded-xl border border-slate-200 p-3 text-xs">
+                                        <div class="flex items-center justify-between gap-3">
+                                            <span class="font-semibold text-slate-900">
+                                                Message #{{ $scheduledMessage->getKey() }}
+                                            </span>
+                                            <span class="font-semibold text-slate-600">
+                                                {{ $scheduledMessage->status }}
+                                            </span>
+                                        </div>
+
+                                        <dl class="mt-3 space-y-2 text-slate-600">
+                                            <div>
+                                                <dt class="font-semibold text-slate-400">Reason code</dt>
+                                                <dd class="mt-0.5 break-words">{{ $reasonCode ?: '—' }}</dd>
+                                            </div>
+                                            <div>
+                                                <dt class="font-semibold text-slate-400">Reason</dt>
+                                                <dd class="mt-0.5 break-words">{{ $reason ?: '—' }}</dd>
+                                            </div>
+                                            <div class="grid gap-2 sm:grid-cols-2">
+                                                <div>
+                                                    <dt class="font-semibold text-slate-400">Provider</dt>
+                                                    <dd class="mt-0.5 break-words">{{ $terminalAttempt?->provider ?: 'Not submitted' }}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt class="font-semibold text-slate-400">Destination</dt>
+                                                    <dd class="mt-0.5 break-all">{{ $terminalAttempt?->destination ?: '—' }}</dd>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <dt class="font-semibold text-slate-400">Provider message ID</dt>
+                                                <dd class="mt-0.5 break-all">{{ $terminalAttempt?->provider_message_id ?: '—' }}</dd>
+                                            </div>
+                                        </dl>
+
+                                        @if($scheduledMessage->deliveryAttempts->count() > 1)
+                                            <details class="mt-3 border-t border-slate-100 pt-3">
+                                                <summary class="cursor-pointer font-semibold text-slate-600">
+                                                    Attempt history ({{ $scheduledMessage->deliveryAttempts->count() }})
+                                                </summary>
+                                                <div class="mt-2 space-y-2">
+                                                    @foreach($scheduledMessage->deliveryAttempts as $attempt)
+                                                        <div class="rounded-lg bg-slate-50 p-2 text-slate-600">
+                                                            Attempt {{ $attempt->attempt_number }} · {{ $attempt->status }}
+                                                            @if($attempt->reason_code)
+                                                                · {{ $attempt->reason_code }}
+                                                            @endif
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            </details>
+                                        @endif
+                                    </div>
+                                @empty
+                                    <p class="text-sm text-slate-500">
+                                        No ScheduledMessage evidence is attached to this recipient.
+                                    </p>
+                                @endforelse
+                            </div>
+                        </div>
+                    @endif
                 </x-ui.card>
             </div>
         </div>

@@ -20,6 +20,7 @@ use App\Modules\Core\Services\Contacts\ContactFilterResolver;
 use App\Modules\Core\Support\Contacts\ContactFilterCriterionRegistry;
 use App\Modules\Messaging\Actions\CreateReusableMessageTemplateAction;
 use App\Modules\Messaging\Data\ReusableMessageTemplateAuthoringContext;
+use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\MessageTemplateAuthoringFieldPresenter;
 use App\Modules\Messaging\Services\ReusableMessageTemplateCatalog;
@@ -180,36 +181,101 @@ class BroadcastController extends Controller
             ->with('success', 'New Broadcast draft created from this message. Choose who should receive it before scheduling.');
     }
 
-    public function show(Broadcast $broadcast): View
+    public function show(Request $request, Broadcast $broadcast): View
     {
         $broadcast->loadCount([
             'recipients',
+            'recipients as pending_recipients_count' => fn ($query) => $query->where('status', BroadcastRecipient::STATUS_PENDING),
+            'recipients as scheduled_recipients_count' => fn ($query) => $query->where('status', BroadcastRecipient::STATUS_SCHEDULED),
             'recipients as sent_recipients_count' => fn ($query) => $query->where('status', BroadcastRecipient::STATUS_SENT),
             'recipients as skipped_recipients_count' => fn ($query) => $query->where('status', BroadcastRecipient::STATUS_SKIPPED),
             'recipients as failed_recipients_count' => fn ($query) => $query->where('status', BroadcastRecipient::STATUS_FAILED),
             'recipients as cancelled_recipients_count' => fn ($query) => $query->where('status', BroadcastRecipient::STATUS_CANCELLED),
         ]);
 
+        $recipientStatuses = [
+            BroadcastRecipient::STATUS_PENDING,
+            BroadcastRecipient::STATUS_SCHEDULED,
+            BroadcastRecipient::STATUS_SENT,
+            BroadcastRecipient::STATUS_SKIPPED,
+            BroadcastRecipient::STATUS_FAILED,
+            BroadcastRecipient::STATUS_CANCELLED,
+        ];
+        $recipientStatus = $request->query('recipient_status');
+        $recipientStatus = is_string($recipientStatus)
+            && in_array($recipientStatus, $recipientStatuses, true)
+                ? $recipientStatus
+                : null;
+
         $recipients = $broadcast->recipients()
             ->with('contact')
+            ->when(
+                $recipientStatus !== null,
+                fn ($query) => $query->where('status', $recipientStatus),
+            )
             ->orderBy('id')
-            ->limit(250)
+            ->paginate(50, ['*'], 'recipient_page')
+            ->withQueryString();
+
+        $deliveryIssues = $broadcast->recipients()
+            ->with('contact')
+            ->whereIn('status', [
+                BroadcastRecipient::STATUS_SKIPPED,
+                BroadcastRecipient::STATUS_FAILED,
+            ])
+            ->latest('id')
+            ->limit(10)
             ->get();
 
-        $scheduledMessages = $broadcast->scheduledMessages()
-            ->latest()
-            ->limit(250)
-            ->get();
+        $selectedDeliveryIssue = null;
+        $selectedDeliveryIssueMessages = collect();
+        $selectedDeliveryIssueId = $request->integer('delivery_issue');
+
+        if ($selectedDeliveryIssueId > 0) {
+            $selectedDeliveryIssue = $broadcast->recipients()
+                ->with('contact')
+                ->whereKey($selectedDeliveryIssueId)
+                ->whereIn('status', [
+                    BroadcastRecipient::STATUS_SKIPPED,
+                    BroadcastRecipient::STATUS_FAILED,
+                ])
+                ->first();
+
+            if ($selectedDeliveryIssue instanceof BroadcastRecipient) {
+                $scheduledMessageIds = collect($selectedDeliveryIssue->scheduled_message_ids ?? [])
+                    ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+                    ->map(fn (mixed $id): int => (int) $id)
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                if ($scheduledMessageIds !== []) {
+                    $selectedDeliveryIssueMessages = ScheduledMessage::query()
+                        ->with([
+                            'terminalOutboxEvent.deliveryAttempt',
+                            'deliveryAttempts',
+                        ])
+                        ->whereIn('id', $scheduledMessageIds)
+                        ->where('context_type', $broadcast->getMorphClass())
+                        ->where('context_id', $broadcast->getKey())
+                        ->orderBy('id')
+                        ->get();
+                }
+            }
+        }
 
         return view('crm.broadcasts.show', [
             'title' => $broadcast->name,
             'heading' => $broadcast->name,
             'broadcast' => $broadcast,
             'recipients' => $recipients,
+            'recipientStatus' => $recipientStatus,
             'recipientFilterContacts' => $this->recipientFilterContacts($broadcast),
             'selectedImportBatches' => $this->selectedImportBatches($broadcast),
             'permissionInvitationPreview' => $this->permissionInvitationPreview($broadcast),
-            'scheduledMessages' => $scheduledMessages,
+            'deliveryIssues' => $deliveryIssues,
+            'selectedDeliveryIssue' => $selectedDeliveryIssue,
+            'selectedDeliveryIssueMessages' => $selectedDeliveryIssueMessages,
         ]);
     }
 

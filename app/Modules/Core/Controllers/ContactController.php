@@ -238,12 +238,17 @@ class ContactController extends Controller
         $suggestedMapping = $importProfile !== null
             ? $contactImportProfileRegistry->suggestedMapping($importProfile, $headers->all())
             : [];
-        $postImportSummaries = $importMode === self::IMPORT_MODE_ADD && $importProfile !== null
-            ? $postProcessorRegistry->summaries($importProfile->postImport)
+        $operatorPostImportConfig = $importMode === self::IMPORT_MODE_ADD
+            ? $postProcessorRegistry->operatorInputConfig(
+                $importProfile?->postImport ?? [],
+            )
             : [];
-        $postImportInputs = $importMode === self::IMPORT_MODE_ADD && $importProfile !== null
-            ? $postProcessorRegistry->inputDefinitions($importProfile->postImport)
-            : [];
+        $postImportSummaries = $postProcessorRegistry->summaries(
+            $operatorPostImportConfig,
+        );
+        $postImportInputs = $postProcessorRegistry->inputDefinitions(
+            $operatorPostImportConfig,
+        );
 
         $primaryImportFieldKeys = array_values(array_unique([
             ...$contactImportRegistry->requiredFieldKeys(),
@@ -445,7 +450,9 @@ class ContactController extends Controller
             : [];
         $postImportConfig = $importMode === self::IMPORT_MODE_ADD
             ? $postProcessorRegistry->withSubmittedInputs(
-                configured: $importProfile?->postImport ?? [],
+                configured: $postProcessorRegistry->operatorInputConfig(
+                    $importProfile?->postImport ?? [],
+                ),
                 submitted: is_array($validated['post_import_inputs'] ?? null)
                     ? $validated['post_import_inputs']
                     : [],

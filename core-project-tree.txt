@@ -259,6 +259,7 @@
 │   │   │   │       ├── ContactImportHandler.php
 │   │   │   │       ├── ContactImportPostProcessorBatchFinalizer.php
 │   │   │   │       ├── ContactImportPostProcessorInputProvider.php
+│   │   │   │       ├── ContactImportPostProcessorOperatorConfigProvider.php
 │   │   │   │       ├── ContactImportPostProcessor.php
 │   │   │   │       ├── ContactImportTreatmentTarget.php
 │   │   │   │       ├── ContactPanelProvider.php
@@ -715,7 +716,6 @@
 │   │   │   │   ├── BuildConsentOptInMessageIntentAction.php
 │   │   │   │   ├── CancelMessageChainEnrollmentAction.php
 │   │   │   │   ├── ClaimScheduledMessageForSendingAction.php
-│   │   │   │   ├── CreateContactPermissionInvitationsForImportBatchAction.php
 │   │   │   │   ├── CreateReusableMessageTemplateAction.php
 │   │   │   │   ├── DispatchConsentOptInMessageAction.php
 │   │   │   │   ├── DispatchMessageAction.php
@@ -770,7 +770,6 @@
 │   │   │   │       ├── SmsMessage.php
 │   │   │   │       └── SmsProvider.php
 │   │   │   ├── Controllers
-│   │   │   │   ├── ContactImportBatchPermissionInvitationController.php
 │   │   │   │   ├── CRM
 │   │   │   │   │   ├── CreateFlowRouteMessageTemplateController.php
 │   │   │   │   │   └── MessageTemplatePresetController.php
@@ -2474,6 +2473,7 @@
 │   │   │   ├── BroadcastMessageReuseTest.php
 │   │   │   ├── BroadcastModelTest.php
 │   │   │   ├── BroadcastResolvedMessageDispatchOwnershipTest.php
+│   │   │   ├── BroadcastShowDiagnosticsTest.php
 │   │   │   ├── BroadcastTokenPersonalizationTest.php
 │   │   │   ├── CancelBroadcastActionTest.php
 │   │   │   ├── MarkBroadcastRecipientSentTest.php
@@ -2680,10 +2680,10 @@
 │   │   │   ├── ConsentDomainRegistryTest.php
 │   │   │   ├── ConsentOptInDefinitionResolverTest.php
 │   │   │   ├── ConsentRevocationControllerTest.php
-│   │   │   ├── ContactImportOccurrencePermissionInvitationTest.php
+│   │   │   ├── ContactImportMarketingPermissionControllerTest.php
 │   │   │   ├── ContactPermissionInvitationControllerTest.php
+│   │   │   ├── ContactPermissionInvitationServiceTest.php
 │   │   │   ├── ContactScheduledMessagesTerminalResultTest.php
-│   │   │   ├── CreateContactPermissionInvitationsForImportBatchActionTest.php
 │   │   │   ├── CreateReusableMessageTemplateActionTest.php
 │   │   │   ├── CtaEngagementTrackingTest.php
 │   │   │   ├── DirectMessageTemplateAutomationRuntimeTest.php
