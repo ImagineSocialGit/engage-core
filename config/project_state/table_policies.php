@@ -51,6 +51,12 @@ return [
         'mode' => 'must_be_empty',
         'reason' => 'Database-backed queued work must be drained before the final export.',
     ],
+    'contact_import_runs' => [
+        'mode' => 'terminal_only',
+        'column' => 'status',
+        'values' => ['failed'],
+        'reason' => 'Active Contact imports depend on an environment-local staged CSV and queue checkpoint. Finish or fail the import before export; failed run diagnostics remain local and are not transferred.',
+    ],
 
     'dashboard_acknowledgements' => [
         'mode' => 'resettable',

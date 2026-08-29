@@ -11,6 +11,7 @@ class ContactImportBatchController extends Controller
     public function index(): View
     {
         $importBatches = ContactImportBatch::query()
+            ->with('run')
             ->latest('imported_at')
             ->latest()
             ->paginate(20);
@@ -29,6 +30,8 @@ class ContactImportBatchController extends Controller
 
     public function show(ContactImportBatch $contactImportBatch): View
     {
+        $contactImportBatch->load('run');
+
         $contactImportBatch->setAttribute(
             'contacts_count',
             $contactImportBatch->importedContactsQuery()->count(),

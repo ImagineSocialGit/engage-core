@@ -242,3 +242,37 @@ Example generic shape:
 Client profiles should enable these only when the intended Campaign and permission
 policy are actually defined. Do not add placeholder Campaign keys merely to make an
 import profile look complete.
+
+## Background processing and recovery
+
+Contact CSV imports are background work. The browser request validates the operator's
+mapping/treatments, creates a durable `ContactImportBatch`, records an environment-local
+`ContactImportRun`, queues the first bounded chunk, and returns immediately.
+
+The default chunk size is 500 CSV rows (`contact_imports.processing.chunk_rows`). A batch
+has only one sequential chunk in flight. This preserves deterministic duplicate identity
+handling and row order while keeping each queue job bounded.
+
+`ContactImportRun` owns the staged CSV path, byte/row checkpoint, processing counters, and
+the immutable execution snapshot needed by workers. It is intentionally not Project State
+data: the staged CSV exists only in the current environment. Active run rows block Project
+State export; failed run diagnostics may remain local.
+
+Each chunk processes inside a database transaction. The Contact changes,
+`ContactImportOccurrence` rows, module import handlers, treatments, post-import processor
+effects, and the run checkpoint commit together. If a worker fails before commit, the
+entire chunk rolls back and the retry resumes from the same durable byte/row checkpoint.
+The unique `(contact_import_batch_id, row_number)` occurrence constraint remains the
+successful-row provenance/idempotency boundary.
+
+`ContactImportBatch.contact_count` is the known CSV data-row total as soon as the import
+is queued. `successful_count` and `failed_count` advance after each committed chunk.
+The batch detail page reads `ContactImportRun.processed_rows` for live progress.
+
+After all rows commit, a separate finalization job runs the existing batch-finalizer
+contract exactly once within the final database transaction. On success it marks the
+batch completed and removes the transient run record/staged CSV. Campaign launch timing
+therefore cannot become actionable while only part of a batch has been imported.
+
+A terminal queue failure marks both the batch and local run failed with durable diagnostics.
+The local failed run is intentionally not transferred through Project State.

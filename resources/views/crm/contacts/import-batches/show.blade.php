@@ -10,6 +10,21 @@
         $unmapped = data_get($statusMapping, 'unmapped', []);
 
         $messagingEnabled = module_enabled('messaging');
+        $importRun = $importBatch->relationLoaded('run') ? $importBatch->run : null;
+        $importIsActive = in_array($importBatch->status, ['pending', 'processing'], true)
+            && $importRun !== null;
+        $importActionsReady = $importBatch->status === 'completed';
+        $progressTotal = $importRun !== null
+            ? max(0, (int) $importRun->total_rows)
+            : max(0, (int) $importBatch->contact_count);
+        $progressProcessed = $importRun !== null
+            ? max(0, (int) $importRun->processed_rows)
+            : ($importActionsReady ? $progressTotal : max(0, (int) $importBatch->successful_count + (int) $importBatch->failed_count));
+        $progressPercent = $progressTotal > 0
+            ? min(100, round(($progressProcessed / $progressTotal) * 100))
+            : ($importActionsReady ? 100 : 0);
+        $failureReason = $importRun?->failure_reason
+            ?: data_get($importBatch->meta, 'failure.message');
 
         $contactsCollection = $contacts->getCollection();
 
@@ -82,6 +97,18 @@
     @endphp
 
     <div class="space-y-6">
+        @if (session('error'))
+            <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+                {{ session('error') }}
+            </div>
+        @endif
+
+        @if (session('success'))
+            <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
+                {{ session('success') }}
+            </div>
+        @endif
+
         <div class="flex flex-wrap items-center justify-between gap-4">
             <a
                 href="{{ route('crm.contacts.import-batches.index') }}"
@@ -153,6 +180,46 @@
                     </dd>
                 </div>
             </dl>
+
+            @if ($importIsActive)
+                <div
+                    class="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4"
+                    x-data
+                    x-init="setTimeout(() => window.location.reload(), 4000)"
+                >
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <p class="font-semibold text-blue-950">
+                                {{ $importBatch->status === 'pending' ? 'Import queued' : 'Import processing' }}
+                            </p>
+                            <p class="mt-1 text-sm text-blue-800">
+                                {{ number_format($progressProcessed) }} of {{ number_format($progressTotal) }} rows processed.
+                                You can leave this page; the import continues in the background.
+                            </p>
+                        </div>
+
+                        <span class="text-sm font-semibold text-blue-900">
+                            {{ $progressPercent }}%
+                        </span>
+                    </div>
+
+                    <div class="mt-3 h-2 overflow-hidden rounded-full bg-blue-100">
+                        <div
+                            class="h-full rounded-full bg-blue-600 transition-all"
+                            style="width: {{ $progressPercent }}%"
+                        ></div>
+                    </div>
+                </div>
+            @elseif ($importBatch->status === 'failed')
+                <div class="mt-6 rounded-xl border border-red-200 bg-red-50 p-4">
+                    <p class="font-semibold text-red-900">
+                        Import failed
+                    </p>
+                    <p class="mt-1 text-sm text-red-800">
+                        {{ $failureReason ?: 'The background import stopped before completion. Review the worker logs, then retry the import.' }}
+                    </p>
+                </div>
+            @endif
         </x-ui.card>
 
         @if ($messagingEnabled)
@@ -169,7 +236,7 @@
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                    @if ($missingEmailConsentCount > 0)
+                    @if ($importActionsReady && $missingEmailConsentCount > 0)
                         <form
                             method="POST"
                             action="{{ route('crm.contacts.import-batches.permission-invitations.store', $importBatch) }}"
@@ -182,7 +249,7 @@
                         </form>
                     @endif
 
-                    @if ($pendingInvitationCount > 0)
+                    @if ($importActionsReady && $pendingInvitationCount > 0)
                         <form
                             method="POST"
                             action="{{ route('crm.contacts.import-batches.permission-invitations.destroy', $importBatch) }}"
@@ -198,9 +265,9 @@
                 </div>
             </div>
 
-            @if (session('success'))
-                <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
-                    {{ session('success') }}
+            @if (! $importActionsReady)
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                    Permission invitations become available after the full Contact import finishes.
                 </div>
             @endif
 

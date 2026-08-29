@@ -14,6 +14,15 @@ class ContactImportBatchPermissionInvitationController extends Controller
         ContactImportBatch $contactImportBatch,
         CreateContactPermissionInvitationsForImportBatchAction $createInvitations,
     ): RedirectResponse {
+        if ($contactImportBatch->status !== ContactImportBatch::STATUS_COMPLETED) {
+            return redirect()
+                ->route('crm.contacts.import-batches.show', $contactImportBatch)
+                ->with(
+                    'error',
+                    'Wait until this Contact import finishes before sending permission invitations.',
+                );
+        }
+
         $result = $createInvitations->handle($contactImportBatch);
 
         return redirect()

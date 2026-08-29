@@ -16,6 +16,7 @@ use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use LogicException;
 use Tests\TestCase;
 
 class CreateContactPermissionInvitationsForImportBatchActionTest extends TestCase
@@ -231,4 +232,21 @@ class CreateContactPermissionInvitationsForImportBatchActionTest extends TestCas
             ->where('status', '!=', ScheduledMessage::STATUS_SKIPPED)
             ->count());
     }
+
+    public function test_it_rejects_permission_invitations_until_the_import_batch_is_completed(): void
+    {
+        $importBatch = ContactImportBatch::factory()->create([
+            'status' => ContactImportBatch::STATUS_PROCESSING,
+        ]);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage(
+            'Permission invitations cannot be created until the Contact import is completed.',
+        );
+
+        app(CreateContactPermissionInvitationsForImportBatchAction::class)
+            ->handle($importBatch);
+    }
+
+
 }

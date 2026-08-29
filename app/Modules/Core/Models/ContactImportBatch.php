@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ContactImportBatch extends Model
 {
@@ -41,6 +42,12 @@ class ContactImportBatch extends Model
         'failed_count' => 'integer',
         'meta' => 'array',
     ];
+
+
+    public function run(): HasOne
+    {
+        return $this->hasOne(ContactImportRun::class, 'contact_import_batch_id');
+    }
 
     /**
      * Legacy/latest-import pointer relation. Historical batch membership is

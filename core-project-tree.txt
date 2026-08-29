@@ -293,11 +293,15 @@
 │   │   │   │   └── Treatments
 │   │   │   │       ├── ContactStatusImportTreatmentTarget.php
 │   │   │   │       └── ContactTagsImportTreatmentTarget.php
+│   │   │   ├── Jobs
+│   │   │   │   ├── FinalizeContactImportBatchJob.php
+│   │   │   │   └── ProcessContactImportBatchChunkJob.php
 │   │   │   ├── Models
 │   │   │   │   ├── BusinessCalendarExclusion.php
 │   │   │   │   ├── BusinessCalendar.php
 │   │   │   │   ├── ContactImportBatch.php
 │   │   │   │   ├── ContactImportOccurrence.php
+│   │   │   │   ├── ContactImportRun.php
 │   │   │   │   ├── Contact.php
 │   │   │   │   ├── ContactStatus.php
 │   │   │   │   ├── ContactTag.php
@@ -322,6 +326,7 @@
 │   │   │   │   │   └── DefaultBusinessCalendarResolver.php
 │   │   │   │   ├── Contacts
 │   │   │   │   │   ├── ContactFilterResolver.php
+│   │   │   │   │   ├── ContactImportBatchProcessor.php
 │   │   │   │   │   ├── ContactImportProfileRegistry.php
 │   │   │   │   │   ├── ContactIndexFilterService.php
 │   │   │   │   │   └── Filters
@@ -1913,7 +1918,8 @@
 │   │   │   │   ├── 2026_07_13_120000_create_site_settings_table.php
 │   │   │   │   ├── 2026_08_19_161800_create_contact_import_occurrences_table.php
 │   │   │   │   ├── 2026_08_22_113500_add_birthday_to_contacts_table.php
-│   │   │   │   └── 2026_08_26_145500_create_business_calendars_table.php
+│   │   │   │   ├── 2026_08_26_145500_create_business_calendars_table.php
+│   │   │   │   └── 2026_08_28_214500_create_contact_import_runs_table.php
 │   │   │   ├── documents
 │   │   │   │   ├── 2026_07_02_000001_create_document_requirement_definitions_table.php
 │   │   │   │   ├── 2026_07_02_000002_create_document_requests_table.php
@@ -2544,6 +2550,7 @@
 │   │   │   ├── ContactImportProfileRegistryTest.php
 │   │   │   ├── ContactImportProfileTreatmentTargetsTest.php
 │   │   │   ├── ContactImportProvenanceTest.php
+│   │   │   ├── ContactImportQueuedProcessingTest.php
 │   │   │   ├── ContactImportTreatmentControllerTest.php
 │   │   │   ├── ContactImportTreatmentRegistryTest.php
 │   │   │   ├── ContactIndexFilterTest.php
@@ -2997,4 +3004,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-709 directories, 2289 files
+710 directories, 2295 files

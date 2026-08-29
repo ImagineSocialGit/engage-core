@@ -8,6 +8,7 @@ use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Services\ContactPermissionInvitationEligibility;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
+use LogicException;
 
 class CreateContactPermissionInvitationsForImportBatchAction
 {
@@ -21,6 +22,12 @@ class CreateContactPermissionInvitationsForImportBatchAction
      */
     public function handle(ContactImportBatch $importBatch): array
     {
+        if ($importBatch->status !== ContactImportBatch::STATUS_COMPLETED) {
+            throw new LogicException(
+                'Permission invitations cannot be created until the Contact import is completed.',
+            );
+        }
+
         $eligible = 0;
         $scheduled = 0;
         $skipped = 0;

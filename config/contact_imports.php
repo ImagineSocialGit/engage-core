@@ -15,5 +15,9 @@ return [
     |
     */
 
+    'processing' => [
+        'chunk_rows' => 500,
+    ],
+
     'profiles' => [],
 ];
