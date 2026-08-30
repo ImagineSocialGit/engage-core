@@ -170,6 +170,37 @@ class ContactConversationShowDataProviderTest extends TestCase
         $this->assertNull(data_get($data, 'conversationReply.unavailable_reason'));
     }
 
+    public function test_conversation_trims_quoted_email_history_from_existing_inbound_rows(): void
+    {
+        $contact = Contact::factory()->create([
+            'email' => 'person@example.test',
+        ]);
+
+        InboundMessage::query()->create([
+            'sender_type' => $contact->getMorphClass(),
+            'sender_id' => $contact->getKey(),
+            'client_key' => 'test-client',
+            'channel' => 'email',
+            'provider' => 'resend',
+            'provider_event_id' => 'contact-conversation-quoted-reply',
+            'from_type' => 'email',
+            'from_value' => 'person@example.test',
+            'to_type' => 'email',
+            'to_value' => 'reply@example.test',
+            'subject' => 'Re: This is a test!',
+            'body' => "Hello!\n\n____________________________\nFrom: Team <team@example.test>\nSent: Saturday\nTo: Person <person@example.test>\nSubject: This is a test!\n\nPrior message with a signed unsubscribe URL.",
+            'classification' => InboundMessage::CLASSIFICATION_NORMAL_REPLY,
+            'purpose' => 'marketing',
+            'scope' => 'mortgage_homebuyer_nurture',
+            'received_at' => now(),
+        ]);
+
+        $data = app(ContactConversationShowDataProvider::class)->dataFor($contact);
+
+        $this->assertSame('Hello!', data_get($data, 'latestInboundReply.body'));
+        $this->assertSame('Hello!', data_get($data, 'conversationItems.0.body'));
+    }
+
     public function test_registered_provider_surfaces_conversation_as_contact_work_rail(): void
     {
         config()->set('modules.enabled', [

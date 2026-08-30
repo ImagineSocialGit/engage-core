@@ -6,6 +6,7 @@ use App\Modules\Core\Contracts\Contacts\ContactShowDataProvider;
 use App\Modules\Core\Models\Contact;
 use App\Modules\InboundMessaging\Models\InboundMessage;
 use App\Modules\InboundMessaging\Services\Reply\EmailReplySubjectResolver;
+use App\Modules\InboundMessaging\Services\Reply\InboundReplyTextNormalizer;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ConsentDomainRegistry;
@@ -24,6 +25,7 @@ class ContactConversationShowDataProvider implements ContactShowDataProvider
         private readonly MessageEligibilityGate $messageEligibilityGate,
         private readonly ConsentDomainRegistry $consentDomainRegistry,
         private readonly EmailReplySubjectResolver $emailReplySubjectResolver,
+        private readonly InboundReplyTextNormalizer $replyTextNormalizer,
     ) {}
 
     /**
@@ -116,7 +118,9 @@ class ContactConversationShowDataProvider implements ContactShowDataProvider
                 ?? ($context !== null && $context !== ''
                     ? 'Reply to '.$context
                     : 'Inbound '.$this->label($channel)),
-            'body' => $this->cleanText($message->body),
+            'body' => $this->cleanText(
+                $this->replyTextNormalizer->normalize($message->body),
+            ),
             'intent' => $this->label($message->reply_intent_key),
             'status' => null,
             'occurred_at' => $message->received_at ?? $message->created_at,

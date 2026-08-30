@@ -59,11 +59,12 @@ class RecordInboundEmailAction
             ? null
             : $this->emailRouteResolver->resolve($toAddresses);
         $route = $resolvedRoute?->route;
-        $body = $this->body($text, $html);
-        $normalized = $this->replyTextNormalizer->normalize($body);
+        $body = $this->replyTextNormalizer->normalize(
+            $this->body($text, $html),
+        );
         $intent = $this->replyIntentClassifier->classify(
             $correlated?->replyProfileKey(),
-            $normalized,
+            $body,
         );
 
         $inboundMessage = $this->recordInboundMessageAction->handle(
@@ -83,7 +84,7 @@ class RecordInboundEmailAction
                     $resolvedRoute,
                 ),
                 'subject' => $this->subject($subject),
-                'body' => $body,
+                'body' => $body !== '' ? $body : null,
                 'classification' => InboundMessage::CLASSIFICATION_NORMAL_REPLY,
                 'purpose' => $correlated?->purpose,
                 'scope' => $correlated?->scope,
