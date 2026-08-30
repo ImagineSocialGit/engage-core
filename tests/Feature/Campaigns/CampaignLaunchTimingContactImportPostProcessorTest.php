@@ -16,6 +16,7 @@ use App\Modules\Messaging\Models\MessageChainStep;
 use App\Modules\Messaging\Models\MessageChainVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class CampaignLaunchTimingContactImportPostProcessorTest extends TestCase
@@ -41,6 +42,36 @@ class CampaignLaunchTimingContactImportPostProcessorTest extends TestCase
             '2026-08-21T14:00:00.000000Z',
             $effective['first_message_at'],
         );
+    }
+
+    public function test_operator_cannot_submit_a_campaign_outside_the_server_built_choices(): void
+    {
+        $processor = app(CampaignLaunchTimingContactImportPostProcessor::class);
+
+        try {
+            $processor->withSubmittedInputs(
+                config: [
+                    'campaign_key' => 'allowed_campaign',
+                    'launch_mode' => 'none',
+                    'campaign_options' => [[
+                        'value' => 'allowed_campaign',
+                        'label' => 'Allowed Campaign',
+                    ]],
+                    'campaign_locked' => false,
+                ],
+                submitted: [
+                    'launch_mode' => 'now',
+                    'campaign_key' => 'invented_campaign',
+                ],
+            );
+
+            $this->fail('An unavailable Campaign key should be rejected.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey(
+                'post_import_inputs.campaign_launch_timing.campaign_key',
+                $exception->errors(),
+            );
+        }
     }
 
     public function test_new_status_routed_enrollment_is_staged_then_retimed_only_at_batch_finalization(): void

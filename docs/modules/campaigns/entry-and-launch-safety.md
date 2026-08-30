@@ -30,20 +30,35 @@ The Contact import occurrence remains the CampaignEnrollment provenance source. 
 
 ## Batch first-message launch timing
 
-Some imports select lifecycle treatment that synchronously enters a Campaign through
-another producer such as FlowRoutes. Campaigns must not create a second competing entry
-path merely to control the first send time.
+Every add-import may expose `campaign_launch_timing` when at least one ready automatic
+Campaign exists. A ready choice is active, has saved eligibility criteria, and points to
+an active MessageChain with a published current version. The preview labels each choice
+with its saved criteria so an operator can connect imported status, relationship,
+source, subsource, tag, and other facts to the available follow-up.
 
-For those profiles, `campaign_launch_timing` is a reconciliation/finalization behavior:
+The operator must choose one of three outcomes:
 
-1. Core applies the operator-selected treatment.
-2. The normal lifecycle producer opens the Campaign enrollment. While the Contact's
-   import batch is still processing, Campaign automation disables eager progression;
-   when this profile has launch timing configured, the first MessageChain action is
-   atomically created on a temporary far-future non-due hold.
-3. The row-level Campaign processor verifies that the open enrollment is new for this
-   import and still has an unmaterialized first MessageChain action.
-4. The processor does not change timing row-by-row.
+- import only;
+- start the selected Campaign as soon as the batch completes;
+- schedule the selected Campaign's first message for a local date and time.
+
+Import only is the safe default. A filename-matched profile may keep one Campaign key
+server-owned, but the operator may still decline launch. Browser input cannot invent a
+Campaign key; a profile-free selection must match the ready option set built by
+Campaigns.
+
+When a launch is selected, `campaign_launch_timing` remains a
+reconciliation/finalization behavior:
+
+1. Core applies the mapped row, domain handlers, and operator-selected treatments.
+2. Campaigns evaluates the selected automatic Campaign through its normal saved
+   eligibility rules and family arbitration. Only eligible Contacts enroll.
+3. While the Contact's import batch is still processing, Campaign automation disables
+   eager progression and holds the first MessageChain action in a temporary far-future
+   non-due state.
+4. The row-level processor verifies that the open enrollment is new for this import and
+   still has an unmaterialized first MessageChain action. It does not change timing
+   row-by-row.
 5. After every CSV row finishes, the Campaign batch finalizer selects only Campaign
    enrollments for Contacts in this import whose enrollment started during this batch.
 6. In one transaction, it verifies that none has materialized a ScheduledMessage and
@@ -63,6 +78,11 @@ If the selected time has passed by the time a long import finishes, the finalize
 the whole safe batch due at finalization time rather than releasing rows piecemeal.
 
 Existing open Campaign enrollments that predate the import are never retimed.
+
+Static import facts do not simulate event-only Flow Routes. For example, a high-intent
+reply Route still requires a real correlated inbound reply and its normalized reply
+profile/intent Automation Event. The import launch choice only starts the eligible
+Campaign that can produce that later conversation.
 
 ## Bounded progression fan-out
 

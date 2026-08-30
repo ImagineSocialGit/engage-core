@@ -9,22 +9,31 @@ use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Services\CampaignEligibilityReconciliationPlanner;
 use App\Modules\Core\Contracts\Contacts\ContactImportPostProcessor;
 use App\Modules\Core\Contracts\Contacts\ContactImportPostProcessorBatchFinalizer;
-use App\Modules\Core\Contracts\Contacts\ContactImportPostProcessorInputProvider;
+use App\Modules\Core\Contracts\Contacts\ContactImportPostProcessorOperatorConfigProvider;
 use App\Modules\Core\Data\Contacts\ContactImportContext;
 use App\Modules\Core\Data\Contacts\ContactImportPostProcessResult;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 final class CampaignLaunchTimingContactImportPostProcessor implements
     ContactImportPostProcessor,
-    ContactImportPostProcessorInputProvider,
+    ContactImportPostProcessorOperatorConfigProvider,
     ContactImportPostProcessorBatchFinalizer
 {
     private const KEY_PATTERN = '/^[a-z0-9]+(?:_[a-z0-9]+)*$/';
+    private const LAUNCH_NONE = 'none';
+    private const LAUNCH_NOW = 'now';
+    private const LAUNCH_SCHEDULED = 'scheduled';
+    private const LAUNCH_MODES = [
+        self::LAUNCH_NONE,
+        self::LAUNCH_NOW,
+        self::LAUNCH_SCHEDULED,
+    ];
 
     public function __construct(
         private readonly ScheduleCampaignImportBatchInitialMessagesAction $scheduleBatch,
@@ -51,7 +60,13 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
     {
         $unknown = array_values(array_diff(
             array_keys($config),
-            ['campaign_key', 'first_message_at'],
+            [
+                'campaign_key',
+                'first_message_at',
+                'launch_mode',
+                'campaign_options',
+                'campaign_locked',
+            ],
         ));
 
         if ($unknown !== []) {
@@ -63,10 +78,14 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
             ));
         }
 
-        $campaignKey = $config['campaign_key'] ?? null;
+        $campaignKey = $this->nullableString($config['campaign_key'] ?? null);
+        $operatorConfig = array_key_exists('launch_mode', $config)
+            || array_key_exists('campaign_options', $config)
+            || array_key_exists('campaign_locked', $config);
 
-        if (! is_string($campaignKey)
-            || ! preg_match(self::KEY_PATTERN, trim($campaignKey))
+        if (($campaignKey === null && ! $operatorConfig)
+            || ($campaignKey !== null
+                && ! preg_match(self::KEY_PATTERN, $campaignKey))
         ) {
             throw new InvalidArgumentException(
                 'Contact import Campaign launch timing [campaign_key] must be a lowercase snake_case key.',
@@ -83,17 +102,87 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
             );
         }
 
+        $launchMode = $this->nullableString($config['launch_mode'] ?? null);
+
+        if ($launchMode !== null && ! in_array($launchMode, self::LAUNCH_MODES, true)) {
+            throw new InvalidArgumentException(
+                'Contact import Campaign launch timing [launch_mode] is invalid.',
+            );
+        }
+
+        $campaignOptions = $this->normalizeCampaignOptions(
+            $config['campaign_options'] ?? [],
+        );
+
         return [
-            'campaign_key' => trim($campaignKey),
+            'campaign_key' => $campaignKey,
             'first_message_at' => is_string($firstMessageAt)
                 ? CarbonImmutable::parse(trim($firstMessageAt))->utc()->toISOString()
                 : null,
+            'launch_mode' => $launchMode,
+            'campaign_options' => $campaignOptions,
+            'campaign_locked' => (bool) ($config['campaign_locked'] ?? false),
         ];
+    }
+
+    public function operatorConfig(?array $configured): array
+    {
+        $configured = $configured !== null
+            ? $this->normalizeConfig($configured)
+            : null;
+        $lockedCampaignKey = $configured['campaign_key'] ?? null;
+        $options = $this->availableCampaignOptions();
+
+        if ($lockedCampaignKey !== null
+            && ! collect($options)->contains(
+                fn (array $option): bool => $option['value'] === $lockedCampaignKey,
+            )
+        ) {
+            $options[] = [
+                'value' => $lockedCampaignKey,
+                'label' => Str::headline($lockedCampaignKey).' — selected by import profile',
+            ];
+        }
+
+        return [
+            'campaign_key' => $lockedCampaignKey
+                ?? ($options[0]['value'] ?? null),
+            'first_message_at' => $configured['first_message_at'] ?? null,
+            'launch_mode' => $configured !== null
+                ? self::LAUNCH_SCHEDULED
+                : self::LAUNCH_NONE,
+            'campaign_options' => $lockedCampaignKey !== null
+                ? array_values(array_filter(
+                    $options,
+                    fn (array $option): bool => $option['value'] === $lockedCampaignKey,
+                ))
+                : $options,
+            'campaign_locked' => $lockedCampaignKey !== null,
+        ];
+    }
+
+    public function shouldProcess(array $config): bool
+    {
+        $config = $this->normalizeConfig($config);
+
+        return $config['launch_mode'] !== self::LAUNCH_NONE
+            && $config['campaign_key'] !== null
+            && $config['first_message_at'] !== null;
     }
 
     public function summary(array $config): string
     {
         $config = $this->normalizeConfig($config);
+
+        if ($config['launch_mode'] === self::LAUNCH_NONE) {
+            return $config['campaign_options'] === []
+                ? 'No ready automatic Campaign is currently available to start from this import.'
+                : 'Optionally start an applicable automatic Campaign after every Contact row has finished importing.';
+        }
+
+        if ($config['campaign_key'] === null) {
+            return 'Choose an automatic Campaign to start after this import.';
+        }
 
         return "Resolve Campaign [{$config['campaign_key']}] through its normal enrollment policy, then apply the selected first-message time after the whole import batch finishes.";
     }
@@ -103,13 +192,57 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
         $config = $this->normalizeConfig($config);
         $timezone = $this->timezone();
 
-        return [[
-            'key' => 'first_message_at',
-            'label' => 'Start sending',
-            'type' => 'datetime-local',
-            'required' => true,
-            'description' => "Choose when the first email/SMS touch for Campaign [{$config['campaign_key']}] should become due. Time is shown in {$timezone}. Automatic eligibility is resolved per Contact, and the whole batch is fully imported before launch timing is applied.",
-        ]];
+        if ($config['campaign_options'] === []) {
+            return [];
+        }
+
+        return [
+            [
+                'key' => 'launch_mode',
+                'label' => 'Start an applicable Campaign after this import?',
+                'type' => 'select',
+                'required' => true,
+                'full_width' => true,
+                'description' => 'Only Contacts who satisfy the selected Campaign’s saved eligibility rules will enroll. Event-only Flow Routes still wait for their real event.',
+                'options' => [
+                    [
+                        'value' => self::LAUNCH_NONE,
+                        'label' => 'Import only — do not start a Campaign',
+                    ],
+                    [
+                        'value' => self::LAUNCH_NOW,
+                        'label' => 'Start as soon as the import completes',
+                    ],
+                    [
+                        'value' => self::LAUNCH_SCHEDULED,
+                        'label' => 'Schedule the first Campaign message',
+                    ],
+                ],
+            ],
+            [
+                'key' => 'campaign_key',
+                'label' => 'Campaign',
+                'type' => 'select',
+                'required' => true,
+                'full_width' => true,
+                'description' => $config['campaign_locked']
+                    ? 'This Campaign was selected by the detected import profile.'
+                    : 'Available Campaigns are active, automatic, have saved eligibility rules, and have a published message journey.',
+                'options' => $config['campaign_options'],
+            ],
+            [
+                'key' => 'first_message_at',
+                'label' => 'Start sending',
+                'type' => 'datetime-local',
+                'required' => true,
+                'full_width' => true,
+                'description' => "Choose when the first Campaign email/SMS should become due. Time is shown in {$timezone}. The whole batch finishes before eligibility is resolved and launch timing is applied.",
+                'show_when' => [
+                    'field' => 'launch_mode',
+                    'equals' => self::LAUNCH_SCHEDULED,
+                ],
+            ],
+        ];
     }
 
     public function withSubmittedInputs(
@@ -119,7 +252,7 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
         $config = $this->normalizeConfig($config);
         $unknown = array_values(array_diff(
             array_keys($submitted),
-            ['first_message_at'],
+            ['launch_mode', 'campaign_key', 'first_message_at'],
         ));
 
         if ($unknown !== []) {
@@ -128,6 +261,59 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
             throw ValidationException::withMessages([
                 "post_import_inputs.{$this->key()}" => 'Campaign launch timing received unsupported operator input.',
             ]);
+        }
+
+        $launchMode = $this->nullableString($submitted['launch_mode'] ?? null);
+
+        if ($launchMode === null
+            && $config['campaign_key'] !== null
+            && $this->nullableString($submitted['first_message_at'] ?? null) !== null
+        ) {
+            $launchMode = self::LAUNCH_SCHEDULED;
+        }
+
+        $launchMode ??= self::LAUNCH_NONE;
+
+        if (! in_array($launchMode, self::LAUNCH_MODES, true)) {
+            throw ValidationException::withMessages([
+                "post_import_inputs.{$this->key()}.launch_mode" => 'Choose whether and when to start a Campaign.',
+            ]);
+        }
+
+        if ($launchMode === self::LAUNCH_NONE) {
+            return [
+                'campaign_key' => null,
+                'first_message_at' => null,
+                'launch_mode' => self::LAUNCH_NONE,
+            ];
+        }
+
+        $campaignKey = $this->nullableString(
+            $submitted['campaign_key'] ?? $config['campaign_key'],
+        );
+        $allowedCampaignKeys = array_column(
+            $config['campaign_options'],
+            'value',
+        );
+
+        if ($config['campaign_key'] !== null) {
+            $allowedCampaignKeys[] = $config['campaign_key'];
+        }
+
+        $allowedCampaignKeys = array_values(array_unique($allowedCampaignKeys));
+
+        if ($campaignKey === null || ! in_array($campaignKey, $allowedCampaignKeys, true)) {
+            throw ValidationException::withMessages([
+                "post_import_inputs.{$this->key()}.campaign_key" => 'Choose an available Campaign.',
+            ]);
+        }
+
+        if ($launchMode === self::LAUNCH_NOW) {
+            return [
+                'campaign_key' => $campaignKey,
+                'first_message_at' => CarbonImmutable::now('UTC')->toISOString(),
+                'launch_mode' => self::LAUNCH_NOW,
+            ];
         }
 
         $value = $submitted['first_message_at'] ?? null;
@@ -160,8 +346,9 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
         }
 
         return [
-            ...$config,
+            'campaign_key' => $campaignKey,
             'first_message_at' => $local->utc()->toISOString(),
+            'launch_mode' => self::LAUNCH_SCHEDULED,
         ];
     }
 
@@ -322,7 +509,14 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
     private function requiredRuntimeConfig(array $config): array
     {
         $config = $this->normalizeConfig($config);
+        $campaignKey = $config['campaign_key'];
         $firstMessageAt = $config['first_message_at'] ?? null;
+
+        if ($campaignKey === null) {
+            throw new InvalidArgumentException(
+                'Campaign launch timing requires [campaign_key] before import processing.',
+            );
+        }
 
         if (! is_string($firstMessageAt) || trim($firstMessageAt) === '') {
             throw new InvalidArgumentException(
@@ -331,9 +525,104 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
         }
 
         return [
-            'campaign_key' => $config['campaign_key'],
+            'campaign_key' => $campaignKey,
             'first_message_at' => $firstMessageAt,
         ];
+    }
+
+    /**
+     * @return array<int, array{value: string, label: string}>
+     */
+    private function availableCampaignOptions(): array
+    {
+        return Campaign::query()
+            ->active()
+            ->where('enrollment_mode', Campaign::ENROLLMENT_MODE_AUTOMATIC)
+            ->whereNotNull('message_chain_id')
+            ->whereHas('messageChain', fn ($query) => $query
+                ->active()
+                ->whereNotNull('current_version_id'))
+            ->orderBy('name')
+            ->orderBy('key')
+            ->get(['key', 'name', 'eligibility_filter'])
+            ->filter(fn (Campaign $campaign): bool => $campaign->hasEligibilityCriteria())
+            ->map(fn (Campaign $campaign): array => [
+                'value' => (string) $campaign->key,
+                'label' => $this->campaignOptionLabel($campaign),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function campaignOptionLabel(Campaign $campaign): string
+    {
+        $criteria = collect($campaign->eligibility_filter ?? [])
+            ->filter(fn (mixed $values): bool => is_array($values) && $values !== [])
+            ->map(function (array $values, mixed $key): string {
+                $labels = collect($values)
+                    ->filter(fn (mixed $value): bool => is_string($value) || is_numeric($value))
+                    ->map(fn (mixed $value): string => Str::headline((string) $value))
+                    ->implode(', ');
+
+                return Str::headline((string) $key).': '.$labels;
+            })
+            ->filter()
+            ->implode('; ');
+
+        return trim((string) $campaign->name)
+            .($criteria !== '' ? ' — eligible when '.$criteria : '');
+    }
+
+    /**
+     * @return array<int, array{value: string, label: string}>
+     */
+    private function normalizeCampaignOptions(mixed $options): array
+    {
+        if (! is_array($options)) {
+            throw new InvalidArgumentException(
+                'Contact import Campaign launch timing [campaign_options] must be an array.',
+            );
+        }
+
+        $normalized = [];
+
+        foreach ($options as $option) {
+            if (! is_array($option)) {
+                throw new InvalidArgumentException(
+                    'Contact import Campaign launch timing contains an invalid Campaign option.',
+                );
+            }
+
+            $value = $this->nullableString($option['value'] ?? null);
+            $label = $this->nullableString($option['label'] ?? null);
+
+            if ($value === null
+                || ! preg_match(self::KEY_PATTERN, $value)
+                || $label === null
+            ) {
+                throw new InvalidArgumentException(
+                    'Contact import Campaign launch timing contains an invalid Campaign option.',
+                );
+            }
+
+            $normalized[$value] = [
+                'value' => $value,
+                'label' => $label,
+            ];
+        }
+
+        return array_values($normalized);
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
     }
 
     private function timezone(): string

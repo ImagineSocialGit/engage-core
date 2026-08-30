@@ -214,12 +214,15 @@ Current reusable processors are:
 - `campaign_enrollment`: requests enrollment in one configured Campaign through the
   normal Campaign action. Existing open enrollment remains idempotent and Campaign
   family/priority arbitration remains authoritative.
-- `campaign_launch_timing`: does **not** select a Campaign audience and does **not**
-  independently enroll a Contact. It expects the normal import treatment/lifecycle path
-  to create the configured Campaign enrollment, requires one batch-level `Start sending`
-  date/time from the operator, and applies that time to the still-unmaterialized first
-  MessageChain action only after the entire import batch has finished. Existing open
-  Campaign enrollments that predate the import are preserved.
+- `campaign_launch_timing`: every add-import may expose active automatic Campaigns that
+  have eligibility criteria and a published MessageChain. Each option summarizes its
+  saved eligibility facts. The operator explicitly chooses import-only, start when the
+  batch completes, or a scheduled first-message time. Campaigns evaluates the durable
+  imported Contact through the selected Campaign's normal eligibility and family policy;
+  it does not force ineligible Contacts into the Campaign. Timing is applied to the
+  still-unmaterialized first MessageChain action only after the entire import batch has
+  finished. Existing open enrollments that predate the import are preserved. A profile
+  may lock the Campaign key but cannot remove the operator's import-only choice.
 
 These processors do not make post-import orchestration transactional with Contact
 identity/domain ingestion. A blocked/unavailable Campaign or one unavailable channel
@@ -242,10 +245,11 @@ Example generic shape:
 ],
 ```
 
-Client profiles should enable Campaign post-import behavior only when the intended
-Campaign policy is actually defined. A profile may constrain `marketing_permission`
-channels/scope, but the operator confirmation is still required at import time. Do not add
-placeholder Campaign keys merely to make an import profile look complete.
+Client profiles should lock Campaign post-import behavior only when the filename itself
+is authoritative for that lifecycle. Ordinary imports discover ready automatic
+Campaigns without a filename convention. A profile may constrain `marketing_permission`
+channels/scope, but the operator confirmation is still required at import time. Do not
+add placeholder Campaign keys merely to make an import profile look complete.
 
 ## Background processing and recovery
 
