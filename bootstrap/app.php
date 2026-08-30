@@ -37,6 +37,12 @@ $app = Application::configure(basePath: dirname(__DIR__))
                     require base_path('routes/webinar.php');
                 });
 
+            Route::middleware(['web'])
+                ->domain('messaging.'.$domain)
+                ->group(function () {
+                    require base_path('routes/messaging.php');
+                });
+
             $crmHost = parse_url(
                 (string) config('app.crm_url'),
                 PHP_URL_HOST,

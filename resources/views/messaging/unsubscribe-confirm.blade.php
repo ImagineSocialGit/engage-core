@@ -1,4 +1,4 @@
-<x-layouts.public title="Confirm Unsubscribe">
+<x-layouts.messaging-public title="Confirm Unsubscribe">
     <section class="px-6 py-20">
         <div class="mx-auto max-w-2xl">
             <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -38,4 +38,4 @@
             </div>
         </div>
     </section>
-</x-layouts.public>
+</x-layouts.messaging-public>

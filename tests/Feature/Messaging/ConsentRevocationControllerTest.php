@@ -8,6 +8,7 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ConsentRevocation;
 use App\Modules\Messaging\Services\MessageEligibilityGate;
+use App\Modules\Messaging\Support\EmailConsentRevocationLinkGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
@@ -54,6 +55,56 @@ class ConsentRevocationControllerTest extends TestCase
         ));
     }
 
+    public function test_generated_consent_links_use_the_messaging_host_while_webinar_cancellation_stays_on_the_webinar_host(): void
+    {
+        $contact = $this->createContact();
+        $links = app(EmailConsentRevocationLinkGenerator::class);
+
+        $this->assertSame(
+            'messaging.'.config('app.root_domain'),
+            parse_url($links->marketingUnsubscribeUrl($contact), PHP_URL_HOST),
+        );
+        $this->assertSame(
+            'messaging.'.config('app.root_domain'),
+            parse_url(
+                $links->transactionalOptOutUrl($contact, 'webinar'),
+                PHP_URL_HOST,
+            ),
+        );
+        $this->assertSame(
+            'webinar.'.config('app.root_domain'),
+            parse_url(route(
+                'webinar.registration.cancellation.show',
+                ['registration' => 1],
+            ), PHP_URL_HOST),
+        );
+    }
+
+    public function test_legacy_webinar_host_unsubscribe_link_remains_valid_and_confirms_on_the_messaging_host(): void
+    {
+        $contact = $this->createContact();
+        $legacyUrl = URL::temporarySignedRoute(
+            'messaging.email.unsubscribe.legacy',
+            now()->addDays(7),
+            ['contact' => $contact],
+        );
+
+        $this->assertSame(
+            'webinar.'.config('app.root_domain'),
+            parse_url($legacyUrl, PHP_URL_HOST),
+        );
+
+        $response = $this->get($legacyUrl);
+
+        $response
+            ->assertOk()
+            ->assertViewIs('messaging.unsubscribe-confirm');
+        $this->assertSame(
+            'messaging.'.config('app.root_domain'),
+            parse_url($response->viewData('confirmUrl'), PHP_URL_HOST),
+        );
+    }
+
     public function test_marketing_unsubscribe_requires_confirmation_before_revoking_channel_purpose_boundary(): void
     {
         $contact = $this->createContact();
@@ -72,7 +123,8 @@ class ConsentRevocationControllerTest extends TestCase
 
         $this->post($response->viewData('confirmUrl'))
             ->assertOk()
-            ->assertViewIs('messaging.unsubscribe-confirmed');
+            ->assertViewIs('messaging.unsubscribe-confirmed')
+            ->assertDontSee('<a', false);
 
         $this->assertDatabaseHas('consent_revocations', [
             'contact_id' => $contact->id,

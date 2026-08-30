@@ -72,28 +72,28 @@ Route::middleware('module:messaging')->group(function () {
         [ConsentRevocationController::class, 'emailMarketingUnsubscribe']
     )
         ->middleware('throttle:6,1')
-        ->name('messaging.email.unsubscribe');
+        ->name('messaging.email.unsubscribe.legacy');
 
     Route::post(
         '/unsubscribe/{contact}',
         [ConsentRevocationController::class, 'storeEmailMarketingUnsubscribe']
     )
         ->middleware('throttle:6,1')
-        ->name('messaging.email.unsubscribe.store');
+        ->name('messaging.email.unsubscribe.store.legacy');
 
     Route::get(
         '/email-preferences/transactional/opt-out/{contact}',
         [ConsentRevocationController::class, 'emailTransactionalOptOut']
     )
         ->middleware('throttle:6,1')
-        ->name('messaging.email.transactional-opt-out');
+        ->name('messaging.email.transactional-opt-out.legacy');
 
     Route::post(
         '/email-preferences/transactional/opt-out/{contact}',
         [ConsentRevocationController::class, 'storeEmailTransactionalOptOut']
     )
         ->middleware('throttle:6,1')
-        ->name('messaging.email.transactional-opt-out.store');
+        ->name('messaging.email.transactional-opt-out.store.legacy');
 });
 
 Route::fallback(function () {

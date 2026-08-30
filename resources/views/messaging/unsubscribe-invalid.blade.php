@@ -1,4 +1,4 @@
-<x-layouts.public title="Unsubscribe Link Expired">
+<x-layouts.messaging-public title="Unsubscribe Link Expired">
     <section class="px-6 py-20">
         <div class="mx-auto max-w-2xl">
             <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -19,16 +19,8 @@
                         Please use the unsubscribe link from the most recent email you received.
                     </p>
 
-                    <div class="mt-10">
-                        <a
-                            href="{{ route('webinar.index') }}"
-                            class="inline-flex items-center justify-center rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-                        >
-                            Return to Webinars
-                        </a>
-                    </div>
                 </div>
             </div>
         </div>
     </section>
-</x-layouts.public>
+</x-layouts.messaging-public>

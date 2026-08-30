@@ -1,4 +1,4 @@
-<x-layouts.public>
+<x-layouts.messaging-public>
     <section class="flex min-h-[70vh] items-center justify-center px-6 py-20">
         <div class="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
             <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
@@ -31,4 +31,4 @@
             </p>
         </div>
     </section>
-</x-layouts.public>
+</x-layouts.messaging-public>

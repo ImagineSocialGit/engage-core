@@ -1,4 +1,4 @@
-<x-layouts.public title="Email Preferences Updated">
+<x-layouts.messaging-public title="Email Preferences Updated">
     <section class="px-6 py-20">
         <div class="mx-auto max-w-2xl">
             <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -20,16 +20,8 @@
                         reminders, follow-ups, or similar operational communications at this address.
                     </p>
 
-                    <div class="mt-10">
-                        <a
-                            href="{{ route('webinar.index') }}"
-                            class="inline-flex items-center justify-center rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-                        >
-                            Return to Webinars
-                        </a>
-                    </div>
                 </div>
             </div>
         </div>
     </section>
-</x-layouts.public>
+</x-layouts.messaging-public>
