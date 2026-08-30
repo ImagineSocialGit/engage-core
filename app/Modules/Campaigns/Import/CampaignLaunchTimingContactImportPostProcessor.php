@@ -234,7 +234,7 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
                 'key' => 'first_message_at',
                 'label' => 'Start sending',
                 'type' => 'datetime-local',
-                'required' => true,
+                'required' => false,
                 'full_width' => true,
                 'description' => "Choose when the first Campaign email/SMS should become due. Time is shown in {$timezone}. The whole batch finishes before eligibility is resolved and launch timing is applied.",
                 'show_when' => [

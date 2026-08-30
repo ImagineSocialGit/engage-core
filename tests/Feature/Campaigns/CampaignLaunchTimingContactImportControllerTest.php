@@ -57,14 +57,17 @@ class CampaignLaunchTimingContactImportControllerTest extends TestCase
         $preview->assertOk();
         $preview->assertViewHas('postImportInputs', function (array $inputs): bool {
             $launchTiming = collect($inputs)->firstWhere('key', 'campaign_launch_timing');
+            $fields = collect($launchTiming['inputs'] ?? [])->keyBy('key');
+            $firstMessageAt = $fields->get('first_message_at');
 
             return is_array($launchTiming)
-                && collect($launchTiming['inputs'] ?? [])->contains(
-                    fn (array $input): bool => ($input['key'] ?? null) === 'launch_mode',
-                )
-                && collect($launchTiming['inputs'] ?? [])->contains(
-                    fn (array $input): bool => ($input['key'] ?? null) === 'first_message_at',
-                );
+                && $fields->has('launch_mode')
+                && is_array($firstMessageAt)
+                && ($firstMessageAt['required'] ?? null) === false
+                && ($firstMessageAt['show_when'] ?? null) === [
+                    'field' => 'launch_mode',
+                    'equals' => 'scheduled',
+                ];
         });
         $preview->assertSee(
             'post_import_inputs[campaign_launch_timing][first_message_at]',
