@@ -10,6 +10,8 @@ use App\Modules\Messaging\Models\ScheduledMessage;
 
 class BroadcastScheduledMessageResultRecorder
 {
+    private const COMPLETION_STATUS_INDEX = 'broadcast_recipients_broadcast_id_status_index';
+
     public function recordSent(
         ScheduledMessage $scheduledMessage,
         ScheduledMessageTerminalResult $terminalResult,
@@ -205,6 +207,7 @@ class BroadcastScheduledMessageResultRecorder
         }
 
         $hasOpenRecipients = BroadcastRecipient::query()
+            ->forceIndex(self::COMPLETION_STATUS_INDEX)
             ->where('broadcast_id', $broadcast->getKey())
             ->whereIn('status', [
                 BroadcastRecipient::STATUS_PENDING,

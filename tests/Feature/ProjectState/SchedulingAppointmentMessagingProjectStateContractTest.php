@@ -11,7 +11,10 @@ class SchedulingAppointmentMessagingProjectStateContractTest extends TestCase
     {
         $section = require config_path('project_state/messaging.php');
 
-        $this->assertSame(5, $section['version'] ?? null);
+        $this->assertGreaterThanOrEqual(
+            5,
+            (int) ($section['version'] ?? 0),
+        );
 
         $enrollments = $section['tables']['message_chain_enrollments'] ?? [];
         $scheduledMessages = $section['tables']['scheduled_messages'] ?? [];

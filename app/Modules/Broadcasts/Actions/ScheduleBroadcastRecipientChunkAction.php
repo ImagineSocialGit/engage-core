@@ -53,15 +53,7 @@ class ScheduleBroadcastRecipientChunkAction
             $chunkSize = $bulk
                 ? $bulkSettings['chunk_size']
                 : max(1, (int) $broadcast->recipient_count);
-
-            $alreadyProcessed = BroadcastRecipient::query()
-                ->where('broadcast_id', $broadcast->getKey())
-                ->where('status', '!=', BroadcastRecipient::STATUS_PENDING)
-                ->count();
-
-            $chunkIndex = $bulk
-                ? intdiv($alreadyProcessed, $chunkSize)
-                : 0;
+            $chunkIndex = $this->nextChunkIndex($broadcast, $bulk);
 
             $releaseAt = $bulk
                 ? $this->bulkDeliveryPolicy->releaseAt(
@@ -311,6 +303,19 @@ class ScheduleBroadcastRecipientChunkAction
                 ],
             ]),
         ])->save();
+    }
+
+    private function nextChunkIndex(Broadcast $broadcast, bool $bulk): int
+    {
+        if (! $bulk) {
+            return 0;
+        }
+
+        $lastChunkIndex = data_get($broadcast->meta, 'scheduling.last_chunk_index');
+
+        return is_numeric($lastChunkIndex)
+            ? max(0, (int) $lastChunkIndex + 1)
+            : 0;
     }
 
     /**
