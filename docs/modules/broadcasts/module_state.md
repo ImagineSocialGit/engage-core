@@ -15,13 +15,13 @@ no BroadcastRecipient.meta.delivery provider/attempt snapshot
 
 Messaging delivery attempts and terminal outbox events remain authoritative for provider execution and exact terminal occurrence.
 
-Broadcast delivery now pins authored copy once instead of copying it into every recipient ScheduledMessage. When a Broadcast with eligible recipients is scheduled, Broadcasts creates or reuses one private Messaging `MessageTemplate`, publishes the exact Broadcast payload as one immutable `MessageTemplateVersion`, and every recipient delivery pins that same version. ScheduledMessage payload retains only per-delivery runtime differences such as destination/contact identity. `broadcasts.payload` remains the draft/source copy and `broadcast_recipients.scheduled_message_ids` remains transitional; replacing those authoring/bookkeeping fields is separate future work.
+Broadcast authoring and delivery now use first-class Messaging template relationships end to end. Each Broadcast owns one private Messaging `MessageTemplate`; draft edits publish immutable `MessageTemplateVersion` rows on that private identity, and scheduling pins the exact current version on `broadcasts.message_template_version_id`. Every recipient delivery pins that same immutable version while ScheduledMessage payload retains only per-delivery runtime differences such as destination/contact identity. `broadcasts.payload` and `broadcast_recipients.scheduled_message_ids` have been removed from the current schema.
 
 Current CRM authoring also supports explicit reusable-copy promotion independently from the private runtime snapshot. A regular Broadcast can be saved into Messaging's existing Message Templates catalog, which creates the canonical reusable `MessageTemplate` / immutable version and catalog presentation. Future Broadcasts may load a copy of the latest published reusable version into their draft. Scheduling snapshots that resulting Broadcast copy into the private immutable runtime version without mutating the reusable library item.
 
-Regular Broadcast authoring also has an executable `broadcast_send` token context. It exposes only Contact fields that the current Messaging recipient-payload path actually materializes for Broadcast delivery: first name, last name, full name, email, phone, source, and subsource. The CRM editor presents those registered fields, validates submitted copy through Messaging's `MessageTemplateTokenValidator`, and stores any explicit `token_fallbacks` beside the current Broadcast copy. Unknown or context-incompatible fields are rejected before the Broadcast can be scheduled.
+Regular Broadcast authoring also has an executable `broadcast_send` token context. It exposes only Contact fields that the current Messaging recipient-payload path actually materializes for Broadcast delivery: first name, last name, full name, email, phone, source, and subsource. The CRM editor presents those registered fields, validates submitted copy through Messaging's `MessageTemplateTokenValidator`, and stores any explicit `token_fallbacks` in the private immutable Messaging version. Unknown or context-incompatible fields are rejected before the Broadcast can be scheduled.
 
-Personalization remains Messaging-owned at runtime. Broadcasts selects recipients and supplies the pinned private template version to `DispatchMessageAction`; Messaging resolves Contact values independently when each recipient delivery renders and applies the shared missing-field contract (`required`, `fallback_value`, or `replace_segment`) before provider rendering. Recipient-derived token snapshots are not copied into version-pinned ScheduledMessage payload. A legacy/stale draft that somehow contains an invalid token is revalidated by `ScheduleBroadcastAction` before the version is pinned or recipients are snapshotted, so an unsafe draft cannot partially materialize runtime state.
+Personalization remains Messaging-owned at runtime. Broadcasts selects recipients and supplies the pinned private template version to `DispatchMessageAction`; Messaging resolves Contact values independently when each recipient delivery renders and applies the shared missing-field contract (`required`, `fallback_value`, or `replace_segment`) before provider rendering. Recipient-derived token snapshots are not copied into version-pinned ScheduledMessage payload. `ScheduleBroadcastAction` revalidates the current private draft version before it is pinned or recipients are snapshotted, so invalid copy cannot partially materialize runtime state.
 
 The reusable-message seam preserves this behavior: saving a Broadcast to Message Templates carries its `token_fallbacks` into the immutable Messaging version, and `ReusableMessageTemplateCatalog` returns those rules when a later Broadcast starts from that saved message. Permission invitations remain a separate Messaging-owned special path and do not use the regular Broadcast token editor.
 
@@ -80,13 +80,11 @@ Operators create separate Broadcasts for separate channels and may use exclusion
 
 Future fallback/channel-strategy work must be modeled deliberately rather than hidden inside one Broadcast.
 
-## Runtime content ownership and remaining target
+## Runtime content ownership
 
-Every scheduled Broadcast delivery now uses a Messaging-owned private `MessageTemplate` and immutable `MessageTemplateVersion`.
+Every Broadcast now uses a Messaging-owned private `MessageTemplate` as its stable editable message identity. Draft saves publish immutable versions on that private template; scheduling pins one version on the Broadcast and every recipient delivery uses that exact version.
 
-The current draft/source authoring model still stores copy on `broadcasts.payload`; scheduling snapshots that copy into the private runtime template.
-
-Target relationship:
+Current relationship:
 
 ```text
 Broadcast.message_template_id
@@ -96,21 +94,19 @@ Broadcast.message_template_version_id nullable
     immutable version pinned when scheduled/published
 ```
 
-The draft editor may create new private template versions as the operator edits.
+The draft editor creates or reuses private template versions as the operator edits.
 
 Scheduling pins exactly one immutable version.
 
 Existing recipient deliveries never change when the draft is edited later.
 
-The private template may remain hidden from the general reusable-template browser unless an operator explicitly promotes or duplicates it into reusable library content.
+The private template remains hidden from the general reusable-template browser unless an operator explicitly promotes the Broadcast copy into reusable library content.
 
-The current CRM implementation supports that explicit promotion from an existing regular Broadcast. Promotion creates a separate CRM-authored Messaging template/catalog identity; it does not attach the source Broadcast to that reusable template. The private runtime template remains a delivery snapshot, not the reusable-library identity.
+The current CRM implementation supports that explicit promotion from an existing regular Broadcast. Promotion creates a separate CRM-authored Messaging template/catalog identity; it does not attach the source Broadcast to that reusable template. The Broadcast's private template remains its own authoring identity, not the reusable-library identity.
 
-Remove the target `broadcasts.payload` JSON column.
+The former `broadcasts.payload` JSON column is removed. Content must not be copied into `broadcasts.meta` or a one-to-one Broadcast payload table.
 
-Do not move the same content into `broadcasts.meta` or a one-to-one Broadcast payload table.
-
-## Target Broadcast schema
+## Current Broadcast schema
 
 Conceptual fields:
 
@@ -234,7 +230,7 @@ id
 broadcast_id
 contact_id
 status
-scheduled_message_ids json nullable
+scheduled_message_id nullable
 sent_at nullable
 terminal_reason nullable
 meta json nullable
@@ -250,13 +246,7 @@ Current rules:
 - `meta.delivery` snapshots are forbidden and removed during terminal reconciliation;
 - unrelated bounded Broadcast-owned metadata may remain until the broader Broadcast schema redesign.
 
-Remaining target:
-
-```text
-scheduled_message_id nullable
-```
-
-Because a normal Broadcast is single-channel, the eventual relationship should replace the current ScheduledMessage ID array with one nullable FK. That future migration should also decide whether any remaining generic recipient metadata has independent Broadcast value rather than moving the same data elsewhere.
+Because a normal Broadcast is single-channel, `scheduled_message_id` is one nullable FK to the recipient's ScheduledMessage. Terminal reconciliation resolves this first-class relationship first and may fall back to Broadcast/contact context defensively. Any future recipient cleanup should audit whether remaining generic metadata has independent Broadcast value rather than moving the same data elsewhere.
 
 ## Scheduling flow
 
@@ -290,7 +280,7 @@ Large-send chunk size and release interval are Messaging-owned operational polic
 
 Bulk Broadcast deliveries use the Messaging-owned `bulk_messages` queue. Horizon isolates that queue on a dedicated supervisor while retaining the configured environment max-process value as the total worker budget across the primary and bulk supervisors. Messaging separately enforces shared provider submission limits at the send boundary, so Broadcast chunk pacing does not pretend to be the provider rate limiter.
 
-BroadcastRecipient stores the returned ScheduledMessage relationship using the current transitional ID array until the planned single-FK persistence cleanup.
+BroadcastRecipient stores the returned ScheduledMessage through its singular nullable `scheduled_message_id` relationship. Dispatch returning more than one ScheduledMessage for a single-channel Broadcast is treated as a contract violation rather than being hidden in an array.
 
 Messaging owns consent, destination, suppression, gates, rendering, claims, retries, provider delivery, bulk-delivery queue policy, and terminal events.
 
@@ -463,12 +453,9 @@ Do not retain copied rendered bodies per recipient unless Messaging's separate r
 
 Broadcast terminal normalization and recipient-delivery version pinning are complete for the current runtime shape.
 
-A separate future Broadcast authoring/bookkeeping persistence refactor may:
+The Broadcast authoring/bookkeeping cutover is complete: message content is owned by the private Messaging template/version relationship and each recipient has one nullable ScheduledMessage FK. Remaining persistence work is narrower:
 
-- replace Broadcast payload storage with stable template/template-version FKs;
-- replace recipient ScheduledMessage ID arrays with one nullable FK;
-- replace remaining scheduling metadata with justified first-class summaries;
-- remove generic Broadcast/BroadcastRecipient metadata only after each retained value is audited;
-- update authoring, scheduling, cancellation, and CRM presentation together in focused batches.
+- replace remaining scheduling metadata with justified first-class summaries where a stable relational field is warranted;
+- remove generic Broadcast/BroadcastRecipient metadata only after each retained value is audited.
 
-That work is not required to reopen the completed Messaging terminal-authority refactor. Export/import tooling should preserve or deliberately transform the current Broadcast payload and ScheduledMessage ID array until that separate migration exists.
+Project State Broadcasts v2 transfers these first-class relationships. The runtime importer remains current-format-only, so refresh exports must be created from code using the current Project State contract.

@@ -98,7 +98,7 @@ class BroadcastTokenPersonalizationTest extends TestCase
             'missing_behavior' => MessageTokenFallbackResolver::BEHAVIOR_REPLACE_SEGMENT,
             'fallback' => '',
             'segment' => 'Hey {first_name},',
-        ]], $broadcast->payload['token_fallbacks']);
+        ]], $broadcast->messagePayload()['token_fallbacks']);
 
         $this
             ->actingAs($user)
@@ -139,7 +139,16 @@ class BroadcastTokenPersonalizationTest extends TestCase
             ]);
         }
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage([
+            'subject' => 'Birthday note',
+            'body' => 'Hey {first_name}, Happy birthday!',
+            'token_fallbacks' => [[
+                'token' => 'first_name',
+                'missing_behavior' => MessageTokenFallbackResolver::BEHAVIOR_REPLACE_SEGMENT,
+                'segment' => 'Hey {first_name},',
+                'fallback' => '',
+            ]],
+        ])->create([
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'broadcast',
@@ -153,16 +162,6 @@ class BroadcastTokenPersonalizationTest extends TestCase
                     $namedContact->getKey(),
                     $missingNameContact->getKey(),
                 ],
-            ],
-            'payload' => [
-                'subject' => 'Birthday note',
-                'body' => 'Hey {first_name}, Happy birthday!',
-                'token_fallbacks' => [[
-                    'token' => 'first_name',
-                    'missing_behavior' => MessageTokenFallbackResolver::BEHAVIOR_REPLACE_SEGMENT,
-                    'segment' => 'Hey {first_name},',
-                    'fallback' => '',
-                ]],
             ],
         ]);
 
@@ -188,13 +187,16 @@ class BroadcastTokenPersonalizationTest extends TestCase
         );
     }
 
-    public function test_invalid_legacy_broadcast_draft_is_blocked_before_recipient_snapshot(): void
+    public function test_invalid_broadcast_draft_is_blocked_before_recipient_snapshot(): void
     {
         Contact::factory()->create([
             'email' => 'recipient@example.test',
         ]);
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage([
+            'subject' => 'Invalid draft',
+            'body' => 'Hello {does_not_exist}',
+        ])->create([
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'broadcast',
@@ -202,10 +204,6 @@ class BroadcastTokenPersonalizationTest extends TestCase
             'message_type' => Broadcast::DEFAULT_MESSAGE_TYPE,
             'payload_class' => EmailPayload::class,
             'recipient_filter' => ['type' => 'all'],
-            'payload' => [
-                'subject' => 'Invalid legacy draft',
-                'body' => 'Hello {does_not_exist}',
-            ],
         ]);
 
         try {

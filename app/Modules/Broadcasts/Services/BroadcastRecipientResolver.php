@@ -63,7 +63,7 @@ class BroadcastRecipientResolver
             ->selectRaw('? as broadcast_id', [$broadcast->getKey()])
             ->addSelect('contacts.id as contact_id')
             ->selectRaw('? as status', [BroadcastRecipient::STATUS_PENDING])
-            ->selectRaw('NULL as scheduled_message_ids')
+            ->selectRaw('NULL as scheduled_message_id')
             ->selectRaw('NULL as sent_at')
             ->selectRaw('NULL as terminal_reason')
             ->selectRaw('NULL as meta')
@@ -74,7 +74,7 @@ class BroadcastRecipientResolver
             'broadcast_id',
             'contact_id',
             'status',
-            'scheduled_message_ids',
+            'scheduled_message_id',
             'sent_at',
             'terminal_reason',
             'meta',

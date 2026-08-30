@@ -269,7 +269,7 @@ class CancelBroadcastActionTest extends TestCase
             'broadcast_id' => $broadcast->id,
             'contact_id' => $contact->id,
             'status' => BroadcastRecipient::STATUS_SENT,
-            'scheduled_message_ids' => [$sentMessage->id],
+            'scheduled_message_id' => $sentMessage->id,
             'sent_at' => now()->subMinutes(5),
         ]);
 

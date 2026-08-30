@@ -127,6 +127,23 @@ class StoreBroadcastRequest extends FormRequest
         return $this->regularBroadcastAttributes($validated);
     }
 
+    /** @return array<string, mixed> */
+    public function messagePayload(): array
+    {
+        $validated = $this->validated();
+
+        if ($this->broadcastType($validated) === Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION) {
+            return [
+                'subject' => $validated['subject'],
+                'body' => $validated['body'],
+            ];
+        }
+
+        $channel = $this->regularBroadcastChannel($validated);
+
+        return $this->regularBroadcastPayload($channel, $validated);
+    }
+
     public function shouldSchedule(): bool
     {
         return $this->validated('intent') === 'schedule';
@@ -162,7 +179,6 @@ class StoreBroadcastRequest extends FormRequest
             'queue' => 'marketing',
             'status' => Broadcast::STATUS_DRAFT,
             'send_at' => $validated['send_at'] ?? null,
-            'payload' => $this->regularBroadcastPayload($channel, $validated),
             'recipient_filter' => $recipientFilter,
             'recipient_count' => 0,
             'scheduled_count' => 0,
@@ -191,10 +207,6 @@ class StoreBroadcastRequest extends FormRequest
             'queue' => 'emails',
             'status' => Broadcast::STATUS_DRAFT,
             'send_at' => $validated['send_at'] ?? null,
-            'payload' => [
-                'subject' => $validated['subject'],
-                'body' => $validated['body'],
-            ],
             'recipient_filter' => $this->permissionInvitationRecipientFilter($validated),
             'recipient_count' => 0,
             'scheduled_count' => 0,

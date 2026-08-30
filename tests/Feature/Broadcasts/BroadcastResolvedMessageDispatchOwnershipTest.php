@@ -22,7 +22,10 @@ class BroadcastResolvedMessageDispatchOwnershipTest extends TestCase
         $contact = Contact::factory()->create();
         $sendAt = now()->addHour();
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage([
+            'subject' => 'Update',
+            'body' => 'News',
+        ])->create([
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'broadcast',
@@ -32,7 +35,6 @@ class BroadcastResolvedMessageDispatchOwnershipTest extends TestCase
             'queue' => 'marketing',
             'send_at' => $sendAt,
             'recipient_filter' => ['type' => 'all'],
-            'payload' => ['subject' => 'Update', 'body' => 'News'],
         ]);
 
         $this->mock(DispatchMessageAction::class)

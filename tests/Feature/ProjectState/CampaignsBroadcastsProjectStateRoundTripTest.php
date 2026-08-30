@@ -157,16 +157,16 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             column: 'meta',
         );
 
-        $this->assertSame(140, $broadcastMessageMeta['broadcast_id']);
-        $this->assertSame(141, $broadcastMessageMeta['broadcast_recipient_id']);
-        $this->assertEquals(
-            [150],
-            $this->jsonColumn(
-                table: 'broadcast_recipients',
-                id: 141,
-                column: 'scheduled_message_ids',
-            ),
-        );
+        $this->assertArrayNotHasKey('broadcast_id', $broadcastMessageMeta);
+        $this->assertArrayNotHasKey('broadcast_recipient_id', $broadcastMessageMeta);
+        $this->assertSame(150, (int) DB::table('broadcast_recipients')
+            ->where('id', 141)
+            ->value('scheduled_message_id'));
+
+        $importedBroadcast = Broadcast::query()->findOrFail(140);
+        $this->assertNotNull($importedBroadcast->message_template_id);
+        $this->assertNotNull($importedBroadcast->message_template_version_id);
+        $this->assertSame('Production broadcast', $importedBroadcast->messagePayload()['subject']);
         $this->assertDatabaseHas('project_state_resume_items', [
             'category' => 'broadcasts',
             'source_table' => 'broadcasts',
@@ -390,6 +390,41 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             'updated_at' => $now,
         ]);
 
+        DB::table('message_templates')->insert([
+            'id' => 410,
+            'key' => 'broadcast.private.140',
+            'name' => 'Broadcast #140: Production broadcast',
+            'description' => 'Private authored message for Broadcast #140.',
+            'channel' => 'email',
+            'status' => 'active',
+            'composition_context_key' => null,
+            'composition_family_key' => null,
+            'current_version_id' => null,
+            'source' => 'broadcast_private',
+            'source_version' => '2',
+            'is_customized' => false,
+            'customized_at' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        DB::table('message_template_versions')->insert([
+            'id' => 411,
+            'message_template_id' => 410,
+            'version' => 1,
+            'subject' => 'Production broadcast',
+            'content' => json_encode([]),
+            'renderer_key' => 'email',
+            'renderer_version' => '1',
+            'content_hash' => hash('sha256', 'project-state-broadcast-private-v1'),
+            'created_by' => null,
+            'created_at' => $now,
+        ]);
+
+        DB::table('message_templates')
+            ->where('id', 410)
+            ->update(['current_version_id' => 411]);
+
         DB::table('scheduled_messages')->insert([
             $this->scheduledMessageRow(
                 id: 130,
@@ -420,14 +455,14 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
                 dedupeKey: 'project-state-broadcast-message',
                 providerKey: 'project-state-broadcast-provider',
                 meta: [
-                    'broadcast_id' => 140,
-                    'broadcast_recipient_id' => 141,
+                    'source' => 'broadcast',
                 ],
                 now: $now,
                 contextType: Broadcast::class,
                 contextId: 140,
                 behaviorOwnerType: Broadcast::class,
                 behaviorOwnerId: 140,
+                messageTemplateVersionId: 411,
             ),
         ]);
 
@@ -450,6 +485,8 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
         DB::table('broadcasts')->insert([
             'id' => 140,
             'user_id' => 7,
+            'message_template_id' => 410,
+            'message_template_version_id' => 411,
             'name' => 'Production broadcast',
             'channel' => 'email',
             'purpose' => 'marketing',
@@ -460,7 +497,6 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             'queue' => 'marketing',
             'status' => 'sending',
             'send_at' => $now->copy()->addHour(),
-            'payload' => json_encode(['subject' => 'Production broadcast']),
             'recipient_filter' => json_encode(['type' => 'contact_ids', 'contact_ids' => [60]]),
             'recipient_count' => 1,
             'scheduled_count' => 1,
@@ -476,7 +512,7 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             'broadcast_id' => 140,
             'contact_id' => 60,
             'status' => 'scheduled',
-            'scheduled_message_ids' => json_encode([150]),
+            'scheduled_message_id' => 150,
             'sent_at' => null,
             'terminal_reason' => null,
             'meta' => json_encode(['owner' => 'production']),
@@ -491,6 +527,15 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
         DB::table('broadcasts')->delete();
         DB::table('campaign_enrollments')->delete();
         DB::table('scheduled_messages')->delete();
+        DB::table('message_templates')
+            ->where('key', 'broadcast.private.140')
+            ->update(['current_version_id' => null]);
+        DB::table('message_template_versions')
+            ->where('message_template_id', 410)
+            ->delete();
+        DB::table('message_templates')
+            ->where('key', 'broadcast.private.140')
+            ->delete();
         DB::table('message_chain_enrollments')->delete();
         DB::table('campaign_step_variants')->delete();
         DB::table('campaign_steps')->delete();
@@ -610,6 +655,7 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
         ?string $behaviorOwnerType = null,
         ?int $behaviorOwnerId = null,
         ?int $messageChainEnrollmentId = null,
+        ?int $messageTemplateVersionId = null,
     ): array {
         return [
             'id' => $id,
@@ -638,7 +684,7 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             'meta' => json_encode($meta),
             'created_at' => $now,
             'updated_at' => $now,
-            'message_template_version_id' => null,
+            'message_template_version_id' => $messageTemplateVersionId,
             'message_chain_enrollment_id' => $messageChainEnrollmentId,
             'message_chain_step_variant_id' => null,
         ];

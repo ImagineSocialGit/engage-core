@@ -103,7 +103,7 @@ class BroadcastShowDiagnosticsTest extends TestCase
         $recipient = BroadcastRecipient::factory()->skipped('Marketing permission is missing.')->create([
             'broadcast_id' => $broadcast->getKey(),
             'contact_id' => $contact->getKey(),
-            'scheduled_message_ids' => [$message->getKey()],
+            'scheduled_message_id' => $message->getKey(),
         ]);
 
         $response = $this->actingAs($user)->get(route('crm.broadcasts.show', [

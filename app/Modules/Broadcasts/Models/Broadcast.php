@@ -2,11 +2,14 @@
 
 namespace App\Modules\Broadcasts\Models;
 
+use App\Modules\Messaging\Models\MessageTemplate;
+use App\Modules\Messaging\Models\MessageTemplateVersion;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use Database\Factories\BroadcastFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
@@ -38,6 +41,8 @@ class Broadcast extends Model
 
     protected $fillable = [
         'user_id',
+        'message_template_id',
+        'message_template_version_id',
         'name',
         'channel',
         'purpose',
@@ -48,7 +53,6 @@ class Broadcast extends Model
         'queue',
         'status',
         'send_at',
-        'payload',
         'recipient_filter',
         'recipient_count',
         'scheduled_count',
@@ -61,8 +65,9 @@ class Broadcast extends Model
     {
         return [
             'user_id' => 'integer',
+            'message_template_id' => 'integer',
+            'message_template_version_id' => 'integer',
             'send_at' => 'datetime',
-            'payload' => 'array',
             'recipient_filter' => 'array',
             'recipient_count' => 'integer',
             'scheduled_count' => 'integer',
@@ -70,6 +75,16 @@ class Broadcast extends Model
             'completed_at' => 'datetime',
             'meta' => 'array',
         ];
+    }
+
+    public function messageTemplate(): BelongsTo
+    {
+        return $this->belongsTo(MessageTemplate::class);
+    }
+
+    public function messageTemplateVersion(): BelongsTo
+    {
+        return $this->belongsTo(MessageTemplateVersion::class);
     }
 
     public function recipients(): HasMany
@@ -80,6 +95,35 @@ class Broadcast extends Model
     public function scheduledMessages(): MorphMany
     {
         return $this->morphMany(ScheduledMessage::class, 'context');
+    }
+
+    /**
+     * Return the authored Broadcast copy from its private Messaging template.
+     * Drafts read the current private version. Once scheduled, the exact pinned
+     * version remains authoritative even if the template's current version were
+     * ever changed later.
+     *
+     * @return array<string, mixed>
+     */
+    public function messagePayload(): array
+    {
+        if (is_numeric($this->message_template_version_id)) {
+            $version = $this->relationLoaded('messageTemplateVersion')
+                ? $this->getRelation('messageTemplateVersion')
+                : $this->messageTemplateVersion()->first();
+
+            if ($version instanceof MessageTemplateVersion) {
+                return $version->payload();
+            }
+        }
+
+        $template = $this->relationLoaded('messageTemplate')
+            ? $this->getRelation('messageTemplate')
+            : $this->messageTemplate()->first();
+
+        return $template instanceof MessageTemplate
+            ? $template->currentPayload()
+            : [];
     }
 
     public function isPermissionInvitation(): bool

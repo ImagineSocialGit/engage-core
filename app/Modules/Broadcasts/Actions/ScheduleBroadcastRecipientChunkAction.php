@@ -48,6 +48,7 @@ class ScheduleBroadcastRecipientChunkAction
             }
 
             $messageTemplateVersion = $this->messageTemplateVersions->resolvePinned($broadcast);
+            $messagePayload = $messageTemplateVersion->payload();
             $bulkSettings = $this->bulkSettings($broadcast);
             $chunkSize = $bulk
                 ? $bulkSettings['chunk_size']
@@ -152,7 +153,7 @@ class ScheduleBroadcastRecipientChunkAction
                     purpose: $broadcast->purpose,
                     scope: $broadcast->scope,
                     dispatchKeys: $broadcast->dispatch_key,
-                    payload: $broadcast->payload ?? [],
+                    payload: $messagePayload,
                     context: $broadcast,
                     triggeredAt: now(),
                     sendAt: $releaseAt,
@@ -169,16 +170,16 @@ class ScheduleBroadcastRecipientChunkAction
                             'payload_class' => $broadcast->payload_class,
                             'queue' => $deliveryQueue,
                             'message_template_version_id' => $messageTemplateVersion->getKey(),
-                            'payload' => $broadcast->payload ?? [],
+                            'payload' => $messagePayload,
                             'consent_policy' => $consentPolicy,
                             'meta' => $definitionMeta,
                         ],
                     ],
                 );
 
-                $scheduledMessageIds = $this->scheduledMessageIds($scheduledMessages);
+                $scheduledMessage = $this->singleScheduledMessage($scheduledMessages);
 
-                if ($scheduledMessageIds === []) {
+                if (! $scheduledMessage instanceof ScheduledMessage) {
                     $this->markSkipped(
                         recipient: $recipient,
                         reason: 'not_scheduled_by_messaging',
@@ -195,7 +196,7 @@ class ScheduleBroadcastRecipientChunkAction
 
                 $recipient->forceFill([
                     'status' => BroadcastRecipient::STATUS_SCHEDULED,
-                    'scheduled_message_ids' => $scheduledMessageIds,
+                    'scheduled_message_id' => $scheduledMessage->getKey(),
                     'sent_at' => null,
                     'terminal_reason' => null,
                     'meta' => array_replace_recursive($recipient->meta ?? [], [
@@ -367,16 +368,33 @@ class ScheduleBroadcastRecipientChunkAction
 
     /**
      * @param array<int, ScheduledMessage> $scheduledMessages
-     * @return array<int, int>
      */
-    private function scheduledMessageIds(array $scheduledMessages): array
+    private function singleScheduledMessage(array $scheduledMessages): ?ScheduledMessage
     {
-        return array_values(array_filter(array_map(
-            fn (ScheduledMessage $scheduledMessage): ?int => $scheduledMessage->getKey()
-                ? (int) $scheduledMessage->getKey()
-                : null,
+        $scheduledMessages = array_values(array_filter(
             $scheduledMessages,
-        )));
+            fn (mixed $message): bool => $message instanceof ScheduledMessage,
+        ));
+
+        if ($scheduledMessages === []) {
+            return null;
+        }
+
+        if (count($scheduledMessages) !== 1) {
+            throw new \RuntimeException(
+                'Broadcast single-channel scheduling returned more than one ScheduledMessage.',
+            );
+        }
+
+        $scheduledMessage = $scheduledMessages[0];
+
+        if (! $scheduledMessage->getKey()) {
+            throw new \RuntimeException(
+                'Broadcast scheduling returned an unpersisted ScheduledMessage.',
+            );
+        }
+
+        return $scheduledMessage;
     }
 
     /**
@@ -389,7 +407,7 @@ class ScheduleBroadcastRecipientChunkAction
     ): void {
         $recipient->forceFill([
             'status' => BroadcastRecipient::STATUS_SKIPPED,
-            'scheduled_message_ids' => null,
+            'scheduled_message_id' => null,
             'sent_at' => null,
             'terminal_reason' => $reason,
             'meta' => array_replace_recursive($recipient->meta ?? [], $meta),

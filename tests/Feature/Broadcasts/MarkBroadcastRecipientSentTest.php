@@ -23,7 +23,7 @@ class MarkBroadcastRecipientSentTest extends TestCase
         $broadcast = Broadcast::factory()->scheduled()->create();
         $contact = Contact::factory()->create();
 
-        $recipient = BroadcastRecipient::factory()->scheduled([123])->create([
+        $recipient = BroadcastRecipient::factory()->scheduled()->create([
             'broadcast_id' => $broadcast->id,
             'contact_id' => $contact->id,
             'meta' => [
@@ -39,10 +39,6 @@ class MarkBroadcastRecipientSentTest extends TestCase
             'recipient_id' => $contact->id,
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
-            'meta' => [
-                'broadcast_id' => $broadcast->id,
-                'broadcast_recipient_id' => $recipient->id,
-            ],
         ]);
 
         app(MarkBroadcastRecipientSent::class)->handle(
@@ -65,7 +61,7 @@ class MarkBroadcastRecipientSentTest extends TestCase
         $broadcast = Broadcast::factory()->scheduled()->create();
         $contact = Contact::factory()->create();
 
-        $recipient = BroadcastRecipient::factory()->scheduled([123])->create([
+        $recipient = BroadcastRecipient::factory()->scheduled()->create([
             'broadcast_id' => $broadcast->id,
             'contact_id' => $contact->id,
         ]);
@@ -79,9 +75,6 @@ class MarkBroadcastRecipientSentTest extends TestCase
             'recipient_id' => $contact->id,
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
-            'meta' => [
-                'broadcast_recipient_id' => $recipient->id,
-            ],
         ]);
 
         app(MarkBroadcastRecipientSent::class)->handle(
@@ -99,12 +92,12 @@ class MarkBroadcastRecipientSentTest extends TestCase
         $broadcast = Broadcast::factory()->scheduled()->create();
         $contact = Contact::factory()->create();
 
-        $recipient = BroadcastRecipient::factory()->scheduled([123])->create([
+        $recipient = BroadcastRecipient::factory()->scheduled()->create([
             'broadcast_id' => $broadcast->id,
             'contact_id' => $contact->id,
         ]);
 
-        BroadcastRecipient::factory()->scheduled([456])->create([
+        BroadcastRecipient::factory()->scheduled()->create([
             'broadcast_id' => $broadcast->id,
         ]);
 
@@ -113,9 +106,6 @@ class MarkBroadcastRecipientSentTest extends TestCase
             'recipient_id' => $contact->id,
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
-            'meta' => [
-                'broadcast_recipient_id' => $recipient->id,
-            ],
         ]);
 
         app(MarkBroadcastRecipientSent::class)->handle(
@@ -133,7 +123,7 @@ class MarkBroadcastRecipientSentTest extends TestCase
         $broadcast = Broadcast::factory()->scheduled()->create();
         $contact = Contact::factory()->create();
 
-        $recipient = BroadcastRecipient::factory()->scheduled([123])->create([
+        $recipient = BroadcastRecipient::factory()->scheduled()->create([
             'broadcast_id' => $broadcast->id,
             'contact_id' => $contact->id,
         ]);

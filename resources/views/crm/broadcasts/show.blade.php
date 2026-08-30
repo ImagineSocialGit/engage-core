@@ -154,7 +154,7 @@
                             </div>
 
                             <div class="mt-2 whitespace-pre-line break-words rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                                {{ $broadcast->payload['message'] ?? '' }}
+                                {{ $broadcast->messagePayload()['message'] ?? '' }}
                             </div>
                         </div>
                     @else
@@ -164,7 +164,7 @@
                             </div>
 
                             <div class="mt-1 text-sm font-medium text-slate-900">
-                                {{ $broadcast->payload['subject'] ?? 'No subject' }}
+                                {{ $broadcast->messagePayload()['subject'] ?? 'No subject' }}
                             </div>
                         </div>
 
@@ -174,7 +174,7 @@
                             </div>
 
                             <div class="mt-2 whitespace-pre-line break-words rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                                {{ $broadcast->payload['body'] ?? '' }}
+                                {{ $broadcast->messagePayload()['body'] ?? '' }}
                             </div>
                         </div>
                     @endif

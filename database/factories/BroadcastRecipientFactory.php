@@ -20,18 +20,18 @@ class BroadcastRecipientFactory extends Factory
             'broadcast_id' => Broadcast::factory(),
             'contact_id' => Contact::factory(),
             'status' => BroadcastRecipient::STATUS_PENDING,
-            'scheduled_message_ids' => null,
+            'scheduled_message_id' => null,
             'sent_at' => null,
             'terminal_reason' => null,
             'meta' => [],
         ];
     }
 
-    public function scheduled(array $scheduledMessageIds = [1]): static
+    public function scheduled(?int $scheduledMessageId = null): static
     {
         return $this->state(fn (): array => [
             'status' => BroadcastRecipient::STATUS_SCHEDULED,
-            'scheduled_message_ids' => $scheduledMessageIds,
+            'scheduled_message_id' => $scheduledMessageId,
         ]);
     }
 

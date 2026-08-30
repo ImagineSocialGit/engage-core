@@ -26,7 +26,7 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
         $broadcast = Broadcast::factory()->scheduled()->create();
         $contact = Contact::factory()->create();
 
-        $recipient = BroadcastRecipient::factory()->scheduled([123])->create([
+        $recipient = BroadcastRecipient::factory()->scheduled()->create([
             'broadcast_id' => $broadcast->id,
             'contact_id' => $contact->id,
             'meta' => [
@@ -43,10 +43,6 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
             'status' => ScheduledMessage::STATUS_SKIPPED,
-            'meta' => [
-                'broadcast_id' => $broadcast->id,
-                'broadcast_recipient_id' => $recipient->id,
-            ],
         ]);
 
         app(MarkBroadcastRecipientSkipped::class)->handle(
@@ -80,7 +76,7 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
         $broadcast = Broadcast::factory()->scheduled()->create();
         $contact = Contact::factory()->create();
 
-        $recipient = BroadcastRecipient::factory()->scheduled([123])->create([
+        $recipient = BroadcastRecipient::factory()->scheduled()->create([
             'broadcast_id' => $broadcast->id,
             'contact_id' => $contact->id,
             'meta' => [
@@ -97,10 +93,6 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
             'status' => ScheduledMessage::STATUS_FAILED,
-            'meta' => [
-                'broadcast_id' => $broadcast->id,
-                'broadcast_recipient_id' => $recipient->id,
-            ],
         ]);
 
         app(MarkBroadcastRecipientFailed::class)->handle(
@@ -135,7 +127,7 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
         $broadcast = Broadcast::factory()->scheduled()->create();
         $contact = Contact::factory()->create();
 
-        $recipient = BroadcastRecipient::factory()->scheduled([123])->create([
+        $recipient = BroadcastRecipient::factory()->scheduled()->create([
             'broadcast_id' => $broadcast->id,
             'contact_id' => $contact->id,
         ]);
@@ -151,9 +143,6 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
             'recipient_id' => $contact->id,
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
-            'meta' => [
-                'broadcast_recipient_id' => $recipient->id,
-            ],
         ]);
 
         app(MarkBroadcastRecipientSkipped::class)->handle(
@@ -173,7 +162,7 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
         $broadcast = Broadcast::factory()->scheduled()->create();
         $contact = Contact::factory()->create();
 
-        $recipient = BroadcastRecipient::factory()->scheduled([123])->create([
+        $recipient = BroadcastRecipient::factory()->scheduled()->create([
             'broadcast_id' => $broadcast->id,
             'contact_id' => $contact->id,
         ]);
@@ -189,9 +178,6 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
             'recipient_id' => $contact->id,
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
-            'meta' => [
-                'broadcast_recipient_id' => $recipient->id,
-            ],
         ]);
 
         app(MarkBroadcastRecipientFailed::class)->handle(
@@ -221,9 +207,6 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
             'recipient_id' => $contact->id,
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
-            'meta' => [
-                'broadcast_recipient_id' => $recipient->id,
-            ],
         ]);
 
         app(MarkBroadcastRecipientSkipped::class)->handle(
@@ -242,7 +225,7 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
         $broadcast = Broadcast::factory()->scheduled()->create();
         $contact = Contact::factory()->create();
 
-        $recipient = BroadcastRecipient::factory()->scheduled([123])->create([
+        $recipient = BroadcastRecipient::factory()->scheduled()->create([
             'broadcast_id' => $broadcast->id,
             'contact_id' => $contact->id,
         ]);

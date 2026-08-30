@@ -86,10 +86,11 @@ return [
     | pinned primary and component template versions during payload resolution;
     | no copied fragment or consolidation recipe belongs in message payload/meta.
     |
-    | Normal Broadcasts usually provide ad hoc payloads inline from the
-    | Broadcast record. Email Broadcast payloads use subject/body. Do not add
-    | reusable Broadcast copy here unless a future workflow intentionally
-    | dispatches Broadcast messages from Messaging config.
+    | Regular Broadcast authoring is owned by a private Messaging template and
+    | immutable version referenced from the Broadcast. Email Broadcast copy uses
+    | subject/body on that private version; recipient ScheduledMessages persist
+    | only runtime differences. Do not add Broadcast-authored copy here unless a
+    | future workflow intentionally dispatches Broadcast messages from config.
     */
 
     /*

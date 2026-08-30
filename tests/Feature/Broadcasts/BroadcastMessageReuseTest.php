@@ -30,17 +30,16 @@ class BroadcastMessageReuseTest extends TestCase
     public function test_regular_broadcast_message_can_be_saved_to_the_existing_message_template_catalog(): void
     {
         $user = User::factory()->create();
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage([
+            'subject' => 'One VA myth to stop repeating',
+            'body' => 'Here is the useful copy.',
+        ])->create([
             'name' => 'Friday Realtor Update',
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'broadcast',
             'dispatch_key' => Broadcast::DEFAULT_DISPATCH_KEY,
             'message_type' => Broadcast::DEFAULT_MESSAGE_TYPE,
-            'payload' => [
-                'subject' => 'One VA myth to stop repeating',
-                'body' => 'Here is the useful copy.',
-            ],
             'meta' => [
                 'broadcast_type' => Broadcast::BROADCAST_TYPE_REGULAR,
             ],
@@ -70,7 +69,7 @@ class BroadcastMessageReuseTest extends TestCase
             ['broadcasts', 'campaign_annual_touch'],
             data_get($catalogEntry->meta, 'authoring.selection_contexts'),
         );
-        $this->assertEquals($broadcast->payload, $template->currentPayload());
+        $this->assertEquals($broadcast->messagePayload(), $template->currentPayload());
 
         $this
             ->actingAs($user)
@@ -88,22 +87,21 @@ class BroadcastMessageReuseTest extends TestCase
     public function test_saved_broadcast_message_preserves_missing_field_behavior_when_loaded_for_reuse(): void
     {
         $user = User::factory()->create();
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage([
+            'subject' => 'A note for {first_name}',
+            'body' => 'Hey {first_name}, here is the update.',
+            'token_fallbacks' => [[
+                'token' => 'first_name',
+                'missing_behavior' => MessageTokenFallbackResolver::BEHAVIOR_FALLBACK_VALUE,
+                'fallback' => 'there',
+            ]],
+        ])->create([
             'name' => 'Personalized Update',
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'broadcast',
             'dispatch_key' => Broadcast::DEFAULT_DISPATCH_KEY,
             'message_type' => Broadcast::DEFAULT_MESSAGE_TYPE,
-            'payload' => [
-                'subject' => 'A note for {first_name}',
-                'body' => 'Hey {first_name}, here is the update.',
-                'token_fallbacks' => [[
-                    'token' => 'first_name',
-                    'missing_behavior' => MessageTokenFallbackResolver::BEHAVIOR_FALLBACK_VALUE,
-                    'fallback' => 'there',
-                ]],
-            ],
             'meta' => [
                 'broadcast_type' => Broadcast::BROADCAST_TYPE_REGULAR,
             ],
@@ -124,7 +122,7 @@ class BroadcastMessageReuseTest extends TestCase
         ))->sole();
 
         $this->assertEquals(
-            $broadcast->payload['token_fallbacks'],
+            $broadcast->messagePayload()['token_fallbacks'],
             $definition['payload']['token_fallbacks'],
         );
         $this->assertSame(
@@ -136,12 +134,11 @@ class BroadcastMessageReuseTest extends TestCase
     public function test_make_new_broadcast_copies_message_but_resets_audience_and_send_state(): void
     {
         $user = User::factory()->create();
-        $broadcast = Broadcast::factory()->completed()->create([
+        $broadcast = Broadcast::factory()->withMessage([
+            'subject' => 'Original subject',
+            'body' => 'Original body',
+        ])->create([
             'name' => 'Original Update',
-            'payload' => [
-                'subject' => 'Original subject',
-                'body' => 'Original body',
-            ],
             'recipient_filter' => [
                 'type' => 'contact_ids',
                 'contact_ids' => [123, 456],
@@ -152,6 +149,10 @@ class BroadcastMessageReuseTest extends TestCase
                 'broadcast_type' => Broadcast::BROADCAST_TYPE_REGULAR,
             ],
         ]);
+        $broadcast->forceFill([
+            'status' => Broadcast::STATUS_COMPLETED,
+            'completed_at' => now(),
+        ])->save();
 
         $response = $this
             ->actingAs($user)
@@ -168,7 +169,7 @@ class BroadcastMessageReuseTest extends TestCase
         $this->assertSame($user->id, $copy->user_id);
         $this->assertSame(Broadcast::STATUS_DRAFT, $copy->status);
         $this->assertSame('Copy of Original Update', $copy->name);
-        $this->assertEquals($broadcast->payload, $copy->payload);
+        $this->assertEquals($broadcast->messagePayload(), $copy->messagePayload());
         $this->assertEquals([
             'type' => 'criteria',
             'criteria' => [],

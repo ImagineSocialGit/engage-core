@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 1,
+    'version' => 2,
     'tables' => [
         'broadcasts' => [
             'mode' => 'insert_empty',
@@ -10,6 +10,8 @@ return [
             'columns' => [
                 'id',
                 'user_id',
+                'message_template_id',
+                'message_template_version_id',
                 'name',
                 'channel',
                 'purpose',
@@ -20,7 +22,6 @@ return [
                 'queue',
                 'status',
                 'send_at',
-                'payload',
                 'recipient_filter',
                 'recipient_count',
                 'scheduled_count',
@@ -31,9 +32,12 @@ return [
                 'updated_at',
             ],
             'json_columns' => [
-                'payload',
                 'recipient_filter',
                 'meta',
+            ],
+            'references' => [
+                'message_template_id' => 'message_templates',
+                'message_template_version_id' => 'message_template_versions',
             ],
             'null_on_import' => ['user_id'],
             'import_value_maps' => [
@@ -59,7 +63,7 @@ return [
                 'broadcast_id',
                 'contact_id',
                 'status',
-                'scheduled_message_ids',
+                'scheduled_message_id',
                 'sent_at',
                 'terminal_reason',
                 'meta',
@@ -67,12 +71,12 @@ return [
                 'updated_at',
             ],
             'json_columns' => [
-                'scheduled_message_ids',
                 'meta',
             ],
             'references' => [
                 'broadcast_id' => 'broadcasts',
                 'contact_id' => 'contacts',
+                'scheduled_message_id' => 'scheduled_messages',
             ],
         ],
     ],

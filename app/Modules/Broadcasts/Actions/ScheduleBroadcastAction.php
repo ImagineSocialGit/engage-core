@@ -34,6 +34,7 @@ class ScheduleBroadcastAction
             $this->messageTokenValidator->assertBroadcastValid($broadcast);
 
             $sendAt = $this->resolveSendAt($broadcast);
+            $this->messageTemplateVersions->pin($broadcast);
             $eligibleRecipientCount = $this->recipientResolver->count($broadcast);
             $evaluatedAt = now();
 
@@ -59,7 +60,6 @@ class ScheduleBroadcastAction
                 return $broadcast->refresh();
             }
 
-            $this->messageTemplateVersions->pin($broadcast);
             $this->recipientResolver->snapshot($broadcast);
 
             $snapshottedRecipientCount = BroadcastRecipient::query()

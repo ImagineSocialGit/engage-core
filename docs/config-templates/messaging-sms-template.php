@@ -78,10 +78,10 @@ return [
     | Campaign presets own timing. Campaign SMS templates own only delivery
     | template fields such as payload_class, queue, and payload.
     |
-    | Regular SMS Broadcasts usually provide ad hoc payloads inline from the
-    | Broadcast record. SMS Broadcast payloads use payload.message and are
-    | hydrated by Messaging with to/channel/purpose/scope/message_type before
-    | scheduling.
+    | Regular SMS Broadcast authoring is owned by a private Messaging template
+    | and immutable version referenced from the Broadcast. SMS Broadcast copy
+    | uses payload.message on that private version; Messaging hydrates recipient
+    | delivery fields such as to/channel/purpose/scope/message_type at runtime.
     */
 
     /*
@@ -237,9 +237,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | Regular SMS Broadcasts are single-channel ad hoc sends. The Broadcast
-    | stores payload.message, then passes an inline Messaging definition with
-    | dispatch_key = broadcast_send. Messaging resolves the Contact phone into
-    | the scheduled payload's to field.
+    | references its private immutable Messaging version and dispatches that
+    | version with dispatch_key = broadcast_send. Messaging resolves the Contact
+    | phone into the ScheduledMessage runtime payload's to field.
     |
     | If a Contact has no usable phone, Messaging schedules nothing for that
     | recipient and Broadcast bookkeeping records the recipient as skipped.

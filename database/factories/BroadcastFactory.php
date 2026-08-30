@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\User;
 use App\Modules\Broadcasts\Models\Broadcast;
+use App\Modules\Broadcasts\Services\BroadcastMessageTemplateVersionService;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -18,6 +19,8 @@ class BroadcastFactory extends Factory
     {
         return [
             'user_id' => User::factory(),
+            'message_template_id' => null,
+            'message_template_version_id' => null,
             'name' => fake()->sentence(3),
             'channel' => 'email',
             'purpose' => 'marketing',
@@ -28,10 +31,6 @@ class BroadcastFactory extends Factory
             'queue' => 'marketing',
             'status' => Broadcast::STATUS_DRAFT,
             'send_at' => null,
-            'payload' => [
-                'subject' => 'Test broadcast',
-                'body' => 'This is a test broadcast.',
-            ],
             'recipient_filter' => [
                 'type' => 'all',
             ],
@@ -41,6 +40,28 @@ class BroadcastFactory extends Factory
             'completed_at' => null,
             'meta' => [],
         ];
+    }
+
+    /**
+     * Give a draft Broadcast its private Messaging authoring template.
+     *
+     * @param array<string, mixed>|null $payload
+     */
+    public function withMessage(?array $payload = null): static
+    {
+        return $this->afterCreating(function (Broadcast $broadcast) use ($payload): void {
+            $resolved = $payload ?? ($broadcast->channel === 'sms'
+                ? ['message' => 'This is a test broadcast.']
+                : [
+                    'subject' => 'Test broadcast',
+                    'body' => 'This is a test broadcast.',
+                ]);
+
+            app(BroadcastMessageTemplateVersionService::class)->saveDraft(
+                broadcast: $broadcast,
+                payload: $resolved,
+            );
+        });
     }
 
     public function scheduled(): static

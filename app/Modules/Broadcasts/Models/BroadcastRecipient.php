@@ -3,6 +3,7 @@
 namespace App\Modules\Broadcasts\Models;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\ScheduledMessage;
 use Database\Factories\BroadcastRecipientFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -28,7 +29,7 @@ class BroadcastRecipient extends Model
         'broadcast_id',
         'contact_id',
         'status',
-        'scheduled_message_ids',
+        'scheduled_message_id',
         'sent_at',
         'terminal_reason',
         'meta',
@@ -39,7 +40,7 @@ class BroadcastRecipient extends Model
         return [
             'broadcast_id' => 'integer',
             'contact_id' => 'integer',
-            'scheduled_message_ids' => 'array',
+            'scheduled_message_id' => 'integer',
             'sent_at' => 'datetime',
             'meta' => 'array',
         ];
@@ -53,5 +54,10 @@ class BroadcastRecipient extends Model
     public function contact(): BelongsTo
     {
         return $this->belongsTo(Contact::class);
+    }
+
+    public function scheduledMessage(): BelongsTo
+    {
+        return $this->belongsTo(ScheduledMessage::class);
     }
 }

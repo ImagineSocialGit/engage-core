@@ -119,9 +119,9 @@
                     channel: @js($broadcastChannel),
                     reusableMessages: @js($reusableMessageTemplates),
                     selectedReusableMessageId: '',
-                    subject: @js(old('subject', $broadcast->payload['subject'] ?? '')),
-                    body: @js(old('body', $broadcast->payload['body'] ?? '')),
-                    message: @js(old('message', $broadcast->payload['message'] ?? '')),
+                    subject: @js(old('subject', $broadcast->messagePayload()['subject'] ?? '')),
+                    body: @js(old('body', $broadcast->messagePayload()['body'] ?? '')),
+                    message: @js(old('message', $broadcast->messagePayload()['message'] ?? '')),
                     availableReusableMessages() {
                         return this.reusableMessages.filter((template) => template.channel === this.channel);
                     },
@@ -227,7 +227,7 @@
                     <x-ui.form.input
                         id="subject"
                         name="subject"
-                        value="{{ old('subject', $broadcast->payload['subject'] ?? '') }}"
+                        value="{{ old('subject', $broadcast->messagePayload()['subject'] ?? '') }}"
                         x-model="subject"
                         x-bind:required="{{ $emailFieldVisibility }}"
                     />
@@ -246,7 +246,7 @@
                         rows="10"
                         x-model="body"
                         x-bind:required="{{ $emailFieldVisibility }}"
-                    >{{ old('body', $broadcast->payload['body'] ?? '') }}</x-ui.form.textarea>
+                    >{{ old('body', $broadcast->messagePayload()['body'] ?? '') }}</x-ui.form.textarea>
 
                     @if($broadcast->isPermissionInvitation())
                         <p class="mt-2 text-xs text-slate-600">
@@ -269,7 +269,7 @@
                             rows="5"
                             x-model="message"
                             x-bind:required="channel === 'sms'"
-                        >{{ old('message', $broadcast->payload['message'] ?? '') }}</x-ui.form.textarea>
+                        >{{ old('message', $broadcast->messagePayload()['message'] ?? '') }}</x-ui.form.textarea>
 
                         <p class="mt-2 text-xs text-slate-500">
                             Keep SMS copy short. Normal Messaging SMS consent, suppression, revocation, and send guards still apply.
@@ -282,7 +282,7 @@
                 @if(! $broadcast->isPermissionInvitation())
                     @include('crm.broadcasts.partials.message-personalization', [
                         'broadcastMessageFields' => $broadcastMessageFields,
-                        'initialTokenFallbacks' => old('token_fallbacks', $broadcast->payload['token_fallbacks'] ?? []),
+                        'initialTokenFallbacks' => old('token_fallbacks', $broadcast->messagePayload()['token_fallbacks'] ?? []),
                     ])
                 @endif
 

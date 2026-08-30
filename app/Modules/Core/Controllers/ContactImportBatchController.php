@@ -32,14 +32,14 @@ class ContactImportBatchController extends Controller
     {
         $contactImportBatch->load('run');
 
-        $contactImportBatch->setAttribute(
-            'contacts_count',
-            $contactImportBatch->importedContactsQuery()->count(),
-        );
-
         $contacts = $contactImportBatch->importedContactsQuery()
             ->latest()
             ->paginate(50);
+
+        $contactImportBatch->setAttribute(
+            'contacts_count',
+            $contacts->total(),
+        );
 
         return view('crm.contacts.import-batches.show', [
             'importBatch' => $contactImportBatch,

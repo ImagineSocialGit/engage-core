@@ -690,7 +690,7 @@ That future Campaign migration is not required to reopen completed ScheduledMess
 
 ## Broadcasts
 
-Current state after 15B3:
+Current Broadcast persistence state:
 
 ```text
 BroadcastRecipient.status
@@ -701,13 +701,19 @@ no copied meta.delivery provider/attempt snapshot
 
 Messaging attempts/outbox remain authoritative for provider execution and exact terminal occurrence.
 
+Implemented after the Broadcast persistence cutover:
+
+- Broadcast authoring content -> one private Messaging template plus immutable versions;
+- `Broadcast.message_template_version_id` -> the immutable version pinned at scheduling;
+- `BroadcastRecipient.scheduled_message_id` -> one nullable ScheduledMessage FK;
+- no Broadcast-authored copy remains in `broadcasts.payload`;
+- no ScheduledMessage ID array remains on BroadcastRecipient.
+
 Still deferred:
 
-- Broadcast payload -> private/reusable immutable template version;
-- `scheduled_message_ids` JSON -> one nullable ScheduledMessage FK;
-- audit/removal of remaining generic Broadcast metadata.
+- audit/removal of remaining generic Broadcast scheduling/recipient metadata where a first-class field is justified.
 
-Export/import must preserve the current Broadcast shape until that separate migration is implemented.
+Project State Broadcasts v2 transfers the first-class relationships. Project State import remains current-format-only.
 
 ## Webinars
 
@@ -931,7 +937,6 @@ Separate future projects remain:
 
 ```text
 Campaign full MessageChain migration
-Broadcast content/version and single-FK migration
 FlowRoutes direct template/chain identity cleanup
 Inbound raw-provider persistence cleanup
 measured retention/pruning/index tuning
@@ -939,7 +944,7 @@ measured retention/pruning/index tuning
 
 Those projects must not be relabeled as unfinished core 15B terminal persistence.
 
-The post-15B schema is stable enough to resume the versioned DB snapshot/export/import safety tool. That tool must preserve current transitional Campaign/Broadcast fields and explicitly reject or translate removed legacy ScheduledMessage terminal columns.
+The post-15B schema is stable enough for the versioned DB snapshot/export/import safety tool. Current Project State transfers the normalized Broadcast template/version and singular ScheduledMessage relationships, and import remains current-format-only.
 
 ## Implemented acceptance results and deferred targets
 
@@ -973,8 +978,8 @@ BroadcastRecipient has one bounded terminal_reason and no meta.delivery snapshot
 ### Deferred module targets
 
 - Campaign enrollment does not yet wrap generic MessageChainEnrollment;
-- Broadcast scheduling now pins one private immutable template version per Broadcast; `broadcasts.payload` remains the transitional draft/source copy until the authoring schema is migrated;
-- BroadcastRecipient still uses `scheduled_message_ids` JSON;
+- Broadcast authoring now lives on one private Messaging template identity and immutable versions; scheduling pins `broadcasts.message_template_version_id`;
+- BroadcastRecipient now owns one nullable `scheduled_message_id` FK for its single-channel delivery;
 - inbound provider normalization remains separate work;
 - complete removal of ScheduledMessage compatibility JSON requires a future measured cutover, not a documentation-only declaration.
 

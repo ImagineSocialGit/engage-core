@@ -14,6 +14,7 @@ use App\Modules\Broadcasts\Requests\SaveBroadcastMessageTemplateRequest;
 use App\Modules\Broadcasts\Requests\UpdateBroadcastRequest;
 use App\Modules\Broadcasts\Services\BroadcastRecipientResolver;
 use App\Modules\Broadcasts\Services\BroadcastAudiencePreviewService;
+use App\Modules\Broadcasts\Services\BroadcastMessageTemplateVersionService;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Core\Services\Contacts\ContactFilterResolver;
@@ -29,6 +30,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use InvalidArgumentException;
 
@@ -47,6 +49,7 @@ class BroadcastController extends Controller
     public function index(Request $request): View
     {
         $broadcasts = Broadcast::query()
+            ->with(['messageTemplate.currentVersion', 'messageTemplateVersion'])
             ->latest()
             ->limit(50)
             ->get();
@@ -91,8 +94,19 @@ class BroadcastController extends Controller
     public function store(
         StoreBroadcastRequest $request,
         ScheduleBroadcastAction $scheduleBroadcastAction,
+        BroadcastMessageTemplateVersionService $messageTemplates,
     ): RedirectResponse {
-        $broadcast = Broadcast::query()->create($request->broadcastAttributes());
+        $broadcast = DB::transaction(function () use ($request, $messageTemplates): Broadcast {
+            $broadcast = Broadcast::query()->create($request->broadcastAttributes());
+
+            $messageTemplates->saveDraft(
+                broadcast: $broadcast,
+                payload: $request->messagePayload(),
+                createdBy: $request->user(),
+            );
+
+            return $broadcast->refresh();
+        }, 3);
 
         if ($request->shouldSchedule()) {
             if ($broadcast->isPermissionInvitation()) {
@@ -145,7 +159,7 @@ class BroadcastController extends Controller
             $createReusableMessageTemplate->handle(
                 name: $request->templateName(),
                 channel: (string) $broadcast->channel,
-                payload: is_array($broadcast->payload) ? $broadcast->payload : [],
+                payload: $broadcast->messagePayload(),
                 context: $this->reusableMessageTemplateContext($broadcast),
                 createdBy: $request->user(),
             );
@@ -241,25 +255,21 @@ class BroadcastController extends Controller
                 ])
                 ->first();
 
-            if ($selectedDeliveryIssue instanceof BroadcastRecipient) {
-                $scheduledMessageIds = collect($selectedDeliveryIssue->scheduled_message_ids ?? [])
-                    ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
-                    ->map(fn (mixed $id): int => (int) $id)
-                    ->unique()
-                    ->values()
-                    ->all();
+            if ($selectedDeliveryIssue instanceof BroadcastRecipient
+                && is_numeric($selectedDeliveryIssue->scheduled_message_id)
+            ) {
+                $scheduledMessage = ScheduledMessage::query()
+                    ->with([
+                        'terminalOutboxEvent.deliveryAttempt',
+                        'deliveryAttempts',
+                    ])
+                    ->whereKey($selectedDeliveryIssue->scheduled_message_id)
+                    ->where('context_type', $broadcast->getMorphClass())
+                    ->where('context_id', $broadcast->getKey())
+                    ->first();
 
-                if ($scheduledMessageIds !== []) {
-                    $selectedDeliveryIssueMessages = ScheduledMessage::query()
-                        ->with([
-                            'terminalOutboxEvent.deliveryAttempt',
-                            'deliveryAttempts',
-                        ])
-                        ->whereIn('id', $scheduledMessageIds)
-                        ->where('context_type', $broadcast->getMorphClass())
-                        ->where('context_id', $broadcast->getKey())
-                        ->orderBy('id')
-                        ->get();
+                if ($scheduledMessage instanceof ScheduledMessage) {
+                    $selectedDeliveryIssueMessages = collect([$scheduledMessage]);
                 }
             }
         }
@@ -326,6 +336,7 @@ class BroadcastController extends Controller
     public function update(
         UpdateBroadcastRequest $request,
         Broadcast $broadcast,
+        BroadcastMessageTemplateVersionService $messageTemplates,
     ): RedirectResponse {
         if ($broadcast->status !== Broadcast::STATUS_DRAFT) {
             return redirect()
@@ -333,7 +344,14 @@ class BroadcastController extends Controller
                 ->with('error', 'Only draft broadcasts can be edited.');
         }
 
-        $broadcast->forceFill($request->broadcastAttributes())->save();
+        DB::transaction(function () use ($request, $broadcast, $messageTemplates): void {
+            $broadcast->forceFill($request->broadcastAttributes())->save();
+            $messageTemplates->saveDraft(
+                broadcast: $broadcast,
+                payload: $request->messagePayload(),
+                createdBy: $request->user(),
+            );
+        }, 3);
 
         return redirect()
             ->route('crm.broadcasts.show', $broadcast)

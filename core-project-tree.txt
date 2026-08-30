@@ -1893,7 +1893,8 @@
 │   │   ├── modules
 │   │   │   ├── broadcasts
 │   │   │   │   ├── 2026_06_12_065258_create_broadcasts_table.php
-│   │   │   │   └── 2026_06_12_065311_create_broadcast_recipients_table.php
+│   │   │   │   ├── 2026_06_12_065311_create_broadcast_recipients_table.php
+│   │   │   │   └── 2026_08_29_150000_cut_over_broadcast_message_persistence.php
 │   │   │   ├── campaigns
 │   │   │   │   ├── 2026_06_12_050337_create_campaigns_table.php
 │   │   │   │   ├── 2026_06_12_050338_create_campaign_steps_table.php
@@ -1919,7 +1920,8 @@
 │   │   │   │   ├── 2026_08_19_161800_create_contact_import_occurrences_table.php
 │   │   │   │   ├── 2026_08_22_113500_add_birthday_to_contacts_table.php
 │   │   │   │   ├── 2026_08_26_145500_create_business_calendars_table.php
-│   │   │   │   └── 2026_08_28_214500_create_contact_import_runs_table.php
+│   │   │   │   ├── 2026_08_28_214500_create_contact_import_runs_table.php
+│   │   │   │   └── 2026_08_29_191700_add_batch_contact_index_to_contact_import_occurrences_table.php
 │   │   │   ├── documents
 │   │   │   │   ├── 2026_07_02_000001_create_document_requirement_definitions_table.php
 │   │   │   │   ├── 2026_07_02_000002_create_document_requests_table.php
@@ -2440,6 +2442,7 @@
 │   ├── dump-client-files.sh
 │   ├── dump-integration-files.sh
 │   ├── dump-migrations.sh
+│   ├── load-investigation-audit.sh
 │   ├── make-automation-dependency-cone-dump.sh
 │   ├── make-crm-dependency-cone-dump.sh
 │   ├── make-module-dependency-cone-dump.sh
@@ -2474,6 +2477,7 @@
 │   │   │   ├── BroadcastControllerTest.php
 │   │   │   ├── BroadcastMessageReuseTest.php
 │   │   │   ├── BroadcastModelTest.php
+│   │   │   ├── BroadcastPersistenceSchemaTest.php
 │   │   │   ├── BroadcastResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── BroadcastShowDiagnosticsTest.php
 │   │   │   ├── BroadcastTokenPersonalizationTest.php
@@ -2544,6 +2548,7 @@
 │   │   │   ├── ContactFilterFactsChangedOutboxTest.php
 │   │   │   ├── ContactFilterResolverTest.php
 │   │   │   ├── ContactImportBatchControllerTest.php
+│   │   │   ├── ContactImportBatchMembershipQueryTest.php
 │   │   │   ├── ContactImportHandlerContextIntegrationTest.php
 │   │   │   ├── ContactImportModeControllerTest.php
 │   │   │   ├── ContactImportPostProcessingControllerTest.php
@@ -3008,4 +3013,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-710 directories, 2299 files
+710 directories, 2304 files

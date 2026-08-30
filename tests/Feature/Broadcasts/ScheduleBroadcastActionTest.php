@@ -26,7 +26,7 @@ class ScheduleBroadcastActionTest extends TestCase
     {
         $contacts = Contact::factory()->count(2)->create();
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'broadcast',
@@ -37,10 +37,6 @@ class ScheduleBroadcastActionTest extends TestCase
             'send_at' => now()->addHour(),
             'recipient_filter' => [
                 'type' => 'all',
-            ],
-            'payload' => [
-                'subject' => 'Monthly update',
-                'body' => 'Here is the monthly update.',
             ],
         ]);
 
@@ -86,7 +82,7 @@ class ScheduleBroadcastActionTest extends TestCase
 
             $this->assertNotNull($recipient);
             $this->assertSame(BroadcastRecipient::STATUS_SCHEDULED, $recipient->status);
-            $this->assertCount(1, $recipient->scheduled_message_ids);
+            $this->assertNotNull($recipient->scheduled_message_id);
             $this->assertNull($recipient->terminal_reason);
         }
     }
@@ -104,7 +100,9 @@ class ScheduleBroadcastActionTest extends TestCase
             'marketing:broadcast' => true,
         ]);
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage([
+            'message' => 'This is an SMS broadcast.',
+        ])->create([
             'channel' => 'sms',
             'purpose' => 'marketing',
             'scope' => 'broadcast',
@@ -115,9 +113,6 @@ class ScheduleBroadcastActionTest extends TestCase
             'send_at' => now()->addHour(),
             'recipient_filter' => [
                 'type' => 'all',
-            ],
-            'payload' => [
-                'message' => 'This is an SMS broadcast.',
             ],
         ]);
 
@@ -207,7 +202,7 @@ class ScheduleBroadcastActionTest extends TestCase
 
             $this->assertNotNull($recipient);
             $this->assertSame(BroadcastRecipient::STATUS_SCHEDULED, $recipient->status);
-            $this->assertCount(1, $recipient->scheduled_message_ids);
+            $this->assertNotNull($recipient->scheduled_message_id);
             $this->assertNull($recipient->terminal_reason);
         }
     }
@@ -219,7 +214,7 @@ class ScheduleBroadcastActionTest extends TestCase
             'source' => 'import',
         ]);
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'broadcast',
@@ -263,7 +258,7 @@ class ScheduleBroadcastActionTest extends TestCase
             'source' => 'import',
         ]);
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'permission_invitation',
@@ -333,7 +328,7 @@ class ScheduleBroadcastActionTest extends TestCase
             'source' => 'test',
         ]);
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'permission_invitation',
@@ -402,7 +397,7 @@ class ScheduleBroadcastActionTest extends TestCase
             'sent_at' => now()->subMinutes(55),
         ]);
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'permission_invitation',
@@ -464,16 +459,13 @@ class ScheduleBroadcastActionTest extends TestCase
             'marketing:broadcast' => true,
         ]);
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'channel' => 'sms',
             'purpose' => 'marketing',
             'scope' => 'broadcast',
             'payload_class' => SmsPayload::class,
             'recipient_filter' => [
                 'type' => 'all',
-            ],
-            'payload' => [
-                'message' => 'Broadcast message',
             ],
         ]);
 
@@ -516,7 +508,7 @@ class ScheduleBroadcastActionTest extends TestCase
             'marketing:broadcast' => true,
         ]);
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'channel' => 'sms',
             'purpose' => 'marketing',
             'scope' => 'broadcast',
@@ -526,9 +518,6 @@ class ScheduleBroadcastActionTest extends TestCase
             'queue' => 'marketing',
             'recipient_filter' => [
                 'type' => 'all',
-            ],
-            'payload' => [
-                'message' => 'Broadcast message',
             ],
         ]);
 
@@ -566,7 +555,7 @@ class ScheduleBroadcastActionTest extends TestCase
 
         $this->assertNotNull($recipient);
         $this->assertSame(BroadcastRecipient::STATUS_SKIPPED, $recipient->status);
-        $this->assertNull($recipient->scheduled_message_ids);
+        $this->assertNull($recipient->scheduled_message_id);
         $this->assertSame('broadcast_channel_unavailable', $recipient->terminal_reason);
         $this->assertSame('sms', data_get($recipient->meta, 'broadcast.channel'));
         $this->assertSame('broadcasts', data_get($recipient->meta, 'broadcast.surface'));
@@ -585,7 +574,7 @@ class ScheduleBroadcastActionTest extends TestCase
             'marketing:broadcast' => true,
         ]);
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'channel' => 'sms',
             'purpose' => 'marketing',
             'scope' => 'broadcast',
@@ -595,9 +584,6 @@ class ScheduleBroadcastActionTest extends TestCase
             'queue' => 'marketing',
             'recipient_filter' => [
                 'type' => 'all',
-            ],
-            'payload' => [
-                'message' => 'Broadcast message',
             ],
         ]);
 
@@ -628,7 +614,7 @@ class ScheduleBroadcastActionTest extends TestCase
 
         $this->assertNotNull($recipient);
         $this->assertSame(BroadcastRecipient::STATUS_SKIPPED, $recipient->status);
-        $this->assertNull($recipient->scheduled_message_ids);
+        $this->assertNull($recipient->scheduled_message_id);
         $this->assertSame('not_scheduled_by_messaging', $recipient->terminal_reason);
     }
 
@@ -637,7 +623,7 @@ class ScheduleBroadcastActionTest extends TestCase
         $included = Contact::factory()->create();
         $excluded = Contact::factory()->create();
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'recipient_filter' => [
                 'type' => 'contact_ids',
                 'contact_ids' => [$included->id],
@@ -690,7 +676,7 @@ class ScheduleBroadcastActionTest extends TestCase
             'tag' => 'refinance',
         ]);
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'recipient_filter' => [
                 'type' => 'tag',
                 'tags' => ['homebuyer'],
@@ -732,7 +718,7 @@ class ScheduleBroadcastActionTest extends TestCase
     {
         $contact = Contact::factory()->create();
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'recipient_filter' => [
                 'type' => 'all',
             ],
@@ -764,7 +750,7 @@ class ScheduleBroadcastActionTest extends TestCase
 
         $this->assertSame($contact->id, $recipient->contact_id);
         $this->assertSame(BroadcastRecipient::STATUS_SKIPPED, $recipient->status);
-        $this->assertNull($recipient->scheduled_message_ids);
+        $this->assertNull($recipient->scheduled_message_id);
         $this->assertSame('not_scheduled_by_messaging', $recipient->terminal_reason);
     }
 
@@ -774,7 +760,7 @@ class ScheduleBroadcastActionTest extends TestCase
 
         Contact::factory()->create();
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'send_at' => null,
             'recipient_filter' => [
                 'type' => 'all',
@@ -833,7 +819,7 @@ class ScheduleBroadcastActionTest extends TestCase
 
         $futureSendAt = Carbon::parse('2026-07-01 11:00:00');
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'send_at' => $futureSendAt,
             'recipient_filter' => [
                 'type' => 'all',
@@ -885,11 +871,14 @@ class ScheduleBroadcastActionTest extends TestCase
         $previouslySent = Contact::factory()->create();
         $previouslyFailed = Contact::factory()->create();
 
-        $previousBroadcast = Broadcast::factory()->create([
-            'status' => Broadcast::STATUS_COMPLETED,
-        ]);
+        $previousBroadcast = Broadcast::factory()->withMessage()->create();
 
-        BroadcastRecipient::factory()->scheduled([1])->create([
+        $previousBroadcast->forceFill([
+            'status' => Broadcast::STATUS_COMPLETED,
+            'completed_at' => now(),
+        ])->save();
+
+        BroadcastRecipient::factory()->scheduled()->create([
             'broadcast_id' => $previousBroadcast->id,
             'contact_id' => $previouslyScheduled->id,
         ]);
@@ -904,7 +893,7 @@ class ScheduleBroadcastActionTest extends TestCase
             'contact_id' => $previouslyFailed->id,
         ]);
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'recipient_filter' => [
                 'type' => 'all',
                 'exclude' => [
@@ -991,7 +980,7 @@ class ScheduleBroadcastActionTest extends TestCase
             'source' => 'test',
         ]);
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'permission_invitation',

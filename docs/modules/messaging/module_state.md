@@ -24,7 +24,7 @@ Remaining transition work is separate from that completed core refactor:
 ```text
 MessageTemplatePreset / assignment / catalog compatibility surfaces
 Campaign-owned step/variant progression -> generic MessageChains
-Broadcast runtime version pinning complete; broadcasts.payload + scheduled_message_ids -> first-class authoring pointer + one relationship
+Broadcast private authoring + immutable version pinning + singular recipient delivery relationship complete
 FlowRoutes direct-message authoring identity cleanup
 Inbound provider raw-payload normalization
 ```
@@ -1328,7 +1328,7 @@ allowlist. Owning modules continue to contribute `TokenSourceProvider` and
 Blade component and handle the emitted insertion event in their local editor. Creation and
 update paths must still validate submitted copy through `MessageTemplateTokenValidator`.
 
-Broadcasts registers `broadcast_send` as one of those executable contexts. The context is deliberately limited to Contact values materialized by `MessageRecipientPayloadResolver`; the Broadcast editor does not expose a field merely because a wider Core token source exists. Regular Broadcast draft/source copy remains transitional inline payload, but scheduling now publishes that exact copy to one private immutable `MessageTemplateVersion` and pins every recipient ScheduledMessage to it. Messaging therefore persists only runtime differences on recipient delivery rows and resolves/finalizes Contact values lazily. Scheduling performs a final validation before version pinning and Broadcast recipient snapshotting.
+Broadcasts registers `broadcast_send` as one of those executable contexts. The context is deliberately limited to Contact values materialized by `MessageRecipientPayloadResolver`; the Broadcast editor does not expose a field merely because a wider Core token source exists. Regular Broadcast draft/source copy is owned by one private Messaging `MessageTemplate` and its current immutable version; scheduling validates that copy, pins the Broadcast to the selected `MessageTemplateVersion`, and gives every recipient ScheduledMessage that same version identity. Messaging therefore persists only runtime differences on recipient delivery rows and resolves/finalizes Contact values lazily. Broadcast recipients retain one nullable `scheduled_message_id` relationship rather than a JSON list of message IDs.
 
 `CreateReusableMessageTemplateAction` and `ReusableMessageTemplateCatalog` preserve `token_fallbacks` along with subject/body/message copy. This is required for Broadcast promotion/reuse: a saved personalized message must not lose the missing-field behavior that made its copy safe. The reusable template's immutable version remains the canonical copy for the library item; loading it into a Broadcast creates a draft copy and does not mutate the saved template.
 

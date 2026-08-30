@@ -66,7 +66,7 @@ class BroadcastMessageTokenValidator
         }
 
         $this->assertValid(
-            payload: is_array($broadcast->payload) ? $broadcast->payload : [],
+            payload: $broadcast->messagePayload(),
             channel: (string) $broadcast->channel,
             dispatchKey: is_string($broadcast->dispatch_key) && trim($broadcast->dispatch_key) !== ''
                 ? trim($broadcast->dispatch_key)

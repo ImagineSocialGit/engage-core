@@ -44,7 +44,7 @@ class BroadcastBulkSchedulingTest extends TestCase
     {
         Contact::factory()->count(5)->create();
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'send_at' => now()->addHour(),
             'recipient_filter' => ['type' => 'all'],
         ]);
@@ -90,7 +90,7 @@ class BroadcastBulkSchedulingTest extends TestCase
     {
         Contact::factory()->count(5)->create();
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'send_at' => now()->addHour(),
             'recipient_filter' => ['type' => 'all'],
         ]);
@@ -246,7 +246,7 @@ class BroadcastBulkSchedulingTest extends TestCase
     {
         Contact::factory()->count(3)->create();
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage()->create([
             'send_at' => now()->addHour(),
             'recipient_filter' => ['type' => 'all'],
         ]);

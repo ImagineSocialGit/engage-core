@@ -135,19 +135,18 @@ class BroadcastScheduledMessageResultRecorder
         Broadcast $broadcast,
         ScheduledMessage $scheduledMessage,
     ): ?BroadcastRecipient {
-        $broadcastRecipientId = $scheduledMessage->meta['broadcast_recipient_id'] ?? null;
+        $recipient = BroadcastRecipient::query()
+            ->where('broadcast_id', $broadcast->getKey())
+            ->where('scheduled_message_id', $scheduledMessage->getKey())
+            ->first();
 
-        if (is_numeric($broadcastRecipientId)) {
-            $recipient = BroadcastRecipient::query()
-                ->where('broadcast_id', $broadcast->getKey())
-                ->whereKey((int) $broadcastRecipientId)
-                ->first();
-
-            if ($recipient) {
-                return $recipient;
-            }
+        if ($recipient instanceof BroadcastRecipient) {
+            return $recipient;
         }
 
+        // Defensive fallback for a partially materialized recipient row. The
+        // single-channel contract still guarantees one BroadcastRecipient per
+        // Contact within one Broadcast.
         return BroadcastRecipient::query()
             ->where('broadcast_id', $broadcast->getKey())
             ->where('contact_id', $scheduledMessage->recipient_id)

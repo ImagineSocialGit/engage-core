@@ -118,7 +118,7 @@ Stop and extend the contract when:
 - an unsupported module table contains required data;
 - a new table or column is unclassified;
 - a polymorphic relation points to an unexported target that must survive;
-- the file must cross incompatible format versions without an external translator.
+- the file was produced under an incompatible Project State contract/version and no deliberate migration path exists for that contract change.
 
 ## Phase 1 — Prepare the source environment
 

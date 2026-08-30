@@ -38,7 +38,7 @@ return [
     'modules' => [
         'core' => [
             'path' => 'database/migrations/modules/core',
-            'schema_version' => 5,
+            'schema_version' => 6,
             'migrations' => [
                 '2026_04_15_195800_create_contact_statuses_table.php',
                 '2026_04_15_195849_create_contact_import_batches_table.php',
@@ -50,6 +50,7 @@ return [
                 '2026_08_22_113500_add_birthday_to_contacts_table.php',
                 '2026_08_26_145500_create_business_calendars_table.php',
                 '2026_08_28_214500_create_contact_import_runs_table.php',
+                '2026_08_29_191700_add_batch_contact_index_to_contact_import_occurrences_table.php',
             ],
         ],
 
@@ -239,10 +240,11 @@ return [
 
         'broadcasts' => [
             'path' => 'database/migrations/modules/broadcasts',
-            'schema_version' => 1,
+            'schema_version' => 2,
             'migrations' => [
                 '2026_06_12_065258_create_broadcasts_table.php',
                 '2026_06_12_065311_create_broadcast_recipients_table.php',
+                '2026_08_29_150000_cut_over_broadcast_message_persistence.php',
             ],
         ],
 

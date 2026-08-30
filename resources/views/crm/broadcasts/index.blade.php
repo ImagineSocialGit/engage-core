@@ -510,9 +510,9 @@
                                     </div>
                                     <div class="mt-1 break-words text-xs text-slate-500">
                                         @if($broadcast->channel === 'sms')
-                                            {{ str($broadcast->payload['message'] ?? 'No message')->limit(80) }}
+                                            {{ str($broadcast->messagePayload()['message'] ?? 'No message')->limit(80) }}
                                         @else
-                                            {{ $broadcast->payload['subject'] ?? 'No subject' }}
+                                            {{ $broadcast->messagePayload()['subject'] ?? 'No subject' }}
                                         @endif
                                     </div>
                                 </div>
@@ -564,9 +564,9 @@
 
                                         <div class="mt-1 text-xs text-slate-500">
                                             @if($broadcast->channel === 'sms')
-                                                {{ str($broadcast->payload['message'] ?? 'No message')->limit(80) }}
+                                                {{ str($broadcast->messagePayload()['message'] ?? 'No message')->limit(80) }}
                                             @else
-                                                {{ $broadcast->payload['subject'] ?? 'No subject' }}
+                                                {{ $broadcast->messagePayload()['subject'] ?? 'No subject' }}
                                             @endif
                                         </div>
                                     </td>
@@ -620,7 +620,7 @@
                                         {{ $broadcast->name }}
                                     </div>
                                     <div class="mt-1 break-words text-xs text-slate-500">
-                                        {{ $broadcast->payload['subject'] ?? 'No subject' }}
+                                        {{ $broadcast->messagePayload()['subject'] ?? 'No subject' }}
                                     </div>
                                 </div>
 
@@ -670,7 +670,7 @@
                                         </a>
 
                                         <div class="mt-1 text-xs text-slate-500">
-                                            {{ $broadcast->payload['subject'] ?? 'No subject' }}
+                                            {{ $broadcast->messagePayload()['subject'] ?? 'No subject' }}
                                         </div>
                                     </td>
 

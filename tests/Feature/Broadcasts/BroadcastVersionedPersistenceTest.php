@@ -59,7 +59,10 @@ class BroadcastVersionedPersistenceTest extends TestCase
             $contacts->push($contact);
         }
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage([
+            'subject' => 'Fixture update',
+            'body' => 'Hello {first_name}, this is the fixture update.',
+        ])->create([
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'broadcast',
@@ -70,10 +73,6 @@ class BroadcastVersionedPersistenceTest extends TestCase
             'recipient_filter' => [
                 'type' => 'contact_ids',
                 'contact_ids' => $contacts->pluck('id')->all(),
-            ],
-            'payload' => [
-                'subject' => 'Fixture update',
-                'body' => 'Hello {first_name}, this is the fixture update.',
             ],
         ]);
 
@@ -104,7 +103,9 @@ class BroadcastVersionedPersistenceTest extends TestCase
 
         $this->assertSame($template->getKey(), $version->message_template_id);
         $this->assertSame($version->getKey(), $template->current_version_id);
-        $this->assertEquals($broadcast->payload, $version->payload());
+        $this->assertEquals($broadcast->messagePayload(), $version->payload());
+        $this->assertSame($template->getKey(), $broadcast->fresh()->message_template_id);
+        $this->assertSame($version->getKey(), $broadcast->fresh()->message_template_version_id);
 
         foreach ($messages as $message) {
             $this->assertSame($version->getKey(), $message->message_template_version_id);

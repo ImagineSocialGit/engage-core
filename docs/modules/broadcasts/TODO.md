@@ -4,8 +4,8 @@
 
 - [x] Bound large Broadcast recipient sets with durable recipient snapshots, paced chunk scheduling, the Messaging-owned bulk queue, and shared provider submission limiting.
 - [x] Pin scheduled Broadcast content to one private Messaging template plus immutable template version shared by all recipient deliveries.
-- [ ] Replace transitional `broadcasts.payload` with a first-class authoring/template pointer when the Broadcast authoring + Project State contract is migrated.
-- [ ] Replace `broadcast_recipients.scheduled_message_ids` arrays with one nullable ScheduledMessage relationship for the normal single-channel Broadcast contract.
+- [x] Replace transitional `broadcasts.payload` with first-class private Messaging template + pinned version relationships, including Project State v2 transfer.
+- [x] Replace `broadcast_recipients.scheduled_message_ids` arrays with one nullable ScheduledMessage relationship for the normal single-channel Broadcast contract.
 - [ ] Replace remaining scheduling metadata with justified first-class summaries and remove generic metadata only after retained values are audited.
 
 ## UX polish

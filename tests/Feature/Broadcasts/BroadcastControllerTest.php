@@ -103,8 +103,8 @@ class BroadcastControllerTest extends TestCase
         $this->assertSame(Broadcast::BROADCAST_TYPE_REGULAR, $broadcast->meta['broadcast_type']);
         $this->assertSame(Broadcast::DEFAULT_MESSAGE_TYPE, $broadcast->message_type);
         $this->assertSame('Weekly update', $broadcast->name);
-        $this->assertSame('This week', $broadcast->payload['subject']);
-        $this->assertSame('Here is the update.', $broadcast->payload['body']);
+        $this->assertSame('This week', $broadcast->messagePayload()['subject']);
+        $this->assertSame('Here is the update.', $broadcast->messagePayload()['body']);
         $this->assertEquals(['type' => 'all'], $broadcast->recipient_filter);
     }
 
@@ -365,9 +365,9 @@ class BroadcastControllerTest extends TestCase
 
         $this->assertSame('sms', $broadcast->channel);
         $this->assertSame(SmsPayload::class, $broadcast->payload_class);
-        $this->assertSame('This is an SMS broadcast.', $broadcast->payload['message']);
-        $this->assertArrayNotHasKey('subject', $broadcast->payload);
-        $this->assertArrayNotHasKey('body', $broadcast->payload);
+        $this->assertSame('This is an SMS broadcast.', $broadcast->messagePayload()['message']);
+        $this->assertArrayNotHasKey('subject', $broadcast->messagePayload());
+        $this->assertArrayNotHasKey('body', $broadcast->messagePayload());
     }
 
     public function test_it_rejects_sms_broadcast_when_sms_is_not_visible_for_broadcasts(): void
@@ -444,7 +444,7 @@ class BroadcastControllerTest extends TestCase
             'email' => 'jane@example.test',
         ]);
 
-        BroadcastRecipient::factory()->scheduled([1])->create([
+        BroadcastRecipient::factory()->scheduled()->create([
             'broadcast_id' => $broadcast->id,
             'contact_id' => $contact->id,
         ]);
@@ -463,18 +463,18 @@ class BroadcastControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $broadcast = Broadcast::factory()->scheduled()->create([
+        $broadcast = Broadcast::factory()->withMessage([
+            'message' => 'This is an SMS broadcast.',
+        ])->create([
             'name' => 'SMS update',
             'channel' => 'sms',
             'purpose' => 'marketing',
             'scope' => 'broadcast',
             'payload_class' => SmsPayload::class,
-            'payload' => [
-                'message' => 'This is an SMS broadcast.',
-            ],
             'recipient_count' => 3,
             'scheduled_count' => 1,
         ]);
+        $broadcast->forceFill(['status' => Broadcast::STATUS_SCHEDULED])->save();
 
         $scheduledContact = Contact::factory()->create([
             'name' => 'Scheduled Lead',
@@ -491,7 +491,7 @@ class BroadcastControllerTest extends TestCase
             'phone' => '+15555550125',
         ]);
 
-        BroadcastRecipient::factory()->scheduled([1])->create([
+        BroadcastRecipient::factory()->scheduled()->create([
             'broadcast_id' => $broadcast->id,
             'contact_id' => $scheduledContact->id,
         ]);
@@ -501,7 +501,7 @@ class BroadcastControllerTest extends TestCase
             'contact_id' => $skippedContact->id,
             'status' => BroadcastRecipient::STATUS_SKIPPED,
             'terminal_reason' => 'broadcast_channel_unavailable',
-            'scheduled_message_ids' => null,
+            'scheduled_message_id' => null,
         ]);
 
         BroadcastRecipient::factory()->create([
@@ -559,13 +559,12 @@ class BroadcastControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage([
+            'subject' => 'Draft subject',
+            'body' => 'Draft body',
+        ])->create([
             'status' => Broadcast::STATUS_DRAFT,
             'name' => 'Draft broadcast',
-            'payload' => [
-                'subject' => 'Draft subject',
-                'body' => 'Draft body',
-            ],
             'recipient_filter' => [
                 'type' => 'tag',
                 'tags' => ['homebuyer'],
@@ -615,13 +614,12 @@ class BroadcastControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage([
+            'subject' => 'Old subject',
+            'body' => 'Old body',
+        ])->create([
             'status' => Broadcast::STATUS_DRAFT,
             'name' => 'Old name',
-            'payload' => [
-                'subject' => 'Old subject',
-                'body' => 'Old body',
-            ],
             'recipient_filter' => [
                 'type' => 'all',
             ],
@@ -643,8 +641,8 @@ class BroadcastControllerTest extends TestCase
         $broadcast->refresh();
 
         $this->assertSame('Updated broadcast', $broadcast->name);
-        $this->assertSame('Updated subject', $broadcast->payload['subject']);
-        $this->assertSame('Updated body', $broadcast->payload['body']);
+        $this->assertSame('Updated subject', $broadcast->messagePayload()['subject']);
+        $this->assertSame('Updated body', $broadcast->messagePayload()['body']);
         $this->assertSame('tag', $broadcast->recipient_filter['type']);
         $this->assertEquals(['realtor'], $broadcast->recipient_filter['tags']);
         $this->assertNotNull($broadcast->send_at);
@@ -697,14 +695,13 @@ class BroadcastControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage([
+            'subject' => 'Old subject',
+            'body' => 'Old body',
+        ])->create([
             'status' => Broadcast::STATUS_DRAFT,
             'name' => 'Old invitation',
             'message_type' => Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
-            'payload' => [
-                'subject' => 'Old subject',
-                'body' => 'Old body',
-            ],
             'recipient_filter' => [
                 'type' => 'imported',
             ],
@@ -727,8 +724,8 @@ class BroadcastControllerTest extends TestCase
         $broadcast->refresh();
 
         $this->assertSame('Updated invitation', $broadcast->name);
-        $this->assertSame('Updated subject', $broadcast->payload['subject']);
-        $this->assertSame('Updated body', $broadcast->payload['body']);
+        $this->assertSame('Updated subject', $broadcast->messagePayload()['subject']);
+        $this->assertSame('Updated body', $broadcast->messagePayload()['body']);
         $this->assertEquals(['type' => 'imported'], $broadcast->recipient_filter);
     }
 
@@ -839,16 +836,16 @@ class BroadcastControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $broadcast = Broadcast::factory()->scheduled()->create([
+        $broadcast = Broadcast::factory()->withMessage([
+            'subject' => 'Original subject',
+            'body' => 'Original body',
+        ])->create([
             'name' => 'Original broadcast',
-            'payload' => [
-                'subject' => 'Original subject',
-                'body' => 'Original body',
-            ],
             'recipient_filter' => [
                 'type' => 'all',
             ],
         ]);
+        $broadcast->forceFill(['status' => Broadcast::STATUS_SCHEDULED])->save();
 
         $response = $this
             ->actingAs($user)
@@ -865,8 +862,8 @@ class BroadcastControllerTest extends TestCase
         $broadcast->refresh();
 
         $this->assertSame('Original broadcast', $broadcast->name);
-        $this->assertSame('Original subject', $broadcast->payload['subject']);
-        $this->assertSame('Original body', $broadcast->payload['body']);
+        $this->assertSame('Original subject', $broadcast->messagePayload()['subject']);
+        $this->assertSame('Original body', $broadcast->messagePayload()['body']);
         $this->assertEquals(['type' => 'all'], $broadcast->recipient_filter);
     }
 
@@ -1190,14 +1187,13 @@ class BroadcastControllerTest extends TestCase
             'name' => 'June import',
         ]);
 
-        $broadcast = Broadcast::factory()->create([
+        $broadcast = Broadcast::factory()->withMessage([
+            'subject' => 'Old subject',
+            'body' => 'Old body',
+        ])->create([
             'status' => Broadcast::STATUS_DRAFT,
             'name' => 'Old invitation',
             'message_type' => Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
-            'payload' => [
-                'subject' => 'Old subject',
-                'body' => 'Old body',
-            ],
             'recipient_filter' => [
                 'type' => 'imported',
             ],

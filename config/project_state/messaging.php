@@ -1,8 +1,7 @@
-
 <?php
 
 return [
-    'version' => 5,
+    'version' => 6,
     'tables' => [
         'message_template_presets' => [
             'mode' => 'upsert',
@@ -595,14 +594,6 @@ return [
                     ],
                     'campaign_step_variant_id' => [
                         'table' => 'campaign_step_variants',
-                        'deferred' => true,
-                    ],
-                    'broadcast_id' => [
-                        'table' => 'broadcasts',
-                        'deferred' => true,
-                    ],
-                    'broadcast_recipient_id' => [
-                        'table' => 'broadcast_recipients',
                         'deferred' => true,
                     ],
                     'flow_route.flow_route_progress_id' => [

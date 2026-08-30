@@ -68,15 +68,6 @@ class ContactImportBatch extends Model
      */
     public function importedContactsQuery(): Builder
     {
-        $batchId = $this->getKey();
-
-        return Contact::query()
-            ->where(function (Builder $query) use ($batchId): void {
-                $query
-                    ->where('contact_import_batch_id', $batchId)
-                    ->orWhereHas('importOccurrences', function (Builder $occurrenceQuery) use ($batchId): void {
-                        $occurrenceQuery->where('contact_import_batch_id', $batchId);
-                    });
-            });
+        return Contact::query()->importedInBatches([$this->getKey()]);
     }
 }

@@ -119,10 +119,6 @@ class UpdateBroadcastRequest extends FormRequest
             return [
                 'name' => $validated['name'],
                 'send_at' => $validated['send_at'] ?? null,
-                'payload' => [
-                    'subject' => $validated['subject'],
-                    'body' => $validated['body'],
-                ],
                 'recipient_filter' => $this->permissionInvitationRecipientFilter($validated),
             ];
         }
@@ -145,9 +141,26 @@ class UpdateBroadcastRequest extends FormRequest
             'channel' => $channel,
             'payload_class' => $channel === 'sms' ? SmsPayload::class : EmailPayload::class,
             'send_at' => $validated['send_at'] ?? null,
-            'payload' => $this->regularBroadcastPayload($channel, $validated),
             'recipient_filter' => $recipientFilter,
         ];
+    }
+
+    /** @return array<string, mixed> */
+    public function messagePayload(): array
+    {
+        $validated = $this->validated();
+        $broadcast = $this->route('broadcast');
+
+        if ($broadcast instanceof Broadcast && $broadcast->isPermissionInvitation()) {
+            return [
+                'subject' => $validated['subject'],
+                'body' => $validated['body'],
+            ];
+        }
+
+        $channel = $this->regularBroadcastChannel($validated);
+
+        return $this->regularBroadcastPayload($channel, $validated);
     }
 
     /**
@@ -324,11 +337,11 @@ class UpdateBroadcastRequest extends FormRequest
     {
         $broadcast = $this->route('broadcast');
 
-        if (! $broadcast instanceof Broadcast || ! is_array($broadcast->payload)) {
+        if (! $broadcast instanceof Broadcast) {
             return [];
         }
 
-        $fallbacks = $broadcast->payload['token_fallbacks'] ?? null;
+        $fallbacks = $broadcast->messagePayload()['token_fallbacks'] ?? null;
 
         return is_array($fallbacks) && array_is_list($fallbacks)
             ? array_values(array_filter($fallbacks, 'is_array'))
