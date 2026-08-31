@@ -6,6 +6,7 @@ use App\Modules\Messaging\Data\Automation\SendMessageAutomationDefinition;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Services\DirectMessageTemplateResolver;
 use App\Modules\Messaging\Services\MessageDefinitionResolver;
+use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Support\AutomationCapabilities\Contracts\AutomationPointDefinitionContributor;
 use App\Support\AutomationCapabilities\Data\AutomationPointDefinition;
 use App\Support\AutomationCapabilities\Data\AutomationPointValidationContext;
@@ -20,6 +21,7 @@ class MessagingAutomationPointDefinitionContributor implements AutomationPointDe
     public function __construct(
         private readonly MessageDefinitionResolver $messageDefinitionResolver,
         private readonly DirectMessageTemplateResolver $directTemplates,
+        private readonly MessageChannelAvailability $channelAvailability,
     ) {}
 
     public function definitions(): iterable
@@ -31,6 +33,15 @@ class MessagingAutomationPointDefinitionContributor implements AutomationPointDe
             schema: ConfigSchema::object([
                 'message_template_key' => ConfigField::optional(ConfigSchema::string()),
                 'message_template_preset_key' => ConfigField::optional(ConfigSchema::string()),
+                'message_template_keys_by_channel' => ConfigField::optional($open),
+                'message_template_channel_context_path' => ConfigField::optional(
+                    ConfigSchema::string(),
+                ),
+                'message_role' => ConfigField::optional(
+                    ConfigSchema::string(
+                        allowedValues: SendMessageAutomationDefinition::ROLES,
+                    ),
+                ),
                 'channel' => ConfigField::optional(
                     ConfigSchema::string(allowedValues: MessageChannel::values()),
                 ),
@@ -77,6 +88,77 @@ class MessagingAutomationPointDefinitionContributor implements AutomationPointDe
                     'invalid_reason' => $parsed->invalidReason,
                 ],
             );
+
+            return;
+        }
+
+        if ($parsed->usesContextualTemplateSelection()) {
+            if ($parsed->isReply()) {
+                foreach ($this->availableChannels() as $channel) {
+                    if (isset($parsed->messageTemplateKeysByChannel[$channel])) {
+                        continue;
+                    }
+
+                    yield $context->error(
+                        code: 'flow_routes.messaging_reply_template_missing',
+                        message: "FlowRoute [{$context->containerKey}] point [{$context->pointKey}] requires a reply Message Template for available channel [{$channel}].",
+                        path: "{$context->path}.definition.message_template_keys_by_channel.{$channel}",
+                        context: [
+                            'point_key' => $context->pointKey,
+                            'channel' => $channel,
+                        ],
+                    );
+                }
+            }
+
+            foreach ($parsed->messageTemplateKeysByChannel as $channel => $templateKey) {
+                if (! in_array($channel, MessageChannel::values(), true)) {
+                    yield $context->error(
+                        code: 'flow_routes.messaging_template_channel_invalid',
+                        message: "FlowRoute [{$context->containerKey}] point [{$context->pointKey}] uses unsupported contextual message channel [{$channel}].",
+                        path: "{$context->path}.definition.message_template_keys_by_channel.{$channel}",
+                        context: [
+                            'point_key' => $context->pointKey,
+                            'channel' => $channel,
+                        ],
+                    );
+
+                    continue;
+                }
+
+                $direct = $this->directTemplates->definition($templateKey);
+
+                if (! is_array($direct)) {
+                    yield $context->error(
+                        code: 'flow_routes.messaging_template_missing',
+                        message: "FlowRoute [{$context->containerKey}] point [{$context->pointKey}] references unavailable Message Template [{$templateKey}].",
+                        path: "{$context->path}.definition.message_template_keys_by_channel.{$channel}",
+                        context: [
+                            'point_key' => $context->pointKey,
+                            'message_template_key' => $templateKey,
+                            'channel' => $channel,
+                        ],
+                    );
+
+                    continue;
+                }
+
+                $templateChannel = trim((string) ($direct['channel'] ?? ''));
+
+                if ($templateChannel !== $channel) {
+                    yield $context->error(
+                        code: 'flow_routes.messaging_template_channel_mismatch',
+                        message: "FlowRoute [{$context->containerKey}] point [{$context->pointKey}] maps [{$channel}] to Message Template [{$templateKey}] on channel [{$templateChannel}].",
+                        path: "{$context->path}.definition.message_template_keys_by_channel.{$channel}",
+                        context: [
+                            'point_key' => $context->pointKey,
+                            'message_template_key' => $templateKey,
+                            'expected_channel' => $channel,
+                            'actual_channel' => $templateChannel,
+                        ],
+                    );
+                }
+            }
 
             return;
         }
@@ -157,5 +239,25 @@ class MessagingAutomationPointDefinitionContributor implements AutomationPointDe
     private function openSchema(): ConfigSchema
     {
         return ConfigSchema::object([], allowUnknown: true);
+    }
+
+    /** @return array<int, string> */
+    private function availableChannels(): array
+    {
+        return array_values(array_intersect(
+            MessageChannel::values(),
+            array_values(array_unique([
+                ...$this->channelAvailability->visibleChannelsForSurface(
+                    surface: 'route_send_message_points',
+                    purpose: 'marketing',
+                    scope: 'general',
+                ),
+                ...$this->channelAvailability->visibleChannelsForSurface(
+                    surface: 'route_send_message_points',
+                    purpose: 'transactional',
+                    scope: 'general',
+                ),
+            ])),
+        ));
     }
 }

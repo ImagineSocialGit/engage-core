@@ -2,9 +2,13 @@
 
 namespace App\Modules\InboundMessaging\Providers;
 
+use App\Modules\InboundMessaging\Automation\InboundMessagingAutomationPointDefinitionContributor;
+use App\Modules\InboundMessaging\Automation\MarkInboundMessageAutoRespondedActionHandler;
+use App\Modules\InboundMessaging\Capabilities\InboundMessagingAutomationCapabilityContributor;
 use App\Modules\InboundMessaging\Console\Commands\SyncInboundReplyProfilesCommand;
 use App\Modules\InboundMessaging\Events\InboundMessageReceived;
 use App\Modules\InboundMessaging\Listeners\ConsumeRoutedInboundMessage;
+use App\Modules\InboundMessaging\Listeners\RecordInboundAutomaticMessage;
 use App\Modules\InboundMessaging\Services\ContactShow\ContactConversationShowDataProvider;
 use App\Modules\InboundMessaging\Services\Dashboard\LeadRepliesDashboardPanelProvider;
 use App\Modules\InboundMessaging\Services\Email\EmailWebhookHandlerResolver;
@@ -12,6 +16,7 @@ use App\Modules\InboundMessaging\Services\Email\RoutedInboundMessageConsumerRegi
 use App\Modules\InboundMessaging\Services\ReplyProfiles\InboundReplyProfilePresentationProvider;
 use App\Modules\InboundMessaging\Services\Sms\SmsWebhookHandlerResolver;
 use App\Modules\InboundMessaging\Validation\InboundMessagingSetupValidationContributor;
+use App\Modules\Messaging\Events\AutomationMessageScheduled;
 use App\Support\Dashboard\DashboardPanelRegistry;
 use App\Support\ReplyHandling\ReplyProfileDependencyRegistry;
 use App\Support\ReplyHandling\ReplyProfilePresentationRegistry;
@@ -22,6 +27,18 @@ class InboundMessagingModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->tag([
+            InboundMessagingAutomationCapabilityContributor::class,
+        ], 'automation.capability_contributors');
+
+        $this->app->tag([
+            InboundMessagingAutomationPointDefinitionContributor::class,
+        ], 'automation.point_definition_contributors');
+
+        $this->app->tag([
+            MarkInboundMessageAutoRespondedActionHandler::class,
+        ], 'automation.action_handlers');
+
         $this->app->singleton(SmsWebhookHandlerResolver::class, function () {
             return SmsWebhookHandlerResolver::default();
         });
@@ -74,6 +91,10 @@ class InboundMessagingModuleServiceProvider extends ServiceProvider
         Event::listen(
             InboundMessageReceived::class,
             ConsumeRoutedInboundMessage::class,
+        );
+        Event::listen(
+            AutomationMessageScheduled::class,
+            RecordInboundAutomaticMessage::class,
         );
 
         if ($this->app->runningInConsole()) {

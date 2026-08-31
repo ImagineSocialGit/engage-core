@@ -18,6 +18,7 @@ class AutomationPointAuthoringRegistryTest extends TestCase
             'flow_routes',
             'tasks',
             'messaging',
+            'inbound_messaging',
             'campaigns',
         ]);
 
@@ -38,6 +39,15 @@ class AutomationPointAuthoringRegistryTest extends TestCase
             'pause_campaign_family',
             'cancel_campaign_family',
         ], $registry->registeredTypes());
+
+        $message = $registry->get('send_message');
+
+        $this->assertNotNull($message);
+        $this->assertSame('Message', $message->name);
+        $this->assertSame(
+            'Message',
+            $message->typeLabel,
+        );
     }
 
 

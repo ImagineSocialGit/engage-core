@@ -95,6 +95,7 @@ class AutomationActionPointHandler implements PointHandler
                     'flow_route' => $provenance,
                 ],
                 occurredAt: now(),
+                executionContext: $context->meta,
             ));
         } catch (Throwable $exception) {
             return PointExecutionResult::failed(

@@ -5,12 +5,14 @@ namespace App\Modules\Messaging\Automation;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Data\Automation\SendMessageAutomationDefinition;
+use App\Modules\Messaging\Events\AutomationMessageScheduled;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\DirectMessageTemplateResolver;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Support\AutomationCapabilities\Contracts\AutomationActionHandler;
 use App\Support\AutomationCapabilities\Data\AutomationActionContext;
 use App\Support\AutomationCapabilities\Data\AutomationActionResult;
+use BackedEnum;
 use Throwable;
 
 class SendMessageAutomationActionHandler implements AutomationActionHandler
@@ -46,7 +48,25 @@ class SendMessageAutomationActionHandler implements AutomationActionHandler
         }
 
         $exactTemplateDefinition = null;
-        $candidateKey = $definition->directTemplateCandidateKey();
+        $contextualChannel = $this->contextualTemplateChannel(
+            $definition,
+            $context,
+        );
+        $candidateKey = $definition->directTemplateCandidateKey(
+            $contextualChannel,
+        );
+
+        if ($definition->usesContextualTemplateSelection()
+            && $candidateKey === null
+        ) {
+            return AutomationActionResult::failed(
+                'send_message_contextual_template_unresolved',
+                output: [
+                    'contextual_channel' => $contextualChannel,
+                    'send_message_definition' => $definition->toMetaPayload(),
+                ],
+            );
+        }
 
         if ($candidateKey !== null) {
             $exactTemplateDefinition = $this->directTemplates->definition($candidateKey);
@@ -123,7 +143,22 @@ class SendMessageAutomationActionHandler implements AutomationActionHandler
             return $this->noMessagesResult($definition);
         }
 
-        return AutomationActionResult::completed(
+        if ($definition->isReply() && count($scheduledMessages) !== 1) {
+            return AutomationActionResult::failed(
+                reason: 'send_message_reply_requires_one_scheduled_message',
+                output: [
+                    'scheduled_message_ids' => array_map(
+                        fn (ScheduledMessage $message): mixed =>
+                            $message->getKey(),
+                        $scheduledMessages,
+                    ),
+                    'send_message_definition' =>
+                        $definition->toMetaPayload(),
+                ],
+            );
+        }
+
+        $result = AutomationActionResult::completed(
             reason: 'message_scheduled',
             artifacts: $scheduledMessages,
             correlationKey: 'scheduled_message.id',
@@ -152,6 +187,14 @@ class SendMessageAutomationActionHandler implements AutomationActionHandler
                 'send_message_definition' => $definition->toMetaPayload(),
             ],
         );
+
+        event(new AutomationMessageScheduled(
+            context: $context,
+            definition: $definition,
+            scheduledMessages: $scheduledMessages,
+        ));
+
+        return $result;
     }
 
     /** @return array<int, string> */
@@ -211,5 +254,34 @@ class SendMessageAutomationActionHandler implements AutomationActionHandler
                 output: $output,
             ),
         };
+    }
+
+    private function contextualTemplateChannel(
+        SendMessageAutomationDefinition $definition,
+        AutomationActionContext $context,
+    ): ?string {
+        if (! $definition->usesContextualTemplateSelection()) {
+            return null;
+        }
+
+        $path = $definition->messageTemplateChannelContextPath;
+
+        if ($path === null) {
+            return null;
+        }
+
+        $value = data_get($context->executionContext, $path);
+
+        if ($value instanceof BackedEnum) {
+            $value = $value->value;
+        }
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
     }
 }

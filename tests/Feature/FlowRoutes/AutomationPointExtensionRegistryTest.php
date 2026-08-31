@@ -24,6 +24,7 @@ class AutomationPointExtensionRegistryTest extends TestCase
         $this->assertArrayHasKey('wait', $definitions);
         $this->assertArrayHasKey('create_task', $definitions);
         $this->assertArrayHasKey('send_message', $definitions);
+        $this->assertArrayHasKey('automatic_message', $definitions);
         $this->assertArrayHasKey('enroll_campaign', $definitions);
         $this->assertArrayHasKey('cancel_campaign', $definitions);
         $this->assertArrayHasKey('pause_campaign', $definitions);
@@ -83,6 +84,7 @@ class AutomationPointExtensionRegistryTest extends TestCase
 
         $this->assertTrue($registry->has('tasks.create_task'));
         $this->assertTrue($registry->has('messaging.dispatch_message'));
+        $this->assertTrue($registry->has('inbound_messaging.automatic_message'));
         $this->assertTrue($registry->has('campaigns.enroll_contact'));
         $this->assertTrue($registry->has('campaigns.cancel_enrollment'));
         $this->assertTrue($registry->has('campaigns.pause_enrollment'));

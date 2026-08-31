@@ -16,10 +16,10 @@ class MessagingAutomationCapabilityContributor implements AutomationCapabilityCo
             pointType: 'send_message',
             handlerKey: 'send_message',
             actionKey: 'messaging.dispatch_message',
-            name: 'Send message',
-            description: 'Dispatch a message through Messaging using a reusable message definition.',
+            name: 'Message',
+            description: 'Start a conversation or reply automatically using a reusable message.',
             requiredModules: ['messaging'],
-            sourceVersion: '2026_07_phase_6c_3',
+            sourceVersion: '2026_08_unified_message_authoring_v1',
         );
     }
 }

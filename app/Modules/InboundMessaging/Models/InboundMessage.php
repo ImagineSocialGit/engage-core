@@ -47,6 +47,7 @@ class InboundMessage extends Model
         'purpose',
         'scope',
         'correlated_scheduled_message_id',
+        'automated_response_scheduled_message_id',
         'reply_intent_key',
         'reply_correlation_method',
         'inbound_email_route_key',
@@ -57,6 +58,7 @@ class InboundMessage extends Model
         'inbox_status',
         'reviewed_at',
         'completed_at',
+        'automated_handled_at',
     ];
 
     protected function casts(): array
@@ -66,12 +68,14 @@ class InboundMessage extends Model
             'sender_id' => 'integer',
             'related_contact_id' => 'integer',
             'correlated_scheduled_message_id' => 'integer',
+            'automated_response_scheduled_message_id' => 'integer',
             'channel' => MessageChannel::class,
             'purpose' => MessagePurpose::class,
             'received_at' => 'datetime',
             'processed_at' => 'datetime',
             'reviewed_at' => 'datetime',
             'completed_at' => 'datetime',
+            'automated_handled_at' => 'datetime',
         ];
     }
 
@@ -124,6 +128,14 @@ class InboundMessage extends Model
         return $this->belongsTo(
             ScheduledMessage::class,
             'correlated_scheduled_message_id',
+        );
+    }
+
+    public function automatedResponseScheduledMessage(): BelongsTo
+    {
+        return $this->belongsTo(
+            ScheduledMessage::class,
+            'automated_response_scheduled_message_id',
         );
     }
 

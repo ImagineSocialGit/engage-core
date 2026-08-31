@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 7,
+    'version' => 8,
     'tables' => [
         'inbound_email_routes' => [
             'mode' => 'upsert',
@@ -124,6 +124,7 @@ return [
                 'purpose',
                 'scope',
                 'correlated_scheduled_message_id',
+                'automated_response_scheduled_message_id',
                 'reply_intent_key',
                 'reply_correlation_method',
                 'inbound_email_route_key',
@@ -134,6 +135,7 @@ return [
                 'inbox_status',
                 'reviewed_at',
                 'completed_at',
+                'automated_handled_at',
                 'created_at',
                 'updated_at',
             ],
@@ -145,6 +147,7 @@ return [
             ],
             'deferred_references' => [
                 'correlated_scheduled_message_id' => 'scheduled_messages',
+                'automated_response_scheduled_message_id' => 'scheduled_messages',
             ],
             'polymorphic_references' => [
                 [

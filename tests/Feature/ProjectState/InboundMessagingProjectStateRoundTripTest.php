@@ -34,13 +34,25 @@ class InboundMessagingProjectStateRoundTripTest extends TestCase
         $inboundRow = $document['sections']['inbound_messaging']['tables']['inbound_messages'][0];
 
         $this->assertSame((int) config('project_state.version'), $document['version']);
-        $this->assertSame(7, $document['sections']['inbound_messaging']['version']);
+        $this->assertSame(
+            (int) config('project_state.sections.inbound_messaging.version'),
+            $document['sections']['inbound_messaging']['version'],
+        );
         $this->assertCount(
             1,
             $document['sections']['inbound_messaging']['tables']['inbound_messages'],
         );
         $this->assertArrayHasKey('webhook_inbox_receipt_id', $inboundRow);
         $this->assertNull($inboundRow['webhook_inbox_receipt_id']);
+        $this->assertArrayHasKey(
+            'automated_response_scheduled_message_id',
+            $inboundRow,
+        );
+        $this->assertNull(
+            $inboundRow['automated_response_scheduled_message_id'],
+        );
+        $this->assertArrayHasKey('automated_handled_at', $inboundRow);
+        $this->assertNull($inboundRow['automated_handled_at']);
         $this->assertArrayNotHasKey('meta', $inboundRow);
         $this->assertSame(
             $this->providerKey('event', 'evt-project-state-inbound'),

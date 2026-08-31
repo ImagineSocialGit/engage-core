@@ -13,6 +13,7 @@
     $availableFields = is_array($field['available_fields'] ?? null) ? $field['available_fields'] : [];
     $availableChannels = is_array($field['available_channels'] ?? null) ? $field['available_channels'] : ['email'];
     $purposes = is_array($field['purposes'] ?? null) ? $field['purposes'] : [];
+    $activeWhen = is_array($field['active_when'] ?? null) ? $field['active_when'] : null;
     $fieldId = $name.'-'.$fieldSuffix;
 @endphp
 
@@ -126,7 +127,12 @@
                 id="{{ $fieldId }}"
                 name="{{ $name }}"
                 x-model="selected"
-                @required($required)
+                @if($activeWhen)
+                    x-bind:disabled="authoringState.{{ $activeWhen['field'] ?? '' }} !== '{{ $activeWhen['equals'] ?? '' }}'"
+                    x-bind:required="authoringState.{{ $activeWhen['field'] ?? '' }} === '{{ $activeWhen['equals'] ?? '' }}'"
+                @else
+                    @required($required)
+                @endif
                 class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200"
             >
                 <option value="">Choose a message template</option>

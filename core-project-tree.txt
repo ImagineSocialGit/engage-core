@@ -587,6 +587,12 @@
 │   │   │   │       │   ├── RespondToSmsHelpInboundMessageAction.php
 │   │   │   │       │   └── RevokeSmsConsentFromInboundMessageAction.php
 │   │   │   │       └── ProcessInboundSmsMessageAction.php
+│   │   │   ├── Automation
+│   │   │   │   ├── InboundMessagingAutomationPointAuthoringContributor.php
+│   │   │   │   ├── InboundMessagingAutomationPointDefinitionContributor.php
+│   │   │   │   └── MarkInboundMessageAutoRespondedActionHandler.php
+│   │   │   ├── Capabilities
+│   │   │   │   └── InboundMessagingAutomationCapabilityContributor.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
 │   │   │   │       └── SyncInboundReplyProfilesCommand.php
@@ -614,7 +620,8 @@
 │   │   │   ├── Events
 │   │   │   │   └── InboundMessageReceived.php
 │   │   │   ├── Listeners
-│   │   │   │   └── ConsumeRoutedInboundMessage.php
+│   │   │   │   ├── ConsumeRoutedInboundMessage.php
+│   │   │   │   └── RecordInboundAutomaticMessage.php
 │   │   │   ├── Models
 │   │   │   │   ├── InboundEmailRoute.php
 │   │   │   │   ├── InboundMessage.php
@@ -799,6 +806,7 @@
 │   │   │   │   ├── MessageChannel.php
 │   │   │   │   └── MessagePurpose.php
 │   │   │   ├── Events
+│   │   │   │   ├── AutomationMessageScheduled.php
 │   │   │   │   ├── MessageConsentGranted.php
 │   │   │   │   ├── MessageConsentRevoked.php
 │   │   │   │   ├── ScheduledMessageFailed.php
@@ -1952,7 +1960,8 @@
 │   │   │   │   ├── 2026_08_24_220000_create_inbound_reply_profile_tables.php
 │   │   │   │   ├── 2026_08_25_120000_create_inbound_email_routes_and_add_route_evidence.php
 │   │   │   │   ├── 2026_08_26_054500_add_inbox_triage_to_inbound_messages_table.php
-│   │   │   │   └── 2026_08_26_124500_consolidate_inbound_webhook_persistence.php
+│   │   │   │   ├── 2026_08_26_124500_consolidate_inbound_webhook_persistence.php
+│   │   │   │   └── 2026_08_30_163500_add_automated_response_tracking_to_inbound_messages_table.php
 │   │   │   ├── internal_notifications
 │   │   │   │   ├── 2026_04_10_173406_create_team_members_table.php
 │   │   │   │   └── 2026_04_11_174215_create_team_member_notification_preferences_table.php
@@ -2113,6 +2122,7 @@
 │   │   │   ├── permission-invitations.md
 │   │   │   ├── persistence-architecture.md
 │   │   │   └── TODO.md
+│   │   ├── messaging-public-host.md
 │   │   ├── mortgage
 │   │   │   └── module_state.md
 │   │   ├── music
@@ -2242,6 +2252,7 @@
 │       │   │   ├── app.blade.php
 │       │   │   ├── crm.blade.php
 │       │   │   ├── favicons.blade.php
+│       │   │   ├── messaging-public.blade.php
 │       │   │   └── public.blade.php
 │       │   ├── messaging
 │       │   │   ├── available-fields.blade.php
@@ -2427,6 +2438,7 @@
 │   │   ├── tasks.php
 │   │   └── webinars.php
 │   ├── crm.php
+│   ├── messaging.php
 │   ├── scheduling.php
 │   ├── staging.php
 │   ├── webhooks.php
@@ -2478,6 +2490,7 @@
 │   │   │   ├── BroadcastMessageReuseTest.php
 │   │   │   ├── BroadcastModelTest.php
 │   │   │   ├── BroadcastPersistenceSchemaTest.php
+│   │   │   ├── BroadcastRecipientReadAmplificationTest.php
 │   │   │   ├── BroadcastResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── BroadcastShowDiagnosticsTest.php
 │   │   │   ├── BroadcastTokenPersonalizationTest.php
@@ -2648,6 +2661,7 @@
 │   │   │   ├── ContactConversationReplyControllerTest.php
 │   │   │   ├── ContactConversationShowDataProviderTest.php
 │   │   │   ├── HandleInboundEmailWebhookActionTest.php
+│   │   │   ├── InboundAutoResponseAutomationTest.php
 │   │   │   ├── InboundEmailRouteResolutionTest.php
 │   │   │   ├── InboundEmailRouteSetupValidationTest.php
 │   │   │   ├── InboundEmailRouteWorkspaceTest.php
@@ -3013,4 +3027,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-710 directories, 2304 files
+712 directories, 2316 files

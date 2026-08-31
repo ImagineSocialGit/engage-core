@@ -9,6 +9,46 @@ use Illuminate\Support\Str;
 class MessageTemplateDisplayLabelResolver
 {
     /**
+     * Resolve a concise label for a template picker where channel and purpose
+     * are presented separately.
+     */
+    public function selectionLabel(MessageTemplatePreset $preset): string
+    {
+        $entry = $preset->relationLoaded('catalogEntries')
+            ? $preset->catalogEntries
+                ->where('is_active', true)
+                ->sortBy(fn (MessageTemplateCatalogEntry $candidate): string =>
+                    str_pad((string) $candidate->item_order, 12, '0', STR_PAD_LEFT)
+                    .'|'.$candidate->item_label)
+                ->first()
+            : $preset->catalogEntries()
+                ->active()
+                ->orderBy('item_order')
+                ->orderBy('item_label')
+                ->first();
+
+        if (! $entry instanceof MessageTemplateCatalogEntry) {
+            return trim((string) $preset->name) ?: 'Message';
+        }
+
+        $group = $this->withoutTrailingChannel((string) $entry->group_label);
+        $item = $this->withoutTrailingChannel($this->label($entry));
+
+        if ($group === '') {
+            return $item !== '' ? $item : 'Message';
+        }
+
+        if ($item === ''
+            || strcasecmp($group, $item) === 0
+            || Str::endsWith(Str::lower($group), ' — '.Str::lower($item))
+        ) {
+            return $group;
+        }
+
+        return $group.' — '.$item;
+    }
+
+    /**
      * Resolve the human-facing label for a catalogued reusable message.
      *
      * Catalog item labels remain stable technical/catalog metadata. This
@@ -139,5 +179,14 @@ class MessageTemplateDisplayLabelResolver
         $value = preg_replace('/\s+/', ' ', trim($value)) ?? '';
 
         return $value !== '' ? $value : null;
+    }
+
+    private function withoutTrailingChannel(string $label): string
+    {
+        return trim((string) preg_replace(
+            '/(?:\s+—\s+|\s+)(?:email|sms|text)$/i',
+            '',
+            trim($label),
+        ));
     }
 }

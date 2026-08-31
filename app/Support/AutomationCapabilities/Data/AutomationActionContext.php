@@ -12,6 +12,7 @@ class AutomationActionContext
      * @param array<string, Model> $models
      * @param array<string, mixed> $runtimeContext
      * @param array<string, mixed> $meta
+     * @param array<string, mixed> $executionContext
      */
     public function __construct(
         public readonly array $input,
@@ -24,6 +25,7 @@ class AutomationActionContext
         public readonly array $runtimeContext = [],
         public readonly array $meta = [],
         public readonly ?DateTimeInterface $occurredAt = null,
+        public readonly array $executionContext = [],
     ) {}
 
     public function model(string $key): ?Model

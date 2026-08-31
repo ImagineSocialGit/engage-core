@@ -4,10 +4,13 @@ namespace Tests\Feature\Messaging;
 
 use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
+use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
+use App\Modules\Messaging\Services\MessageTemplateDisplayLabelResolver;
 use App\Modules\Messaging\Services\RouteAuthoringMessageTemplateEligibilityResolver;
+use App\Support\AutomationCapabilities\Data\AutomationPointAuthoringContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -89,17 +92,113 @@ class FlowRouteReusableMessageTemplateAuthoringTest extends TestCase
         config()->set('messaging.channel_availability.email.purpose_scopes', ['*' => true]);
 
         $contributor = app(\App\Modules\Messaging\Automation\MessagingAutomationPointAuthoringContributor::class);
-        $context = new \App\Support\AutomationCapabilities\Data\AutomationPointAuthoringContext();
+        $context = new AutomationPointAuthoringContext();
 
         $this->assertTrue($contributor->available('send_message', $context));
 
         $fields = $contributor->fields('send_message', [], $context);
 
-        $this->assertCount(1, $fields);
-        $this->assertSame('component', $fields[0]['type']);
-        $this->assertSame('messaging.route-message-template-picker', $fields[0]['component']);
-        $this->assertEquals([], $fields[0]['options']);
-        $this->assertNotEmpty($fields[0]['available_fields']);
+        $this->assertCount(2, $fields);
+        $this->assertSame('message_role', $fields[0]['name']);
+        $this->assertSame('initiatory', $fields[0]['value']);
+        $this->assertSame('component', $fields[1]['type']);
+        $this->assertSame('messaging.route-message-template-picker', $fields[1]['component']);
+        $this->assertSame(
+            ['field' => 'message_role', 'equals' => 'initiatory'],
+            $fields[1]['active_when'],
+        );
+        $this->assertEquals([], $fields[1]['options']);
+        $this->assertNotEmpty($fields[1]['available_fields']);
     }
 
+    public function test_inbound_route_message_authoring_requires_templates_for_every_available_reply_channel(): void
+    {
+        config()->set('modules.enabled', [
+            'workflow',
+            'flow_routes',
+            'messaging',
+            'inbound_messaging',
+        ]);
+
+        foreach (['email', 'sms'] as $channel) {
+            config()->set("messaging.channel_availability.{$channel}.runtime_supported", true);
+            config()->set("messaging.channel_availability.{$channel}.surfaces.route_send_message_points", true);
+            config()->set("messaging.channel_availability.{$channel}.purpose_scopes", ['*' => true]);
+        }
+
+        $route = FlowRoute::factory()->create([
+            'trigger_type' => FlowRoute::TRIGGER_AUTOMATION_EVENT,
+            'trigger_key' => 'inbound_message.normal_reply',
+        ]);
+        $context = new AutomationPointAuthoringContext(container: $route);
+        $contributor = app(\App\Modules\Messaging\Automation\MessagingAutomationPointAuthoringContributor::class);
+        $fields = collect($contributor->fields('send_message', [], $context));
+
+        $this->assertSame(
+            ['initiatory', 'reply'],
+            collect($fields->firstWhere('name', 'message_role')['options'])
+                ->pluck('value')
+                ->all(),
+        );
+
+        foreach (['email', 'sms'] as $channel) {
+            $field = $fields->firstWhere(
+                'name',
+                'message_template_preset_id_'.$channel,
+            );
+
+            $this->assertIsArray($field);
+            $this->assertSame(
+                ['field' => 'message_role', 'equals' => 'reply'],
+                $field['active_when'],
+            );
+            $this->assertContains(
+                'required_if:message_role,reply',
+                $contributor->rules('send_message', $context)[
+                    'message_template_preset_id_'.$channel
+                ],
+            );
+        }
+    }
+
+    public function test_route_message_picker_label_avoids_repeating_group_item_and_channel(): void
+    {
+        $preset = MessageTemplatePreset::factory()->create([
+            'name' => 'Mortgage Homebuyer Nurture — Reply Acknowledgement — Reply Acknowledgement Email',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+        ]);
+        MessageTemplateCatalogEntry::factory()
+            ->forPreset($preset)
+            ->create([
+                'group_label' => 'Mortgage Homebuyer Nurture — Reply Acknowledgement',
+                'item_label' => 'Reply Acknowledgement Email',
+            ]);
+
+        $this->assertSame(
+            'Mortgage Homebuyer Nurture — Reply Acknowledgement',
+            app(MessageTemplateDisplayLabelResolver::class)
+                ->selectionLabel($preset),
+        );
+    }
+
+    public function test_reply_message_editor_summary_uses_business_language_without_repeating_templates(): void
+    {
+        $contributor = app(\App\Modules\Messaging\Automation\MessagingAutomationPointAuthoringContributor::class);
+
+        $this->assertSame(
+            'Replies automatically on the inbound channel',
+            $contributor->editorSummary(
+                'send_message',
+                [
+                    'message_role' => 'reply',
+                    'message_template_keys_by_channel' => [
+                        'email' => 'email.marketing.reply_acknowledgement',
+                        'sms' => 'sms.marketing.reply_acknowledgement',
+                    ],
+                ],
+                new AutomationPointAuthoringContext(),
+            ),
+        );
+    }
 }

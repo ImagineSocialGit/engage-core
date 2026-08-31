@@ -30,7 +30,7 @@
 
         <div
             @if($showWhen)
-                x-show='authoringState[@js($showWhen['field'] ?? '')] === @js($showWhen['equals'] ?? null)'
+                x-show="authoringState.{{ $showWhen['field'] ?? '' }} === '{{ $showWhen['equals'] ?? '' }}'"
                 x-cloak
             @endif
         >
@@ -118,7 +118,7 @@
                         id="{{ $fieldId }}"
                         name="{{ $name }}"
                         @required($required)
-                        @if(($field['state'] ?? false) === true) x-model='authoringState[@js($name)]' @endif
+                        @if(($field['state'] ?? false) === true) x-model="authoringState.{{ $name }}" @endif
                         class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200"
                     >
                         @if(filled($field['placeholder'] ?? null))

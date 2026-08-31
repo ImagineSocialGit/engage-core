@@ -35,6 +35,16 @@
     $resumeAtValue = $isCurrentEditor
         ? old('resume_at', (string) ($leadInDefinition['resume_at'] ?? ''))
         : (string) ($leadInDefinition['resume_at'] ?? '');
+    $capabilityModules = $capabilities
+        ->map(fn (array $capability): array => [
+            'key' => (string) $capability['module_key'],
+            'label' => config(
+                'modules.modules.'.$capability['module_key'].'.name',
+                \Illuminate\Support\Str::headline($capability['module_key']),
+            ),
+        ])
+        ->unique('key')
+        ->values();
 @endphp
 
 <template x-teleport="body">
@@ -555,7 +565,22 @@
                 </div>
             </section>
 
-            <section class="mt-8 border-t border-orange-100 pt-7">
+            <section
+                class="mt-8 border-t border-orange-100 pt-7"
+                x-data="{
+                    selectedPointModules: [],
+                    togglePointModule(module) {
+                        this.selectedPointModules = this.selectedPointModules.includes(module)
+                            ? this.selectedPointModules.filter(selected => selected !== module)
+                            : [...this.selectedPointModules, module];
+                    },
+                    pointModuleVisible(module) {
+                        return this.selectedPointModules.length === 0
+                            || this.selectedPointModules.includes(module);
+                    },
+                }"
+                data-flow-route-point-module-filters
+            >
                 <div>
                     <h3 class="text-lg font-semibold tracking-tight text-slate-950">Add a Point</h3>
                     <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
@@ -563,12 +588,43 @@
                     </p>
                 </div>
 
+                @if($capabilityModules->count() > 1)
+                    <div class="mt-4 flex flex-wrap gap-2" aria-label="Filter Points by module">
+                        <button
+                            type="button"
+                            @click="selectedPointModules = []"
+                            :aria-pressed="selectedPointModules.length === 0"
+                            :class="selectedPointModules.length === 0 ? 'ring-2 ring-slate-950' : 'opacity-70 hover:opacity-100'"
+                            class="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 ring-1 ring-slate-300 transition"
+                            data-flow-route-point-module-filter="all"
+                        >
+                            All
+                        </button>
+
+                        @foreach($capabilityModules as $module)
+                            <button
+                                type="button"
+                                @click="togglePointModule(@js($module['key']))"
+                                :aria-pressed="selectedPointModules.includes(@js($module['key']))"
+                                :class="selectedPointModules.includes(@js($module['key'])) ? 'ring-2 ring-slate-950' : 'opacity-70 hover:opacity-100'"
+                                class="rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition {{ module_tone($module['key'], 'badge') }}"
+                                data-flow-route-point-module-filter="{{ $module['key'] }}"
+                            >
+                                {{ $module['label'] }}
+                            </button>
+                        @endforeach
+                    </div>
+                @endif
+
                 <div class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     @forelse($capabilities as $capability)
                         <button
                             type="button"
                             @click="openAddPoint({{ $capability['id'] }})"
+                            x-show="pointModuleVisible(@js($capability['module_key']))"
+                            x-transition.opacity
                             class="rounded-2xl p-4 text-left ring-1 transition hover:-translate-y-0.5 hover:shadow-md {{ module_tone($capability['module_key'], 'item') }}"
+                            data-flow-route-point-module-card="{{ $capability['module_key'] }}"
                         >
                             <div class="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                                 <span class="font-semibold text-slate-950">{{ $capability['name'] }}</span>

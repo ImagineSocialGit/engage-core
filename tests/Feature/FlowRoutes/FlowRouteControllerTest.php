@@ -16,6 +16,59 @@ class FlowRouteControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_conditional_point_fields_render_attribute_safe_alpine_expressions(): void
+    {
+        $this->view('crm.flow-routes.partials.point-fields', [
+            'fieldSuffix' => 'test',
+            'fields' => [
+                [
+                    'type' => 'select',
+                    'name' => 'message_role',
+                    'label' => 'Message role',
+                    'state' => true,
+                    'value' => 'reply',
+                    'options' => [
+                        ['value' => 'initiatory', 'label' => 'Initiatory'],
+                        ['value' => 'reply', 'label' => 'Reply'],
+                    ],
+                ],
+                [
+                    'type' => 'component',
+                    'component' => 'messaging.route-message-template-picker',
+                    'name' => 'message_template_preset_id_email',
+                    'label' => 'Email reply template',
+                    'show_when' => [
+                        'field' => 'message_role',
+                        'equals' => 'reply',
+                    ],
+                    'active_when' => [
+                        'field' => 'message_role',
+                        'equals' => 'reply',
+                    ],
+                    'options' => [],
+                    'create_url' => '#',
+                    'available_fields' => [],
+                    'available_channels' => ['email'],
+                    'purposes' => [],
+                ],
+            ],
+        ])
+            ->assertSee('x-model="authoringState.message_role"', false)
+            ->assertSee(
+                'x-show="authoringState.message_role === \'reply\'"',
+                false,
+            )
+            ->assertSee(
+                'x-bind:disabled="authoringState.message_role !== \'reply\'"',
+                false,
+            )
+            ->assertSee(
+                'x-bind:required="authoringState.message_role === \'reply\'"',
+                false,
+            )
+            ->assertDontSee('authoringState[', false);
+    }
+
     public function test_index_lists_current_routes_with_business_language_summaries_and_module_owned_points(): void
     {
         config()->set('modules.enabled', [
@@ -116,6 +169,7 @@ class FlowRouteControllerTest extends TestCase
             ->assertSee('Create follow-up task')
             ->assertSee('aria-label="Route flow"', false)
             ->assertSee('data-module="tasks"', false)
+            ->assertSee('data-flow-route-point-module-filters', false)
             ->assertSee(
                 route('crm.flow-routes.bindings.index'),
                 false,
