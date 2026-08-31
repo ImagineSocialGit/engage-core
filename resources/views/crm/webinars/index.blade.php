@@ -11,6 +11,14 @@
         x-data="{
             activeDevTestingModal: null,
             activeMessageWebinar: @js($initialMessageWebinarId),
+            webinarLinkOptions: @js(($webinarLinkOptions ?? collect())->all()),
+            paidAdTrackingPlatforms: @js($paidAdTrackingPlatforms ?? []),
+            activeLinksWebinar: null,
+            linksModalOpen: false,
+            linksReportingOpen: false,
+            linksPlatformKey: 'meta',
+            copiedLinksField: null,
+            linksCopyFailed: false,
             openDevTestingModal(name) {
                 this.activeDevTestingModal = name;
             },
@@ -19,6 +27,77 @@
             },
             closeMessageReview() {
                 this.activeMessageWebinar = null;
+            },
+            openLinksModal(webinarId) {
+                const key = String(webinarId);
+
+                if (!this.webinarLinkOptions[key]) {
+                    return;
+                }
+
+                this.activeLinksWebinar = key;
+                this.linksModalOpen = true;
+                this.linksReportingOpen = false;
+                this.linksPlatformKey = 'meta';
+                this.copiedLinksField = null;
+                this.linksCopyFailed = false;
+            },
+            closeLinksModal() {
+                this.linksModalOpen = false;
+                this.linksReportingOpen = false;
+                this.copiedLinksField = null;
+                this.linksCopyFailed = false;
+            },
+            selectedLinkOption() {
+                return this.webinarLinkOptions[String(this.activeLinksWebinar)] || {};
+            },
+            selectedAdPlatform() {
+                return this.paidAdTrackingPlatforms[this.linksPlatformKey] || {};
+            },
+            selectLinksWebinar(webinarId) {
+                this.activeLinksWebinar = String(webinarId);
+                this.linksReportingOpen = false;
+                this.copiedLinksField = null;
+                this.linksCopyFailed = false;
+            },
+            async copyLinksValue(value, field) {
+                if (!value) {
+                    return;
+                }
+
+                this.linksCopyFailed = false;
+
+                try {
+                    if (navigator.clipboard && window.isSecureContext) {
+                        await navigator.clipboard.writeText(value);
+                    } else {
+                        const textarea = document.createElement('textarea');
+                        textarea.value = value;
+                        textarea.setAttribute('readonly', '');
+                        textarea.style.position = 'fixed';
+                        textarea.style.opacity = '0';
+                        document.body.appendChild(textarea);
+                        textarea.focus();
+                        textarea.select();
+
+                        const copied = document.execCommand('copy');
+                        textarea.remove();
+
+                        if (!copied) {
+                            throw new Error('copy_failed');
+                        }
+                    }
+
+                    this.copiedLinksField = field;
+                    setTimeout(() => {
+                        if (this.copiedLinksField === field) {
+                            this.copiedLinksField = null;
+                        }
+                    }, 1500);
+                } catch (error) {
+                    this.copiedLinksField = null;
+                    this.linksCopyFailed = true;
+                }
             }
         }"
     >
@@ -382,6 +461,15 @@
                                 </a>
 
                                 @if($upcomingRegistrationUrl)
+                                    <button
+                                        type="button"
+                                        data-webinar-get-links="{{ $upcomingWebinar->getKey() }}"
+                                        x-on:click="openLinksModal({{ $upcomingWebinar->getKey() }})"
+                                        class="inline-flex min-h-8 items-center justify-center rounded-full bg-sky-700 px-3 text-[11px] font-extrabold text-white hover:bg-sky-600"
+                                    >
+                                        Get Links
+                                    </button>
+
                                     <a
                                         href="{{ $upcomingRegistrationUrl }}"
                                         target="_blank"
@@ -409,6 +497,270 @@
                 </a>
             </aside>
         </section>
+
+        @if(($webinarLinkOptions ?? collect())->isNotEmpty())
+            <div
+                x-show="linksModalOpen"
+                x-cloak
+                x-on:keydown.escape.window="if (linksModalOpen) closeLinksModal()"
+                x-on:click.self="closeLinksModal()"
+                class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 px-3 py-4 sm:px-4"
+                data-webinar-links-modal
+            >
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="webinar-links-modal-title"
+                    class="my-auto max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white shadow-2xl"
+                >
+                    <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-6">
+                        <div>
+                            <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-sky-700">Webinar links</p>
+                            <h2 id="webinar-links-modal-title" class="mt-1 text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
+                                Get Links
+                            </h2>
+                            <p class="mt-1 text-sm leading-6 text-slate-600">
+                                Copy the normal registration link, or open the reporting section when you are setting up a paid ad.
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            x-on:click="closeLinksModal()"
+                            class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-xl font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-950"
+                            aria-label="Close Get Links"
+                        >
+                            ×
+                        </button>
+                    </div>
+
+                    <div class="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
+                        <label class="grid gap-2 text-sm font-extrabold text-slate-800">
+                            Webinar
+                            <select
+                                x-bind:value="activeLinksWebinar || ''"
+                                x-on:change="selectLinksWebinar($event.target.value)"
+                                class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                            >
+                                @foreach(($webinarLinkOptions ?? collect()) as $webinarId => $linkOption)
+                                    <option value="{{ $webinarId }}">{{ $linkOption['option_label'] }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+
+                        <section class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                    <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-500">
+                                        Webinar registration link
+                                    </p>
+                                    <p class="mt-1 text-sm font-bold text-slate-950" x-text="selectedLinkOption().webinar_title || 'Webinar'"></p>
+                                    <p
+                                        class="mt-1 text-xs text-slate-500"
+                                        x-show="selectedLinkOption().starts_at_label"
+                                        x-text="selectedLinkOption().starts_at_label"
+                                    ></p>
+                                </div>
+
+                                <a
+                                    x-bind:href="selectedLinkOption().destination_url || '#'"
+                                    target="_blank"
+                                    rel="noopener"
+                                    class="text-xs font-extrabold text-sky-700 underline decoration-sky-300 underline-offset-4 hover:text-sky-900"
+                                >
+                                    Open page
+                                </a>
+                            </div>
+
+                            <div class="mt-4 flex flex-col gap-2 sm:flex-row">
+                                <input
+                                    type="text"
+                                    readonly
+                                    x-bind:value="selectedLinkOption().destination_url || ''"
+                                    class="min-h-11 min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
+                                    aria-label="Webinar registration link"
+                                >
+                                <button
+                                    type="button"
+                                    x-on:click="copyLinksValue(selectedLinkOption().destination_url || '', 'destination')"
+                                    class="min-h-11 shrink-0 rounded-xl bg-slate-950 px-5 text-sm font-extrabold text-white hover:bg-slate-800"
+                                >
+                                    <span x-text="copiedLinksField === 'destination' ? 'Copied' : 'Copy full URL'"></span>
+                                </button>
+                            </div>
+                        </section>
+
+                        @if(! empty($paidAdTrackingPlatforms ?? []))
+                            <section class="overflow-hidden rounded-2xl border border-sky-200 bg-white" data-webinar-ad-reporting-section>
+                                <button
+                                    type="button"
+                                    x-on:click="linksReportingOpen = !linksReportingOpen; copiedLinksField = null; linksCopyFailed = false"
+                                    class="flex min-h-14 w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-sky-50 sm:px-5"
+                                    aria-controls="webinar-ad-reporting-links"
+                                    x-bind:aria-expanded="linksReportingOpen ? 'true' : 'false'"
+                                    data-webinar-ad-reporting-toggle
+                                >
+                                    <span>
+                                        <span class="block text-sm font-black text-slate-950">Get ad links for reporting</span>
+                                        <span class="mt-0.5 block text-xs leading-5 text-slate-600">
+                                            Meta, TikTok, and YouTube tracking setup.
+                                        </span>
+                                    </span>
+                                    <span
+                                        aria-hidden="true"
+                                        class="text-xl font-bold text-sky-700 transition"
+                                        x-bind:class="linksReportingOpen ? 'rotate-180' : ''"
+                                    >
+                                        ⌄
+                                    </span>
+                                </button>
+
+                                <div
+                                    id="webinar-ad-reporting-links"
+                                    x-show="linksReportingOpen"
+                                    x-cloak
+                                    class="border-t border-sky-200 bg-sky-50/40 p-4 sm:p-5"
+                                    data-webinar-ad-reporting-links
+                                >
+                                    <p class="text-sm leading-6 text-slate-700">
+                                        Use the normal webinar URL above as the ad destination. Then add the tracking text below in the matching field in your ad platform.
+                                    </p>
+
+                                    <div class="mt-4">
+                                        <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-500">Ad platform</p>
+                                        <div class="mt-2 grid grid-cols-3 gap-2" role="group" aria-label="Ad platform">
+                                            @foreach(($paidAdTrackingPlatforms ?? []) as $platformKey => $platform)
+                                                <button
+                                                    type="button"
+                                                    x-on:click="linksPlatformKey = @js($platformKey); copiedLinksField = null; linksCopyFailed = false"
+                                                    x-bind:class="linksPlatformKey === @js($platformKey)
+                                                        ? 'border-sky-700 bg-sky-700 text-white'
+                                                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'"
+                                                    class="min-h-10 rounded-xl border px-3 py-2 text-xs font-extrabold transition sm:text-sm"
+                                                >
+                                                    {{ $platform['short_label'] }}
+                                                </button>
+                                            @endforeach
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                                        <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-500" x-text="selectedAdPlatform().destination_label || 'Destination URL'"></p>
+                                        <p class="mt-1 text-sm leading-6 text-slate-700">
+                                            Use the webinar registration URL shown above. Do not add the tracking text directly to that URL when the ad platform provides the separate field shown below.
+                                        </p>
+                                    </div>
+
+                                    <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                                        <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                                            <div>
+                                                <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-500" x-text="selectedAdPlatform().parameters_label || 'Tracking parameters'"></p>
+                                                <p class="mt-1 text-sm font-bold text-slate-950">Copy this exactly as shown.</p>
+                                            </div>
+                                        </div>
+
+                                        <textarea
+                                            readonly
+                                            rows="5"
+                                            x-bind:value="selectedAdPlatform().parameters || ''"
+                                            class="mt-3 w-full resize-y rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 font-mono text-xs leading-5 text-slate-800"
+                                            aria-label="Ad reporting tracking parameters"
+                                        ></textarea>
+
+                                        <div class="mt-2 flex justify-end">
+                                            <button
+                                                type="button"
+                                                x-on:click="copyLinksValue(selectedAdPlatform().parameters || '', 'ad-parameters')"
+                                                class="rounded-xl bg-sky-700 px-4 py-2 text-sm font-extrabold text-white hover:bg-sky-600"
+                                            >
+                                                <span x-text="copiedLinksField === 'ad-parameters' ? 'Copied' : 'Copy tracking text'"></span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        x-show="(selectedAdPlatform().custom_parameters || []).length > 0"
+                                        x-cloak
+                                        class="mt-4 rounded-2xl border border-indigo-200 bg-white p-4"
+                                    >
+                                        <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-indigo-700">Google Ads custom parameters</p>
+                                        <p class="mt-1 text-sm leading-6 text-slate-600">
+                                            Create these at the matching level and use the readable name already in Google Ads as the value.
+                                        </p>
+
+                                        <div class="mt-3 overflow-x-auto">
+                                            <table class="min-w-full text-left text-sm">
+                                                <thead>
+                                                    <tr class="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                                                        <th class="px-2 py-2 font-extrabold">Where</th>
+                                                        <th class="px-2 py-2 font-extrabold">Parameter</th>
+                                                        <th class="px-2 py-2 font-extrabold">Value</th>
+                                                        <th class="px-2 py-2"><span class="sr-only">Copy</span></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <template x-for="parameter in (selectedAdPlatform().custom_parameters || [])" x-bind:key="parameter.key">
+                                                        <tr class="border-b border-slate-100 last:border-0">
+                                                            <td class="px-2 py-3 font-bold text-slate-900" x-text="parameter.level"></td>
+                                                            <td class="px-2 py-3 font-mono text-xs text-slate-800" x-text="parameter.key"></td>
+                                                            <td class="px-2 py-3 text-slate-600" x-text="parameter.value_hint"></td>
+                                                            <td class="px-2 py-3 text-right">
+                                                                <button
+                                                                    type="button"
+                                                                    x-on:click="copyLinksValue(parameter.key, 'custom-' + parameter.key)"
+                                                                    class="text-xs font-extrabold text-indigo-700 underline decoration-indigo-300 underline-offset-4 hover:text-indigo-900"
+                                                                >
+                                                                    <span x-text="copiedLinksField === ('custom-' + parameter.key) ? 'Copied' : 'Copy key'"></span>
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    </template>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-4 grid gap-3 lg:grid-cols-2">
+                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                            <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-500">Where it goes</p>
+                                            <p class="mt-2 text-sm leading-6 text-slate-700" x-text="selectedAdPlatform().instructions || ''"></p>
+                                        </div>
+
+                                        <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                                            <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-amber-700">Before publishing</p>
+                                            <ul class="mt-2 space-y-2 text-sm leading-5 text-amber-950">
+                                                <template x-for="note in (selectedAdPlatform().notes || [])" x-bind:key="note">
+                                                    <li class="flex gap-2">
+                                                        <span aria-hidden="true">•</span>
+                                                        <span x-text="note"></span>
+                                                    </li>
+                                                </template>
+                                                <li class="flex gap-2">
+                                                    <span aria-hidden="true">•</span>
+                                                    <span>Use the ad platform’s Preview or Test option and confirm the correct webinar page opens.</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+
+                                    <p class="mt-4 text-xs leading-5 text-slate-600">
+                                        Click IDs such as <code class="font-bold">fbclid</code>, <code class="font-bold">gclid</code>, and <code class="font-bold">ttclid</code> are added by the ad platforms when applicable. Do not add them manually.
+                                    </p>
+                                </div>
+                            </section>
+                        @endif
+
+                        <p
+                            x-show="linksCopyFailed"
+                            x-cloak
+                            class="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800"
+                        >
+                            Automatic copy did not work in this browser. Select the field and copy it manually.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        @endif
 
 @foreach(($upcomingWebinars ?? collect()) as $upcomingWebinar)
     @php
@@ -1188,6 +1540,15 @@
                                                 >
                                                     <span x-show="!copied">Copy Link</span>
                                                     <span x-show="copied">Copied</span>
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    data-webinar-get-links="{{ $webinar->getKey() }}"
+                                                    x-on:click="openLinksModal({{ $webinar->getKey() }})"
+                                                    class="inline-flex items-center rounded-md border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-800 hover:bg-sky-100"
+                                                >
+                                                    Get Links
                                                 </button>
                                             </div>
                                         @else

@@ -22,6 +22,7 @@ use App\Modules\Webinars\Requests\UpdateWebinarSeriesProviderEventTypeRequest;
 use App\Modules\Webinars\Requests\UpdateWebinarSeriesScheduleProfileRequest;
 use App\Modules\Webinars\Services\WebinarMessageChainPresentationService;
 use App\Modules\Webinars\Services\WebinarScheduleProfileResolver;
+use App\Support\Reporting\PaidAdTrackingLinkGenerator;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\RedirectResponse;
@@ -42,6 +43,7 @@ class WebinarController extends Controller
         Request $request,
         WebinarMessageChainPresentationService $messageChainPresentation,
         WebinarScheduleProfileResolver $scheduleProfileResolver,
+        PaidAdTrackingLinkGenerator $paidAdTrackingLinkGenerator,
     ): View {
 
         $series = WebinarSeries::query()
@@ -72,7 +74,7 @@ class WebinarController extends Controller
             ->matchingCurrentSeriesProvider()
             ->orderBy('starts_at')
             ->orderBy('id')
-            ->limit(6)
+            ->limit(2)
             ->get();
 
         $upcomingMessageReviews = collect();
@@ -231,6 +233,37 @@ class WebinarController extends Controller
             ->limit(50)
             ->get();
 
+        $webinarLinkOptions = $upcomingWebinars
+            ->concat($webinars)
+            ->unique(fn (Webinar $webinar): int => (int) $webinar->getKey())
+            ->filter(fn (Webinar $webinar): bool => filled($webinar->webinarSeries?->slug))
+            ->mapWithKeys(function (Webinar $webinar): array {
+                $startsAtLabel = $webinar->starts_at?->copy()
+                    ->setTimezone($webinar->timezone)
+                    ->format('M j, Y · g:i A T');
+
+                return [
+                    (string) $webinar->getKey() => [
+                        'webinar_id' => (int) $webinar->getKey(),
+                        'webinar_title' => $webinar->title,
+                        'series_title' => $webinar->webinarSeries?->title,
+                        'starts_at_label' => $startsAtLabel,
+                        'option_label' => trim(implode(' — ', array_filter([
+                            $webinar->title,
+                            $startsAtLabel,
+                        ]))),
+                        'destination_url' => route('webinar.show', [
+                            'seriesSlug' => $webinar->webinarSeries->slug,
+                        ]),
+                    ],
+                ];
+            });
+
+        $paidAdTrackingPlatforms = function_exists('module_enabled')
+            && module_enabled('reporting')
+                ? $paidAdTrackingLinkGenerator->platforms()
+                : [];
+
         return view('crm.webinars.index', [
             'title' => 'Webinars',
             'heading' => 'Webinars',
@@ -256,6 +289,8 @@ class WebinarController extends Controller
             ),
             'webinarDevEnabled' => $this->devTestingAllowed(),
             'webinarSmokeEnabled' => $this->devTestingAllowed(),
+            'webinarLinkOptions' => $webinarLinkOptions,
+            'paidAdTrackingPlatforms' => $paidAdTrackingPlatforms,
         ]);
     }
 
