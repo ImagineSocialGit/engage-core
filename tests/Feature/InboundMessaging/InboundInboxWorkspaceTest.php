@@ -8,6 +8,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\InboundMessaging\Actions\RecordInboundMessageAction;
 use App\Modules\InboundMessaging\Models\InboundEmailRoute;
 use App\Modules\InboundMessaging\Models\InboundMessage;
+use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -290,6 +291,48 @@ class InboundInboxWorkspaceTest extends TestCase
                 route('crm.inbound-messaging.inbox.show', $message),
                 false,
             );
+    }
+
+    public function test_automatically_answered_message_is_done_and_not_dashboard_review_work(): void
+    {
+        $contact = Contact::factory()->create();
+        $response = ScheduledMessage::factory()
+            ->forContact($contact)
+            ->email()
+            ->sent()
+            ->create([
+                'message_type' => 'reply_acknowledgement',
+            ]);
+        $message = $this->message([
+            'subject' => 'Automatically answered message',
+            'sender_type' => $contact->getMorphClass(),
+            'sender_id' => $contact->getKey(),
+            'related_contact_id' => $contact->getKey(),
+            'inbox_status' => InboundMessage::INBOX_STATUS_DONE,
+            'completed_at' => now(),
+            'automated_response_scheduled_message_id' => $response->getKey(),
+            'automated_handled_at' => now(),
+        ]);
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('crm.inbound-messaging.inbox.index', [
+                'status' => 'done',
+            ]))
+            ->assertOk()
+            ->assertSee('Automatically answered message')
+            ->assertSee('System auto-responded')
+            ->assertSee('data-inbound-auto-response', false);
+
+        $this->actingAs($user)
+            ->get(route('crm.index'))
+            ->assertOk()
+            ->assertDontSee('Automatically answered message');
+
+        $this->assertSame(
+            InboundMessage::INBOX_STATUS_DONE,
+            $message->fresh()->inbox_status,
+        );
     }
 
     /**

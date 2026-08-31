@@ -212,6 +212,17 @@
                             <p class="mt-2 text-sm leading-6 text-slate-600">
                                 {{ $row['preview'] }}
                             </p>
+
+                            @if(is_array($row['automated_response'] ?? null))
+                                <div
+                                    class="mt-3 inline-flex flex-wrap items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800"
+                                    data-inbound-auto-response
+                                >
+                                    <span>System auto-responded by {{ $row['automated_response']['channel_label'] }}</span>
+                                    <span aria-hidden="true">·</span>
+                                    <span>{{ $row['automated_response']['status_label'] }}</span>
+                                </div>
+                            @endif
                         </div>
 
                         <div class="shrink-0 lg:w-64">

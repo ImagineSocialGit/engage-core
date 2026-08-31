@@ -52,7 +52,7 @@ class InboundInboxProjectStateContractTest extends TestCase
             $document['version'],
         );
         $this->assertSame(
-            7,
+            (int) config('project_state.sections.inbound_messaging.version'),
             $document['sections']['inbound_messaging']['version'],
         );
 

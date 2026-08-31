@@ -70,6 +70,7 @@ final class InboundInboxWorkspace
             'sender',
             'relatedContact',
             'correlatedScheduledMessage.messageChainStepVariant',
+            'automatedResponseScheduledMessage',
         ]);
 
         $routeLabels = $this->routeLabels();
@@ -103,6 +104,7 @@ final class InboundInboxWorkspace
             'sender',
             'relatedContact',
             'correlatedScheduledMessage.messageChainStepVariant',
+            'automatedResponseScheduledMessage',
         ]);
 
         return $this->present(
@@ -121,6 +123,7 @@ final class InboundInboxWorkspace
             'sender',
             'relatedContact',
             'correlatedScheduledMessage.messageChainStepVariant',
+            'automatedResponseScheduledMessage',
         ]);
     }
 
@@ -410,6 +413,7 @@ final class InboundInboxWorkspace
     ): array {
         $person = $this->person($message);
         $body = trim((string) $message->body);
+        $automatedResponse = $message->automatedResponseScheduledMessage;
 
         return [
             'message' => $message,
@@ -424,7 +428,9 @@ final class InboundInboxWorkspace
                 $profileLabels,
             ),
             'channel_label' => $this->channelLabel($message->channel),
-            'status_label' => $this->statusLabel($message->inbox_status),
+            'status_label' => $automatedResponse instanceof ScheduledMessage
+                ? 'System auto-responded'
+                : $this->statusLabel($message->inbox_status),
             'status' => $message->inbox_status,
             'received_at_label' => $this->dateLabel(
                 $message->received_at ?? $message->created_at,
@@ -435,6 +441,16 @@ final class InboundInboxWorkspace
             'preview' => $body !== ''
                 ? Str::limit(preg_replace('/\s+/u', ' ', $body) ?? $body, 180)
                 : 'No message text was provided.',
+            'automated_response' => $automatedResponse instanceof ScheduledMessage
+                ? [
+                    'scheduled_message_id' => (int) $automatedResponse->getKey(),
+                    'channel_label' => $this->channelLabel($automatedResponse->channel),
+                    'status_label' => Str::of($automatedResponse->status)
+                        ->replace('_', ' ')
+                        ->title()
+                        ->toString(),
+                ]
+                : null,
             'href' => route('crm.inbound-messaging.inbox.show', $message),
         ];
     }

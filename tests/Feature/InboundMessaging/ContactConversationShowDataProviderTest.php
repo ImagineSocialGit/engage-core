@@ -240,6 +240,84 @@ class ContactConversationShowDataProviderTest extends TestCase
             ->assertDontSee('What’s already happening');
     }
 
+    public function test_automated_response_is_featured_after_the_latest_inbound_reply(): void
+    {
+        config()->set('modules.enabled', [
+            'messaging',
+            'inbound_messaging',
+        ]);
+
+        $contact = Contact::factory()->create([
+            'email' => 'person@example.test',
+        ]);
+        $response = ScheduledMessage::factory()
+            ->forContact($contact)
+            ->email()
+            ->sent()
+            ->create([
+                'message_type' => 'reply_acknowledgement',
+                'payload' => [
+                    'to' => 'person@example.test',
+                    'subject' => 'Thanks for reaching out',
+                    'body' => 'A member of our team will follow up shortly.',
+                ],
+                'send_at' => now()->subMinute(),
+            ]);
+        $inbound = InboundMessage::query()->create([
+            'sender_type' => $contact->getMorphClass(),
+            'sender_id' => $contact->getKey(),
+            'related_contact_id' => $contact->getKey(),
+            'client_key' => 'test-client',
+            'channel' => 'email',
+            'provider' => 'resend',
+            'provider_event_id' => 'contact-conversation-auto-response',
+            'provider_message_id' => 'provider-auto-response',
+            'from_type' => 'email',
+            'from_value' => 'person@example.test',
+            'to_type' => 'email',
+            'to_value' => 'team@example.test',
+            'subject' => 'I am interested',
+            'body' => 'Please call me.',
+            'classification' => InboundMessage::CLASSIFICATION_NORMAL_REPLY,
+            'purpose' => 'marketing',
+            'scope' => 'mortgage_homebuyer_nurture',
+            'automated_response_scheduled_message_id' => $response->getKey(),
+            'received_at' => now()->subMinutes(2),
+            'inbox_status' => InboundMessage::INBOX_STATUS_DONE,
+            'completed_at' => now()->subMinute(),
+            'automated_handled_at' => now()->subMinute(),
+        ]);
+
+        $data = app(ContactConversationShowDataProvider::class)->dataFor($contact);
+
+        $this->assertSame(
+            'outbound-'.$response->getKey(),
+            data_get($data, 'latestAutomatedResponse.id'),
+        );
+        $this->assertTrue(data_get($data, 'latestAutomatedResponse.automated_response'));
+        $this->assertSame(
+            'A member of our team will follow up shortly.',
+            data_get($data, 'latestAutomatedResponse.body'),
+        );
+        $this->assertCount(2, $data['conversationItems']);
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('crm.contacts.show', $contact))
+            ->assertOk()
+            ->assertSee('data-contact-automated-response', false)
+            ->assertSee('System auto-responded')
+            ->assertSee('A member of our team will follow up shortly.')
+            ->assertSee('Send another reply')
+            ->assertSee('data-contact-conversation-composer', false);
+
+        $this->assertSame($inbound->getKey(), data_get(
+            $data,
+            'conversationReply.inbound_message_id',
+        ));
+    }
+
     public function test_non_reply_inbound_commands_do_not_pollute_contact_conversation(): void
     {
         $contact = Contact::factory()->create();

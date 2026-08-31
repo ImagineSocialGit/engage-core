@@ -2,7 +2,6 @@
 
 namespace App\Modules\Messaging\Automation;
 
-use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\Messaging\Data\Automation\SendMessageAutomationDefinition;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Services\DirectMessageTemplateResolver;
@@ -265,11 +264,11 @@ class MessagingAutomationPointAuthoringContributor implements AutomationPointAut
             return true;
         }
 
-        $route = $context->container;
+        $triggerType = $context->container?->getAttribute('trigger_type');
+        $triggerKey = $context->container?->getAttribute('trigger_key');
 
-        return $route instanceof FlowRoute
-            && $route->trigger_type === FlowRoute::TRIGGER_AUTOMATION_EVENT
-            && Str::startsWith((string) $route->trigger_key, 'inbound_message.');
+        return $triggerType === 'automation_event'
+            && Str::startsWith((string) $triggerKey, 'inbound_message.');
     }
 
     private function role(array $definition): string

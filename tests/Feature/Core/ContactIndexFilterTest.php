@@ -77,10 +77,11 @@ class ContactIndexFilterTest extends TestCase
         $this->assertSame(['Referral'], $filters['criteria']['source']);
         $this->assertSame(['priority'], $filters['criteria']['tag']);
         $this->assertTrue($filters['has_filters']);
-        $this->assertSame(1, $filters['secondary_active_count']);
+        $this->assertSame(0, $filters['secondary_active_count']);
         $this->assertSame(4, $response->viewData('totalContacts'));
         $this->assertContains('source', array_column($filters['primary'], 'key'));
-        $this->assertContains('tag', array_column($filters['secondary'], 'key'));
+        $this->assertContains('tag', array_column($filters['primary'], 'key'));
+        $this->assertNotContains('tag', array_column($filters['secondary'], 'key'));
     }
 
     public function test_search_matches_email_phone_and_split_first_last_name(): void

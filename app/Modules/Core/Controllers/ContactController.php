@@ -102,6 +102,7 @@ class ContactController extends Controller
     ): View {
         $relations = [
             'notes' => fn ($query) => $query->latest(),
+            'tags' => fn ($query) => $query->orderBy('tag'),
         ];
 
         if (module_enabled('workflow')) {

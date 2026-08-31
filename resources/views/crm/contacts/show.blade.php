@@ -35,12 +35,28 @@
     $latestInboundReply = is_array($latestInboundReply ?? null)
         ? $latestInboundReply
         : null;
+    $latestAutomatedResponse = is_array($latestAutomatedResponse ?? null)
+        ? $latestAutomatedResponse
+        : null;
     $conversationReply = is_array($conversationReply ?? null)
         ? $conversationReply
         : null;
-    $conversationTimeline = $latestInboundReply
-        ? $conversationItems->reject(fn (array $item) => ($item['id'] ?? null) === ($latestInboundReply['id'] ?? null))->take(7)->values()
-        : $conversationItems->take(8)->values();
+    $primaryConversationItemIds = array_values(array_filter([
+        $latestInboundReply['id'] ?? null,
+        $latestAutomatedResponse['id'] ?? null,
+    ]));
+    $conversationTimeline = $conversationItems
+        ->reject(fn (array $item) => in_array(
+            $item['id'] ?? null,
+            $primaryConversationItemIds,
+            true,
+        ))
+        ->take($primaryConversationItemIds === [] ? 8 : 6)
+        ->values();
+    $contactTags = $contact->tags
+        ->pluck('tag')
+        ->filter(fn ($tag) => filled($tag))
+        ->values();
     $clientTimezone = config('client.timezone', config('app.timezone', 'UTC'));
 
     $defaultContactTaskDueAt = now($clientTimezone)->addDay()->setTime(9, 0)->format('Y-m-d\TH:i');
@@ -288,6 +304,19 @@
                     </div>
                 </div>
 
+                @if($contactTags->isNotEmpty())
+                    <div data-contact-tags>
+                        <p class="text-sm text-slate-500">Tags</p>
+                        <div class="mt-2 flex flex-wrap gap-2">
+                            @foreach($contactTags as $tag)
+                                <span class="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-100">
+                                    {{ $tag }}
+                                </span>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
                 <div class="flex flex-wrap gap-2">
                     @if(module_enabled('tasks'))
                         <x-ui.button type="button" variant="secondary" x-on:click="taskModalOpen = true">
@@ -481,8 +510,55 @@
                             @endif
                         </div>
 
+                        @if($latestAutomatedResponse)
+                            <div class="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4" data-contact-automated-response>
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-200">
+                                            System auto-responded
+                                        </span>
+                                        @if(filled($latestAutomatedResponse['channel'] ?? null))
+                                            <span class="text-xs font-semibold uppercase text-slate-500">
+                                                {{ $latestAutomatedResponse['channel'] }}
+                                            </span>
+                                        @endif
+                                        @if(filled($latestAutomatedResponse['status'] ?? null))
+                                            <span class="text-xs font-semibold text-emerald-700">
+                                                {{ str($latestAutomatedResponse['status'])->replace('_', ' ')->title() }}
+                                            </span>
+                                        @endif
+                                    </div>
+
+                                    @if($latestAutomatedResponse['occurred_at'] ?? null)
+                                        <span class="text-xs text-slate-500">
+                                            {{ $latestAutomatedResponse['occurred_at']->copy()->setTimezone($clientTimezone)->format('M j, g:i A') }}
+                                        </span>
+                                    @endif
+                                </div>
+
+                                <p class="mt-3 text-sm font-semibold text-slate-900">
+                                    {{ $latestAutomatedResponse['title'] ?? 'Automatic acknowledgement' }}
+                                </p>
+
+                                @if(filled($latestAutomatedResponse['body'] ?? null))
+                                    <p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{{ $latestAutomatedResponse['body'] }}</p>
+                                @endif
+                            </div>
+                        @endif
+
                         @if($conversationReply)
-                            <div class="rounded-2xl border border-slate-200 bg-white p-4" data-contact-conversation-composer>
+                            <details
+                                class="rounded-2xl border border-slate-200 bg-white p-4"
+                                data-contact-conversation-composer
+                                @if(! $latestAutomatedResponse) open @endif
+                            >
+                                <summary class="cursor-pointer text-sm font-semibold text-slate-900">
+                                    {{ $latestAutomatedResponse
+                                        ? 'Send another reply'
+                                        : 'Reply by '.($conversationReply['channel_label'] ?? 'message') }}
+                                </summary>
+
+                                <div class="mt-3">
                                 <div class="flex flex-wrap items-center justify-between gap-2">
                                     <div>
                                         <p class="text-sm font-semibold text-slate-900">
@@ -566,7 +642,8 @@
                                         {{ $conversationReply['unavailable_reason'] ?? 'Reply is not available for this message.' }}
                                     </div>
                                 @endif
-                            </div>
+                                </div>
+                            </details>
                         @endif
                     @else
                         <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">

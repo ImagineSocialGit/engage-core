@@ -5,6 +5,7 @@ namespace Tests\Feature\Core;
 use App\Models\User;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactStatus;
+use App\Modules\Core\Models\ContactTag;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -185,6 +186,23 @@ class ContactControllerTest extends TestCase
                 ]),
                 false,
             );
+    }
+
+    public function test_contact_show_displays_contact_tags(): void
+    {
+        $user = User::factory()->create();
+        $contact = Contact::factory()->create();
+
+        ContactTag::query()->create([
+            'contact_id' => $contact->getKey(),
+            'tag' => 'Hand Raiser',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('crm.contacts.show', $contact))
+            ->assertOk()
+            ->assertSee('data-contact-tags', false)
+            ->assertSee('Hand Raiser');
     }
 
     public function test_it_renders_import_preview_with_csv_mapping_fields(): void

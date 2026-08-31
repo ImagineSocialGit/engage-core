@@ -157,10 +157,8 @@
                 @endif
             @endif
 
-            @if($name !== '')
-                @error($name)
-                    <p class="mt-1 text-sm text-red-700">{{ $message }}</p>
-                @enderror
+            @if($name !== '' && isset($errors) && $errors->has($name))
+                <p class="mt-1 text-sm text-red-700">{{ $errors->first($name) }}</p>
             @endif
         </div>
     @endforeach

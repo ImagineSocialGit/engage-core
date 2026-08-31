@@ -158,9 +158,9 @@
         </button>
     </div>
 
-    @error($name)
-        <p class="text-sm text-red-700">{{ $message }}</p>
-    @enderror
+    @if($name !== '' && isset($errors) && $errors->has($name))
+        <p class="text-sm text-red-700">{{ $errors->first($name) }}</p>
+    @endif
 
     <template x-teleport="body">
         <div

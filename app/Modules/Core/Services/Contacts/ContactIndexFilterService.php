@@ -12,6 +12,7 @@ final class ContactIndexFilterService
         'status',
         'relationship',
         'source',
+        'tag',
     ];
 
     private const MAX_SEARCH_LENGTH = 120;

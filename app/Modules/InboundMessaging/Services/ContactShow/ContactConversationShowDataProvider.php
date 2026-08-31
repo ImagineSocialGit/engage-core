@@ -39,7 +39,10 @@ class ContactConversationShowDataProvider implements ContactShowDataProvider
         ]));
 
         $replies = InboundMessage::query()
-            ->with('correlatedScheduledMessage')
+            ->with([
+                'correlatedScheduledMessage',
+                'automatedResponseScheduledMessage',
+            ])
             ->whereIn('sender_type', $contactTypes)
             ->where('sender_id', $contact->getKey())
             ->where('classification', InboundMessage::CLASSIFICATION_NORMAL_REPLY)
@@ -68,6 +71,15 @@ class ContactConversationShowDataProvider implements ContactShowDataProvider
 
                 $items[] = $this->inboundItem($message);
 
+                $automatedResponse = $message->automatedResponseScheduledMessage;
+
+                if ($automatedResponse instanceof ScheduledMessage) {
+                    $items[] = $this->outboundItem(
+                        $automatedResponse,
+                        automatedResponse: true,
+                    );
+                }
+
                 return $items;
             })
             ->concat($manualReplies->map(
@@ -82,10 +94,18 @@ class ContactConversationShowDataProvider implements ContactShowDataProvider
         $latestInbound = $latestInboundMessage instanceof InboundMessage
             ? $this->inboundItem($latestInboundMessage)
             : null;
+        $latestAutomatedResponseMessage = $latestInboundMessage?->automatedResponseScheduledMessage;
+        $latestAutomatedResponse = $latestAutomatedResponseMessage instanceof ScheduledMessage
+            ? $this->outboundItem(
+                $latestAutomatedResponseMessage,
+                automatedResponse: true,
+            )
+            : null;
 
         return [
             'conversationItems' => $conversation->all(),
             'latestInboundReply' => $latestInbound,
+            'latestAutomatedResponse' => $latestAutomatedResponse,
             'conversationReply' => $latestInboundMessage instanceof InboundMessage
                 ? $this->replyContext($contact, $latestInboundMessage)
                 : null,
@@ -130,12 +150,16 @@ class ContactConversationShowDataProvider implements ContactShowDataProvider
     /**
      * @return array<string, mixed>
      */
-    private function outboundItem(ScheduledMessage $message): array
+    private function outboundItem(
+        ScheduledMessage $message,
+        bool $automatedResponse = false,
+    ): array
     {
         $subject = data_get($message->payload, 'subject');
         $messageBody = data_get($message->payload, 'message');
 
-        if ($message->message_type === self::CONVERSATION_REPLY_TYPE
+        if (($message->message_type === self::CONVERSATION_REPLY_TYPE
+                || $automatedResponse)
             && ! is_string($messageBody)
         ) {
             $messageBody = data_get($message->payload, 'body');
@@ -145,6 +169,7 @@ class ContactConversationShowDataProvider implements ContactShowDataProvider
             'id' => 'outbound-'.$message->getKey(),
             'source_id' => (int) $message->getKey(),
             'direction' => 'outbound',
+            'automated_response' => $automatedResponse,
             'channel' => $message->channel,
             'title' => is_string($subject) && trim($subject) !== ''
                 ? trim($subject)
