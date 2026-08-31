@@ -2,6 +2,7 @@
 
 namespace App\Modules\Webinars\Providers;
 
+use App\Modules\Webinars\Automation\WebinarAutomationTriggerAuthoringContributor;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Webinars\ConfigContracts\WebinarMessageAreaConfigContract;
 use App\Modules\Webinars\ConfigContracts\WebinarPostEventConfigContract;
@@ -40,6 +41,10 @@ class WebinarsModuleServiceProvider extends ServiceProvider
 
     public function register(): void
     {
+        $this->app->tag([
+            WebinarAutomationTriggerAuthoringContributor::class,
+        ], 'automation.trigger_authoring_contributors');
+
         $this->app->tag([
             WebinarMessageAreaConfigContract::class,
             WebinarPostEventConfigContract::class,

@@ -12,6 +12,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Core\Models\ContactImportOccurrence;
 use App\Modules\Core\Models\ContactImportRun;
+use App\Modules\Core\Jobs\EmitContactImportAutomationEventsJob;
 use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportTreatmentRegistry;
@@ -273,6 +274,14 @@ final class ContactImportBatchProcessor
 
         if (is_string($csvPath) && $csvPath !== '') {
             Storage::disk('local')->delete($csvPath);
+        }
+
+        if (ContactImportBatch::query()
+            ->whereKey($contactImportBatchId)
+            ->where('status', ContactImportBatch::STATUS_COMPLETED)
+            ->exists()
+        ) {
+            EmitContactImportAutomationEventsJob::dispatch($contactImportBatchId);
         }
     }
 

@@ -583,6 +583,16 @@ class FlowRoutePresentationResolver
             'task.completed' => 'a task is completed',
             'permission_invitation.accepted' => 'someone confirms their communication preferences',
             'inbound_message.normal_reply' => 'someone replies to a message',
+            'contact.created' => 'a contact is added manually',
+            'contact.imported' => 'a contact is imported',
+            'contact.tag_added' => 'a tag is added to a contact',
+            'form.submitted' => 'someone submits a form',
+            'appointment.scheduled' => 'an appointment is scheduled',
+            'appointment.confirmed' => 'an appointment is confirmed',
+            'appointment.rescheduled' => 'an appointment is rescheduled',
+            'appointment.canceled' => 'an appointment is canceled',
+            'appointment.completed' => 'an appointment is completed',
+            'appointment.no_show' => 'someone misses an appointment',
             default => Str::of($eventKey)->replace(['.', '_'], ' ')->lower()->toString(),
         };
     }
@@ -665,6 +675,9 @@ class FlowRoutePresentationResolver
             'task' => 'tasks',
             'permission_invitation' => 'messaging',
             'inbound_message' => 'inbound_messaging',
+            'contact' => 'core',
+            'form' => 'forms',
+            'appointment' => 'scheduling',
             default => Str::before($eventKey, '.') ?: 'other',
         };
     }

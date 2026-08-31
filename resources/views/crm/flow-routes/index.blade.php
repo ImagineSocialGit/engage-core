@@ -9,6 +9,8 @@
         x-data="{
             openRouteEditor: @js($openRouteEditorId),
             openCreateRoute: @js((bool) $openCreateRoute),
+            createTriggerKey: @js($createRouteTriggerKey),
+            createTriggerValues: @js($createRouteTriggerValues),
             openRoute(id) {
                 this.openRouteEditor = Number(id);
                 const url = new URL(window.location.href);
@@ -338,7 +340,9 @@
 
                                                             <ul class="mt-2 space-y-2">
                                                                 @foreach($event['assigned_items'] as $action)
-                                                                    @php($point = $action['presented_points'][0] ?? null)
+                                                                    @php
+                                                                        $point = $action['presented_points'][0] ?? null;
+                                                                    @endphp
 
                                                                     <li class="rounded-xl px-3 py-3 ring-1 {{ $point ? module_tone($point['module_key'], 'item') : 'bg-slate-50 ring-slate-200' }}">
                                                                         <div class="flex gap-3 text-sm leading-6 text-slate-900">
@@ -367,7 +371,9 @@
 
                                                             <ul class="mt-2 space-y-2">
                                                                 @foreach($event['available_items'] as $action)
-                                                                    @php($point = $action['presented_points'][0] ?? null)
+                                                                    @php
+                                                                        $point = $action['presented_points'][0] ?? null;
+                                                                    @endphp
 
                                                                     <li class="rounded-xl px-3 py-3 opacity-80 ring-1 {{ $point ? module_tone($point['module_key'], 'item') : 'bg-slate-50 ring-slate-200' }}">
                                                                         <div class="flex gap-3 text-sm leading-6 text-slate-800">
@@ -430,7 +436,7 @@
                         <div>
                             <p class="text-xs font-bold uppercase tracking-[0.14em] text-orange-700">Flow Routes</p>
                             <h2 id="create-route-heading" class="mt-1 text-xl font-semibold tracking-tight text-slate-950">Create Route</h2>
-                            <p class="mt-2 text-sm leading-6 text-slate-600">Start with the Status that should make this Route eligible. You will build the Route before assigning it.</p>
+                            <p class="mt-2 text-sm leading-6 text-slate-600">Choose the real-world activity that should start this Route. You will build the Route before assigning it.</p>
                         </div>
                         <button type="button" x-on:click="closeCreate()" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-950" aria-label="Close Create Route">
                             <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18" /></svg>
@@ -448,16 +454,67 @@
                         </div>
 
                         <div>
-                            <label for="create-route-status" class="text-sm font-semibold text-slate-900">Contact Status <span class="text-red-700" aria-hidden="true">*</span></label>
-                            <select id="create-route-status" name="contact_status_id" required class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200" data-flow-route-create-status>
-                                <option value="">Choose a Status</option>
-                                @foreach($createRouteContactStatuses as $status)
-                                    <option value="{{ $status->getKey() }}" @selected((string) old('contact_status_id', $createRouteStatusId) === (string) $status->getKey())>{{ $status->name }}</option>
+                            <label for="create-route-trigger" class="text-sm font-semibold text-slate-900">Runs when <span class="text-red-700" aria-hidden="true">*</span></label>
+                            <select id="create-route-trigger" name="trigger_authoring_key" required x-model="createTriggerKey" class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200" data-flow-route-create-trigger>
+                                <option value="">Choose what starts this Route</option>
+                                @foreach(collect($createRouteTriggers)->groupBy('module_label') as $moduleLabel => $moduleTriggers)
+                                    <optgroup label="{{ $moduleLabel }}">
+                                        @foreach($moduleTriggers as $trigger)
+                                            <option value="{{ $trigger['key'] }}" @selected((string) old('trigger_authoring_key', $createRouteTriggerKey) === (string) $trigger['key'])>{{ $trigger['name'] }}</option>
+                                        @endforeach
+                                    </optgroup>
                                 @endforeach
                             </select>
-                            <p class="mt-1 text-xs leading-5 text-slate-600">This defines who the Route is for. Assignment is a separate safety step.</p>
-                            @error('contact_status_id')<p class="mt-1 text-sm text-red-700">{{ $message }}</p>@enderror
+                            <p class="mt-1 text-xs leading-5 text-slate-600">Only activities available in this CRM are shown.</p>
+                            @error('trigger_authoring_key')<p class="mt-1 text-sm text-red-700">{{ $message }}</p>@enderror
                         </div>
+
+                        @foreach($createRouteTriggers as $trigger)
+                            <section
+                                x-show="createTriggerKey === @js($trigger['key'])"
+                                class="space-y-4 rounded-2xl border px-4 py-4 {{ module_tone($trigger['module_key'], 'panel') }}"
+                                data-flow-route-trigger-fields="{{ $trigger['key'] }}"
+                            >
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-950">{{ $trigger['name'] }}</p>
+                                    <p class="mt-1 text-xs leading-5 text-slate-600">{{ $trigger['description'] }}</p>
+                                </div>
+
+                                @foreach($trigger['fields'] as $field)
+                                    @php
+                                        $fieldName = (string) $field['name'];
+                                        $fieldId = 'create-route-'.str_replace('_', '-', $fieldName);
+                                        $fieldValue = old($fieldName, $createRouteTriggerValues[$fieldName] ?? '');
+                                        $fieldRequired = (bool) ($field['required'] ?? false);
+                                    @endphp
+                                    <div>
+                                        <label for="{{ $fieldId }}" class="text-sm font-semibold text-slate-900">
+                                            {{ $field['label'] }}
+                                            @if($fieldRequired)<span class="text-red-700" aria-hidden="true">*</span>@endif
+                                        </label>
+
+                                        <select
+                                            id="{{ $fieldId }}"
+                                            name="{{ $fieldName }}"
+                                            x-model="createTriggerValues.{{ $fieldName }}"
+                                            x-bind:disabled="createTriggerKey !== @js($trigger['key'])"
+                                            @if($fieldRequired) x-bind:required="createTriggerKey === @js($trigger['key'])" @endif
+                                            class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200"
+                                        >
+                                            <option value="">{{ $field['placeholder'] ?? 'Choose an option' }}</option>
+                                            @foreach(($field['options'] ?? []) as $option)
+                                                <option value="{{ $option['value'] }}" @selected((string) $fieldValue === (string) $option['value'])>{{ $option['label'] }}</option>
+                                            @endforeach
+                                        </select>
+
+                                        @if(filled($field['help'] ?? null))
+                                            <p class="mt-1 text-xs leading-5 text-slate-600">{{ $field['help'] }}</p>
+                                        @endif
+                                        @error($fieldName)<p class="mt-1 text-sm text-red-700">{{ $message }}</p>@enderror
+                                    </div>
+                                @endforeach
+                            </section>
+                        @endforeach
 
                         <div>
                             <label for="create-route-description" class="text-sm font-semibold text-slate-900">Description <span class="font-normal text-slate-500">Optional</span></label>
@@ -466,7 +523,7 @@
                         </div>
 
                         <div class="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
-                            <span class="font-semibold">Safe by default:</span> creating this Route does not assign it to the Status. Add and review its Points first, then choose it in Assignments when it is ready to run.
+                            <span class="font-semibold">Safe by default:</span> creating this Route does not turn it on for that activity. Add and review its Points first, then choose it in Assignments when it is ready to run.
                         </div>
 
                         <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">

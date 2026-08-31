@@ -2,6 +2,7 @@
 
 namespace App\Modules\Scheduling\Providers;
 
+use App\Modules\Scheduling\Automation\AppointmentAutomationTriggerAuthoringContributor;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Scheduling\Console\Commands\SyncAppointmentCommunicationsCatalogCommand;
 use App\Modules\Scheduling\EventDefinitions\SchedulingPublicBookingEventDefinitionContributor;
@@ -20,6 +21,10 @@ class SchedulingModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->tag([
+            AppointmentAutomationTriggerAuthoringContributor::class,
+        ], 'automation.trigger_authoring_contributors');
+
         $this->app->tag(
             SchedulingSetupValidationContributor::class,
             'setup.validation_contributors',

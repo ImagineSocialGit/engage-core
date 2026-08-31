@@ -2,6 +2,7 @@
 
 namespace App\Modules\Forms\Providers;
 
+use App\Modules\Forms\Automation\FormSubmissionAutomationTriggerAuthoringContributor;
 use App\Modules\Forms\ConfigContracts\FormDefinitionConfigContract;
 use App\Modules\Forms\ConfigContracts\FormDefinitionConfigContractTargetProvider;
 use App\Modules\Forms\Console\Commands\IssueExternalFormIntakeSecretCommand;
@@ -13,6 +14,10 @@ class FormsModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->tag([
+            FormSubmissionAutomationTriggerAuthoringContributor::class,
+        ], 'automation.trigger_authoring_contributors');
+
         $this->app->tag(
             FormsSetupValidationContributor::class,
             'setup.validation_contributors',

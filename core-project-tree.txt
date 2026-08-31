@@ -245,6 +245,7 @@
 │   │   │   │   ├── AddContactTagAutomationActionHandler.php
 │   │   │   │   ├── ContactTagAutomationPointAuthoringContributor.php
 │   │   │   │   ├── ContactTagAutomationPointDefinitionContributor.php
+│   │   │   │   ├── CoreAutomationTriggerAuthoringContributor.php
 │   │   │   │   └── RemoveContactTagAutomationActionHandler.php
 │   │   │   ├── Capabilities
 │   │   │   │   └── CoreAutomationCapabilityContributor.php
@@ -296,8 +297,11 @@
 │   │   │   │       ├── ContactStatusImportTreatmentTarget.php
 │   │   │   │       └── ContactTagsImportTreatmentTarget.php
 │   │   │   ├── Jobs
+│   │   │   │   ├── EmitContactImportAutomationEventsJob.php
 │   │   │   │   ├── FinalizeContactImportBatchJob.php
 │   │   │   │   └── ProcessContactImportBatchChunkJob.php
+│   │   │   ├── Listeners
+│   │   │   │   └── RecordManualContactCreatedAutomationEvent.php
 │   │   │   ├── Models
 │   │   │   │   ├── BusinessCalendarExclusion.php
 │   │   │   │   ├── BusinessCalendar.php
@@ -503,6 +507,8 @@
 │   │   │   ├── Actions
 │   │   │   │   ├── CreateFormSubmissionAction.php
 │   │   │   │   └── SyncFormPresetsAction.php
+│   │   │   ├── Automation
+│   │   │   │   └── FormSubmissionAutomationTriggerAuthoringContributor.php
 │   │   │   ├── ConfigContracts
 │   │   │   │   ├── FormDefinitionConfigContract.php
 │   │   │   │   └── FormDefinitionConfigContractTargetProvider.php
@@ -590,6 +596,7 @@
 │   │   │   ├── Automation
 │   │   │   │   ├── InboundMessagingAutomationPointAuthoringContributor.php
 │   │   │   │   ├── InboundMessagingAutomationPointDefinitionContributor.php
+│   │   │   │   ├── InboundReplyAutomationTriggerAuthoringContributor.php
 │   │   │   │   └── MarkInboundMessageAutoRespondedActionHandler.php
 │   │   │   ├── Capabilities
 │   │   │   │   └── InboundMessagingAutomationCapabilityContributor.php
@@ -1087,6 +1094,8 @@
 │   │   │   │   ├── RescheduleAppointmentAction.php
 │   │   │   │   ├── RescheduleAppointmentToSlotAction.php
 │   │   │   │   └── TransitionAppointmentStatusAction.php
+│   │   │   ├── Automation
+│   │   │   │   └── AppointmentAutomationTriggerAuthoringContributor.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
 │   │   │   │       └── SyncAppointmentCommunicationsCatalogCommand.php
@@ -1295,6 +1304,8 @@
 │   │   │   │   ├── SyncWebinarScheduleProfilesAction.php
 │   │   │   │   ├── SyncWebinarSeriesFromProviderAction.php
 │   │   │   │   └── UpdateWebinarSeriesMessageTemplateAction.php
+│   │   │   ├── Automation
+│   │   │   │   └── WebinarAutomationTriggerAuthoringContributor.php
 │   │   │   ├── ConfigContracts
 │   │   │   │   ├── WebinarMessageAreaConfigContract.php
 │   │   │   │   ├── WebinarPostEventConfigContract.php
@@ -1512,6 +1523,13 @@
 │       │   │   └── AutomationOpportunity.php
 │       │   └── Services
 │       │       └── AutomationBehaviorFingerprintBuilder.php
+│       ├── AutomationTriggers
+│       │   ├── AutomationTriggerAuthoringRegistry.php
+│       │   ├── Contracts
+│       │   │   └── AutomationTriggerAuthoringContributor.php
+│       │   └── Data
+│       │       ├── AutomationTriggerAuthoringDefinition.php
+│       │       └── AutomationTriggerSelection.php
 │       ├── Caching
 │       │   └── CacheKey.php
 │       ├── Clients
@@ -2636,6 +2654,7 @@
 │   │   │   ├── FlowRoutesModelSchemaTest.php
 │   │   │   ├── FlowRoutesSetupValidationContributorTest.php
 │   │   │   ├── FlowRouteTransitionSelectionTest.php
+│   │   │   ├── FlowRouteTriggerAuthoringTest.php
 │   │   │   ├── FlowRouteTriggerBindingTest.php
 │   │   │   ├── HandleContactWorkflowStatusChangedTest.php
 │   │   │   └── SyncFlowRoutePresetsActionTest.php
@@ -2651,6 +2670,7 @@
 │   │   │   ├── FormsFoundationTest.php
 │   │   │   ├── FormsSetupValidationContributorTest.php
 │   │   │   ├── FormsSurfaceTest.php
+│   │   │   ├── FormSubmissionAutomationEventTest.php
 │   │   │   ├── FormSubmissionConsentIntentResolverTest.php
 │   │   │   ├── FormSubmissionMessagingConsentBridgeTest.php
 │   │   │   ├── FormSubmissionVerificationTest.php
@@ -3027,4 +3047,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-712 directories, 2316 files
+719 directories, 2329 files

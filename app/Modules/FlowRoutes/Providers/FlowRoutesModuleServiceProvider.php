@@ -27,6 +27,7 @@ use App\Modules\FlowRoutes\Services\ReplyProfiles\FlowRouteReplyProfileDependenc
 use App\Modules\FlowRoutes\Validation\FlowRoutesSetupValidationContributor;
 use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
 use App\Support\AutomationCapabilities\AutomationPointAuthoringRegistry;
+use App\Support\AutomationTriggers\AutomationTriggerAuthoringRegistry;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use App\Support\ReplyHandling\ReplyProfileDependencyRegistry;
 use Illuminate\Support\Facades\Event;
@@ -36,6 +37,12 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->singleton(AutomationTriggerAuthoringRegistry::class, function ($app): AutomationTriggerAuthoringRegistry {
+            return new AutomationTriggerAuthoringRegistry(
+                contributors: $app->tagged('automation.trigger_authoring_contributors'),
+            );
+        });
+
         $this->app->tag(
             FlowRoutePresetDefinitionConfigContract::class,
             'config.contracts',

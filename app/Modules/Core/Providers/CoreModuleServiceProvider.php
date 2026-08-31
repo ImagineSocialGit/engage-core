@@ -5,6 +5,7 @@ namespace App\Modules\Core\Providers;
 use App\Modules\Core\Automation\AddContactTagAutomationActionHandler;
 use App\Modules\Core\Automation\ContactTagAutomationPointAuthoringContributor;
 use App\Modules\Core\Automation\ContactTagAutomationPointDefinitionContributor;
+use App\Modules\Core\Automation\CoreAutomationTriggerAuthoringContributor;
 use App\Modules\Core\Automation\RemoveContactTagAutomationActionHandler;
 use App\Modules\Core\Capabilities\CoreAutomationCapabilityContributor;
 use App\Modules\Core\ConfigContracts\ContactStatusConfigContractTargetProvider;
@@ -16,6 +17,8 @@ use App\Modules\Core\Import\Treatments\ContactStatusImportTreatmentTarget;
 use App\Modules\Core\Import\Treatments\ContactTagsImportTreatmentTarget;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactTag;
+use App\Modules\Core\Events\ManualContactCreated;
+use App\Modules\Core\Listeners\RecordManualContactCreatedAutomationEvent;
 use App\Modules\Core\Observers\ContactEligibilityFactObserver;
 use App\Modules\Core\Observers\ContactTagEligibilityFactObserver;
 use App\Modules\Core\Services\Contacts\Filters\ImportBatchContactFilterCriterion;
@@ -34,6 +37,7 @@ use App\Modules\Core\TokenContracts\SiteSettingTokenSourceProvider;
 use App\Modules\Core\Validation\CoreSetupValidationContributor;
 use App\Support\ProcessHighway\ProcessHighwayEntryRampInspector;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Event;
 
 class CoreModuleServiceProvider extends ServiceProvider
 {
@@ -67,6 +71,10 @@ class CoreModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             ContactTagAutomationPointAuthoringContributor::class,
         ], 'automation.point_authoring_contributors');
+
+        $this->app->tag([
+            CoreAutomationTriggerAuthoringContributor::class,
+        ], 'automation.trigger_authoring_contributors');
 
         $this->app->tag([
             AddContactTagAutomationActionHandler::class,
@@ -202,6 +210,10 @@ class CoreModuleServiceProvider extends ServiceProvider
     {
         Contact::observe(ContactEligibilityFactObserver::class);
         ContactTag::observe(ContactTagEligibilityFactObserver::class);
+        Event::listen(
+            ManualContactCreated::class,
+            RecordManualContactCreatedAutomationEvent::class,
+        );
 
         $treatments
             ->registerTarget(ContactStatusImportTreatmentTarget::class)

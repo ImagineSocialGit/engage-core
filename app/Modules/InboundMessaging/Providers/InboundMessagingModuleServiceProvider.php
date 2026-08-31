@@ -3,6 +3,7 @@
 namespace App\Modules\InboundMessaging\Providers;
 
 use App\Modules\InboundMessaging\Automation\InboundMessagingAutomationPointDefinitionContributor;
+use App\Modules\InboundMessaging\Automation\InboundReplyAutomationTriggerAuthoringContributor;
 use App\Modules\InboundMessaging\Automation\MarkInboundMessageAutoRespondedActionHandler;
 use App\Modules\InboundMessaging\Capabilities\InboundMessagingAutomationCapabilityContributor;
 use App\Modules\InboundMessaging\Console\Commands\SyncInboundReplyProfilesCommand;
@@ -27,6 +28,10 @@ class InboundMessagingModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->tag([
+            InboundReplyAutomationTriggerAuthoringContributor::class,
+        ], 'automation.trigger_authoring_contributors');
+
         $this->app->tag([
             InboundMessagingAutomationCapabilityContributor::class,
         ], 'automation.capability_contributors');

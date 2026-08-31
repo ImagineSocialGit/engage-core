@@ -16,6 +16,8 @@ use App\Modules\Forms\Services\FormSubmissionValidator;
 use App\Modules\Forms\Services\FormSubmissionVerificationPolicy;
 use App\Modules\Forms\Services\PublishedFormResolver;
 use App\Support\ModuleIntegrations\Forms\FormSubmissionConsentBridge;
+use App\Support\AutomationEvents\Data\AutomationEventData;
+use App\Support\AutomationEvents\Services\AutomationEventOutbox;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use JsonException;
@@ -29,6 +31,7 @@ final class CreateFormSubmissionAction
         private readonly FormSubmissionConsentIntentResolver $consentIntents,
         private readonly FormSubmissionConsentBridge $consentBridge,
         private readonly FormSubmissionVerificationPolicy $verifications,
+        private readonly AutomationEventOutbox $automationEvents,
     ) {}
 
     public function handle(FormSubmissionInput $input): FormSubmissionResult
@@ -144,6 +147,30 @@ final class CreateFormSubmissionAction
             contact: $contact,
             payload: $normalized->payload,
             intents: $consentIntents,
+        );
+
+        $this->automationEvents->record(
+            AutomationEventData::forSubject(
+                eventKey: 'form.submitted',
+                subject: $submission,
+                contactId: $contact?->getKey(),
+                occurredAt: $submission->submitted_at,
+                payload: [
+                    'form' => [
+                        'id' => $form->definitionId,
+                        'key' => $form->key,
+                        'version_id' => $form->versionId,
+                        'version' => $form->versionNumber,
+                    ],
+                    'form_submission' => [
+                        'id' => (int) $submission->getKey(),
+                        'status' => (string) $submission->status,
+                        'source' => $submission->source,
+                    ],
+                ],
+                meta: ['source_module' => 'forms'],
+            ),
+            idempotencyKey: 'form-submitted:'.$submission->getKey(),
         );
 
         return new FormSubmissionResult(

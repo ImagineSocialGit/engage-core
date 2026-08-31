@@ -3,7 +3,7 @@
 namespace App\Modules\FlowRoutes\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Core\Models\ContactStatus;
+use App\Modules\Core\Automation\CoreAutomationTriggerAuthoringContributor;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Requests\StoreFlowRouteRequest;
 use App\Modules\FlowRoutes\Services\FlowRouteEditorCatalog;
@@ -13,12 +13,14 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use App\Support\AutomationTriggers\AutomationTriggerAuthoringRegistry;
 
 class FlowRouteController extends Controller
 {
     public function __construct(
         private readonly FlowRoutePresentationResolver $presentation,
         private readonly FlowRouteEditorCatalog $editorCatalog,
+        private readonly AutomationTriggerAuthoringRegistry $triggerAuthoring,
     ) {}
 
     public function index(Request $request): View
@@ -100,14 +102,28 @@ class FlowRouteController extends Controller
             ->values();
 
         $requestedEditorId = $request->integer('edit_route');
-        $contactStatuses = ContactStatus::query()
-            ->active()
-            ->ordered()
-            ->get();
         $requestedStatusKey = trim((string) $request->query('status', ''));
-        $createRouteStatus = $requestedStatusKey !== ''
-            ? $contactStatuses->firstWhere('key', $requestedStatusKey)
+        $createRouteTriggers = $this->triggerAuthoring->presentation();
+        $statusTrigger = collect($createRouteTriggers)->firstWhere(
+            'key',
+            CoreAutomationTriggerAuthoringContributor::CONTACT_STATUS,
+        );
+        $selectedStatusOption = $requestedStatusKey !== '' && is_array($statusTrigger)
+            ? collect($statusTrigger['fields'][0]['options'] ?? [])->firstWhere('key', $requestedStatusKey)
             : null;
+        $createRouteStatusId = is_array($selectedStatusOption)
+            ? ($selectedStatusOption['value'] ?? null)
+            : null;
+        $createRouteTriggerValues = collect($createRouteTriggers)
+            ->flatMap(fn (array $trigger): array => $trigger['fields'] ?? [])
+            ->mapWithKeys(fn (array $field): array => [
+                (string) $field['name'] => old((string) $field['name'], ''),
+            ])
+            ->all();
+        $createRouteTriggerValues['contact_status_id'] = old(
+            'contact_status_id',
+            $createRouteStatusId ?? ($createRouteTriggerValues['contact_status_id'] ?? ''),
+        );
 
         return view('crm.flow-routes.index', [
             'routes' => $routes,
@@ -116,8 +132,14 @@ class FlowRouteController extends Controller
             'openRouteEditorId' => $routeEditors->has($requestedEditorId) ? $requestedEditorId : null,
             'openCreateRoute' => $request->boolean('create')
                 || (string) $request->session()->getOldInput('_flow_route_create') === '1',
-            'createRouteContactStatuses' => $contactStatuses,
-            'createRouteStatusId' => $createRouteStatus?->getKey(),
+            'createRouteTriggers' => $createRouteTriggers,
+            'createRouteTriggerKey' => old(
+                'trigger_authoring_key',
+                $requestedStatusKey !== ''
+                    ? CoreAutomationTriggerAuthoringContributor::CONTACT_STATUS
+                    : ($createRouteTriggers[0]['key'] ?? null),
+            ),
+            'createRouteTriggerValues' => $createRouteTriggerValues,
             'automaticActions' => $automaticActions,
             'routeSummary' => [
                 'routes' => $routes->count(),
@@ -131,13 +153,14 @@ class FlowRouteController extends Controller
 
     public function store(StoreFlowRouteRequest $request): RedirectResponse
     {
-        $status = ContactStatus::query()
-            ->active()
-            ->findOrFail($request->contactStatusId());
+        $selection = $this->triggerAuthoring->selection(
+            $request->triggerAuthoringKey(),
+            $request->validated(),
+        );
 
         $route = FlowRoute::query()->create([
             'key' => 'crm_route_'.Str::lower((string) Str::uuid()),
-            'contact_status_id' => $status->getKey(),
+            'contact_status_id' => $selection->contactStatusId,
             'owner_type' => null,
             'owner_id' => null,
             'owner_group' => 'client',
@@ -145,8 +168,8 @@ class FlowRouteController extends Controller
             'description' => $request->routeDescription(),
             'version' => 1,
             'is_current_version' => true,
-            'trigger_type' => FlowRoute::TRIGGER_CONTACT_STATUS,
-            'trigger_key' => (string) $status->key,
+            'trigger_type' => $selection->triggerType,
+            'trigger_key' => $selection->triggerKey,
             'is_active' => true,
             'source_version' => null,
             'is_customized' => true,
@@ -154,6 +177,10 @@ class FlowRouteController extends Controller
             'meta' => [
                 'authoring' => [
                     'source' => 'crm',
+                    'trigger_authoring_key' => $request->triggerAuthoringKey(),
+                ],
+                'definition' => [
+                    'entry_conditions' => $selection->entryConditions,
                 ],
             ],
         ]);
