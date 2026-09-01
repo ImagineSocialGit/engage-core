@@ -19,6 +19,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactTag;
 use App\Modules\Core\Events\ManualContactCreated;
 use App\Modules\Core\Listeners\RecordManualContactCreatedAutomationEvent;
+use App\Modules\Core\ModuleFacts\CoreContactModuleFactProvider;
 use App\Modules\Core\Observers\ContactEligibilityFactObserver;
 use App\Modules\Core\Observers\ContactTagEligibilityFactObserver;
 use App\Modules\Core\Services\Contacts\Filters\ImportBatchContactFilterCriterion;
@@ -36,6 +37,7 @@ use App\Modules\Core\TokenContracts\ContactTokenSourceProvider;
 use App\Modules\Core\TokenContracts\SiteSettingTokenSourceProvider;
 use App\Modules\Core\Validation\CoreSetupValidationContributor;
 use App\Support\ProcessHighway\ProcessHighwayEntryRampInspector;
+use App\Support\ModuleFacts\ModuleFactRegistry;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Event;
 
@@ -203,6 +205,11 @@ class CoreModuleServiceProvider extends ServiceProvider
         $this->app->tag(
             SiteSettingTokenSourceProvider::class,
             'token.source_providers',
+        );
+
+        $this->app->tag(
+            CoreContactModuleFactProvider::class,
+            ModuleFactRegistry::PROVIDER_TAG,
         );
     }
 

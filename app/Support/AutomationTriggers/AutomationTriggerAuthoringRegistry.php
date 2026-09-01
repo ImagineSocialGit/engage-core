@@ -65,6 +65,12 @@ final class AutomationTriggerAuthoringRegistry
     }
 
     /** @return array<int, string> */
+    public function registeredKeys(): array
+    {
+        return array_keys($this->definitions);
+    }
+
+    /** @return array<int, string> */
     public function availableKeys(): array
     {
         return array_map(

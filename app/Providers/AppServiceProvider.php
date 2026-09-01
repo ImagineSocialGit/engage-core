@@ -60,6 +60,7 @@ use App\Support\SetupValidation\Contributors\ModuleDependenciesSetupValidationCo
 use App\Support\SetupValidation\Contributors\ModuleMigrationsSetupValidationContributor;
 use App\Support\SetupValidation\Contributors\PresetCompositionSetupValidationContributor;
 use App\Support\SetupValidation\Contributors\ReferenceRegistrySetupValidationContributor;
+use App\Support\ModuleFacts\Validation\ModuleFactsSetupValidationContributor;
 use App\Support\SetupValidation\SetupValidationManager;
 use App\Support\TokenContracts\TokenContractRegistry;
 use Illuminate\Console\Scheduling\Schedule;
@@ -243,6 +244,7 @@ class AppServiceProvider extends ServiceProvider
             ModuleMigrationsSetupValidationContributor::class,
             PresetCompositionSetupValidationContributor::class,
             ReferenceRegistrySetupValidationContributor::class,
+            ModuleFactsSetupValidationContributor::class,
         ], 'setup.validation_contributors');
 
         $enabledModules = $this->app->make(ModuleManager::class)->enabledKeysWithDependencies();

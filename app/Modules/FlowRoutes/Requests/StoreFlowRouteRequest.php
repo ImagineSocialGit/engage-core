@@ -23,13 +23,13 @@ class StoreFlowRouteRequest extends FormRequest
             'trigger_authoring_key' => [
                 'required',
                 'string',
-                Rule::in($triggers->availableKeys()),
+                Rule::in($triggers->registeredKeys()),
             ],
         ];
 
         $key = trim((string) $this->input('trigger_authoring_key'));
 
-        if ($key !== '' && in_array($key, $triggers->availableKeys(), true)) {
+        if ($key !== '' && in_array($key, $triggers->registeredKeys(), true)) {
             $rules = array_replace($rules, $triggers->rules($key));
         }
 

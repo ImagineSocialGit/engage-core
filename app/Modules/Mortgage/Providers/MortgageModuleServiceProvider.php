@@ -5,13 +5,18 @@ namespace App\Modules\Mortgage\Providers;
 use App\Modules\Core\Data\Contacts\ContactImportField;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Mortgage\Import\MortgageContactImportHandler;
+use App\Modules\Mortgage\ModuleFacts\MortgageModuleFactProvider;
+use App\Support\ModuleFacts\ModuleFactRegistry;
 use Illuminate\Support\ServiceProvider;
 
 class MortgageModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->tag(
+            MortgageModuleFactProvider::class,
+            ModuleFactRegistry::PROVIDER_TAG,
+        );
     }
 
     public function boot(ContactImportRegistry $contactImports): void

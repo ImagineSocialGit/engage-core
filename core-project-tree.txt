@@ -241,6 +241,7 @@
 │   │   │   │   │   └── UpdateContactStatusAction.php
 │   │   │   │   └── ContactStatuses
 │   │   │   │       └── SyncContactStatusPresetsAction.php
+│   │   │   ├── AnnualDates
 │   │   │   ├── Automation
 │   │   │   │   ├── AddContactTagAutomationActionHandler.php
 │   │   │   │   ├── ContactTagAutomationPointAuthoringContributor.php
@@ -313,6 +314,9 @@
 │   │   │   │   ├── ContactTag.php
 │   │   │   │   ├── Note.php
 │   │   │   │   └── SiteSetting.php
+│   │   │   ├── ModuleFacts
+│   │   │   │   ├── ContactBirthdayModuleFactResolver.php
+│   │   │   │   └── CoreContactModuleFactProvider.php
 │   │   │   ├── Observers
 │   │   │   │   ├── ContactEligibilityFactObserver.php
 │   │   │   │   └── ContactTagEligibilityFactObserver.php
@@ -958,6 +962,7 @@
 │   │   │       └── MessagingSetupValidationContributor.php
 │   │   ├── Mortgage
 │   │   │   ├── Actions
+│   │   │   ├── AnnualDates
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   ├── Data
@@ -975,6 +980,9 @@
 │   │   │   │   ├── MortgageRealtorProductionSnapshot.php
 │   │   │   │   ├── MortgageRealtorProfile.php
 │   │   │   │   └── MortgageStage.php
+│   │   │   ├── ModuleFacts
+│   │   │   │   ├── MortgageHomePurchaseDateModuleFactResolver.php
+│   │   │   │   └── MortgageModuleFactProvider.php
 │   │   │   ├── Providers
 │   │   │   │   └── MortgageModuleServiceProvider.php
 │   │   │   ├── Requests
@@ -1479,6 +1487,9 @@
 │   │   │   └── IntegrationsModuleServiceProvider.php
 │   │   └── PlatformMigrationServiceProvider.php
 │   └── Support
+│       ├── AnnualDates
+│       │   ├── Contracts
+│       │   └── Data
 │       ├── AutomationCapabilities
 │       │   ├── AutomationActionRegistry.php
 │       │   ├── AutomationCapabilityRegistry.php
@@ -1576,6 +1587,21 @@
 │       │   └── EnvironmentVariableCatalog.php
 │       ├── Guidance
 │       │   └── FirstUseGuidance.php
+│       ├── ModuleFacts
+│       │   ├── Contracts
+│       │   │   ├── ModuleFactProvider.php
+│       │   │   ├── ModuleFactQueryResolver.php
+│       │   │   └── ModuleFactValueResolver.php
+│       │   ├── Data
+│       │   │   ├── ModuleFactDefinition.php
+│       │   │   └── ModuleFactQuery.php
+│       │   ├── Enums
+│       │   │   ├── ModuleFactCapability.php
+│       │   │   ├── ModuleFactQueryOperator.php
+│       │   │   └── ModuleFactType.php
+│       │   ├── ModuleFactRegistry.php
+│       │   └── Validation
+│       │       └── ModuleFactsSetupValidationContributor.php
 │       ├── ModuleIntegrations
 │       │   ├── Forms
 │       │   │   ├── Contracts
@@ -1687,6 +1713,8 @@
 │       │   │   ├── ReportingObservationResult.php
 │       │   │   ├── ReportingProjectionFact.php
 │       │   │   └── ReportingProjectionWindow.php
+│       │   ├── PaidAdTrackingLinkGenerator.php
+│       │   ├── PaidAdTrackingSetupGenerator.php
 │       │   ├── ReportingEventDefinitionRegistry.php
 │       │   ├── ReportingProjectionFactRegistry.php
 │       │   └── Services
@@ -2812,6 +2840,8 @@
 │   │   │   ├── SmsSendGuardTest.php
 │   │   │   ├── TeamMemberNotificationPreferenceTest.php
 │   │   │   └── TestingSurfaceBackgroundIsolationTest.php
+│   │   ├── ModuleFacts
+│   │   │   └── ModuleFactRegistryTest.php
 │   │   ├── Modules
 │   │   │   ├── ContactShowModuleVisibilityTest.php
 │   │   │   ├── MigrationContractSourceOfTruthTest.php
@@ -2826,7 +2856,8 @@
 │   │   │   └── PlatformMigrationFoundationTest.php
 │   │   ├── Mortgage
 │   │   │   ├── MortgageContactImportHandlerTest.php
-│   │   │   └── MortgageDomainFoundationTest.php
+│   │   │   ├── MortgageDomainFoundationTest.php
+│   │   │   └── MortgageModuleFactProviderTest.php
 │   │   ├── Observability
 │   │   │   ├── ObservabilityConfigurationContractTest.php
 │   │   │   └── RequestCorrelationTest.php
@@ -2989,6 +3020,7 @@
 │   │   │   ├── WebinarDevControllerEnvironmentGuardTest.php
 │   │   │   ├── WebinarFunnelFactContributorTest.php
 │   │   │   ├── WebinarJoinBrowserProofTest.php
+│   │   │   ├── WebinarLinkModalTest.php
 │   │   │   ├── WebinarMessageAreaRegistryTest.php
 │   │   │   ├── WebinarMessageChainReviewWorkspaceTest.php
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
@@ -3047,4 +3079,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-719 directories, 2329 files
+732 directories, 2348 files

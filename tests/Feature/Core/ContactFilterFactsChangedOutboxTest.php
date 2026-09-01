@@ -41,7 +41,7 @@ class ContactFilterFactsChangedOutboxTest extends TestCase
         $this->assertSame(0, AutomationEventOutboxEvent::query()->count());
     }
 
-    public function test_contact_tag_create_and_delete_emit_transient_tag_fact_events_without_automation_ledger_history(): void
+    public function test_contact_tag_changes_emit_transient_filter_events_while_tag_added_remains_a_durable_automation_trigger(): void
     {
         $contact = Contact::withoutEvents(fn () => Contact::factory()->create());
 
@@ -66,6 +66,11 @@ class ContactFilterFactsChangedOutboxTest extends TestCase
             ['VIP'],
             data_get($events->last()[0]->changes, 'removed'),
         );
-        $this->assertSame(0, AutomationEventOutboxEvent::query()->count());
+        $this->assertSame(1, AutomationEventOutboxEvent::query()->count());
+
+        $outboxEvent = AutomationEventOutboxEvent::query()->sole();
+
+        $this->assertSame('contact.tag_added', $outboxEvent->event_key);
+        $this->assertSame($contact->getKey(), $outboxEvent->contact_id);
     }
 }
