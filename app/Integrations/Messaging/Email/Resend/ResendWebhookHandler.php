@@ -2,10 +2,10 @@
 
 namespace App\Integrations\Messaging\Email\Resend;
 
-use App\Modules\InboundMessaging\Actions\Email\HandleInboundEmailWebhookAction;
 use App\Modules\InboundMessaging\Actions\Email\RecordInboundEmailAction;
 use App\Modules\InboundMessaging\Contracts\Email\EmailWebhookHandler;
 use App\Modules\InboundMessaging\Services\Email\EmailWebhookPayload;
+use App\Modules\Messaging\Actions\HandleEmailProviderEventAction;
 use App\Modules\Messaging\Models\MessageSuppression;
 use App\Support\Webhooks\Services\WebhookInbox;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -14,7 +14,7 @@ class ResendWebhookHandler implements EmailWebhookHandler
 {
     public function __construct(
         private readonly ResendWebhookVerifier $verifier,
-        private readonly HandleInboundEmailWebhookAction $handleInboundEmailWebhookAction,
+        private readonly HandleEmailProviderEventAction $providerEvents,
         private readonly RecordInboundEmailAction $recordInboundEmailAction,
         private readonly ResendReceivedEmailClient $receivedEmailClient,
         private readonly WebhookInbox $webhookInbox,
@@ -81,7 +81,7 @@ class ResendWebhookHandler implements EmailWebhookHandler
                     return ['http_status' => 204];
                 }
 
-                $this->handleInboundEmailWebhookAction->handle(
+                $this->providerEvents->handle(
                     event: $payload->payload,
                     sourceEventId: $eventId,
                     provider: MessageSuppression::PROVIDER_RESEND,

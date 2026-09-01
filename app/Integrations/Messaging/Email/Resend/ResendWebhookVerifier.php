@@ -2,6 +2,8 @@
 
 namespace App\Integrations\Messaging\Email\Resend;
 
+use Illuminate\Support\Carbon;
+
 class ResendWebhookVerifier
 {
     /**
@@ -12,14 +14,15 @@ class ResendWebhookVerifier
         $eventId = $this->header($headers, 'svix-id');
         $timestamp = $this->header($headers, 'svix-timestamp');
         $signature = $this->header($headers, 'svix-signature');
-        $secret = config('services.resend.webhook_secret');
+        $secrets = $this->configuredSecrets(
+            config('services.resend.webhook_secret'),
+        );
 
         if (
             $eventId === null
             || $timestamp === null
             || $signature === null
-            || ! is_string($secret)
-            || trim($secret) === ''
+            || $secrets === []
         ) {
             return false;
         }
@@ -28,13 +31,19 @@ class ResendWebhookVerifier
             return false;
         }
 
-        return $this->signatureMatches(
-            eventId: $eventId,
-            timestamp: $timestamp,
-            payload: $payload,
-            signatureHeader: $signature,
-            secret: $secret,
-        );
+        foreach ($secrets as $secret) {
+            if ($this->signatureMatches(
+                eventId: $eventId,
+                timestamp: $timestamp,
+                payload: $payload,
+                signatureHeader: $signature,
+                secret: $secret,
+            )) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -65,7 +74,7 @@ class ResendWebhookVerifier
 
         $driftSeconds = (int) config('services.resend.webhook_timestamp_drift_seconds', 300);
 
-        return abs(time() - (int) $timestamp) <= $driftSeconds;
+        return abs(Carbon::now()->getTimestamp() - (int) $timestamp) <= $driftSeconds;
     }
 
     private function signatureMatches(
@@ -103,7 +112,7 @@ class ResendWebhookVerifier
             return $decoded === false ? null : $decoded;
         }
 
-        return $secret;
+        return $secret !== '' ? $secret : null;
     }
 
     /**
@@ -126,5 +135,30 @@ class ResendWebhookVerifier
             ->filter()
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function configuredSecrets(mixed $configured): array
+    {
+        $values = is_array($configured) ? $configured : [$configured];
+        $secrets = [];
+
+        foreach ($values as $value) {
+            if (! is_string($value)) {
+                continue;
+            }
+
+            foreach (preg_split('/[\s,;]+/', trim($value)) ?: [] as $secret) {
+                $secret = trim($secret);
+
+                if ($secret !== '') {
+                    $secrets[] = $secret;
+                }
+            }
+        }
+
+        return array_values(array_unique($secrets));
     }
 }

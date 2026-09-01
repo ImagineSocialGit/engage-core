@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Webhooks;
 
-use App\Modules\InboundMessaging\Actions\Email\HandleInboundEmailWebhookAction;
+use App\Modules\Messaging\Services\MessageSuppressionService;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Models\MessageSuppression;
 use App\Support\Webhooks\Models\WebhookInboxReceipt;
@@ -125,18 +125,20 @@ class EmailWebhookControllerTest extends TestCase
     public function test_failed_processing_is_recorded_and_same_event_can_resume(): void
     {
         $calls = 0;
-        $action = Mockery::mock(HandleInboundEmailWebhookAction::class);
-        $action->shouldReceive('handle')
+        $suppressions = Mockery::mock(MessageSuppressionService::class);
+        $suppressions->shouldReceive('suppress')
             ->twice()
-            ->andReturnUsing(function () use (&$calls): void {
+            ->andReturnUsing(function () use (&$calls): MessageSuppression {
                 $calls++;
 
                 if ($calls === 1) {
                     throw new RuntimeException('Simulated Resend processing failure.');
                 }
+
+                return new MessageSuppression();
             });
 
-        app()->instance(HandleInboundEmailWebhookAction::class, $action);
+        app()->instance(MessageSuppressionService::class, $suppressions);
 
         $event = $this->event(type: 'email.bounced');
         $eventId = 'evt_retryable_failure_1';

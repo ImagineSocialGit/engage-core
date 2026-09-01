@@ -28,7 +28,10 @@ class TelnyxSmsProvider implements SmsProvider
             'from' => $from,
             'to' => $to,
             'text' => $message,
-            'use_profile_webhooks' => true,
+            'webhook_url' => route('webhooks.message-events.sms', [
+                'provider' => $this->provider(),
+            ]),
+            'use_profile_webhooks' => false,
             'client_state' => filled($meta)
                 ? base64_encode(json_encode($meta, JSON_THROW_ON_ERROR))
                 : null,

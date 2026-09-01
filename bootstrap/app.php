@@ -68,6 +68,10 @@ $app = Application::configure(basePath: dirname(__DIR__))
 
         $middleware->validateCsrfTokens(except: [
             'webinar/zoom',
+            'message-events/email/resend',
+            'message-events/sms/telnyx',
+            'inbound/email/resend',
+            'inbound/sms/telnyx',
             'sms/telnyx',
             'sms/twilio',
             'email/resend',
@@ -122,11 +126,6 @@ $app = Application::configure(basePath: dirname(__DIR__))
     ->create();
 
 $app->afterLoadingEnvironment(function () use ($app): void {
-    /*
-     * Cached configuration already contains the fully resolved selected-client
-     * environment and merged config. Re-loading .env files at runtime would
-     * contradict Laravel's config-cache model.
-     */
     if (
         $app->configurationIsCached()
         || Env::get('APP_ENV') === 'testing'
