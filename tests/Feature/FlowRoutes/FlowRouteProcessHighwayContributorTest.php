@@ -181,5 +181,28 @@ class FlowRouteProcessHighwayContributorTest extends TestCase
         $this->assertNotNull($statusConsequence);
         $this->assertSame('consequence', $statusConsequence['role']);
         $this->assertSame('Changes status to', $statusConsequence['label']);
+
+        $statusFilter = collect($graph['qualifier_filters'])->firstWhere('key', 'status');
+
+        $this->assertNotNull($statusFilter);
+
+        $statusOption = collect($statusFilter['options'])->firstWhere('value', 'engaged');
+
+        $this->assertNotNull($statusOption);
+        $this->assertSame($statusFactKey, $statusOption['node_key']);
+        $this->assertSame([], $statusOption['entry_highway_keys']);
+        $this->assertSame([$businessHighway['key']], $statusOption['producer_highway_keys']);
+        $this->assertSame([], $statusOption['highway_keys']);
+
+        $statusInspector = $graph['entry_ramp_inspectors'][$statusFactKey];
+        $flowRouteSource = collect($statusInspector['application_sources'])
+            ->firstWhere('key', 'flow_route:'.$processKey);
+
+        $this->assertSame(0, $statusInspector['process_count']);
+        $this->assertNotNull($flowRouteSource);
+        $this->assertSame(
+            route('crm.flow-routes.show', $routeId),
+            $flowRouteSource['url'],
+        );
     }
 }

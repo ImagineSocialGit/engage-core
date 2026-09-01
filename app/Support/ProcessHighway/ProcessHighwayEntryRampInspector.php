@@ -27,8 +27,12 @@ final class ProcessHighwayEntryRampInspector
         $actionProviders = $this->actionProviders();
         $segmentsByKey = collect($graph['segments'] ?? [])->keyBy('key');
         $edgesByTarget = collect($graph['edges'] ?? [])->groupBy('to_node_key');
-        $entryRampKeys = collect($graph['highways'] ?? [])
-            ->flatMap(fn (array $highway): array => $highway['entry_node_keys'] ?? [])
+        $factKeys = collect($graph['qualifier_filters'] ?? [])
+            ->flatMap(fn (array $filter): array => collect($filter['options'] ?? [])
+                ->pluck('node_key')
+                ->all())
+            ->merge(collect($graph['highways'] ?? [])
+                ->flatMap(fn (array $highway): array => $highway['entry_node_keys'] ?? []))
             ->filter(fn (mixed $key): bool => is_string($key) && $key !== '')
             ->unique()
             ->values();
@@ -36,8 +40,8 @@ final class ProcessHighwayEntryRampInspector
         $highways = collect($graph['highways'] ?? []);
         $inspectors = [];
 
-        foreach ($entryRampKeys as $entryRampKey) {
-            $node = $nodesByKey->get($entryRampKey);
+        foreach ($factKeys as $factKey) {
+            $node = $nodesByKey->get($factKey);
 
             if (! is_array($node)) {
                 continue;
@@ -62,8 +66,8 @@ final class ProcessHighwayEntryRampInspector
             $applicationSources = [
                 ...$this->normalizeSources($inspection['application_sources'] ?? []),
                 ...$this->configuredFlowRouteSources(
-                    nodeKey: $entryRampKey,
-                    edges: $edgesByTarget->get($entryRampKey, collect())->all(),
+                    nodeKey: $factKey,
+                    edges: $edgesByTarget->get($factKey, collect())->all(),
                     segmentsByKey: $segmentsByKey,
                 ),
             ];
@@ -73,8 +77,8 @@ final class ProcessHighwayEntryRampInspector
                 highways: $highways,
             );
 
-            $inspectors[$entryRampKey] = [
-                'key' => $entryRampKey,
+            $inspectors[$factKey] = [
+                'key' => $factKey,
                 'label' => $node['label'],
                 'criterion_key' => $criterionKey,
                 'criterion_label' => $this->criterionLabel($criterionKey),

@@ -124,6 +124,85 @@ class ProcessHighwayEntryRampInspectorTest extends TestCase
             'workflow:contact_import',
         ], collect($inspection['application_sources'])->pluck('key')->all());
     }
+
+    public function test_automatically_produced_fact_receives_an_inspector_without_being_an_entry_ramp(): void
+    {
+        $contact = Contact::factory()->create();
+
+        ContactTag::query()->create([
+            'contact_id' => $contact->getKey(),
+            'tag' => 'Hand Raiser',
+        ]);
+
+        $nodeKey = 'core:contact_tag:present:Hand%20Raiser';
+        $routeKey = 'flow_routes:route:high_intent_reply';
+        $node = [
+            'key' => $nodeKey,
+            'label' => 'Tag: Hand Raiser',
+            'attributes' => [
+                'criterion_key' => 'tag',
+                'value' => 'Hand Raiser',
+                'value_label' => 'Hand Raiser',
+            ],
+        ];
+        $eventNode = [
+            'key' => 'automation:event:inbound_message.normal_reply',
+            'label' => 'Contact replies to a message',
+            'attributes' => [],
+        ];
+        $graph = [
+            'segments' => [[
+                'key' => $routeKey,
+                'source_key' => 'flow_routes',
+                'name' => 'High-intent reply',
+                'authority' => [
+                    'edit_targets' => [[
+                        'mode' => 'link',
+                        'method' => 'GET',
+                        'url' => '/routes/high-intent-reply',
+                    ]],
+                ],
+            ]],
+            'nodes' => [$eventNode, $node],
+            'edges' => [[
+                'key' => $routeKey.':edge:add-tag',
+                'segment_key' => $routeKey,
+                'from_node_key' => $routeKey,
+                'to_node_key' => $nodeKey,
+                'role' => 'consequence',
+                'label' => 'Adds',
+            ]],
+            'highways' => [[
+                'entry_node_keys' => [$eventNode['key']],
+                'entry_nodes' => [$eventNode],
+                'entry_requirements' => [],
+            ]],
+            'qualifier_filters' => [[
+                'key' => 'tag',
+                'options' => [[
+                    'value' => 'Hand Raiser',
+                    'label' => 'Hand Raiser',
+                    'node_key' => $nodeKey,
+                    'highway_keys' => ['contacts:standard:highway:reply'],
+                    'entry_highway_keys' => [],
+                    'producer_highway_keys' => ['contacts:standard:highway:reply'],
+                ]],
+            ]],
+        ];
+
+        $decorated = app(ProcessHighwayEntryRampInspector::class)->decorate($graph);
+        $inspection = $decorated['entry_ramp_inspectors'][$nodeKey];
+
+        $this->assertSame(1, $inspection['contact_count']);
+        $this->assertSame(0, $inspection['process_count']);
+        $this->assertSame(
+            '/routes/high-intent-reply',
+            collect($inspection['application_sources'])
+                ->firstWhere('key', 'flow_route:'.$routeKey)['url'],
+        );
+        $this->assertNull($decorated['highways'][0]['entry_nodes'][0]['inspector']);
+    }
+
     public function test_status_ramp_summarizes_direct_partial_and_downstream_process_effects(): void
     {
         $statusId = DB::table('contact_statuses')->insertGetId([

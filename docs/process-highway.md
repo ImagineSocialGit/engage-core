@@ -221,7 +221,8 @@ For every business highway, the read model exposes:
 - nested module-owned segments;
 - compact mechanism-owned actions;
 - outcomes attached to the exact mechanism or action that causes them;
-- qualifier values derived only from root entry ramps for Status, Tag, Relationship, Webinar Outcome, Source, and future filters;
+- qualifier values discoverable when they either appear on a root entry ramp or are produced automatically by a contributed consequence edge;
+- per-option entry and producer Highway membership so presentation can distinguish "what starts here" from "how contacts can get here";
 - searchable business text;
 - safe authoritative navigation targets.
 
@@ -235,7 +236,14 @@ The composer never invents missing transitions. If no contributor establishes a 
 
 The CRM surface does not render any process until the user selects at least one contact scope or entry-fact filter. Free-text search refines an already selected audience; it is not an audience by itself.
 
-Filtering uses root entry ramps only. A status or tag created later by a Route is an outcome and cannot make that Route appear under an unrelated audience filter.
+The available filters include relevant facts from both directions:
+
+- a fact used by a root entry ramp because something automatic can happen from it;
+- a fact produced by a contributed consequence edge because something automatic can arrive there.
+
+Actual process matching still uses root entry requirements only. Selecting an output-only Status or Tag therefore does not make its producing Route appear as though that Route starts from the resulting fact. Its inspector instead explains the configured inbound source. Removed-tag consequences are not exposed as selectable present-tag facts.
+
+For compatibility, an option's existing `highway_keys` field remains entry-only. `entry_highway_keys` makes that meaning explicit, while `producer_highway_keys` identifies automatic inbound paths.
 
 The visual flow is top to bottom:
 
@@ -271,14 +279,14 @@ The contextual launcher does not mutate Contact, Campaign, Flow Route, Messaging
 
 ## Entry-ramp inspection
 
-Status and Tag entry ramps open a bounded read-only inspector. Owner modules contribute current counts and ordinary application paths through:
+Discoverable Status and Tag facts open a bounded read-only inspector, whether the fact is a process entrance, an automatic outcome, or both. Owner modules contribute current counts and ordinary application paths through:
 
 ```text
 App\Support\ProcessHighway\Contracts\ProcessHighwayEntryRampContributor
 process_highway.entry_ramp_contributors
 ```
 
-Core contributes Tag counts and import capability. Workflow contributes Status counts plus direct Contact editing and import capability. The shared inspector discovers configured Flow Routes from graph consequence edges and links to their authoritative Route editors.
+Core contributes Tag counts and import capability. Workflow contributes Status counts plus direct Contact editing and import capability. The shared inspector discovers configured Flow Routes from graph consequence edges and links to their authoritative Route editors. Output-only facts receive inspectors even when they have no downstream process.
 
 The count is the number of contacts whose current facts match the selected ramp. The application-path list explains how the fact can currently be assigned. It is not historical attribution.
 

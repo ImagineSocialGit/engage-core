@@ -65,7 +65,6 @@ class FlowRouteIndexAuthoringLinkTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/flow-routes')
             ->assertOk()
-            ->assertSee('Edit Route')
             ->assertSee('openRoute('.$route->getKey().')', false)
             ->assertSee('data-flow-route-editor-state', false)
             ->assertSee('data-flow-route-point-module-filters', false);

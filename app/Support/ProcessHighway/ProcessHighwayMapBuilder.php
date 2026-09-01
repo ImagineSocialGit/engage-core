@@ -70,7 +70,11 @@ final class ProcessHighwayMapBuilder
             'subjects' => $subjects,
             'highways' => $highways,
             'highway_count' => count($highways),
-            'qualifier_filters' => $this->qualifierFilters($highways),
+            'qualifier_filters' => $this->qualifierFilters(
+                highways: $highways,
+                nodes: $nodes,
+                edges: $edges,
+            ),
         ];
     }
 
@@ -890,10 +894,15 @@ final class ProcessHighwayMapBuilder
 
     /**
      * @param array<int, array<string, mixed>> $highways
+     * @param array<int, array<string, mixed>> $nodes
+     * @param array<int, array<string, mixed>> $edges
      * @return array<int, array<string, mixed>>
      */
-    private function qualifierFilters(array $highways): array
-    {
+    private function qualifierFilters(
+        array $highways,
+        array $nodes,
+        array $edges,
+    ): array {
         $filters = [];
         $priorities = [
             'status' => 10,
@@ -903,39 +912,117 @@ final class ProcessHighwayMapBuilder
             'source' => 50,
             'subsource' => 60,
         ];
+        $entryHighwayKeysByNode = [];
+        $highwayKeysBySegment = [];
 
         foreach ($highways as $highway) {
-            foreach ($highway['entry_nodes'] as $node) {
-                $criterionKey = $node['attributes']['criterion_key'] ?? null;
-                $value = $node['attributes']['value'] ?? null;
+            $highwayKey = $highway['key'] ?? null;
 
-                if (! is_string($criterionKey) || $criterionKey === '' || ! is_string($value) || $value === '') {
-                    continue;
-                }
-
-                $filters[$criterionKey] ??= [
-                    'key' => $criterionKey,
-                    'label' => $this->criterionLabel($criterionKey),
-                    'priority' => $priorities[$criterionKey] ?? 100,
-                    'options' => [],
-                ];
-                $filters[$criterionKey]['options'][$value] ??= [
-                    'value' => $value,
-                    'label' => $node['attributes']['value_label']
-                        ?? $this->qualifierValueLabel($node, $criterionKey, $value),
-                    'highway_keys' => [],
-                ];
-                $filters[$criterionKey]['options'][$value]['highway_keys'][] = $highway['key'];
+            if (! is_string($highwayKey) || $highwayKey === '') {
+                continue;
             }
+
+            foreach ($highway['entry_node_keys'] ?? [] as $nodeKey) {
+                if (is_string($nodeKey) && $nodeKey !== '') {
+                    $entryHighwayKeysByNode[$nodeKey][$highwayKey] = true;
+                }
+            }
+
+            foreach ($highway['segment_keys'] ?? [] as $segmentKey) {
+                if (is_string($segmentKey) && $segmentKey !== '') {
+                    $highwayKeysBySegment[$segmentKey][$highwayKey] = true;
+                }
+            }
+        }
+
+        $producerHighwayKeysByNode = [];
+
+        foreach ($edges as $edge) {
+            if (! is_array($edge)
+                || ($edge['role'] ?? null) !== 'consequence'
+                || ! $this->isVisible($edge)
+            ) {
+                continue;
+            }
+
+            $nodeKey = $edge['to_node_key'] ?? null;
+            $segmentKey = $edge['segment_key'] ?? null;
+
+            if (! is_string($nodeKey) || $nodeKey === ''
+                || ! is_string($segmentKey) || $segmentKey === ''
+            ) {
+                continue;
+            }
+
+            foreach (array_keys($highwayKeysBySegment[$segmentKey] ?? []) as $highwayKey) {
+                $producerHighwayKeysByNode[$nodeKey][$highwayKey] = true;
+            }
+        }
+
+        foreach ($nodes as $node) {
+            if (! is_array($node) || ! $this->isVisible($node)) {
+                continue;
+            }
+
+            $nodeKey = $node['key'] ?? null;
+            $criterionKey = $node['attributes']['criterion_key'] ?? null;
+            $value = $node['attributes']['value'] ?? null;
+
+            if (! is_string($nodeKey) || $nodeKey === ''
+                || ! is_string($criterionKey) || $criterionKey === ''
+                || ! is_string($value) || $value === ''
+                || ($criterionKey === 'tag' && ($node['attributes']['present'] ?? true) !== true)
+            ) {
+                continue;
+            }
+
+            $entryHighwayKeys = array_keys($entryHighwayKeysByNode[$nodeKey] ?? []);
+            $producerHighwayKeys = array_keys($producerHighwayKeysByNode[$nodeKey] ?? []);
+
+            if ($entryHighwayKeys === [] && $producerHighwayKeys === []) {
+                continue;
+            }
+
+            sort($entryHighwayKeys);
+            sort($producerHighwayKeys);
+
+            $filters[$criterionKey] ??= [
+                'key' => $criterionKey,
+                'label' => $this->criterionLabel($criterionKey),
+                'priority' => $priorities[$criterionKey] ?? 100,
+                'options' => [],
+            ];
+            $filters[$criterionKey]['options'][$value] ??= [
+                'value' => $value,
+                'label' => $node['attributes']['value_label']
+                    ?? $this->qualifierValueLabel($node, $criterionKey, $value),
+                'node_key' => $nodeKey,
+                'highway_keys' => [],
+                'entry_highway_keys' => [],
+                'producer_highway_keys' => [],
+            ];
+
+            $option = &$filters[$criterionKey]['options'][$value];
+            $option['highway_keys'] = array_values(array_unique([
+                ...$option['highway_keys'],
+                ...$entryHighwayKeys,
+            ]));
+            $option['entry_highway_keys'] = array_values(array_unique([
+                ...$option['entry_highway_keys'],
+                ...$entryHighwayKeys,
+            ]));
+            $option['producer_highway_keys'] = array_values(array_unique([
+                ...$option['producer_highway_keys'],
+                ...$producerHighwayKeys,
+            ]));
+            sort($option['highway_keys']);
+            sort($option['entry_highway_keys']);
+            sort($option['producer_highway_keys']);
+            unset($option);
         }
 
         foreach ($filters as &$filter) {
             $options = array_values($filter['options']);
-
-            foreach ($options as &$option) {
-                $option['highway_keys'] = array_values(array_unique($option['highway_keys']));
-            }
-            unset($option);
 
             usort($options, static fn (array $left, array $right): int => [
                 $left['label'],

@@ -209,6 +209,132 @@ class ProcessHighwayMapBuilderTest extends TestCase
         $this->assertSame('PATCH', $entry['authority']['edit_targets'][0]['method']);
     }
 
+    public function test_automatically_produced_facts_are_discoverable_without_starting_another_process(): void
+    {
+        $segment = $this->segment(
+            key: 'flow_routes:route:high_intent_reply',
+            sourceKey: 'flow_routes',
+            laneKey: 'contacts:standard',
+            nodeKeys: [
+                'automation:event:inbound_message.normal_reply',
+                'flow_routes:route:high_intent_reply',
+                'workflow:status:engaged',
+                'core:contact_tag:present:Hand%20Raiser',
+                'core:contact_tag:absent:Legacy',
+                'flow_routes:route:high_intent_reply:exit',
+            ],
+            entryNodeKeys: ['automation:event:inbound_message.normal_reply'],
+            exitNodeKeys: ['flow_routes:route:high_intent_reply:exit'],
+        );
+        $statusNode = $this->node(
+            key: 'workflow:status:engaged',
+            label: 'Status: Engaged',
+            segmentKeys: [$segment['key']],
+            criterionKey: 'status',
+            value: 'engaged',
+        );
+        $tagNode = $this->node(
+            key: 'core:contact_tag:present:Hand%20Raiser',
+            label: 'Tag: Hand Raiser',
+            segmentKeys: [$segment['key']],
+            criterionKey: 'tag',
+            value: 'Hand Raiser',
+            ownerKey: 'core',
+        );
+        $removedTagNode = $this->node(
+            key: 'core:contact_tag:absent:Legacy',
+            label: 'Tag removed: Legacy',
+            segmentKeys: [$segment['key']],
+            criterionKey: 'tag',
+            value: 'Legacy',
+            ownerKey: 'core',
+        );
+        $removedTagNode['attributes']['present'] = false;
+        $edges = [
+            ...$this->segmentEdges($segment),
+            [
+                'key' => $segment['key'].':edge:status',
+                'from_node_key' => $segment['key'],
+                'to_node_key' => $statusNode['key'],
+                'role' => 'consequence',
+                'label' => 'Changes status to',
+                'sort_order' => 30,
+                'authority' => $this->authority('flow_routes'),
+                'attributes' => [],
+                'segment_key' => $segment['key'],
+            ],
+            [
+                'key' => $segment['key'].':edge:tag',
+                'from_node_key' => $segment['key'],
+                'to_node_key' => $tagNode['key'],
+                'role' => 'consequence',
+                'label' => 'Adds',
+                'sort_order' => 40,
+                'authority' => $this->authority('flow_routes'),
+                'attributes' => [],
+                'segment_key' => $segment['key'],
+            ],
+            [
+                'key' => $segment['key'].':edge:removed-tag',
+                'from_node_key' => $segment['key'],
+                'to_node_key' => $removedTagNode['key'],
+                'role' => 'consequence',
+                'label' => 'Removes',
+                'sort_order' => 50,
+                'authority' => $this->authority('flow_routes'),
+                'attributes' => [],
+                'segment_key' => $segment['key'],
+            ],
+        ];
+        $subjects = [[
+            'key' => 'contacts',
+            'label' => 'Contacts',
+            'lanes' => [[
+                'key' => 'contacts:standard',
+                'label' => 'Standard contacts',
+                'subject_key' => 'contacts',
+                'scope' => 'standard',
+                'relationship_key' => null,
+                'relationship_label' => null,
+                'sort_order' => 10,
+                'segment_keys' => [$segment['key']],
+            ]],
+        ]];
+
+        $map = app(ProcessHighwayMapBuilder::class)->build(
+            segments: [$segment],
+            nodes: [
+                $this->node(
+                    key: 'automation:event:inbound_message.normal_reply',
+                    label: 'Contact replies to a message',
+                    segmentKeys: [$segment['key']],
+                    ownerKey: 'inbound_messaging',
+                ),
+                $statusNode,
+                $tagNode,
+                $removedTagNode,
+                ...$this->mechanismAndExitNodes($segment),
+            ],
+            edges: $edges,
+            subjects: $subjects,
+        );
+
+        $highwayKey = $map['highways'][0]['key'];
+        $filters = collect($map['qualifier_filters'])->keyBy('key');
+        $status = collect($filters['status']['options'])->firstWhere('value', 'engaged');
+        $tag = collect($filters['tag']['options'])->firstWhere('value', 'Hand Raiser');
+
+        $this->assertSame('workflow:status:engaged', $status['node_key']);
+        $this->assertSame([], $status['entry_highway_keys']);
+        $this->assertSame([$highwayKey], $status['producer_highway_keys']);
+        $this->assertSame([], $status['highway_keys']);
+        $this->assertSame('core:contact_tag:present:Hand%20Raiser', $tag['node_key']);
+        $this->assertSame([$highwayKey], $tag['producer_highway_keys']);
+        $this->assertFalse(collect($filters['tag']['options'])->contains(
+            fn (array $option): bool => $option['value'] === 'Legacy',
+        ));
+    }
+
     public function test_reply_acknowledgements_attach_to_the_matching_business_branch(): void
     {
         $statusKey = 'workflow:status:past_contact';

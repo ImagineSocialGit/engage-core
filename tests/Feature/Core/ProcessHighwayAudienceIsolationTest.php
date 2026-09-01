@@ -62,11 +62,17 @@ class ProcessHighwayAudienceIsolationTest extends TestCase
 
         $this->assertNotNull($statusFilter);
         $this->assertEqualsCanonicalizing(
-            ['prospect_nurture', 'past_contact'],
+            ['engaged', 'prospect_nurture', 'past_contact'],
             collect($statusFilter['options'])->pluck('value')->all(),
         );
-        $this->assertFalse(
-            collect($statusFilter['options'])->contains('value', 'engaged'),
+        $engagedOption = collect($statusFilter['options'])->firstWhere('value', 'engaged');
+
+        $this->assertNotNull($engagedOption);
+        $this->assertSame([], $engagedOption['highway_keys']);
+        $this->assertSame([], $engagedOption['entry_highway_keys']);
+        $this->assertEqualsCanonicalizing(
+            [$coldHighway['key'], $pastHighway['key']],
+            $engagedOption['producer_highway_keys'],
         );
     }
 
