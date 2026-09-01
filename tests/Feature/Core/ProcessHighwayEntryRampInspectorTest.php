@@ -7,6 +7,7 @@ use App\Modules\Core\Models\ContactTag;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use App\Modules\Workflow\Services\ProcessHighway\WorkflowProcessHighwayEntryRampContributor;
 use App\Support\ProcessHighway\ProcessHighwayEntryRampInspector;
+use App\Support\ProcessHighway\ProcessHighwayExitLinkBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -150,6 +151,14 @@ class ProcessHighwayEntryRampInspectorTest extends TestCase
             'label' => 'Contact replies to a message',
             'attributes' => [],
         ];
+        $secondEventNode = [
+            'key' => 'automation:event:webinar.normal_reply',
+            'label' => 'Contact replies to a webinar message',
+            'attributes' => [],
+        ];
+        $firstHighwayKey = 'contacts:standard:highway:past-client-reply';
+        $secondHighwayKey = 'contacts:standard:highway:webinar-reply';
+        $edgeKey = $routeKey.':edge:add-tag';
         $graph = [
             'segments' => [[
                 'key' => $routeKey,
@@ -163,29 +172,56 @@ class ProcessHighwayEntryRampInspectorTest extends TestCase
                     ]],
                 ],
             ]],
-            'nodes' => [$eventNode, $node],
+            'nodes' => [$eventNode, $secondEventNode, $node],
             'edges' => [[
-                'key' => $routeKey.':edge:add-tag',
+                'key' => $edgeKey,
                 'segment_key' => $routeKey,
                 'from_node_key' => $routeKey,
                 'to_node_key' => $nodeKey,
                 'role' => 'consequence',
                 'label' => 'Adds',
             ]],
-            'highways' => [[
-                'entry_node_keys' => [$eventNode['key']],
-                'entry_nodes' => [$eventNode],
-                'entry_requirements' => [],
-            ]],
+            'highways' => [
+                [
+                    'key' => $firstHighwayKey,
+                    'name' => 'Past Client reply',
+                    'segment_keys' => [$routeKey],
+                    'lane_scope' => 'standard',
+                    'relationship_key' => null,
+                    'entry_node_keys' => [$eventNode['key']],
+                    'entry_nodes' => [$eventNode],
+                    'entry_requirements' => [[
+                        'criterion_key' => 'status',
+                        'values' => [[
+                            'value' => 'past_contact',
+                        ]],
+                    ]],
+                ],
+                [
+                    'key' => $secondHighwayKey,
+                    'name' => 'Webinar reply',
+                    'segment_keys' => [$routeKey],
+                    'lane_scope' => 'standard',
+                    'relationship_key' => null,
+                    'entry_node_keys' => [$secondEventNode['key']],
+                    'entry_nodes' => [$secondEventNode],
+                    'entry_requirements' => [[
+                        'criterion_key' => 'webinar_outcome',
+                        'values' => [[
+                            'value' => 'attended',
+                        ]],
+                    ]],
+                ],
+            ],
             'qualifier_filters' => [[
                 'key' => 'tag',
                 'options' => [[
                     'value' => 'Hand Raiser',
                     'label' => 'Hand Raiser',
                     'node_key' => $nodeKey,
-                    'highway_keys' => ['contacts:standard:highway:reply'],
+                    'highway_keys' => [],
                     'entry_highway_keys' => [],
-                    'producer_highway_keys' => ['contacts:standard:highway:reply'],
+                    'producer_highway_keys' => [$firstHighwayKey, $secondHighwayKey],
                 ]],
             ]],
         ];
@@ -195,10 +231,38 @@ class ProcessHighwayEntryRampInspectorTest extends TestCase
 
         $this->assertSame(1, $inspection['contact_count']);
         $this->assertSame(0, $inspection['process_count']);
+        $flowRouteSource = collect($inspection['application_sources'])
+            ->firstWhere('key', 'flow_route:'.$routeKey);
+
         $this->assertSame(
             '/routes/high-intent-reply',
-            collect($inspection['application_sources'])
-                ->firstWhere('key', 'flow_route:'.$routeKey)['url'],
+            $flowRouteSource['url'],
+        );
+        $this->assertSame('automatic', $flowRouteSource['source_type']);
+        $this->assertSame('flow_routes', $flowRouteSource['owner_key']);
+        $this->assertEqualsCanonicalizing(
+            [$firstHighwayKey, $secondHighwayKey],
+            collect($flowRouteSource['highway_targets'])->pluck('highway_key')->all(),
+        );
+
+        $firstTarget = collect($flowRouteSource['highway_targets'])
+            ->firstWhere('highway_key', $firstHighwayKey);
+        $firstAnchor = app(ProcessHighwayExitLinkBuilder::class)->anchor(
+            $firstHighwayKey,
+            $edgeKey,
+        );
+
+        $this->assertSame($edgeKey, $firstTarget['edge_key']);
+        $this->assertSame($firstAnchor, $firstTarget['anchor']);
+        $this->assertSame(
+            ['status' => 'past_contact'],
+            $firstTarget['entry_selection'],
+        );
+        $this->assertSame(
+            route('crm.process-highway.index', [
+                'highway' => $firstHighwayKey,
+            ]).'#'.$firstAnchor,
+            $firstTarget['url'],
         );
         $this->assertNull($decorated['highways'][0]['entry_nodes'][0]['inspector']);
     }

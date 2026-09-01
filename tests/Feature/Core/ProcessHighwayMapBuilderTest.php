@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Core;
 
+use App\Support\ProcessHighway\ProcessHighwayExitLinkBuilder;
 use App\Support\ProcessHighway\ProcessHighwayMapBuilder;
 use Tests\TestCase;
 
@@ -286,6 +287,12 @@ class ProcessHighwayMapBuilderTest extends TestCase
                 'segment_key' => $segment['key'],
             ],
         ];
+        $segment['edge_keys'] = [
+            ...$segment['edge_keys'],
+            $segment['key'].':edge:status',
+            $segment['key'].':edge:tag',
+            $segment['key'].':edge:removed-tag',
+        ];
         $subjects = [[
             'key' => 'contacts',
             'label' => 'Contacts',
@@ -333,6 +340,24 @@ class ProcessHighwayMapBuilderTest extends TestCase
         $this->assertFalse(collect($filters['tag']['options'])->contains(
             fn (array $option): bool => $option['value'] === 'Legacy',
         ));
+
+        $outcomes = collect($map['highways'][0]['segments'][0]['mechanism_outcomes'])
+            ->keyBy(fn (array $outcome): string => $outcome['node']['key']);
+        $statusOutcome = $outcomes[$statusNode['key']];
+        $removedTagOutcome = $outcomes[$removedTagNode['key']];
+
+        $this->assertSame(
+            app(ProcessHighwayExitLinkBuilder::class)->anchor(
+                $highwayKey,
+                $segment['key'].':edge:status',
+            ),
+            $statusOutcome['exit_anchor'],
+        );
+        $this->assertSame(
+            route('crm.process-highway.index', ['status' => 'engaged']),
+            $statusOutcome['fact_target']['url'],
+        );
+        $this->assertNull($removedTagOutcome['fact_target']);
     }
 
     public function test_reply_acknowledgements_attach_to_the_matching_business_branch(): void

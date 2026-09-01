@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\FlowRoutes;
 
+use App\Support\ProcessHighway\ProcessHighwayExitLinkBuilder;
 use App\Support\ProcessHighway\ProcessHighwayReadService;
 use App\Support\ProcessHighway\ProcessHighwaySemanticKey;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -203,6 +204,25 @@ class FlowRouteProcessHighwayContributorTest extends TestCase
         $this->assertSame(
             route('crm.flow-routes.show', $routeId),
             $flowRouteSource['url'],
+        );
+        $this->assertSame('automatic', $flowRouteSource['source_type']);
+        $this->assertSame('flow_routes', $flowRouteSource['owner_key']);
+        $this->assertCount(1, $flowRouteSource['highway_targets']);
+
+        $highwayTarget = $flowRouteSource['highway_targets'][0];
+        $exitAnchor = app(ProcessHighwayExitLinkBuilder::class)->anchor(
+            $businessHighway['key'],
+            $statusConsequence['key'],
+        );
+
+        $this->assertSame($businessHighway['key'], $highwayTarget['highway_key']);
+        $this->assertSame($statusConsequence['key'], $highwayTarget['edge_key']);
+        $this->assertSame($exitAnchor, $highwayTarget['anchor']);
+        $this->assertSame(
+            route('crm.process-highway.index', [
+                'highway' => $businessHighway['key'],
+            ]).'#'.$exitAnchor,
+            $highwayTarget['url'],
         );
     }
 }

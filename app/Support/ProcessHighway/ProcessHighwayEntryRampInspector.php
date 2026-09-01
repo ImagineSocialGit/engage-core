@@ -15,6 +15,7 @@ final class ProcessHighwayEntryRampInspector
 
     public function __construct(
         private readonly Container $container,
+        private readonly ProcessHighwayExitLinkBuilder $exitLinks,
     ) {}
 
     /**
@@ -69,6 +70,7 @@ final class ProcessHighwayEntryRampInspector
                     nodeKey: $factKey,
                     edges: $edgesByTarget->get($factKey, collect())->all(),
                     segmentsByKey: $segmentsByKey,
+                    highways: $highways,
                 ),
             ];
             $processes = $this->processesForRamp(
@@ -86,10 +88,7 @@ final class ProcessHighwayEntryRampInspector
                 'value_label' => $node['attributes']['value_label']
                     ?? $this->valueLabel($node, $criterionKey, $value),
                 'contact_count' => max(0, (int) ($inspection['contact_count'] ?? 0)),
-                'application_sources' => collect($applicationSources)
-                    ->unique('key')
-                    ->values()
-                    ->all(),
+                'application_sources' => $this->consolidateSources($applicationSources),
                 'process_count' => count($processes),
                 'exact_process_count' => collect($processes)
                     ->where('match', 'exact')
@@ -243,18 +242,20 @@ final class ProcessHighwayEntryRampInspector
     /**
      * @param array<int, mixed> $edges
      * @param Collection<string, array<string, mixed>> $segmentsByKey
+     * @param Collection<int, array<string, mixed>> $highways
      * @return array<int, array{key: string, label: string, detail: string, url?: string}>
      */
     private function configuredFlowRouteSources(
         string $nodeKey,
         array $edges,
         Collection $segmentsByKey,
+        Collection $highways,
     ): array {
         return collect($edges)
             ->filter(fn (mixed $edge): bool => is_array($edge)
                 && ($edge['to_node_key'] ?? null) === $nodeKey
                 && ($edge['role'] ?? null) === 'consequence')
-            ->map(function (array $edge) use ($segmentsByKey): ?array {
+            ->map(function (array $edge) use ($segmentsByKey, $highways): ?array {
                 $segmentKey = $edge['segment_key'] ?? null;
                 $segment = is_string($segmentKey)
                     ? $segmentsByKey->get($segmentKey)
@@ -276,9 +277,68 @@ final class ProcessHighwayEntryRampInspector
                         ? (string) $edge['label']
                         : 'This Flow Route can apply the selected fact.',
                     'url' => is_array($target) ? ($target['url'] ?? null) : null,
+                    'source_type' => 'automatic',
+                    'owner_key' => 'flow_routes',
+                    'highway_targets' => $highways
+                        ->filter(fn (array $highway): bool => in_array(
+                            $segment['key'],
+                            $highway['segment_keys'] ?? [],
+                            true,
+                        ))
+                        ->map(fn (array $highway): ?array => $this->exitLinks->highwayTarget(
+                            highway: $highway,
+                            edge: $edge,
+                        ))
+                        ->filter()
+                        ->sortBy(fn (array $highwayTarget): array => [
+                            $highwayTarget['highway_name'],
+                            $highwayTarget['highway_key'],
+                        ])
+                        ->values()
+                        ->all(),
                 ], fn (mixed $value): bool => $value !== null && $value !== '');
             })
             ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param array<int, mixed> $sources
+     * @return array<int, array<string, mixed>>
+     */
+    private function consolidateSources(array $sources): array
+    {
+        return collect($sources)
+            ->filter(fn (mixed $source): bool => is_array($source)
+                && $this->string($source['key'] ?? null) !== null)
+            ->groupBy('key')
+            ->map(function (Collection $matchingSources): array {
+                $source = $matchingSources->first();
+                $highwayTargets = $matchingSources
+                    ->flatMap(fn (array $matchingSource): array => is_array($matchingSource['highway_targets'] ?? null)
+                        ? $matchingSource['highway_targets']
+                        : [])
+                    ->filter(fn (mixed $target): bool => is_array($target)
+                        && $this->string($target['highway_key'] ?? null) !== null
+                        && $this->string($target['edge_key'] ?? null) !== null)
+                    ->unique(fn (array $target): string => $target['highway_key'].'|'.$target['edge_key'])
+                    ->sortBy(fn (array $target): array => [
+                        $target['highway_name'] ?? '',
+                        $target['highway_key'],
+                        $target['edge_key'],
+                    ])
+                    ->values()
+                    ->all();
+
+                if ($highwayTargets !== []) {
+                    $source['highway_targets'] = $highwayTargets;
+                } else {
+                    unset($source['highway_targets']);
+                }
+
+                return $source;
+            })
             ->values()
             ->all();
     }

@@ -6,6 +6,10 @@ use Illuminate\Support\Str;
 
 final class ProcessHighwayMapBuilder
 {
+    public function __construct(
+        private readonly ProcessHighwayExitLinkBuilder $exitLinks,
+    ) {}
+
     /**
      * @param array<int, array<string, mixed>> $segments
      * @param array<int, array<string, mixed>> $nodes
@@ -388,11 +392,17 @@ final class ProcessHighwayMapBuilder
             ->values();
         $entryRequirements = $this->entryRequirements($rootSegments, $componentNodesByKey);
         $qualifiers = $this->requirementsQualifiers($entryRequirements);
+        $key = ($lane['key'] ?? 'lane').':highway:'.substr(
+            sha1(implode('|', $rootSegmentKeys)),
+            0,
+            12,
+        );
         $decoratedSegments = $segments
             ->map(fn (array $segment): array => $this->decorateSegment(
                 segment: $segment,
                 nodesByKey: $componentNodesByKey,
                 edgesByKey: $componentEdgesByKey,
+                highwayKey: $key,
             ))
             ->values();
         $acknowledgementSegments = $decoratedSegments
@@ -436,11 +446,6 @@ final class ProcessHighwayMapBuilder
             entryRequirements: $entryRequirements,
             entryNodes: $entryNodes->all(),
             segments: $rootSegments->all(),
-        );
-        $key = ($lane['key'] ?? 'lane').':highway:'.substr(
-            sha1(implode('|', $rootSegmentKeys)),
-            0,
-            12,
         );
         $sourceKeys = $segments
             ->pluck('source_key')
@@ -515,8 +520,12 @@ final class ProcessHighwayMapBuilder
      * @param \Illuminate\Support\Collection<string, array<string, mixed>> $edgesByKey
      * @return array<string, mixed>
      */
-    private function decorateSegment(array $segment, $nodesByKey, $edgesByKey): array
-    {
+    private function decorateSegment(
+        array $segment,
+        $nodesByKey,
+        $edgesByKey,
+        string $highwayKey,
+    ): array {
         $entryKeys = collect($segment['entry_node_keys'] ?? []);
         $exitKeys = collect($segment['exit_node_keys'] ?? []);
         $mechanismNodeKey = $segment['mechanism_node_key'] ?? null;
@@ -564,12 +573,17 @@ final class ProcessHighwayMapBuilder
         $outcomesByTrigger = $outcomeEdges
             ->groupBy('from_node_key')
             ->map(fn ($triggerEdges): array => collect($triggerEdges)
-                ->map(function (array $edge) use ($nodesByKey): ?array {
+                ->map(function (array $edge) use ($nodesByKey, $highwayKey): ?array {
                     $node = $nodesByKey->get($edge['to_node_key'] ?? null);
 
                     return is_array($node) ? [
                         'edge' => $edge,
                         'node' => $node,
+                        'exit_anchor' => $this->exitLinks->anchor(
+                            highwayKey: $highwayKey,
+                            edgeKey: (string) ($edge['key'] ?? ''),
+                        ),
+                        'fact_target' => $this->exitLinks->factTarget($node),
                     ] : null;
                 })
                 ->filter()

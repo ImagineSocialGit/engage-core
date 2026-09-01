@@ -288,6 +288,10 @@ process_highway.entry_ramp_contributors
 
 Core contributes Tag counts and import capability. Workflow contributes Status counts plus direct Contact editing and import capability. The shared inspector discovers configured Flow Routes from graph consequence edges and links to their authoritative Route editors. Output-only facts receive inspectors even when they have no downstream process.
 
+Automatic Flow Route sources also expose one `highway_targets` entry for every Highway occurrence containing the consequence edge. Each target carries the Highway key, the exact edge key, a stable exit anchor, the originating entry selection, and a URL reserved for scroll-and-highlight navigation. A shared downstream segment therefore retains separate destinations for separate originating audiences instead of collapsing them into one link.
+
+Decorated outcome records carry the same stable `exit_anchor` plus a `fact_target` for the resulting Status, present Tag, or other query-safe criterion. Removed-Tag outcomes intentionally have no fact target because they do not represent the selectable presence of that Tag.
+
 The count is the number of contacts whose current facts match the selected ramp. The application-path list explains how the fact can currently be assigned. It is not historical attribution.
 
 The same inspector also derives forward impact from the already composed Highway graph. For the selected fact it shows:
