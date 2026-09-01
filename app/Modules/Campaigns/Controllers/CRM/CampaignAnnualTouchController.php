@@ -24,6 +24,11 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use App\Modules\Core\Models\Contact;
+use App\Support\ModuleFacts\Data\ModuleFactDefinition;
+use App\Support\ModuleFacts\Enums\ModuleFactCapability;
+use App\Support\ModuleFacts\Enums\ModuleFactType;
+use App\Support\ModuleFacts\ModuleFactRegistry;
 
 class CampaignAnnualTouchController extends Controller
 {
@@ -31,6 +36,7 @@ class CampaignAnnualTouchController extends Controller
         private readonly ReusableMessageTemplateCatalog $reusableTemplates,
         private readonly MessageTemplateAuthoringFieldPresenter $authoringFields,
         private readonly CampaignAnnualTouchAudienceService $annualTouchAudience,
+        private readonly ModuleFactRegistry $moduleFacts,
     ) {}
 
     public function index(Request $request): View
@@ -64,6 +70,20 @@ class CampaignAnnualTouchController extends Controller
             'smsTemplates' => $templates->get('sms', collect())->values(),
             'annualTouchAvailableFields' => $this->authoringFields->groupsForContext(
                 ProcessDueCampaignTouchDatesAction::DISPATCH_KEY,
+            ),
+            'annualDateSources' => collect($this->annualDateFacts())
+                ->map(fn (ModuleFactDefinition $fact): array => [
+                    'key' => $fact->key,
+                    'label' => $fact->label,
+                    'description' => $fact->description,
+                    'owner' => $fact->owner,
+                ])
+                ->values()
+                ->all(),
+            'annualDateSourceKeys' => $this->moduleFacts->acceptedKeys(
+                Contact::class,
+                ModuleFactType::Date,
+                ModuleFactCapability::Annualizable,
             ),
         ]);
     }
@@ -220,7 +240,16 @@ class CampaignAnnualTouchController extends Controller
             'touches' => ['required', 'array', 'min:1', 'max:50'],
             'touches.*.id' => ['nullable', 'integer'],
             'touches.*.name' => ['required', 'string', 'max:191'],
-            'touches.*.source_type' => ['required', Rule::in(['birthday', 'fixed_date'])],
+            'touches.*.source_type' => ['required', Rule::in([CampaignTouchDate::SOURCE_CONTACT_FIELD, CampaignTouchDate::SOURCE_REGISTERED_DATE, CampaignTouchDate::SOURCE_FIXED_DATE])],
+            'touches.*.source_key' => [
+                'nullable',
+                'string',
+                Rule::in(array_keys($this->moduleFacts->acceptedKeys(
+                    Contact::class,
+                    ModuleFactType::Date,
+                    ModuleFactCapability::Annualizable,
+                ))),
+            ],
             'touches.*.month' => ['nullable', 'integer', 'between:1,12'],
             'touches.*.day' => ['nullable', 'integer', 'between:1,31'],
             'touches.*.send_time' => ['required', 'date_format:H:i'],
@@ -243,7 +272,18 @@ class CampaignAnnualTouchController extends Controller
         foreach ($validated['touches'] as $index => $touch) {
             $field = 'touches.'.$index;
 
-            if (($touch['source_type'] ?? null) === 'fixed_date') {
+            if (in_array(($touch['source_type'] ?? null), [
+                CampaignTouchDate::SOURCE_CONTACT_FIELD,
+                CampaignTouchDate::SOURCE_REGISTERED_DATE,
+            ], true)
+                && ! $this->annualDateFact((string) ($touch['source_key'] ?? ''))
+            ) {
+                throw ValidationException::withMessages([
+                    $field.'.source_key' => 'Choose an available annual date source.',
+                ]);
+            }
+
+            if (($touch['source_type'] ?? null) === CampaignTouchDate::SOURCE_FIXED_DATE) {
                 $month = (int) ($touch['month'] ?? 0);
                 $day = (int) ($touch['day'] ?? 0);
 
@@ -297,17 +337,22 @@ class CampaignAnnualTouchController extends Controller
                 ]);
             }
 
-            $isBirthday = $touch['source_type'] === 'birthday';
+            $usesRegisteredDate = in_array($touch['source_type'], [
+                CampaignTouchDate::SOURCE_CONTACT_FIELD,
+                CampaignTouchDate::SOURCE_REGISTERED_DATE,
+            ], true);
 
             $date->forceFill([
                 'campaign_touch_program_id' => $program->getKey(),
                 'name' => trim((string) $touch['name']),
-                'source_type' => $isBirthday
-                    ? CampaignTouchDate::SOURCE_CONTACT_FIELD
+                'source_type' => $usesRegisteredDate
+                    ? CampaignTouchDate::SOURCE_REGISTERED_DATE
                     : CampaignTouchDate::SOURCE_FIXED_DATE,
-                'source_key' => $isBirthday ? 'birthday' : null,
-                'month' => $isBirthday ? null : (int) $touch['month'],
-                'day' => $isBirthday ? null : (int) $touch['day'],
+                'source_key' => $usesRegisteredDate
+                    ? $this->moduleFacts->canonicalKey((string) $touch['source_key'])
+                    : null,
+                'month' => $usesRegisteredDate ? null : (int) $touch['month'],
+                'day' => $usesRegisteredDate ? null : (int) $touch['day'],
                 'offset_days' => 0,
                 'send_time' => $touch['send_time'].':00',
                 'sort_order' => ($index + 1) * 10,
@@ -495,6 +540,32 @@ class CampaignAnnualTouchController extends Controller
         }
 
         return (int) $value;
+    }
+
+    /** @return array<int, ModuleFactDefinition> */
+    private function annualDateFacts(): array
+    {
+        return array_values(array_filter(
+            $this->moduleFacts->matching(
+                Contact::class,
+                ModuleFactType::Date,
+                ModuleFactCapability::Annualizable,
+            ),
+            fn (ModuleFactDefinition $definition): bool => $definition->queryResolver !== null,
+        ));
+    }
+
+    private function annualDateFact(string $key): ?ModuleFactDefinition
+    {
+        $definition = $this->moduleFacts->find($key);
+
+        return $definition instanceof ModuleFactDefinition
+            && $definition->subject === Contact::class
+            && $definition->type === ModuleFactType::Date
+            && $definition->has(ModuleFactCapability::Annualizable)
+            && $definition->queryResolver !== null
+                ? $definition
+                : null;
     }
 
     private function newProgramKey(): string

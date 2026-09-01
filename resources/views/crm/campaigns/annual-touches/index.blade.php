@@ -1,7 +1,7 @@
 <x-layouts.crm
     title="Annual Touches"
     heading="Annual Touches"
-    subheading="Set recurring birthday and calendar-date messages for the contacts you choose."
+    subheading="Set recurring birthday, anniversary, and calendar-date messages for the contacts you choose."
     module="campaigns"
 >
     @php
@@ -18,6 +18,8 @@
         $defaultRepeatYears = old('repeat_years', $editing ? $editingProgram->repeat_years : 10);
         $defaultStartsOn = old('starts_on', $editing && $editingProgram->starts_on ? $editingProgram->starts_on->toDateString() : '');
         $defaultActive = old('is_active', $editing ? $editingProgram->is_active : true);
+        $defaultAnnualDateSourceKey = $annualDateSourceKeys['birthday']
+            ?? ($annualDateSources[0]['key'] ?? '');
 
         $initialTouches = old('touches');
 
@@ -26,16 +28,20 @@
                 $initialTouches = $editingProgram->touchDates
                     ->where('is_active', true)
                     ->values()
-                    ->map(function ($touchDate) {
+                    ->map(function ($touchDate) use ($annualDateSourceKeys) {
                         $variants = $touchDate->variants->where('is_active', true)->keyBy('channel');
 
                         return [
                             'id' => $touchDate->getKey(),
                             'name' => $touchDate->name ?: 'Annual touch',
-                            'source_type' => $touchDate->source_type === \App\Modules\Campaigns\Models\CampaignTouchDate::SOURCE_CONTACT_FIELD
-                                && $touchDate->source_key === 'birthday'
-                                    ? 'birthday'
-                                    : 'fixed_date',
+                            'source_type' => in_array($touchDate->source_type, [
+                                \App\Modules\Campaigns\Models\CampaignTouchDate::SOURCE_CONTACT_FIELD,
+                                \App\Modules\Campaigns\Models\CampaignTouchDate::SOURCE_REGISTERED_DATE,
+                            ], true)
+                                ? 'registered_date_source'
+                                : 'fixed_date',
+                            'source_key' => $annualDateSourceKeys[$touchDate->source_key]
+                                ?? $touchDate->source_key,
                             'month' => $touchDate->month,
                             'day' => $touchDate->day,
                             'send_time' => is_string($touchDate->send_time)
@@ -50,7 +56,8 @@
                 $initialTouches = [[
                     'id' => null,
                     'name' => 'Birthday',
-                    'source_type' => 'birthday',
+                    'source_type' => 'registered_date_source',
+                    'source_key' => $defaultAnnualDateSourceKey,
                     'month' => null,
                     'day' => null,
                     'send_time' => '09:00',
@@ -304,6 +311,7 @@
                             id: null,
                             name: '',
                             source_type: 'fixed_date',
+                            source_key: '',
                             month: null,
                             day: null,
                             send_time: '09:00',
@@ -681,7 +689,7 @@
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h3 class="text-lg font-semibold text-slate-950">Annual dates</h3>
-                            <p class="mt-1 text-sm text-slate-600">Birthday uses the Contact birthday field. Fixed dates are useful for holidays or client-defined annual touches.</p>
+                            <p class="mt-1 text-sm text-slate-600">Use a date already stored for the contact, or choose a fixed annual date for holidays and shared calendar dates.</p>
                         </div>
                         <button
                             type="button"
@@ -716,8 +724,24 @@
                                         x-model="row.source_type"
                                         class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900"
                                     >
-                                        <option value="birthday">Contact birthday</option>
+                                        <option value="registered_date_source">Date from field</option>
                                         <option value="fixed_date">Fixed annual date</option>
+                                    </select>
+                                </div>
+
+                                <div class="min-w-0 lg:col-span-2" x-show="row.source_type === 'registered_date_source'">
+                                    <label class="text-xs font-bold uppercase tracking-wide text-slate-600">Date field</label>
+                                    <select
+                                        :name="`touches[${index}][source_key]`"
+                                        x-model="row.source_key"
+                                        x-bind:disabled="row.source_type !== 'registered_date_source'"
+                                        x-bind:required="row.source_type === 'registered_date_source'"
+                                        class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-2 text-sm text-slate-900"
+                                    >
+                                        <option value="">Choose a date source</option>
+                                        @foreach($annualDateSources as $source)
+                                            <option value="{{ $source['key'] }}">{{ $source['label'] }}</option>
+                                        @endforeach
                                     </select>
                                 </div>
 
@@ -727,6 +751,8 @@
                                         <select
                                             :name="`touches[${index}][month]`"
                                             x-model="row.month"
+                                            x-bind:disabled="row.source_type !== 'fixed_date'"
+                                            x-bind:required="row.source_type === 'fixed_date'"
                                             class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-2 text-sm text-slate-900"
                                         >
                                             <option value="">Month</option>
@@ -737,6 +763,8 @@
                                         <select
                                             :name="`touches[${index}][day]`"
                                             x-model="row.day"
+                                            x-bind:disabled="row.source_type !== 'fixed_date'"
+                                            x-bind:required="row.source_type === 'fixed_date'"
                                             class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-2 text-sm text-slate-900"
                                         >
                                             <option value="">Day</option>

@@ -117,6 +117,7 @@
 │   │   │   │   ├── SyncCampaignPresetsAction.php
 │   │   │   │   └── UpdateCampaignEligibilityAction.php
 │   │   │   ├── Automation
+│   │   │   │   ├── CampaignAnnualTouchAutomationTriggerAuthoringContributor.php
 │   │   │   │   ├── CampaignsAutomationPointAuthoringContributor.php
 │   │   │   │   ├── CampaignsAutomationPointDefinitionContributor.php
 │   │   │   │   ├── CancelCampaignAutomationActionHandler.php
@@ -163,6 +164,7 @@
 │   │   │   │   ├── CampaignEnrollmentContactImportPostProcessor.php
 │   │   │   │   └── CampaignLaunchTimingContactImportPostProcessor.php
 │   │   │   ├── Jobs
+│   │   │   │   ├── EmitDueAnnualTouchAutomationEventsJob.php
 │   │   │   │   ├── ProcessDueCampaignTouchDatesJob.php
 │   │   │   │   ├── ReconcileAutomaticCampaignEligibilityJob.php
 │   │   │   │   └── ReconcileContactCampaignEligibilityJob.php
@@ -210,6 +212,7 @@
 │   │   │   │       └── CampaignsProcessHighwayContributor.php
 │   │   │   ├── Support
 │   │   │   ├── TokenContracts
+│   │   │   │   ├── CampaignAnnualTouchComputedTokenValueProvider.php
 │   │   │   │   ├── CampaignTokenContextProvider.php
 │   │   │   │   └── CampaignTokenSourceProvider.php
 │   │   │   └── Validation
@@ -2855,6 +2858,7 @@
 │   │   │   ├── ModuleRouteMiddlewareTest.php
 │   │   │   └── PlatformMigrationFoundationTest.php
 │   │   ├── Mortgage
+│   │   │   ├── MortgageAnnualTouchDateSourceTest.php
 │   │   │   ├── MortgageContactImportHandlerTest.php
 │   │   │   ├── MortgageDomainFoundationTest.php
 │   │   │   └── MortgageModuleFactProviderTest.php
@@ -3079,4 +3083,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-732 directories, 2348 files
+732 directories, 2352 files

@@ -46,21 +46,31 @@ Messaging remains the final delivery authority. Audience membership does not byp
 
 ## Supported date sources
 
-### Contact field
+### Date from field
 
-Current first-class source:
+Campaigns consumes the shared typed `ModuleFactRegistry`. Each enabled producer module contributes only the facts it owns, including:
 
-- `birthday`
+- a stable namespaced key and operator-facing label/description;
+- its owner, Contact subject, date value type, and `annualizable` capability;
+- producer-owned value and query resolvers.
+
+Campaigns asks the registry only for queryable, annualizable Contact dates. It does not assume that every annual-touch date is a column on `contacts` and does not import producer-module models. Existing legacy `contact_field` birthday rows and the `birthday` alias remain readable; new authoring stores canonical fact keys as `registered_date_source`.
+
+Core contributes the universal Contact fact:
+
+- `core.contact.birthday` — resolved from `contacts.birthday`.
 
 Birthdays on February 29 are treated as due on February 28 in non-leap years.
+
+When Mortgage is enabled, Mortgage contributes:
+
+- `mortgage.contact.home_purchase_date` — the most recent recorded **Purchase** loan closing date linked to the Contact through Mortgage loan participants.
+
+Mortgage remains authoritative for that date and owns both resolvers. Campaigns and Core do not copy it onto `contacts` or `contact_mortgage_profiles`. Refinance closings do not replace the home-purchase anniversary source.
 
 ### Fixed annual date
 
 A touch can provide `month` and `day`, such as December 25. Fixed dates can apply to otherwise eligible Contacts even when they do not have a birthday or Contact Status.
-
-### Registered date source
-
-`registered_date_source` remains reserved for a future module-contributed date registry. The runtime currently ignores it rather than importing another module's model or table.
 
 ## Audience
 

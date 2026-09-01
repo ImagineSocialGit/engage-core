@@ -195,8 +195,8 @@ class CampaignAnnualTouchRuntimeTest extends TestCase
         ?array $audienceFilter = null,
     ): array {
         return $this->variant(
-            sourceType: CampaignTouchDate::SOURCE_CONTACT_FIELD,
-            sourceKey: 'birthday',
+            sourceType: CampaignTouchDate::SOURCE_REGISTERED_DATE,
+            sourceKey: 'core.contact.birthday',
             startsOn: $startsOn,
             repeatYears: $repeatYears,
             audienceFilter: $audienceFilter,

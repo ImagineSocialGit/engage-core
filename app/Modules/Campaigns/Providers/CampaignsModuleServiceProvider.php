@@ -2,6 +2,7 @@
 
 namespace App\Modules\Campaigns\Providers;
 
+use App\Modules\Campaigns\Automation\CampaignAnnualTouchAutomationTriggerAuthoringContributor;
 use App\Modules\Campaigns\Automation\CampaignsAutomationPointAuthoringContributor;
 use App\Modules\Campaigns\Automation\CampaignsAutomationPointDefinitionContributor;
 use App\Modules\Campaigns\Automation\CancelCampaignAutomationActionHandler;
@@ -16,6 +17,7 @@ use App\Modules\Campaigns\ConfigContracts\CampaignPresetDefinitionConfigContract
 use App\Modules\Campaigns\Console\Commands\DeactivateCampaignCommand;
 use App\Modules\Campaigns\Console\Commands\SyncCampaignPresetsCommand;
 use App\Modules\Campaigns\Jobs\ProcessDueCampaignTouchDatesJob;
+use App\Modules\Campaigns\Jobs\EmitDueAnnualTouchAutomationEventsJob;
 use App\Modules\Campaigns\Jobs\ReconcileAutomaticCampaignEligibilityJob;
 use App\Modules\Campaigns\Listeners\ReconcileCampaignEligibilityFromAutomationEvent;
 use App\Modules\Campaigns\Listeners\ReconcileCampaignEligibilityFromContactFilterFactsChanged;
@@ -43,6 +45,10 @@ class CampaignsModuleServiceProvider extends ServiceProvider
         $this->app->tag([CampaignsAutomationCapabilityContributor::class], 'automation.capability_contributors');
         $this->app->tag([CampaignsAutomationPointDefinitionContributor::class], 'automation.point_definition_contributors');
         $this->app->tag([CampaignsAutomationPointAuthoringContributor::class], 'automation.point_authoring_contributors');
+        $this->app->tag(
+            CampaignAnnualTouchAutomationTriggerAuthoringContributor::class,
+            'automation.trigger_authoring_contributors',
+        );
         $this->app->tag([
             EnrollCampaignAutomationActionHandler::class,
             CancelCampaignAutomationActionHandler::class,
@@ -74,6 +80,12 @@ class CampaignsModuleServiceProvider extends ServiceProvider
                 $schedule
                     ->job(new ProcessDueCampaignTouchDatesJob())
                     ->everyMinute()
+                    ->withoutOverlapping();
+
+                $schedule
+                    ->job(new EmitDueAnnualTouchAutomationEventsJob())
+                    ->dailyAt('00:05')
+                    ->timezone((string) config('client.timezone', config('app.timezone', 'UTC')))
                     ->withoutOverlapping();
 
                 $schedule

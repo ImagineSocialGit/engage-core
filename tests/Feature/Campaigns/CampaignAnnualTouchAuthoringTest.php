@@ -42,6 +42,8 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
 
         $index
             ->assertOk()
+            ->assertSee('Date from field')
+            ->assertSee('Fixed annual date')
             ->assertViewHas('audience', fn (array $audience): bool => isset($audience['modes']['all'])
                 && ($audience['mode'] ?? null) === 'all')
             ->assertViewHas('emailTemplates', fn ($templates): bool => $templates->contains('id', $email->getKey())
@@ -59,7 +61,8 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
                 'touches' => [
                     [
                         'name' => 'Birthday',
-                        'source_type' => 'birthday',
+                        'source_type' => 'registered_date_source',
+                        'source_key' => 'birthday',
                         'send_time' => '09:00',
                         'email_template_preset_id' => $email->getKey(),
                         'sms_template_preset_id' => $sms->getKey(),
@@ -94,8 +97,8 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
         ]);
         $this->assertDatabaseHas('campaign_touch_dates', [
             'campaign_touch_program_id' => $program->getKey(),
-            'source_type' => 'contact_field',
-            'source_key' => 'birthday',
+            'source_type' => 'registered_date_source',
+            'source_key' => 'core.contact.birthday',
         ]);
         $this->assertDatabaseHas('campaign_touch_dates', [
             'campaign_touch_program_id' => $program->getKey(),
@@ -132,6 +135,9 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
                 ) && $fields->contains(
                     fn (array $field): bool => ($field['token'] ?? null) === 'contact.birthday'
                         && ($field['syntax'] ?? null) === '{birthday}',
+                ) && $fields->contains(
+                    fn (array $field): bool => ($field['token'] ?? null) === 'annual_touch.occurrence_ordinal'
+                        && ($field['syntax'] ?? null) === '{anniversary_ordinal}',
                 ) && ! $fields->contains(
                     fn (array $field): bool => str_starts_with((string) ($field['token'] ?? ''), 'campaign.'),
                 );
@@ -296,7 +302,8 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
                 'is_active' => 1,
                 'touches' => [[
                     'name' => 'Birthday',
-                    'source_type' => 'birthday',
+                    'source_type' => 'registered_date_source',
+                    'source_key' => 'birthday',
                     'send_time' => '09:00',
                     'email_template_preset_id' => $campaignStepTemplate->getKey(),
                 ]],

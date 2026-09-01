@@ -12,6 +12,11 @@ use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use App\Support\ModuleFacts\Data\ModuleFactDefinition;
+use App\Support\ModuleFacts\Data\ModuleFactQuery;
+use App\Support\ModuleFacts\Enums\ModuleFactCapability;
+use App\Support\ModuleFacts\Enums\ModuleFactType;
+use App\Support\ModuleFacts\ModuleFactRegistry;
 
 class ProcessDueCampaignTouchDatesAction
 {
@@ -23,6 +28,7 @@ class ProcessDueCampaignTouchDatesAction
     public function __construct(
         private readonly CampaignAnnualTouchAudienceService $annualTouchAudience,
         private readonly DispatchMessageAction $dispatchMessage,
+        private readonly ModuleFactRegistry $moduleFacts,
     ) {}
 
     /**
@@ -170,18 +176,18 @@ class ProcessDueCampaignTouchDatesAction
         CampaignTouchDate $touchDate,
         Carbon $now,
     ): ?Carbon {
-        if ($touchDate->source_type === CampaignTouchDate::SOURCE_REGISTERED_DATE) {
-            return null;
-        }
-
         $sourceDate = $now->copy()
             ->startOfDay()
             ->subDays((int) $touchDate->offset_days);
 
-        if ($touchDate->source_type === CampaignTouchDate::SOURCE_CONTACT_FIELD) {
-            return $touchDate->source_key === 'birthday'
-                ? $sourceDate
-                : null;
+        if (in_array($touchDate->source_type, [
+            CampaignTouchDate::SOURCE_CONTACT_FIELD,
+            CampaignTouchDate::SOURCE_REGISTERED_DATE,
+        ], true)) {
+            return is_string($touchDate->source_key)
+                && $this->annualDateFact($touchDate->source_key) instanceof ModuleFactDefinition
+                    ? $sourceDate
+                    : null;
         }
 
         if ($touchDate->source_type !== CampaignTouchDate::SOURCE_FIXED_DATE
@@ -247,8 +253,11 @@ class ProcessDueCampaignTouchDatesAction
     ): Builder {
         $query = $this->audienceQuery($program);
 
-        if ($touchDate->source_type === CampaignTouchDate::SOURCE_CONTACT_FIELD) {
-            $this->applyContactDateFilter(
+        if (in_array($touchDate->source_type, [
+            CampaignTouchDate::SOURCE_CONTACT_FIELD,
+            CampaignTouchDate::SOURCE_REGISTERED_DATE,
+        ], true)) {
+            $this->applyAnnualDateSourceFilter(
                 query: $query,
                 sourceKey: (string) $touchDate->source_key,
                 sourceDate: $sourceDate,
@@ -291,39 +300,22 @@ class ProcessDueCampaignTouchDatesAction
     /**
      * @param Builder<Contact> $query
      */
-    private function applyContactDateFilter(
+    private function applyAnnualDateSourceFilter(
         Builder $query,
         string $sourceKey,
         Carbon $sourceDate,
     ): void {
-        if ($sourceKey !== 'birthday') {
+        if (! $this->annualDateFact($sourceKey)) {
             $query->whereRaw('1 = 0');
 
             return;
         }
 
-        $month = (int) $sourceDate->month;
-        $day = (int) $sourceDate->day;
-
-        $query->where(function (Builder $query) use ($month, $day, $sourceDate): void {
-            $query
-                ->where(function (Builder $query) use ($month, $day): void {
-                    $query
-                        ->whereMonth('contacts.birthday', $month)
-                        ->whereDay('contacts.birthday', $day);
-                });
-
-            if ($month === 2
-                && $day === 28
-                && ! $sourceDate->isLeapYear()
-            ) {
-                $query->orWhere(function (Builder $query): void {
-                    $query
-                        ->whereMonth('contacts.birthday', 2)
-                        ->whereDay('contacts.birthday', 29);
-                });
-            }
-        });
+        $this->moduleFacts->apply(
+            $sourceKey,
+            $query,
+            ModuleFactQuery::annualMonthDay($sourceDate),
+        );
     }
 
     private function matchesMonthDay(
@@ -370,6 +362,16 @@ class ProcessDueCampaignTouchDatesAction
             purpose: $variant->purpose,
             scope: $variant->scope,
             dispatchKeys: self::DISPATCH_KEY,
+            payload: [
+                'tokens' => [
+                    'annual_touch' => $this->occurrenceTokens(
+                        contact: $contact,
+                        program: $program,
+                        touchDate: $touchDate,
+                        occurrenceYear: $occurrenceYear,
+                    ),
+                ],
+            ],
             context: $program,
             triggeredAt: $now,
             sendAt: $now,
@@ -396,5 +398,89 @@ class ProcessDueCampaignTouchDatesAction
         );
 
         return $messages[0] ?? null;
+    }
+
+    /** @return array{occurrence_number: int, occurrence_ordinal: string, source_date: string} */
+    private function occurrenceTokens(
+        Contact $contact,
+        CampaignTouchProgram $program,
+        CampaignTouchDate $touchDate,
+        int $occurrenceYear,
+    ): array {
+        $number = 1;
+        $sourceDate = null;
+
+        if (in_array($touchDate->source_type, [
+            CampaignTouchDate::SOURCE_CONTACT_FIELD,
+            CampaignTouchDate::SOURCE_REGISTERED_DATE,
+        ], true)
+            && is_string($touchDate->source_key)
+            && $this->annualDateFact($touchDate->source_key) instanceof ModuleFactDefinition
+        ) {
+            $fact = $this->moduleFacts->require($touchDate->source_key);
+            $resolved = $this->moduleFacts->resolve($fact->key, $contact);
+            $sourceDate = $resolved instanceof \DateTimeInterface
+                ? Carbon::instance($resolved)
+                : null;
+
+            if (! $sourceDate instanceof Carbon) {
+                throw new \LogicException(
+                    "Annual date fact [{$fact->key}] matched contact [{$contact->getKey()}] but did not resolve a source date.",
+                );
+            }
+
+            $number = max(1, $occurrenceYear - (int) $sourceDate->year);
+        } else {
+            $anchor = $program->starts_on instanceof \DateTimeInterface
+                ? Carbon::instance($program->starts_on)
+                : ($program->created_at instanceof \DateTimeInterface
+                    ? Carbon::instance($program->created_at)
+                    : Carbon::createSafe($occurrenceYear, 1, 1));
+            $number = max(1, $occurrenceYear - (int) $anchor->year + 1);
+            $month = (int) $touchDate->month;
+            $day = min(
+                (int) $touchDate->day,
+                Carbon::createSafe($occurrenceYear, $month, 1)->daysInMonth,
+            );
+            $sourceDate = Carbon::createSafe(
+                $occurrenceYear,
+                $month,
+                $day,
+            );
+        }
+
+        return [
+            'occurrence_number' => $number,
+            'occurrence_ordinal' => $this->ordinal($number),
+            'source_date' => $sourceDate->toDateString(),
+        ];
+    }
+
+    private function ordinal(int $number): string
+    {
+        $mod100 = $number % 100;
+        $suffix = in_array($mod100, [11, 12, 13], true)
+            ? 'th'
+            : match ($number % 10) {
+                1 => 'st',
+                2 => 'nd',
+                3 => 'rd',
+                default => 'th',
+            };
+
+        return $number.$suffix;
+    }
+
+    private function annualDateFact(string $key): ?ModuleFactDefinition
+    {
+        $definition = $this->moduleFacts->find($key);
+
+        return $definition instanceof ModuleFactDefinition
+            && $definition->subject === Contact::class
+            && $definition->type === ModuleFactType::Date
+            && $definition->has(ModuleFactCapability::Annualizable)
+            && $definition->queryResolver !== null
+                ? $definition
+                : null;
     }
 }
