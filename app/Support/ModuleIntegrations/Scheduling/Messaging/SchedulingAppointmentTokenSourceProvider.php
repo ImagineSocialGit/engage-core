@@ -12,34 +12,37 @@ final class SchedulingAppointmentTokenSourceProvider implements TokenSourceProvi
         yield TokenSourceDefinition::computed(
             token: 'appointment.display_date',
             owner: 'scheduling',
-            label: 'Appointment date',
-            description: 'Appointment date formatted in the appointment timezone.',
+            label: 'Meeting date',
+            description: 'The appointment date formatted in the meeting’s time zone.',
             sourcePath: 'appointment.display_date',
             providerClass: SchedulingAppointmentComputedTokenValueProvider::class,
             aliases: ['appointment_date'],
             nullable: false,
+            example: 'September 15, 2026',
         );
 
         yield TokenSourceDefinition::computed(
             token: 'appointment.display_time_with_timezone',
             owner: 'scheduling',
-            label: 'Appointment time with time zone',
-            description: 'Appointment time formatted with its time-zone abbreviation.',
+            label: 'Meeting time',
+            description: 'The appointment time with its time-zone abbreviation.',
             sourcePath: 'appointment.display_time_with_timezone',
             providerClass: SchedulingAppointmentComputedTokenValueProvider::class,
             aliases: ['appointment_time_with_timezone'],
             nullable: false,
+            example: '2:00 PM EDT',
         );
 
         yield TokenSourceDefinition::computed(
             token: 'appointment.location_or_method',
             owner: 'scheduling',
-            label: 'Appointment location or method',
-            description: 'Durable appointment location details or remote meeting method.',
+            label: 'Meeting location or link',
+            description: 'Where the appointment happens, including its remote meeting link when applicable.',
             sourcePath: 'appointment.location_or_method',
             providerClass: SchedulingAppointmentComputedTokenValueProvider::class,
             aliases: ['appointment_location_or_method'],
             nullable: false,
+            example: 'Zoom — https://…',
         );
     }
 }

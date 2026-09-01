@@ -21,14 +21,9 @@ class WebinarTokenContextProvider implements TokenContextProvider
     ];
 
     private const WEBINAR = [
-        'webinar.id',
         'webinar.title',
-        'webinar.slug',
         'webinar.platform',
         'webinar.registration_url',
-        'webinar.starts_at',
-        'webinar.ends_at',
-        'webinar.timezone',
         'webinar.description',
         'webinar_start_date',
         'webinar_start_time',
@@ -36,10 +31,7 @@ class WebinarTokenContextProvider implements TokenContextProvider
     ];
 
     private const SERIES = [
-        'webinar_series.id',
         'webinar_series.title',
-        'webinar_series.slug',
-        'webinar_series.status',
     ];
 
     public function contexts(): iterable
@@ -53,9 +45,6 @@ class WebinarTokenContextProvider implements TokenContextProvider
                 ...self::CLIENT_IDENTITY,
                 ...self::WEBINAR,
                 ...self::SERIES,
-                'webinar_registration.id',
-                'webinar_registration.status',
-                'webinar_registration.registered_at',
                 'webinar_join_url',
                 'cancel_registration_url',
             ],
@@ -74,8 +63,6 @@ class WebinarTokenContextProvider implements TokenContextProvider
                 ...self::CLIENT_IDENTITY,
                 ...self::WEBINAR,
                 ...self::SERIES,
-                'webinar_waitlist_signup.id',
-                'webinar_waitlist_signup.source_page',
             ],
             ['email', 'sms'],
             ['marketing'],
@@ -92,8 +79,6 @@ class WebinarTokenContextProvider implements TokenContextProvider
                 ...self::CLIENT_IDENTITY,
                 ...self::WEBINAR,
                 ...self::SERIES,
-                'webinar_registration.id',
-                'webinar_registration.attended_at',
                 'webinar_playback_url',
                 'webinar_booking_url',
                 'webinar_end_date',

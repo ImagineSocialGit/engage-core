@@ -18,15 +18,60 @@ class WebinarTokenSourceProvider implements TokenSourceProvider
         yield from $this->columns('webinar_registration', WebinarRegistration::class, ['id', 'contact_id', 'webinar_id', 'webinar_slug', 'status', 'source', 'registered_at', 'attended_at', 'cancelled_at', 'created_at', 'updated_at'], ['attended_at' => ['registration_attended_at']]);
         yield from $this->columns('webinar_waitlist_signup', WebinarWaitlistSignup::class, ['id', 'contact_id', 'webinar_series_id', 'source_page', 'notified_at', 'created_at', 'updated_at']);
 
-        foreach (['webinar_join_url', 'cancel_registration_url', 'webinar_playback_url', 'webinar_booking_url', 'webinar_start_date', 'webinar_start_time', 'webinar_start_datetime', 'webinar_end_date', 'webinar_end_time', 'webinar_end_datetime'] as $token) {
-            yield TokenSourceDefinition::computed($token, 'webinars', str($token)->headline()->toString(), 'Value explicitly produced by WebinarMessageData.', $token, WebinarMessageTokenValueProvider::class);
+        $computed = [
+            'webinar_join_url' => ['Join link', 'The private link the registrant uses to join the webinar.', 'https://…'],
+            'cancel_registration_url' => ['Cancel-registration link', 'A signed link that cancels this webinar registration.', 'https://…'],
+            'webinar_playback_url' => ['Replay link', 'The link where the contact can watch the webinar replay.', 'https://…'],
+            'webinar_booking_url' => ['Book-a-meeting link', 'The link where the contact can schedule a follow-up meeting.', 'https://…'],
+            'webinar_start_date' => ['Webinar date', 'The webinar date formatted for the recipient.', 'September 15, 2026'],
+            'webinar_start_time' => ['Webinar start time', 'The webinar start time formatted for the recipient.', '2:00 PM EDT'],
+            'webinar_start_datetime' => ['Webinar date and time', 'The webinar date and start time in one friendly value.', 'September 15, 2026 at 2:00 PM EDT'],
+            'webinar_end_date' => ['Webinar end date', 'The webinar end date formatted for the recipient.', 'September 15, 2026'],
+            'webinar_end_time' => ['Webinar end time', 'The webinar end time formatted for the recipient.', '3:00 PM EDT'],
+            'webinar_end_datetime' => ['Webinar end date and time', 'The webinar end date and time in one friendly value.', 'September 15, 2026 at 3:00 PM EDT'],
+        ];
+
+        foreach ($computed as $token => [$label, $description, $example]) {
+            yield TokenSourceDefinition::computed(
+                token: $token,
+                owner: 'webinars',
+                label: $label,
+                description: $description,
+                sourcePath: $token,
+                providerClass: WebinarMessageTokenValueProvider::class,
+                example: $example,
+            );
         }
     }
 
     private function columns(string $prefix, string $model, array $columns, array $aliases = []): iterable
     {
         foreach ($columns as $column) {
-            yield TokenSourceDefinition::modelColumn("{$prefix}.{$column}", 'webinars', str("{$prefix} {$column}")->headline()->toString(), "Value stored in {$prefix}.{$column}.", $model, $column, $aliases[$column] ?? []);
+            [$label, $description, $example] = $this->presentation("{$prefix}.{$column}");
+
+            yield TokenSourceDefinition::modelColumn(
+                token: "{$prefix}.{$column}",
+                owner: 'webinars',
+                label: $label,
+                description: $description,
+                modelClass: $model,
+                column: $column,
+                aliases: $aliases[$column] ?? [],
+                example: $example,
+            );
         }
+    }
+
+    /** @return array{0: string, 1: string, 2: ?string} */
+    private function presentation(string $token): array
+    {
+        return match ($token) {
+            'webinar.title' => ['Webinar title', 'The public title of the webinar.', 'First-Time Homebuyer Workshop'],
+            'webinar.platform' => ['Webinar platform', 'The platform hosting the webinar.', 'Zoom'],
+            'webinar.registration_url' => ['Registration link', 'The public link where someone can register.', 'https://…'],
+            'webinar.description' => ['Webinar description', 'The public description of the webinar.', null],
+            'webinar_series.title' => ['Webinar series name', 'The public name of the webinar series.', 'VA Homebuyer Game Plan'],
+            default => [str($token)->replace('.', ' ')->headline()->toString(), 'A registered Webinar system field.', null],
+        };
     }
 }

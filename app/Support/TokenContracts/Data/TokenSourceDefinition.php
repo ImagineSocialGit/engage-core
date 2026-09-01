@@ -26,6 +26,7 @@ class TokenSourceDefinition
         public readonly ?string $modelClass = null,
         public readonly ?string $column = null,
         public readonly ?string $providerClass = null,
+        public readonly ?string $example = null,
     ) {
         foreach ([$token, $owner, $label, $description, $sourcePath] as $value) {
             if (trim($value) === '') {
@@ -65,6 +66,7 @@ class TokenSourceDefinition
         string $column,
         array $aliases = [],
         bool $nullable = true,
+        ?string $example = null,
     ): self {
         if (! is_subclass_of($modelClass, Model::class)) {
             throw new InvalidArgumentException("Model token [{$token}] must reference an Eloquent model.");
@@ -87,6 +89,7 @@ class TokenSourceDefinition
             nullable: $nullable,
             modelClass: $modelClass,
             column: $column,
+            example: self::nullableExample($example),
         );
     }
 
@@ -103,6 +106,7 @@ class TokenSourceDefinition
         string $providerClass,
         array $aliases = [],
         bool $nullable = true,
+        ?string $example = null,
     ): self {
         if (! is_subclass_of($providerClass, ComputedTokenValueProvider::class)) {
             throw new InvalidArgumentException(
@@ -120,6 +124,7 @@ class TokenSourceDefinition
             aliases: array_values(array_unique($aliases)),
             nullable: $nullable,
             providerClass: $providerClass,
+            example: self::nullableExample($example),
         );
     }
 
@@ -131,5 +136,16 @@ class TokenSourceDefinition
     private function containsMetaSegment(string $value): bool
     {
         return in_array('meta', preg_split('/[.:-]+/', strtolower($value)) ?: [], true);
+    }
+
+    private static function nullableExample(?string $example): ?string
+    {
+        if (! is_string($example)) {
+            return null;
+        }
+
+        $example = trim($example);
+
+        return $example !== '' ? $example : null;
     }
 }

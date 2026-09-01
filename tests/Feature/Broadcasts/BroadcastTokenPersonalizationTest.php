@@ -44,7 +44,7 @@ class BroadcastTokenPersonalizationTest extends TestCase
         $this->assertSame('broadcasts', $context->owner);
         $this->assertEqualsCanonicalizing(['email', 'sms'], $context->channels);
         $this->assertContains('first_name', $registry->authorableTokens(Broadcast::DEFAULT_DISPATCH_KEY));
-        $this->assertContains('contact.source', $registry->authorableTokens(Broadcast::DEFAULT_DISPATCH_KEY));
+        $this->assertNotContains('contact.source', $registry->authorableTokens(Broadcast::DEFAULT_DISPATCH_KEY));
         $this->assertNotContains('birthday', $registry->authorableTokens(Broadcast::DEFAULT_DISPATCH_KEY));
 
         $fields = collect(app(MessageTemplateAuthoringFieldPresenter::class)

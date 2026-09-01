@@ -20,6 +20,7 @@ class CampaignTokenSourceProvider implements TokenSourceProvider
             providerClass: CampaignAnnualTouchComputedTokenValueProvider::class,
             aliases: ['anniversary_number'],
             nullable: false,
+            example: '5',
         );
 
         yield TokenSourceDefinition::computed(
@@ -31,16 +32,18 @@ class CampaignTokenSourceProvider implements TokenSourceProvider
             providerClass: CampaignAnnualTouchComputedTokenValueProvider::class,
             aliases: ['anniversary_ordinal'],
             nullable: false,
+            example: '5th',
         );
 
         yield TokenSourceDefinition::computed(
             token: 'annual_touch.source_date',
             owner: 'campaigns',
             label: 'Original annual date',
-            description: 'The original registered source date or configured annual date.',
+            description: 'The original contact date or configured annual date.',
             sourcePath: 'annual_touch.source_date',
             providerClass: CampaignAnnualTouchComputedTokenValueProvider::class,
             nullable: false,
+            example: 'August 31, 2021',
         );
 
         foreach (['id', 'key', 'name', 'description', 'channel', 'purpose', 'scope', 'status', 'source_version', 'created_at', 'updated_at'] as $column) {

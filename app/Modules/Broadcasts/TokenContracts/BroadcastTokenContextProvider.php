@@ -6,7 +6,7 @@ use App\Modules\Broadcasts\Models\Broadcast;
 use App\Support\TokenContracts\Contracts\TokenContextProvider;
 use App\Support\TokenContracts\Data\TokenContextDefinition;
 
-class BroadcastTokenContextProvider implements TokenContextProvider
+final class BroadcastTokenContextProvider implements TokenContextProvider
 {
     public function contexts(): iterable
     {
@@ -20,8 +20,6 @@ class BroadcastTokenContextProvider implements TokenContextProvider
                 'contact.name',
                 'contact.email',
                 'contact.phone',
-                'contact.source',
-                'contact.subsource',
             ],
             channels: ['email', 'sms'],
             purposes: ['marketing'],

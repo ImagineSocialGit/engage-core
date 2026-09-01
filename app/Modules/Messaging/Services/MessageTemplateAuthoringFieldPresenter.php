@@ -25,6 +25,7 @@ class MessageTemplateAuthoringFieldPresenter
      *         syntax: string,
      *         label: string,
      *         description: string,
+     *         example: ?string,
      *         owner: string
      *     }>
      * }>
@@ -54,6 +55,7 @@ class MessageTemplateAuthoringFieldPresenter
                 'syntax' => '{'.$insertToken.'}',
                 'label' => $source->label,
                 'description' => $source->description,
+                'example' => $source->example,
                 'owner' => $source->owner,
             ];
         }
