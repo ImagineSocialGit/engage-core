@@ -10,8 +10,8 @@ use App\Modules\FlowRoutes\Requests\StoreFlowRoutePointRequest;
 use App\Modules\FlowRoutes\Requests\UpdateFlowRouteLeadInDelayRequest;
 use App\Modules\FlowRoutes\Requests\UpdateFlowRoutePointOrderRequest;
 use App\Modules\FlowRoutes\Requests\UpdateFlowRoutePointRequest;
-use App\Modules\FlowRoutes\Services\FlowRoutePointAuthoringService;
 use App\Modules\FlowRoutes\Services\FlowRouteActivationService;
+use App\Modules\FlowRoutes\Services\FlowRoutePointAuthoringService;
 use App\Support\Guidance\FirstUseGuidance;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -39,6 +39,7 @@ class FlowRouteEditorController extends Controller
         $this->ensureCurrentVersion($flowRoute);
         $validated = $request->validate([
             'enabled' => ['required', 'boolean'],
+            'return_to_editor' => ['nullable', 'boolean'],
         ]);
 
         if ((bool) $validated['enabled']) {
@@ -49,7 +50,13 @@ class FlowRouteEditorController extends Controller
             $message = 'Automation turned off. Work already in progress is not canceled.';
         }
 
-        return redirect()->route('crm.flow-routes.index')->with('status', $message);
+        $parameters = (bool) ($validated['return_to_editor'] ?? false)
+            ? ['edit_route' => $flowRoute->getKey()]
+            : [];
+
+        return redirect()
+            ->route('crm.flow-routes.index', $parameters)
+            ->with('status', $message);
     }
 
     public function updateKind(Request $request, FlowRoute $flowRoute): RedirectResponse
@@ -94,7 +101,12 @@ class FlowRouteEditorController extends Controller
 
         $this->explainBusinessDaySettings($request, $input, $point);
 
-        return $this->redirectToEditor($flowRoute, 'Point added to Route.');
+        return $this->redirectToEditor(
+            $flowRoute,
+            $flowRoute->isAutomaticBehavior()
+                ? 'Action added.'
+                : 'Step added to Route.',
+        );
     }
 
     public function updatePoint(
@@ -114,7 +126,7 @@ class FlowRouteEditorController extends Controller
 
         $this->explainBusinessDaySettings($request, $input, $point);
 
-        return $this->redirectToEditor($flowRoute, 'Point updated.');
+        return $this->redirectToEditor($flowRoute, 'Step updated.');
     }
 
     public function updateLeadInDelay(
@@ -131,7 +143,7 @@ class FlowRouteEditorController extends Controller
 
         $this->explainBusinessDaySettings($request, $input);
 
-        return $this->redirectToEditor($flowRoute, 'Route start updated.');
+        return $this->redirectToEditor($flowRoute, 'First-step timing updated.');
     }
 
     public function destroyPoint(
@@ -143,7 +155,7 @@ class FlowRouteEditorController extends Controller
 
         $this->authoring->deactivate($flowRoute, $flowRoutePoint);
 
-        return $this->redirectToEditor($flowRoute, 'Point removed from the active Route.');
+        return $this->redirectToEditor($flowRoute, 'Step removed from the active Route.');
     }
 
     public function reorderPoints(
@@ -157,7 +169,7 @@ class FlowRouteEditorController extends Controller
             pointIds: array_map('intval', $request->validated('point_ids')),
         );
 
-        return $this->redirectToEditor($flowRoute, 'Point order saved.');
+        return $this->redirectToEditor($flowRoute, 'Step order saved.');
     }
 
     public function movePointUp(
@@ -169,7 +181,7 @@ class FlowRouteEditorController extends Controller
 
         $this->authoring->move($flowRoute, $flowRoutePoint, -1);
 
-        return $this->redirectToEditor($flowRoute, 'Point moved.');
+        return $this->redirectToEditor($flowRoute, 'Step moved.');
     }
 
     public function movePointDown(
@@ -181,7 +193,7 @@ class FlowRouteEditorController extends Controller
 
         $this->authoring->move($flowRoute, $flowRoutePoint, 1);
 
-        return $this->redirectToEditor($flowRoute, 'Point moved.');
+        return $this->redirectToEditor($flowRoute, 'Step moved.');
     }
 
     private function ensureCurrentVersion(FlowRoute $flowRoute): void
@@ -195,7 +207,7 @@ class FlowRouteEditorController extends Controller
     ): void {
         if ((int) $flowRoutePoint->flow_route_id !== (int) $flowRoute->getKey()) {
             throw ValidationException::withMessages([
-                'point' => 'That Point does not belong to this Route.',
+                'point' => 'That step does not belong to this Route.',
             ]);
         }
     }

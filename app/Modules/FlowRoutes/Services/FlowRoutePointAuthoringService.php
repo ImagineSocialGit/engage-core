@@ -122,7 +122,7 @@ class FlowRoutePointAuthoringService
 
         if (! $capability instanceof FlowRouteCapability) {
             throw ValidationException::withMessages([
-                'point' => 'This Point cannot be edited because its capability is unavailable.',
+                'point' => 'This step cannot be edited because its action is unavailable.',
             ]);
         }
 
@@ -317,7 +317,7 @@ class FlowRoutePointAuthoringService
 
         if (! in_array($direction, [-1, 1], true)) {
             throw ValidationException::withMessages([
-                'point' => 'Point movement must be up or down.',
+                'point' => 'A step can only be moved up or down.',
             ]);
         }
 
@@ -371,7 +371,7 @@ class FlowRoutePointAuthoringService
 
         if ($submittedSorted !== $activeSorted) {
             throw ValidationException::withMessages([
-                'point_ids' => 'The saved order must contain every active Point in this Route exactly once.',
+                'point_ids' => 'The saved order must contain every active step in this Route exactly once.',
             ]);
         }
 
@@ -395,7 +395,7 @@ class FlowRoutePointAuthoringService
 
         if ($hasRunningProgress) {
             throw ValidationException::withMessages([
-                'route' => 'This Route currently has active or waiting progress. Finish or cancel that progress before changing its Points.',
+                'route' => 'This Route currently has active or waiting progress. Finish or cancel that progress before changing its steps.',
             ]);
         }
     }
@@ -404,7 +404,7 @@ class FlowRoutePointAuthoringService
     {
         if ((int) $point->flow_route_id !== (int) $route->getKey()) {
             throw ValidationException::withMessages([
-                'point' => 'That Point does not belong to this Route.',
+                'point' => 'That step does not belong to this Route.',
             ]);
         }
     }

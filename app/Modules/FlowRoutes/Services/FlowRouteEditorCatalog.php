@@ -47,11 +47,18 @@ class FlowRouteEditorCatalog
                     'key' => (string) $capability->key,
                     'module_key' => (string) $capability->module_key,
                     'point_type' => $pointType,
-                    'name' => $definition?->name ?? (string) $capability->name,
-                    'description' => $definition?->description ?? (string) ($capability->description ?? ''),
-                    'tip' => $definition?->tip ?? '',
-                    'use_cases' => $definition?->useCases ?? [],
-                    'fields' => $this->authoring->fields($pointType, [], $context),
+                    'name' => $this->stepLanguage($definition?->name ?? (string) $capability->name),
+                    'description' => $this->stepLanguage(
+                        $definition?->description ?? (string) ($capability->description ?? ''),
+                    ),
+                    'tip' => $this->stepLanguage($definition?->tip ?? ''),
+                    'use_cases' => array_map(
+                        fn (mixed $useCase): string => $this->stepLanguage((string) $useCase),
+                        $definition?->useCases ?? [],
+                    ),
+                    'fields' => $this->presentFields(
+                        $this->authoring->fields($pointType, [], $context),
+                    ),
                 ];
             })
             ->values();
@@ -66,6 +73,49 @@ class FlowRouteEditorCatalog
     public function editorOptions(): array
     {
         return [];
+    }
+
+    private function stepLanguage(string $copy): string
+    {
+        return (string) preg_replace_callback(
+            '/\b(?:Point|Points|point|points)\b/',
+            static fn (array $match): string => match ($match[0]) {
+                'Point' => 'Step',
+                'Points' => 'Steps',
+                'points' => 'steps',
+                default => 'step',
+            },
+            $copy,
+        );
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $fields
+     * @return array<int, array<string, mixed>>
+     */
+    private function presentFields(array $fields): array
+    {
+        return array_map(function (array $field): array {
+            foreach (['label', 'help', 'placeholder', 'description'] as $copyKey) {
+                if (is_string($field[$copyKey] ?? null)) {
+                    $field[$copyKey] = $this->stepLanguage($field[$copyKey]);
+                }
+            }
+
+            if (is_array($field['options'] ?? null)) {
+                $field['options'] = array_map(function (mixed $option): mixed {
+                    if (! is_array($option) || ! is_string($option['label'] ?? null)) {
+                        return $option;
+                    }
+
+                    $option['label'] = $this->stepLanguage($option['label']);
+
+                    return $option;
+                }, $field['options']);
+            }
+
+            return $field;
+        }, $fields);
     }
 
     private function context(

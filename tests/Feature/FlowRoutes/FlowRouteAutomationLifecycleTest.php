@@ -76,6 +76,33 @@ class FlowRouteAutomationLifecycleTest extends TestCase
         $this->assertFalse($route->activeTriggerBindings()->exists());
     }
 
+    public function test_automation_can_be_turned_on_from_the_editor_without_closing_it(): void
+    {
+        $user = User::factory()->create();
+        $route = $this->route('editor_activation', 'Editor activation', FlowRoute::AUTHORING_KIND_ROUTE);
+        $this->changeStatusPoint($route, 'engaged');
+
+        $this->actingAs($user)
+            ->patch(route('crm.flow-routes.enabled.update', $route), [
+                'enabled' => true,
+                'return_to_editor' => true,
+            ])
+            ->assertRedirect(route('crm.flow-routes.index', [
+                'edit_route' => $route->getKey(),
+            ]));
+
+        $this->assertTrue($route->activeTriggerBindings()->global()->exists());
+
+        $this->actingAs($user)
+            ->get(route('crm.flow-routes.index', [
+                'edit_route' => $route->getKey(),
+            ]))
+            ->assertOk()
+            ->assertSee('data-flow-route-editor-state', false)
+            ->assertSee('data-flow-route-editor-enabled', false)
+            ->assertSee('Turn off');
+    }
+
     public function test_same_event_and_conditions_cannot_enable_two_contact_status_mutations(): void
     {
         $first = $this->route('first_status', 'Move to Engaged', FlowRoute::AUTHORING_KIND_AUTOMATIC_BEHAVIOR, true);

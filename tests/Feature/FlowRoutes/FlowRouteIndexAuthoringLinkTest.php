@@ -67,8 +67,7 @@ class FlowRouteIndexAuthoringLinkTest extends TestCase
             ->assertOk()
             ->assertSee('Edit Route')
             ->assertSee('openRoute('.$route->getKey().')', false)
-            ->assertSee('Route editor')
-            ->assertSee('Route flow')
-            ->assertDontSee('Back to Routes');
+            ->assertSee('data-flow-route-editor-state', false)
+            ->assertSee('data-flow-route-point-module-filters', false);
     }
 }

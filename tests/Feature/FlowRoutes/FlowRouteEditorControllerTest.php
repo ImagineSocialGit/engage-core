@@ -406,7 +406,7 @@ class FlowRouteEditorControllerTest extends TestCase
             ->delete('http://crm.'.config('app.root_domain').'/flow-routes/'.$route->getKey().'/points/'.$task->getKey())
             ->assertRedirect(route('crm.flow-routes.index', ['edit_route' => $route->getKey()]))
             ->assertSessionHasErrors([
-                'point_order' => "This Point can't be removed because it would leave Wait as the final Point. Add or move another Point after Wait first.",
+                'point_order' => "This step can't be removed because it would leave Wait as the final step. Add or move another step after Wait first.",
             ]);
 
         $this->assertTrue($task->fresh()->is_active);

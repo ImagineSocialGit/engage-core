@@ -46,6 +46,7 @@
         ])
         ->unique('key')
         ->values();
+    $canEnable = $routePresentation['is_enabled'] || $businessPoints->isNotEmpty();
 @endphp
 
 <template x-teleport="body">
@@ -68,13 +69,13 @@
             @js([
                 'wait' => [
                     'type' => \App\Modules\FlowRoutes\Enums\FlowRoutePointType::Wait->value,
-                    'message' => "Wait can't be the final Point. Add or move another Point after Wait first.",
-                    'remove_message' => "This Point can't be removed because it would leave Wait as the final Point. Add or move another Point after Wait first.",
+                    'message' => "Wait can't be the final step. Add or move another step after Wait first.",
+                    'remove_message' => "This step can't be removed because it would leave Wait as the final step. Add or move another step after Wait first.",
                 ],
                 'change_status' => [
                     'type' => \App\Modules\FlowRoutes\Enums\FlowRoutePointType::ChangeStatus->value,
-                    'message' => 'Change Status must be the final Point in the Route because changing workflow status hands the contact off to what comes next.',
-                    'remove_message' => "This Point can't be removed because Change Status must remain the final Point in the Route.",
+                    'message' => 'Change Status must be the final step in the Route because changing workflow status hands the contact off to what comes next.',
+                    'remove_message' => "This step can't be removed because Change Status must remain the final step in the Route.",
                 ],
             ])
         )"
@@ -85,13 +86,10 @@
         <header class="flex items-start justify-between gap-3 border-b border-orange-100 px-4 py-4 sm:gap-4 sm:px-7 sm:py-5">
             <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
-                    <p class="text-sm font-semibold uppercase tracking-[0.16em] text-orange-800">{{ $isAutomaticBehavior ? 'Automatic behavior' : 'Route editor' }}</p>
-
-                    @if($flowRoute->is_customized)
-                        <span class="rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-900 ring-1 ring-orange-200">
-                            Customized
-                        </span>
-                    @endif
+                    <p class="text-sm font-semibold uppercase tracking-[0.16em] text-orange-800">{{ $isAutomaticBehavior ? 'Automatic behavior' : 'Route' }}</p>
+                    <span class="rounded-full px-2.5 py-1 text-xs font-semibold ring-1 {{ $routePresentation['is_enabled'] ? 'bg-emerald-50 text-emerald-900 ring-emerald-300' : 'bg-slate-100 text-slate-800 ring-slate-300' }}" data-flow-route-editor-state>
+                        {{ $routePresentation['is_enabled'] ? 'On' : 'Off' }}
+                    </span>
                 </div>
 
                 <h2 id="route-editor-title-{{ $flowRoute->getKey() }}" class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
@@ -105,14 +103,31 @@
                 @endif
             </div>
 
-            <button
-                type="button"
-                @click="closeRoute()"
-                class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-xl text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
-                aria-label="Close automation editor"
-            >
-                ×
-            </button>
+            <div class="flex shrink-0 items-center gap-2">
+                <form method="POST" action="{{ route('crm.flow-routes.enabled.update', $flowRoute) }}">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="enabled" value="{{ $routePresentation['is_enabled'] ? 0 : 1 }}">
+                    <input type="hidden" name="return_to_editor" value="1">
+                    <button
+                        type="submit"
+                        @disabled(! $canEnable)
+                        class="inline-flex min-h-10 items-center justify-center rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none"
+                        data-flow-route-editor-enabled
+                    >
+                        {{ $routePresentation['is_enabled'] ? 'Turn off' : ($canEnable ? 'Turn on' : 'Add a step first') }}
+                    </button>
+                </form>
+
+                <button
+                    type="button"
+                    @click="closeRoute()"
+                    class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-white text-xl text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
+                    aria-label="Close automation editor"
+                >
+                    ×
+                </button>
+            </div>
         </header>
 
         <div class="overflow-y-auto px-4 py-5 sm:px-7 sm:py-6">
@@ -147,6 +162,12 @@
                         {{ $entryConditionSummary }}
                     </p>
                 @endforeach
+
+                @if(($routePresentation['conflict_names'] ?? []) !== [])
+                    <p class="mt-3 rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm leading-6 text-red-950">
+                        Conflicts with {{ implode(', ', $routePresentation['conflict_names']) }} because both change the same result from the same event.
+                    </p>
+                @endif
             </section>
 
             @unless($isAutomaticBehavior)
@@ -160,15 +181,15 @@
             >
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                        <h3 class="font-semibold text-slate-950">When should this Route begin?</h3>
+                        <h3 class="font-semibold text-slate-950">When should the first step happen?</h3>
                         <p class="mt-1 text-sm leading-6 text-slate-700">
-                            Choose whether the first action happens right away or after a lead-in delay.
+                            Choose whether the first step happens right away or after a delay.
                         </p>
                     </div>
 
                     @if($leadInPresentation)
                         <span class="rounded-full bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-900 ring-1 ring-orange-200">
-                            {{ rtrim((string) ($leadInPresentation['summary'] ?? 'Delay before first action'), '.') }}
+                            {{ rtrim((string) ($leadInPresentation['summary'] ?? 'Delay before first step'), '.') }}
                         </span>
                     @endif
                 </div>
@@ -188,7 +209,7 @@
                             >
                             <span>
                                 <span class="block text-sm font-semibold text-slate-950">Immediately</span>
-                                <span class="mt-1 block text-xs leading-5 text-slate-600">Begin with the first action as soon as this Route starts.</span>
+                                <span class="mt-1 block text-xs leading-5 text-slate-600">Begin with the first step as soon as this Route starts.</span>
                             </span>
                         </label>
 
@@ -202,7 +223,7 @@
                             >
                             <span>
                                 <span class="block text-sm font-semibold text-slate-950">After a delay</span>
-                                <span class="mt-1 block text-xs leading-5 text-slate-600">Wait before the first action happens.</span>
+                                <span class="mt-1 block text-xs leading-5 text-slate-600">Wait before the first step happens.</span>
                             </span>
                         </label>
                     </div>
@@ -254,7 +275,7 @@
 
                         <div x-show="waitMode === 'resume_at'" class="mt-4 max-w-md">
                             <label class="block">
-                                <span class="text-sm font-semibold text-slate-900">Begin the first action at</span>
+                                <span class="text-sm font-semibold text-slate-900">Begin the first step at</span>
                                 <input
                                     type="datetime-local"
                                     name="resume_at"
@@ -283,7 +304,7 @@
                             type="submit"
                             class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 sm:w-auto"
                         >
-                            Save Route start
+                            Save timing
                         </button>
                     </div>
                 </form>
@@ -293,9 +314,9 @@
             <section class="mt-7">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div>
-                        <h3 class="text-lg font-semibold tracking-tight text-slate-950">{{ $isAutomaticBehavior ? 'Action' : 'Actions' }}</h3>
+                        <h3 class="text-lg font-semibold tracking-tight text-slate-950">{{ $isAutomaticBehavior ? 'Action' : 'Steps' }}</h3>
                         <p class="mt-1 text-sm leading-6 text-slate-700">
-                            {{ $isAutomaticBehavior ? 'This one action happens when the event above occurs.' : 'The first action happens after any lead-in delay. Actions normally continue from top to bottom; a Decision can direct the Route to a later action or end it.' }}
+                            {{ $isAutomaticBehavior ? 'This one action happens when the event above occurs.' : 'The first step happens after any initial delay. Steps normally continue from top to bottom; a Decision can direct the Route to a later step or end it.' }}
                         </p>
                     </div>
 
@@ -355,7 +376,7 @@
                                         <button
                                             type="button"
                                             class="mt-0.5 inline-flex h-8 w-8 shrink-0 cursor-grab items-center justify-center rounded-lg bg-white/90 text-base font-bold text-slate-500 ring-1 ring-black/10 active:cursor-grabbing"
-                                            aria-label="Drag to reorder Point"
+                                            aria-label="Drag to reorder step"
                                             title="Drag to reorder"
                                         >
                                             ⋮⋮
@@ -478,7 +499,7 @@
                                         </span>
                                     </form>
 
-                                    <div class="col-span-2 flex items-center justify-end gap-2 sm:col-auto sm:justify-start" aria-label="Move Point without dragging">
+                                    <div class="col-span-2 flex items-center justify-end gap-2 sm:col-auto sm:justify-start" aria-label="Move step without dragging">
                                         <form method="POST" action="{{ route('crm.flow-routes.points.move-up', [$flowRoute, $point]) }}">
                                             @csrf
                                             @method('PATCH')
@@ -486,7 +507,7 @@
                                             <button
                                                 type="submit"
                                                 class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
-                                                aria-label="Move Point up"
+                                                aria-label="Move step up"
                                                 :disabled="!canMove({{ $point->getKey() }}, -1)"
                                                 @disabled($loop->first)
                                             >
@@ -501,7 +522,7 @@
                                             <button
                                                 type="submit"
                                                 class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
-                                                aria-label="Move Point down"
+                                                aria-label="Move step down"
                                                 :disabled="!canMove({{ $point->getKey() }}, 1)"
                                                 @disabled($loop->last)
                                             >
@@ -523,11 +544,11 @@
                             <div @click.outside="closePoint()" class="max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl ring-1 ring-black/10 sm:max-h-[92vh] sm:p-7">
                                 <div class="flex items-start justify-between gap-4">
                                     <div>
-                                        <p class="text-sm font-semibold uppercase tracking-[0.14em] text-orange-800">Edit Point</p>
+                                        <p class="text-sm font-semibold uppercase tracking-[0.14em] text-orange-800">Edit step</p>
                                         <h3 class="mt-1 text-xl font-semibold text-slate-950">{{ $presented['type_label'] ?? \Illuminate\Support\Str::headline($point->type) }}</h3>
                                     </div>
 
-                                    <button type="button" @click="closePoint()" class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-xl text-slate-700" aria-label="Close Point editor">×</button>
+                                    <button type="button" @click="closePoint()" class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-xl text-slate-700" aria-label="Close step editor">×</button>
                                 </div>
 
                                 <form method="POST" action="{{ route('crm.flow-routes.points.update', [$flowRoute, $point]) }}" class="mt-6 space-y-4">
@@ -555,14 +576,14 @@
 
                                     <div class="grid gap-2 pt-2 sm:flex sm:justify-end sm:gap-3">
                                         <button type="button" @click="closePoint()" class="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 sm:w-auto">Cancel</button>
-                                        <button type="submit" class="w-full rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 sm:w-auto">Save Point</button>
+                                        <button type="submit" class="w-full rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 sm:w-auto">Save step</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     @empty
                         <div class="rounded-2xl border border-dashed border-amber-300 bg-amber-50 px-5 py-6 text-sm text-amber-950">
-                            This Route has no active actions. Add the first action below, then choose whether it should happen immediately or after a delay.
+                            This Route has no steps yet. Add the first step below, then choose whether it should happen immediately or after a delay.
                         </div>
                     @endforelse
                 </div>
@@ -610,14 +631,14 @@
                 data-flow-route-point-module-filters
             >
                 <div>
-                    <h3 class="text-lg font-semibold tracking-tight text-slate-950">Add a Point</h3>
+                    <h3 class="text-lg font-semibold tracking-tight text-slate-950">Add a step</h3>
                     <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
-                        Choose what should happen next. Each Point type includes a practical tip and example use cases.
+                        Choose what should happen next. Each available step includes a practical tip and example use cases.
                     </p>
                 </div>
 
                 @if($capabilityModules->count() > 1)
-                    <div class="mt-4 flex flex-wrap gap-2" aria-label="Filter Points by module">
+                    <div class="mt-4 flex flex-wrap gap-2" aria-label="Filter steps by module">
                         <button
                             type="button"
                             @click="selectedPointModules = []"
@@ -673,10 +694,10 @@
                             <div @click.outside="closeAddPoint()" class="max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl ring-1 ring-black/10 sm:max-h-[92vh] sm:p-7">
                                 <div class="flex items-start justify-between gap-4">
                                     <div>
-                                        <p class="text-sm font-semibold uppercase tracking-[0.14em] text-orange-800">Add Point</p>
+                                        <p class="text-sm font-semibold uppercase tracking-[0.14em] text-orange-800">Add step</p>
                                         <h3 class="mt-1 text-xl font-semibold text-slate-950">{{ $capability['name'] }}</h3>
                                     </div>
-                                    <button type="button" @click="closeAddPoint()" class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-xl text-slate-700" aria-label="Close Add Point dialog">×</button>
+                                    <button type="button" @click="closeAddPoint()" class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-xl text-slate-700" aria-label="Close Add step dialog">×</button>
                                 </div>
 
                                 <p class="mt-3 text-sm leading-6 text-slate-700">{{ $capability['description'] }}</p>
@@ -724,14 +745,14 @@
 
                                     <div class="grid gap-2 pt-2 sm:flex sm:justify-end sm:gap-3">
                                         <button type="button" @click="closeAddPoint()" class="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 sm:w-auto">Cancel</button>
-                                        <button type="submit" class="w-full rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 sm:w-auto">Add Point</button>
+                                        <button type="submit" class="w-full rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 sm:w-auto">Add step</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     @empty
                         <div class="rounded-2xl border border-dashed border-amber-300 bg-amber-50 px-5 py-6 text-sm text-amber-950 md:col-span-2 xl:col-span-3">
-                            No authorable capabilities are currently available.
+                            No steps are currently available for this Route.
                         </div>
                     @endforelse
                 </div>

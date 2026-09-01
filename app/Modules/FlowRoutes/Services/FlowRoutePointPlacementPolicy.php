@@ -140,28 +140,28 @@ class FlowRoutePointPlacementPolicy
     {
         return match ($violation) {
             self::VIOLATION_TERMINAL_WAIT => match ($operation) {
-                'remove' => "This Point can't be removed because it would leave Wait as the final Point. Add or move another Point after Wait first.",
-                'move' => "This Point can't be moved because Wait can't be the final Point. Add or move another Point after Wait first.",
-                'add' => "Wait can't be the only or final Point in a Route. Add another Point first so something can happen after the Wait.",
-                default => "Wait can't be the final Point. Add or move another Point after Wait first.",
+                'remove' => "This step can't be removed because it would leave Wait as the final step. Add or move another step after Wait first.",
+                'move' => "This step can't be moved because Wait can't be the final step. Add or move another step after Wait first.",
+                'add' => "Wait can't be the only or final step in a Route. Add another step first so something can happen after the Wait.",
+                default => "Wait can't be the final step. Add or move another step after Wait first.",
             },
             self::VIOLATION_NON_TERMINAL_STATUS_CHANGE => match ($operation) {
-                'remove' => "This Point can't be removed because Change Status must remain the final Point in the Route.",
-                'move' => "This Point can't be moved because Change Status must remain the final Point in the Route.",
-                'add' => "This Point can't be added after Change Status. Change Status ends the Route and hands the contact off to what comes next.",
-                default => 'Change Status must be the final Point in the Route because changing workflow status hands the contact off to what comes next.',
+                'remove' => "This step can't be removed because Change Status must remain the final step in the Route.",
+                'move' => "This step can't be moved because Change Status must remain the final step in the Route.",
+                'add' => "This step can't be added after Change Status. Change Status ends the Route and hands the contact off to what comes next.",
+                default => 'Change Status must be the final step in the Route because changing workflow status hands the contact off to what comes next.',
             },
             self::VIOLATION_DECISION_TARGET_MISSING => match ($operation) {
-                'remove' => "This Point can't be removed because a Decision still sends contacts to it. Update that Decision first.",
-                'add' => 'The Decision must send contacts to an active Point in this Route.',
-                default => 'Every Decision path must lead to an active Point in this Route.',
+                'remove' => "This step can't be removed because a Decision still sends contacts to it. Update that Decision first.",
+                'add' => 'The Decision must send contacts to an active step in this Route.',
+                default => 'Every Decision path must lead to an active step in this Route.',
             },
             self::VIOLATION_DECISION_TARGET_NOT_FORWARD => match ($operation) {
                 'move', 'reorder' => "That order would make a Decision send contacts backward. Move its destination after the Decision.",
-                'add' => 'A Decision can only send contacts to a later Point in the Route.',
+                'add' => 'A Decision can only send contacts to a later step in the Route.',
                 default => 'Every Decision path must move forward to prevent Route loops.',
             },
-            default => 'That Point order is not valid for this Route.',
+            default => 'That step order is not valid for this Route.',
         };
     }
 

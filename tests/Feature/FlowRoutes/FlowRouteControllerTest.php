@@ -167,9 +167,13 @@ class FlowRouteControllerTest extends TestCase
             ->assertSee($route->name)
             ->assertSee('Wait 1 week')
             ->assertSee('Create follow-up task')
-            ->assertSee('aria-label="Route flow"', false)
+            ->assertSee('aria-label="Route steps"', false)
+            ->assertSee('data-flow-route-step-list', false)
             ->assertSee('data-module="tasks"', false)
             ->assertSee('data-flow-route-point-module-filters', false)
+            ->assertSee('Add a step')
+            ->assertDontSee('Add a Point')
+            ->assertDontSee('Choose a later Point')
             ->assertDontSee(
                 route('crm.flow-routes.bindings.index'),
                 false,
@@ -222,12 +226,16 @@ class FlowRouteControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/flow-routes')
             ->assertOk()
-            ->assertSee('webinar.attended')
+            ->assertSee('someone attends a webinar')
             ->assertSee('Attended Webinar')
             ->assertSee('Webinar Attended Nurture')
             ->assertSee($assignedRoute->name)
             ->assertSee($availableRoute->name)
             ->assertSee('Automatic behaviors')
+            ->assertSee('data-automatic-behavior-sentence', false)
+            ->assertSee('Create automation')
+            ->assertSee('One action')
+            ->assertSee('Several steps')
             ->assertSee('Turn off')
             ->assertSee('Turn on');
 
