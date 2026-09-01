@@ -3,20 +3,23 @@
 @php($journeyNodesWithOutcomes = collect($segment['journey_nodes'] ?? [])->filter(fn (array $node): bool => ($node['outcomes'] ?? []) !== []))
 @php($journeyNodesWithoutOutcomes = collect($segment['journey_nodes'] ?? [])->reject(fn (array $node): bool => ($node['outcomes'] ?? []) !== []))
 @php($acknowledgements = collect($segment['supporting_acknowledgements'] ?? []))
-@php($acknowledgementChannels = $acknowledgements->flatMap(fn (array $acknowledgement): array => $acknowledgement['channels'] ?? [])->unique()->sort()->values())
 @php($hasAttachedOutcomes = ($segment['mechanism_outcomes'] ?? []) !== [] || $journeyNodesWithOutcomes->isNotEmpty() || ($segment['additional_outcome_groups'] ?? []) !== [] || $acknowledgements->isNotEmpty())
+@php($isTerminalSegment = (bool) ($isTerminalSegment ?? false))
 
 <article
     data-process-highway-segment="{{ $segment['key'] }}"
     data-process-highway-owner="{{ $segment['source_key'] }}"
+    data-process-highway-terminal-segment="{{ $isTerminalSegment ? 'true' : 'false' }}"
     @if($mechanismBadge !== null) data-process-highway-mechanism="{{ $segment['source_key'] }}" @endif
-    class="rounded-2xl p-4 ring-1 sm:p-5 {{ module_tone($segment['source_key'], 'panel') }}"
 >
     <div @class([
-        'grid gap-5',
-        'lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.72fr)]' => $hasAttachedOutcomes,
+        'grid items-start gap-5',
+        'lg:grid-cols-[minmax(0,1fr)_minmax(17rem,0.62fr)]' => $hasAttachedOutcomes && ! $isTerminalSegment,
     ])>
-        <div class="min-w-0">
+        <div
+            data-process-highway-road-node="{{ $segment['key'] }}"
+            class="rounded-2xl p-4 shadow-sm ring-1 sm:p-5 {{ module_tone($segment['source_key'], 'panel') }}"
+        >
             <div class="flex flex-wrap items-center gap-2">
                 @if($mechanismBadge !== null)
                     <span class="rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ module_tone($segment['source_key'], 'badge') }}">{{ $mechanismBadge }}</span>
@@ -56,66 +59,45 @@
             @endif
         </div>
 
-        @if($hasAttachedOutcomes)
-            <aside class="space-y-3 lg:border-l lg:border-black/10 lg:pl-5" aria-label="What this can cause">
-                @foreach($segment['mechanism_outcomes'] ?? [] as $outcome)
-                    @include('crm.process-highway._outcome', [
-                        'outcome' => $outcome,
-                        'businessHighwayKey' => $businessHighwayKey,
-                    ])
-                @endforeach
+        @if($hasAttachedOutcomes && ! $isTerminalSegment)
+            <aside data-process-highway-side-exits="{{ $segment['key'] }}" aria-label="Side exits">
+                <div class="mb-2 hidden items-center lg:flex" aria-hidden="true">
+                    <span class="h-px w-5 bg-slate-300"></span>
+                    <svg viewBox="0 0 20 20" class="-ml-1 h-5 w-5 text-slate-400" fill="currentColor">
+                        <path d="M7.5 5.25 12.25 10 7.5 14.75V5.25Z" />
+                    </svg>
+                    <span class="ml-1 text-[0.68rem] font-bold uppercase tracking-[0.12em] text-slate-500">Side exits</span>
+                </div>
 
-                @foreach($journeyNodesWithOutcomes as $node)
-                    <div class="rounded-xl border border-slate-200 bg-white/80 p-3">
-                        <p class="text-xs font-semibold text-slate-600">{{ $node['label'] }}</p>
-                        <div class="mt-2 space-y-2">
-                            @foreach($node['outcomes'] as $outcome)
-                                @include('crm.process-highway._outcome', [
-                                    'outcome' => $outcome,
-                                    'businessHighwayKey' => $businessHighwayKey,
-                                    'compact' => true,
-                                ])
-                            @endforeach
-                        </div>
-                    </div>
-                @endforeach
-
-                @foreach($segment['additional_outcome_groups'] ?? [] as $group)
-                    <div class="rounded-xl border border-slate-200 bg-white/80 p-3">
-                        <p class="text-xs font-semibold text-slate-600">{{ $group['trigger_node']['label'] }}</p>
-                        <div class="mt-2 space-y-2">
-                            @foreach($group['outcomes'] as $outcome)
-                                @include('crm.process-highway._outcome', [
-                                    'outcome' => $outcome,
-                                    'businessHighwayKey' => $businessHighwayKey,
-                                    'compact' => true,
-                                ])
-                            @endforeach
-                        </div>
-                    </div>
-                @endforeach
-
-                @if($acknowledgements->isNotEmpty())
-                    <div data-process-highway-acknowledgement class="rounded-xl border border-blue-200 bg-blue-50 p-3">
-                        <p class="text-xs font-bold uppercase tracking-[0.1em] text-blue-700">For the same matched reply</p>
-                        <p class="mt-1 text-sm font-semibold text-blue-950">An acknowledgement is sent on the channel the contact used.</p>
-                        @if($acknowledgementChannels->isNotEmpty())
-                            <p class="mt-1 text-xs text-blue-800">Configured for {{ $acknowledgementChannels->map(fn (string $channel): string => strtoupper($channel))->implode(' and ') }}.</p>
-                        @endif
-                        <div class="mt-3 flex flex-wrap gap-2">
-                            @foreach($acknowledgements as $acknowledgement)
-                                @php($acknowledgementTarget = $acknowledgement['navigation_target'] ?? null)
-                                @php($channelLabel = collect($acknowledgement['channels'] ?? [])->map(fn (string $channel): string => strtoupper($channel))->implode('/'))
-                                @if(is_array($acknowledgementTarget))
-                                    <a href="{{ $acknowledgementTarget['url'] }}" class="text-xs font-semibold text-blue-900 underline decoration-blue-300 underline-offset-4 hover:text-blue-950">
-                                        Edit {{ $channelLabel ?: 'acknowledgement' }}
-                                    </a>
-                                @endif
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
+                @include('crm.process-highway._segment-exits', [
+                    'segment' => $segment,
+                    'businessHighwayKey' => $businessHighwayKey,
+                    'journeyNodesWithOutcomes' => $journeyNodesWithOutcomes,
+                    'acknowledgements' => $acknowledgements,
+                    'wideExitLayout' => false,
+                ])
             </aside>
         @endif
     </div>
+
+    @if($hasAttachedOutcomes && $isTerminalSegment)
+        <aside data-process-highway-terminal-exits="{{ $segment['key'] }}" aria-label="Final exits" class="mt-3">
+            <div class="flex flex-col items-center" aria-hidden="true">
+                <span class="h-6 w-px bg-slate-300"></span>
+                <svg viewBox="0 0 20 20" class="-mt-1 h-5 w-5 text-slate-400" fill="currentColor">
+                    <path d="M5.25 7.5 10 12.25 14.75 7.5H5.25Z" />
+                </svg>
+            </div>
+            <p class="mb-3 text-center text-[0.68rem] font-bold uppercase tracking-[0.12em] text-slate-500">Final exits</p>
+            <div class="mx-auto max-w-4xl">
+                @include('crm.process-highway._segment-exits', [
+                    'segment' => $segment,
+                    'businessHighwayKey' => $businessHighwayKey,
+                    'journeyNodesWithOutcomes' => $journeyNodesWithOutcomes,
+                    'acknowledgements' => $acknowledgements,
+                    'wideExitLayout' => true,
+                ])
+            </div>
+        </aside>
+    @endif
 </article>

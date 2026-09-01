@@ -50,7 +50,14 @@ class ProcessHighwayUsabilitySurfaceTest extends TestCase
             ->assertSee('data-process-highway-source-highway-target', false)
             ->assertSee('data-process-highway-other-sources', false)
             ->assertSee('data-process-highway-missing-requirements="contacts:standard:highway:fixture"', false)
-            ->assertSee('data-process-highway-segment-group="programs"', false)
+            ->assertSee('data-process-highway-road="contacts:standard:highway:fixture"', false)
+            ->assertSee('data-process-highway-road-origin', false)
+            ->assertSee('data-process-highway-stage="0"', false)
+            ->assertSee('data-process-highway-road-node="campaigns:campaign:past_client"', false)
+            ->assertSee('data-process-highway-terminal-segment="true"', false)
+            ->assertSee('data-process-highway-terminal-exits="campaigns:campaign:past_client"', false)
+            ->assertSee('data-process-highway-exit-stack="campaigns:campaign:past_client"', false)
+            ->assertDontSee('data-process-highway-segment-group=', false)
             ->assertSee('data-process-highway-mechanism="campaigns"', false)
             ->assertSee('data-process-highway-outcome="workflow:status:engaged"', false)
             ->assertSee('id="process-highway-exit-fixture"', false)
@@ -61,6 +68,25 @@ class ProcessHighwayUsabilitySurfaceTest extends TestCase
             ->assertDontSee('data-process-highway-impact-processes', false)
             ->assertDontSee('data-process-highway-entry-actions', false)
             ->assertDontSee('data-process-highway-mechanism="workflow"', false);
+    }
+
+    public function test_non_terminal_mechanism_places_its_outcomes_on_a_side_exit(): void
+    {
+        $segment = $this->highway()['highways'][0]['segments'][0];
+
+        $this->view('crm.process-highway._segment', [
+            'segment' => $segment,
+            'businessHighwayKey' => 'contacts:standard:highway:fixture',
+            'mechanismBadges' => [
+                'campaigns' => 'Campaign',
+                'flow_routes' => 'Flow Route',
+            ],
+            'isTerminalSegment' => false,
+        ])
+            ->assertSee('data-process-highway-terminal-segment="false"', false)
+            ->assertSee('data-process-highway-side-exits="campaigns:campaign:past_client"', false)
+            ->assertSee('data-process-highway-exit-stack="campaigns:campaign:past_client"', false)
+            ->assertDontSee('data-process-highway-terminal-exits=', false);
     }
 
     /** @return array<string, mixed> */
@@ -202,6 +228,13 @@ class ProcessHighwayUsabilitySurfaceTest extends TestCase
                 'state' => 'active',
                 'state_label' => 'Active',
                 'segment_count' => 1,
+                'segment_connections' => [],
+                'segment_stages' => [[
+                    'campaigns:campaign:past_client',
+                ]],
+                'terminal_segment_keys' => [
+                    'campaigns:campaign:past_client',
+                ],
                 'qualifiers' => ['status' => ['past_contact']],
                 'entry_requirements' => [[
                     'criterion_key' => 'status',

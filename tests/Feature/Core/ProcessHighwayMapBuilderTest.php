@@ -135,6 +135,15 @@ class ProcessHighwayMapBuilderTest extends TestCase
         $this->assertSame('any', $connected['entry_requirements'][0]['operator']);
         $this->assertSame('engaged', $connected['entry_requirements'][0]['values'][0]['value']);
         $this->assertSame('Engaged', $connected['name']);
+        $this->assertSame([], $connected['segment_connections']);
+        $this->assertEqualsCanonicalizing(
+            [$standardCampaign['key'], $standardRoute['key']],
+            $connected['segment_stages'][0],
+        );
+        $this->assertEqualsCanonicalizing(
+            [$standardCampaign['key'], $standardRoute['key']],
+            $connected['terminal_segment_keys'],
+        );
 
         $relationshipHighway = collect($map['highways'])->firstWhere(
             'lane_key',
@@ -426,6 +435,81 @@ class ProcessHighwayMapBuilderTest extends TestCase
         $this->assertSame(1, count($routingSegment['supporting_acknowledgements']));
         $this->assertSame($acknowledgement['key'], $routingSegment['supporting_acknowledgements'][0]['key']);
         $this->assertSame(['email'], $routingSegment['supporting_acknowledgements'][0]['channels']);
+    }
+
+    public function test_explicit_handoffs_produce_north_to_south_stages_and_terminal_segments(): void
+    {
+        $campaignKey = 'campaigns:campaign:past_client';
+        $routeKey = 'flow_routes:route:past_client_reply';
+        $statusKey = 'workflow:status:past_contact';
+        $replyProfileKey = 'inbound_messaging:reply_profile:past_client_nurture';
+        $campaign = $this->segment(
+            key: $campaignKey,
+            sourceKey: 'campaigns',
+            laneKey: 'contacts:standard',
+            nodeKeys: [$statusKey, $campaignKey, $replyProfileKey],
+            entryNodeKeys: [$statusKey],
+            exitNodeKeys: [$replyProfileKey],
+        );
+        $route = $this->segment(
+            key: $routeKey,
+            sourceKey: 'flow_routes',
+            laneKey: 'contacts:standard',
+            nodeKeys: [$replyProfileKey, $routeKey, $routeKey.':exit'],
+            entryNodeKeys: [$replyProfileKey],
+            exitNodeKeys: [$routeKey.':exit'],
+        );
+        $subjects = [[
+            'key' => 'contacts',
+            'label' => 'Contacts',
+            'lanes' => [[
+                'key' => 'contacts:standard',
+                'label' => 'Standard contacts',
+                'subject_key' => 'contacts',
+                'scope' => 'standard',
+                'relationship_key' => null,
+                'relationship_label' => null,
+                'sort_order' => 10,
+                'segment_keys' => [$campaignKey, $routeKey],
+            ]],
+        ]];
+
+        $map = app(ProcessHighwayMapBuilder::class)->build(
+            segments: [$campaign, $route],
+            nodes: [
+                $this->node($statusKey, 'Status: Past Client', [$campaignKey], 'status', 'past_contact'),
+                $this->node($campaignKey, 'Past Client Nurture', [$campaignKey], ownerKey: 'campaigns'),
+                [
+                    ...$this->node(
+                        $replyProfileKey,
+                        'Reply to Past Client messages',
+                        [$campaignKey, $routeKey],
+                        ownerKey: 'inbound_messaging',
+                    ),
+                    'role' => 'trigger',
+                    'reference_only' => true,
+                ],
+                ...$this->mechanismAndExitNodes($route),
+            ],
+            edges: [
+                ...$this->segmentEdges($campaign),
+                ...$this->segmentEdges($route),
+            ],
+            subjects: $subjects,
+        );
+
+        $this->assertSame(1, $map['highway_count']);
+        $this->assertSame([
+            [
+                'from_segment_key' => $campaignKey,
+                'to_segment_key' => $routeKey,
+            ],
+        ], $map['highways'][0]['segment_connections']);
+        $this->assertSame([
+            [$campaignKey],
+            [$routeKey],
+        ], $map['highways'][0]['segment_stages']);
+        $this->assertSame([$routeKey], $map['highways'][0]['terminal_segment_keys']);
     }
 
     /**

@@ -46,6 +46,7 @@ final class ProcessHighwayMapBuilder
                         lane: $lane,
                         rootSegmentKeys: $rootedHighway['root_segment_keys'],
                         segmentKeys: $rootedHighway['segment_keys'],
+                        segmentConnections: $rootedHighway['segment_connections'],
                         segmentsByKey: $segmentsByKey,
                         nodesByKey: $nodesByKey,
                         edgesByKey: $edgesByKey,
@@ -87,7 +88,11 @@ final class ProcessHighwayMapBuilder
      * @param \Illuminate\Support\Collection<string, array<string, mixed>> $segmentsByKey
      * @param \Illuminate\Support\Collection<string, array<string, mixed>> $nodesByKey
      * @param \Illuminate\Support\Collection<string, array<string, mixed>> $edgesByKey
-     * @return array<int, array{root_segment_keys: array<int, string>, segment_keys: array<int, string>}>
+     * @return array<int, array{
+     *     root_segment_keys: array<int, string>,
+     *     segment_keys: array<int, string>,
+     *     segment_connections: array<int, array{from_segment_key: string, to_segment_key: string}>
+     * }>
      */
     private function rootedHighways(
         array $segmentKeys,
@@ -214,9 +219,26 @@ final class ProcessHighwayMapBuilder
 
             $includedKeys = array_keys($included);
             sort($includedKeys);
+            $segmentConnections = collect($includedKeys)
+                ->flatMap(function (string $producerKey) use ($adjacency, $included): array {
+                    return collect(array_keys($adjacency[$producerKey] ?? []))
+                        ->filter(fn (string $consumerKey): bool => isset($included[$consumerKey]))
+                        ->map(fn (string $consumerKey): array => [
+                            'from_segment_key' => $producerKey,
+                            'to_segment_key' => $consumerKey,
+                        ])
+                        ->all();
+                })
+                ->sortBy(fn (array $connection): array => [
+                    $connection['from_segment_key'],
+                    $connection['to_segment_key'],
+                ])
+                ->values()
+                ->all();
             $highways[] = [
                 'root_segment_keys' => $groupRootKeys,
                 'segment_keys' => $includedKeys,
+                'segment_connections' => $segmentConnections,
             ];
         }
 
@@ -285,6 +307,7 @@ final class ProcessHighwayMapBuilder
      * @param array<string, mixed> $lane
      * @param array<int, string> $rootSegmentKeys
      * @param array<int, string> $segmentKeys
+     * @param array<int, array{from_segment_key: string, to_segment_key: string}> $segmentConnections
      * @param \Illuminate\Support\Collection<string, array<string, mixed>> $segmentsByKey
      * @param \Illuminate\Support\Collection<string, array<string, mixed>> $nodesByKey
      * @param \Illuminate\Support\Collection<string, array<string, mixed>> $edgesByKey
@@ -295,6 +318,7 @@ final class ProcessHighwayMapBuilder
         array $lane,
         array $rootSegmentKeys,
         array $segmentKeys,
+        array $segmentConnections,
         $segmentsByKey,
         $nodesByKey,
         $edgesByKey,
@@ -310,6 +334,30 @@ final class ProcessHighwayMapBuilder
             ->values();
 
         $orderedSegmentKeys = $segments->pluck('key')->values()->all();
+        $segmentConnections = collect($segmentConnections)
+            ->filter(fn (array $connection): bool => in_array(
+                $connection['from_segment_key'] ?? null,
+                $orderedSegmentKeys,
+                true,
+            ) && in_array(
+                $connection['to_segment_key'] ?? null,
+                $orderedSegmentKeys,
+                true,
+            ))
+            ->values()
+            ->all();
+        $segmentStages = $this->segmentStages(
+            segmentKeys: $orderedSegmentKeys,
+            connections: $segmentConnections,
+        );
+        $nonTerminalSegmentKeys = collect($segmentConnections)
+            ->pluck('from_segment_key')
+            ->filter(fn (mixed $key): bool => is_string($key))
+            ->unique();
+        $terminalSegmentKeys = collect($orderedSegmentKeys)
+            ->reject(fn (string $key): bool => $nonTerminalSegmentKeys->contains($key))
+            ->values()
+            ->all();
         $rootSegments = collect($rootSegmentKeys)
             ->map(fn (string $key): ?array => $segmentsByKey->get($key))
             ->filter(fn (mixed $segment): bool => is_array($segment))
@@ -486,6 +534,9 @@ final class ProcessHighwayMapBuilder
             },
             'root_segment_keys' => array_values($rootSegmentKeys),
             'segment_keys' => $orderedSegmentKeys,
+            'segment_connections' => $segmentConnections,
+            'segment_stages' => $segmentStages,
+            'terminal_segment_keys' => $terminalSegmentKeys,
             'segment_count' => count($decoratedSegments),
             'source_keys' => $sourceKeys->all(),
             'source_labels' => $sourceLabels->all(),
@@ -512,6 +563,64 @@ final class ProcessHighwayMapBuilder
                 ...$segments->pluck('description')->all(),
             ], fn (mixed $value): bool => is_string($value) && $value !== ''))),
         ];
+    }
+
+    /**
+     * @param array<int, string> $segmentKeys
+     * @param array<int, array{from_segment_key: string, to_segment_key: string}> $connections
+     * @return array<int, array<int, string>>
+     */
+    private function segmentStages(array $segmentKeys, array $connections): array
+    {
+        $order = array_flip($segmentKeys);
+        $remaining = array_fill_keys($segmentKeys, true);
+        $incomingCount = array_fill_keys($segmentKeys, 0);
+        $outgoing = array_fill_keys($segmentKeys, []);
+
+        foreach ($connections as $connection) {
+            $from = $connection['from_segment_key'] ?? null;
+            $to = $connection['to_segment_key'] ?? null;
+
+            if (! is_string($from) || ! is_string($to)
+                || ! isset($remaining[$from]) || ! isset($remaining[$to])
+                || isset($outgoing[$from][$to])
+            ) {
+                continue;
+            }
+
+            $outgoing[$from][$to] = true;
+            $incomingCount[$to]++;
+        }
+
+        $stages = [];
+
+        while ($remaining !== []) {
+            $stage = array_values(array_filter(
+                array_keys($remaining),
+                fn (string $key): bool => ($incomingCount[$key] ?? 0) === 0,
+            ));
+
+            if ($stage === []) {
+                $stage = array_keys($remaining);
+            }
+
+            usort($stage, fn (string $left, string $right): int =>
+                ($order[$left] ?? PHP_INT_MAX) <=> ($order[$right] ?? PHP_INT_MAX));
+            $stages[] = $stage;
+
+            foreach ($stage as $segmentKey) {
+                unset($remaining[$segmentKey]);
+
+                foreach (array_keys($outgoing[$segmentKey] ?? []) as $downstreamKey) {
+                    $incomingCount[$downstreamKey] = max(
+                        0,
+                        ($incomingCount[$downstreamKey] ?? 0) - 1,
+                    );
+                }
+            }
+        }
+
+        return $stages;
     }
 
     /**

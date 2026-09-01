@@ -1,40 +1,43 @@
-@php($filterItem = [
-    'key' => $businessHighway['key'],
-    'subject_key' => $businessHighway['subject_key'],
-    'lane_scope' => $businessHighway['lane_scope'],
-    'relationship_key' => $businessHighway['relationship_key'],
-    'qualifiers' => $businessHighway['qualifiers'],
-    'entry_requirements' => $businessHighway['entry_requirements'],
-    'search_text' => $businessHighway['search_text'],
-])
-@php($entryNodesByKey = collect($businessHighway['entry_nodes'])->keyBy('key'))
-@php($entryRequirements = collect($businessHighway['entry_requirements']))
-@php($segments = collect($businessHighway['segments']))
-@php($attachedAcknowledgementKeys = $segments->flatMap(fn (array $segment): array => array_column($segment['supporting_acknowledgements'] ?? [], 'key'))->unique())
-@php($visibleSegments = $segments->reject(fn (array $segment): bool => ($segment['attributes']['role'] ?? null) === 'reply_messaging' && $attachedAcknowledgementKeys->contains($segment['key'])))
-@php($campaignSegments = $visibleSegments->where('source_key', 'campaigns')->values())
-@php($replySegments = $visibleSegments->filter(fn (array $segment): bool => $segment['source_key'] === 'flow_routes' && ($segment['attributes']['role'] ?? null) === 'reply_routing')->values())
-@php($otherSegments = $visibleSegments->reject(fn (array $segment): bool => $campaignSegments->contains('key', $segment['key']) || $replySegments->contains('key', $segment['key']))->values())
-@php($segmentGroups = collect([
-    [
-        'key' => 'programs',
-        'label' => 'Ongoing programs',
-        'detail' => 'These programs apply while the full entrance requirements remain true.',
-        'segments' => $campaignSegments,
-    ],
-    [
-        'key' => 'reply-branches',
-        'label' => 'Independent reply branches',
-        'detail' => 'Each branch starts only when its own reply rule matches. They are not steps in one sequence.',
-        'segments' => $replySegments,
-    ],
-    [
-        'key' => 'other-automation',
-        'label' => 'Other automatic responses',
-        'detail' => null,
-        'segments' => $otherSegments,
-    ],
-])->filter(fn (array $group): bool => $group['segments']->isNotEmpty()))
+@php
+    $filterItem = [
+        'key' => $businessHighway['key'],
+        'subject_key' => $businessHighway['subject_key'],
+        'lane_scope' => $businessHighway['lane_scope'],
+        'relationship_key' => $businessHighway['relationship_key'],
+        'qualifiers' => $businessHighway['qualifiers'],
+        'entry_requirements' => $businessHighway['entry_requirements'],
+        'search_text' => $businessHighway['search_text'],
+    ];
+    $entryNodesByKey = collect($businessHighway['entry_nodes'])->keyBy('key');
+    $entryRequirements = collect($businessHighway['entry_requirements']);
+    $segments = collect($businessHighway['segments']);
+    $attachedAcknowledgementKeys = $segments
+        ->flatMap(fn (array $segment): array => array_column($segment['supporting_acknowledgements'] ?? [], 'key'))
+        ->unique();
+    $visibleSegments = $segments
+        ->reject(fn (array $segment): bool => ($segment['attributes']['role'] ?? null) === 'reply_messaging'
+            && $attachedAcknowledgementKeys->contains($segment['key']));
+    $visibleSegmentsByKey = $visibleSegments->keyBy('key');
+    $segmentStages = collect($businessHighway['segment_stages'] ?? [])
+        ->map(fn (array $stage) => collect($stage)
+            ->map(fn (mixed $key): ?array => is_string($key) ? $visibleSegmentsByKey->get($key) : null)
+            ->filter(fn (mixed $segment): bool => is_array($segment))
+            ->values())
+        ->filter(fn ($stage): bool => $stage->isNotEmpty())
+        ->values();
+    $stagedSegmentKeys = $segmentStages
+        ->flatMap(fn ($stage) => $stage->pluck('key'))
+        ->unique();
+    $unstagedSegments = $visibleSegments
+        ->reject(fn (array $segment): bool => $stagedSegmentKeys->contains($segment['key']))
+        ->values();
+
+    if ($unstagedSegments->isNotEmpty()) {
+        $segmentStages->push($unstagedSegments);
+    }
+
+    $terminalSegmentKeys = collect($businessHighway['terminal_segment_keys'] ?? []);
+@endphp
 
 <article
     x-show="{{ $matchMethod }}(@js($filterItem))"
@@ -150,21 +153,38 @@
         data-process-highway-details="{{ $businessHighway['key'] }}"
         class="border-t border-slate-200 bg-slate-50/50 px-5 py-5 sm:px-7 sm:py-7"
     >
-        <div class="mx-auto max-w-5xl space-y-7">
-            @foreach($segmentGroups as $group)
-                <section data-process-highway-segment-group="{{ $group['key'] }}">
-                    <div class="mb-3">
-                        <h3 class="text-sm font-semibold text-slate-950">{{ $group['label'] }}</h3>
-                        @if($group['detail'])
-                            <p class="mt-1 text-xs leading-5 text-slate-600">{{ $group['detail'] }}</p>
-                        @endif
-                    </div>
+        <div class="mx-auto max-w-6xl" data-process-highway-road="{{ $businessHighway['key'] }}">
+            <div class="flex flex-col items-center" data-process-highway-road-origin>
+                <span class="rounded-full bg-slate-900 px-3 py-1 text-[0.68rem] font-bold uppercase tracking-[0.12em] text-white">Automatic path</span>
+                <span class="h-6 w-px bg-slate-300" aria-hidden="true"></span>
+                <svg viewBox="0 0 20 20" class="-mt-1 h-5 w-5 text-slate-400" fill="currentColor" aria-hidden="true">
+                    <path d="M5.25 7.5 10 12.25 14.75 7.5H5.25Z" />
+                </svg>
+            </div>
 
-                    <div class="space-y-4">
-                        @foreach($group['segments'] as $segment)
+            @foreach($segmentStages as $stageIndex => $stage)
+                @if(! $loop->first)
+                    <div class="flex h-12 flex-col items-center justify-center" data-process-highway-stage-connector>
+                        <span class="h-7 w-px bg-slate-300" aria-hidden="true"></span>
+                        <svg viewBox="0 0 20 20" class="-mt-1 h-5 w-5 text-slate-400" fill="currentColor" aria-hidden="true">
+                            <path d="M5.25 7.5 10 12.25 14.75 7.5H5.25Z" />
+                        </svg>
+                    </div>
+                @endif
+
+                <section data-process-highway-stage="{{ $stageIndex }}">
+                    @if($stage->count() > 1)
+                        <div class="mb-3 text-center" data-process-highway-parallel-stage>
+                            <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Independent paths at this point</p>
+                        </div>
+                    @endif
+
+                    <div class="space-y-5">
+                        @foreach($stage as $segment)
                             @include('crm.process-highway._segment', [
                                 'segment' => $segment,
                                 'businessHighwayKey' => $businessHighway['key'],
+                                'isTerminalSegment' => $terminalSegmentKeys->contains($segment['key']),
                             ])
                         @endforeach
                     </div>

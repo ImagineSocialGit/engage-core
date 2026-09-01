@@ -439,10 +439,20 @@ It includes:
 - module-tone wayfinding on every visible owned item;
 - progressive disclosure for implementation details;
 - exact safe navigation to authoritative editors;
-- responsive horizontal/vertical map treatment;
+- a north-to-south process road with responsive side exits;
 - no-result and optional-module empty states.
 
-The primary information hierarchy is business meaning first and implementation ownership second. The surface does not group by Campaigns versus Flow Routes. Inside one connected highway, eligibility-driven Campaign mechanisms sort before scoped reply orchestration, and reply acknowledgements follow the main orchestration. The ordering is presentation metadata only and does not change runtime execution.
+The primary information hierarchy is business meaning first and implementation ownership second. The surface does not group by Campaigns versus Flow Routes. Inside one connected Highway, explicit cross-segment handoffs determine north-to-south stages. Segments with the same entrance and no handoff between them occupy one parallel stage instead of being presented as a false sequence.
+
+The composed Highway read model exposes:
+
+```text
+segment_connections     explicit directed handoffs between module-owned segments
+segment_stages          topological north-to-south presentation layers
+terminal_segment_keys   segments with no downstream segment handoff
+```
+
+Outcomes from a non-terminal segment render as side exits because the main road continues into another segment. Outcomes from a terminal segment render below it as final exits. This is presentation metadata derived from the already composed graph; it does not introduce another workflow definition or alter runtime order. Reply acknowledgements remain attached to their matching orchestration segment.
 
 ## Fact navigation and exact exits
 
