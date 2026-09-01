@@ -3,6 +3,7 @@
 namespace App\Modules\FlowRoutes\Requests;
 
 use App\Modules\Core\Automation\CoreAutomationTriggerAuthoringContributor;
+use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Support\AutomationTriggers\AutomationTriggerAuthoringRegistry;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -20,6 +21,11 @@ class StoreFlowRouteRequest extends FormRequest
         $rules = [
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
+            'authoring_kind' => [
+                'nullable',
+                'string',
+                Rule::in(FlowRoute::AUTHORING_KINDS),
+            ],
             'trigger_authoring_key' => [
                 'required',
                 'string',
@@ -65,5 +71,14 @@ class StoreFlowRouteRequest extends FormRequest
     public function triggerAuthoringKey(): string
     {
         return trim((string) $this->validated('trigger_authoring_key'));
+    }
+
+    public function authoringKind(): string
+    {
+        $kind = trim((string) ($this->validated('authoring_kind') ?? ''));
+
+        return in_array($kind, FlowRoute::AUTHORING_KINDS, true)
+            ? $kind
+            : FlowRoute::AUTHORING_KIND_ROUTE;
     }
 }

@@ -492,6 +492,8 @@
 │   │   │   │   ├── ContactShow
 │   │   │   │   │   └── ContactRoutesVisibilityDataProvider.php
 │   │   │   │   ├── ContactStatusAutomationImpactResolver.php
+│   │   │   │   ├── FlowRouteActivationService.php
+│   │   │   │   ├── FlowRouteBindingConflictDetector.php
 │   │   │   │   ├── FlowRouteConditionEvaluatorRegistry.php
 │   │   │   │   ├── FlowRouteEditorCatalog.php
 │   │   │   │   ├── FlowRouteEntryCriteriaEvaluator.php
@@ -2678,6 +2680,7 @@
 │   │   │   ├── ContactTagAutomationCapabilityTest.php
 │   │   │   ├── FlowRouteAutomationEventExecutionContextTest.php
 │   │   │   ├── FlowRouteAutomationEventPersistenceTest.php
+│   │   │   ├── FlowRouteAutomationLifecycleTest.php
 │   │   │   ├── FlowRouteBindingControllerTest.php
 │   │   │   ├── FlowRouteConditionalStatusChangeTest.php
 │   │   │   ├── FlowRouteConditionBranchPointTest.php
@@ -3100,4 +3103,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-733 directories, 2368 files
+733 directories, 2371 files

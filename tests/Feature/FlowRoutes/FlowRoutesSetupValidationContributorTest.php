@@ -301,6 +301,55 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
         );
     }
 
+    public function test_it_reports_competing_status_changes_for_the_same_event_and_conditions(): void
+    {
+        $routes = collect(['engaged', 'application_started'])->map(function (string $statusKey): FlowRoute {
+            $route = FlowRoute::query()->create([
+                'key' => 'appointment_'.$statusKey,
+                'name' => 'Appointment '.str_replace('_', ' ', $statusKey),
+                'version' => 1,
+                'is_current_version' => true,
+                'trigger_type' => FlowRoute::TRIGGER_AUTOMATION_EVENT,
+                'trigger_key' => 'appointment.scheduled',
+                'is_active' => true,
+                'meta' => ['definition' => ['entry_conditions' => []]],
+            ]);
+
+            FlowRoutePoint::query()->create([
+                'flow_route_id' => $route->getKey(),
+                'key' => 'change_status_'.$statusKey,
+                'type' => FlowRoutePointType::ChangeStatus->value,
+                'name' => 'Change status',
+                'sort_order' => 10,
+                'is_start' => true,
+                'is_active' => true,
+                'definition' => ['contact_status_key' => $statusKey],
+                'settings' => [],
+                'cancel_conditions' => [],
+                'is_customized' => true,
+                'meta' => [],
+            ]);
+
+            FlowRouteTriggerBinding::query()->create([
+                'trigger_type' => $route->trigger_type,
+                'trigger_key' => $route->trigger_key,
+                'flow_route_id' => $route->getKey(),
+                'context_type' => null,
+                'context_id' => null,
+                'is_active' => true,
+                'meta' => [],
+            ]);
+
+            return $route;
+        });
+
+        $this->assertCount(2, $routes);
+        $this->assertContains(
+            'flow_routes.exclusive_effect_conflict',
+            array_column($this->findings(), 'code'),
+        );
+    }
+
     /**
      * @param array<string, mixed> $point
      * @return array<string, mixed>

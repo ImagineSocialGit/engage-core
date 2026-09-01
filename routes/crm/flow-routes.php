@@ -24,6 +24,15 @@ Route::middleware('module:flow_routes')
         Route::get('/{flowRoute}', [FlowRouteEditorController::class, 'show'])
             ->name('show');
 
+        Route::patch('/{flowRoute}/enabled', [FlowRouteEditorController::class, 'updateEnabled'])
+            ->name('enabled.update');
+
+        Route::patch('/{flowRoute}/kind', [FlowRouteEditorController::class, 'updateKind'])
+            ->name('kind.update');
+
+        Route::delete('/{flowRoute}', [FlowRouteEditorController::class, 'destroy'])
+            ->name('destroy');
+
         Route::patch('/{flowRoute}/start-delay', [FlowRouteEditorController::class, 'updateLeadInDelay'])
             ->name('start-delay.update');
 

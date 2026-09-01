@@ -6,14 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Modules\Core\Automation\CoreAutomationTriggerAuthoringContributor;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Requests\StoreFlowRouteRequest;
+use App\Modules\FlowRoutes\Services\FlowRouteBindingConflictDetector;
 use App\Modules\FlowRoutes\Services\FlowRouteEditorCatalog;
 use App\Modules\FlowRoutes\Services\FlowRoutePresentationResolver;
+use App\Support\AutomationTriggers\AutomationTriggerAuthoringRegistry;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use App\Support\AutomationTriggers\AutomationTriggerAuthoringRegistry;
 
 class FlowRouteController extends Controller
 {
@@ -21,6 +21,7 @@ class FlowRouteController extends Controller
         private readonly FlowRoutePresentationResolver $presentation,
         private readonly FlowRouteEditorCatalog $editorCatalog,
         private readonly AutomationTriggerAuthoringRegistry $triggerAuthoring,
+        private readonly FlowRouteBindingConflictDetector $conflicts,
     ) {}
 
     public function index(Request $request): View
@@ -32,121 +33,105 @@ class FlowRouteController extends Controller
                 'activeFlowRoutePoints.capability',
                 'activeTriggerBindings',
             ])
-            ->orderByDesc('is_active')
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->reject(fn (FlowRoute $route): bool => $route->isArchivedFromAuthoring())
+            ->values();
 
-        $presentedRoutes = $routeModels
-            ->map(fn (FlowRoute $route): array => $this->presentation->route($route));
+        $presentedRoutes = $routeModels->map(function (FlowRoute $route): array {
+            $presented = $this->presentation->route($route);
+            $presented['conflict_names'] = $presented['is_enabled']
+                ? $this->conflicts->conflictsFor($route)
+                    ->pluck('route.name')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all()
+                : [];
+
+            return $presented;
+        });
 
         $routes = $presentedRoutes
-            ->where('kind', 'route')
+            ->where('kind', FlowRoute::AUTHORING_KIND_ROUTE)
             ->values();
 
-        $routeEditors = $routeModels
-            ->filter(fn (FlowRoute $route): bool => ($this->presentation->route($route)['kind'] ?? null) === 'route')
-            ->mapWithKeys(function (FlowRoute $route): array {
-                $points = $route->flowRoutePoints
-                    ->where('is_active', true)
-                    ->sortBy('sort_order')
-                    ->values();
-
-                return [
-                    (int) $route->getKey() => [
-                        'model' => $route,
-                        'route' => $this->presentation->route($route),
-                        'points' => $points,
-                        'capabilities' => $this->editorCatalog->availableCapabilities($route),
-                    ],
-                ];
-            });
-
-        $automaticActions = $presentedRoutes
-            ->where('kind', 'automatic_action')
-            ->groupBy('group_key')
-            ->map(function (Collection $items): array {
-                $events = $items
-                    ->groupBy('trigger_key')
-                    ->map(function (Collection $eventItems): array {
-                        $first = $eventItems->first();
-                        $assignedItems = $eventItems
-                            ->filter(fn (array $item): bool => (int) $item['assignment_count'] > 0)
-                            ->values();
-                        $availableItems = $eventItems
-                            ->filter(fn (array $item): bool => (int) $item['assignment_count'] === 0)
-                            ->values();
-
-                        return [
-                            'key' => (string) ($first['trigger_key'] ?? 'other'),
-                            'label' => (string) ($first['trigger_summary'] ?? 'Automatic activity'),
-                            'assignment_query' => $first['assignment_query'] ?? [],
-                            'assignment_anchor' => $first['assignment_anchor'] ?? null,
-                            'assigned_items' => $assignedItems,
-                            'available_items' => $availableItems,
-                            'assigned_count' => $assignedItems->count(),
-                            'available_count' => $availableItems->count(),
-                        ];
-                    })
-                    ->sortBy('label')
-                    ->values();
-
-                return [
-                    'key' => (string) ($items->first()['group_key'] ?? 'other'),
-                    'label' => (string) ($items->first()['group_label'] ?? 'Other'),
-                    'events' => $events,
-                    'action_count' => $items->count(),
-                    'assigned_count' => $items->where('assignment_count', '>', 0)->count(),
-                ];
-            })
-            ->sortBy('label')
+        $automaticBehaviors = $presentedRoutes
+            ->where('kind', FlowRoute::AUTHORING_KIND_AUTOMATIC_BEHAVIOR)
+            ->sortBy(fn (array $route): string => ($route['group_label'] ?? '').($route['trigger_summary'] ?? '').$route['name'])
             ->values();
+
+        $presentedById = $presentedRoutes->keyBy('id');
+        $routeEditors = $routeModels->mapWithKeys(function (FlowRoute $route) use ($presentedById): array {
+            $points = $route->flowRoutePoints
+                ->where('is_active', true)
+                ->sortBy('sort_order')
+                ->values();
+
+            return [
+                (int) $route->getKey() => [
+                    'model' => $route,
+                    'route' => $presentedById->get((int) $route->getKey()),
+                    'points' => $points,
+                    'capabilities' => $this->editorCatalog->availableCapabilities($route),
+                ],
+            ];
+        });
 
         $requestedEditorId = $request->integer('edit_route');
         $requestedStatusKey = trim((string) $request->query('status', ''));
-        $createRouteTriggers = $this->triggerAuthoring->presentation();
-        $statusTrigger = collect($createRouteTriggers)->firstWhere(
+        $createTriggers = $this->triggerAuthoring->presentation();
+        $statusTrigger = collect($createTriggers)->firstWhere(
             'key',
             CoreAutomationTriggerAuthoringContributor::CONTACT_STATUS,
         );
         $selectedStatusOption = $requestedStatusKey !== '' && is_array($statusTrigger)
             ? collect($statusTrigger['fields'][0]['options'] ?? [])->firstWhere('key', $requestedStatusKey)
             : null;
-        $createRouteStatusId = is_array($selectedStatusOption)
+        $createStatusId = is_array($selectedStatusOption)
             ? ($selectedStatusOption['value'] ?? null)
             : null;
-        $createRouteTriggerValues = collect($createRouteTriggers)
+        $createTriggerValues = collect($createTriggers)
             ->flatMap(fn (array $trigger): array => $trigger['fields'] ?? [])
             ->mapWithKeys(fn (array $field): array => [
                 (string) $field['name'] => old((string) $field['name'], ''),
             ])
             ->all();
-        $createRouteTriggerValues['contact_status_id'] = old(
+        $createTriggerValues['contact_status_id'] = old(
             'contact_status_id',
-            $createRouteStatusId ?? ($createRouteTriggerValues['contact_status_id'] ?? ''),
+            $createStatusId ?? ($createTriggerValues['contact_status_id'] ?? ''),
         );
+        $requestedCreateKind = (string) old(
+            'authoring_kind',
+            $request->query('create_kind', FlowRoute::AUTHORING_KIND_ROUTE),
+        );
+
+        if (! in_array($requestedCreateKind, FlowRoute::AUTHORING_KINDS, true)) {
+            $requestedCreateKind = FlowRoute::AUTHORING_KIND_ROUTE;
+        }
 
         return view('crm.flow-routes.index', [
             'routes' => $routes,
+            'automaticBehaviors' => $automaticBehaviors,
             'routeEditors' => $routeEditors,
             'editorOptions' => $this->editorCatalog->editorOptions(),
             'openRouteEditorId' => $routeEditors->has($requestedEditorId) ? $requestedEditorId : null,
             'openCreateRoute' => $request->boolean('create')
                 || (string) $request->session()->getOldInput('_flow_route_create') === '1',
-            'createRouteTriggers' => $createRouteTriggers,
+            'openCreateKind' => $requestedCreateKind,
+            'createRouteTriggers' => $createTriggers,
             'createRouteTriggerKey' => old(
                 'trigger_authoring_key',
                 $requestedStatusKey !== ''
                     ? CoreAutomationTriggerAuthoringContributor::CONTACT_STATUS
-                    : ($createRouteTriggers[0]['key'] ?? null),
+                    : ($createTriggers[0]['key'] ?? null),
             ),
-            'createRouteTriggerValues' => $createRouteTriggerValues,
-            'automaticActions' => $automaticActions,
+            'createRouteTriggerValues' => $createTriggerValues,
             'routeSummary' => [
                 'routes' => $routes->count(),
-                'automatic_actions' => $automaticActions->sum(
-                    fn (array $group): int => (int) $group['action_count'],
-                ),
-                'unassigned_routes' => $routes->where('assignment_count', 0)->count(),
+                'automatic_behaviors' => $automaticBehaviors->count(),
+                'enabled' => $presentedRoutes->where('is_enabled', true)->count(),
+                'conflicts' => $presentedRoutes->filter(fn (array $route): bool => $route['conflict_names'] !== [])->count(),
             ],
         ]);
     }
@@ -157,6 +142,7 @@ class FlowRouteController extends Controller
             $request->triggerAuthoringKey(),
             $request->validated(),
         );
+        $kind = $request->authoringKind();
 
         $route = FlowRoute::query()->create([
             'key' => 'crm_route_'.Str::lower((string) Str::uuid()),
@@ -170,13 +156,14 @@ class FlowRouteController extends Controller
             'is_current_version' => true,
             'trigger_type' => $selection->triggerType,
             'trigger_key' => $selection->triggerKey,
-            'is_active' => true,
+            'is_active' => false,
             'source_version' => null,
             'is_customized' => true,
             'customized_at' => now(),
             'meta' => [
                 'authoring' => [
                     'source' => 'crm',
+                    'kind' => $kind,
                     'trigger_authoring_key' => $request->triggerAuthoringKey(),
                 ],
                 'definition' => [
@@ -185,8 +172,12 @@ class FlowRouteController extends Controller
             ],
         ]);
 
+        $label = $kind === FlowRoute::AUTHORING_KIND_AUTOMATIC_BEHAVIOR
+            ? 'Automatic behavior'
+            : 'Route';
+
         return redirect()
             ->route('crm.flow-routes.index', ['edit_route' => $route->getKey()])
-            ->with('status', 'Route created. Add its Points, then choose it in Assignments when it is ready to run.');
+            ->with('status', "{$label} created. Add its action, review it, and turn it on when it is ready.");
     }
 }

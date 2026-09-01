@@ -24,6 +24,14 @@ class FlowRoute extends Model
     public const TRIGGER_CONTACT_STATUS = 'contact_status';
     public const TRIGGER_AUTOMATION_EVENT = 'automation_event';
 
+    public const AUTHORING_KIND_ROUTE = 'route';
+    public const AUTHORING_KIND_AUTOMATIC_BEHAVIOR = 'automatic_behavior';
+
+    public const AUTHORING_KINDS = [
+        self::AUTHORING_KIND_ROUTE,
+        self::AUTHORING_KIND_AUTOMATIC_BEHAVIOR,
+    ];
+
     public const TRIGGERS = [
         self::TRIGGER_MANUAL,
         self::TRIGGER_CONTACT_STATUS,
@@ -183,5 +191,36 @@ class FlowRoute extends Model
     public function scopeNotCustomized(Builder $query): Builder
     {
         return $query->where('is_customized', false);
+    }
+
+    public function authoringKind(): string
+    {
+        $kind = data_get($this->meta, 'authoring.kind');
+
+        if (is_string($kind) && in_array($kind, self::AUTHORING_KINDS, true)) {
+            return $kind;
+        }
+
+        if (data_get($this->meta, 'authoring.source') === 'crm') {
+            return self::AUTHORING_KIND_ROUTE;
+        }
+
+        $pointCount = $this->relationLoaded('activeFlowRoutePoints')
+            ? $this->activeFlowRoutePoints->count()
+            : $this->activeFlowRoutePoints()->count();
+
+        return $this->trigger_type === self::TRIGGER_AUTOMATION_EVENT && $pointCount === 1
+            ? self::AUTHORING_KIND_AUTOMATIC_BEHAVIOR
+            : self::AUTHORING_KIND_ROUTE;
+    }
+
+    public function isAutomaticBehavior(): bool
+    {
+        return $this->authoringKind() === self::AUTHORING_KIND_AUTOMATIC_BEHAVIOR;
+    }
+
+    public function isArchivedFromAuthoring(): bool
+    {
+        return filled(data_get($this->meta, 'authoring.archived_at'));
     }
 }

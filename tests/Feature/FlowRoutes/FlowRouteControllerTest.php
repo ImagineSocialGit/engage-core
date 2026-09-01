@@ -170,7 +170,7 @@ class FlowRouteControllerTest extends TestCase
             ->assertSee('aria-label="Route flow"', false)
             ->assertSee('data-module="tasks"', false)
             ->assertSee('data-flow-route-point-module-filters', false)
-            ->assertSee(
+            ->assertDontSee(
                 route('crm.flow-routes.bindings.index'),
                 false,
             );
@@ -225,8 +225,11 @@ class FlowRouteControllerTest extends TestCase
             ->assertSee('webinar.attended')
             ->assertSee('Attended Webinar')
             ->assertSee('Webinar Attended Nurture')
-            ->assertDontSee($assignedRoute->name)
-            ->assertDontSee($availableRoute->name);
+            ->assertSee($assignedRoute->name)
+            ->assertSee($availableRoute->name)
+            ->assertSee('Automatic behaviors')
+            ->assertSee('Turn off')
+            ->assertSee('Turn on');
 
         $this->assertFalse($availableRoute->activeTriggerBindings()->exists());
     }

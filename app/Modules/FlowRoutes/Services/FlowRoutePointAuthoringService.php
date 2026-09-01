@@ -30,6 +30,12 @@ class FlowRoutePointAuthoringService
     ): FlowRoutePoint {
         $this->ensureRouteCanBeChanged($route);
 
+        if ($route->isAutomaticBehavior() && $route->activeFlowRoutePoints()->exists()) {
+            throw ValidationException::withMessages([
+                'capability_id' => 'An Automatic behavior can contain only one action. Turn it into a Route before adding another action.',
+            ]);
+        }
+
         $capability = FlowRouteCapability::query()
             ->active()
             ->findOrFail($capabilityId);
@@ -294,6 +300,10 @@ class FlowRoutePointAuthoringService
 
             $this->markRouteCustomized($route);
             $this->rebuildSequence($route);
+
+            if ($proposedOrder->isEmpty()) {
+                $route->activeTriggerBindings()->global()->update(['is_active' => false]);
+            }
         });
     }
 

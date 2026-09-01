@@ -8,6 +8,7 @@ use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
 use App\Modules\FlowRoutes\Requests\UpdateFlowRouteTriggerBindingRequest;
 use App\Modules\FlowRoutes\Services\FlowRoutePresentationResolver;
+use App\Modules\FlowRoutes\Services\FlowRouteBindingConflictDetector;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
@@ -18,6 +19,7 @@ class FlowRouteBindingController extends Controller
 {
     public function __construct(
         private readonly FlowRoutePresentationResolver $presentation,
+        private readonly FlowRouteBindingConflictDetector $conflicts,
     ) {}
 
     public function index(): View
@@ -126,6 +128,12 @@ class FlowRouteBindingController extends Controller
         string $triggerKey,
         int $flowRouteId,
     ): FlowRouteTriggerBinding {
+        $route = FlowRoute::query()
+            ->with('activeFlowRoutePoints')
+            ->findOrFail($flowRouteId);
+
+        $this->conflicts->assertNoConflicts($route);
+
         $binding = FlowRouteTriggerBinding::query()->firstOrNew([
             'trigger_type' => $triggerType,
             'trigger_key' => $triggerKey,

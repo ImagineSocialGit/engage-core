@@ -10,6 +10,7 @@ use App\Modules\FlowRoutes\Models\FlowRouteCapability;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
 use App\Modules\FlowRoutes\Services\FlowRoutePresetDefinitionFactory;
+use App\Modules\FlowRoutes\Services\FlowRouteBindingConflictDetector;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Support\AutomationCapabilities\AutomationCapabilityRegistry;
 use App\Support\AutomationCapabilities\AutomationPointDefinitionRegistry;
@@ -34,6 +35,7 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
         private readonly AutomationPointDefinitionRegistry $pointDefinitionRegistry,
         private readonly PointHandlerRegistry $pointHandlerRegistry,
         private readonly FlowRoutePresetDefinitionFactory $definitionFactory,
+        private readonly FlowRouteBindingConflictDetector $bindingConflicts,
         private readonly ModuleManager $moduleManager,
         private readonly PresetCompositionResolver $compositionResolver,
         private readonly PresetPackageResolver $packageResolver,
@@ -46,6 +48,7 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
         yield from $this->validateRuntimeRoutes();
         yield from $this->validateRunnableInstances();
         yield from $this->validateActiveTriggerBindings();
+        yield from $this->validateExclusiveEffectConflicts();
     }
 
     /**
@@ -526,6 +529,28 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
                     context: ['binding_id' => $binding->getKey()],
                 );
             }
+        }
+    }
+
+    /**
+     * @return iterable<int, SetupValidationFinding>
+     */
+    private function validateExclusiveEffectConflicts(): iterable
+    {
+        foreach ($this->bindingConflicts->activeConflicts() as $conflict) {
+            $first = $conflict['first'];
+            $second = $conflict['second'];
+
+            yield $this->error(
+                code: 'flow_routes.exclusive_effect_conflict',
+                message: "FlowRoutes [{$first->key}] and [{$second->key}] run from the same event and both change the same exclusive business fact. Turn off, edit, or delete one automation.",
+                path: "flow_routes.{$second->getKey()}.trigger_bindings",
+                context: [
+                    'first_route_key' => $first->key,
+                    'second_route_key' => $second->key,
+                    'effects' => $conflict['effects'],
+                ],
+            );
         }
     }
 

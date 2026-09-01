@@ -17,6 +17,10 @@ class FlowRouteEditorCatalog
     /** @return Collection<int, array<string, mixed>> */
     public function availableCapabilities(FlowRoute $route): Collection
     {
+        if ($route->isAutomaticBehavior() && $route->activeFlowRoutePoints()->exists()) {
+            return collect();
+        }
+
         return FlowRouteCapability::query()
             ->active()
             ->whereIn('point_type', $this->authoring->registeredTypes())

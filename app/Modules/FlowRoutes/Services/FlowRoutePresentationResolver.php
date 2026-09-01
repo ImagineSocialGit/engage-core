@@ -35,10 +35,7 @@ class FlowRoutePresentationResolver
             ? $route->activeTriggerBindings
             : $route->activeTriggerBindings()->get();
 
-        $kind = $points->count() === 1
-            && $route->trigger_type === FlowRoute::TRIGGER_AUTOMATION_EVENT
-                ? 'automatic_action'
-                : 'route';
+        $kind = $route->authoringKind();
         $group = $this->groupForRoute($route);
         $summaryPoints = $this->routeSummaryPoints($route, $points);
         $entryConditions = $this->entryConditions($route);
@@ -53,7 +50,7 @@ class FlowRoutePresentationResolver
             'is_active' => (bool) $route->is_active,
             'is_current_version' => (bool) $route->is_current_version,
             'kind' => $kind,
-            'kind_label' => $kind === 'route' ? 'Route' : 'Automatic action',
+            'kind_label' => $kind === FlowRoute::AUTHORING_KIND_ROUTE ? 'Route' : 'Automatic behavior',
             'group_key' => $group['key'],
             'group_label' => $group['label'],
             'trigger_type' => (string) $route->trigger_type,
@@ -63,6 +60,7 @@ class FlowRoutePresentationResolver
                 ? [$this->entryConditionSummary($entryConditions)]
                 : [],
             'assignment_count' => $activeBindings->count(),
+            'is_enabled' => $activeBindings->isNotEmpty(),
             'assignment_summary' => $this->assignmentSummary($activeBindings),
             'assignment_query' => $this->assignmentQuery($route),
             'assignment_anchor' => $this->assignmentAnchor($route),

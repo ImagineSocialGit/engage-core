@@ -11,6 +11,7 @@ use App\Modules\FlowRoutes\Requests\UpdateFlowRouteLeadInDelayRequest;
 use App\Modules\FlowRoutes\Requests\UpdateFlowRoutePointOrderRequest;
 use App\Modules\FlowRoutes\Requests\UpdateFlowRoutePointRequest;
 use App\Modules\FlowRoutes\Services\FlowRoutePointAuthoringService;
+use App\Modules\FlowRoutes\Services\FlowRouteActivationService;
 use App\Support\Guidance\FirstUseGuidance;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,6 +21,7 @@ class FlowRouteEditorController extends Controller
 {
     public function __construct(
         private readonly FlowRoutePointAuthoringService $authoring,
+        private readonly FlowRouteActivationService $activation,
         private readonly FirstUseGuidance $guidance,
     ) {}
 
@@ -30,6 +32,51 @@ class FlowRouteEditorController extends Controller
         return redirect()->route('crm.flow-routes.index', [
             'edit_route' => $flowRoute->getKey(),
         ]);
+    }
+
+    public function updateEnabled(Request $request, FlowRoute $flowRoute): RedirectResponse
+    {
+        $this->ensureCurrentVersion($flowRoute);
+        $validated = $request->validate([
+            'enabled' => ['required', 'boolean'],
+        ]);
+
+        if ((bool) $validated['enabled']) {
+            $this->activation->enable($flowRoute);
+            $message = 'Automation turned on.';
+        } else {
+            $this->activation->disable($flowRoute);
+            $message = 'Automation turned off. Work already in progress is not canceled.';
+        }
+
+        return redirect()->route('crm.flow-routes.index')->with('status', $message);
+    }
+
+    public function updateKind(Request $request, FlowRoute $flowRoute): RedirectResponse
+    {
+        $this->ensureCurrentVersion($flowRoute);
+        $validated = $request->validate([
+            'authoring_kind' => ['required', 'string', 'in:route,automatic_behavior'],
+        ]);
+
+        $this->activation->changeKind($flowRoute, (string) $validated['authoring_kind']);
+
+        return $this->redirectToEditor(
+            $flowRoute,
+            $validated['authoring_kind'] === FlowRoute::AUTHORING_KIND_ROUTE
+                ? 'This is now a Route. You can add more actions.'
+                : 'This is now an Automatic behavior.',
+        );
+    }
+
+    public function destroy(FlowRoute $flowRoute): RedirectResponse
+    {
+        $this->ensureCurrentVersion($flowRoute);
+        $this->activation->archive($flowRoute);
+
+        return redirect()
+            ->route('crm.flow-routes.index')
+            ->with('status', 'Automation deleted. Historical activity was preserved.');
     }
 
     public function storePoint(

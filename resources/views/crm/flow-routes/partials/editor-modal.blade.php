@@ -3,6 +3,7 @@
     $routePresentation = $editor['route'];
     $points = $editor['points'];
     $capabilities = $editor['capabilities'];
+    $isAutomaticBehavior = $routePresentation['kind'] === \App\Modules\FlowRoutes\Models\FlowRoute::AUTHORING_KIND_AUTOMATIC_BEHAVIOR;
     $leadInWait = $points->first()?->type === \App\Modules\FlowRoutes\Enums\FlowRoutePointType::Wait->value
         ? $points->first()
         : null;
@@ -84,7 +85,7 @@
         <header class="flex items-start justify-between gap-3 border-b border-orange-100 px-4 py-4 sm:gap-4 sm:px-7 sm:py-5">
             <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
-                    <p class="text-sm font-semibold uppercase tracking-[0.16em] text-orange-800">Route editor</p>
+                    <p class="text-sm font-semibold uppercase tracking-[0.16em] text-orange-800">{{ $isAutomaticBehavior ? 'Automatic behavior' : 'Route editor' }}</p>
 
                     @if($flowRoute->is_customized)
                         <span class="rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-900 ring-1 ring-orange-200">
@@ -108,7 +109,7 @@
                 type="button"
                 @click="closeRoute()"
                 class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-xl text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
-                aria-label="Close Route editor"
+                aria-label="Close automation editor"
             >
                 ×
             </button>
@@ -148,6 +149,7 @@
                 @endforeach
             </section>
 
+            @unless($isAutomaticBehavior)
             <section
                 x-data="{
                     startTiming: @js($startTimingValue),
@@ -286,13 +288,14 @@
                     </div>
                 </form>
             </section>
+            @endunless
 
             <section class="mt-7">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div>
-                        <h3 class="text-lg font-semibold tracking-tight text-slate-950">Actions</h3>
+                        <h3 class="text-lg font-semibold tracking-tight text-slate-950">{{ $isAutomaticBehavior ? 'Action' : 'Actions' }}</h3>
                         <p class="mt-1 text-sm leading-6 text-slate-700">
-                            The first action happens after any lead-in delay. Actions normally continue from top to bottom; a Decision can direct the Route to a later action or end it.
+                            {{ $isAutomaticBehavior ? 'This one action happens when the event above occurs.' : 'The first action happens after any lead-in delay. Actions normally continue from top to bottom; a Decision can direct the Route to a later action or end it.' }}
                         </p>
                     </div>
 
@@ -565,6 +568,31 @@
                 </div>
             </section>
 
+            @if(! $isAutomaticBehavior && $points->count() === 1)
+                <section class="mt-6 rounded-2xl border border-sky-200 bg-sky-50 p-4 sm:p-5">
+                    <h3 class="font-semibold text-sky-950">This Route currently has one action</h3>
+                    <p class="mt-1 text-sm leading-6 text-sky-900">If it should finish after that action, make it an Automatic behavior. If more work belongs here, keep building the Route.</p>
+                    <form method="POST" action="{{ route('crm.flow-routes.kind.update', $flowRoute) }}" class="mt-3">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="authoring_kind" value="automatic_behavior">
+                        <button type="submit" class="rounded-xl border border-sky-300 bg-white px-4 py-2.5 text-sm font-semibold text-sky-950 shadow-sm hover:bg-sky-100">Make Automatic behavior</button>
+                    </form>
+                </section>
+            @elseif($isAutomaticBehavior && $businessPoints->count() === 1)
+                <section class="mt-6 rounded-2xl border border-orange-200 bg-orange-50 p-4 sm:p-5">
+                    <h3 class="font-semibold text-orange-950">Need another action?</h3>
+                    <p class="mt-1 text-sm leading-6 text-orange-900">Turn this into a Route first, then add actions, decisions, or waits.</p>
+                    <form method="POST" action="{{ route('crm.flow-routes.kind.update', $flowRoute) }}" class="mt-3">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="authoring_kind" value="route">
+                        <button type="submit" class="rounded-xl border border-orange-300 bg-white px-4 py-2.5 text-sm font-semibold text-orange-950 shadow-sm hover:bg-orange-100">Turn into Route</button>
+                    </form>
+                </section>
+            @endif
+
+            @if(! $isAutomaticBehavior || $businessPoints->isEmpty())
             <section
                 class="mt-8 border-t border-orange-100 pt-7"
                 x-data="{
@@ -708,6 +736,7 @@
                     @endforelse
                 </div>
             </section>
+            @endif
         </div>
     </div>
 </div>
