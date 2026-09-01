@@ -24,11 +24,12 @@ use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Modules\FlowRoutes\Services\ProcessHighway\FlowRoutesProcessHighwayContributor;
 use App\Modules\FlowRoutes\Services\ProcessHighway\FlowRoutesProcessHighwayEntryRampActionContributor;
 use App\Modules\FlowRoutes\Services\ReplyProfiles\FlowRouteReplyProfileDependencyContributor;
+use App\Modules\FlowRoutes\Validation\FlowRouteCapabilityMaterializationSetupValidationContributor;
 use App\Modules\FlowRoutes\Validation\FlowRoutesSetupValidationContributor;
 use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
 use App\Support\AutomationCapabilities\AutomationPointAuthoringRegistry;
-use App\Support\AutomationTriggers\AutomationTriggerAuthoringRegistry;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
+use App\Support\AutomationTriggers\AutomationTriggerAuthoringRegistry;
 use App\Support\ReplyHandling\ReplyProfileDependencyRegistry;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -73,6 +74,7 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
 
         $this->app->tag([
             FlowRoutesSetupValidationContributor::class,
+            FlowRouteCapabilityMaterializationSetupValidationContributor::class,
         ], 'setup.validation_contributors');
 
         $this->app->tag([

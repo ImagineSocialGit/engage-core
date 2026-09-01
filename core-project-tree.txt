@@ -511,6 +511,7 @@
 │   │   │   │       └── FlowRouteReplyProfileDependencyContributor.php
 │   │   │   ├── Support
 │   │   │   └── Validation
+│   │   │       ├── FlowRouteCapabilityMaterializationSetupValidationContributor.php
 │   │   │       └── FlowRoutesSetupValidationContributor.php
 │   │   ├── Forms
 │   │   │   ├── Actions
@@ -2682,6 +2683,7 @@
 │   │   │   ├── FlowRouteAutomationEventPersistenceTest.php
 │   │   │   ├── FlowRouteAutomationLifecycleTest.php
 │   │   │   ├── FlowRouteBindingControllerTest.php
+│   │   │   ├── FlowRouteCapabilityMaterializationSetupValidationContributorTest.php
 │   │   │   ├── FlowRouteConditionalStatusChangeTest.php
 │   │   │   ├── FlowRouteConditionBranchPointTest.php
 │   │   │   ├── FlowRouteControllerTest.php
@@ -3103,4 +3105,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-733 directories, 2371 files
+733 directories, 2373 files
