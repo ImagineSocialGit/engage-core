@@ -350,7 +350,7 @@
             <section data-process-highway-audience class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div>
-                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">1 · Choose an audience</p>
+                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">1 · Choose a Contact Set</p>
                         <h2 class="mt-2 text-xl font-semibold tracking-tight text-slate-950">What happens automatically to these contacts?</h2>
                         <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                             Choose at least one contact fact. Exact processes appear first; processes that use your selection as only part of their entrance appear separately.
