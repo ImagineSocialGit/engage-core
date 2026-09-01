@@ -21,7 +21,7 @@ class TasksAutomationPointAuthoringContributor implements AutomationPointAuthori
         yield new AutomationPointAuthoringDefinition(
             pointType: 'create_task',
             moduleKey: 'tasks',
-            name: 'Create a Task automatically',
+            name: 'Create a Task from a Template',
             description: 'Create a new Task from a reusable Task Template every time a record reaches this Point.',
             tip: 'Automatic Task creation requires a Task Template so the same work, responsibility, assignment, timing, and linked-record defaults stay consistent.',
             useCases: [

@@ -24,7 +24,7 @@ class AppointmentTaskAutomationPointAuthoringContributor implements AutomationPo
         yield new AutomationPointAuthoringDefinition(
             pointType: 'create_appointment_task',
             moduleKey: 'scheduling',
-            name: 'Create appointment task',
+            name: 'Create appointment-related task',
             description: 'Create a Task due before or after the Appointment and optionally assign it to the Appointment host.',
             tip: 'The due date follows the Appointment. If it is rescheduled, the open Task moves with it; if it is canceled, the open Task is canceled.',
             useCases: [

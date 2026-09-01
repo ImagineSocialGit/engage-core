@@ -80,7 +80,7 @@ class CampaignsAutomationPointAuthoringContributor implements AutomationPointAut
         yield new AutomationPointAuthoringDefinition(
             pointType: self::POINT_PAUSE_FAMILY,
             moduleKey: 'campaigns',
-            name: 'Pause Current Nurture',
+            name: 'Pause Active Campaigns In A Group',
             description: 'Temporarily pause the contact’s open Campaign enrollment in a selected Campaign family.',
             tip: 'Use this for reply handling so the Route does not need to know which specific nurture Campaign the contact entered.',
             useCases: [
@@ -94,7 +94,7 @@ class CampaignsAutomationPointAuthoringContributor implements AutomationPointAut
         yield new AutomationPointAuthoringDefinition(
             pointType: self::POINT_CANCEL_FAMILY,
             moduleKey: 'campaigns',
-            name: 'Stop Current Nurture',
+            name: 'Stop Active Campaigns In A Group',
             description: 'Permanently stop the contact’s open Campaign enrollment in a selected Campaign family.',
             tip: 'Use this for lifecycle cleanup so the Route does not need a list of every Campaign that could be running.',
             useCases: [
