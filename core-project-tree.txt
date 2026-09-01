@@ -1624,6 +1624,18 @@
 │       │   ├── RelationshipLocationAreaBridge.php
 │       │   ├── RelationshipLocationAreaImportHandler.php
 │       │   └── Scheduling
+│       │       ├── Automation
+│       │       │   ├── AppointmentHostNotificationAutomationCapabilityContributor.php
+│       │       │   ├── AppointmentHostNotificationAutomationPointAuthoringContributor.php
+│       │       │   ├── AppointmentHostNotificationAutomationPointDefinitionContributor.php
+│       │       │   ├── AppointmentHostNotificationScheduler.php
+│       │       │   ├── AppointmentTaskAutomationCapabilityContributor.php
+│       │       │   ├── AppointmentTaskAutomationPointAuthoringContributor.php
+│       │       │   ├── AppointmentTaskAutomationPointDefinitionContributor.php
+│       │       │   ├── CreateAppointmentTaskAutomationActionHandler.php
+│       │       │   ├── NotifyAppointmentHostAutomationActionHandler.php
+│       │       │   ├── ReconcileAppointmentHostNotifications.php
+│       │       │   └── ReconcileAppointmentTasks.php
 │       │       ├── Contracts
 │       │       │   └── AppointmentCommunications.php
 │       │       ├── Messaging
@@ -2187,6 +2199,7 @@
 │   │   │   ├── module_state.md
 │   │   │   └── TODO.md
 │   │   ├── scheduling
+│   │   │   ├── appointment-relative-flow-route-automation.md
 │   │   │   ├── module_state.md
 │   │   │   └── TODO.md
 │   │   ├── tasks
@@ -2757,6 +2770,7 @@
 │   │   │   ├── ContactPermissionInvitationControllerTest.php
 │   │   │   ├── ContactPermissionInvitationServiceTest.php
 │   │   │   ├── ContactScheduledMessagesTerminalResultTest.php
+│   │   │   ├── ContextualMessageFieldCatalogTest.php
 │   │   │   ├── CreateReusableMessageTemplateActionTest.php
 │   │   │   ├── CtaEngagementTrackingTest.php
 │   │   │   ├── DirectMessageTemplateAutomationRuntimeTest.php
@@ -2922,9 +2936,12 @@
 │   │   │   ├── ReportingWorkspaceTest.php
 │   │   │   └── SchedulingDailyProjectionTest.php
 │   │   ├── Scheduling
+│   │   │   ├── AppointmentAutomationAuthoringTest.php
 │   │   │   ├── AppointmentCommunicationsAuthoringTest.php
 │   │   │   ├── AppointmentCommunicationsLifecycleTest.php
+│   │   │   ├── AppointmentHostNotificationAutomationTest.php
 │   │   │   ├── AppointmentLifecycleActionTest.php
+│   │   │   ├── AppointmentTaskAutomationRuntimeTest.php
 │   │   │   ├── BookableSlotOfferAndBookingHoldActionTest.php
 │   │   │   ├── BookingHoldConversionAndReleaseActionTest.php
 │   │   │   ├── CreateAppointmentActionTest.php
@@ -3083,4 +3100,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-732 directories, 2352 files
+733 directories, 2368 files
