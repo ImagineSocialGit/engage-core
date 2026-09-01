@@ -59,7 +59,10 @@
         @if($hasAttachedOutcomes)
             <aside class="space-y-3 lg:border-l lg:border-black/10 lg:pl-5" aria-label="What this can cause">
                 @foreach($segment['mechanism_outcomes'] ?? [] as $outcome)
-                    @include('crm.process-highway._outcome', ['outcome' => $outcome])
+                    @include('crm.process-highway._outcome', [
+                        'outcome' => $outcome,
+                        'businessHighwayKey' => $businessHighwayKey,
+                    ])
                 @endforeach
 
                 @foreach($journeyNodesWithOutcomes as $node)
@@ -67,7 +70,11 @@
                         <p class="text-xs font-semibold text-slate-600">{{ $node['label'] }}</p>
                         <div class="mt-2 space-y-2">
                             @foreach($node['outcomes'] as $outcome)
-                                @include('crm.process-highway._outcome', ['outcome' => $outcome, 'compact' => true])
+                                @include('crm.process-highway._outcome', [
+                                    'outcome' => $outcome,
+                                    'businessHighwayKey' => $businessHighwayKey,
+                                    'compact' => true,
+                                ])
                             @endforeach
                         </div>
                     </div>
@@ -78,7 +85,11 @@
                         <p class="text-xs font-semibold text-slate-600">{{ $group['trigger_node']['label'] }}</p>
                         <div class="mt-2 space-y-2">
                             @foreach($group['outcomes'] as $outcome)
-                                @include('crm.process-highway._outcome', ['outcome' => $outcome, 'compact' => true])
+                                @include('crm.process-highway._outcome', [
+                                    'outcome' => $outcome,
+                                    'businessHighwayKey' => $businessHighwayKey,
+                                    'compact' => true,
+                                ])
                             @endforeach
                         </div>
                     </div>

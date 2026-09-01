@@ -1,4 +1,3 @@
-
 @php($filterItem = [
     'key' => $businessHighway['key'],
     'subject_key' => $businessHighway['subject_key'],
@@ -163,7 +162,10 @@
 
                     <div class="space-y-4">
                         @foreach($group['segments'] as $segment)
-                            @include('crm.process-highway._segment', ['segment' => $segment])
+                            @include('crm.process-highway._segment', [
+                                'segment' => $segment,
+                                'businessHighwayKey' => $businessHighway['key'],
+                            ])
                         @endforeach
                     </div>
                 </section>

@@ -412,7 +412,7 @@ Each Route exposes:
 - links into a Campaign mechanism when a Point starts that Campaign;
 - exact Route and Point edit identities.
 
-For `inbound_message.normal_reply`, a Route whose branch conditions positively scope `reply_profile_key` uses those reply-profile semantic nodes as its visible trigger. It does not use the global inbound-reply event as its composition identity. This prevents unrelated reply Routes from collapsing into one highway and lets the Route attach after the Campaign message journey that emits the same profile.
+For `inbound_message.normal_reply`, a Route whose route-level entry conditions positively scope `reply_profile_key` uses those reply-profile semantic nodes as its visible trigger. Older definitions that put this positive scope in a branch condition retain the same projection as a compatibility fallback. Route-level entry conditions take precedence because they decide whether the Route starts at all. The Route does not use the global inbound-reply event as its composition identity. This prevents unrelated reply Routes from collapsing into one highway and lets the Route attach after the Campaign message journey that emits the same profile.
 
 Unscoped automation-event Routes continue to expose the ordinary automation-event trigger. A Flow Route with multiple positive reply-profile values deliberately represents one orchestration mechanism shared by those business entrances.
 
@@ -443,6 +443,20 @@ It includes:
 - no-result and optional-module empty states.
 
 The primary information hierarchy is business meaning first and implementation ownership second. The surface does not group by Campaigns versus Flow Routes. Inside one connected highway, eligibility-driven Campaign mechanisms sort before scoped reply orchestration, and reply acknowledgements follow the main orchestration. The ordering is presentation metadata only and does not change runtime execution.
+
+## Fact navigation and exact exits
+
+Durable outcome facts link back to Process Highway with the produced qualifier selected. A fact selection is a view of the matching contact set, not another process definition.
+
+The fact inspector is deliberately inbound-only. It shows the current matching-contact count and the configured ways that the fact can be applied. Automatic sources link to their authoritative owner and, when the same source produces the fact from one or more composed Highways, expose one exact-exit link per originating Highway. Manual, imported, and other non-automatic sources remain secondary context. Downstream programs, recommendations, and entry actions stay on the main Highway surface rather than being repeated in the inspector.
+
+An exact-exit destination uses both parts of the read-model contract:
+
+```text
+?highway=<semantic highway key>#<exact exit anchor>
+```
+
+The query parameter restores the originating Highway's subject, lane mode, relationship scope, and entry facts, then pins that Highway as the exact result. The fragment expands the Highway, waits for the expanded layout to settle, moves focus to the precise outcome, centers it in the viewport, and applies a temporary visual emphasis. Invalid Highway keys and malformed or missing anchors fail safely without changing the ordinary filter experience.
 
 ## Campaign actionability and immutable authoring
 

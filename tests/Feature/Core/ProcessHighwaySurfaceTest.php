@@ -40,7 +40,7 @@ class ProcessHighwaySurfaceTest extends TestCase
     }
 
 
-    public function test_status_query_preselects_the_highway_audience_without_requiring_a_matching_process(): void
+    public function test_fact_queries_preselect_the_highway_audience_without_requiring_a_matching_process(): void
     {
         config()->set('modules.enabled', [
             'core',
@@ -49,11 +49,15 @@ class ProcessHighwaySurfaceTest extends TestCase
         $response = $this->actingAs($this->createUser())
             ->get(route('crm.process-highway.index', [
                 'status' => 'past_contact',
+                'tag' => 'Hand Raiser',
             ]))
             ->assertOk();
 
         $this->assertEquals(
-            ['status' => 'past_contact'],
+            [
+                'status' => 'past_contact',
+                'tag' => 'Hand Raiser',
+            ],
             $response->viewData('initialQualifierSelection'),
         );
 
@@ -67,6 +71,20 @@ class ProcessHighwaySurfaceTest extends TestCase
             [],
             $invalidResponse->viewData('initialQualifierSelection'),
         );
+        $this->assertNull($invalidResponse->viewData('initialHighwayKey'));
+
+        $unknownHighwayResponse = $this->actingAs($this->createUser())
+            ->get(route('crm.process-highway.index', [
+                'highway' => 'contacts:standard:highway:unknown',
+                'status' => 'past_contact',
+            ]))
+            ->assertOk();
+
+        $this->assertSame(
+            ['status' => 'past_contact'],
+            $unknownHighwayResponse->viewData('initialQualifierSelection'),
+        );
+        $this->assertNull($unknownHighwayResponse->viewData('initialHighwayKey'));
     }
 
     public function test_flow_routes_contribute_owned_nodes_edges_and_exact_edit_targets(): void
@@ -183,6 +201,24 @@ class ProcessHighwaySurfaceTest extends TestCase
             fn (array $edge): bool => $edge['from_node_key'] === $pointNode['key']
                 && $edge['role'] === 'exits',
         ));
+
+        $deepLinkResponse = $this->actingAs($this->createUser())
+            ->get(route('crm.process-highway.index', [
+                'highway' => $businessHighway['key'],
+            ]))
+            ->assertOk();
+
+        $this->assertSame(
+            ['status' => 'engaged'],
+            $deepLinkResponse->viewData('initialQualifierSelection'),
+        );
+        $this->assertSame(
+            $businessHighway['key'],
+            $deepLinkResponse->viewData('initialHighwayKey'),
+        );
+        $this->assertSame('contacts', $deepLinkResponse->viewData('initialSubjectKey'));
+        $this->assertSame('standard', $deepLinkResponse->viewData('initialContactMode'));
+        $this->assertNull($deepLinkResponse->viewData('initialRelationship'));
 
         $this->actingAs($this->createUser())
             ->get(route('crm.process-highway.index'))

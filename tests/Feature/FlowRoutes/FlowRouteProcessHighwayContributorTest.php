@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\FlowRoutes;
 
-use App\Support\ProcessHighway\ProcessHighwayExitLinkBuilder;
 use App\Support\ProcessHighway\ProcessHighwayReadService;
 use App\Support\ProcessHighway\ProcessHighwaySemanticKey;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -182,47 +181,88 @@ class FlowRouteProcessHighwayContributorTest extends TestCase
         $this->assertNotNull($statusConsequence);
         $this->assertSame('consequence', $statusConsequence['role']);
         $this->assertSame('Changes status to', $statusConsequence['label']);
+    }
 
-        $statusFilter = collect($graph['qualifier_filters'])->firstWhere('key', 'status');
+    public function test_route_level_reply_profiles_keep_independent_reply_routes_on_separate_highways(): void
+    {
+        config()->set('modules.enabled', array_values(array_unique([
+            ...config('modules.enabled', []),
+            'flow_routes',
+            'inbound_messaging',
+        ])));
 
-        $this->assertNotNull($statusFilter);
+        $routes = [
+            'cold_lead_reply' => 'cold_lead_nurture',
+            'past_client_reply' => 'past_client_nurture',
+        ];
 
-        $statusOption = collect($statusFilter['options'])->firstWhere('value', 'engaged');
+        foreach ($routes as $routeKey => $replyProfileKey) {
+            $routeId = DB::table('flow_routes')->insertGetId([
+                'key' => $routeKey,
+                'name' => str($routeKey)->headline()->toString(),
+                'description' => 'Fixture scoped reply Route.',
+                'version' => 1,
+                'is_current_version' => true,
+                'trigger_type' => 'automation_event',
+                'trigger_key' => 'inbound_message.normal_reply',
+                'is_active' => true,
+                'is_customized' => false,
+                'meta' => json_encode([
+                    'definition' => [
+                        'category' => 'consumer_reply',
+                        'default_role' => 'reply_routing',
+                        'entry_conditions' => [[
+                            'source' => 'execution_meta',
+                            'path' => 'automation_event.payload.inbound_message.reply_profile_key',
+                            'operator' => 'equals',
+                            'value' => $replyProfileKey,
+                        ]],
+                    ],
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
 
-        $this->assertNotNull($statusOption);
-        $this->assertSame($statusFactKey, $statusOption['node_key']);
-        $this->assertSame([], $statusOption['entry_highway_keys']);
-        $this->assertSame([$businessHighway['key']], $statusOption['producer_highway_keys']);
-        $this->assertSame([], $statusOption['highway_keys']);
+            DB::table('flow_route_points')->insert([
+                'flow_route_id' => $routeId,
+                'key' => 'record_reply',
+                'type' => 'noop',
+                'name' => 'Record reply',
+                'sort_order' => 10,
+                'is_start' => true,
+                'is_active' => true,
+                'definition' => json_encode([]),
+                'settings' => json_encode([]),
+                'cancel_conditions' => json_encode([]),
+                'is_customized' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
 
-        $statusInspector = $graph['entry_ramp_inspectors'][$statusFactKey];
-        $flowRouteSource = collect($statusInspector['application_sources'])
-            ->firstWhere('key', 'flow_route:'.$processKey);
+        $graph = app(ProcessHighwayReadService::class)->read();
 
-        $this->assertSame(0, $statusInspector['process_count']);
-        $this->assertNotNull($flowRouteSource);
-        $this->assertSame(
-            route('crm.flow-routes.show', $routeId),
-            $flowRouteSource['url'],
-        );
-        $this->assertSame('automatic', $flowRouteSource['source_type']);
-        $this->assertSame('flow_routes', $flowRouteSource['owner_key']);
-        $this->assertCount(1, $flowRouteSource['highway_targets']);
+        $this->assertSame(2, $graph['highway_count']);
 
-        $highwayTarget = $flowRouteSource['highway_targets'][0];
-        $exitAnchor = app(ProcessHighwayExitLinkBuilder::class)->anchor(
-            $businessHighway['key'],
-            $statusConsequence['key'],
-        );
+        foreach ($routes as $routeKey => $replyProfileKey) {
+            $processKey = ProcessHighwaySemanticKey::flowRoute($routeKey);
+            $replyProfileNodeKey = ProcessHighwaySemanticKey::replyProfile($replyProfileKey);
+            $businessHighway = collect($graph['highways'])->first(
+                fn (array $highway): bool => in_array($processKey, $highway['segment_keys'], true),
+            );
 
-        $this->assertSame($businessHighway['key'], $highwayTarget['highway_key']);
-        $this->assertSame($statusConsequence['key'], $highwayTarget['edge_key']);
-        $this->assertSame($exitAnchor, $highwayTarget['anchor']);
-        $this->assertSame(
-            route('crm.process-highway.index', [
-                'highway' => $businessHighway['key'],
-            ]).'#'.$exitAnchor,
-            $highwayTarget['url'],
-        );
+            $this->assertNotNull($businessHighway);
+            $this->assertSame([$processKey], $businessHighway['root_segment_keys']);
+            $this->assertSame([$processKey], $businessHighway['segment_keys']);
+            $this->assertSame([$replyProfileNodeKey], $businessHighway['entry_node_keys']);
+            $this->assertSame(
+                [$replyProfileKey],
+                $businessHighway['segments'][0]['attributes']['reply_profile_keys'],
+            );
+            $this->assertNotContains(
+                ProcessHighwaySemanticKey::automationEvent('inbound_message.normal_reply'),
+                $businessHighway['entry_node_keys'],
+            );
+        }
     }
 }

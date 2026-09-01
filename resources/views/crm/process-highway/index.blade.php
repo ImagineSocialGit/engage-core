@@ -23,7 +23,10 @@
                 ->replace(['_', '-'], ' ')
                 ->headline()
                 ->toString(),
+            'node_key' => null,
             'highway_keys' => [],
+            'entry_highway_keys' => [],
+            'producer_highway_keys' => [],
         ];
 
         if ($statusFilterIndex === false) {
@@ -67,7 +70,23 @@
     $secondaryQualifierFilters = $qualifierFilters
         ->reject(fn (array $filter): bool => in_array($filter['key'], $primaryQualifierKeys, true))
         ->values();
-    $initialSubject = (string) (($subjects->first()['key'] ?? null) ?: 'contacts');
+    $requestedInitialSubject = is_string($initialSubjectKey ?? null)
+        ? $initialSubjectKey
+        : null;
+    $initialSubject = $subjects->contains(
+        fn (array $subject): bool => ($subject['key'] ?? null) === $requestedInitialSubject,
+    )
+        ? $requestedInitialSubject
+        : (string) (($subjects->first()['key'] ?? null) ?: 'contacts');
+    $resolvedInitialContactMode = ($initialContactMode ?? null) === 'relationship'
+        ? 'relationship'
+        : 'standard';
+    $resolvedInitialRelationship = is_string($initialRelationship ?? null)
+        ? $initialRelationship
+        : '';
+    $resolvedInitialHighwayKey = is_string($initialHighwayKey ?? null)
+        ? $initialHighwayKey
+        : '';
     $laneOptions = $subjects
         ->flatMap(fn (array $subject): array => array_map(
             fn (array $lane): array => [...$lane, 'subject_key' => $subject['key']],
@@ -145,17 +164,20 @@
         x-data="{
             items: @js($filterableHighways),
             subject: @js($initialSubject),
-            contactMode: 'standard',
-            relationship: '',
+            contactMode: @js($resolvedInitialContactMode),
+            relationship: @js($resolvedInitialRelationship),
             query: '',
             qualifiers: @js($qualifierSelection),
             qualifierLabels: @js($qualifierLabels),
             rampInspectors: @js($entryRampInspectors),
-            expandedHighway: '',
+            focusedHighway: @js($resolvedInitialHighwayKey),
+            focusedExit: '',
+            expandedHighway: @js($resolvedInitialHighwayKey),
             showMoreFilters: false,
             ramp: null,
             init() {
                 this.filterChanged();
+                this.$nextTick(() => this.focusExit());
             },
             selectedCriteria() {
                 return Object.entries(this.qualifiers)
@@ -163,7 +185,8 @@
                     .map(([key, value]) => ({ key, value }));
             },
             hasAudienceSelection() {
-                return this.selectedCriteria().length > 0
+                return this.focusedHighway !== ''
+                    || this.selectedCriteria().length > 0
                     || (this.contactMode === 'relationship' && this.relationship !== '');
             },
             scopeMatches(item) {
@@ -184,7 +207,11 @@
                 });
             },
             baseMatches(item) {
-                if (! this.hasAudienceSelection() || item.subject_key !== this.subject || ! this.scopeMatches(item)) {
+                if (this.focusedHighway !== '') {
+                    if (item.key !== this.focusedHighway) {
+                        return false;
+                    }
+                } else if (! this.hasAudienceSelection() || item.subject_key !== this.subject || ! this.scopeMatches(item)) {
                     return false;
                 }
 
@@ -195,6 +222,10 @@
             isExact(item) {
                 if (! this.baseMatches(item)) {
                     return false;
+                }
+
+                if (this.focusedHighway !== '') {
+                    return item.key === this.focusedHighway;
                 }
 
                 const selected = this.selectedCriteria();
@@ -215,7 +246,7 @@
                 });
             },
             isPartial(item) {
-                if (! this.baseMatches(item) || this.isExact(item)) {
+                if (this.focusedHighway !== '' || ! this.baseMatches(item) || this.isExact(item)) {
                     return false;
                 }
 
@@ -283,23 +314,18 @@
 
                 return `${requirement.criterion_label || this.humanize(requirement.criterion_key)}: ${values.join(' or ')}`;
             },
-            selectedStatusInspector() {
-                const status = this.qualifiers.status || '';
-
-                if (! status) {
-                    return null;
-                }
-
-                return Object.values(this.rampInspectors).find((inspector) => {
-                    return inspector.criterion_key === 'status' && inspector.value === status;
-                }) || null;
+            selectedInspectors() {
+                return this.selectedCriteria()
+                    .map(({ key, value }) => Object.values(this.rampInspectors).find((inspector) => {
+                        return inspector.criterion_key === key && inspector.value === value;
+                    }))
+                    .filter(Boolean);
             },
-            openSelectedStatusInspector() {
-                const inspector = this.selectedStatusInspector();
-
-                if (inspector) {
-                    this.openRamp(inspector);
-                }
+            automaticSources() {
+                return (this.ramp?.application_sources || []).filter((source) => source.source_type === 'automatic');
+            },
+            otherSources() {
+                return (this.ramp?.application_sources || []).filter((source) => source.source_type !== 'automatic');
             },
             setContactMode(mode) {
                 this.contactMode = mode;
@@ -309,6 +335,11 @@
                     this.qualifiers.relationship = '';
                 }
 
+                this.audienceChanged();
+            },
+            audienceChanged() {
+                this.focusedHighway = '';
+                this.focusedExit = '';
                 this.filterChanged();
             },
             filterChanged() {
@@ -324,6 +355,8 @@
                 this.contactMode = 'standard';
                 this.relationship = '';
                 this.query = '';
+                this.focusedHighway = '';
+                this.focusedExit = '';
                 this.expandedHighway = '';
                 Object.keys(this.qualifiers).forEach((key) => this.qualifiers[key] = '');
             },
@@ -336,8 +369,56 @@
             closeRamp() {
                 this.ramp = null;
             },
+            centerExit(element) {
+                this.$nextTick(() => {
+                    requestAnimationFrame(() => requestAnimationFrame(() => {
+                        try {
+                            element.focus({ preventScroll: true });
+                        } catch (error) {
+                            element.focus();
+                        }
+
+                        const bounds = element.getBoundingClientRect();
+                        const centeredTop = window.scrollY
+                            + bounds.top
+                            - ((window.innerHeight - bounds.height) / 2);
+
+                        window.scrollTo({
+                            top: Math.max(0, centeredTop),
+                            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                        });
+                    }));
+                });
+            },
+            focusExit() {
+                let anchor = '';
+
+                try {
+                    anchor = decodeURIComponent(window.location.hash.replace(/^#/, ''));
+                } catch (error) {
+                    return;
+                }
+
+                if (! /^process-highway-exit-[a-f0-9]{16}$/.test(anchor)) {
+                    return;
+                }
+
+                const element = document.getElementById(anchor);
+
+                if (! element) {
+                    return;
+                }
+
+                const highwayKey = element.dataset.processHighwayExitHighway || '';
+
+                this.focusedHighway = highwayKey || this.focusedHighway;
+                this.expandedHighway = highwayKey || this.expandedHighway;
+                this.focusedExit = anchor;
+                this.centerExit(element);
+            },
         }"
         x-on:keydown.escape.window="closeRamp()"
+        x-on:hashchange.window="focusExit()"
     >
         @if(($highway['highway_count'] ?? 0) === 0)
             <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
@@ -383,7 +464,7 @@
                 <div data-process-highway-primary-filters class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                     <label x-cloak x-show="contactMode === 'relationship'" class="block">
                         <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-600">Relationship type</span>
-                        <select x-model="relationship" x-on:change="filterChanged()" data-process-highway-relationship-type class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900 shadow-sm focus:border-slate-500 focus:ring-slate-500">
+                        <select x-model="relationship" x-on:change="audienceChanged()" data-process-highway-relationship-type class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900 shadow-sm focus:border-slate-500 focus:ring-slate-500">
                             <option value="">Choose a relationship</option>
                             @foreach($relationshipOptions as $option)
                                 <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
@@ -394,7 +475,7 @@
                     @foreach($primaryQualifierFilters as $filter)
                         <label class="block">
                             <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-600">{{ $filter['label'] }}</span>
-                            <select x-model="qualifiers['{{ $filter['key'] }}']" x-on:change="filterChanged()" data-process-highway-qualifier="{{ $filter['key'] }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900 shadow-sm focus:border-slate-500 focus:ring-slate-500">
+                            <select x-model="qualifiers['{{ $filter['key'] }}']" x-on:change="audienceChanged()" data-process-highway-qualifier="{{ $filter['key'] }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900 shadow-sm focus:border-slate-500 focus:ring-slate-500">
                                 <option value="">Any {{ strtolower($filter['label']) }}</option>
                                 @foreach($filter['options'] as $option)
                                     <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
@@ -406,29 +487,24 @@
 
                 <div
                     x-cloak
-                    x-show="selectedStatusInspector() !== null"
-                    data-process-highway-status-inspector
-                    class="mt-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                    x-show="selectedInspectors().length > 0"
+                    data-process-highway-fact-inspectors
+                    class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4"
                 >
-                    <div class="min-w-0">
-                        <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Selected status</p>
-                        <p class="mt-1 text-sm font-semibold text-slate-950" x-text="selectedStatusInspector()?.value_label"></p>
-                        <p class="mt-1 text-xs leading-5 text-slate-600">
-                            <span x-text="selectedStatusInspector()?.exact_process_count || 0"></span>
-                            <span x-text="(selectedStatusInspector()?.exact_process_count || 0) === 1 ? 'direct process' : 'direct processes'"></span>
-                            ·
-                            <span x-text="selectedStatusInspector()?.partial_process_count || 0"></span>
-                            <span x-text="(selectedStatusInspector()?.partial_process_count || 0) === 1 ? 'process with additional requirements' : 'processes with additional requirements'"></span>
-                        </p>
+                    <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">How contacts get here</p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <template x-for="inspector in selectedInspectors()" :key="inspector.key">
+                            <button
+                                type="button"
+                                x-on:click="openRamp(inspector)"
+                                data-process-highway-fact-inspector
+                                class="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
+                            >
+                                <span x-text="`${inspector.criterion_label}: ${inspector.value_label}`"></span>
+                                <span class="ml-2" aria-hidden="true">›</span>
+                            </button>
+                        </template>
                     </div>
-
-                    <button
-                        type="button"
-                        x-on:click="openSelectedStatusInspector()"
-                        class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
-                    >
-                        See what happens with this status
-                    </button>
                 </div>
 
                 @if($subjects->count() > 1 || $secondaryQualifierFilters->isNotEmpty())
@@ -441,7 +517,7 @@
                             @if($subjects->count() > 1)
                                 <label class="block">
                                     <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-600">Subject</span>
-                                    <select x-model="subject" x-on:change="filterChanged()" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900 shadow-sm focus:border-slate-500 focus:ring-slate-500">
+                                    <select x-model="subject" x-on:change="audienceChanged()" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900 shadow-sm focus:border-slate-500 focus:ring-slate-500">
                                         @foreach($subjects as $subject)
                                             <option value="{{ $subject['key'] }}">{{ $subject['label'] }}</option>
                                         @endforeach
@@ -452,7 +528,7 @@
                             @foreach($secondaryQualifierFilters as $filter)
                                 <label @if($filter['key'] === 'relationship') x-cloak x-show="contactMode === 'relationship'" @endif class="block">
                                     <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-600">{{ $filter['key'] === 'relationship' ? 'Relationship stage' : $filter['label'] }}</span>
-                                    <select x-model="qualifiers['{{ $filter['key'] }}']" x-on:change="filterChanged()" data-process-highway-qualifier="{{ $filter['key'] }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900 shadow-sm focus:border-slate-500 focus:ring-slate-500">
+                                    <select x-model="qualifiers['{{ $filter['key'] }}']" x-on:change="audienceChanged()" data-process-highway-qualifier="{{ $filter['key'] }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900 shadow-sm focus:border-slate-500 focus:ring-slate-500">
                                         <option value="">Any {{ strtolower($filter['label']) }}</option>
                                         @foreach($filter['options'] as $option)
                                             <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
@@ -524,7 +600,7 @@
         @endif
 
         <div x-cloak x-show="ramp !== null" x-transition.opacity x-on:click.self="closeRamp()" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="presentation">
-            <section x-show="ramp !== null" class="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white shadow-2xl ring-1 ring-slate-950/10" role="dialog" aria-modal="true" aria-label="Entry ramp details">
+            <section x-show="ramp !== null" class="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white shadow-2xl ring-1 ring-slate-950/10" role="dialog" aria-modal="true" aria-label="Fact source details">
                 <template x-if="ramp !== null">
                     <div>
                         <header class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-5 sm:px-6">
@@ -543,116 +619,58 @@
                                 <p class="mt-1 text-3xl font-semibold" x-text="Number(ramp.contact_count).toLocaleString()"></p>
                             </div>
 
-                            <div x-show="(ramp.processes || []).length > 0" data-process-highway-impact-processes>
-                                <div class="flex items-end justify-between gap-3">
-                                    <div>
-                                        <h3 class="text-sm font-semibold text-slate-950" x-text="ramp.criterion_key === 'status' ? 'What happens with this status' : 'What this fact can start'"></h3>
-                                        <p class="mt-1 text-xs leading-5 text-slate-600">
-                                            Direct matches can start from this fact alone. Partial matches still require the other facts shown.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div class="mt-3 space-y-3">
-                                    <template x-for="process in ramp.processes" :key="process.key">
-                                        <article data-process-highway-impact-process class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                            <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div data-process-highway-automatic-sources>
+                                <h3 class="text-sm font-semibold text-slate-950">Automatic ways contacts get here</h3>
+                                <div x-show="automaticSources().length > 0" class="mt-3 space-y-3">
+                                    <template x-for="source in automaticSources()" :key="source.key">
+                                        <article data-process-highway-automatic-source class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                                            <div class="flex items-start justify-between gap-3">
                                                 <div class="min-w-0">
-                                                    <span
-                                                        class="inline-flex rounded-full bg-white px-2.5 py-1 text-[0.7rem] font-bold text-slate-700 ring-1 ring-slate-300"
-                                                        x-text="process.match_label"
-                                                    ></span>
-                                                    <h4 class="mt-2 text-sm font-semibold text-slate-950" x-text="process.name"></h4>
+                                                    <p class="text-sm font-semibold text-slate-950" x-text="source.label"></p>
+                                                    <p class="mt-1 text-xs leading-5 text-slate-600" x-text="source.detail"></p>
                                                 </div>
-                                                <span class="text-xs font-semibold text-slate-500" x-text="process.state_label"></span>
-                                            </div>
-
-                                            <template x-if="(process.remaining_requirements || []).length > 0">
-                                                <div class="mt-3 rounded-xl bg-amber-50 px-3 py-2 ring-1 ring-amber-200">
-                                                    <p class="text-[0.68rem] font-bold uppercase tracking-[0.1em] text-amber-800">Also requires</p>
-                                                    <p
-                                                        class="mt-1 text-xs leading-5 text-amber-950"
-                                                        x-text="(process.remaining_requirements || []).map((requirement) => `${requirement.criterion_label}: ${(requirement.values || []).join(' or ')}`).join(' · ')"
-                                                    ></p>
-                                                </div>
-                                            </template>
-
-                                            <div class="mt-3 space-y-3">
-                                                <template x-for="segment in process.segments" :key="segment.key">
-                                                    <div class="rounded-xl border border-slate-200 bg-white p-3">
-                                                        <div class="flex items-start justify-between gap-3">
-                                                            <div class="min-w-0">
-                                                                <p class="text-[0.68rem] font-bold uppercase tracking-[0.1em] text-slate-500" x-text="segment.owner_label"></p>
-                                                                <p class="mt-1 text-sm font-semibold text-slate-900" x-text="segment.name"></p>
-                                                            </div>
-                                                            <template x-if="segment.navigation_target && segment.navigation_target.url">
-                                                                <a
-                                                                    x-bind:href="segment.navigation_target.url"
-                                                                    class="shrink-0 text-xs font-semibold text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
-                                                                >
-                                                                    Open
-                                                                </a>
-                                                            </template>
-                                                        </div>
-
-                                                        <template x-if="(segment.effects || []).length > 0">
-                                                            <ul class="mt-3 space-y-2 border-t border-slate-100 pt-3">
-                                                                <template x-for="effect in segment.effects" :key="effect.key">
-                                                                    <li class="text-xs leading-5 text-slate-700">
-                                                                        <div class="flex items-start justify-between gap-3">
-                                                                            <div class="min-w-0">
-                                                                                <span class="font-semibold text-slate-900" x-text="effect.label"></span>
-                                                                                <span x-show="effect.detail" class="mt-0.5 block text-slate-500" x-text="effect.detail"></span>
-                                                                            </div>
-                                                                            <template x-if="effect.navigation_target && effect.navigation_target.url">
-                                                                                <a
-                                                                                    x-bind:href="effect.navigation_target.url"
-                                                                                    class="shrink-0 font-semibold text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
-                                                                                >
-                                                                                    Edit
-                                                                                </a>
-                                                                            </template>
-                                                                        </div>
-                                                                    </li>
-                                                                </template>
-                                                            </ul>
-                                                        </template>
-                                                    </div>
+                                                <template x-if="source.url">
+                                                    <a x-bind:href="source.url" data-process-highway-source-owner-link class="shrink-0 text-xs font-semibold text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950">
+                                                        <span x-text="source.owner_key === 'flow_routes' ? 'View the route' : 'Open source'"></span>
+                                                    </a>
                                                 </template>
                                             </div>
+
+                                            <template x-if="(source.highway_targets || []).length > 0">
+                                                <div class="mt-3 border-t border-slate-200 pt-3">
+                                                    <template x-for="target in source.highway_targets" :key="`${target.highway_key}|${target.edge_key}`">
+                                                        <a
+                                                            x-bind:href="target.url"
+                                                            data-process-highway-source-highway-target
+                                                            class="mt-2 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition first:mt-0 hover:border-slate-300 hover:text-slate-950"
+                                                        >
+                                                            <span x-text="target.highway_name"></span>
+                                                            <span class="shrink-0">See exact exit →</span>
+                                                        </a>
+                                                    </template>
+                                                </div>
+                                            </template>
                                         </article>
                                     </template>
                                 </div>
+                                <p x-show="automaticSources().length === 0" data-process-highway-no-automatic-source class="mt-3 rounded-2xl border border-dashed border-slate-300 px-4 py-3 text-xs leading-5 text-slate-600">
+                                    No configured automation currently applies this fact.
+                                </p>
                             </div>
 
-                            <div x-show="(ramp.actions || []).length > 0" data-process-highway-entry-actions>
-                                <h3 class="text-sm font-semibold text-slate-950">Want to add automation?</h3>
-                                <p class="mt-1 text-xs leading-5 text-slate-600">Continue in the feature that owns the automation. Process Highway will keep showing the result here once it is configured.</p>
+                            <div x-show="otherSources().length > 0" data-process-highway-other-sources>
+                                <h3 class="text-sm font-semibold text-slate-950">Other ways this fact can be applied</h3>
                                 <div class="mt-3 space-y-2">
-                                    <template x-for="action in ramp.actions" :key="action.key">
-                                        <a
-                                            x-bind:href="action.url"
-                                            class="flex items-start justify-between gap-4 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-left transition hover:border-orange-300 hover:bg-orange-100"
-                                            data-process-highway-entry-action
-                                        >
-                                            <span>
-                                                <span class="block text-sm font-semibold text-orange-950" x-text="action.label"></span>
-                                                <span class="mt-1 block text-xs leading-5 text-orange-900/80" x-text="action.detail"></span>
-                                            </span>
-                                            <span class="shrink-0 text-xs font-semibold text-orange-900">Open →</span>
-                                        </a>
-                                    </template>
-                                </div>
-                            </div>
-
-                            <div>
-                                <h3 class="text-sm font-semibold text-slate-950">How this can be applied</h3>
-                                <div class="mt-3 space-y-2">
-                                    <template x-for="source in ramp.application_sources" :key="source.key">
+                                    <template x-for="source in otherSources()" :key="source.key">
                                         <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                                             <div class="flex items-start justify-between gap-3">
-                                                <div><p class="text-sm font-semibold text-slate-950" x-text="source.label"></p><p class="mt-1 text-xs leading-5 text-slate-600" x-text="source.detail"></p></div>
-                                                <template x-if="source.url"><a x-bind:href="source.url" class="shrink-0 text-xs font-semibold text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950">Open</a></template>
+                                                <div>
+                                                    <p class="text-sm font-semibold text-slate-950" x-text="source.label"></p>
+                                                    <p class="mt-1 text-xs leading-5 text-slate-600" x-text="source.detail"></p>
+                                                </div>
+                                                <template x-if="source.url">
+                                                    <a x-bind:href="source.url" class="shrink-0 text-xs font-semibold text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950">Open</a>
+                                                </template>
                                             </div>
                                         </div>
                                     </template>

@@ -16,6 +16,10 @@ class ProcessHighwayUsabilitySurfaceTest extends TestCase
             'initialQualifierSelection' => [
                 'status' => 'past_contact',
             ],
+            'initialHighwayKey' => 'contacts:standard:highway:fixture',
+            'initialSubjectKey' => 'contacts',
+            'initialContactMode' => 'standard',
+            'initialRelationship' => null,
         ]);
 
         $view
@@ -38,13 +42,24 @@ class ProcessHighwayUsabilitySurfaceTest extends TestCase
             ->assertSee('data-process-highway-entry-expression="contacts:standard:highway:fixture"', false)
             ->assertSee('data-process-highway-entry-requirement="status"', false)
             ->assertSee('data-entry-ramp-inspector="workflow:status:past_contact"', false)
-            ->assertSee('data-process-highway-status-inspector', false)
-            ->assertSee('data-process-highway-impact-processes', false)
-            ->assertSee('data-process-highway-impact-process', false)
+            ->assertSee('data-process-highway-fact-inspectors', false)
+            ->assertSee('data-process-highway-fact-inspector', false)
+            ->assertSee('data-process-highway-automatic-sources', false)
+            ->assertSee('data-process-highway-automatic-source', false)
+            ->assertSee('data-process-highway-source-owner-link', false)
+            ->assertSee('data-process-highway-source-highway-target', false)
+            ->assertSee('data-process-highway-other-sources', false)
             ->assertSee('data-process-highway-missing-requirements="contacts:standard:highway:fixture"', false)
             ->assertSee('data-process-highway-segment-group="programs"', false)
             ->assertSee('data-process-highway-mechanism="campaigns"', false)
             ->assertSee('data-process-highway-outcome="workflow:status:engaged"', false)
+            ->assertSee('id="process-highway-exit-fixture"', false)
+            ->assertSee('data-process-highway-exit-edge="campaigns:campaign:past_client:edge:engaged"', false)
+            ->assertSee('data-process-highway-exit-highway="contacts:standard:highway:fixture"', false)
+            ->assertSee('data-process-highway-fact-target="status:engaged"', false)
+            ->assertSee('href="/process-highway?status=engaged"', false)
+            ->assertDontSee('data-process-highway-impact-processes', false)
+            ->assertDontSee('data-process-highway-entry-actions', false)
             ->assertDontSee('data-process-highway-mechanism="workflow"', false);
     }
 
@@ -86,7 +101,30 @@ class ProcessHighwayUsabilitySurfaceTest extends TestCase
                 'value' => 'past_contact',
                 'value_label' => 'Past Client',
                 'contact_count' => 4,
-                'application_sources' => [],
+                'application_sources' => [
+                    [
+                        'key' => 'flow_route:flow_routes:route:past_client_reply',
+                        'label' => 'Past Client reply',
+                        'detail' => 'Changes status to',
+                        'url' => '/flow-routes/1',
+                        'source_type' => 'automatic',
+                        'owner_key' => 'flow_routes',
+                        'highway_targets' => [[
+                            'highway_key' => 'contacts:standard:highway:fixture',
+                            'highway_name' => 'Past Client Nurture',
+                            'edge_key' => 'campaigns:campaign:past_client:edge:engaged',
+                            'anchor' => 'process-highway-exit-fixture',
+                            'url' => '/process-highway?highway=contacts%3Astandard%3Ahighway%3Afixture#process-highway-exit-fixture',
+                            'entry_selection' => ['status' => 'past_contact'],
+                            'lane_scope' => 'standard',
+                        ]],
+                    ],
+                    [
+                        'key' => 'workflow:contact_editor',
+                        'label' => 'Contact workspace',
+                        'detail' => 'A user can assign this status directly.',
+                    ],
+                ],
                 'process_count' => 1,
                 'exact_process_count' => 1,
                 'partial_process_count' => 0,
@@ -196,6 +234,13 @@ class ProcessHighwayUsabilitySurfaceTest extends TestCase
                             'label' => 'Positive reply can mark',
                         ],
                         'node' => $outcomeNode,
+                        'exit_anchor' => 'process-highway-exit-fixture',
+                        'fact_target' => [
+                            'criterion_key' => 'status',
+                            'value' => 'engaged',
+                            'label' => 'Engaged',
+                            'url' => '/process-highway?status=engaged',
+                        ],
                     ]],
                     'additional_outcome_groups' => [],
                 ]],

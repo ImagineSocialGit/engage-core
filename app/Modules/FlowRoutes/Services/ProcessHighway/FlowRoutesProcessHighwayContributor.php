@@ -53,9 +53,9 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
         $presentedPoints = collect(
             $this->presentation->presentedPoints($route, $points),
         )->keyBy('key');
-        $replyProfileKeys = $this->replyProfileKeys($points);
-        $replyIntentKeys = $this->replyIntentKeys($points);
-        $replyChannels = $this->replyChannels($points);
+        $replyProfileKeys = $this->replyProfileKeys($route, $points);
+        $replyIntentKeys = $this->replyIntentKeys($route, $points);
+        $replyChannels = $this->replyChannels($route, $points);
         $processKey = ProcessHighwaySemanticKey::flowRoute((string) $route->key);
         $routeTarget = $this->routeTarget($route);
         $routeAuthority = new ProcessHighwayAuthority(
@@ -806,27 +806,47 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
      * @param Collection<int, FlowRoutePoint> $points
      * @return array<int, string>
      */
-    private function replyProfileKeys(Collection $points): array
+    private function replyProfileKeys(FlowRoute $route, Collection $points): array
     {
-        return $this->branchConditionValues($points, 'reply_profile_key');
+        return $this->scopedConditionValues($route, $points, 'reply_profile_key');
     }
 
     /**
      * @param Collection<int, FlowRoutePoint> $points
      * @return array<int, string>
      */
-    private function replyIntentKeys(Collection $points): array
+    private function replyIntentKeys(FlowRoute $route, Collection $points): array
     {
-        return $this->branchConditionValues($points, 'reply_intent_key');
+        return $this->scopedConditionValues($route, $points, 'reply_intent_key');
     }
 
     /**
      * @param Collection<int, FlowRoutePoint> $points
      * @return array<int, string>
      */
-    private function replyChannels(Collection $points): array
+    private function replyChannels(FlowRoute $route, Collection $points): array
     {
-        return $this->branchConditionValues($points, 'channel');
+        return $this->scopedConditionValues($route, $points, 'channel');
+    }
+
+    /**
+     * @param Collection<int, FlowRoutePoint> $points
+     * @return array<int, string>
+     */
+    private function scopedConditionValues(
+        FlowRoute $route,
+        Collection $points,
+        string $pathSuffix,
+    ): array {
+        $entryConditions = data_get($route->meta, 'definition.entry_conditions', []);
+        $entryValues = $this->conditionValues(
+            is_array($entryConditions) ? $entryConditions : [],
+            $pathSuffix,
+        );
+
+        return $entryValues !== []
+            ? $entryValues
+            : $this->branchConditionValues($points, $pathSuffix);
     }
 
     /**
@@ -835,8 +855,8 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
      */
     private function branchConditionValues(Collection $points, string $pathSuffix): array
     {
-        return $points
-            ->flatMap(function (FlowRoutePoint $point) use ($pathSuffix): array {
+        $conditions = $points
+            ->flatMap(function (FlowRoutePoint $point): array {
                 $definition = $this->definition($point);
                 $branches = is_array($definition['branches'] ?? null)
                     ? array_values(array_filter($definition['branches'], 'is_array'))
@@ -846,25 +866,38 @@ final class FlowRoutesProcessHighwayContributor implements ProcessHighwayContrib
                     ->flatMap(fn (array $branch): array => is_array($branch['conditions'] ?? null)
                         ? array_values(array_filter($branch['conditions'], 'is_array'))
                         : [])
-                    ->filter(function (array $condition) use ($pathSuffix): bool {
-                        $path = $this->string($condition['path'] ?? null);
-                        $operator = $this->string($condition['operator'] ?? null) ?? 'equals';
-
-                        return $path !== null
-                            && str_ends_with($path, $pathSuffix)
-                            && in_array($operator, ['equals', 'equal', 'in'], true);
-                    })
-                    ->flatMap(function (array $condition): array {
-                        $values = is_array($condition['values'] ?? null)
-                            ? $condition['values']
-                            : [$condition['value'] ?? null];
-
-                        return array_values(array_filter(array_map(
-                            fn (mixed $value): ?string => $this->string($value),
-                            $values,
-                        )));
-                    })
                     ->all();
+            })
+            ->all();
+
+        return $this->conditionValues($conditions, $pathSuffix);
+    }
+
+    /**
+     * @param array<int, mixed> $conditions
+     * @return array<int, string>
+     */
+    private function conditionValues(array $conditions, string $pathSuffix): array
+    {
+        return collect($conditions)
+            ->filter(fn (mixed $condition): bool => is_array($condition))
+            ->filter(function (array $condition) use ($pathSuffix): bool {
+                $path = $this->string($condition['path'] ?? null);
+                $operator = $this->string($condition['operator'] ?? null) ?? 'equals';
+
+                return $path !== null
+                    && str_ends_with($path, $pathSuffix)
+                    && in_array($operator, ['equals', 'equal', 'in'], true);
+            })
+            ->flatMap(function (array $condition): array {
+                $values = is_array($condition['values'] ?? null)
+                    ? $condition['values']
+                    : [$condition['value'] ?? null];
+
+                return array_values(array_filter(array_map(
+                    fn (mixed $value): ?string => $this->string($value),
+                    $values,
+                )));
             })
             ->unique()
             ->sort()
