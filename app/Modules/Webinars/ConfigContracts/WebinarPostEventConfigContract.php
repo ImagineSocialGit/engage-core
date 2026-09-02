@@ -74,11 +74,6 @@ class WebinarPostEventConfigContract implements ConfigContract
                     'channels' => [],
                 ],
             ),
-            'booking' => ConfigField::required(ConfigSchema::object([
-                'url' => ConfigField::required(
-                    ConfigSchema::string(nullable: true),
-                ),
-            ])),
             'outcome_messages' => ConfigField::required(ConfigSchema::object([
                 'enabled' => ConfigField::optional(ConfigSchema::boolean()),
                 'dispatch_key' => ConfigField::optional(ConfigSchema::string()),

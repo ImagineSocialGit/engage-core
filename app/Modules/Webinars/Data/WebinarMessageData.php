@@ -103,7 +103,6 @@ readonly class WebinarMessageData extends MessageData
             'cancel_registration_url' => $cancelRegistrationUrl,
             'webinar_playback_url' => $playbackUrl,
             'webinar_playback_passcode' => $this->webinar->playback_passcode,
-            'webinar_booking_url' => $this->bookingUrl(),
 
             'webinar_start_date' => $this->formatDate($startsAt, $timezone),
             'webinar_start_time' => $this->formatTime($startsAt, $timezone),
@@ -301,15 +300,6 @@ readonly class WebinarMessageData extends MessageData
         }
 
         return $baseUrl.$path;
-    }
-
-    private function bookingUrl(): ?string
-    {
-        $url = config('webinars.post_event.booking.url');
-
-        return is_string($url) && trim($url) !== ''
-            ? trim($url)
-            : null;
     }
 
     public function formattedStart(string $format = 'M j g:i A'): string

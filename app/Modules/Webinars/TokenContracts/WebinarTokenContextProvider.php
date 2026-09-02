@@ -80,7 +80,6 @@ class WebinarTokenContextProvider implements TokenContextProvider
                 ...self::WEBINAR,
                 ...self::SERIES,
                 'webinar_playback_url',
-                'webinar_booking_url',
                 'webinar_end_date',
                 'webinar_end_time',
                 'webinar_end_datetime',

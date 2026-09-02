@@ -22,7 +22,6 @@ class WebinarTokenSourceProvider implements TokenSourceProvider
             'webinar_join_url' => ['Join link', 'The private link the registrant uses to join the webinar.', 'https://…'],
             'cancel_registration_url' => ['Cancel-registration link', 'A signed link that cancels this webinar registration.', 'https://…'],
             'webinar_playback_url' => ['Replay link', 'The link where the contact can watch the webinar replay.', 'https://…'],
-            'webinar_booking_url' => ['Book-a-meeting link', 'The link where the contact can schedule a follow-up meeting.', 'https://…'],
             'webinar_start_date' => ['Webinar date', 'The webinar date formatted for the recipient.', 'September 15, 2026'],
             'webinar_start_time' => ['Webinar start time', 'The webinar start time formatted for the recipient.', '2:00 PM EDT'],
             'webinar_start_datetime' => ['Webinar date and time', 'The webinar date and start time in one friendly value.', 'September 15, 2026 at 2:00 PM EDT'],

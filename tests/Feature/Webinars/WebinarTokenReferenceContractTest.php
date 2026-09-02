@@ -46,4 +46,18 @@ class WebinarTokenReferenceContractTest extends TestCase
         $this->assertContains('webinar_series.status', $tokens);
         $this->assertContains('webinar_registration.status', $tokens);
     }
+
+    public function test_booking_is_not_a_webinar_runtime_token_or_reference_alias(): void
+    {
+        $reference = require base_path('config/reference/tokens.php');
+
+        $this->assertNotContains(
+            'webinar_booking_url',
+            data_get($reference, 'contexts.webinar_ended.approved_aliases', []),
+        );
+
+        $tokens = app(TokenContractRegistry::class)->allAuthorableTokens();
+
+        $this->assertNotContains('webinar_booking_url', $tokens);
+    }
 }

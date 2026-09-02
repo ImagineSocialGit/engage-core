@@ -42,10 +42,6 @@ return [
         'channels' => [],
     ],
 
-    'booking' => [
-        'url' => null,
-    ],
-
     'outcome_messages' => [
         'channels' => [
             'email',
