@@ -10,18 +10,27 @@
     @endforeach
 
     @foreach($journeyNodesWithOutcomes as $node)
-        <div class="rounded-xl border border-slate-200 bg-white/80 p-3">
-            <p class="text-xs font-semibold text-slate-600">{{ $node['label'] }}</p>
-            <div class="mt-2 space-y-2">
-                @foreach($node['outcomes'] as $outcome)
-                    @include('crm.process-highway._outcome', [
-                        'outcome' => $outcome,
-                        'businessHighwayKey' => $businessHighwayKey,
-                        'compact' => true,
-                    ])
-                @endforeach
+        @if(($segment['source_key'] ?? null) === 'campaigns')
+            @foreach($node['outcomes'] as $outcome)
+                @include('crm.process-highway._outcome', [
+                    'outcome' => $outcome,
+                    'businessHighwayKey' => $businessHighwayKey,
+                ])
+            @endforeach
+        @else
+            <div class="rounded-xl border border-slate-200 bg-white/80 p-3">
+                <p class="text-xs font-semibold text-slate-600">{{ $node['label'] }}</p>
+                <div class="mt-2 space-y-2">
+                    @foreach($node['outcomes'] as $outcome)
+                        @include('crm.process-highway._outcome', [
+                            'outcome' => $outcome,
+                            'businessHighwayKey' => $businessHighwayKey,
+                            'compact' => true,
+                        ])
+                    @endforeach
+                </div>
             </div>
-        </div>
+        @endif
     @endforeach
 
     @foreach($segment['additional_outcome_groups'] ?? [] as $group)

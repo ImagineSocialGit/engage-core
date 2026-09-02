@@ -4,6 +4,7 @@
 @php($exitAnchor = is_string($outcome['exit_anchor'] ?? null) ? $outcome['exit_anchor'] : null)
 @php($exitEdgeKey = is_string($outcome['edge']['key'] ?? null) ? $outcome['edge']['key'] : null)
 @php($businessHighwayKey = is_string($businessHighwayKey ?? null) ? $businessHighwayKey : '')
+@php($outcomeDetail = is_string($outcome['node']['detail'] ?? null) ? trim($outcome['node']['detail']) : '')
 
 @if(is_array($outcomeTarget))
     <a
@@ -23,6 +24,9 @@
     >
         <span class="block text-[0.65rem] font-bold uppercase tracking-[0.1em] text-slate-500">{{ $outcome['edge']['label'] ?: 'Can lead to' }}</span>
         <span class="mt-1 block text-sm font-semibold text-slate-900">{{ $outcome['node']['label'] }}</span>
+        @if($outcomeDetail !== '')
+            <span data-process-highway-outcome-detail class="mt-1 block text-xs leading-5 text-slate-600">{{ $outcomeDetail }}</span>
+        @endif
     </a>
 @else
     <div
@@ -40,5 +44,8 @@
     >
         <span class="block text-[0.65rem] font-bold uppercase tracking-[0.1em] text-slate-500">{{ $outcome['edge']['label'] ?: 'Can lead to' }}</span>
         <span class="mt-1 block text-sm font-semibold text-slate-900">{{ $outcome['node']['label'] }}</span>
+        @if($outcomeDetail !== '')
+            <span data-process-highway-outcome-detail class="mt-1 block text-xs leading-5 text-slate-600">{{ $outcomeDetail }}</span>
+        @endif
     </div>
 @endif

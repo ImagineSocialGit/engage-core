@@ -60,13 +60,13 @@
         </div>
 
         @if($hasAttachedOutcomes && ! $isTerminalSegment)
-            <aside data-process-highway-side-exits="{{ $segment['key'] }}" aria-label="Side exits">
+            <aside data-process-highway-side-exits="{{ $segment['key'] }}" aria-label="Exits to">
                 <div class="mb-2 hidden items-center lg:flex" aria-hidden="true">
                     <span class="h-px w-5 bg-slate-300"></span>
                     <svg viewBox="0 0 20 20" class="-ml-1 h-5 w-5 text-slate-400" fill="currentColor">
                         <path d="M7.5 5.25 12.25 10 7.5 14.75V5.25Z" />
                     </svg>
-                    <span class="ml-1 text-[0.68rem] font-bold uppercase tracking-[0.12em] text-slate-500">Side exits</span>
+                    <span class="ml-1 text-[0.68rem] font-bold uppercase tracking-[0.12em] text-slate-500">Exits to…</span>
                 </div>
 
                 @include('crm.process-highway._segment-exits', [
@@ -81,14 +81,14 @@
     </div>
 
     @if($hasAttachedOutcomes && $isTerminalSegment)
-        <aside data-process-highway-terminal-exits="{{ $segment['key'] }}" aria-label="Final exits" class="mt-3">
+        <aside data-process-highway-terminal-exits="{{ $segment['key'] }}" aria-label="Exits to" class="mt-3">
             <div class="flex flex-col items-center" aria-hidden="true">
                 <span class="h-6 w-px bg-slate-300"></span>
                 <svg viewBox="0 0 20 20" class="-mt-1 h-5 w-5 text-slate-400" fill="currentColor">
                     <path d="M5.25 7.5 10 12.25 14.75 7.5H5.25Z" />
                 </svg>
             </div>
-            <p class="mb-3 text-center text-[0.68rem] font-bold uppercase tracking-[0.12em] text-slate-500">Final exits</p>
+            <p class="mb-3 text-center text-[0.68rem] font-bold uppercase tracking-[0.12em] text-slate-500">Exits to…</p>
             <div class="mx-auto max-w-4xl">
                 @include('crm.process-highway._segment-exits', [
                     'segment' => $segment,

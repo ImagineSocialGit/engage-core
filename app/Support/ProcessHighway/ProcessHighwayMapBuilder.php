@@ -47,6 +47,7 @@ final class ProcessHighwayMapBuilder
                         rootSegmentKeys: $rootedHighway['root_segment_keys'],
                         segmentKeys: $rootedHighway['segment_keys'],
                         segmentConnections: $rootedHighway['segment_connections'],
+                        segmentHandoffs: $rootedHighway['segment_handoffs'],
                         segmentsByKey: $segmentsByKey,
                         nodesByKey: $nodesByKey,
                         edgesByKey: $edgesByKey,
@@ -91,7 +92,8 @@ final class ProcessHighwayMapBuilder
      * @return array<int, array{
      *     root_segment_keys: array<int, string>,
      *     segment_keys: array<int, string>,
-     *     segment_connections: array<int, array{from_segment_key: string, to_segment_key: string}>
+     *     segment_connections: array<int, array{from_segment_key: string, to_segment_key: string}>,
+     *     segment_handoffs: array<int, array{from_segment_key: string, to_segment_key: string, via_node_keys: array<int, string>}>
      * }>
      */
     private function rootedHighways(
@@ -104,6 +106,7 @@ final class ProcessHighwayMapBuilder
         $allowed = array_fill_keys($segmentKeys, true);
         $adjacency = array_fill_keys($segmentKeys, []);
         $incoming = array_fill_keys($segmentKeys, []);
+        $handoffs = array_fill_keys($segmentKeys, []);
         $entryMembership = [];
         $mechanismMembership = [];
 
@@ -151,8 +154,10 @@ final class ProcessHighwayMapBuilder
                     $this->connectDownstream(
                         adjacency: $adjacency,
                         incoming: $incoming,
+                        handoffs: $handoffs,
                         producerKey: $producerKey,
                         consumerKey: $consumerKey,
+                        viaNodeKey: $targetNodeKey,
                     );
                 }
             }
@@ -162,8 +167,10 @@ final class ProcessHighwayMapBuilder
                     $this->connectDownstream(
                         adjacency: $adjacency,
                         incoming: $incoming,
+                        handoffs: $handoffs,
                         producerKey: $producerKey,
                         consumerKey: $consumerKey,
+                        viaNodeKey: $targetNodeKey,
                     );
                 }
             }
@@ -235,10 +242,25 @@ final class ProcessHighwayMapBuilder
                 ])
                 ->values()
                 ->all();
+            $segmentHandoffs = collect($segmentConnections)
+                ->map(function (array $connection) use ($handoffs): array {
+                    $producerKey = $connection['from_segment_key'];
+                    $consumerKey = $connection['to_segment_key'];
+                    $viaNodeKeys = array_keys($handoffs[$producerKey][$consumerKey] ?? []);
+                    sort($viaNodeKeys);
+
+                    return [
+                        ...$connection,
+                        'via_node_keys' => $viaNodeKeys,
+                    ];
+                })
+                ->values()
+                ->all();
             $highways[] = [
                 'root_segment_keys' => $groupRootKeys,
                 'segment_keys' => $includedKeys,
                 'segment_connections' => $segmentConnections,
+                'segment_handoffs' => $segmentHandoffs,
             ];
         }
 
@@ -283,12 +305,15 @@ final class ProcessHighwayMapBuilder
     /**
      * @param array<string, array<string, bool>> $adjacency
      * @param array<string, array<string, bool>> $incoming
+     * @param array<string, array<string, array<string, bool>>> $handoffs
      */
     private function connectDownstream(
         array &$adjacency,
         array &$incoming,
+        array &$handoffs,
         string $producerKey,
         string $consumerKey,
+        string $viaNodeKey,
     ): void {
         if (
             $producerKey === $consumerKey
@@ -300,6 +325,7 @@ final class ProcessHighwayMapBuilder
 
         $adjacency[$producerKey][$consumerKey] = true;
         $incoming[$consumerKey][$producerKey] = true;
+        $handoffs[$producerKey][$consumerKey][$viaNodeKey] = true;
     }
 
     /**
@@ -308,6 +334,7 @@ final class ProcessHighwayMapBuilder
      * @param array<int, string> $rootSegmentKeys
      * @param array<int, string> $segmentKeys
      * @param array<int, array{from_segment_key: string, to_segment_key: string}> $segmentConnections
+     * @param array<int, array{from_segment_key: string, to_segment_key: string, via_node_keys: array<int, string>}> $segmentHandoffs
      * @param \Illuminate\Support\Collection<string, array<string, mixed>> $segmentsByKey
      * @param \Illuminate\Support\Collection<string, array<string, mixed>> $nodesByKey
      * @param \Illuminate\Support\Collection<string, array<string, mixed>> $edgesByKey
@@ -319,6 +346,7 @@ final class ProcessHighwayMapBuilder
         array $rootSegmentKeys,
         array $segmentKeys,
         array $segmentConnections,
+        array $segmentHandoffs,
         $segmentsByKey,
         $nodesByKey,
         $edgesByKey,
@@ -341,6 +369,18 @@ final class ProcessHighwayMapBuilder
                 true,
             ) && in_array(
                 $connection['to_segment_key'] ?? null,
+                $orderedSegmentKeys,
+                true,
+            ))
+            ->values()
+            ->all();
+        $segmentHandoffs = collect($segmentHandoffs)
+            ->filter(fn (array $handoff): bool => in_array(
+                $handoff['from_segment_key'] ?? null,
+                $orderedSegmentKeys,
+                true,
+            ) && in_array(
+                $handoff['to_segment_key'] ?? null,
                 $orderedSegmentKeys,
                 true,
             ))
@@ -490,6 +530,13 @@ final class ProcessHighwayMapBuilder
             })
             ->values()
             ->all();
+        $junctions = $this->replyJunctions(
+            highwayKey: $key,
+            stages: $segmentStages,
+            handoffs: $segmentHandoffs,
+            segmentsByKey: collect($decoratedSegments)->keyBy('key'),
+            nodesByKey: $componentNodesByKey,
+        );
         $name = $this->highwayName(
             entryRequirements: $entryRequirements,
             entryNodes: $entryNodes->all(),
@@ -535,7 +582,9 @@ final class ProcessHighwayMapBuilder
             'root_segment_keys' => array_values($rootSegmentKeys),
             'segment_keys' => $orderedSegmentKeys,
             'segment_connections' => $segmentConnections,
+            'segment_handoffs' => $segmentHandoffs,
             'segment_stages' => $segmentStages,
+            'junctions' => $junctions,
             'terminal_segment_keys' => $terminalSegmentKeys,
             'segment_count' => count($decoratedSegments),
             'source_keys' => $sourceKeys->all(),
@@ -621,6 +670,120 @@ final class ProcessHighwayMapBuilder
         }
 
         return $stages;
+    }
+
+    /**
+     * @param array<int, array<int, string>> $stages
+     * @param array<int, array{from_segment_key: string, to_segment_key: string, via_node_keys: array<int, string>}> $handoffs
+     * @param \Illuminate\Support\Collection<string, array<string, mixed>> $segmentsByKey
+     * @param \Illuminate\Support\Collection<string, array<string, mixed>> $nodesByKey
+     * @return array<int, array<string, mixed>>
+     */
+    private function replyJunctions(
+        string $highwayKey,
+        array $stages,
+        array $handoffs,
+        $segmentsByKey,
+        $nodesByKey,
+    ): array {
+        $stageBySegment = [];
+
+        foreach ($stages as $stageIndex => $stage) {
+            foreach ($stage as $segmentKey) {
+                $stageBySegment[$segmentKey] = $stageIndex;
+            }
+        }
+
+        $junctions = [];
+
+        foreach ($handoffs as $handoff) {
+            $fromSegmentKey = $handoff['from_segment_key'] ?? null;
+            $toSegmentKey = $handoff['to_segment_key'] ?? null;
+
+            if (! is_string($fromSegmentKey) || ! is_string($toSegmentKey)) {
+                continue;
+            }
+
+            $fromSegment = $segmentsByKey->get($fromSegmentKey);
+            $toSegment = $segmentsByKey->get($toSegmentKey);
+
+            if (! is_array($fromSegment) || ! is_array($toSegment)
+                || ($toSegment['source_key'] ?? null) !== 'flow_routes'
+            ) {
+                continue;
+            }
+
+            foreach ($handoff['via_node_keys'] ?? [] as $viaNodeKey) {
+                $node = is_string($viaNodeKey) ? $nodesByKey->get($viaNodeKey) : null;
+
+                if (! is_array($node)
+                    || ($node['attributes']['event_key'] ?? null) !== 'inbound_message.normal_reply'
+                ) {
+                    continue;
+                }
+
+                $junctionKey = $highwayKey.':reply-junction:'.substr(
+                    sha1((string) $viaNodeKey),
+                    0,
+                    12,
+                );
+                $junctions[$junctionKey] ??= [
+                    'key' => $junctionKey,
+                    'node_key' => $viaNodeKey,
+                    'label' => 'Reply received',
+                    'description' => 'Inbound Messaging classifies the reply before any matching automation runs.',
+                    'source_key' => 'inbound_messaging',
+                    'before_stage_index' => $stageBySegment[$toSegmentKey] ?? 0,
+                    'navigation_target' => $node['navigation_target'] ?? null,
+                    'from_segment_keys' => [],
+                    'branch_segment_keys' => [],
+                    'has_catch_all_branch' => false,
+                    'alternative_path' => [
+                        'label' => 'Other reply',
+                        'description' => 'No configured reply Route matches this message.',
+                        'inbox_review' => true,
+                        'team_notification_available' => in_array(
+                            'internal_notifications',
+                            (array) config('modules.enabled', []),
+                            true,
+                        ),
+                        'campaign_continues' => true,
+                        'recommendation' => 'Consider pausing or stopping the campaign when another reply is received.',
+                    ],
+                ];
+                $junctions[$junctionKey]['before_stage_index'] = min(
+                    $junctions[$junctionKey]['before_stage_index'],
+                    $stageBySegment[$toSegmentKey] ?? 0,
+                );
+                $junctions[$junctionKey]['from_segment_keys'][] = $fromSegmentKey;
+                $junctions[$junctionKey]['branch_segment_keys'][] = $toSegmentKey;
+                $junctions[$junctionKey]['has_catch_all_branch'] =
+                    $junctions[$junctionKey]['has_catch_all_branch']
+                    || ($toSegment['attributes']['reply_intent_keys'] ?? []) === [];
+            }
+        }
+
+        return collect($junctions)
+            ->map(function (array $junction): array {
+                $junction['from_segment_keys'] = array_values(array_unique(
+                    $junction['from_segment_keys'],
+                ));
+                $junction['branch_segment_keys'] = array_values(array_unique(
+                    $junction['branch_segment_keys'],
+                ));
+
+                if ($junction['has_catch_all_branch']) {
+                    $junction['alternative_path'] = null;
+                }
+
+                return $junction;
+            })
+            ->sortBy(fn (array $junction): array => [
+                $junction['before_stage_index'],
+                $junction['node_key'],
+            ])
+            ->values()
+            ->all();
     }
 
     /**

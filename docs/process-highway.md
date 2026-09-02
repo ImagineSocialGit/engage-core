@@ -383,6 +383,8 @@ Manual Campaigns expose explicit enrollment as their entry. Saved targeting crit
 
 Campaign reply-profile discovery reads the Campaign-selected published MessageChainVersion first. Legacy Campaign message-template assignments remain a compatibility fallback only. The resolver never reads message payloads and does not make Campaigns responsible for inbound reply execution.
 
+The visible Campaign completion is the ordinary no-reply path: the Campaign ends after its final message and the contact status does not change. Eligibility loss and re-entry remain Campaign lifecycle details, not separate road exits.
+
 Criterion fact ownership is preserved:
 
 ```text
@@ -439,7 +441,7 @@ It includes:
 - module-tone wayfinding on every visible owned item;
 - progressive disclosure for implementation details;
 - exact safe navigation to authoritative editors;
-- a north-to-south process road with responsive side exits;
+- a north-to-south process road with responsive `Exits to…` outcomes;
 - no-result and optional-module empty states.
 
 The primary information hierarchy is business meaning first and implementation ownership second. The surface does not group by Campaigns versus Flow Routes. Inside one connected Highway, explicit cross-segment handoffs determine north-to-south stages. Segments with the same entrance and no handoff between them occupy one parallel stage instead of being presented as a false sequence.
@@ -448,11 +450,15 @@ The composed Highway read model exposes:
 
 ```text
 segment_connections     explicit directed handoffs between module-owned segments
+segment_handoffs        those connections plus the semantic nodes they pass through
 segment_stages          topological north-to-south presentation layers
+junctions               semantic event panels inserted between connected stages
 terminal_segment_keys   segments with no downstream segment handoff
 ```
 
-Outcomes from a non-terminal segment render as side exits because the main road continues into another segment. Outcomes from a terminal segment render below it as final exits. This is presentation metadata derived from the already composed graph; it does not introduce another workflow definition or alter runtime order. Reply acknowledgements remain attached to their matching orchestration segment.
+Every visible outcome group uses the heading `Exits to…`; the surface does not distinguish between "side" and "final" exits in client-facing copy. A non-terminal segment places those outcomes beside the continuing road, while a terminal segment places them below it. This is presentation metadata derived from the already composed graph; it does not introduce another workflow definition or alter runtime order. Reply acknowledgements remain attached to their matching orchestration segment.
+
+A handoff through `inbound_message.normal_reply` becomes one `Reply received` junction before its matching Flow Route stage. Matching intent Routes fan out beneath that event instead of appearing as sequential or generically independent processes. If no contributed Route is a catch-all, the junction also exposes an `Other reply` path: the message remains reviewable in the Inbound Messaging Inbox, an internal notification can be scheduled when an eligible assigned or default team member resolves, and the Campaign continues. The accompanying pause/stop guidance is a configuration recommendation, not runtime behavior or a mutation from Process Highway.
 
 ## Fact navigation and exact exits
 

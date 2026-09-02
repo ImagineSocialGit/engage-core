@@ -60,6 +60,7 @@ class ProcessHighwayUsabilitySurfaceTest extends TestCase
             ->assertDontSee('data-process-highway-segment-group=', false)
             ->assertSee('data-process-highway-mechanism="campaigns"', false)
             ->assertSee('data-process-highway-outcome="workflow:status:engaged"', false)
+            ->assertSee('data-process-highway-outcome-detail', false)
             ->assertSee('id="process-highway-exit-fixture"', false)
             ->assertSee('data-process-highway-exit-edge="campaigns:campaign:past_client:edge:engaged"', false)
             ->assertSee('data-process-highway-exit-highway="contacts:standard:highway:fixture"', false)
@@ -87,6 +88,34 @@ class ProcessHighwayUsabilitySurfaceTest extends TestCase
             ->assertSee('data-process-highway-side-exits="campaigns:campaign:past_client"', false)
             ->assertSee('data-process-highway-exit-stack="campaigns:campaign:past_client"', false)
             ->assertDontSee('data-process-highway-terminal-exits=', false);
+    }
+
+    public function test_reply_junction_exposes_matching_and_unmatched_paths(): void
+    {
+        $this->view('crm.process-highway._junction', [
+            'junction' => [
+                'key' => 'contacts:standard:highway:fixture:reply-junction',
+                'node_key' => 'inbound_messaging:reply_profile:past_client',
+                'label' => 'Reply received',
+                'description' => 'Fixture description.',
+                'navigation_target' => [
+                    'url' => '/inbound-messaging',
+                    'label' => 'Open Inbound Messaging',
+                ],
+                'alternative_path' => [
+                    'label' => 'Other reply',
+                    'description' => 'Fixture alternative.',
+                    'inbox_review' => true,
+                    'team_notification_available' => true,
+                    'campaign_continues' => true,
+                    'recommendation' => 'Fixture recommendation.',
+                ],
+            ],
+        ])
+            ->assertSee('data-process-highway-junction=', false)
+            ->assertSee('data-process-highway-junction-node=', false)
+            ->assertSee('data-process-highway-alternative-reply=', false)
+            ->assertSee('data-process-highway-recommendation', false);
     }
 
     /** @return array<string, mixed> */
@@ -178,6 +207,7 @@ class ProcessHighwayUsabilitySurfaceTest extends TestCase
         $outcomeNode = [
             'key' => 'workflow:status:engaged',
             'label' => 'Status: Engaged',
+            'detail' => 'Fixture outcome detail.',
             'navigation_target' => [
                 ...$navigationTarget,
                 'owner_key' => 'workflow',
@@ -229,9 +259,11 @@ class ProcessHighwayUsabilitySurfaceTest extends TestCase
                 'state_label' => 'Active',
                 'segment_count' => 1,
                 'segment_connections' => [],
+                'segment_handoffs' => [],
                 'segment_stages' => [[
                     'campaigns:campaign:past_client',
                 ]],
+                'junctions' => [],
                 'terminal_segment_keys' => [
                     'campaigns:campaign:past_client',
                 ],

@@ -33,13 +33,16 @@
 │   │   │   ├── Email
 │   │   │   │   └── Resend
 │   │   │   │       ├── ResendEmailProvider.php
+│   │   │   │       ├── ResendMessageEventWebhookHandler.php
 │   │   │   │       ├── ResendReceivedEmailClient.php
 │   │   │   │       ├── ResendWebhookHandler.php
 │   │   │   │       └── ResendWebhookVerifier.php
 │   │   │   └── Sms
 │   │   │       ├── Telnyx
+│   │   │       │   ├── TelnyxMessageEventWebhookHandler.php
 │   │   │       │   ├── TelnyxSmsProvider.php
-│   │   │       │   └── TelnyxWebhookHandler.php
+│   │   │       │   ├── TelnyxWebhookHandler.php
+│   │   │       │   └── TelnyxWebhookVerifier.php
 │   │   │       └── Twilio
 │   │   │           ├── TwilioSmsProvider.php
 │   │   │           └── TwilioWebhookHandler.php
@@ -749,6 +752,7 @@
 │   │   │   │   ├── EnsureConsentOptInMessageTemplateVersionAction.php
 │   │   │   │   ├── GrantMessageConsentAction.php
 │   │   │   │   ├── GrantMessageConsentsAction.php
+│   │   │   │   ├── HandleEmailProviderEventAction.php
 │   │   │   │   ├── ImportMessageConsentAction.php
 │   │   │   │   ├── PauseMessageChainEnrollmentAction.php
 │   │   │   │   ├── ProcessMessageChainEnrollmentAction.php
@@ -797,11 +801,14 @@
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
 │   │   │   │   │   ├── CreateFlowRouteMessageTemplateController.php
+│   │   │   │   │   ├── MessageDeliveryIssueController.php
 │   │   │   │   │   └── MessageTemplatePresetController.php
-│   │   │   │   └── Public
-│   │   │   │       ├── ConsentRevocationController.php
-│   │   │   │       ├── ContactPermissionInvitationController.php
-│   │   │   │       └── CtaEngagementRedirectController.php
+│   │   │   │   ├── Public
+│   │   │   │   │   ├── ConsentRevocationController.php
+│   │   │   │   │   ├── ContactPermissionInvitationController.php
+│   │   │   │   │   └── CtaEngagementRedirectController.php
+│   │   │   │   └── Webhooks
+│   │   │   │       └── MessageEventWebhookController.php
 │   │   │   ├── Data
 │   │   │   │   ├── Automation
 │   │   │   │   │   └── SendMessageAutomationDefinition.php
@@ -889,12 +896,18 @@
 │   │   │   │   │   └── MessageConsentStateResolver.php
 │   │   │   │   ├── ConsentDomainRegistry.php
 │   │   │   │   ├── ConsentOptInDefinitionResolver.php
+│   │   │   │   ├── ContactPanels
+│   │   │   │   │   └── MessageDeliveryIssueContactPanelProvider.php
 │   │   │   │   ├── ContactPermissionInvitationEligibility.php
 │   │   │   │   ├── ContactPermissionInvitationService.php
 │   │   │   │   ├── ContactShow
 │   │   │   │   │   ├── ContactMessagingShowDataProvider.php
 │   │   │   │   │   └── ContactScheduledMessagesVisibilityDataProvider.php
 │   │   │   │   ├── CtaTrackingRequestClassifier.php
+│   │   │   │   ├── Dashboard
+│   │   │   │   │   └── MessagingDeliveryIssuesDashboardPanelProvider.php
+│   │   │   │   ├── DeliveryIssues
+│   │   │   │   │   └── MessageDeliveryIssueReviewService.php
 │   │   │   │   ├── DevMessageSink.php
 │   │   │   │   ├── DirectMessageTemplateResolver.php
 │   │   │   │   ├── Email
@@ -2183,9 +2196,11 @@
 │   │   ├── messaging
 │   │   │   ├── checklist.md
 │   │   │   ├── cta-engagement-tracking.md
+│   │   │   ├── delivery-issue-review.md
 │   │   │   ├── module_state.md
 │   │   │   ├── permission-invitations.md
 │   │   │   ├── persistence-architecture.md
+│   │   │   ├── provider-webhook-routing.md
 │   │   │   └── TODO.md
 │   │   ├── messaging-public-host.md
 │   │   ├── mortgage
@@ -2387,6 +2402,7 @@
 │       │   │   ├── import-preview.blade.php
 │       │   │   ├── index.blade.php
 │       │   │   ├── panels
+│       │   │   │   ├── messaging-delivery-issues.blade.php
 │       │   │   │   └── webinar-history.blade.php
 │       │   │   ├── partials
 │       │   │   │   └── post-import-inputs.blade.php
@@ -2415,13 +2431,17 @@
 │       │   │   └── reply-profiles
 │       │   │       └── index.blade.php
 │       │   ├── messaging
+│       │   │   ├── delivery-issues
+│       │   │   │   └── index.blade.php
 │       │   │   └── message-templates
 │       │   │       └── index.blade.php
 │       │   ├── process-highway
 │       │   │   ├── _business-process.blade.php
 │       │   │   ├── index.blade.php
+│       │   │   ├── _junction.blade.php
 │       │   │   ├── _outcome.blade.php
-│       │   │   └── _segment.blade.php
+│       │   │   ├── _segment.blade.php
+│       │   │   └── _segment-exits.blade.php
 │       │   ├── project-state
 │       │   │   └── index.blade.php
 │       │   ├── reporting
@@ -2810,8 +2830,10 @@
 │   │   │   ├── MessageDefinitionModuleAvailabilityBoundaryTest.php
 │   │   │   ├── MessageDefinitionResolverTest.php
 │   │   │   ├── MessageDeliveryConsolidatorTest.php
+│   │   │   ├── MessageDeliveryIssueReviewTest.php
 │   │   │   ├── MessageDispatchDefinitionMatcherTest.php
 │   │   │   ├── MessageEligibilityGateTest.php
+│   │   │   ├── MessageEventWebhookOwnershipTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
 │   │   │   ├── MessageTemplateBehaviorOwnershipValidationTest.php
 │   │   │   ├── MessageTemplateCarouselEditorTest.php
@@ -3106,4 +3128,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-733 directories, 2374 files
+738 directories, 2391 files

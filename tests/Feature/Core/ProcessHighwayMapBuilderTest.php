@@ -439,8 +439,17 @@ class ProcessHighwayMapBuilderTest extends TestCase
 
     public function test_explicit_handoffs_produce_north_to_south_stages_and_terminal_segments(): void
     {
+        config()->set('modules.enabled', [
+            'core',
+            'campaigns',
+            'inbound_messaging',
+            'flow_routes',
+            'internal_notifications',
+        ]);
+
         $campaignKey = 'campaigns:campaign:past_client';
-        $routeKey = 'flow_routes:route:past_client_reply';
+        $buyingIntentRouteKey = 'flow_routes:route:past_client_buying_intent';
+        $notInterestedRouteKey = 'flow_routes:route:past_client_not_interested';
         $statusKey = 'workflow:status:past_contact';
         $replyProfileKey = 'inbound_messaging:reply_profile:past_client_nurture';
         $campaign = $this->segment(
@@ -451,14 +460,24 @@ class ProcessHighwayMapBuilderTest extends TestCase
             entryNodeKeys: [$statusKey],
             exitNodeKeys: [$replyProfileKey],
         );
-        $route = $this->segment(
-            key: $routeKey,
+        $buyingIntentRoute = $this->segment(
+            key: $buyingIntentRouteKey,
             sourceKey: 'flow_routes',
             laneKey: 'contacts:standard',
-            nodeKeys: [$replyProfileKey, $routeKey, $routeKey.':exit'],
+            nodeKeys: [$replyProfileKey, $buyingIntentRouteKey, $buyingIntentRouteKey.':exit'],
             entryNodeKeys: [$replyProfileKey],
-            exitNodeKeys: [$routeKey.':exit'],
+            exitNodeKeys: [$buyingIntentRouteKey.':exit'],
         );
+        $buyingIntentRoute['attributes']['reply_intent_keys'] = ['buying_intent'];
+        $notInterestedRoute = $this->segment(
+            key: $notInterestedRouteKey,
+            sourceKey: 'flow_routes',
+            laneKey: 'contacts:standard',
+            nodeKeys: [$replyProfileKey, $notInterestedRouteKey, $notInterestedRouteKey.':exit'],
+            entryNodeKeys: [$replyProfileKey],
+            exitNodeKeys: [$notInterestedRouteKey.':exit'],
+        );
+        $notInterestedRoute['attributes']['reply_intent_keys'] = ['not_interested'];
         $subjects = [[
             'key' => 'contacts',
             'label' => 'Contacts',
@@ -470,12 +489,16 @@ class ProcessHighwayMapBuilderTest extends TestCase
                 'relationship_key' => null,
                 'relationship_label' => null,
                 'sort_order' => 10,
-                'segment_keys' => [$campaignKey, $routeKey],
+                'segment_keys' => [
+                    $campaignKey,
+                    $buyingIntentRouteKey,
+                    $notInterestedRouteKey,
+                ],
             ]],
         ]];
 
         $map = app(ProcessHighwayMapBuilder::class)->build(
-            segments: [$campaign, $route],
+            segments: [$campaign, $buyingIntentRoute, $notInterestedRoute],
             nodes: [
                 $this->node($statusKey, 'Status: Past Client', [$campaignKey], 'status', 'past_contact'),
                 $this->node($campaignKey, 'Past Client Nurture', [$campaignKey], ownerKey: 'campaigns'),
@@ -483,17 +506,23 @@ class ProcessHighwayMapBuilderTest extends TestCase
                     ...$this->node(
                         $replyProfileKey,
                         'Reply to Past Client messages',
-                        [$campaignKey, $routeKey],
+                        [$campaignKey, $buyingIntentRouteKey, $notInterestedRouteKey],
                         ownerKey: 'inbound_messaging',
                     ),
                     'role' => 'trigger',
                     'reference_only' => true,
+                    'attributes' => [
+                        'event_key' => 'inbound_message.normal_reply',
+                        'reply_profile_key' => 'past_client_nurture',
+                    ],
                 ],
-                ...$this->mechanismAndExitNodes($route),
+                ...$this->mechanismAndExitNodes($buyingIntentRoute),
+                ...$this->mechanismAndExitNodes($notInterestedRoute),
             ],
             edges: [
                 ...$this->segmentEdges($campaign),
-                ...$this->segmentEdges($route),
+                ...$this->segmentEdges($buyingIntentRoute),
+                ...$this->segmentEdges($notInterestedRoute),
             ],
             subjects: $subjects,
         );
@@ -502,14 +531,46 @@ class ProcessHighwayMapBuilderTest extends TestCase
         $this->assertSame([
             [
                 'from_segment_key' => $campaignKey,
-                'to_segment_key' => $routeKey,
+                'to_segment_key' => $buyingIntentRouteKey,
+            ],
+            [
+                'from_segment_key' => $campaignKey,
+                'to_segment_key' => $notInterestedRouteKey,
             ],
         ], $map['highways'][0]['segment_connections']);
         $this->assertSame([
+            [
+                'from_segment_key' => $campaignKey,
+                'to_segment_key' => $buyingIntentRouteKey,
+                'via_node_keys' => [$replyProfileKey],
+            ],
+            [
+                'from_segment_key' => $campaignKey,
+                'to_segment_key' => $notInterestedRouteKey,
+                'via_node_keys' => [$replyProfileKey],
+            ],
+        ], $map['highways'][0]['segment_handoffs']);
+        $this->assertSame([
             [$campaignKey],
-            [$routeKey],
+            [$buyingIntentRouteKey, $notInterestedRouteKey],
         ], $map['highways'][0]['segment_stages']);
-        $this->assertSame([$routeKey], $map['highways'][0]['terminal_segment_keys']);
+        $this->assertSame(
+            [$buyingIntentRouteKey, $notInterestedRouteKey],
+            $map['highways'][0]['terminal_segment_keys'],
+        );
+
+        $junction = $map['highways'][0]['junctions'][0];
+
+        $this->assertSame($replyProfileKey, $junction['node_key']);
+        $this->assertSame(1, $junction['before_stage_index']);
+        $this->assertSame(
+            [$buyingIntentRouteKey, $notInterestedRouteKey],
+            $junction['branch_segment_keys'],
+        );
+        $this->assertFalse($junction['has_catch_all_branch']);
+        $this->assertTrue($junction['alternative_path']['inbox_review']);
+        $this->assertTrue($junction['alternative_path']['team_notification_available']);
+        $this->assertTrue($junction['alternative_path']['campaign_continues']);
     }
 
     /**

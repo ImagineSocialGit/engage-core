@@ -37,6 +37,9 @@
     }
 
     $terminalSegmentKeys = collect($businessHighway['terminal_segment_keys'] ?? []);
+    $junctionsByStage = collect($businessHighway['junctions'] ?? [])
+        ->filter(fn (mixed $junction): bool => is_array($junction))
+        ->groupBy(fn (array $junction): int => (int) ($junction['before_stage_index'] ?? 0));
 @endphp
 
 <article
@@ -163,7 +166,9 @@
             </div>
 
             @foreach($segmentStages as $stageIndex => $stage)
-                @if(! $loop->first)
+                @php($stageJunctions = $junctionsByStage->get($stageIndex, collect()))
+
+                @if(! $loop->first || $stageJunctions->isNotEmpty())
                     <div class="flex h-12 flex-col items-center justify-center" data-process-highway-stage-connector>
                         <span class="h-7 w-px bg-slate-300" aria-hidden="true"></span>
                         <svg viewBox="0 0 20 20" class="-mt-1 h-5 w-5 text-slate-400" fill="currentColor" aria-hidden="true">
@@ -172,14 +177,34 @@
                     </div>
                 @endif
 
+                @foreach($stageJunctions as $junction)
+                    @include('crm.process-highway._junction', [
+                        'junction' => $junction,
+                    ])
+                @endforeach
+
+                @if($stageJunctions->isNotEmpty())
+                    <div class="flex h-14 flex-col items-center justify-center" data-process-highway-junction-branches>
+                        <span class="h-7 w-px bg-slate-300" aria-hidden="true"></span>
+                        @if($stage->count() > 1)
+                            <span class="w-2/3 max-w-3xl border-t border-slate-300" aria-hidden="true"></span>
+                        @else
+                            <svg viewBox="0 0 20 20" class="-mt-1 h-5 w-5 text-slate-400" fill="currentColor" aria-hidden="true">
+                                <path d="M5.25 7.5 10 12.25 14.75 7.5H5.25Z" />
+                            </svg>
+                        @endif
+                    </div>
+                @endif
+
                 <section data-process-highway-stage="{{ $stageIndex }}">
                     @if($stage->count() > 1)
-                        <div class="mb-3 text-center" data-process-highway-parallel-stage>
-                            <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Independent paths at this point</p>
-                        </div>
+                        <div data-process-highway-parallel-stage aria-hidden="true"></div>
                     @endif
 
-                    <div class="space-y-5">
+                    <div @class([
+                        'grid gap-5',
+                        'md:grid-cols-2' => $stage->count() > 1,
+                    ])>
                         @foreach($stage as $segment)
                             @include('crm.process-highway._segment', [
                                 'segment' => $segment,

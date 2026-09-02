@@ -307,6 +307,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
             $replyAuthority = new ProcessHighwayAuthority(
                 ownerKey: 'inbound_messaging',
                 editTargets: [
+                    $this->inboundInboxTarget($replyProfileKey),
                     $this->replyProfileTarget($replyProfileKey),
                     $messagesLinkTarget,
                     $linkTarget,
@@ -343,10 +344,15 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
         $completeKey = $processKey.':exit:completed';
         $nodes[] = new ProcessHighwayNode(
             key: $completeKey,
-            label: 'Journey completed',
+            label: 'Campaign ends at the final message',
             role: ProcessHighwayNode::ROLE_EXIT,
             authority: $reviewAuthority,
+            detail: 'The contact status does NOT change.',
             sortOrder: 300,
+            attributes: [
+                'completion_reason' => 'no_reply',
+                'contact_status_changes' => false,
+            ],
         );
         $exitNodeKeys[] = $completeKey;
         $edges[] = new ProcessHighwayEdge(
@@ -355,7 +361,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
             toNodeKey: $completeKey,
             role: ProcessHighwayEdge::ROLE_EXITS,
             authority: $reviewAuthority,
-            label: 'When the journey finishes',
+            label: 'No reply',
             sortOrder: $edgeOrder++,
         );
 
@@ -369,6 +375,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
                 sortOrder: 250,
                 attributes: [
                     'when_ineligible' => (string) $campaign->ineligible_behavior,
+                    'highway_visibility' => 'hidden',
                 ],
             );
             $exitNodeKeys[] = $ineligibleKey;
@@ -380,6 +387,9 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
                 authority: $inlineAuthority,
                 label: 'If eligibility ends',
                 sortOrder: $edgeOrder++,
+                attributes: [
+                    'highway_visibility' => 'hidden',
+                ],
             );
 
             if ($campaign->reentry_policy === Campaign::REENTRY_WHEN_ELIGIBLE_AGAIN) {
@@ -757,6 +767,17 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
                 'profile' => $replyProfileKey,
             ]),
             resourceType: 'reply_profile',
+            resourceKey: $replyProfileKey,
+        );
+    }
+
+    private function inboundInboxTarget(string $replyProfileKey): ProcessHighwayEditTarget
+    {
+        return ProcessHighwayEditTarget::link(
+            ownerKey: 'inbound_messaging',
+            label: 'Open Inbound Messaging',
+            url: route('crm.inbound-messaging.inbox.index'),
+            resourceType: 'inbound_reply_stream',
             resourceKey: $replyProfileKey,
         );
     }

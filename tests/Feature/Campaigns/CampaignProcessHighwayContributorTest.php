@@ -77,6 +77,8 @@ class CampaignProcessHighwayContributorTest extends TestCase
         $statusNode = $nodes[ProcessHighwaySemanticKey::status('past_contact')];
         $tagNode = $nodes[ProcessHighwaySemanticKey::tag('VIP')];
         $campaignNode = $nodes[$processKey];
+        $completionNode = $nodes[$processKey.':exit:completed'];
+        $ineligibleNode = $nodes[$processKey.':consequence:ineligible'];
 
         $this->assertSame('workflow', $statusNode['authority']['owner_key']);
         $this->assertSame('amber', $statusNode['authority']['tone']);
@@ -84,6 +86,9 @@ class CampaignProcessHighwayContributorTest extends TestCase
         $this->assertSame('slate', $tagNode['authority']['tone']);
         $this->assertSame('campaigns', $campaignNode['authority']['owner_key']);
         $this->assertSame('rose', $campaignNode['authority']['tone']);
+        $this->assertSame('no_reply', $completionNode['attributes']['completion_reason']);
+        $this->assertFalse($completionNode['attributes']['contact_status_changes']);
+        $this->assertSame('hidden', $ineligibleNode['attributes']['highway_visibility']);
         $this->assertSame(
             'inline',
             $statusNode['authority']['edit_targets'][0]['mode'],
@@ -158,6 +163,14 @@ class CampaignProcessHighwayContributorTest extends TestCase
                 && $edge['from_node_key'] === $processKey.':consequence:eligible-again'
                 && $edge['to_node_key'] === $eligibilityGatewayKey,
         ));
+        $this->assertTrue($edges->contains(
+            fn (array $edge): bool => $edge['key'] === $processKey.':edge:completed'
+                && $edge['label'] === 'No reply',
+        ));
+        $this->assertTrue($edges->contains(
+            fn (array $edge): bool => $edge['key'] === $processKey.':edge:ineligible'
+                && ($edge['attributes']['highway_visibility'] ?? null) === 'hidden',
+        ));
         $this->assertSame(
             'hidden',
             $nodes[$processKey.':consequence:eligible-again']['attributes']['highway_visibility'],
@@ -166,7 +179,17 @@ class CampaignProcessHighwayContributorTest extends TestCase
             fn (array $edge): bool => $edge['from_node_key'] === $processKey.':consequence:eligible-again'
                 && ($edge['attributes']['highway_visibility'] ?? null) === 'hidden',
         ));
-        $this->assertSame([], $businessHighway['segments'][0]['additional_outcome_groups']);
+        $presentedCampaign = $businessHighway['segments'][0];
+
+        $this->assertSame([], $presentedCampaign['additional_outcome_groups']);
+        $this->assertSame(
+            [$processKey.':exit:completed'],
+            collect($presentedCampaign['journey_nodes'])
+                ->flatMap(fn (array $node): array => $node['outcomes'] ?? [])
+                ->pluck('node.key')
+                ->values()
+                ->all(),
+        );
 
         $campaign->refresh();
 
