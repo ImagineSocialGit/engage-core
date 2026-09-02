@@ -69,17 +69,29 @@ class MessagingSetupValidationContributorTest extends TestCase
             ],
         ]);
 
-        $findings = $this->findings();
-        $messages = array_column($findings, 'message');
+        $findings = collect($this->findings());
+        $paths = $findings->pluck('path')->all();
 
-        $this->assertContains('Payload class does not exist.', $messages);
-        $this->assertContains('Message definition has invalid [queue].', $messages);
-        $this->assertContains('Email payload requires a body.', $messages);
+        $this->assertContains(
+            'messaging.email.definitions.transactional.webinar.default.confirmation.payload_class',
+            $paths,
+        );
+        $this->assertContains(
+            'messaging.email.definitions.transactional.webinar.default.confirmation.queue',
+            $paths,
+        );
+        $this->assertContains(
+            'messaging.email.definitions.transactional.webinar.default.confirmation.payload.body',
+            $paths,
+        );
+        $this->assertTrue($findings->every(
+            fn (array $finding): bool => ($finding['severity'] ?? null) === SetupValidationFinding::SEVERITY_ERROR,
+        ));
     }
 
     public function test_it_validates_customized_db_presets_with_the_existing_message_validator(): void
     {
-        MessageTemplatePreset::query()->create([
+        $preset = MessageTemplatePreset::query()->create([
             'key' => 'custom.invalid',
             'name' => 'Invalid customized preset',
             'channel' => 'email',
@@ -100,12 +112,13 @@ class MessagingSetupValidationContributorTest extends TestCase
             'meta' => [],
         ]);
 
-        $messages = array_column($this->findings(), 'message');
+        $paths = array_column($this->findings(), 'path');
+        $basePath = 'message_template_presets.'.$preset->getKey();
 
-        $this->assertContains('Payload class does not exist.', $messages);
-        $this->assertContains('Message definition has invalid [dispatch_key] or [dispatch_keys].', $messages);
-        $this->assertContains('Message definition has invalid [queue].', $messages);
-        $this->assertContains('Email payload requires a body.', $messages);
+        $this->assertContains($basePath, $paths);
+        $this->assertContains($basePath.'.payload_class', $paths);
+        $this->assertContains($basePath.'.queue', $paths);
+        $this->assertContains($basePath.'.payload.body', $paths);
     }
 
     public function test_it_reports_active_assignment_to_inactive_preset(): void
@@ -290,13 +303,11 @@ class MessagingSetupValidationContributorTest extends TestCase
 
         $result = app(SetupValidationManager::class)->validate();
 
-        $this->assertContains(
-            'Payload class does not exist.',
-            array_map(
-                fn (SetupValidationFinding $finding): string => $finding->message,
-                $result->findings(),
-            ),
-        );
+        $this->assertTrue(collect($result->findings())->contains(
+            fn (SetupValidationFinding $finding): bool =>
+                $finding->module === 'messaging'
+                && str_ends_with((string) $finding->path, '.payload_class'),
+        ));
     }
 
     /**

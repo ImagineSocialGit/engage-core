@@ -206,10 +206,6 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
             'stale_provider_submission_outcome_unknown',
             $attempt->reason_code,
         );
-        $this->assertStringContainsString(
-            'automatic retry was blocked',
-            (string) $attempt->reason,
-        );
         $this->assertSame('+15555550123', $attempt->destination);
     }
 

@@ -108,13 +108,21 @@ class ScheduleCampaignImportBatchInitialMessagesActionTest extends TestCase
         ]);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('cannot change after a Campaign message has already been materialized');
 
-        app(ScheduleCampaignImportBatchInitialMessagesAction::class)->handle(
-            batch: $batch,
-            campaignKey: 'candidate_campaign',
-            firstMessageAt: '2026-08-22T14:30:00Z',
-        );
+        try {
+            app(ScheduleCampaignImportBatchInitialMessagesAction::class)->handle(
+                batch: $batch,
+                campaignKey: 'candidate_campaign',
+                firstMessageAt: '2026-08-22T14:30:00Z',
+            );
+        } finally {
+            $this->assertTrue(
+                $chainEnrollment->fresh()->next_action_at?->equalTo(
+                    Carbon::parse('2026-08-23T12:00:00Z'),
+                ) ?? false,
+            );
+            $this->assertDatabaseCount('scheduled_messages', 1);
+        }
     }
 
     private function stagedEnrollment(

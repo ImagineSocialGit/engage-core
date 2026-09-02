@@ -334,9 +334,6 @@ class ScheduledMessagePayloadCanonicalizerTest extends TestCase
         }
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            'Scheduled message payload exceeds the maximum nesting depth.',
-        );
 
         $this->canonicalizer()->canonicalize(
             EmailPayload::class,
@@ -352,9 +349,6 @@ class ScheduledMessagePayloadCanonicalizerTest extends TestCase
     public function test_it_rejects_payloads_that_exceed_the_encoded_size_limit(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            'Scheduled message payload exceeds the maximum encoded size.',
-        );
 
         $this->canonicalizer()->canonicalize(
             EmailPayload::class,

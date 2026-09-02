@@ -270,8 +270,13 @@ class ContactPermissionInvitationControllerTest extends TestCase
             'token' => $invitation->token,
         ]));
 
-        $response->assertOk();
-        $response->assertSee('EMAIL, SMS');
+        $response
+            ->assertOk()
+            ->assertViewIs('messaging.permission-invitations.accepted')
+            ->assertViewHas('invitation', fn (mixed $presented): bool =>
+                $presented instanceof ContactPermissionInvitation
+                && $presented->is($invitation)
+            );
     }
 
     public function test_already_accepted_invitation_cannot_create_duplicate_consent_rows(): void

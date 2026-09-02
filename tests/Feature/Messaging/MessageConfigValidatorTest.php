@@ -74,11 +74,20 @@ class MessageConfigValidatorTest extends TestCase
             scope: 'webinar',
         );
 
-        $messages = array_column($issues, 'message');
+        $paths = array_column($issues, 'path');
 
-        $this->assertContains('Payload class does not exist.', $messages);
-        $this->assertContains('Message definition has invalid [queue].', $messages);
-        $this->assertContains('Email payload requires a body.', $messages);
+        $this->assertContains(
+            'messaging.email.definitions.transactional.webinar.default.confirmations.0.payload_class',
+            $paths,
+        );
+        $this->assertContains(
+            'messaging.email.definitions.transactional.webinar.default.confirmations.0.queue',
+            $paths,
+        );
+        $this->assertContains(
+            'messaging.email.definitions.transactional.webinar.default.confirmations.0.payload.body',
+            $paths,
+        );
     }
 
     public function test_it_reports_unknown_payload_tokens_as_errors_without_a_caller_allowlist(): void
@@ -105,16 +114,13 @@ class MessageConfigValidatorTest extends TestCase
             scope: 'webinar',
         );
 
-        $tokenIssue = collect($issues)->first(
-            fn (array $issue): bool => str_contains($issue['message'], '{next_step_url}'),
+        $tokenIssue = collect($issues)->firstWhere(
+            'path',
+            'messaging.email.definitions.transactional.webinar.default.confirmations.0.payload.body',
         );
 
         $this->assertNotNull($tokenIssue);
         $this->assertSame('error', $tokenIssue['level']);
-        $this->assertSame(
-            'messaging.email.definitions.transactional.webinar.default.confirmations.0.payload.body',
-            $tokenIssue['path'],
-        );
     }
 
     public function test_it_accepts_webinar_tokens_registered_for_registration_created_and_render_slots(): void
@@ -174,8 +180,8 @@ class MessageConfigValidatorTest extends TestCase
 
         $this->assertTrue(collect($issues)->contains(
             fn (array $issue): bool => ($issue['level'] ?? null) === 'error'
-                && str_contains($issue['message'], '{webinar_playback_url}')
-                && str_contains($issue['message'], 'registration_created'),
+                && ($issue['path'] ?? null)
+                    === 'messaging.email.definitions.transactional.webinar.default.confirmations.0.payload.body',
         ));
     }
 

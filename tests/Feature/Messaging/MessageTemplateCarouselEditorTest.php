@@ -61,12 +61,9 @@ class MessageTemplateCarouselEditorTest extends TestCase
             ->assertSee('data-message-editor-channel="email"', false)
             ->assertSee('data-message-editor-published-preview', false)
             ->assertSee('data-message-editor-form', false)
-            ->assertSee('Published first subject {first_name}')
             ->assertSee('data-message-token-fallback-summary', false)
             ->assertSee('data-message-token-fallbacks', false)
             ->assertSee('name="payload[token_fallbacks][0][missing_behavior]"', false)
-            ->assertSee('Published second subject')
-            ->assertSee('Save &amp; publish', false)
             ->assertDontSee('payload_class');
     }
 

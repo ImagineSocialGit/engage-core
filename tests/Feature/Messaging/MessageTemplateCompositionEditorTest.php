@@ -43,10 +43,20 @@ class MessageTemplateCompositionEditorTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/message-templates?preset='.$preset->getKey())
             ->assertOk()
-            ->assertSee('Shared content')
-            ->assertSee('Impact review')
-            ->assertSee('Exact published preview')
-            ->assertSee('Shared reminder')
+            ->assertViewHas('selectedPreset', fn (mixed $selected): bool =>
+                $selected instanceof MessageTemplatePreset && $selected->is($preset)
+            )
+            ->assertViewHas('sharedCompositionLayers', fn (mixed $layers): bool =>
+                $layers instanceof \Illuminate\Support\Collection
+                && $layers->contains(fn (mixed $candidate): bool =>
+                    is_array($candidate)
+                    && ($candidate['layer'] ?? null) instanceof MessageTemplateCompositionLayer
+                    && $candidate['layer']->is($layer)
+                )
+            )
+            ->assertViewHas('currentTemplateVersion', fn (mixed $version): bool =>
+                $version instanceof \App\Modules\Messaging\Models\MessageTemplateVersion
+            )
             ->assertSee(route('crm.messaging.message-templates.composition-layers.update', $layer));
     }
 

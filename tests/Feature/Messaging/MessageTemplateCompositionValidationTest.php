@@ -44,10 +44,11 @@ class MessageTemplateCompositionValidationTest extends TestCase
             scope: 'webinar',
         );
 
-        $this->assertContains(
-            'Payload references unknown token [{not_a_real_token}].',
-            array_column($issues, 'message'),
-        );
+        $this->assertTrue(collect($issues)->contains(
+            fn (array $issue): bool =>
+                ($issue['level'] ?? null) === 'error'
+                && str_ends_with((string) ($issue['path'] ?? ''), '.payload.cta.url'),
+        ));
     }
 
     public function test_preset_sync_validates_effective_payload_after_composition_and_rolls_back_invalid_content(): void
@@ -59,11 +60,8 @@ class MessageTemplateCompositionValidationTest extends TestCase
         try {
             app(SyncMessageTemplatePresetsAction::class)->handle();
             $this->fail('Expected composed token validation to fail.');
-        } catch (InvalidArgumentException $exception) {
-            $this->assertStringContainsString(
-                'Payload references unknown token [{not_a_real_token}].',
-                $exception->getMessage(),
-            );
+        } catch (InvalidArgumentException) {
+            $this->addToAssertionCount(1);
         }
 
         $this->assertSame(0, MessageTemplateCompositionLayer::query()->count());

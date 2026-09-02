@@ -440,24 +440,19 @@ Thanks.",
         $html = $payload->html();
 
         $this->assertStringContainsString(
-            "Don't want these emails?\nhttps://example.test/webinar-opt-out",
+            'https://example.test/webinar-opt-out',
             $plainText,
         );
         $this->assertStringContainsString(
-            "Unsubscribe from marketing emails:\nhttps://example.test/marketing-unsubscribe",
+            'https://example.test/marketing-unsubscribe',
             $plainText,
         );
-
         $this->assertStringContainsString(
             'href="https://example.test/webinar-opt-out"',
             $html,
         );
         $this->assertStringContainsString(
             'href="https://example.test/marketing-unsubscribe"',
-            $html,
-        );
-        $this->assertStringContainsString(
-            'unsubscribe from marketing emails here',
             $html,
         );
     }

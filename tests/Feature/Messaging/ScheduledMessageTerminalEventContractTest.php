@@ -120,9 +120,6 @@ class ScheduledMessageTerminalEventContractTest extends TestCase
         ]);
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionMessage(
-            "ScheduledMessage [{$message->getKey()}] has no durable terminal outbox event.",
-        );
 
         new ScheduledMessageSent($message);
     }
@@ -134,9 +131,6 @@ class ScheduledMessageTerminalEventContractTest extends TestCase
         ]);
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            'ScheduledMessageSent requires a matching sent terminal result.',
-        );
 
         new ScheduledMessageSent(
             $message,

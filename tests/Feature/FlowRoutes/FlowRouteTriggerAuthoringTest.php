@@ -116,8 +116,24 @@ class FlowRouteTriggerAuthoringTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/flow-routes?create=1')
             ->assertOk()
-            ->assertSee('Someone replies to a message')
-            ->assertSee('Cold lead nurture replies — High Intent')
+            ->assertViewHas('createRouteTriggers', function (array $triggers): bool {
+                $replyTrigger = collect($triggers)->firstWhere(
+                    'key',
+                    InboundReplyAutomationTriggerAuthoringContributor::KEY,
+                );
+
+                if (! is_array($replyTrigger)) {
+                    return false;
+                }
+
+                $replyOutcomeField = collect($replyTrigger['fields'] ?? [])
+                    ->firstWhere('name', 'reply_outcome');
+
+                return is_array($replyOutcomeField)
+                    && collect($replyOutcomeField['options'] ?? [])
+                        ->contains(fn (mixed $option): bool => is_array($option)
+                            && ($option['value'] ?? null) === 'cold_lead_nurture|high_intent');
+            })
             ->assertSee('data-flow-route-create-trigger', false);
 
         $response = $this->actingAs($user)->post(

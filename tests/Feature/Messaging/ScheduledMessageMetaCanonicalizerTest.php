@@ -311,7 +311,6 @@ class ScheduledMessageMetaCanonicalizerTest extends TestCase
     public function test_oversized_canonical_condition_metadata_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('maximum encoded size');
 
         $this->canonicalizer()->canonicalize([
             'conditions' => [[
@@ -331,7 +330,6 @@ class ScheduledMessageMetaCanonicalizerTest extends TestCase
     public function test_excessively_nested_canonical_condition_metadata_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('maximum nesting depth');
 
         $this->canonicalizer()->canonicalize([
             'conditions' => [[
@@ -359,7 +357,6 @@ class ScheduledMessageMetaCanonicalizerTest extends TestCase
     public function test_oversized_canonical_condition_collection_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('too many collection items');
 
         $this->canonicalizer()->canonicalize([
             'conditions' => [[

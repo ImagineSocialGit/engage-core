@@ -99,16 +99,12 @@ class MessageChainPresentationServiceTest extends TestCase
 
         $this->assertSame(2, $presentation['message_count']);
         $this->assertEquals(['email', 'sms'], array_keys($presentation['channels']));
-        $this->assertSame('Emails', $presentation['channels']['email']['label']);
-        $this->assertSame('SMS', $presentation['channels']['sms']['label']);
-        $this->assertSame(
-            '15 minutes after the sequence starts',
-            $presentation['channels']['email']['messages'][0]['timing'],
-        );
-        $this->assertSame(
-            '1 hour before webinar start',
-            $presentation['channels']['sms']['messages'][0]['timing'],
-        );
+        $this->assertSame('welcome_email', $presentation['channels']['email']['messages'][0]['step_key']);
+        $this->assertSame('email', $presentation['channels']['email']['messages'][0]['variant_key']);
+        $this->assertSame('email', $presentation['channels']['email']['messages'][0]['channel']);
+        $this->assertSame('reminder_sms', $presentation['channels']['sms']['messages'][0]['step_key']);
+        $this->assertSame('sms', $presentation['channels']['sms']['messages'][0]['variant_key']);
+        $this->assertSame('sms', $presentation['channels']['sms']['messages'][0]['channel']);
         $this->assertSame(
             'Welcome {first_name}',
             $presentation['channels']['email']['messages'][0]['payload']['subject'],

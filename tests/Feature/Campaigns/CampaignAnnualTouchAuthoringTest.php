@@ -42,8 +42,8 @@ class CampaignAnnualTouchAuthoringTest extends TestCase
 
         $index
             ->assertOk()
-            ->assertSee('Date from field')
-            ->assertSee('Fixed annual date')
+            ->assertSee('value="registered_date_source"', false)
+            ->assertSee('value="fixed_date"', false)
             ->assertViewHas('audience', fn (array $audience): bool => isset($audience['modes']['all'])
                 && ($audience['mode'] ?? null) === 'all')
             ->assertViewHas('emailTemplates', fn ($templates): bool => $templates->contains('id', $email->getKey())

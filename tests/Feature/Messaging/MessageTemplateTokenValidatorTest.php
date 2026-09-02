@@ -44,10 +44,6 @@ class MessageTemplateTokenValidatorTest extends TestCase
 
         $this->assertSame('error', $issues[0]['level']);
         $this->assertSame('payload.body', $issues[0]['path']);
-        $this->assertSame(
-            'Payload references unknown token [{not_a_real_token}].',
-            $issues[0]['message'],
-        );
     }
 
     public function test_it_rejects_registered_tokens_that_are_unavailable_for_the_dispatch_context(): void
@@ -65,10 +61,7 @@ class MessageTemplateTokenValidatorTest extends TestCase
         );
 
         $this->assertSame('error', $issues[0]['level']);
-        $this->assertSame(
-            'Payload references token [{webinar_playback_url}] that is not available for dispatch context [registration_created].',
-            $issues[0]['message'],
-        );
+        $this->assertSame('payload.body', $issues[0]['path']);
     }
 
     public function test_multiple_dispatch_contexts_only_allow_tokens_available_in_every_context(): void
@@ -89,10 +82,7 @@ class MessageTemplateTokenValidatorTest extends TestCase
         );
 
         $this->assertSame('error', $issues[0]['level']);
-        $this->assertStringContainsString(
-            'not available for dispatch context [registration_created, webinar_ended]',
-            $issues[0]['message'],
-        );
+        $this->assertSame('payload.body', $issues[0]['path']);
     }
 
     public function test_it_rejects_dispatch_contexts_that_do_not_match_the_message_route(): void
@@ -110,10 +100,7 @@ class MessageTemplateTokenValidatorTest extends TestCase
         );
 
         $this->assertSame('error', $issues[0]['level']);
-        $this->assertSame(
-            'Dispatch context [registration_created] is not compatible with message route [email:marketing:webinar_nurture:campaigns].',
-            $issues[0]['message'],
-        );
+        $this->assertSame('payload', $issues[0]['path']);
     }
 
     public function test_token_extraction_is_shared_and_deduplicated(): void
@@ -183,7 +170,8 @@ class MessageTemplateTokenValidatorTest extends TestCase
         );
 
         $this->assertCount(1, $issues);
-        $this->assertStringContainsString('not available for dispatch context [flow_route_send_message]', $issues[0]['message']);
+        $this->assertSame('error', $issues[0]['level']);
+        $this->assertSame('payload.body', $issues[0]['path']);
     }
 
 

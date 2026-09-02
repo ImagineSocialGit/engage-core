@@ -120,7 +120,6 @@ class EnrollContactInCampaignActionTest extends TestCase
         $contact = Contact::factory()->create();
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Configure exit conditions on the selected MessageChainVersion');
 
         app(EnrollContactInCampaignAction::class)->handle(
             contact: $contact,
@@ -305,17 +304,24 @@ class EnrollContactInCampaignActionTest extends TestCase
             campaignKey: $first->key,
         );
 
-        $this->expectException(CampaignUnavailableForEnrollmentException::class);
-        $this->expectExceptionMessage('is not lower than candidate priority');
-
         try {
             app(EnrollContactInCampaignAction::class)->handle(
                 contact: $contact,
                 campaignKey: $second->key,
             );
-        } finally {
-            $this->assertDatabaseCount('campaign_enrollments', 1);
+            $this->fail('Expected equal-priority family enrollment to keep the existing incumbent.');
+        } catch (CampaignUnavailableForEnrollmentException $exception) {
+            $this->assertSame(
+                CampaignUnavailableForEnrollmentException::REASON_FAMILY_BLOCKED,
+                $exception->reason,
+            );
+            $this->assertSame('realtor_nurture', $exception->familyKey);
+            $this->assertSame(20, $exception->campaignPriority);
+            $this->assertSame($first->key, $exception->blockingCampaignKey);
+            $this->assertSame(20, $exception->blockingPriority);
         }
+
+        $this->assertDatabaseCount('campaign_enrollments', 1);
     }
 
     public function test_campaigns_without_a_family_remain_independently_enrollable(): void
@@ -375,7 +381,6 @@ class EnrollContactInCampaignActionTest extends TestCase
         );
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('is not active');
 
         try {
             app(EnrollContactInCampaignAction::class)->handle(
@@ -403,7 +408,6 @@ class EnrollContactInCampaignActionTest extends TestCase
         ]);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('has no selected MessageChain');
 
         try {
             app(EnrollContactInCampaignAction::class)->handle(

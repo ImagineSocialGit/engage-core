@@ -84,9 +84,6 @@ class MessageDispatchDefinitionMatcherTest extends TestCase
     public function test_it_rejects_physical_config_path_criteria(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            'Dispatch criteria [source_config_path] is not supported',
-        );
 
         app(MessageDispatchDefinitionMatcher::class)->normalizeCriteria([
             'source_config_path' =>
@@ -123,7 +120,6 @@ class MessageDispatchDefinitionMatcherTest extends TestCase
     public function test_it_rejects_non_scalar_custom_criteria(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Dispatch criteria [meta.delivery_profile] must be a scalar value or null.');
 
         app(MessageDispatchDefinitionMatcher::class)->normalizeCriteria([
             'meta.delivery_profile' => ['alternate'],

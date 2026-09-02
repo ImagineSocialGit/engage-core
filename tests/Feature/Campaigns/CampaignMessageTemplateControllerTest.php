@@ -58,19 +58,32 @@ class CampaignMessageTemplateControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/campaigns/message-templates?campaign='.$campaign->getKey())
             ->assertOk()
-            ->assertSee($campaign->name)
-            ->assertSee($step->name)
-            ->assertSee($emailVariant->name)
-            ->assertSee($emailPreset->name)
+            ->assertViewHas('selectedCampaign', fn ($selected): bool =>
+                $selected instanceof Campaign && $selected->is($campaign))
+            ->assertViewHas('selectedStep', fn ($selected): bool =>
+                $selected instanceof CampaignStep && $selected->is($step))
+            ->assertViewHas('currentAssignments', fn ($assignments): bool =>
+                collect($assignments)->contains(
+                    fn (mixed $assignment): bool =>
+                        $assignment instanceof MessageTemplatePresetAssignment
+                        && (int) $assignment->message_template_preset_id === (int) $emailPreset->getKey(),
+                ))
+            ->assertViewHas('messageCarousel', function (array $carousel) use ($emailPreset): bool {
+                $messages = collect($carousel['channels'] ?? [])
+                    ->flatMap(fn (array $channel): array => $channel['messages'] ?? []);
+
+                return ($carousel['message_count'] ?? null) === 1
+                    && $messages->contains(
+                        fn (mixed $message): bool => is_array($message)
+                            && ($message['preset_id'] ?? null) === (int) $emailPreset->getKey(),
+                    );
+            })
             ->assertSee('name="campaign_step_variant_id"', false)
             ->assertSee('name="message_template_preset_id"', false)
             ->assertSee(route('crm.messaging.message-templates.index', ['module' => 'campaigns']), false)
             ->assertSee('data-message-editor-carousel', false)
             ->assertSee('data-message-editor-form', false)
-            ->assertSee('Published copy')
-            ->assertSee('Save &amp; publish', false)
-            ->assertSee('name="return_to"', false)
-            ->assertSee('Step 1', false);
+            ->assertSee('name="return_to"', false);
     }
 
 
@@ -266,11 +279,16 @@ class CampaignMessageTemplateControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/campaigns/message-templates?campaign='.$campaign->key.'&step='.$step->step_number)
             ->assertOk()
-            ->assertSee('Webinar Attended Nurture')
-            ->assertSee('Step 1')
-            ->assertSee('Email follow-up')
-            ->assertSee('Active template')
-            ->assertSee($preset->name);
+            ->assertViewHas('selectedCampaign', fn ($selected): bool =>
+                $selected instanceof Campaign && $selected->is($campaign))
+            ->assertViewHas('selectedStep', fn ($selected): bool =>
+                $selected instanceof CampaignStep && $selected->is($step))
+            ->assertViewHas('currentAssignments', fn ($assignments): bool =>
+                collect($assignments)->contains(
+                    fn (mixed $assignment): bool =>
+                        $assignment instanceof MessageTemplatePresetAssignment
+                        && (int) $assignment->message_template_preset_id === (int) $preset->getKey(),
+                ));
     }
 
     public function test_index_includes_inactive_campaigns_and_lifecycle_controls(): void
@@ -290,10 +308,18 @@ class CampaignMessageTemplateControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/campaigns/message-templates?campaign='.$campaign->getKey())
             ->assertOk()
-            ->assertSee($campaign->name)
-            ->assertSee('inactive')
-            ->assertSee('Activate Campaign')
-            ->assertDontSee('Deactivate Campaign');
+            ->assertViewHas('selectedCampaign', fn ($selected): bool =>
+                $selected instanceof Campaign
+                && $selected->is($campaign)
+                && $selected->status === Campaign::STATUS_INACTIVE)
+            ->assertSee(
+                route('crm.campaigns.message-templates.activate', $campaign),
+                false,
+            )
+            ->assertDontSee(
+                route('crm.campaigns.message-templates.deactivate', $campaign),
+                false,
+            );
     }
 
     public function test_deactivate_and_activate_routes_use_campaign_lifecycle_actions(): void

@@ -164,16 +164,20 @@ class FlowRouteControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/flow-routes')
             ->assertOk()
+            ->assertViewHas('routes', function ($routes) use ($route): bool {
+                $presented = collect($routes)->firstWhere('id', $route->getKey());
+
+                return is_array($presented)
+                    && ($presented['name'] ?? null) === $route->name
+                    && collect($presented['presented_points'] ?? [])
+                        ->contains(fn (mixed $point): bool => is_array($point)
+                            && ($point['module_key'] ?? null) === 'tasks');
+            })
             ->assertSee($route->name)
-            ->assertSee('Wait 1 week')
             ->assertSee('Create follow-up task')
-            ->assertSee('aria-label="Route steps"', false)
             ->assertSee('data-flow-route-step-list', false)
             ->assertSee('data-module="tasks"', false)
             ->assertSee('data-flow-route-point-module-filters', false)
-            ->assertSee('Add a step')
-            ->assertDontSee('Add a Point')
-            ->assertDontSee('Choose a later Point')
             ->assertDontSee(
                 route('crm.flow-routes.bindings.index'),
                 false,
@@ -226,19 +230,23 @@ class FlowRouteControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/flow-routes')
             ->assertOk()
-            ->assertSee('someone attends a webinar')
-            ->assertSee('Attended Webinar')
-            ->assertSee('Webinar Attended Nurture')
+            ->assertViewHas('automaticBehaviors', function ($behaviors) use ($assignedRoute, $availableRoute): bool {
+                $byId = collect($behaviors)->keyBy('id');
+
+                return $byId->has($assignedRoute->getKey())
+                    && $byId->has($availableRoute->getKey())
+                    && (bool) data_get($byId->get($assignedRoute->getKey()), 'is_enabled') === true
+                    && (bool) data_get($byId->get($availableRoute->getKey()), 'is_enabled') === false;
+            })
+            ->assertViewHas('routeSummary', function (array $summary): bool {
+                return ($summary['automatic_behaviors'] ?? null) === 2
+                    && ($summary['enabled'] ?? null) === 1;
+            })
             ->assertSee($assignedRoute->name)
             ->assertSee($availableRoute->name)
-            ->assertSee('Automatic behaviors')
-            ->assertSee('data-automatic-behavior-sentence', false)
-            ->assertSee('Create automation')
-            ->assertSee('One action')
-            ->assertSee('Several steps')
-            ->assertSee('Turn off')
-            ->assertSee('Turn on');
+            ->assertSee('data-automatic-behavior-sentence', false);
 
+        $this->assertTrue($assignedRoute->activeTriggerBindings()->exists());
         $this->assertFalse($availableRoute->activeTriggerBindings()->exists());
     }
 

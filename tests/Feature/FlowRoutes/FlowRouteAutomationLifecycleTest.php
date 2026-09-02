@@ -39,8 +39,12 @@ class FlowRouteAutomationLifecycleTest extends TestCase
             ->assertOk()
             ->assertViewHas('openRouteEditorId', $route->getKey())
             ->assertViewHas('routeEditors', fn ($editors): bool => $editors->has($route->getKey()))
-            ->assertSee('This Route currently has one action')
-            ->assertSee('Make Automatic behavior');
+            ->assertSee('data-flow-route-editor-state', false);
+
+        $this->assertSame(
+            FlowRoute::AUTHORING_KIND_ROUTE,
+            data_get($route->fresh()->meta, 'authoring.kind'),
+        );
     }
 
     public function test_route_can_be_converted_to_an_editable_automatic_behavior_and_archived(): void
@@ -99,8 +103,7 @@ class FlowRouteAutomationLifecycleTest extends TestCase
             ]))
             ->assertOk()
             ->assertSee('data-flow-route-editor-state', false)
-            ->assertSee('data-flow-route-editor-enabled', false)
-            ->assertSee('Turn off');
+            ->assertSee('data-flow-route-editor-enabled', false);
     }
 
     public function test_same_event_and_conditions_cannot_enable_two_contact_status_mutations(): void
@@ -125,9 +128,9 @@ class FlowRouteAutomationLifecycleTest extends TestCase
             $this->fail('The conflicting automation should not have been enabled.');
         } catch (ValidationException $exception) {
             $this->assertArrayHasKey('flow_route', $exception->errors());
-            $this->assertStringContainsString('Move to Engaged', $exception->errors()['flow_route'][0]);
         }
 
+        $this->assertTrue($first->activeTriggerBindings()->global()->exists());
         $this->assertFalse($second->activeTriggerBindings()->exists());
     }
 

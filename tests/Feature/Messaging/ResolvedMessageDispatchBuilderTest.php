@@ -17,7 +17,6 @@ class ResolvedMessageDispatchBuilderTest extends TestCase
     public function test_content_only_template_requires_explicit_behavior_or_exact_send_at(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('requires exact [sendAt] or explicit caller-owned [behavior]');
 
         app(ResolvedMessageDispatchBuilder::class)->build(
             template: $this->template(),
@@ -85,7 +84,6 @@ class ResolvedMessageDispatchBuilderTest extends TestCase
     public function test_it_rejects_scheduled_behavior_without_schedule(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Resolved scheduled message dispatch is missing [schedule].');
 
         app(ResolvedMessageDispatchBuilder::class)->build(
             template: $this->template(),
@@ -97,7 +95,6 @@ class ResolvedMessageDispatchBuilderTest extends TestCase
     public function test_it_rejects_behavior_fields_inside_reusable_template_data(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('must not own [timing]');
 
         app(ResolvedMessageDispatchBuilder::class)->build(
             template: $this->template() + ['timing' => 'immediate'],

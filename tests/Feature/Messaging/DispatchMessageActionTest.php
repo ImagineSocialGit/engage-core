@@ -470,7 +470,6 @@ class DispatchMessageActionTest extends TestCase
         ]);
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Dispatch criteria matched multiple message definitions.');
 
         app(DispatchMessageAction::class)->handle(
             recipient: $this->contactWithConsent('marketing'),

@@ -34,7 +34,7 @@ class MessageTemplateUsageResolverTest extends TestCase
             sourceConfigPath: $primaryPath,
             itemOrder: 10,
         );
-        $this->catalogEntry(
+        $alternateEntry = $this->catalogEntry(
             preset: $preset,
             variantKey: 'email_alternate',
             itemLabel: 'Alternate Email',
@@ -65,9 +65,15 @@ class MessageTemplateUsageResolverTest extends TestCase
             ->forPreset($preset)
             ->sole();
 
-        $this->assertSame('Campaigns', $usage['module_label']);
-        $this->assertSame('Webinar Attended Nurture', $usage['context_label']);
-        $this->assertSame('Alternate Email', $usage['item_label']);
+        $this->assertSame((int) $preset->assignments()->sole()->getKey(), $usage['assignment_id']);
+        $this->assertSame($alternateEntry->item_label, $usage['item_label']);
+        $this->assertSame(
+            route('crm.campaigns.message-templates.index', [
+                'campaign' => 'webinar_attended_nurture',
+                'step' => 1,
+            ]),
+            $usage['url'],
+        );
     }
 
     private function catalogEntry(

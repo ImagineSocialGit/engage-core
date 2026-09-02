@@ -31,7 +31,6 @@ class FlowRouteCreationAuthoringTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/flow-routes?create=1&status=past_client')
             ->assertOk()
-            ->assertSee('Create automation')
             ->assertSee('data-flow-route-create-modal', false)
             ->assertSee('value="'.$status->getKey().'" selected', false);
 

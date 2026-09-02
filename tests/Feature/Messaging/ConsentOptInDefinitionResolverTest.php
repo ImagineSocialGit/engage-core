@@ -93,9 +93,11 @@ class ConsentOptInDefinitionResolverTest extends TestCase
             messageScope: 'webinar_waitlist',
         );
 
+        $topic = app(ConsentDomainRegistry::class)->topicForDomain('webinar');
+
         $this->assertSame('Custom subject', $definition['payload']['subject']);
         $this->assertSame(
-            'Custom webinars and webinar follow-up copy from Custom Client.',
+            'Custom '.$topic.' copy from Custom Client.',
             $definition['payload']['body'],
         );
     }

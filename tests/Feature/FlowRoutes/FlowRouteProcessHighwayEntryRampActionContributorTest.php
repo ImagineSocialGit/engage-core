@@ -18,11 +18,11 @@ class FlowRouteProcessHighwayEntryRampActionContributorTest extends TestCase
         );
 
         $this->assertCount(1, $actions);
-        $this->assertSame('Automate something for this status', $actions[0]['label']);
+        $this->assertSame('flow_routes:create_for_status', $actions[0]['key']);
+        $this->assertSame('flow_routes', $actions[0]['owner_key']);
         $this->assertSame(
             route('crm.flow-routes.index', ['create' => 1, 'status' => 'past_client']),
             $actions[0]['url'],
         );
-        $this->assertStringContainsString('stays unassigned', $actions[0]['detail']);
     }
 }

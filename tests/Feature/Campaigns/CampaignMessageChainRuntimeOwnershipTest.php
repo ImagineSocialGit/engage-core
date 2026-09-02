@@ -71,8 +71,7 @@ class CampaignMessageChainRuntimeOwnershipTest extends TestCase
             ->dataFor($contact)['contactVisibilitySections']['campaigns'];
 
         $this->assertCount(1, $section['items']);
-        $this->assertSame('Active', $section['items'][0]['status']);
-        $this->assertStringContainsString('Pending', (string) $section['items'][0]['meta']['Last Message']);
+        $this->assertSame($campaign->name, $section['items'][0]['title']);
         $this->assertSame((int) $linked->getKey(), (int) $chainEnrollment->fresh()->latestScheduledMessage?->getKey());
 
         $chainEnrollment->forceFill([

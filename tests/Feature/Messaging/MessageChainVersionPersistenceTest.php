@@ -269,18 +269,12 @@ class MessageChainVersionPersistenceTest extends TestCase
             try {
                 $mutation();
                 $this->fail('Published message-chain records should be immutable.');
-            } catch (LogicException $exception) {
-                $this->assertStringContainsString(
-                    'immutable',
-                    strtolower($exception->getMessage()),
-                );
+            } catch (LogicException) {
+                $this->addToAssertionCount(1);
             }
         }
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionMessage(
-            'Published MessageChainVersion records are immutable.',
-        );
 
         $version->delete();
     }

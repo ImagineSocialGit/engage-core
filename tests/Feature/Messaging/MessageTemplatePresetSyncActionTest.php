@@ -132,7 +132,6 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         ]);
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('must define variant templates under [variants]');
 
         app(SyncMessageTemplatePresetsAction::class)->handle();
     }

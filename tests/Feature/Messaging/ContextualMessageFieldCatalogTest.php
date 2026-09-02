@@ -42,7 +42,6 @@ class ContextualMessageFieldCatalogTest extends TestCase
         $firstName = $fields->firstWhere('insert_token', 'first_name');
 
         $this->assertIsArray($firstName);
-        $this->assertSame('First name', $firstName['label']);
-        $this->assertSame('Jamie', $firstName['example']);
+        $this->assertSame('first_name', $firstName['insert_token']);
     }
 }

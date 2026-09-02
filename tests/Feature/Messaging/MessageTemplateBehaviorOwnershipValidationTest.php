@@ -34,11 +34,12 @@ class MessageTemplateBehaviorOwnershipValidationTest extends TestCase
             scope: 'webinar',
         );
 
-        $messages = collect($issues)->pluck('message')->all();
+        $paths = collect($issues)->pluck('path')->all();
+        $basePath = 'messaging.email.definitions.transactional.webinar.default.confirmation';
 
-        $this->assertTrue(collect($messages)->contains(fn (string $message): bool => str_contains($message, '[timing]')));
-        $this->assertTrue(collect($messages)->contains(fn (string $message): bool => str_contains($message, '[schedule]')));
-        $this->assertTrue(collect($messages)->contains(fn (string $message): bool => str_contains($message, '[conditions]')));
+        $this->assertContains($basePath.'.timing', $paths);
+        $this->assertContains($basePath.'.schedule', $paths);
+        $this->assertContains($basePath.'.conditions', $paths);
     }
 
     public function test_content_only_reusable_message_template_is_valid(): void

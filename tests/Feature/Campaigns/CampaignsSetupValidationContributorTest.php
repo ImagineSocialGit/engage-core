@@ -102,10 +102,8 @@ class CampaignsSetupValidationContributorTest extends TestCase
         $findings = $this->findings();
 
         $this->assertSame(['campaigns.definition_invalid'], array_column($findings, 'code'));
-        $this->assertStringContainsString(
-            'removed field [key]',
-            $findings[0]['message'],
-        );
+        $this->assertSame(SetupValidationFinding::SEVERITY_ERROR, $findings[0]['severity']);
+        $this->assertSame('test_campaign', data_get($findings[0], 'context.campaign_key'));
     }
 
     public function test_it_reports_reusable_copy_owned_by_campaign_step_and_variant(): void
@@ -173,10 +171,8 @@ class CampaignsSetupValidationContributorTest extends TestCase
         $findings = $this->findings();
 
         $this->assertSame(['campaigns.definition_invalid'], array_column($findings, 'code'));
-        $this->assertStringContainsString(
-            'unsupported campaign step variant dependency state',
-            strtolower($findings[0]['message']),
-        );
+        $this->assertSame(SetupValidationFinding::SEVERITY_ERROR, $findings[0]['severity']);
+        $this->assertSame('dependency_campaign', data_get($findings[0], 'context.campaign_key'));
     }
 
     public function test_it_warns_when_dependency_rules_are_dormant_under_non_dependency_strategy(): void

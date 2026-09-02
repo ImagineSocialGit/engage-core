@@ -194,17 +194,16 @@ class MessageTemplatePresetControllerTest extends TestCase
             ->get('http://crm.'.config('app.root_domain').'/message-templates?preset='.$preset->getKey())
             ->assertOk()
             ->assertSee($preset->name)
-            ->assertSee('Webinar Attended Nurture')
-            ->assertViewHas('messageLibrary', function (mixed $library): bool {
-                $labels = collect(is_array($library) ? ($library['channels'] ?? []) : [])
+            ->assertViewHas('messageLibrary', function (mixed $library) use ($preset, $neighborPreset): bool {
+                $presetIds = collect(is_array($library) ? ($library['channels'] ?? []) : [])
                     ->flatMap(fn (array $channel): array => $channel['messages'] ?? [])
-                    ->pluck('step_name')
+                    ->pluck('preset_id')
                     ->values()
                     ->all();
 
-                return $labels === [
-                    'Now let’s talk about YOUR VA loan',
-                    'What to do next after the webinar',
+                return $presetIds === [
+                    $preset->getKey(),
+                    $neighborPreset->getKey(),
                 ];
             })
             ->assertSee(route('crm.campaigns.message-templates.index', [
@@ -274,27 +273,26 @@ class MessageTemplatePresetControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/message-templates?q=10-minute')
             ->assertOk()
-            ->assertSee('10-Minute Reminder')
-            ->assertSee('Homebuyer Game Plan — Webinar Reminders')
-            ->assertDontSee('Cold Lead Nurture')
-            ->assertViewHas('messageLibrary', fn (mixed $library): bool =>
-                collect(is_array($library) ? ($library['channels'] ?? []) : [])
+            ->assertViewHas('messageLibrary', function (mixed $library) use ($webinarPreset, $campaignPreset): bool {
+                $presetIds = collect(is_array($library) ? ($library['channels'] ?? []) : [])
                     ->flatMap(fn (array $channel): array => $channel['messages'] ?? [])
-                    ->pluck('step_name')
-                    ->contains('10-Minute Reminder')
-            );
+                    ->pluck('preset_id');
+
+                return $presetIds->contains($webinarPreset->getKey())
+                    && ! $presetIds->contains($campaignPreset->getKey());
+            });
 
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/message-templates?q=mortgage&module=campaigns')
             ->assertOk()
-            ->assertSee('Don’t Google your way through a mortgage.')
-            ->assertSee('Context')
-            ->assertViewHas('messageLibrary', fn (mixed $library): bool =>
-                collect(is_array($library) ? ($library['channels'] ?? []) : [])
+            ->assertViewHas('messageLibrary', function (mixed $library) use ($campaignPreset, $webinarPreset): bool {
+                $presetIds = collect(is_array($library) ? ($library['channels'] ?? []) : [])
                     ->flatMap(fn (array $channel): array => $channel['messages'] ?? [])
-                    ->pluck('step_name')
-                    ->contains('Don’t Google your way through a mortgage.')
-            );
+                    ->pluck('preset_id');
+
+                return $presetIds->contains($campaignPreset->getKey())
+                    && ! $presetIds->contains($webinarPreset->getKey());
+            });
     }
 
     public function test_it_updates_email_template_safe_copy_fields(): void
@@ -535,9 +533,13 @@ class MessageTemplatePresetControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/message-templates?preset='.$preset->getKey())
             ->assertOk()
-            ->assertSee('Watch the Recording')
-            ->assertSee('Get Pre-Approved')
-            ->assertSee('https://robthemortgagecoach.my1003app.com/322051/register');
+            ->assertViewHas('selectedPreset', fn (mixed $selected): bool =>
+                $selected instanceof MessageTemplatePreset && $selected->is($preset)
+            )
+            ->assertViewHas('editablePayload', fn (mixed $payload): bool =>
+                is_array($payload)
+                && count($payload['ctas'] ?? []) === 2
+            );
 
         $this->actingAs($user)
             ->patch('http://crm.'.config('app.root_domain').'/message-templates/'.$preset->getKey(), [

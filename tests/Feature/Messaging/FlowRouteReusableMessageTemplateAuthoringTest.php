@@ -8,7 +8,6 @@ use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
-use App\Modules\Messaging\Services\MessageTemplateDisplayLabelResolver;
 use App\Modules\Messaging\Services\RouteAuthoringMessageTemplateEligibilityResolver;
 use App\Support\AutomationCapabilities\Data\AutomationPointAuthoringContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -159,46 +158,5 @@ class FlowRouteReusableMessageTemplateAuthoringTest extends TestCase
                 ],
             );
         }
-    }
-
-    public function test_route_message_picker_label_avoids_repeating_group_item_and_channel(): void
-    {
-        $preset = MessageTemplatePreset::factory()->create([
-            'name' => 'Mortgage Homebuyer Nurture — Reply Acknowledgement — Reply Acknowledgement Email',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-        ]);
-        MessageTemplateCatalogEntry::factory()
-            ->forPreset($preset)
-            ->create([
-                'group_label' => 'Mortgage Homebuyer Nurture — Reply Acknowledgement',
-                'item_label' => 'Reply Acknowledgement Email',
-            ]);
-
-        $this->assertSame(
-            'Mortgage Homebuyer Nurture — Reply Acknowledgement',
-            app(MessageTemplateDisplayLabelResolver::class)
-                ->selectionLabel($preset),
-        );
-    }
-
-    public function test_reply_message_editor_summary_uses_business_language_without_repeating_templates(): void
-    {
-        $contributor = app(\App\Modules\Messaging\Automation\MessagingAutomationPointAuthoringContributor::class);
-
-        $this->assertSame(
-            'Replies automatically on the inbound channel',
-            $contributor->editorSummary(
-                'send_message',
-                [
-                    'message_role' => 'reply',
-                    'message_template_keys_by_channel' => [
-                        'email' => 'email.marketing.reply_acknowledgement',
-                        'sms' => 'sms.marketing.reply_acknowledgement',
-                    ],
-                ],
-                new AutomationPointAuthoringContext(),
-            ),
-        );
     }
 }

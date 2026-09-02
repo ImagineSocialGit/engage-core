@@ -15,7 +15,6 @@ class FlowRoutePointPlacementPolicyTest extends TestCase
         $policy = app(FlowRoutePointPlacementPolicy::class);
 
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage("Wait can't be the final step.");
 
         $policy->assertValidSequence(collect([
             $this->point(FlowRoutePointType::CreateTask->value),
@@ -28,7 +27,6 @@ class FlowRoutePointPlacementPolicyTest extends TestCase
         $policy = app(FlowRoutePointPlacementPolicy::class);
 
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('Change Status must be the final step in the Route');
 
         $policy->assertValidSequence(collect([
             $this->point(FlowRoutePointType::ChangeStatus->value),

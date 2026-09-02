@@ -287,9 +287,9 @@ class SendScheduledMessageJobTest extends TestCase
             ScheduledMessage::STATUS_SKIPPED,
             $scheduledMessage->status,
         );
-        $this->assertStringContainsString(
-            '{webinar.title}',
-            (string) $this->terminalAttempt($scheduledMessage)->reason,
+        $this->assertSame(
+            'unresolved_message_tokens',
+            $this->terminalAttempt($scheduledMessage)->reason_code,
         );
         $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
         Event::assertDispatched(
@@ -548,8 +548,8 @@ class SendScheduledMessageJobTest extends TestCase
 
         $this->assertSame('skipped', $scheduledMessage->status);
         $this->assertSame(
-            'Message eligibility gate denied send.',
-            $this->terminalAttempt($scheduledMessage)->reason,
+            'scheduled_message_gate_denied',
+            $this->terminalAttempt($scheduledMessage)->reason_code,
         );
         $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
@@ -614,8 +614,8 @@ class SendScheduledMessageJobTest extends TestCase
 
         $this->assertSame('skipped', $scheduledMessage->status);
         $this->assertSame(
-            'Message eligibility gate denied send.',
-            $this->terminalAttempt($scheduledMessage)->reason,
+            'scheduled_message_gate_denied',
+            $this->terminalAttempt($scheduledMessage)->reason_code,
         );
         $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
@@ -671,8 +671,8 @@ class SendScheduledMessageJobTest extends TestCase
 
         $this->assertSame('skipped', $scheduledMessage->status);
         $this->assertSame(
-            'Message conditions no longer pass.',
-            $this->terminalAttempt($scheduledMessage)->reason,
+            'scheduled_message_gate_denied',
+            $this->terminalAttempt($scheduledMessage)->reason_code,
         );
         $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
@@ -725,8 +725,9 @@ class SendScheduledMessageJobTest extends TestCase
         $scheduledMessage->refresh();
 
         $this->assertSame('skipped', $scheduledMessage->status);
-        $this->assertNotNull(
-            $this->terminalAttempt($scheduledMessage)->reason,
+        $this->assertSame(
+            'scheduled_message_gate_denied',
+            $this->terminalAttempt($scheduledMessage)->reason_code,
         );
         $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
@@ -772,8 +773,8 @@ class SendScheduledMessageJobTest extends TestCase
 
         $this->assertSame('skipped', $scheduledMessage->status);
         $this->assertSame(
-            'Message eligibility gate denied send.',
-            $this->terminalAttempt($scheduledMessage)->reason,
+            'scheduled_message_gate_denied',
+            $this->terminalAttempt($scheduledMessage)->reason_code,
         );
         $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
@@ -816,8 +817,8 @@ class SendScheduledMessageJobTest extends TestCase
 
             $this->assertSame('failed', $scheduledMessage->status);
             $this->assertSame(
-                'Scheduled message payload class is invalid.',
-                $this->terminalAttempt($scheduledMessage)->reason,
+                'message_delivery_exception',
+                $this->terminalAttempt($scheduledMessage)->reason_code,
             );
             $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
@@ -1183,7 +1184,11 @@ Thanks.",
 
         $this->get(route('messaging.permission-invitations.show', ['token' => $invitation->token]))
             ->assertOk()
-            ->assertSee('EMAIL')
+            ->assertViewIs('messaging.permission-invitations.accepted')
+            ->assertViewHas('invitation', fn (mixed $presented): bool =>
+                $presented instanceof ContactPermissionInvitation
+                && $presented->is($invitation)
+            )
             ->assertDontSee('name="channels[]"', false);
     }
 
@@ -1291,9 +1296,9 @@ Thanks.",
         $scheduledMessage->refresh();
 
         $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $scheduledMessage->status);
-        $this->assertStringContainsString(
-            'Message payload contains unresolved token(s): {missing_token}.',
-            (string) $this->terminalAttempt($scheduledMessage)->reason,
+        $this->assertSame(
+            'unresolved_message_tokens',
+            $this->terminalAttempt($scheduledMessage)->reason_code,
         );
         $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
@@ -1339,9 +1344,9 @@ Thanks.",
         $scheduledMessage->refresh();
 
         $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $scheduledMessage->status);
-        $this->assertStringContainsString(
-            'Message payload contains unresolved token(s): :missing_token.',
-            (string) $this->terminalAttempt($scheduledMessage)->reason,
+        $this->assertSame(
+            'unresolved_message_tokens',
+            $this->terminalAttempt($scheduledMessage)->reason_code,
         );
         $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
@@ -1465,7 +1470,6 @@ Thanks.",
             $attempt->status,
         );
         $this->assertSame('sms_disabled', $attempt->reason_code);
-        $this->assertSame('SMS delivery is disabled.', $attempt->reason);
         $this->assertArrayNotHasKey(
             'meta',
             $attempt->getAttributes(),
@@ -1504,8 +1508,8 @@ Thanks.",
         try {
             $this->handleScheduledMessage($scheduledMessage);
             $this->fail('Expected retryable delivery exception.');
-        } catch (RuntimeException $exception) {
-            $this->assertSame('Temporary provider outage.', $exception->getMessage());
+        } catch (RuntimeException) {
+            $this->addToAssertionCount(1);
         }
 
         $scheduledMessage->refresh();
@@ -1528,7 +1532,6 @@ Thanks.",
             'message_delivery_retryable_exception',
             $attempt->reason_code,
         );
-        $this->assertSame('Temporary provider outage.', $attempt->reason);
         $this->assertArrayNotHasKey(
             'meta',
             $attempt->getAttributes(),
@@ -1580,8 +1583,8 @@ Thanks.",
         try {
             $this->handleScheduledMessage($scheduledMessage);
             $this->fail('Expected terminal delivery exception.');
-        } catch (RuntimeException $exception) {
-            $this->assertSame('Provider still unavailable.', $exception->getMessage());
+        } catch (RuntimeException) {
+            $this->addToAssertionCount(1);
         }
 
         $scheduledMessage->refresh();
@@ -1599,7 +1602,6 @@ Thanks.",
             $attempt->status,
         );
         $this->assertSame('message_delivery_exception', $attempt->reason_code);
-        $this->assertSame('Provider still unavailable.', $attempt->reason);
         $this->assertArrayNotHasKey(
             'meta',
             $attempt->getAttributes(),

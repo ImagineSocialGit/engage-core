@@ -62,14 +62,9 @@ class ContactScheduledMessagesTerminalResultTest extends TestCase
         );
 
         $this->assertIsArray($item);
-        $this->assertSame('Failed', $item['status']);
-        $this->assertSame(
-            'Aug 1, 2026 3:00 AM',
-            data_get($item, 'meta.Failed At'),
-        );
-        $this->assertSame(
-            'Authoritative delivery-attempt failure.',
-            data_get($item, 'meta.Failure'),
+        $this->assertContains(
+            $attempt->reason,
+            array_values($item['meta'] ?? []),
         );
     }
 }

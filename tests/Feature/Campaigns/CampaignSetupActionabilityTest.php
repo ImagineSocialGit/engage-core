@@ -64,8 +64,9 @@ class CampaignSetupActionabilityTest extends TestCase
         $messageReview = $response->viewData('messageReview');
 
         $this->assertCount(1, $workspace['schedule_steps']);
-        $this->assertSame('2 days after the Campaign starts', $workspace['schedule_steps'][0]['timing']);
+        $this->assertSame(1, $workspace['schedule_steps'][0]['step_number']);
         $this->assertEquals(['email'], $workspace['schedule_steps'][0]['channels']);
+        $this->assertSame(1, $workspace['schedule_steps'][0]['message_count']);
         $this->assertSame(1, $messageReview['message_count']);
         $this->assertSame('preset:'.$preset->getKey(), $messageReview['initial_message_id']);
 
