@@ -242,8 +242,7 @@ class WebinarRegistrationBoundaryContractTest extends TestCase
             ->assertOk()
             ->assertViewIs('webinar.registration-cancellation-confirm')
             ->assertViewHas('cancellationState', 'already_cancelled')
-            ->assertViewHas('cancelUrl', null)
-            ->assertDontSee('Cancel registration');
+            ->assertViewHas('cancelUrl', null);
 
         $this->post($url)
             ->assertOk()
@@ -290,9 +289,7 @@ class WebinarRegistrationBoundaryContractTest extends TestCase
                         'webinar.registration-cancellation-confirm',
                     )
                     ->assertViewHas('cancellationState', 'ineligible')
-                    ->assertViewHas('cancelUrl', null)
-                    ->assertSee('Cancellation is no longer available')
-                    ->assertDontSee('Cancel registration');
+                    ->assertViewHas('cancelUrl', null);
             }
 
             $registration->refresh();

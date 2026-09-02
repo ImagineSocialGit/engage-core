@@ -127,10 +127,11 @@ class WebinarReplacementPublicLifecycleTest extends TestCase
 
         $this->get($showUrl)
             ->assertOk()
-            ->assertSee(
-                $canonical->starts_at
-                    ->timezone($canonical->timezone)
-                    ->format('F j, Y'),
+            ->assertViewIs('webinar.registration-cancellation-confirm')
+            ->assertViewHas(
+                'registration',
+                fn (WebinarRegistration $viewRegistration): bool =>
+                    $viewRegistration->is($canonicalRegistration),
             );
 
         $storeUrl = URL::temporarySignedRoute(
@@ -144,7 +145,12 @@ class WebinarReplacementPublicLifecycleTest extends TestCase
 
         $this->post($storeUrl)
             ->assertOk()
-            ->assertSee('Your registration has been cancelled');
+            ->assertViewIs('webinar.registration-cancelled')
+            ->assertViewHas(
+                'registration',
+                fn (WebinarRegistration $viewRegistration): bool =>
+                    $viewRegistration->is($canonicalRegistration),
+            );
         $this->post($storeUrl)->assertOk();
 
         $this->assertSame('registered', $sourceRegistration->refresh()->status);
@@ -261,7 +267,13 @@ class WebinarReplacementPublicLifecycleTest extends TestCase
                 ->forRegistration($sourceRegistration),
         )
             ->assertOk()
-            ->assertSee('Your registration is already cancelled');
+            ->assertViewIs('webinar.registration-cancellation-confirm')
+            ->assertViewHas('cancellationState', 'already_cancelled')
+            ->assertViewHas(
+                'registration',
+                fn (WebinarRegistration $viewRegistration): bool =>
+                    $viewRegistration->is($canonicalRegistration),
+            );
 
         $joinResolver = app(ResolveWebinarJoinUrlAction::class);
 

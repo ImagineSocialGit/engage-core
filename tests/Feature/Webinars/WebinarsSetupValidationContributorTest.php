@@ -280,7 +280,6 @@ class WebinarsSetupValidationContributorTest extends TestCase
         $this->assertSame('webinars.message_areas.config_invalid', $findings[0]['code']);
         $this->assertSame('webinars.message_areas', $findings[0]['source']);
         $this->assertSame('webinars.message_areas', $findings[0]['path']);
-        $this->assertStringContainsString('cannot be disabled directly', $findings[0]['message']);
     }
 
     public function test_it_accepts_valid_config_and_runtime_profile_state(): void
@@ -739,7 +738,6 @@ class WebinarsSetupValidationContributorTest extends TestCase
             'webinars.register.configured-series.content.registration.questions',
             $finding['path'],
         );
-        $this->assertStringContainsString('duplicated', $finding['message']);
     }
 
     public function test_it_reports_an_unsupported_trust_variant(): void

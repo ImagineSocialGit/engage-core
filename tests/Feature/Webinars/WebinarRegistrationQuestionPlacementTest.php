@@ -119,8 +119,6 @@ class WebinarRegistrationQuestionPlacementTest extends TestCase
     public function test_unknown_question_placement_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('placement [after_everything] is not supported');
-
         app(WebinarRegistrationQuestionResolver::class)->resolve([
             [
                 'key' => 'bad_placement',

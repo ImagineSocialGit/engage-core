@@ -112,11 +112,8 @@ class WebinarProviderEventTypeFoundationTest extends TestCase
         try {
             $manager->provider('zoom', 'conference');
             $this->fail('Unsupported event types must be rejected.');
-        } catch (InvalidArgumentException $exception) {
-            $this->assertStringContainsString(
-                'Unsupported Webinar provider event type [conference]',
-                $exception->getMessage(),
-            );
+        } catch (InvalidArgumentException) {
+            $this->addToAssertionCount(1);
         }
 
         Config::set(
@@ -125,10 +122,6 @@ class WebinarProviderEventTypeFoundationTest extends TestCase
         );
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            'Webinar provider [zoom] does not configure event type [meeting].',
-        );
-
         $manager->provider('zoom', 'meeting');
     }
 

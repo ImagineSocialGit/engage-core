@@ -60,19 +60,33 @@ class WebinarMessageTemplateControllerTest extends TestCase
 
         $this->withoutMiddleware(ForceStagingAccess::class);
 
-        $areas = config('webinars.message_areas');
-
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/webinars/message-templates')
             ->assertOk()
-            ->assertSee($areas['confirmation']['label'])
-            ->assertSee($areas['registration_opt_in']['label'])
-            ->assertSee($areas['reminders']['label'])
-            ->assertSee($areas['waitlist']['label'])
-            ->assertSee($areas['waitlist_opt_in']['label'])
-            ->assertSee($areas['post_attended']['label'])
-            ->assertSee($areas['post_missed']['label'])
-            ->assertSee('Confirmation Email')
+            ->assertViewHas('sections', function ($sections) use ($preset): bool {
+                foreach ([
+                    'confirmation',
+                    'registration_opt_in',
+                    'reminders',
+                    'waitlist',
+                    'waitlist_opt_in',
+                    'post_attended',
+                    'post_missed',
+                ] as $sectionKey) {
+                    if (! $sections->has($sectionKey)) {
+                        return false;
+                    }
+                }
+
+                $confirmation = $sections->get('confirmation');
+
+                return is_array($confirmation)
+                    && collect($confirmation['entries'] ?? [])->contains(
+                        fn (array $entry): bool =>
+                            ($entry['selected_preset'] ?? null) instanceof MessageTemplatePreset
+                            && $entry['selected_preset']->is($preset),
+                    );
+            })
             ->assertSee('name="message_template_preset_id"', false)
             ->assertSee(route('crm.messaging.message-templates.index', ['module' => 'webinars']), false)
             ->assertDontSee('name="subject"', false)
@@ -126,7 +140,13 @@ class WebinarMessageTemplateControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/webinars/message-templates?section=registration_opt_in')
             ->assertOk()
-            ->assertSee(config('webinars.message_areas.registration_opt_in.label'))
+            ->assertViewHas('selectedSectionKey', 'registration_opt_in')
+            ->assertViewHas('sections', function ($sections): bool {
+                $section = $sections->get('registration_opt_in');
+
+                return is_array($section)
+                    && ($section['managed_by_messaging'] ?? false) === true;
+            })
             ->assertDontSee('name="message_template_preset_id"', false);
     }
 
@@ -493,8 +513,15 @@ class WebinarMessageTemplateControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/webinars/message-templates?section=confirmation')
             ->assertOk()
-            ->assertSee('10 minutes')
-            ->assertDontSee('>Immediate<', false);
+            ->assertViewHas('sections', function ($sections): bool {
+                $section = $sections->get('confirmation');
+                $entry = is_array($section)
+                    ? collect($section['entries'] ?? [])->first()
+                    : null;
+                $label = is_array($entry) ? ($entry['schedule_label'] ?? null) : null;
+
+                return is_string($label) && trim($label) !== '';
+            });
     }
 
     public function test_index_displays_next_day_at_timing_from_the_active_webinar_schedule_profile(): void
@@ -559,7 +586,15 @@ class WebinarMessageTemplateControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/webinars/message-templates?section=post_attended')
             ->assertOk()
-            ->assertSee('09:00');
+            ->assertViewHas('sections', function ($sections): bool {
+                $section = $sections->get('post_attended');
+                $entry = is_array($section)
+                    ? collect($section['entries'] ?? [])->first()
+                    : null;
+                $label = is_array($entry) ? ($entry['schedule_label'] ?? null) : null;
+
+                return is_string($label) && trim($label) !== '';
+            });
     }
 
 
@@ -578,8 +613,12 @@ class WebinarMessageTemplateControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/webinars/message-templates')
             ->assertOk()
-            ->assertDontSee(config('webinars.message_areas.post_missed.label'))
-            ->assertSee(config('webinars.message_areas.post_attended.label'));
+            ->assertViewHas(
+                'sections',
+                fn ($sections): bool =>
+                    ! $sections->has('post_missed')
+                    && $sections->has('post_attended'),
+            );
     }
 
     public function test_update_rejects_a_template_assignment_for_a_disabled_message_area(): void

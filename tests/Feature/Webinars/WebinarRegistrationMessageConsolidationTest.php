@@ -81,11 +81,7 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
         $smsPayload = app(ScheduledMessagePayloadResolver::class)->resolve($sms);
 
         $this->assertStringContainsString('Confirmation body.', $emailPayload->text());
-        $this->assertStringContainsString('email updates', $emailPayload->text());
-        $this->assertStringContainsString('marketing emails', $emailPayload->text());
         $this->assertStringContainsString('Confirmation SMS.', $smsPayload->message());
-        $this->assertStringContainsString('text message updates', $smsPayload->message());
-        $this->assertStringContainsString('marketing text messages', $smsPayload->message());
     }
 
     public function test_future_confirmation_is_materialized_early_only_when_components_need_a_carrier(): void

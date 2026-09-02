@@ -263,7 +263,7 @@ class WebinarRegistrationControllerTest extends TestCase
 
         $this->get(route('webinar.show', $series->slug))
             ->assertOk()
-            ->assertSee('notify');
+            ->assertSee(route('webinar.waitlist.store', $series->slug), false);
 
         $webinar = Webinar::factory()->create([
             'webinar_series_id' => $series->id,

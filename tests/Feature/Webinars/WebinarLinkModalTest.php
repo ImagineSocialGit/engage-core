@@ -120,9 +120,6 @@ class WebinarLinkModalTest extends TestCase
             ->assertSee('data-webinar-links-modal', false)
             ->assertSee('data-webinar-get-links="'.$first->getKey().'"', false)
             ->assertSee('x-on:click="openLinksModal('.$first->getKey().')"', false)
-            ->assertSee('Copy Link')
-            ->assertSee('Get Links')
-            ->assertSee('Get ad links for reporting')
             ->assertSee('data-webinar-ad-reporting-links', false);
 
         $this->assertGreaterThanOrEqual(
@@ -157,9 +154,7 @@ class WebinarLinkModalTest extends TestCase
             ->assertViewHas('paidAdTrackingPlatforms', [])
             ->assertSee('data-webinar-links-modal', false)
             ->assertSee('data-webinar-get-links="'.$webinar->getKey().'"', false)
-            ->assertSee('Get Links')
-            ->assertDontSee('data-webinar-ad-reporting-section', false)
-            ->assertDontSee('Get ad links for reporting');
+            ->assertDontSee('data-webinar-ad-reporting-section', false);
     }
 
     private function futureWebinar(

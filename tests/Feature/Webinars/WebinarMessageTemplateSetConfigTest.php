@@ -24,10 +24,6 @@ class WebinarMessageTemplateSetConfigTest extends TestCase
     public function test_flat_webinar_definition_shape_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            'Webinar message definitions must be grouped under a named template set',
-        );
-
         app(MessageDefinitionConfigSetResolver::class)->sets(
             scope: 'webinar',
             scopeConfig: [

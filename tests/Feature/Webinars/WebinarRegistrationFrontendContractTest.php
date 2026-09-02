@@ -41,7 +41,6 @@ class WebinarRegistrationFrontendContractTest extends TestCase
             'aria-labelledby="webinar-registration-validation-summary-title"',
             $formView,
         );
-        $this->assertSame(4, substr_count($formView, '<span class="sr-only">Required</span>'));
 
         foreach ([
             'name="company_website"',

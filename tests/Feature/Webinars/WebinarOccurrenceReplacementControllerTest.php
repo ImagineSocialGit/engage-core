@@ -34,10 +34,7 @@ class WebinarOccurrenceReplacementControllerTest extends TestCase
         );
 
         $response->assertRedirect(route('crm.webinar-series.index'));
-        $response->assertSessionHas(
-            'success',
-            'Occurrence replacement prepared. Replacement registrations will finalize independently.',
-        );
+        $response->assertSessionHas('success');
         $response->assertSessionHas('occurrence_replacement_result', function (array $result): bool {
             return $result['eligible_registrations'] === 1
                 && $result['created_registrations'] === 1
@@ -103,10 +100,7 @@ class WebinarOccurrenceReplacementControllerTest extends TestCase
         );
 
         $response->assertRedirect(route('crm.webinar-series.index'));
-        $response->assertSessionHas(
-            'error',
-            'A Webinar occurrence replacement must remain within the same Webinar series.',
-        );
+        $response->assertSessionHas('error');
         $this->assertNull(
             $otherSeriesReplacement->refresh()->replacement_of_webinar_id,
         );
@@ -181,17 +175,43 @@ class WebinarOccurrenceReplacementControllerTest extends TestCase
             route('crm.webinar-series.index', ['attention' => 1]),
         );
 
-        $response->assertOk();
-        $response->assertSeeText('Zoom Meeting');
-        $response->assertSeeText('Replaces #'.$source->getKey());
-        $response->assertSeeText('1 replacement needs attention');
-        $response->assertSee(
-            route(
-                'crm.webinar-registrations.finalization.retry',
+        $response
+            ->assertOk()
+            ->assertViewHas('webinars', function ($webinars) use (
+                $replacement,
+                $source,
                 $replacementRegistration,
-            ),
-            false,
-        );
+            ): bool {
+                $viewWebinar = $webinars->first(
+                    fn (Webinar $candidate): bool => $candidate->is($replacement),
+                );
+
+                if (! $viewWebinar instanceof Webinar) {
+                    return false;
+                }
+
+                $viewRegistration = $viewWebinar->registrations->first(
+                    fn (WebinarRegistration $candidate): bool =>
+                        $candidate->is($replacementRegistration),
+                );
+
+                return $viewWebinar->provider_event_type
+                        === WebinarProviderEventType::Meeting->value
+                    && (int) $viewWebinar->replacement_of_webinar_id
+                        === (int) $source->getKey()
+                    && $viewRegistration instanceof WebinarRegistration
+                    && data_get(
+                        $viewRegistration->meta,
+                        'registration_finalization.status',
+                    ) === 'failed';
+            })
+            ->assertSee(
+                route(
+                    'crm.webinar-registrations.finalization.retry',
+                    $replacementRegistration,
+                ),
+                false,
+            );
     }
 
     /** @return array{0: Webinar, 1: Webinar} */

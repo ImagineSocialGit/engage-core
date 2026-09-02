@@ -220,10 +220,27 @@ class ProviderAttendanceReconciliationTest extends TestCase
             route('crm.webinar-series.index', ['archived' => 1]),
         );
 
-        $response->assertOk();
-        $response->assertSee($webinar->title);
-        $response->assertSee('bg-amber-50', false);
-        $response->assertSee('title="', false);
+        $response
+            ->assertOk()
+            ->assertViewHas('webinars', function ($webinars) use ($webinar): bool {
+                $viewWebinar = $webinars->first(
+                    fn (Webinar $candidate): bool => $candidate->is($webinar),
+                );
+
+                return $viewWebinar instanceof Webinar
+                    && data_get(
+                        $viewWebinar->meta,
+                        'normalized.post_event.attendance_checked_at',
+                    ) !== null
+                    && data_get(
+                        $viewWebinar->meta,
+                        'normalized.post_event.attendance_ready',
+                    ) === false
+                    && data_get(
+                        $viewWebinar->meta,
+                        'normalized.post_event.attendance_snapshot_reason',
+                    ) === 'no_participant_records';
+            });
     }
 
     /**

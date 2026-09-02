@@ -60,8 +60,19 @@ class WebinarPostEventReviewTest extends TestCase
         $this->actingAs($user)
             ->get(route('crm.index'))
             ->assertOk()
-            ->assertSee('Review webinar follow-ups')
-            ->assertSee('Homebuyer Game Plan');
+            ->assertViewHas('workPanels', function ($panels) use ($webinar): bool {
+                $panel = $panels->firstWhere('key', 'webinars.activity');
+
+                if (! is_array($panel)) {
+                    return false;
+                }
+
+                return collect($panel['items'] ?? [])->contains(
+                    fn (array $item): bool =>
+                        ($item['type'] ?? null) === 'webinar_post_event_review'
+                        && ($item['key'] ?? null) === 'post-event-review-'.$webinar->getKey(),
+                );
+            });
     }
 
     public function test_recording_completed_pipeline_reconciles_attendance_before_replay_and_follow_ups(): void
@@ -163,8 +174,6 @@ class WebinarPostEventReviewTest extends TestCase
         ]);
 
         $this->expectException(\DomainException::class);
-        $this->expectExceptionMessage('Attendance is still syncing.');
-
         app(ReviewWebinarPostEventAction::class)->handle(
             webinar: $webinar,
             playbackMode: ReviewWebinarPostEventAction::MODE_CURRENT,

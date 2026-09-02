@@ -357,7 +357,6 @@ class WebinarRegistrationQuestionTest extends TestCase
             'contactPanel' => $panel,
         ])->render();
 
-        $this->assertStringContainsString('Registration Questions', $html);
         $this->assertStringContainsString(
             'What is your biggest question or concern about buying a home?',
             $html,

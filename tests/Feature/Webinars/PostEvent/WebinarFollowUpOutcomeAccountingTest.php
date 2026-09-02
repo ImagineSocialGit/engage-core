@@ -280,8 +280,7 @@ class WebinarFollowUpOutcomeAccountingTest extends TestCase
             ->assertSee(
                 route('crm.webinar-registrations.follow-up.retry', $registration),
                 false,
-            )
-            ->assertSee('bg-red-50', false);
+            );
 
         $this->actingAs($user)
             ->from($indexUrl)

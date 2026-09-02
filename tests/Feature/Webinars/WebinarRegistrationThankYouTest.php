@@ -34,7 +34,10 @@ class WebinarRegistrationThankYouTest extends TestCase
         $this->get($this->thankYouUrl($registration))
             ->assertOk()
             ->assertSee('data-registration-status="processing"', false)
-            ->assertSee($webinar->starts_at->timezone($webinar->timezone)->format('F j, Y'));
+            ->assertViewHas(
+                'webinar',
+                fn (Webinar $viewWebinar): bool => $viewWebinar->is($webinar),
+            );
     }
 
     public function test_completed_initial_finalization_is_presented_as_confirmed(): void
@@ -111,15 +114,11 @@ class WebinarRegistrationThankYouTest extends TestCase
 
         $this->get($this->thankYouUrl($registration))
             ->assertOk()
-            ->assertSee(
-                $registeredWebinar->starts_at
-                    ->timezone($registeredWebinar->timezone)
-                    ->format('F j, Y'),
-            )
-            ->assertDontSee(
-                $nextWebinar->starts_at
-                    ->timezone($nextWebinar->timezone)
-                    ->format('F j, Y'),
+            ->assertViewHas(
+                'webinar',
+                fn (Webinar $viewWebinar): bool =>
+                    $viewWebinar->is($registeredWebinar)
+                    && ! $viewWebinar->is($nextWebinar),
             );
     }
 

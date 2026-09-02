@@ -225,8 +225,7 @@ class WebinarWaitlistSignupControllerTest extends TestCase
             'title' => 'Homebuyer Basics',
         ]);
 
-        $this->followingRedirects()
-            ->from(route('webinar.show', $series->slug))
+        $this->from(route('webinar.show', $series->slug))
             ->post(route('webinar.waitlist.store', $series->slug), [
                 'first_name' => 'Jeff',
                 'last_name' => 'Yarnall',
@@ -234,9 +233,9 @@ class WebinarWaitlistSignupControllerTest extends TestCase
                 'marketing_email_consent' => true,
                 'marketing_sms_consent' => false,
             ])
-            ->assertOk()
-            ->assertSee('You’re on the list')
-            ->assertSee('Thanks for signing up');
+            ->assertRedirect(route('webinar.show', $series->slug))
+            ->assertSessionHas('webinar_waitlist_success', true)
+            ->assertSessionHas('success');
 
         $this->assertSame(1, WebinarWaitlistSignup::query()->count());
         $this->assertSame(1, MessageConsent::query()->count());

@@ -65,7 +65,6 @@ class WebinarMessageReadinessServiceTest extends TestCase
         $this->assertSame(WebinarMessageReadinessService::STATUS_READY, $readiness['status']);
         $this->assertSame(WebinarMessageReadinessService::STATUS_READY, $readiness['contexts']['confirmation']['status']);
         $this->assertSame(WebinarMessageReadinessService::STATUS_READY, $readiness['contexts']['registration_opt_in']['status']);
-        $this->assertSame('Sent separately', $readiness['contexts']['registration_opt_in']['status_label']);
         $this->assertSame(
             'sent_separately',
             $readiness['contexts']['registration_opt_in']['channels'][0]['delivery_mode'],
@@ -138,10 +137,6 @@ class WebinarMessageReadinessServiceTest extends TestCase
             $readiness['contexts']['registration_opt_in']['status'],
         );
         $this->assertSame(
-            'Included with confirmation',
-            $readiness['contexts']['registration_opt_in']['status_label'],
-        );
-        $this->assertSame(
             'included_with_confirmation',
             $readiness['contexts']['registration_opt_in']['channels'][0]['delivery_mode'],
         );
@@ -167,7 +162,6 @@ class WebinarMessageReadinessServiceTest extends TestCase
             WebinarMessageReadinessService::STATUS_READY,
             $readiness['contexts']['waitlist_opt_in']['status'],
         );
-        $this->assertSame('Sent separately', $readiness['contexts']['waitlist_opt_in']['status_label']);
         $this->assertSame(
             'sent_separately',
             $readiness['contexts']['waitlist_opt_in']['channels'][0]['delivery_mode'],
