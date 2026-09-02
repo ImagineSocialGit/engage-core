@@ -19,6 +19,24 @@ Use for repeatable Messaging consent/channel checks. It is not backlog.
 - SMS appears only on explicitly enabled surfaces.
 - Permission-invitation SMS opt-in remains explicit.
 
+## Provider webhooks and inbound replies
+
+- Keep provider delivery/lifecycle callbacks on Messaging-owned `/message-events/...` endpoints.
+- Keep human inbound email/SMS on Inbound Messaging-owned `/inbound/...` endpoints.
+- Never configure `email.received` on the Resend delivery/lifecycle endpoint.
+- Configure the Resend inbound endpoint for `email.received` only.
+- Keep every active Resend endpoint signing secret in `RESEND_WEBHOOK_SECRET`; the verifier accepts multiple trusted secrets during endpoint/key rotation.
+- When inbound Resend email is enabled, the configured `RESEND_API_KEY` must be able to retrieve received emails; the current runtime therefore requires Resend Full Access rather than Sending Access.
+- Configure `INBOUND_EMAIL_DOMAIN` only for the domain actually enabled for Resend Receiving.
+- Preserve the reserved `reply+` signed Reply-To namespace for ScheduledMessage correlation; authored inbound routes use other local parts.
+- A real reply test must prove webhook receipt, Receiving API retrieval, signed correlation, and durable InboundMessage creation.
+- Keep Resend Open Tracking and Click Tracking disabled while Engage Core owns CTA tracking through `tracking_key`.
+- Bounce, complaint, provider suppression, and definitive invalid-destination failures must remain Messaging-owned delivery-health consequences.
+- Complaint suppressions remain protected from casual operator release.
+- Editing a Contact destination must not delete historical suppression evidence; only current destination matches surface as active delivery issues.
+
+See `provider-webhook-routing.md` for the technical contract and `../../operations/client-third-party-services-checklist.md` for provider-account provisioning.
+
 ## Bulk delivery
 
 - Large recipient sets use the shared bounded bulk-delivery policy rather than module-specific magic numbers.

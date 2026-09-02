@@ -642,8 +642,9 @@ CDN_BASE_URL=
 ---
 
 # 14. Email and Resend
+# 14. Email and Resend
 
-Provider selection, credentials, webhook secrets, and sender identities are selected-client deployment values.
+Provider selection, credentials, webhook secrets, sender identities, and inbound receiving-domain identity are selected-client deployment values.
 
 Canonical provider path:
 
@@ -663,12 +664,51 @@ FROM_EMAIL_MARKETING=
 FROM_NAME_MARKETING=
 ```
 
-Selected-client Resend credentials/webhook secret:
+Selected-client Resend credentials, webhook secrets, and optional inbound receiving domain:
 
 ```env
 RESEND_API_KEY=
 RESEND_WEBHOOK_SECRET=
+INBOUND_EMAIL_DOMAIN=
 ```
+
+Recommended role split when inbound replies are enabled:
+
+```text
+email.<ROOT_DOMAIN>
+    Resend sending domain
+
+replies.<ROOT_DOMAIN>
+    Resend receiving domain
+    value used by INBOUND_EMAIL_DOMAIN
+
+webhooks.<ROOT_DOMAIN>
+    Engage Core webhook host
+```
+
+The standard sending domain is a deployment recommendation, not a requirement to use that literal subdomain. The visible From address must belong to the domain actually verified for sending. A display name may provide the human-facing sender identity independently from the subdomain used in the address.
+
+The current Resend credential contract is:
+
+```text
+outbound email only
+    Sending Access may be sufficient
+
+Inbound Messaging email receiving enabled
+    Full Access is required
+```
+
+Inbound `email.received` webhooks contain receiving metadata rather than the complete email body. Engage Core uses `RESEND_API_KEY` to retrieve the received email by `email_id` from Resend's Received Emails API. The runtime currently has one Resend API-key setting for both operations.
+
+Each Resend webhook registration may have its own Svix signing secret. `RESEND_WEBHOOK_SECRET` accepts one or more active trusted secrets separated by commas, semicolons, or whitespace. This supports the canonical split between the Messaging delivery/lifecycle endpoint and the Inbound Messaging `email.received` endpoint without adding another environment variable.
+
+`INBOUND_EMAIL_DOMAIN` is required only when the selected deployment uses Resend Receiving / Inbound Messaging email. It should contain a bare domain such as:
+
+```env
+INBOUND_EMAIL_DOMAIN=replies.example.com
+```
+
+Do not include a scheme, mailbox/local part, or `@`.
 
 Root/process webhook verification tolerance:
 
@@ -697,6 +737,8 @@ Resend-specific override
 ```
 
 Do not set the Resend-specific override keys to blank values unless blank is truly intended.
+
+Keep provider-dashboard Open Tracking and Click Tracking disabled while Engage Core owns CTA engagement tracking through Messaging `tracking_key` redirects. Provider-level tracking is an operational setting rather than an environment variable.
 
 ### SMTP variables removed from the canonical Resend example
 
@@ -1012,7 +1054,9 @@ Before deleting an existing live environment variable, search the full repositor
 [ ] Root logging resolves to the intended production channel/stack/level/retention
 [ ] Production observability is installed/verified when this deployment uses the Engage Core observability path
 [ ] Mail sender fallbacks resolve to non-empty addresses
-[ ] Resend secret/API key set when enabled
+[ ] Resend API key and active webhook signing secrets set when email is enabled
+[ ] Resend API key has Full Access when Inbound Messaging email receiving is enabled
+[ ] INBOUND_EMAIL_DOMAIN matches the verified Resend receiving domain when inbound email is enabled
 [ ] SMS_ENABLED deliberate
 [ ] Telnyx sender numbers/profile IDs correct when enabled
 [ ] Webinars/Zoom provider and credentials correct when enabled

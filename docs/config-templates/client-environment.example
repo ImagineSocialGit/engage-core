@@ -57,6 +57,13 @@
 # FROM_NAME_TRANSACTIONAL=
 # FROM_EMAIL_MARKETING=
 # FROM_NAME_MARKETING=
+#
+# Resend credential/webhook notes:
+# - outbound-only deployments may use a Sending Access API key;
+# - inbound email receiving requires Full Access with the current runtime;
+# - RESEND_WEBHOOK_SECRET may contain multiple active endpoint secrets;
+# - INBOUND_EMAIL_DOMAIN is the bare Resend receiving domain, commonly
+#   replies.[ROOT_DOMAIN].
 # RESEND_API_KEY=
 # RESEND_WEBHOOK_SECRET=
 # INBOUND_EMAIL_DOMAIN=
