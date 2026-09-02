@@ -17,6 +17,7 @@
 ################################
 # APP_URL=
 # ROOT_DOMAIN=
+# Messaging public host is derived as messaging.[ROOT_DOMAIN]; do not add MESSAGING_APP_URL.
 # CRM_APP_URL=
 # WEBINAR_APP_URL=
 # SCHEDULING_APP_URL=
@@ -97,6 +98,11 @@
 ################################
 # SMS_ENABLED=
 # SMS_PROVIDER=
+
+# Optional provider-neutral sender fallbacks.
+# SMS_FROM=
+# SMS_FROM_TRANSACTIONAL=
+# SMS_FROM_MARKETING=
 # TELNYX_API_KEY=
 # TELNYX_FROM=
 # TELNYX_FROM_TRANSACTIONAL=

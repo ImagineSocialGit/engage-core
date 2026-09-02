@@ -39,15 +39,21 @@ Use:
 php artisan engage:deployment-plan
 ```
 
-The command is read-only. It resolves enabled modules and their registered deployment contributors, then reports required/defaulted/optional environment values without displaying secret contents.
+The command is read-only. Normal output emphasizes required environment values plus active persisted overrides so deployment blockers and deliberate runtime differences remain obvious. Inactive optional/defaulted rows stay hidden. Use:
 
-Machine-readable output is available with:
+```bash
+php artisan engage:deployment-plan --verbose
+```
+
+when the full environment matrix is useful.
+
+Machine-readable output remains exhaustive:
 
 ```bash
 php artisan engage:deployment-plan --json
 ```
 
-A missing, blank, or persisted-identity-mismatched required value causes a non-zero exit status so deployment automation can stop before runtime work continues. For example, an explicitly selected `CLIENT_KEY` cannot silently disagree with the value persisted in root `.env`.
+A missing, blank, invalid, or persisted-identity-mismatched required value causes a non-zero exit status so deployment automation can stop before runtime work continues. Provider/capability selectors may declare allowed values; unsupported selections are deployment blockers rather than deferred runtime failures. For example, an explicitly selected `CLIENT_KEY` cannot silently disagree with the value persisted in root `.env`.
 
 ## Add only missing required variable names
 
@@ -90,9 +96,71 @@ php artisan engage:deployment-plan
 
 Deployment contributors answer a different question:
 
-> Does this committed client build actually need this variable?
+> Does this committed client build actually need this variable in this environment?
 
 That distinction is required because selected-client `.env` loading happens before Laravel service providers and module contributor tags are available.
+
+## Messaging provider requirements
+
+Messaging contributes provider-aware deployment requirements instead of requiring credentials for every provider the codebase happens to support.
+
+Email currently has one configured provider, `resend`, so Messaging requires an explicit supported `EMAIL_PROVIDER` selection. Local/testing deployment planning treats provider credentials as non-live; staging/production require `MAIL_MAILER=resend`, the Resend API key, a resolved sender address, and `RESEND_WEBHOOK_SECRET`.
+
+Outbound Resend delivery/lifecycle callbacks are now owned directly by Messaging at:
+
+```text
+/message-events/email/resend
+```
+
+That endpoint records delivery evidence and applies Messaging-owned consequences such as bounce/complaint/provider suppressions and provider unsubscribe revocations. It no longer depends on the Inbound Messaging module. True received email remains separately owned by Inbound Messaging at:
+
+```text
+/inbound/email/resend
+```
+
+When inbound email receiving is enabled, the current runtime uses the same `RESEND_API_KEY` to retrieve the received message body, so that key needs Resend Full Access rather than Sending Access. `RESEND_WEBHOOK_SECRET` may contain multiple active endpoint secrets during provider-secret rotation/cutover.
+
+SMS resolves progressively:
+
+```text
+SMS_ENABLED=false
+    -> stop
+    -> no SMS provider or provider credentials are required
+
+SMS_ENABLED=true
+    -> require a supported SMS_PROVIDER
+    -> require only the selected provider's credentials and sender identities
+```
+
+Local/testing deployment planning allows either configured SMS provider behind non-live semantics. For staging/production, live SMS additionally requires Inbound Messaging because STOP, HELP, START/re-opt-in, and normal inbound replies still use the Inbound Messaging SMS path.
+
+The canonical ownership split is:
+
+```text
+/message-events/sms/telnyx
+    -> Messaging
+    -> outbound delivery/lifecycle callback
+
+/inbound/sms/telnyx
+    -> Inbound Messaging
+    -> inbound message + STOP/HELP/START compliance path
+```
+
+Although outbound Twilio provider code exists, the current public inbound SMS route and default inbound handler resolver admit Telnyx only. Therefore staging/production must not be declared ready with `SMS_PROVIDER=twilio`; current live-safe SMS provider selection is Telnyx. Disabled SMS never requires an SMS provider.
+
+Messaging recognizes provider-neutral `SMS_FROM`, `SMS_FROM_TRANSACTIONAL`, and `SMS_FROM_MARKETING` fallbacks because current SMS configuration consumes them. Purpose-specific Telnyx/Twilio sender variables are required only when the effective sender chain does not already resolve a sender.
+
+The Messaging public preference host is derived from the selected client's existing domain contract:
+
+```text
+messaging.[ROOT_DOMAIN]
+```
+
+Do not add `MESSAGING_APP_URL`. Deployment must provision DNS, TLS, and web-server routing for that hostname and verify the canonical Messaging public routes. Host reachability is an operational deployment concern; it is not modeled as a fake environment variable in this batch.
+
+`MESSAGING_SMS_MARKETING_PROFILE_ID` and `MESSAGING_SMS_TRANSACTIONAL_PROFILE_ID` remain recognized client keys. Inbound Messaging uses them, when present, to map Telnyx Messaging Profile IDs back to message purpose; STOP/re-opt-in behavior has safe fallback handling when a provider context cannot be mapped, so this batch does not make them universal required values.
+
+Stable product decisions such as SMS enablement/provider selection are still environment-backed in the current runtime. A later product-config pass may move those non-secret decisions into committed client PHP config; this batch does not change that ownership yet.
 
 ## Adding a module
 

@@ -826,6 +826,8 @@
 │   │   │   │   ├── MessageTemplatePresetPublicationResult.php
 │   │   │   │   ├── ResolvedMessageDispatch.php
 │   │   │   │   └── ReusableMessageTemplateAuthoringContext.php
+│   │   │   ├── Deployment
+│   │   │   │   └── MessagingDeploymentPlanContributor.php
 │   │   │   ├── Enums
 │   │   │   │   ├── MessageChannel.php
 │   │   │   │   └── MessagePurpose.php
@@ -2682,7 +2684,9 @@
 │   │   ├── Deployment
 │   │   │   ├── DeploymentPlanRegistrationTest.php
 │   │   │   ├── DeploymentPlanResolverTest.php
+│   │   │   ├── EngageDeploymentPlanCommandTest.php
 │   │   │   ├── EnvironmentFileSynchronizerTest.php
+│   │   │   ├── EnvironmentRequirementAllowedValuesTest.php
 │   │   │   └── EnvironmentVariableCatalogTest.php
 │   │   ├── Documents
 │   │   │   └── DocumentsFoundationTest.php
@@ -2856,6 +2860,7 @@
 │   │   │   ├── MessageTemplateUsageResolverTest.php
 │   │   │   ├── MessageTemplateVersionPersistenceTest.php
 │   │   │   ├── MessageTokenFallbackResolverTest.php
+│   │   │   ├── MessagingDeploymentPlanContributorTest.php
 │   │   │   ├── MessagingIndexShapeTest.php
 │   │   │   ├── MessagingSetupValidationContributorTest.php
 │   │   │   ├── ProviderSubmissionLimiterTest.php
@@ -3128,4 +3133,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-738 directories, 2391 files
+739 directories, 2395 files

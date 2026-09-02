@@ -36,20 +36,45 @@ final class EngageDeploymentPlanCommand extends Command
         $this->line('Coverage:    '.implode(', ', $plan->coveredOwners));
         $this->newLine();
 
-        $this->table(
-            ['Scope', 'Key', 'Need', 'Status', 'Secret', 'Target'],
-            array_map(
-                static fn (ResolvedEnvironmentRequirement $requirement): array => [
-                    $requirement->definition->scope,
-                    $requirement->definition->key,
-                    $requirement->requirement->requirement,
-                    $requirement->status,
-                    $requirement->definition->secret ? 'yes' : 'no',
-                    $requirement->targetPath,
-                ],
+        $verbose = (bool) $this->option('verbose');
+        $visibleRequirements = $verbose
+            ? $plan->environmentRequirements
+            : array_values(array_filter(
                 $plan->environmentRequirements,
-            ),
-        );
+                static fn (ResolvedEnvironmentRequirement $requirement): bool =>
+                    $requirement->requirement->isRequired()
+                    || $requirement->status === ResolvedEnvironmentRequirement::STATUS_READY,
+            ));
+
+        if ($visibleRequirements === []) {
+            $this->line('No required environment values or active overrides were contributed.');
+        } else {
+            $this->table(
+                ['Scope', 'Key', 'Need', 'Status', 'Secret', 'Target'],
+                array_map(
+                    static fn (ResolvedEnvironmentRequirement $requirement): array => [
+                        $requirement->definition->scope,
+                        $requirement->definition->key,
+                        $requirement->requirement->requirement,
+                        $requirement->status,
+                        $requirement->definition->secret ? 'yes' : 'no',
+                        $requirement->targetPath,
+                    ],
+                    $visibleRequirements,
+                ),
+            );
+        }
+
+        if (! $verbose) {
+            $hiddenCount = count($plan->environmentRequirements) - count($visibleRequirements);
+
+            if ($hiddenCount > 0) {
+                $this->line(sprintf(
+                    '%d inactive optional/defaulted requirement(s) hidden. Use [--verbose] to show the full environment matrix.',
+                    $hiddenCount,
+                ));
+            }
+        }
 
         if ($plan->unusedEnvironmentKeys !== []) {
             $this->newLine();
@@ -70,12 +95,17 @@ final class EngageDeploymentPlanCommand extends Command
 
             foreach ($blocking as $requirement) {
                 $secret = $requirement->definition->secret ? ' [secret]' : '';
+                $allowed = $requirement->requirement->allowedValues !== []
+                    ? ' Allowed: '.implode(', ', $requirement->requirement->allowedValues).'.'
+                    : '';
+
                 $this->line(sprintf(
-                    '  - %s (%s)%s: %s',
+                    '  - %s (%s)%s: %s%s',
                     $requirement->definition->key,
                     $requirement->definition->scope,
                     $secret,
                     $requirement->requirement->reason,
+                    $allowed,
                 ));
             }
 

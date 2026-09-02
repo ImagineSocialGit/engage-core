@@ -150,6 +150,8 @@ final class EnvironmentVariableCatalog
             ['WEBINAR_CONFIRMATION_MESSAGE_QUEUE', $root, 'webinars', false],
             ['WEBINAR_FOLLOWUP_QUEUE', $root, 'webinars', false],
             ['SMS_QUEUE', $root, 'messaging', false],
+            ['MESSAGING_DELIVERY_CLAIM_LEASE_SECONDS', $root, 'messaging', false],
+            ['MESSAGING_DELIVERY_RECOVERY_BATCH_SIZE', $root, 'messaging', false],
             ['MESSAGING_PENDING_MESSAGE_OVERDUE_GRACE_SECONDS', $root, 'messaging', false],
             ['MESSAGING_BULK_CHUNK_SIZE', $root, 'messaging', false],
             ['MESSAGING_BULK_RELEASE_INTERVAL_SECONDS', $root, 'messaging', false],
@@ -273,6 +275,9 @@ final class EnvironmentVariableCatalog
             // SMS provider selection and credentials.
             ['SMS_ENABLED', $client, 'messaging', false],
             ['SMS_PROVIDER', $client, 'messaging', false],
+            ['SMS_FROM', $client, 'messaging', false],
+            ['SMS_FROM_TRANSACTIONAL', $client, 'messaging', false],
+            ['SMS_FROM_MARKETING', $client, 'messaging', false],
             ['TELNYX_API_KEY', $client, 'messaging', true],
             ['TELNYX_FROM', $client, 'messaging', false],
             ['TELNYX_FROM_TRANSACTIONAL', $client, 'messaging', false],

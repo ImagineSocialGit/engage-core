@@ -15,6 +15,7 @@ use App\Modules\Messaging\ConfigContracts\PermissionInvitationConfigContract;
 use App\Modules\Messaging\ConfigContracts\SmsMessageDefinitionConfigContract;
 use App\Modules\Messaging\Console\Commands\AuditEmailHygieneCommand;
 use App\Modules\Messaging\Console\Commands\SyncMessageTemplatePresetsCommand;
+use App\Modules\Messaging\Deployment\MessagingDeploymentPlanContributor;
 use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
@@ -93,6 +94,11 @@ class MessagingModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             MessagingSetupValidationContributor::class,
         ], 'setup.validation_contributors');
+
+        $this->app->tag(
+            MessagingDeploymentPlanContributor::class,
+            'deployment.plan_contributors',
+        );
 
         $this->app->tag([
             MessagingReplyProfileDependencyContributor::class,

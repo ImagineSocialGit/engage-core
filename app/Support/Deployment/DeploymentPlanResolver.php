@@ -72,6 +72,12 @@ final class DeploymentPlanResolver
                     );
                 }
 
+                if ($definition->secret && $requirement->allowedValues !== []) {
+                    throw new InvalidArgumentException(
+                        "Secret environment key [{$definition->key}] cannot declare allowed values in a deployment plan.",
+                    );
+                }
+
                 if (isset($requirements[$definition->key])) {
                     throw new InvalidArgumentException(
                         "Environment key [{$definition->key}] was contributed more than once.",
@@ -131,6 +137,9 @@ final class DeploymentPlanResolver
         $mismatched = $hasPersistedValue
             && $requirement->expectedValue !== null
             && (string) $persistedValue !== $requirement->expectedValue;
+        $invalid = $hasPersistedValue
+            && $requirement->allowedValues !== []
+            && ! in_array((string) $persistedValue, $requirement->allowedValues, true);
 
         $status = match (true) {
             $requirement->isRequired() && ! $persisted
@@ -139,6 +148,8 @@ final class DeploymentPlanResolver
                 => ResolvedEnvironmentRequirement::STATUS_UNRESOLVED,
             $requirement->isRequired() && $mismatched
                 => ResolvedEnvironmentRequirement::STATUS_MISMATCH,
+            $requirement->isRequired() && $invalid
+                => ResolvedEnvironmentRequirement::STATUS_INVALID,
             $requirement->requirement === EnvironmentRequirement::DEFAULTED && ! $hasPersistedValue
                 => ResolvedEnvironmentRequirement::STATUS_DEFAULT,
             $requirement->requirement === EnvironmentRequirement::OPTIONAL && ! $hasPersistedValue

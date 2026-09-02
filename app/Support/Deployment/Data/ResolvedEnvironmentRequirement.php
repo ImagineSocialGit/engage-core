@@ -10,6 +10,7 @@ final readonly class ResolvedEnvironmentRequirement
     public const STATUS_MISSING = 'missing';
     public const STATUS_UNRESOLVED = 'unresolved';
     public const STATUS_MISMATCH = 'mismatch';
+    public const STATUS_INVALID = 'invalid';
     public const STATUS_DEFAULT = 'default';
     public const STATUS_OPTIONAL = 'optional';
 
@@ -29,6 +30,7 @@ final readonly class ResolvedEnvironmentRequirement
                 self::STATUS_MISSING,
                 self::STATUS_UNRESOLVED,
                 self::STATUS_MISMATCH,
+                self::STATUS_INVALID,
             ], true);
     }
 
@@ -43,6 +45,7 @@ final readonly class ResolvedEnvironmentRequirement
             'requirement' => $this->requirement->requirement,
             'reason' => $this->requirement->reason,
             'status' => $this->status,
+            'allowed_values' => $this->requirement->allowedValues,
             'target_path' => $this->targetPath,
             'persisted' => $this->persisted,
         ];
