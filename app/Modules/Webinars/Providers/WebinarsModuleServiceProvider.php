@@ -10,6 +10,7 @@ use App\Modules\Webinars\ConfigContracts\WebinarScheduleProfileConfigContract;
 use App\Modules\Webinars\ConfigContracts\WebinarsConfigContractTargetProvider;
 use App\Modules\Webinars\Console\Commands\ImportWebinarRegistrationsCommand;
 use App\Modules\Webinars\Console\Commands\SyncWebinarScheduleProfilesCommand;
+use App\Modules\Webinars\Deployment\WebinarsDeploymentPlanContributor;
 use App\Modules\Webinars\EventDefinitions\WebinarBehaviorEventDefinitionContributor;
 use App\Modules\Webinars\Jobs\RecoverWebinarRegistrationFinalizationsJob;
 use App\Modules\Webinars\ReadModels\WebinarFunnelFactContributor;
@@ -75,6 +76,11 @@ class WebinarsModuleServiceProvider extends ServiceProvider
             WebinarMessageChainSetupValidationContributor::class,
             WebinarsSetupValidationContributor::class,
         ], 'setup.validation_contributors');
+
+        $this->app->tag(
+            WebinarsDeploymentPlanContributor::class,
+            'deployment.plan_contributors',
+        );
 
         $this->app->tag(
             WebinarBehaviorEventDefinitionContributor::class,

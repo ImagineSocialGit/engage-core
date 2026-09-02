@@ -87,9 +87,20 @@ final readonly class EnvironmentRequirement
         return new self($key, self::OPTIONAL, $reason);
     }
 
-    public static function defaulted(string $key, string $reason): self
-    {
-        return new self($key, self::DEFAULTED, $reason);
+    /**
+     * @param array<int, string> $allowedValues
+     */
+    public static function defaulted(
+        string $key,
+        string $reason,
+        array $allowedValues = [],
+    ): self {
+        return new self(
+            key: $key,
+            requirement: self::DEFAULTED,
+            reason: $reason,
+            allowedValues: $allowedValues,
+        );
     }
 
     public function isRequired(): bool

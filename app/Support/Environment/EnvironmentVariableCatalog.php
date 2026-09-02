@@ -295,7 +295,6 @@ final class EnvironmentVariableCatalog
 
             // Webinar provider selection and credentials.
             ['WEBINAR_PROVIDER', $client, 'webinars', false],
-            ['WEBINAR_BOOKING_URL', $client, 'webinars', false],
             ['ZOOM_ACCOUNT_ID', $client, 'webinars', false],
             ['ZOOM_CLIENT_ID', $client, 'webinars', false],
             ['ZOOM_CLIENT_SECRET', $client, 'webinars', true],

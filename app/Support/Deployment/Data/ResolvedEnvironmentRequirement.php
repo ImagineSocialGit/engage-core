@@ -25,12 +25,17 @@ final readonly class ResolvedEnvironmentRequirement
 
     public function blocksDeployment(): bool
     {
+        if (in_array($this->status, [
+            self::STATUS_MISMATCH,
+            self::STATUS_INVALID,
+        ], true)) {
+            return true;
+        }
+
         return $this->requirement->isRequired()
             && in_array($this->status, [
                 self::STATUS_MISSING,
                 self::STATUS_UNRESOLVED,
-                self::STATUS_MISMATCH,
-                self::STATUS_INVALID,
             ], true);
     }
 

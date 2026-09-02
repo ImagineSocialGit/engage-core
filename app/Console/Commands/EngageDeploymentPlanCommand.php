@@ -43,7 +43,8 @@ final class EngageDeploymentPlanCommand extends Command
                 $plan->environmentRequirements,
                 static fn (ResolvedEnvironmentRequirement $requirement): bool =>
                     $requirement->requirement->isRequired()
-                    || $requirement->status === ResolvedEnvironmentRequirement::STATUS_READY,
+                    || $requirement->status === ResolvedEnvironmentRequirement::STATUS_READY
+                    || $requirement->blocksDeployment(),
             ));
 
         if ($visibleRequirements === []) {

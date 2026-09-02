@@ -142,14 +142,14 @@ final class DeploymentPlanResolver
             && ! in_array((string) $persistedValue, $requirement->allowedValues, true);
 
         $status = match (true) {
+            $hasPersistedValue && $mismatched
+                => ResolvedEnvironmentRequirement::STATUS_MISMATCH,
+            $hasPersistedValue && $invalid
+                => ResolvedEnvironmentRequirement::STATUS_INVALID,
             $requirement->isRequired() && ! $persisted
                 => ResolvedEnvironmentRequirement::STATUS_MISSING,
             $requirement->isRequired() && ! $hasPersistedValue
                 => ResolvedEnvironmentRequirement::STATUS_UNRESOLVED,
-            $requirement->isRequired() && $mismatched
-                => ResolvedEnvironmentRequirement::STATUS_MISMATCH,
-            $requirement->isRequired() && $invalid
-                => ResolvedEnvironmentRequirement::STATUS_INVALID,
             $requirement->requirement === EnvironmentRequirement::DEFAULTED && ! $hasPersistedValue
                 => ResolvedEnvironmentRequirement::STATUS_DEFAULT,
             $requirement->requirement === EnvironmentRequirement::OPTIONAL && ! $hasPersistedValue
