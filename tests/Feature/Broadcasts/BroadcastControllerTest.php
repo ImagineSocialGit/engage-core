@@ -32,7 +32,7 @@ class BroadcastControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        Broadcast::factory()->create([
+        $regular = Broadcast::factory()->create([
             'name' => 'Weekly update',
             'message_type' => Broadcast::DEFAULT_MESSAGE_TYPE,
             'meta' => [
@@ -40,7 +40,7 @@ class BroadcastControllerTest extends TestCase
             ],
         ]);
 
-        Broadcast::factory()->create([
+        $invitation = Broadcast::factory()->create([
             'name' => 'Imported opt-in invitation',
             'channel' => 'email',
             'purpose' => 'transactional',
@@ -65,16 +65,12 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.index'));
 
         $response->assertOk();
-        $response->assertSee(
-            'name="broadcast_type" value="'.Broadcast::BROADCAST_TYPE_REGULAR.'"',
-            false,
+        $response->assertViewHas('regularBroadcasts', fn ($broadcasts): bool =>
+            $broadcasts->contains(fn (Broadcast $candidate): bool => $candidate->is($regular))
         );
-        $response->assertSee(
-            'name="broadcast_type" value="'.Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION.'"',
-            false,
+        $response->assertViewHas('permissionInvitationBroadcasts', fn ($broadcasts): bool =>
+            $broadcasts->contains(fn (Broadcast $candidate): bool => $candidate->is($invitation))
         );
-        $response->assertSee('Weekly update');
-        $response->assertSee('Imported opt-in invitation');
     }
 
     public function test_it_creates_a_draft_broadcast(): void
@@ -454,9 +450,15 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.show', $broadcast));
 
         $response->assertOk();
-        $response->assertSee('Weekly update');
-        $response->assertSee('Jane Lead');
-        $response->assertSee('jane@example.test');
+        $response->assertViewHas('broadcast', fn (mixed $selected): bool =>
+            $selected instanceof Broadcast && $selected->is($broadcast)
+        );
+        $response->assertViewHas('recipients', fn ($recipients): bool =>
+            $recipients->getCollection()->contains(
+                fn (BroadcastRecipient $recipient): bool =>
+                    (int) $recipient->contact_id === (int) $contact->getKey(),
+            )
+        );
     }
 
     public function test_it_shows_sms_broadcast_recipient_outcomes(): void
@@ -516,14 +518,23 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.show', $broadcast));
 
         $response->assertOk();
-        $response->assertSee('SMS update');
-        $response->assertSee('This is an SMS broadcast.');
-        $response->assertSee('+15555550123');
-        $response->assertSee('+15555550124');
-        $response->assertSee('+15555550125');
+        $response->assertViewHas('broadcast', fn (mixed $selected): bool =>
+            $selected instanceof Broadcast && $selected->is($broadcast)
+        );
+        $response->assertViewHas('recipients', function ($recipients) use (
+            $scheduledContact,
+            $skippedContact,
+            $failedContact,
+        ): bool {
+            $byContact = $recipients->getCollection()->keyBy('contact_id');
 
-        $response->assertSee('broadcast channel unavailable');
-        $response->assertSee('provider rejected');
+            return $byContact->get($scheduledContact->getKey())?->status
+                    === BroadcastRecipient::STATUS_SCHEDULED
+                && $byContact->get($skippedContact->getKey())?->status
+                    === BroadcastRecipient::STATUS_SKIPPED
+                && $byContact->get($failedContact->getKey())?->status
+                    === BroadcastRecipient::STATUS_FAILED;
+        });
     }
 
     public function test_it_shows_an_opt_in_invitation_with_distinct_copy(): void
@@ -551,8 +562,13 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.show', $broadcast));
 
         $response->assertOk();
-        $response->assertSee('Imported opt-in invitation');
-        $response->assertSee('transactional / permission_invitation');
+        $response->assertViewHas('broadcast', fn (mixed $selected): bool =>
+            $selected instanceof Broadcast
+                && $selected->is($broadcast)
+                && $selected->message_type === Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION
+                && $selected->purpose === 'transactional'
+                && $selected->scope === 'permission_invitation'
+        );
     }
 
     public function test_it_shows_the_edit_form_for_a_draft_broadcast(): void
@@ -576,11 +592,13 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.edit', $broadcast));
 
         $response->assertOk();
-        $response->assertSee('name="name"', false);
-        $response->assertSee('Draft broadcast');
-        $response->assertSee('Draft subject');
-        $response->assertSee('Draft body');
-        $response->assertSee('homebuyer');
+        $response->assertViewIs('crm.broadcasts.edit');
+        $response->assertViewHas('broadcast', fn (mixed $selected): bool =>
+            $selected instanceof Broadcast
+                && $selected->is($broadcast)
+                && data_get($selected->recipient_filter, 'type') === 'tag'
+                && data_get($selected->recipient_filter, 'tags') === ['homebuyer']
+        );
     }
 
     public function test_it_shows_the_edit_form_for_an_opt_in_invitation_with_locked_recipients(): void
@@ -815,8 +833,9 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.show', $broadcast));
 
         $response->assertOk();
-        $response->assertSee('Jane Lead');
-        $response->assertSee('jane@example.test');
+        $response->assertViewHas('recipientFilterContacts', fn ($contacts): bool =>
+            $contacts->contains(fn (Contact $candidate): bool => $candidate->is($contact))
+        );
     }
 
     public function test_it_does_not_show_the_edit_form_for_a_non_draft_broadcast(): void
@@ -1256,10 +1275,15 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.show', $broadcast));
 
         $response->assertOk();
-        $response->assertSee('June CSV Import');
-        $response->assertSee('june-leads.csv');
-        $response->assertSee('12 successful');
-        $response->assertSee('1 failed');
+        $response->assertViewHas('selectedImportBatches', function ($batches) use ($batch): bool {
+            $selected = $batches->first();
+
+            return $batches->count() === 1
+                && $selected instanceof ContactImportBatch
+                && $selected->is($batch)
+                && (int) $selected->successful_count === 12
+                && (int) $selected->failed_count === 1;
+        });
     }
 
 }

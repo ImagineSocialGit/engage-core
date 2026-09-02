@@ -105,11 +105,19 @@ class InboundInboxWorkspaceTest extends TestCase
             ->assertSee('data-inbound-inbox', false)
             ->assertSee('Website form received')
             ->assertSee('Website Forms')
-            ->assertSee('Not matched to a person')
             ->assertSee(
                 route('crm.inbound-messaging.inbox.show', $message),
                 false,
-            );
+            )
+            ->assertViewHas('workspace', function (array $workspace) use ($message): bool {
+                $presented = collect($workspace['messages']->items())
+                    ->first(fn (mixed $item): bool => is_array($item)
+                        && ($item['message'] ?? null) instanceof InboundMessage
+                        && $item['message']->is($message));
+
+                return is_array($presented)
+                    && ($presented['person'] ?? null) === null;
+            });
     }
 
     public function test_operator_can_move_message_through_human_triage_states(): void
@@ -321,8 +329,18 @@ class InboundInboxWorkspaceTest extends TestCase
             ]))
             ->assertOk()
             ->assertSee('Automatically answered message')
-            ->assertSee('System auto-responded')
-            ->assertSee('data-inbound-auto-response', false);
+            ->assertSee('data-inbound-auto-response', false)
+            ->assertViewHas('workspace', function (array $workspace) use ($message, $response): bool {
+                $presented = collect($workspace['messages']->items())
+                    ->first(fn (mixed $item): bool => is_array($item)
+                        && ($item['message'] ?? null) instanceof InboundMessage
+                        && $item['message']->is($message));
+
+                return is_array($presented)
+                    && ($presented['status'] ?? null) === InboundMessage::INBOX_STATUS_DONE
+                    && data_get($presented, 'automated_response.scheduled_message_id')
+                        === (int) $response->getKey();
+            });
 
         $this->actingAs($user)
             ->get(route('crm.index'))

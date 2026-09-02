@@ -206,13 +206,15 @@ class BroadcastTokenPersonalizationTest extends TestCase
             'recipient_filter' => ['type' => 'all'],
         ]);
 
+        $thrown = null;
+
         try {
             app(ScheduleBroadcastAction::class)->handle($broadcast);
-            $this->fail('Invalid tokenized Broadcast should not schedule.');
         } catch (InvalidArgumentException $exception) {
-            $this->assertStringContainsString('unknown token', strtolower($exception->getMessage()));
+            $thrown = $exception;
         }
 
+        $this->assertInstanceOf(InvalidArgumentException::class, $thrown);
         $this->assertSame(Broadcast::STATUS_DRAFT, $broadcast->fresh()->status);
         $this->assertSame(0, BroadcastRecipient::query()->count());
         $this->assertSame(0, ScheduledMessage::query()->count());

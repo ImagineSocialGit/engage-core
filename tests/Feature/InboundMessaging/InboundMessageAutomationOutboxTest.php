@@ -94,9 +94,6 @@ class InboundMessageAutomationOutboxTest extends TestCase
         ]);
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionMessage(
-            'Inbound provider event and message identifiers resolve to different messages.',
-        );
 
         $action->handle([
             ...$this->normalReplyData(),

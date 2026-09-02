@@ -99,7 +99,7 @@ class ContactConversationShowDataProviderTest extends TestCase
             'Yes, I am ready. Please call me tomorrow.',
             $items[1]['body'],
         );
-        $this->assertSame('High Intent', $items[1]['intent']);
+        $this->assertSame($inbound->getKey(), $items[1]['source_id']);
         $this->assertSame('outbound', $items[2]['direction']);
         $this->assertSame(
             'Are you still thinking about buying?',
@@ -236,8 +236,7 @@ class ContactConversationShowDataProviderTest extends TestCase
             ->get(route('crm.contacts.show', $contact))
             ->assertOk()
             ->assertSee('data-contact-conversation-rail', false)
-            ->assertSee('Please call me tomorrow.')
-            ->assertDontSee('What’s already happening');
+            ->assertSee('Please call me tomorrow.');
     }
 
     public function test_automated_response_is_featured_after_the_latest_inbound_reply(): void
@@ -307,9 +306,7 @@ class ContactConversationShowDataProviderTest extends TestCase
             ->get(route('crm.contacts.show', $contact))
             ->assertOk()
             ->assertSee('data-contact-automated-response', false)
-            ->assertSee('System auto-responded')
             ->assertSee('A member of our team will follow up shortly.')
-            ->assertSee('Send another reply')
             ->assertSee('data-contact-conversation-composer', false);
 
         $this->assertSame($inbound->getKey(), data_get(

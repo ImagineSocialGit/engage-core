@@ -48,9 +48,8 @@ class InboundEmailRouteWorkspaceTest extends TestCase
             ->assertSee('data-inbound-email-route-editor', false)
             ->assertSee('website-forms@inbound.example.test')
             ->assertSee('Website Forms')
-            ->assertDontSee('Route key')
-            ->assertDontSee('Context key')
-            ->assertDontSee('Stable external-system');
+            ->assertDontSee('name="key"', false)
+            ->assertDontSee('name="context_key"', false);
     }
 
     public function test_operator_can_create_update_and_disable_address_without_authoring_internal_keys(): void
