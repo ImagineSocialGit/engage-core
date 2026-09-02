@@ -142,6 +142,7 @@ return [
                 'max' => 2,
                 'hide_when_empty' => false,
                 'panels' => [
+                    'messaging.delivery_issues',
                     'tasks.today',
                     'inbound_messaging.replies',
                     'documents.review',

@@ -4,6 +4,12 @@
 
 Messaging is a reusable capability module.
 
+Operator review of current bounce/suppression problems is documented in
+[`delivery-issue-review.md`](delivery-issue-review.md).
+
+The detailed workflow lives in the NEW focused document rather than being vaguely appended to an
+arbitrary location in this already-large module state file.
+
 The core persistence refactor is implemented and green:
 
 ```text

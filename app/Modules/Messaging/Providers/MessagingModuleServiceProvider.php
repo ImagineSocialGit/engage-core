@@ -4,6 +4,7 @@ namespace App\Modules\Messaging\Providers;
 
 use App\Modules\Core\Events\ManualContactCreated;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Messaging\Automation\MessagingAutomationPointAuthoringContributor;
 use App\Modules\Messaging\Automation\MessagingAutomationPointDefinitionContributor;
 use App\Modules\Messaging\Automation\SendMessageAutomationActionHandler;
@@ -21,16 +22,18 @@ use App\Modules\Messaging\Jobs\ProcessDueMessageChainEnrollmentsJob;
 use App\Modules\Messaging\Jobs\PruneScheduledMessageCtaEngagementsJob;
 use App\Modules\Messaging\Jobs\PublishScheduledMessageOutboxEventsJob;
 use App\Modules\Messaging\Jobs\RecoverStaleScheduledMessageClaimsJob;
-use App\Modules\Messaging\Listeners\GrantManualContactCreatedConsents;
 use App\Modules\Messaging\Listeners\AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal;
+use App\Modules\Messaging\Listeners\GrantManualContactCreatedConsents;
 use App\Modules\Messaging\Listeners\MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailed;
 use App\Modules\Messaging\Listeners\MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped;
 use App\Modules\Messaging\Listeners\MarkClaimedPermissionInvitationSentAfterScheduledMessageSent;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Services\ContactPanels\MessageDeliveryIssueContactPanelProvider;
 use App\Modules\Messaging\Services\ContactShow\ContactMessagingShowDataProvider;
 use App\Modules\Messaging\Services\ContactShow\ContactScheduledMessagesVisibilityDataProvider;
+use App\Modules\Messaging\Services\Dashboard\MessagingDeliveryIssuesDashboardPanelProvider;
 use App\Modules\Messaging\Services\Email\EmailProviderManager;
 use App\Modules\Messaging\Services\MessageChainExecutionContextResolver;
 use App\Modules\Messaging\Services\MessageRecipientGateRegistry;
@@ -40,6 +43,7 @@ use App\Modules\Messaging\Services\ReplyProfiles\MessagingReplyProfileDependency
 use App\Modules\Messaging\Services\Sms\SmsProviderManager;
 use App\Modules\Messaging\TokenContracts\MessagingTokenContextProvider;
 use App\Modules\Messaging\Validation\MessagingSetupValidationContributor;
+use App\Support\Dashboard\DashboardPanelRegistry;
 use App\Support\ReplyHandling\ReplyProfileDependencyRegistry;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -94,6 +98,10 @@ class MessagingModuleServiceProvider extends ServiceProvider
             MessagingReplyProfileDependencyContributor::class,
         ], ReplyProfileDependencyRegistry::CONTRIBUTOR_TAG);
 
+        $this->app->tag([
+            MessagingDeliveryIssuesDashboardPanelProvider::class,
+        ], DashboardPanelRegistry::providerTag());
+
         $this->app->singleton(Client::class, function () {
             return new Client(
                 config('services.twilio.sid'),
@@ -141,6 +149,9 @@ class MessagingModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->app->make(ContactPanelRegistry::class)
+            ->register(MessageDeliveryIssueContactPanelProvider::class, 'messaging');
+
         $this->callAfterResolving(
             Schedule::class,
             function (Schedule $schedule): void {

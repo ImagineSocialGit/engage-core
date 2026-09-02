@@ -72,6 +72,7 @@ return [
                 'max' => 2,
                 'hide_when_empty' => false,
                 'panels' => [
+                    'messaging.delivery_issues',
                     'tasks.today',
                     'inbound_messaging.replies',
                     'documents.review',
@@ -98,6 +99,7 @@ return [
                     'immediate_work' => [
                         'max' => 2,
                         'panels' => [
+                            'messaging.delivery_issues',
                             'tasks.today',
                             'inbound_messaging.replies',
                             'scheduling.today',
@@ -117,6 +119,7 @@ return [
                     'immediate_work' => [
                         'max' => 2,
                         'panels' => [
+                            'messaging.delivery_issues',
                             'tasks.today',
                             'inbound_messaging.replies',
                             'scheduling.today',
@@ -139,6 +142,7 @@ return [
                     'immediate_work' => [
                         'max' => 2,
                         'panels' => [
+                            'messaging.delivery_issues',
                             'inbound_messaging.replies',
                             'tasks.today',
                             'scheduling.today',
