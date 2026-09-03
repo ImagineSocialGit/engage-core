@@ -227,12 +227,25 @@ class PublicSchedulingSurfaceTest extends TestCase
         );
     }
 
-    public function test_public_surface_uses_plain_language_and_client_theme_overrides(): void
+    public function test_public_surface_uses_plain_language_and_layered_client_presentation_overrides(): void
     {
         CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
         $this->registerPublicSurface('https://schedule.test');
+
         config()->set('scheduling.public.presentation.brand_name', 'Example Client');
-        config()->set('scheduling.public.presentation.primary_color', '#123456');
+        config()->set('scheduling.public.presentation.primary_color', null);
+        config()->set('public_surfaces.theme.colors.primary', '#123456');
+        config()->set('public_surfaces.theme.layout.header', 'fixture-public-header');
+        config()->set('public_surfaces.theme.components.card.base', 'fixture-public-card');
+        config()->set('public_surfaces.theme.components.button.base', 'fixture-public-button');
+        config()->set(
+            'scheduling.public.presentation.style.catalog_title',
+            'fixture-scheduling-catalog-title',
+        );
+        config()->set(
+            'scheduling.public.presentation.style.service_title',
+            'fixture-scheduling-service-title',
+        );
 
         $service = BookableService::factory()->create([
             'key' => 'plain-language',
@@ -247,15 +260,47 @@ class PublicSchedulingSurfaceTest extends TestCase
             ->assertOk()
             ->assertSee('Example Client')
             ->assertSee('--public-primary: #123456', false)
+            ->assertSee('fixture-public-header', false)
+            ->assertSee('fixture-scheduling-catalog-title', false)
             ->assertSee('data-public-surface', false)
+            ->assertSee('data-scheduling-public-style-contract="1"', false)
             ->assertSee('data-report-service-selected', false)
             ->assertDontSee('Step 1');
 
         $this->get('https://schedule.test/services/'.$service->key)
             ->assertOk()
+            ->assertSee('fixture-public-card', false)
+            ->assertSee('fixture-public-button', false)
+            ->assertSee('fixture-scheduling-service-title', false)
             ->assertSee('id="scheduling-public-booking-config"', false)
             ->assertDontSee('opaque offer')
             ->assertDontSee('authoritative availability');
+    }
+
+    public function test_public_surface_renders_shared_generated_client_logo_descriptor(): void
+    {
+        $this->registerPublicSurface('https://schedule.test');
+
+        config()->set('filesystems.disks.spaces.url', 'https://cdn.example.test');
+        config()->set('client.key', 'example-client');
+        config()->set('public_surfaces.theme.brand.logo', [
+            'path' => 'brand/logo',
+            'sizes' => [320, 640],
+            'placeholder' => 'brand/logo/placeholder.webp',
+        ]);
+
+        $response = $this->get('https://schedule.test/');
+
+        $response
+            ->assertOk()
+            ->assertSee(
+                'https://cdn.example.test/example-client/images/brand/logo/640.webp',
+                false,
+            )
+            ->assertSee(
+                'https://cdn.example.test/example-client/images/brand/logo/320.avif 320w',
+                false,
+            );
     }
 
     public function test_fixed_location_availability_separates_address_and_preparation_details(): void

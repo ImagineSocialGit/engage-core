@@ -1824,3 +1824,47 @@ The shared public shell is intentionally thin. It may own reusable layout, respo
 Do not repurpose the existing `x-ui.*` CRM/general components solely to make a new public surface resemble Webinars. Several of those components still carry historical Webinar style configuration and have broad CRM usage. Migrate them only through an explicit shared-UI cleanup, not opportunistically during a feature surface redesign.
 
 Public forms should preserve progressive enhancement whenever practical. Client-side interaction may improve selection and presentation, but a normal HTML form must continue to submit the same server-owned facts and server validation remains authoritative.
+
+## Client-wide public presentation configuration
+
+Shared public-facing product surfaces should inherit a client-wide design language before a module adds its own journey-specific presentation.
+
+The platform contract is:
+
+```text
+config/public_surfaces.php
+    -> client/<client>/config/public_surfaces.php
+    -> shared x-layouts.public-surface / x-public-surface.card / x-public-surface.button
+
+module public presentation
+    -> module defaults
+    -> client/<client>/config/<module>.php sparse overrides
+```
+
+`public_surfaces.php` owns only concepts that should be coherent across public products:
+
+```text
+shared colors
+page/header/footer shell treatment
+generic public card treatment
+generic public button treatment
+```
+
+A module such as Scheduling may then expose semantic class keys for its own journey:
+
+```text
+service catalog
+service heading
+meeting/location panel
+form fields
+day-period tabs
+time choices
+appointment summary
+confirmation/review states
+```
+
+Client files should override only the semantic keys that need a client-specific presentation. Do not duplicate the full platform contract merely to change one color or one component.
+
+Public presentation config may contain trusted Tailwind utility class strings because it is committed application/client configuration. It must not contain arbitrary Blade view paths, executable callbacks, HTML fragments, or booking/runtime behavior.
+
+Content ownership remains separate from presentation ownership. A Scheduling service name, description, address, preparation instructions, availability, booking rules, consent state, and appointment commitment remain Scheduling data/runtime facts. Styling config may change how those facts look; it must not redefine what they mean.

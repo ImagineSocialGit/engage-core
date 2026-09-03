@@ -6,10 +6,10 @@
 >
     @csrf
     <div class="grid gap-4 sm:grid-cols-2">
-        <label class="grid gap-2 text-sm font-bold text-slate-800 sm:col-span-2" for="address_line_1">
+        <label class="{{ $publicPresentation['style']['field_label'] }} sm:col-span-2" for="address_line_1">
             Street address
             <input
-                class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-medium text-slate-950 outline-none transition focus:border-[var(--public-primary)] focus:ring-2 focus:ring-[var(--public-accent)]/30"
+                class="{{ $publicPresentation['style']['input'] }}"
                 id="address_line_1"
                 name="address_line_1"
                 type="text"
@@ -19,10 +19,10 @@
             >
         </label>
 
-        <label class="grid gap-2 text-sm font-bold text-slate-800 sm:col-span-2" for="address_line_2">
+        <label class="{{ $publicPresentation['style']['field_label'] }} sm:col-span-2" for="address_line_2">
             <span>Apartment, suite, etc. <span class="font-medium text-slate-500">(optional)</span></span>
             <input
-                class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-medium text-slate-950 outline-none transition focus:border-[var(--public-primary)] focus:ring-2 focus:ring-[var(--public-accent)]/30"
+                class="{{ $publicPresentation['style']['input'] }}"
                 id="address_line_2"
                 name="address_line_2"
                 type="text"
@@ -31,10 +31,10 @@
             >
         </label>
 
-        <label class="grid gap-2 text-sm font-bold text-slate-800" for="city">
+        <label class="{{ $publicPresentation['style']['field_label'] }}" for="city">
             City
             <input
-                class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-medium text-slate-950 outline-none transition focus:border-[var(--public-primary)] focus:ring-2 focus:ring-[var(--public-accent)]/30"
+                class="{{ $publicPresentation['style']['input'] }}"
                 id="city"
                 name="city"
                 type="text"
@@ -44,10 +44,10 @@
             >
         </label>
 
-        <label class="grid gap-2 text-sm font-bold text-slate-800" for="region">
+        <label class="{{ $publicPresentation['style']['field_label'] }}" for="region">
             State / region
             <input
-                class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-medium text-slate-950 outline-none transition focus:border-[var(--public-primary)] focus:ring-2 focus:ring-[var(--public-accent)]/30"
+                class="{{ $publicPresentation['style']['input'] }}"
                 id="region"
                 name="region"
                 type="text"
@@ -57,10 +57,10 @@
             >
         </label>
 
-        <label class="grid gap-2 text-sm font-bold text-slate-800" for="postal_code">
+        <label class="{{ $publicPresentation['style']['field_label'] }}" for="postal_code">
             Postal code
             <input
-                class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-medium text-slate-950 outline-none transition focus:border-[var(--public-primary)] focus:ring-2 focus:ring-[var(--public-accent)]/30"
+                class="{{ $publicPresentation['style']['input'] }}"
                 id="postal_code"
                 name="postal_code"
                 type="text"
@@ -70,10 +70,10 @@
             >
         </label>
 
-        <label class="grid gap-2 text-sm font-bold text-slate-800" for="country">
+        <label class="{{ $publicPresentation['style']['field_label'] }}" for="country">
             Country code
             <input
-                class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-medium uppercase text-slate-950 outline-none transition focus:border-[var(--public-primary)] focus:ring-2 focus:ring-[var(--public-accent)]/30"
+                class="{{ $publicPresentation['style']['input'] }} uppercase"
                 id="country"
                 name="country"
                 type="text"

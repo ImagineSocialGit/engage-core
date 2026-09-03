@@ -9,10 +9,10 @@
     @if($destinationVerification['single_channel'])
         <input type="hidden" name="channel" value="{{ $destinationVerification['single_channel'] }}">
     @else
-        <label class="grid gap-2 text-sm font-bold text-slate-800" for="verification_channel{{ $suffix }}">
+        <label class="{{ $publicPresentation['style']['field_label'] }}" for="verification_channel{{ $suffix }}">
             How would you like to receive your code?
             <select
-                class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-medium text-slate-950 outline-none transition focus:border-[var(--public-primary)] focus:ring-2 focus:ring-[var(--public-accent)]/30"
+                class="{{ $publicPresentation['style']['input'] }}"
                 id="verification_channel{{ $suffix }}"
                 name="channel"
                 required
@@ -29,12 +29,12 @@
         </label>
     @endif
 
-    <label class="grid gap-2 text-sm font-bold text-slate-800" for="verification_destination{{ $suffix }}">
+    <label class="{{ $publicPresentation['style']['field_label'] }}" for="verification_destination{{ $suffix }}">
         <span data-verification-input-label>
             {{ old('channel', $destinationVerification['default_channel']) === 'sms' ? 'Mobile phone number' : 'Email address' }}
         </span>
         <input
-            class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-medium text-slate-950 outline-none transition focus:border-[var(--public-primary)] focus:ring-2 focus:ring-[var(--public-accent)]/30"
+            class="{{ $publicPresentation['style']['input'] }}"
             id="verification_destination{{ $suffix }}"
             name="destination"
             type="{{ old('channel', $destinationVerification['default_channel']) === 'sms' ? 'tel' : 'email' }}"

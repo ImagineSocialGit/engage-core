@@ -275,7 +275,11 @@ class PublicBookingHoldTest extends TestCase
 
         $this->get((string) $response->headers->get('Location'))
             ->assertOk()
-            ->assertSee('123 Main Street, Denver, CO 80202, US');
+            ->assertSeeInOrder([
+                '123 Main Street',
+                'Denver, CO 80202',
+            ])
+            ->assertDontSee('123 Main Street, Denver, CO 80202, US');
 
         $this->post('https://schedule.test/offers/'.$offer->offer_id.'/hold', [
             'idempotency_key' => (string) Str::uuid(),

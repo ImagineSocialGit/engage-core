@@ -2340,3 +2340,21 @@ business context label
 ```
 
 Do not persist schedule summary text unless a concrete reason appears. Prefer deriving it from the canonical schedule/profile/criteria definition.
+
+## Public-surface presentation config
+
+Client-wide public presentation belongs in:
+
+```text
+client/<client>/config/public_surfaces.php
+```
+
+Module-specific public presentation belongs in the module's normal client config, for example:
+
+```text
+client/<client>/config/scheduling.php
+```
+
+The recursive `ClientServiceProvider` merge means both files should be sparse overrides of platform defaults. Associative presentation maps merge recursively; do not copy the entire default map when changing only a few semantic style keys.
+
+Use presentation config for committed, trusted visual choices only. Do not place runtime business rules, arbitrary HTML, Blade view paths, provider credentials, or user-authored content in public style maps.

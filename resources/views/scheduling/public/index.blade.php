@@ -5,25 +5,30 @@
     :accent-color="$publicPresentation['accent_color']"
     :surface-color="$publicPresentation['surface_color']"
     :background-color="$publicPresentation['background_color']"
-    body-class="bg-[var(--public-background)] text-slate-950"
-    header-class="border-b border-slate-200/80 bg-white/95 backdrop-blur"
-    footer-class="border-t border-slate-200 bg-white"
 >
     <x-slot:header>
-        <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
+        <div class="{{ $publicPresentation['style']['header_inner'] }}">
             <a
                 href="{{ route('scheduling.public.index', [], false) }}"
-                class="inline-flex min-h-12 items-center text-slate-950 no-underline"
+                class="{{ $publicPresentation['style']['brand_link'] }}"
                 aria-label="{{ $publicPresentation['brand_name'] }} appointments"
             >
-                @if($publicPresentation['logo_url'])
+                @if($publicPresentation['logo'])
+                    <x-ui.image
+                        :path="$publicPresentation['logo']"
+                        :alt="$publicPresentation['brand_name']"
+                        sizes="96px"
+                        class="{{ $publicPresentation['style']['brand_logo'] }}"
+                        :placeholder="false"
+                    />
+                @elseif($publicPresentation['logo_url'])
                     <img
                         src="{{ $publicPresentation['logo_url'] }}"
                         alt="{{ $publicPresentation['brand_name'] }}"
-                        class="max-h-12 max-w-52 object-contain"
+                        class="{{ $publicPresentation['style']['brand_logo'] }}"
                     >
                 @else
-                    <span class="text-base font-extrabold tracking-tight sm:text-lg">
+                    <span class="{{ $publicPresentation['style']['brand_text'] }}">
                         {{ $publicPresentation['brand_name'] }}
                     </span>
                 @endif
@@ -32,19 +37,20 @@
     </x-slot:header>
 
     <x-slot:footer>
-        <div class="mx-auto w-full max-w-6xl px-4 py-6 text-center text-xs leading-5 text-slate-500 sm:px-6">
+        <div class="{{ $publicPresentation['style']['footer_inner'] }}">
             {{ $publicPresentation['brand_name'] }}
         </div>
     </x-slot:footer>
 
     <div
-        class="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-12 lg:py-16"
+        class="{{ $publicPresentation['style']['page'] }}"
         data-scheduling-public-booking
+        data-scheduling-public-style-contract="1"
         data-booking-state="{{ $pageState }}"
     >
         @if($errors->any())
             <div
-                class="mx-auto mb-6 max-w-3xl rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-900 shadow-sm"
+                class="{{ $publicPresentation['style']['error_banner'] }}"
                 role="alert"
                 aria-labelledby="booking-errors-title"
             >
@@ -53,31 +59,31 @@
         @endif
 
         @if($holdSummary)
-            <div class="mx-auto max-w-3xl">
+            <div class="{{ $publicPresentation['style']['state_width'] }}">
                 <x-public-surface.card aria-live="polite">
                     @if($holdSummary['status'] === 'active')
-                        <span class="inline-flex rounded-full bg-[var(--public-primary)]/10 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--public-primary)]">Time reserved</span>
-                        <h1 class="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Complete your booking</h1>
-                        <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">This time is held while you add your contact details.</p>
+                        <span class="{{ $publicPresentation['style']['state_badge'] }}">Time reserved</span>
+                        <h1 class="{{ $publicPresentation['style']['state_title'] }}">Complete your booking</h1>
+                        <p class="{{ $publicPresentation['style']['state_body'] }}">This time is held while you add your contact details.</p>
                     @elseif($holdSummary['status'] === 'converted' && $holdSummary['confirmation_pending'])
-                        <span class="inline-flex rounded-full bg-[var(--public-primary)]/10 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--public-primary)]">Request received</span>
-                        <h1 class="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">We received your request</h1>
-                        <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">The team will review it and contact you using the information you provided.</p>
+                        <span class="{{ $publicPresentation['style']['state_badge'] }}">Request received</span>
+                        <h1 class="{{ $publicPresentation['style']['state_title'] }}">We received your request</h1>
+                        <p class="{{ $publicPresentation['style']['state_body'] }}">The team will review it and contact you using the information you provided.</p>
                     @elseif($holdSummary['status'] === 'converted')
-                        <span class="inline-flex rounded-full bg-[var(--public-primary)]/10 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--public-primary)]">Appointment booked</span>
-                        <h1 class="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">You’re all set</h1>
-                        <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">Your appointment has been booked. Save the details below.</p>
+                        <span class="{{ $publicPresentation['style']['state_badge'] }}">Appointment booked</span>
+                        <h1 class="{{ $publicPresentation['style']['state_title'] }}">You’re all set</h1>
+                        <p class="{{ $publicPresentation['style']['state_body'] }}">Your appointment has been booked. Save the details below.</p>
                     @else
                         <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.14em] text-slate-600">Time no longer available</span>
-                        <h1 class="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Choose another time</h1>
-                        <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">This reservation expired before the booking was completed.</p>
+                        <h1 class="{{ $publicPresentation['style']['state_title'] }}">Choose another time</h1>
+                        <p class="{{ $publicPresentation['style']['state_body'] }}">This reservation expired before the booking was completed.</p>
                     @endif
 
-                    @include('scheduling.public.partials.appointment-summary', ['summary' => $holdSummary])
+                    @include('scheduling.public.partials.appointment-summary', ['summary' => $holdSummary, 'publicPresentation' => $publicPresentation])
 
                     @if($holdSummary['status'] === 'active')
                         <p
-                            class="mt-5 text-sm font-bold text-slate-600"
+                            class="{{ $publicPresentation['style']['countdown'] }}"
                             data-countdown
                             data-expires-at="{{ $holdSummary['expires_at'] }}"
                             data-expired-message="This reservation has expired. Refresh to choose another time."
@@ -95,10 +101,10 @@
                             <input type="hidden" name="public_submission_attempt_id" value="">
 
                             <div class="grid gap-4 sm:grid-cols-2">
-                                <label class="grid gap-2 text-sm font-bold text-slate-800" for="first_name">
+                                <label class="{{ $publicPresentation['style']['field_label'] }}" for="first_name">
                                     First name
                                     <input
-                                        class="min-h-12 rounded-xl border border-slate-300 bg-white px-4 py-3 font-medium outline-none transition focus:border-[var(--public-primary)] focus:ring-2 focus:ring-[var(--public-accent)]/30"
+                                        class="{{ $publicPresentation['style']['input'] }}"
                                         id="first_name"
                                         name="first_name"
                                         type="text"
@@ -112,10 +118,10 @@
                                     @enderror
                                 </label>
 
-                                <label class="grid gap-2 text-sm font-bold text-slate-800" for="last_name">
+                                <label class="{{ $publicPresentation['style']['field_label'] }}" for="last_name">
                                     Last name
                                     <input
-                                        class="min-h-12 rounded-xl border border-slate-300 bg-white px-4 py-3 font-medium outline-none transition focus:border-[var(--public-primary)] focus:ring-2 focus:ring-[var(--public-accent)]/30"
+                                        class="{{ $publicPresentation['style']['input'] }}"
                                         id="last_name"
                                         name="last_name"
                                         type="text"
@@ -129,10 +135,10 @@
                                     @enderror
                                 </label>
 
-                                <label class="grid gap-2 text-sm font-bold text-slate-800" for="email">
+                                <label class="{{ $publicPresentation['style']['field_label'] }}" for="email">
                                     Email address
                                     <input
-                                        class="min-h-12 rounded-xl border border-slate-300 bg-white px-4 py-3 font-medium outline-none transition read-only:bg-slate-100 focus:border-[var(--public-primary)] focus:ring-2 focus:ring-[var(--public-accent)]/30"
+                                        class="{{ $publicPresentation['style']['input'] }} read-only:bg-slate-100"
                                         id="email"
                                         name="email"
                                         type="email"
@@ -150,7 +156,7 @@
                                     @enderror
                                 </label>
 
-                                <label class="grid gap-2 text-sm font-bold text-slate-800" for="phone">
+                                <label class="{{ $publicPresentation['style']['field_label'] }}" for="phone">
                                     <span>
                                         Phone number
                                         @if(($holdSummary['location_type'] ?? null) !== 'phone')
@@ -158,7 +164,7 @@
                                         @endif
                                     </span>
                                     <input
-                                        class="min-h-12 rounded-xl border border-slate-300 bg-white px-4 py-3 font-medium outline-none transition read-only:bg-slate-100 focus:border-[var(--public-primary)] focus:ring-2 focus:ring-[var(--public-accent)]/30"
+                                        class="{{ $publicPresentation['style']['input'] }} read-only:bg-slate-100"
                                         id="phone"
                                         name="phone"
                                         type="tel"
@@ -198,9 +204,9 @@
                 </x-public-surface.card>
             </div>
         @elseif($offerSummary)
-            <div class="mx-auto max-w-3xl">
+            <div class="{{ $publicPresentation['style']['state_width'] }}">
                 <a
-                    class="mb-4 inline-flex items-center gap-2 text-sm font-bold text-slate-600 transition hover:text-[var(--public-primary)]"
+                    class="{{ $publicPresentation['style']['back_link'] }}"
                     href="{{ route('scheduling.public.services.show', array_filter(['serviceKey' => $offerSummary['service_key'], 'date' => $offerSummary['is_range'] ? null : $offerSummary['date']]), false) }}"
                 >
                     <span aria-hidden="true">←</span> Change time
@@ -208,25 +214,25 @@
 
                 <x-public-surface.card aria-live="polite">
                     @if($offerSummary['status'] === 'active')
-                        <span class="inline-flex rounded-full bg-[var(--public-primary)]/10 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--public-primary)]">Selected time</span>
+                        <span class="{{ $publicPresentation['style']['state_badge'] }}">Selected time</span>
                         @if($destinationVerification['required'])
-                            <h1 class="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Confirm it’s you</h1>
-                            <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">We’ll send a short code before reserving this appointment.</p>
+                            <h1 class="{{ $publicPresentation['style']['state_title'] }}">Confirm it’s you</h1>
+                            <p class="{{ $publicPresentation['style']['state_body'] }}">We’ll send a short code before reserving this appointment.</p>
                         @else
-                            <h1 class="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Review your appointment</h1>
-                            <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">Continue to reserve this time while you add your contact details.</p>
+                            <h1 class="{{ $publicPresentation['style']['state_title'] }}">Review your appointment</h1>
+                            <p class="{{ $publicPresentation['style']['state_body'] }}">Continue to reserve this time while you add your contact details.</p>
                         @endif
                     @else
                         <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.14em] text-slate-600">Selection expired</span>
-                        <h1 class="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">This time needs to be selected again</h1>
-                        <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">No appointment was reserved.</p>
+                        <h1 class="{{ $publicPresentation['style']['state_title'] }}">This time needs to be selected again</h1>
+                        <p class="{{ $publicPresentation['style']['state_body'] }}">No appointment was reserved.</p>
                     @endif
 
-                    @include('scheduling.public.partials.appointment-summary', ['summary' => $offerSummary])
+                    @include('scheduling.public.partials.appointment-summary', ['summary' => $offerSummary, 'publicPresentation' => $publicPresentation])
 
                     @if($offerSummary['status'] === 'active')
                         <p
-                            class="mt-5 text-sm font-bold text-slate-600"
+                            class="{{ $publicPresentation['style']['countdown'] }}"
                             data-countdown
                             data-expires-at="{{ $offerSummary['expires_at'] }}"
                             data-expired-message="This selection has expired. Refresh to choose another time."
@@ -247,10 +253,10 @@
                                     action="{{ route('scheduling.public.offers.verification.verify', ['offerId' => $offerSummary['offer_id']], false) }}"
                                 >
                                     @csrf
-                                    <label class="grid gap-2 text-sm font-bold text-slate-800" for="verification_code">
+                                    <label class="{{ $publicPresentation['style']['field_label'] }}" for="verification_code">
                                         Verification code
                                         <input
-                                            class="min-h-12 rounded-xl border border-slate-300 bg-white px-4 py-3 font-medium outline-none transition focus:border-[var(--public-primary)] focus:ring-2 focus:ring-[var(--public-accent)]/30"
+                                            class="{{ $publicPresentation['style']['input'] }}"
                                             id="verification_code"
                                             name="code"
                                             type="text"
@@ -280,11 +286,11 @@
 
                                 <details class="mt-6 border-t border-slate-200 pt-5">
                                     <summary class="cursor-pointer text-sm font-extrabold text-slate-700">Use a different email or phone number</summary>
-                                    @include('scheduling.public.partials.verification-form', ['suffix' => '-change', 'buttonLabel' => 'Send new code'])
+                                    @include('scheduling.public.partials.verification-form', ['suffix' => '-change', 'buttonLabel' => 'Send new code', 'publicPresentation' => $publicPresentation])
                                 </details>
                             @else
                                 <div data-destination-verification="required">
-                                    @include('scheduling.public.partials.verification-form', ['suffix' => '', 'buttonLabel' => 'Send code'])
+                                    @include('scheduling.public.partials.verification-form', ['suffix' => '', 'buttonLabel' => 'Send code', 'publicPresentation' => $publicPresentation])
                                 </div>
                             @endif
                         @else
@@ -310,28 +316,28 @@
                 </x-public-surface.card>
             </div>
         @elseif(!$selectedService)
-            <div class="mx-auto max-w-4xl">
-                <div class="mx-auto max-w-3xl text-center">
-                    <h1 class="text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">{{ $publicPresentation['heading'] }}</h1>
-                    <p class="mx-auto mt-4 max-w-2xl text-lg leading-8 text-slate-600">{{ $publicPresentation['intro'] }}</p>
+            <div class="{{ $publicPresentation['style']['catalog_width'] }}">
+                <div class="{{ $publicPresentation['style']['catalog_intro'] }}">
+                    <h1 class="{{ $publicPresentation['style']['catalog_title'] }}">{{ $publicPresentation['heading'] }}</h1>
+                    <p class="{{ $publicPresentation['style']['catalog_body'] }}">{{ $publicPresentation['intro'] }}</p>
                 </div>
 
-                <section class="mt-10 grid gap-4 sm:grid-cols-2" aria-label="Available services">
+                <section class="{{ $publicPresentation['style']['catalog_grid'] }}" aria-label="Available services">
                     @forelse($services as $service)
                         <a
-                            class="group block rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6 text-slate-950 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg"
+                            class="{{ $publicPresentation['style']['service_card'] }}"
                             href="{{ route('scheduling.public.services.show', ['serviceKey' => $service->key], false) }}"
                             data-report-service-selected
                             data-service-key="{{ $service->key }}"
                         >
-                            <span class="block text-lg font-extrabold tracking-tight">{{ $service->name }}</span>
-                            <span class="mt-2 block text-sm leading-6 text-slate-600">
+                            <span class="{{ $publicPresentation['style']['service_card_title'] }}">{{ $service->name }}</span>
+                            <span class="{{ $publicPresentation['style']['service_card_body'] }}">
                                 {{ $service->usesRangeDuration() ? 'Choose your start and end time' : $service->duration_minutes.' minutes' }}
                                 @if($service->description)
                                     <span class="block pt-1">{{ $service->description }}</span>
                                 @endif
                             </span>
-                            <span class="mt-5 inline-flex items-center text-sm font-extrabold text-[var(--public-primary)]">Choose this service <span class="ml-1 transition group-hover:translate-x-1" aria-hidden="true">→</span></span>
+                            <span class="{{ $publicPresentation['style']['service_card_cta'] }}">Choose this service <span class="ml-1 transition group-hover:translate-x-1" aria-hidden="true">→</span></span>
                         </a>
                     @empty
                         <div
@@ -344,27 +350,28 @@
                 </section>
             </div>
         @else
-            <div class="mx-auto max-w-4xl">
+            <div class="{{ $publicPresentation['style']['service_width'] }}">
                 <a
-                    class="mb-4 inline-flex items-center gap-2 text-sm font-bold text-slate-600 transition hover:text-[var(--public-primary)]"
+                    class="{{ $publicPresentation['style']['back_link'] }}"
                     href="{{ route('scheduling.public.index', [], false) }}"
                 >
                     <span aria-hidden="true">←</span> All services
                 </a>
 
                 <x-public-surface.card>
-                    <div class="max-w-3xl">
-                        <h1 class="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">{{ $selectedService->name }}</h1>
+                    <div class="{{ $publicPresentation['style']['service_header'] }}">
+                        <h1 class="{{ $publicPresentation['style']['service_title'] }}">{{ $selectedService->name }}</h1>
                         @if($selectedService->description)
-                            <p class="mt-3 text-base leading-7 text-slate-600">{{ $selectedService->description }}</p>
+                            <p class="{{ $publicPresentation['style']['service_description'] }}">{{ $selectedService->description }}</p>
                         @endif
                     </div>
 
                     @if($requiresCustomerSitePreparation)
-                        <div class="mt-7 border-t border-slate-200 pt-7">
-                            <h2 class="text-xl font-black tracking-tight text-slate-950">Where should we meet?</h2>
-                            <p class="mt-2 text-sm leading-6 text-slate-600">Enter the address where this appointment will take place.</p>
+                        <div class="{{ $publicPresentation['style']['section'] }}">
+                            <h2 class="{{ $publicPresentation['style']['section_title'] }}">Where should we meet?</h2>
+                            <p class="{{ $publicPresentation['style']['section_body'] }}">Enter the address where this appointment will take place.</p>
                             @include('scheduling.public.partials.address-form', [
+                                'publicPresentation' => $publicPresentation,
                                 'preparedLocation' => null,
                                 'buttonLabel' => 'Show available times',
                             ])
@@ -373,6 +380,7 @@
                         @if($preparedLocation)
                             <div class="mt-7">
                                 @include('scheduling.public.partials.location-details', [
+                                    'publicPresentation' => $publicPresentation,
                                     'location' => $preparedLocation,
                                 ])
                             </div>
@@ -386,10 +394,10 @@
                             >
                                 @csrf
                                 <div class="grid gap-4 sm:grid-cols-2">
-                                    <label class="grid gap-2 text-sm font-bold text-slate-800" for="range_starts_at">
+                                    <label class="{{ $publicPresentation['style']['field_label'] }}" for="range_starts_at">
                                         Start
                                         <input
-                                            class="min-h-12 rounded-xl border border-slate-300 bg-white px-4 py-3 font-medium outline-none transition focus:border-[var(--public-primary)] focus:ring-2 focus:ring-[var(--public-accent)]/30"
+                                            class="{{ $publicPresentation['style']['input'] }}"
                                             id="range_starts_at"
                                             name="range_starts_at"
                                             type="datetime-local"
@@ -400,10 +408,10 @@
                                             required
                                         >
                                     </label>
-                                    <label class="grid gap-2 text-sm font-bold text-slate-800" for="range_ends_at">
+                                    <label class="{{ $publicPresentation['style']['field_label'] }}" for="range_ends_at">
                                         End
                                         <input
-                                            class="min-h-12 rounded-xl border border-slate-300 bg-white px-4 py-3 font-medium outline-none transition focus:border-[var(--public-primary)] focus:ring-2 focus:ring-[var(--public-accent)]/30"
+                                            class="{{ $publicPresentation['style']['input'] }}"
                                             id="range_ends_at"
                                             name="range_ends_at"
                                             type="datetime-local"
@@ -420,16 +428,16 @@
                                 </div>
                             </form>
                         @else
-                            <div class="mt-7 border-t border-slate-200 pt-7">
+                            <div class="{{ $publicPresentation['style']['section'] }}">
                                 <form
                                     class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
                                     method="GET"
                                     action="{{ route('scheduling.public.services.show', ['serviceKey' => $selectedService->key], false) }}"
                                 >
-                                    <label class="grid gap-2 text-sm font-bold text-slate-800" for="date">
+                                    <label class="{{ $publicPresentation['style']['field_label'] }}" for="date">
                                         Date
                                         <input
-                                            class="min-h-12 rounded-xl border border-slate-300 bg-white px-4 py-3 font-medium outline-none transition focus:border-[var(--public-primary)] focus:ring-2 focus:ring-[var(--public-accent)]/30"
+                                            class="{{ $publicPresentation['style']['input'] }}"
                                             id="date"
                                             name="date"
                                             type="date"
@@ -442,7 +450,7 @@
                                     <x-public-surface.button type="submit" variant="secondary">View times</x-public-surface.button>
                                 </form>
 
-                                <p class="mt-3 text-sm leading-6 text-slate-500">
+                                <p class="mt-3 {{ $publicPresentation['style']['helper_text'] }}">
                                     Times shown in {{ str_replace('_', ' ', $displayTimezone) }}. Choose a start time to see the complete appointment time.
                                 </p>
 
@@ -456,7 +464,7 @@
                                         @csrf
 
                                         <div
-                                            class="grid grid-cols-2 gap-2 sm:inline-grid sm:grid-flow-col sm:auto-cols-fr"
+                                            class="{{ $publicPresentation['style']['day_period_tabs'] }}"
                                             role="tablist"
                                             aria-label="Time of day"
                                             data-day-period-tabs
@@ -464,7 +472,7 @@
                                             @foreach($availableTimePeriods as $period)
                                                 <button
                                                     type="button"
-                                                    class="min-h-11 rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-extrabold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--public-accent)] aria-selected:border-[var(--public-primary)] aria-selected:bg-[var(--public-primary)] aria-selected:text-white"
+                                                    class="{{ $publicPresentation['style']['day_period_tab'] }}"
                                                     id="booking-period-tab-{{ $period['key'] }}"
                                                     role="tab"
                                                     aria-controls="booking-period-panel-{{ $period['key'] }}"
@@ -476,7 +484,7 @@
                                             @endforeach
                                         </div>
 
-                                        <div class="mt-5" aria-live="polite">
+                                        <div class="{{ $publicPresentation['style']['time_panel'] }}" aria-live="polite">
                                             @foreach($availableTimePeriods as $period)
                                                 <section
                                                     id="booking-period-panel-{{ $period['key'] }}"
@@ -484,7 +492,7 @@
                                                     aria-labelledby="booking-period-tab-{{ $period['key'] }}"
                                                     data-day-period-panel="{{ $period['key'] }}"
                                                 >
-                                                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                                                    <div class="{{ $publicPresentation['style']['time_grid'] }}">
                                                         @foreach($period['times'] as $time)
                                                             <div class="relative">
                                                                 <input
@@ -499,7 +507,7 @@
                                                                     required
                                                                 >
                                                                 <label
-                                                                    class="flex min-h-12 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-3 text-center text-sm font-extrabold text-[var(--public-primary)] transition hover:border-[var(--public-primary)] hover:bg-slate-50 peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--public-accent)] data-[selected=true]:border-[var(--public-primary)] data-[selected=true]:bg-[var(--public-primary)] data-[selected=true]:text-white"
+                                                                    class="{{ $publicPresentation['style']['time_option'] }}"
                                                                     for="booking-time-{{ $loop->parent->index }}-{{ $loop->index }}"
                                                                     data-time-option
                                                                     data-day-period="{{ $period['key'] }}"
@@ -517,7 +525,7 @@
                                             @endforeach
                                         </div>
 
-                                        <div class="mt-6 flex justify-end border-t border-slate-200 pt-5">
+                                        <div class="{{ $publicPresentation['style']['continue_row'] }}">
                                             <x-public-surface.button type="submit" data-time-continue>
                                                 Continue
                                             </x-public-surface.button>
@@ -525,7 +533,7 @@
                                     </form>
                                 @else
                                     <div
-                                        class="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600"
+                                        class="{{ $publicPresentation['style']['empty_state'] }}"
                                         data-booking-empty-state="times"
                                     >
                                         No appointment times are available on this date. Try another date.
@@ -538,6 +546,7 @@
                             <details class="mt-7 border-t border-slate-200 pt-5">
                                 <summary class="cursor-pointer text-sm font-extrabold text-slate-700">Change service address</summary>
                                 @include('scheduling.public.partials.address-form', [
+                                    'publicPresentation' => $publicPresentation,
                                     'buttonLabel' => 'Update address',
                                 ])
                             </details>

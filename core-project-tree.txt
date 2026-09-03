@@ -1937,6 +1937,7 @@
 │   │   ├── webinars.php
 │   │   └── workflow.php
 │   ├── project_state.php
+│   ├── public_surfaces.php
 │   ├── queue.php
 │   ├── reference
 │   │   ├── keys.php
@@ -3247,4 +3248,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-773 directories, 2475 files
+773 directories, 2476 files

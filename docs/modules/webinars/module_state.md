@@ -1041,3 +1041,18 @@ The dashboard review is the canonical operator surface. Internal Notifications m
 The Webinar public layout remains Webinar-configurable, but its outer HTML page shell now delegates to the module-neutral `x-layouts.public-surface` component. Webinar-specific content, header/navigation configuration, compliance identity, hero, countdown, trust, and registration components remain Webinar-owned.
 
 This is a presentation reuse seam only. It does not make Scheduling depend on Webinars, and it does not move Webinar business behavior into shared UI code. New public product surfaces should prefer the shared public-surface shell/primitives for baseline spacing, card shape, typography, focus treatment, and responsive structure, then layer module-owned content and behavior on top.
+
+## Client-wide public theme relationship
+
+The shared `x-layouts.public-surface` component now has client-wide fallbacks from `public_surfaces.theme`. The Webinar `x-layouts.public` wrapper still gives `webinars.style` precedence so existing Webinar campaigns retain their current authored presentation. When a Webinar style key is absent, the wrapper may inherit the equivalent shared public-surface shell value.
+
+This provides a gradual reuse path:
+
+```text
+client-wide public surface theme
+-> Webinar wrapper fallback
+-> Webinar-specific page/style override
+-> Webinar series-specific override
+```
+
+Webinar hero, registration, urgency, event details, instructor, trust, consent, countdown, and series-specific presentation remain Webinar-owned. The shared public theme is not a replacement for those campaign-specific contracts.

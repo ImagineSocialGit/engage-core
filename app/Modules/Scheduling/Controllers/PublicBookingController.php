@@ -1398,13 +1398,13 @@ class PublicBookingController extends Controller
     {
         $primary = $this->hexColor(
             config('scheduling.public.presentation.primary_color'),
-            config('theme.colors.primary'),
-            '#0f766e',
+            config('public_surfaces.theme.colors.primary'),
+            config('theme.colors.primary', '#0f766e'),
         );
         $accent = $this->hexColor(
             config('scheduling.public.presentation.accent_color'),
-            config('theme.colors.accent'),
-            $primary,
+            config('public_surfaces.theme.colors.accent'),
+            config('theme.colors.primary_light', $primary),
         );
 
         return [
@@ -1427,13 +1427,17 @@ class PublicBookingController extends Controller
             'accent_color' => $accent,
             'surface_color' => $this->hexColor(
                 config('scheduling.public.presentation.surface_color'),
-                null,
+                config('public_surfaces.theme.colors.surface'),
                 '#ffffff',
             ),
             'background_color' => $this->hexColor(
                 config('scheduling.public.presentation.background_color'),
-                null,
+                config('public_surfaces.theme.colors.background'),
                 '#f6f7f8',
+            ),
+            'logo' => $this->publicGeneratedImage(
+                config('scheduling.public.presentation.logo'),
+                config('public_surfaces.theme.brand.logo'),
             ),
             'logo_url' => $this->safePublicUrl(
                 config('scheduling.public.presentation.logo_url'),
@@ -1448,7 +1452,32 @@ class PublicBookingController extends Controller
                 true,
             ),
             'consent_text' => $this->publicBookingDisclosureText(),
+            'style' => $this->publicPresentationStyle(),
         ];
+    }
+
+    /** @return array<string, string> */
+    private function publicPresentationStyle(): array
+    {
+        $defaults = config('scheduling.public_presentation_style_defaults', []);
+        $configured = config('scheduling.public.presentation.style', []);
+
+        $style = [];
+
+        foreach ([
+            is_array($defaults) ? $defaults : [],
+            is_array($configured) ? $configured : [],
+        ] as $layer) {
+            foreach ($layer as $key => $value) {
+                if (! is_string($key) || ! is_string($value) || trim($value) === '') {
+                    continue;
+                }
+
+                $style[$key] = $this->presentationClass($value, '');
+            }
+        }
+
+        return $style;
     }
 
     /** @return array<string, string> */
@@ -1482,6 +1511,15 @@ class PublicBookingController extends Controller
         );
     }
 
+    private function presentationClass(mixed $value, string $default): string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return $default;
+        }
+
+        return mb_substr(trim($value), 0, 4000);
+    }
+
     private function presentationString(
         mixed $preferred,
         mixed $fallback,
@@ -1507,6 +1545,68 @@ class PublicBookingController extends Controller
         }
 
         return $default;
+    }
+
+    /**
+     * @return array{path: string, sizes?: array<int, int>, placeholder?: string}|null
+     */
+    private function publicGeneratedImage(mixed ...$candidates): ?array
+    {
+        foreach ($candidates as $candidate) {
+            if (! is_array($candidate)) {
+                continue;
+            }
+
+            $path = $this->safeGeneratedImagePath($candidate['path'] ?? null);
+
+            if ($path === null) {
+                continue;
+            }
+
+            $image = ['path' => $path];
+
+            $sizes = array_values(array_unique(array_filter(
+                is_array($candidate['sizes'] ?? null) ? $candidate['sizes'] : [],
+                static fn (mixed $size): bool => is_int($size)
+                    && $size >= 1
+                    && $size <= 4096,
+            )));
+
+            if ($sizes !== []) {
+                sort($sizes);
+                $image['sizes'] = $sizes;
+            }
+
+            $placeholder = $this->safeGeneratedImagePath(
+                $candidate['placeholder'] ?? null,
+            );
+
+            if ($placeholder !== null) {
+                $image['placeholder'] = $placeholder;
+            }
+
+            return $image;
+        }
+
+        return null;
+    }
+
+    private function safeGeneratedImagePath(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $value = trim($value, " \t\n\r\0\x0B/");
+
+        if ($value === ''
+            || str_contains($value, '..')
+            || preg_match('/[^A-Za-z0-9._\/-]/D', $value) === 1
+        ) {
+            return null;
+        }
+
+        return mb_substr($value, 0, 512);
     }
 
     private function safePublicUrl(mixed $value): ?string

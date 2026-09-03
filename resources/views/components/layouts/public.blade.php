@@ -6,10 +6,10 @@
 <x-layouts.public-surface
     :title="$title ?? data_get(config('webinars.content', []), 'brand.name', config('app.name'))"
     :meta-description="$metaDescription"
-    :body-class="data_get(config('webinars.style', []), 'layout.body', 'min-h-screen flex flex-col bg-white text-slate-900')"
-    :header-class="data_get(config('webinars.style', []), 'layout.header.wrap', 'border-b border-slate-200 bg-white')"
-    :main-class="data_get(config('webinars.style', []), 'layout.main', 'flex-1')"
-    :footer-class="data_get(config('webinars.style', []), 'layout.footer.wrap', 'border-t border-slate-200 bg-white')"
+    :body-class="data_get(config('webinars.style', []), 'layout.body', config('public_surfaces.theme.layout.body', 'bg-white text-slate-900 font-sans'))"
+    :header-class="data_get(config('webinars.style', []), 'layout.header.wrap', config('public_surfaces.theme.layout.header', 'border-b border-slate-200 bg-white'))"
+    :main-class="data_get(config('webinars.style', []), 'layout.main', config('public_surfaces.theme.layout.main', 'flex-1'))"
+    :footer-class="data_get(config('webinars.style', []), 'layout.footer.wrap', config('public_surfaces.theme.layout.footer', 'border-t border-slate-200 bg-white'))"
 >
     <x-slot:header>
         <div

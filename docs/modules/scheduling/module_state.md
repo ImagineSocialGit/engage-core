@@ -1472,7 +1472,7 @@ It does not implement waits, branching, campaigns, outbound message automation, 
 
 If Flow Routes becomes enabled while simple fallback metadata still exists, the simple listener does not execute it. Flow Routes becomes the active orchestration owner.
 
-The public Scheduling booking-page visual redesign remains a separate UX task. It must not be coupled to this automation/fallback architecture.
+The public Scheduling booking-page redesign is implemented as a separate presentation concern from this automation/fallback architecture. Public presentation changes must remain decoupled from After Booking orchestration.
 
 ## Public booking presentation contract
 
@@ -1502,3 +1502,31 @@ For US physical addresses, the normal public presentation is a street line follo
 Offer and hold summaries carry `location_presentation` derived from the committed Scheduling location snapshot, so review/confirmation pages do not reread mutable service authoring to decide what address or instructions to show.
 
 The public booking page revision fallback is `scheduling-public-v4`. Existing reporting event keys and funnel semantics are unchanged.
+
+## Client presentation layering for public booking
+
+Scheduling public booking uses two presentation layers without changing booking authority:
+
+```text
+public_surfaces.theme
+    -> shared shell/card/button primitives
+
+scheduling.public.presentation
+    -> Scheduling content/presentation values
+    -> Scheduling semantic style keys
+```
+
+`client/<client>/config/public_surfaces.php` may establish a client-wide public design language shared with Webinar and future public products. `client/<client>/config/scheduling.php` may sparsely override Scheduling-specific semantic style keys.
+
+The Scheduling controller resolves colors in this order:
+
+```text
+Scheduling-specific public color
+-> client/shared public-surface color
+-> client theme color
+-> platform neutral fallback
+```
+
+The client-wide shared surface owns page/header/footer, generic card, and generic button presentation. Scheduling continues to own service catalog, booking state, location/method, fields, time-period tabs, time choices, review, verification, and confirmation semantics. Style config changes presentation only; it does not alter available slots, submitted `starts_at`, holds, destination verification, appointment creation, consent, reporting facts, or route behavior.
+
+The stable browser hook `data-scheduling-public-style-contract="1"` identifies the themed Scheduling public surface for smoke/regression tooling.
