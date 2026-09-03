@@ -21,6 +21,8 @@
 # CRM_APP_URL=
 # WEBINAR_APP_URL=
 # SCHEDULING_APP_URL=
+#   Optional. Omit to disable the generic public Scheduling surface. When set,
+#   use a root-level http:// or https:// origin with no credentials/path/query/fragment.
 
 ################################
 # DATABASE IDENTITY / CREDENTIALS

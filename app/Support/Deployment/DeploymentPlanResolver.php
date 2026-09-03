@@ -137,9 +137,12 @@ final class DeploymentPlanResolver
         $mismatched = $hasPersistedValue
             && $requirement->expectedValue !== null
             && (string) $persistedValue !== $requirement->expectedValue;
-        $invalid = $hasPersistedValue
+        $invalidAllowedValue = $hasPersistedValue
             && $requirement->allowedValues !== []
             && ! in_array((string) $persistedValue, $requirement->allowedValues, true);
+        $invalidValueRule = $hasPersistedValue
+            && ! $this->matchesValueRule($persistedValue, $requirement->valueRule);
+        $invalid = $invalidAllowedValue || $invalidValueRule;
 
         $status = match (true) {
             $hasPersistedValue && $mismatched
@@ -210,6 +213,60 @@ final class DeploymentPlanResolver
         }
 
         return ! is_string($value) || trim($value) !== '';
+    }
+
+    private function matchesValueRule(mixed $value, ?string $valueRule): bool
+    {
+        if ($valueRule === null) {
+            return true;
+        }
+
+        return match ($valueRule) {
+            EnvironmentRequirement::VALUE_RULE_HTTP_ORIGIN => $this->isHttpOrigin($value),
+            default => false,
+        };
+    }
+
+    private function isHttpOrigin(mixed $value): bool
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return false;
+        }
+
+        $parts = parse_url(trim($value));
+
+        if (! is_array($parts)) {
+            return false;
+        }
+
+        $scheme = is_string($parts['scheme'] ?? null)
+            ? strtolower(trim($parts['scheme']))
+            : null;
+        $host = is_string($parts['host'] ?? null)
+            ? trim($parts['host'])
+            : null;
+        $path = is_string($parts['path'] ?? null)
+            ? trim($parts['path'])
+            : '';
+
+        if (! in_array($scheme, ['http', 'https'], true)
+            || $host === null
+            || $host === ''
+            || ! in_array($path, ['', '/'], true)
+        ) {
+            return false;
+        }
+
+        foreach (['user', 'pass', 'query', 'fragment'] as $unsupportedPart) {
+            if (array_key_exists($unsupportedPart, $parts)) {
+                return false;
+            }
+        }
+
+        $port = $parts['port'] ?? null;
+
+        return $port === null
+            || (is_int($port) && $port >= 1 && $port <= 65535);
     }
 
     private function displayPath(string $path): string

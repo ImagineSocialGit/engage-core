@@ -51,6 +51,7 @@ final readonly class ResolvedEnvironmentRequirement
             'reason' => $this->requirement->reason,
             'status' => $this->status,
             'allowed_values' => $this->requirement->allowedValues,
+            'value_rule' => $this->requirement->valueRule,
             'target_path' => $this->targetPath,
             'persisted' => $this->persisted,
         ];

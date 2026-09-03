@@ -10,6 +10,8 @@ final readonly class EnvironmentRequirement
     public const OPTIONAL = 'optional';
     public const DEFAULTED = 'defaulted';
 
+    public const VALUE_RULE_HTTP_ORIGIN = 'http_origin';
+
     /**
      * @param array<int, string> $allowedValues
      */
@@ -19,6 +21,7 @@ final readonly class EnvironmentRequirement
         public string $reason,
         public ?string $expectedValue = null,
         public array $allowedValues = [],
+        public ?string $valueRule = null,
     ) {
         if (! in_array($this->requirement, [self::REQUIRED, self::OPTIONAL, self::DEFAULTED], true)) {
             throw new InvalidArgumentException(
@@ -62,6 +65,14 @@ final readonly class EnvironmentRequirement
                 "Environment requirement [{$this->key}] expected value must be one of its allowed values.",
             );
         }
+
+        if ($this->valueRule !== null
+            && ! in_array($this->valueRule, self::valueRules(), true)
+        ) {
+            throw new InvalidArgumentException(
+                "Unsupported environment value rule [{$this->valueRule}] for [{$this->key}].",
+            );
+        }
     }
 
     /**
@@ -72,6 +83,7 @@ final readonly class EnvironmentRequirement
         string $reason,
         ?string $expectedValue = null,
         array $allowedValues = [],
+        ?string $valueRule = null,
     ): self {
         return new self(
             key: $key,
@@ -79,12 +91,21 @@ final readonly class EnvironmentRequirement
             reason: $reason,
             expectedValue: $expectedValue,
             allowedValues: $allowedValues,
+            valueRule: $valueRule,
         );
     }
 
-    public static function optional(string $key, string $reason): self
-    {
-        return new self($key, self::OPTIONAL, $reason);
+    public static function optional(
+        string $key,
+        string $reason,
+        ?string $valueRule = null,
+    ): self {
+        return new self(
+            key: $key,
+            requirement: self::OPTIONAL,
+            reason: $reason,
+            valueRule: $valueRule,
+        );
     }
 
     /**
@@ -94,17 +115,27 @@ final readonly class EnvironmentRequirement
         string $key,
         string $reason,
         array $allowedValues = [],
+        ?string $valueRule = null,
     ): self {
         return new self(
             key: $key,
             requirement: self::DEFAULTED,
             reason: $reason,
             allowedValues: $allowedValues,
+            valueRule: $valueRule,
         );
     }
 
     public function isRequired(): bool
     {
         return $this->requirement === self::REQUIRED;
+    }
+
+    /** @return array<int, string> */
+    private static function valueRules(): array
+    {
+        return [
+            self::VALUE_RULE_HTTP_ORIGIN,
+        ];
     }
 }

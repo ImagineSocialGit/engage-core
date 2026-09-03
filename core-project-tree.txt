@@ -1152,6 +1152,8 @@
 │   │   │   │   ├── SchedulingLocationSnapshot.php
 │   │   │   │   ├── TravelFeasibility.php
 │   │   │   │   └── TravelTimeEstimate.php
+│   │   │   ├── Deployment
+│   │   │   │   └── SchedulingDeploymentPlanContributor.php
 │   │   │   ├── Enums
 │   │   │   │   └── SchedulingAvailabilityWindowType.php
 │   │   │   ├── EventDefinitions
@@ -1384,6 +1386,8 @@
 │   │   │   │   ├── WebinarRegistrationImportRow.php
 │   │   │   │   ├── WebinarRegistrationReplacementChain.php
 │   │   │   │   └── WebinarRegistrationResult.php
+│   │   │   ├── Deployment
+│   │   │   │   └── WebinarsDeploymentPlanContributor.php
 │   │   │   ├── Enums
 │   │   │   │   ├── WebinarProviderEventType.php
 │   │   │   │   ├── WebinarProviderLifecycleStatus.php
@@ -2687,6 +2691,7 @@
 │   │   │   ├── EngageDeploymentPlanCommandTest.php
 │   │   │   ├── EnvironmentFileSynchronizerTest.php
 │   │   │   ├── EnvironmentRequirementAllowedValuesTest.php
+│   │   │   ├── EnvironmentRequirementValueRuleTest.php
 │   │   │   └── EnvironmentVariableCatalogTest.php
 │   │   ├── Documents
 │   │   │   └── DocumentsFoundationTest.php
@@ -2999,6 +3004,7 @@
 │   │   │   ├── SchedulingConfigurationWorkspaceTest.php
 │   │   │   ├── SchedulingContactPanelTest.php
 │   │   │   ├── SchedulingDashboardPanelTest.php
+│   │   │   ├── SchedulingDeploymentPlanContributorTest.php
 │   │   │   ├── SchedulingDestinationVerificationMessagingBridgeTest.php
 │   │   │   ├── SchedulingFoundationTest.php
 │   │   │   ├── SchedulingHostAndServiceFoundationTest.php
@@ -3114,6 +3120,7 @@
 │   │   │   ├── WebinarScheduleProfileDefinitionResolverMessageAreaTest.php
 │   │   │   ├── WebinarScheduleProfileMessageChainSyncTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
+│   │   │   ├── WebinarsDeploymentPlanContributorTest.php
 │   │   │   ├── WebinarSeriesMessageChainOwnershipTest.php
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
 │   │   │   ├── WebinarStateCanonicalizerTest.php
@@ -3133,4 +3140,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-739 directories, 2395 files
+741 directories, 2400 files

@@ -162,6 +162,26 @@ Do not add `MESSAGING_APP_URL`. Deployment must provision DNS, TLS, and web-serv
 
 Stable product decisions such as SMS enablement/provider selection are still environment-backed in the current runtime. A later product-config pass may move those non-secret decisions into committed client PHP config; this batch does not change that ownership yet.
 
+## Scheduling public-origin requirements
+
+Scheduling has one deployment-owned environment value: `SCHEDULING_APP_URL`.
+
+The generic public booking surface is optional. Omitting `SCHEDULING_APP_URL` intentionally leaves public Scheduling routes disabled without blocking an otherwise valid Scheduling deployment. Internal appointment authoring, availability, lifecycle state, dashboard surfaces, and database-owned Scheduling configuration do not require a public Scheduling hostname.
+
+When `SCHEDULING_APP_URL` is present, it must be a root-level `http://` or `https://` origin with no credentials, path, query, or fragment. The deployment plan applies the same origin rule used by Scheduling setup validation so a malformed deliberate override blocks before installation/runtime work instead of being reported as a ready optional value.
+
+Examples:
+
+```text
+valid:   https://booking.example.com
+valid:   https://appointments.example.com:8443
+invalid: booking.example.com
+invalid: https://booking.example.com/schedule
+invalid: https://booking.example.com?source=crm
+```
+
+Scheduling hold lifetimes, destination-verification limits, public booking rate limits, travel defaults, reschedule suggestion limits, and expiration batch sizing remain committed application configuration. They are not deployment environment requirements merely because they affect Scheduling runtime behavior.
+
 ## Adding a module
 
 Module/config changes are authored in development and committed. A staging or production deployment must not modify `client/[CLIENT_KEY]/config/modules.php` to make the target work.
@@ -180,11 +200,14 @@ Unused values are informational. They are never deleted automatically.
 
 ## Current contributor coverage
 
-The foundation begins with:
+Current deployment-plan contributors cover:
 
 - Core
 - Forms
+- Messaging provider/runtime requirements
+- Webinars / Zoom
+- Scheduling public-origin requirements
 
-Forms also closes one important ambiguity in the current runtime model: when the committed preset selects one or more public Forms, `FORMS_EXTERNAL_INTAKE_ENABLED` becomes an explicit required deployment decision. A fresh target therefore cannot silently treat missing configuration as "disabled" and skip the signing-credential requirements. Once that value is deliberately set to `true`, the Forms contributor exposes the caller identity, signing secret, source/provider, and allowed-form requirements.
+Forms resolves public intake enablement and its signing/identity requirements. Messaging resolves the selected email/SMS providers, live credentials, sender fallbacks, webhook verification, and operational defaults. Webinars resolves Zoom provider readiness and post-event webhook requirements. Scheduling keeps public booking optional while validating any deliberately persisted public origin.
 
-Additional module/provider contributors should be added from fresh dependency cones as their deployment requirements are implemented. The Bash launcher should not encode those requirements itself.
+Additional module/provider contributors should continue to be added from fresh dependency cones. The Bash launcher should consume the resolved deployment plan rather than re-encoding module requirements itself.

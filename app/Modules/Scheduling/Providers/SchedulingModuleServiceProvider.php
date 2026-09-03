@@ -5,6 +5,7 @@ namespace App\Modules\Scheduling\Providers;
 use App\Modules\Scheduling\Automation\AppointmentAutomationTriggerAuthoringContributor;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Scheduling\Console\Commands\SyncAppointmentCommunicationsCatalogCommand;
+use App\Modules\Scheduling\Deployment\SchedulingDeploymentPlanContributor;
 use App\Modules\Scheduling\EventDefinitions\SchedulingPublicBookingEventDefinitionContributor;
 use App\Modules\Scheduling\Jobs\ExpireBookingHoldsJob;
 use App\Modules\Scheduling\ReadModels\SchedulingBookingFunnelFactContributor;
@@ -28,6 +29,11 @@ class SchedulingModuleServiceProvider extends ServiceProvider
         $this->app->tag(
             SchedulingSetupValidationContributor::class,
             'setup.validation_contributors',
+        );
+
+        $this->app->tag(
+            SchedulingDeploymentPlanContributor::class,
+            'deployment.plan_contributors',
         );
 
         $this->app->tag(
