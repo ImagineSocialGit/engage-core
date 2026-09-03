@@ -51,6 +51,23 @@ class StoreBroadcastRequest extends FormRequest
                 'string',
                 'max:1600',
             ],
+            'cta_present' => ['nullable', 'boolean'],
+            'cta' => ['nullable', 'array'],
+            'cta.label' => [
+                Rule::requiredIf(fn (): bool => $this->isRegularEmailBroadcastRequest()
+                    && filled($this->input('cta.url'))),
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'cta.url' => [
+                Rule::requiredIf(fn (): bool => $this->isRegularEmailBroadcastRequest()
+                    && filled($this->input('cta.label'))),
+                'nullable',
+                'string',
+                'url:http,https',
+                'max:2000',
+            ],
             'token_fallbacks_present' => ['nullable', 'boolean'],
             'token_fallbacks' => ['nullable', 'array', 'max:50'],
             'token_fallbacks.*' => ['required', 'array'],
@@ -351,6 +368,14 @@ class StoreBroadcastRequest extends FormRequest
                 'body' => $validated['body'],
             ];
 
+        if ($channel === 'email') {
+            $cta = $this->primaryCta($validated);
+
+            if ($cta !== []) {
+                $payload['cta'] = $cta;
+            }
+        }
+
         if (! $this->hasTokenFallbackSubmission($validated)) {
             return $payload;
         }
@@ -380,6 +405,14 @@ class StoreBroadcastRequest extends FormRequest
                 'subject' => (string) $this->input('subject', ''),
                 'body' => (string) $this->input('body', ''),
             ];
+
+        if ($channel === 'email') {
+            $cta = $this->primaryCta($this->all());
+
+            if ($cta !== []) {
+                $payload['cta'] = $cta;
+            }
+        }
 
         if ($this->hasTokenFallbackSubmission($this->all())) {
             $payload['token_fallbacks'] = $this->tokenFallbackInputForValidation();
@@ -415,6 +448,27 @@ class StoreBroadcastRequest extends FormRequest
 
             return $policy;
         }, $raw);
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @return array<string, string>
+     */
+    private function primaryCta(array $values): array
+    {
+        $cta = is_array($values['cta'] ?? null) ? $values['cta'] : [];
+        $label = is_string($cta['label'] ?? null) ? trim($cta['label']) : '';
+        $url = is_string($cta['url'] ?? null) ? trim($cta['url']) : '';
+
+        if ($label === '' || $url === '') {
+            return [];
+        }
+
+        return [
+            'tracking_key' => 'primary',
+            'label' => $label,
+            'url' => $url,
+        ];
     }
 
     /** @param array<string, mixed> $values */
@@ -462,6 +516,12 @@ class StoreBroadcastRequest extends FormRequest
     private function isRegularBroadcastRequest(): bool
     {
         return ! $this->isPermissionInvitationRequest();
+    }
+
+    private function isRegularEmailBroadcastRequest(): bool
+    {
+        return $this->isRegularBroadcastRequest()
+            && $this->regularBroadcastChannelInput() === 'email';
     }
 
 }

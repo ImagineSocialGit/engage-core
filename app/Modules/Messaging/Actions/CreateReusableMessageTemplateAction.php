@@ -9,6 +9,7 @@ use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
 use App\Modules\Messaging\Services\MessageTokenFallbackResolver;
+use App\Modules\Messaging\Support\CtaTrackingLinkGenerator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -290,6 +291,12 @@ class CreateReusableMessageTemplateAction
                 'body' => $body,
             ];
 
+            $cta = $this->normalizedCta($payload['cta'] ?? null);
+
+            if ($cta !== []) {
+                $normalized['cta'] = $cta;
+            }
+
             if (array_key_exists('token_fallbacks', $payload)) {
                 $normalized['token_fallbacks'] = $payload['token_fallbacks'];
             }
@@ -316,5 +323,35 @@ class CreateReusableMessageTemplateAction
         }
 
         throw new InvalidArgumentException("Reusable message template channel [{$channel}] is not supported.");
+    }
+
+    /** @return array<string, string> */
+    private function normalizedCta(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $label = is_string($value['label'] ?? null) ? trim($value['label']) : '';
+        $url = is_string($value['url'] ?? null) ? trim($value['url']) : '';
+
+        if ($label === '' || $url === '') {
+            return [];
+        }
+
+        $cta = [
+            'label' => $label,
+            'url' => $url,
+        ];
+        $trackingKey = $value['tracking_key'] ?? null;
+
+        if (CtaTrackingLinkGenerator::isValidTrackingKey($trackingKey)) {
+            $cta = [
+                'tracking_key' => trim((string) $trackingKey),
+                ...$cta,
+            ];
+        }
+
+        return $cta;
     }
 }

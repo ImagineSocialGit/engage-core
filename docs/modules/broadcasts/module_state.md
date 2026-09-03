@@ -23,7 +23,9 @@ Regular Broadcast authoring also has an executable `broadcast_send` token contex
 
 Personalization remains Messaging-owned at runtime. Broadcasts selects recipients and supplies the pinned private template version to `DispatchMessageAction`; Messaging resolves Contact values independently when each recipient delivery renders and applies the shared missing-field contract (`required`, `fallback_value`, or `replace_segment`) before provider rendering. Recipient-derived token snapshots are not copied into version-pinned ScheduledMessage payload. `ScheduleBroadcastAction` revalidates the current private draft version before it is pinned or recipients are snapshotted, so invalid copy cannot partially materialize runtime state.
 
-The reusable-message seam preserves this behavior: saving a Broadcast to Message Templates carries its `token_fallbacks` into the immutable Messaging version, and `ReusableMessageTemplateCatalog` returns those rules when a later Broadcast starts from that saved message. Permission invitations remain a separate Messaging-owned special path and do not use the regular Broadcast token editor.
+The reusable-message seam preserves this behavior: saving a Broadcast to Message Templates carries its `token_fallbacks` and optional primary email `cta` into the immutable Messaging version, and `ReusableMessageTemplateCatalog` returns those values when a later Broadcast starts from that saved message. Permission invitations remain a separate Messaging-owned special path and do not use the regular Broadcast token/CTA editor.
+
+Regular email Broadcasts may author one primary CTA as a button label plus HTTP(S) destination. Broadcasts stores the canonical CTA in its private Messaging payload with the server-owned tracking key `primary`; operators do not author tracking keys or signed click URLs. The source destination stays in the immutable template version. When a recipient ScheduledMessage renders, Messaging uses the existing CTA tracking seam to replace the rendered destination with the signed click route while plain-text email carries the corresponding tracked URL. Draft/show previews use the source URL and do not record delivery engagement. `{cta}` may be placed in the body to control button placement; otherwise the email renderer appends the CTA after the body.
 
 ## Responsibility
 
@@ -391,6 +393,7 @@ Use business-facing content fields:
 Email
     subject
     body
+    optional primary CTA label + HTTP(S) destination
 
 SMS
     message
@@ -402,12 +405,12 @@ Reusable message authoring is explicit:
 
 ```text
 Save to Message Templates
-    copy the regular Broadcast message into Messaging's reusable template/catalog infrastructure
+    copy the regular Broadcast message, token fallback policy, and primary email CTA into Messaging's reusable template/catalog infrastructure
     publish an immutable Messaging version
     expose the saved message on the existing Message Templates screen
 
 Start from a saved message
-    load the latest published reusable version into the current Broadcast draft
+    load the latest published reusable version, including its primary email CTA, into the current Broadcast draft
     editing the Broadcast does not mutate the saved template
 
 Make a new Broadcast from this

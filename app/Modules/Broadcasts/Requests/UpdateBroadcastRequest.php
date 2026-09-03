@@ -46,6 +46,23 @@ class UpdateBroadcastRequest extends FormRequest
                 'string',
                 'max:1600',
             ],
+            'cta_present' => ['nullable', 'boolean'],
+            'cta' => ['nullable', 'array'],
+            'cta.label' => [
+                Rule::requiredIf(fn (): bool => $this->isRegularEmailBroadcastRoute()
+                    && filled($this->input('cta.url'))),
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'cta.url' => [
+                Rule::requiredIf(fn (): bool => $this->isRegularEmailBroadcastRoute()
+                    && filled($this->input('cta.label'))),
+                'nullable',
+                'string',
+                'url:http,https',
+                'max:2000',
+            ],
             'token_fallbacks_present' => ['nullable', 'boolean'],
             'token_fallbacks' => ['nullable', 'array', 'max:50'],
             'token_fallbacks.*' => ['required', 'array'],
@@ -283,6 +300,16 @@ class UpdateBroadcastRequest extends FormRequest
                 'body' => $validated['body'],
             ];
 
+        if ($channel === 'email') {
+            $cta = $this->hasCtaSubmission($validated)
+                ? $this->primaryCta($validated)
+                : $this->existingPrimaryCta();
+
+            if ($cta !== []) {
+                $payload['cta'] = $cta;
+            }
+        }
+
         if (! $this->hasTokenFallbackSubmission($validated)) {
             $existing = $this->existingTokenFallbacks();
 
@@ -319,6 +346,17 @@ class UpdateBroadcastRequest extends FormRequest
                 'body' => (string) $this->input('body', ''),
             ];
 
+        if ($channel === 'email') {
+            $values = $this->all();
+            $cta = $this->hasCtaSubmission($values)
+                ? $this->primaryCta($values)
+                : $this->existingPrimaryCta();
+
+            if ($cta !== []) {
+                $payload['cta'] = $cta;
+            }
+        }
+
         if ($this->hasTokenFallbackSubmission($this->all())) {
             $payload['token_fallbacks'] = $this->tokenFallbackInputForValidation();
         } else {
@@ -330,6 +368,55 @@ class UpdateBroadcastRequest extends FormRequest
         }
 
         return $payload;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @return array<string, string>
+     */
+    private function primaryCta(array $values): array
+    {
+        $cta = is_array($values['cta'] ?? null) ? $values['cta'] : [];
+        $label = is_string($cta['label'] ?? null) ? trim($cta['label']) : '';
+        $url = is_string($cta['url'] ?? null) ? trim($cta['url']) : '';
+
+        if ($label === '' || $url === '') {
+            return [];
+        }
+
+        return [
+            'tracking_key' => 'primary',
+            'label' => $label,
+            'url' => $url,
+        ];
+    }
+
+    /** @return array<string, string> */
+    private function existingPrimaryCta(): array
+    {
+        $broadcast = $this->route('broadcast');
+
+        if (! $broadcast instanceof Broadcast) {
+            return [];
+        }
+
+        return $this->primaryCta([
+            'cta' => $broadcast->messagePayload()['cta'] ?? null,
+        ]);
+    }
+
+    /** @param array<string, mixed> $values */
+    private function hasCtaSubmission(array $values): bool
+    {
+        if (array_key_exists('cta', $values)) {
+            return true;
+        }
+
+        return in_array(
+            $values['cta_present'] ?? null,
+            [true, 1, '1', 'true', 'on'],
+            true,
+        );
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -419,5 +506,11 @@ class UpdateBroadcastRequest extends FormRequest
         $broadcast = $this->route('broadcast');
 
         return $broadcast instanceof Broadcast && $broadcast->isPermissionInvitation();
+    }
+
+    private function isRegularEmailBroadcastRoute(): bool
+    {
+        return ! $this->isPermissionInvitationRoute()
+            && $this->regularBroadcastChannelInput() === 'email';
     }
 }

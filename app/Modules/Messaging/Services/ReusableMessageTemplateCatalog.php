@@ -164,6 +164,14 @@ class ReusableMessageTemplateCatalog
                 'body' => is_string($payload['body'] ?? null) ? $payload['body'] : '',
             ];
 
+        if ($channel === 'email'
+            && is_array($payload['cta'] ?? null)
+            && filled($payload['cta']['label'] ?? null)
+            && filled($payload['cta']['url'] ?? null)
+        ) {
+            $normalized['cta'] = $payload['cta'];
+        }
+
         if (is_array($payload['token_fallbacks'] ?? null)) {
             $normalized['token_fallbacks'] = array_values($payload['token_fallbacks']);
         }

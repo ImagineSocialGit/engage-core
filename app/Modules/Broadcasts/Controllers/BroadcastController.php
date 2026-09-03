@@ -286,6 +286,7 @@ class BroadcastController extends Controller
             'deliveryIssues' => $deliveryIssues,
             'selectedDeliveryIssue' => $selectedDeliveryIssue,
             'selectedDeliveryIssueMessages' => $selectedDeliveryIssueMessages,
+            'broadcastCta' => $this->broadcastPrimaryCta($broadcast),
         ]);
     }
 
@@ -594,6 +595,33 @@ class BroadcastController extends Controller
             selectionContexts: ['broadcasts', 'campaign_annual_touch'],
             description: 'Reusable CRM-authored Broadcast message.',
         );
+    }
+
+
+    /** @return array{label: string, url: string}|null */
+    private function broadcastPrimaryCta(Broadcast $broadcast): ?array
+    {
+        if (! $broadcast->isRegularBroadcast() || $broadcast->channel !== 'email') {
+            return null;
+        }
+
+        $cta = $broadcast->messagePayload()['cta'] ?? null;
+
+        if (! is_array($cta)) {
+            return null;
+        }
+
+        $label = is_string($cta['label'] ?? null) ? trim($cta['label']) : '';
+        $url = is_string($cta['url'] ?? null) ? trim($cta['url']) : '';
+
+        if ($label === '' || $url === '') {
+            return null;
+        }
+
+        return [
+            'label' => $label,
+            'url' => $url,
+        ];
     }
 
 

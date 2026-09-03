@@ -177,6 +177,25 @@
                                 {{ $broadcast->messagePayload()['body'] ?? '' }}
                             </div>
                         </div>
+
+                        @if(is_array($broadcastCta) && filled($broadcastCta['label'] ?? null) && filled($broadcastCta['url'] ?? null))
+                            <div data-broadcast-cta-preview>
+                                <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Call to action
+                                </div>
+                                <a
+                                    href="{{ $broadcastCta['url'] }}"
+                                    class="mt-2 inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    {{ $broadcastCta['label'] }}
+                                </a>
+                                <div class="mt-2 break-all text-xs text-slate-500">
+                                    {{ $broadcastCta['url'] }}
+                                </div>
+                            </div>
+                        @endif
                     @endif
 
                     @if($broadcast->isRegularBroadcast())

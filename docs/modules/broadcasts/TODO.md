@@ -16,3 +16,4 @@
 - [x] Add `Make a new Broadcast from this` with a clean WHO/timing reset; do not persist clone lineage without a proven audit/product need.
 - [x] Let regular Broadcast copy be explicitly saved into Messaging's existing reusable Message Templates catalog and loaded into later Broadcast drafts.
 - [x] Add Contact-field personalization to regular Broadcast authoring through the registered `broadcast_send` token context, including 23C1 missing-field behavior and reusable-template preservation.
+- [x] Add one first-class primary CTA to regular email Broadcast authoring, persist it in the private immutable Messaging payload, preserve it through reusable Message Templates, and let Messaging inject signed click tracking at ScheduledMessage render time.

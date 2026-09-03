@@ -47,6 +47,8 @@
                         subject: @js(old('subject', '')),
                         body: @js(old('body', '')),
                         message: @js(old('message', '')),
+                        ctaLabel: @js(old('cta.label', '')),
+                        ctaUrl: @js(old('cta.url', '')),
                         availableReusableMessages() {
                             return this.reusableMessages.filter((template) => template.channel === this.channel);
                         },
@@ -68,12 +70,16 @@
 
                             if (this.channel === 'sms') {
                                 this.message = payload.message || '';
+                                this.ctaLabel = '';
+                                this.ctaUrl = '';
                                 queueMicrotask(announceTemplate);
                                 return;
                             }
 
                             this.subject = payload.subject || '';
                             this.body = payload.body || '';
+                            this.ctaLabel = payload.cta?.label || '';
+                            this.ctaUrl = payload.cta?.url || '';
                             queueMicrotask(announceTemplate);
                         },
                     }"
@@ -175,6 +181,8 @@
 
                         <x-ui.form.error name="body" />
                     </div>
+
+                    @include('crm.broadcasts.partials.cta-editor')
 
                     <div x-show="channel === 'sms'">
                         <x-ui.form.label for="message">

@@ -122,6 +122,8 @@
                     subject: @js(old('subject', $broadcast->messagePayload()['subject'] ?? '')),
                     body: @js(old('body', $broadcast->messagePayload()['body'] ?? '')),
                     message: @js(old('message', $broadcast->messagePayload()['message'] ?? '')),
+                    ctaLabel: @js(old('cta.label', data_get($broadcast->messagePayload(), 'cta.label', ''))),
+                    ctaUrl: @js(old('cta.url', data_get($broadcast->messagePayload(), 'cta.url', ''))),
                     availableReusableMessages() {
                         return this.reusableMessages.filter((template) => template.channel === this.channel);
                     },
@@ -143,12 +145,16 @@
 
                         if (this.channel === 'sms') {
                             this.message = payload.message || '';
+                            this.ctaLabel = '';
+                            this.ctaUrl = '';
                             queueMicrotask(announceTemplate);
                             return;
                         }
 
                         this.subject = payload.subject || '';
                         this.body = payload.body || '';
+                        this.ctaLabel = payload.cta?.label || '';
+                        this.ctaUrl = payload.cta?.url || '';
                         queueMicrotask(announceTemplate);
                     },
                 }"
@@ -258,6 +264,8 @@
                 </div>
 
                 @if(! $broadcast->isPermissionInvitation())
+                    @include('crm.broadcasts.partials.cta-editor')
+
                     <div x-show="channel === 'sms'">
                         <x-ui.form.label for="message">
                             SMS Message

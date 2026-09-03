@@ -87,8 +87,9 @@
 
             const subject = this.form.querySelector('[name=subject]')?.value || '';
             const body = this.form.querySelector('[name=body]')?.value || '';
+            const ctaLabel = this.form.elements.namedItem('cta[label]')?.value || '';
 
-            return `${subject}\n${body}`;
+            return `${subject}\n${body}\n${ctaLabel}`;
         },
         referencedTokens() {
             const copy = this.currentMessageCopy();
@@ -122,7 +123,7 @@
             return fields;
         },
         rememberMessageInput(target) {
-            if (! target || ! ['subject', 'body', 'message'].includes(target.name)) {
+            if (! target || ! ['subject', 'body', 'message', 'cta[label]'].includes(target.name)) {
                 return;
             }
 
@@ -141,7 +142,7 @@
             }
 
             const channel = this.currentChannel();
-            const allowedNames = channel === 'sms' ? ['message'] : ['subject', 'body'];
+            const allowedNames = channel === 'sms' ? ['message'] : ['subject', 'body', 'cta[label]'];
             let input = this.activeMessageInput;
 
             if (! input || ! allowedNames.includes(input.name) || input.closest('form') !== this.form) {
