@@ -16,4 +16,5 @@
 - [ ] UX Phase / 23A3 maintenance cleanup: finish the terminology/progressive-disclosure pass across existing service, staff/provider, assignment, resource, and appointment maintenance surfaces; explain any unavoidable specialized terms in place.
 
 - [x] UX / After Booking handoff: add a dedicated Scheduling → After Booking workspace, use `appointment.scheduled` as the neutral trigger, hand rich automation to Flow Routes through the shared authoring-link contract, and keep only idempotent tag/status/template-backed-task fallbacks when Flow Routes is unavailable.
+- [x] UX / Scheduling admin completion: split the giant Scheduling Setup maintenance page into a readiness/navigation hub plus dedicated Services and Staff & Providers workspaces; add an authoritative service edit page for service-owned settings and staff assignment while preserving the existing Availability, Communications, After Booking, and Resources owners.
 - [ ] UX / Public booking visual redesign: redesign and polish the public Scheduling landing/booking page as a dedicated customer-facing UX pass; keep it separate from after-booking automation architecture.

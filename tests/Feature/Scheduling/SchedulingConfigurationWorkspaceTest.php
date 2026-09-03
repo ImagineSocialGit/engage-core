@@ -44,7 +44,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_configuration_workspace_exposes_structural_forms_routes_and_usage_state(): void
+    public function test_configuration_workspace_exposes_dedicated_setup_surfaces_and_existing_write_routes(): void
     {
         $user = User::factory()->create();
         $host = SchedulingHost::factory()->create();
@@ -59,21 +59,45 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
             ->get(route('crm.scheduling.configuration.index'))
             ->assertOk()
             ->assertSee('data-scheduling-configuration', false)
-            ->assertSee('data-configuration-host-create', false)
+            ->assertSee('data-scheduling-setup-area="services"', false)
+            ->assertSee('data-scheduling-setup-area="availability"', false)
+            ->assertSee('data-scheduling-setup-area="staff"', false)
+            ->assertSee(
+                route('crm.scheduling.configuration.services.index'),
+                false,
+            )
+            ->assertSee(
+                route('crm.scheduling.configuration.staff.index'),
+                false,
+            )
+            ->assertDontSee('data-configuration-service-create', false)
+            ->assertDontSee('data-configuration-host-create', false);
+
+        $this->actingAs($user)
+            ->get(route('crm.scheduling.configuration.services.index'))
+            ->assertOk()
+            ->assertSee('data-scheduling-services-workspace', false)
             ->assertSee('data-configuration-service-create', false)
-            ->assertSee('data-scheduling-host-id="'.$host->id.'"', false)
             ->assertSee('data-bookable-service-id="'.$service->id.'"', false)
-            ->assertSee('data-service-assignment-form="'.$service->id.'"', false)
-            ->assertSee(
-                route('crm.scheduling.configuration.hosts.store'),
-                false,
-            )
-            ->assertSee(
-                route('crm.scheduling.configuration.hosts.update', $host),
-                false,
-            )
             ->assertSee(
                 route('crm.scheduling.configuration.services.store'),
+                false,
+            )
+            ->assertSee(
+                route('crm.scheduling.configuration.services.edit', $service),
+                false,
+            );
+
+        $this->actingAs($user)
+            ->get(route('crm.scheduling.configuration.services.edit', $service))
+            ->assertOk()
+            ->assertSee('data-scheduling-service-editor="'.$service->id.'"', false)
+            ->assertSee(
+                'data-configuration-service-update="'.$service->id.'"',
+                false,
+            )
+            ->assertSee(
+                'data-service-assignment-form="'.$service->id.'"',
                 false,
             )
             ->assertSee(
@@ -89,6 +113,21 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
             );
 
         $this->actingAs($user)
+            ->get(route('crm.scheduling.configuration.staff.index'))
+            ->assertOk()
+            ->assertSee('data-scheduling-staff-workspace', false)
+            ->assertSee('data-configuration-host-create', false)
+            ->assertSee('data-scheduling-host-id="'.$host->id.'"', false)
+            ->assertSee(
+                route('crm.scheduling.configuration.hosts.store'),
+                false,
+            )
+            ->assertSee(
+                route('crm.scheduling.configuration.hosts.update', $host),
+                false,
+            );
+
+        $this->actingAs($user)
             ->get(route('crm.scheduling.index'))
             ->assertOk()
             ->assertSee('data-scheduling-configuration-link', false)
@@ -100,15 +139,20 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
 
     public function test_first_use_configuration_is_service_first_and_hides_generated_create_fields(): void
     {
-        $response = $this->actingAs(User::factory()->create())
-            ->get(route('crm.scheduling.configuration.index'));
+        $user = User::factory()->create();
 
-        $response
+        $this->actingAs($user)
+            ->get(route('crm.scheduling.configuration.index'))
             ->assertOk()
             ->assertSeeInOrder([
-                'data-configuration-section="services"',
-                'data-configuration-section="hosts"',
-            ], false)
+                'data-scheduling-setup-area="services"',
+                'data-scheduling-setup-area="availability"',
+                'data-scheduling-setup-area="staff"',
+            ], false);
+
+        $this->actingAs($user)
+            ->get(route('crm.scheduling.configuration.services.index'))
+            ->assertOk()
             ->assertDontSee('name="key"', false)
             ->assertDontSee('name="sort_order"', false);
     }
@@ -122,7 +166,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
                 'name' => 'Planning Call',
                 'duration_minutes' => 30,
             ])
-            ->assertRedirect(route('crm.scheduling.configuration.index'))
+            ->assertRedirect(route('crm.scheduling.configuration.services.index'))
             ->assertSessionHasNoErrors();
 
         $service = BookableService::query()->sole();
@@ -142,7 +186,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
                 'name' => 'Taylor Smith',
                 'email' => 'taylor@example.test',
             ])
-            ->assertRedirect(route('crm.scheduling.configuration.index'))
+            ->assertRedirect(route('crm.scheduling.configuration.staff.index'))
             ->assertSessionHasNoErrors();
 
         $host = SchedulingHost::query()->sole();
@@ -168,7 +212,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
                     'email' => 'ADVISOR@EXAMPLE.TEST',
                 ]),
             )
-            ->assertRedirect(route('crm.scheduling.configuration.index'))
+            ->assertRedirect(route('crm.scheduling.configuration.staff.index'))
             ->assertSessionHasNoErrors();
 
         $host = SchedulingHost::query()->sole();
@@ -193,7 +237,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
                     'sort_order' => 20,
                 ], includeKey: false),
             )
-            ->assertRedirect(route('crm.scheduling.configuration.index'))
+            ->assertRedirect(route('crm.scheduling.configuration.staff.index'))
             ->assertSessionHasNoErrors();
 
         $host->refresh();
@@ -288,7 +332,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
                     'is_public' => true,
                 ]),
             )
-            ->assertRedirect(route('crm.scheduling.configuration.index'))
+            ->assertRedirect(route('crm.scheduling.configuration.services.index'))
             ->assertSessionHasNoErrors();
 
         $service = BookableService::query()->sole();
@@ -323,7 +367,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
                     'location_url' => '',
                 ], includeKey: false),
             )
-            ->assertRedirect(route('crm.scheduling.configuration.index'))
+            ->assertRedirect(route('crm.scheduling.configuration.services.edit', $service))
             ->assertSessionHasNoErrors();
 
         $service->refresh();
@@ -353,7 +397,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
                     'maximum_duration_minutes' => 10080,
                 ]),
             )
-            ->assertRedirect(route('crm.scheduling.configuration.index'))
+            ->assertRedirect(route('crm.scheduling.configuration.services.index'))
             ->assertSessionHasNoErrors();
 
         $service = BookableService::query()->sole();
@@ -372,7 +416,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
                     'duration_minutes' => 90,
                 ], includeKey: false),
             )
-            ->assertRedirect(route('crm.scheduling.configuration.index'))
+            ->assertRedirect(route('crm.scheduling.configuration.services.edit', $service))
             ->assertSessionHasNoErrors();
 
         $service->refresh();
@@ -579,7 +623,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
                     ]],
                 ],
             )
-            ->assertRedirect(route('crm.scheduling.configuration.index'))
+            ->assertRedirect(route('crm.scheduling.configuration.services.edit', $service))
             ->assertSessionHasNoErrors();
 
         $primaryAssignment = BookableServiceHost::query()

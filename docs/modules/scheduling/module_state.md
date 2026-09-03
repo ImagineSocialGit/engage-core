@@ -70,6 +70,34 @@ Advanced rule authoring remains available behind progressive disclosure for staf
 
 Any specialized term that must remain visible follows the shared UI/UX rule: explain it visibly below the control when understanding is important to the current decision, or use an accessible hover/focus/tap/click help affordance for secondary repeated terminology.
 
+## Scheduling setup maintenance surfaces
+
+The Scheduling setup surface is a navigation/readiness hub rather than a single page containing every maintenance form.
+
+The CRM contract is:
+
+```text
+Scheduling -> Setup
+  -> Services
+  -> Availability
+  -> Staff & Providers
+  -> Appointment Communications
+  -> After Booking
+  -> Resources (advanced)
+```
+
+The service name is the customer-facing appointment/service identity. Appointment type is not separately authored as display copy: it is derived from the first-class appointment format and method (`In person` / `Remote`, then business location / customer-provided address / phone call / virtual meeting). `location_details.label` is not an appointment display name. Manual CRM authoring exposes it only for a fixed business location where a place name such as `Main Office` or `Downtown Branch` adds information beyond the address. Phone, virtual-meeting, and customer-address services do not ask the operator to invent another appointment-type label. Preparation instructions remain separate from both the service description and the derived meeting method.
+
+Services are a first-class maintenance workspace. `GET /scheduling/configuration/services` owns service discovery and simple creation. `GET /scheduling/configuration/services/{bookableService}/edit` is the authoritative service editor for business-facing service settings, appointment format/location behavior, duration policy, public-booking state, confirmation requirements, advanced booking rules, and explicit staff/provider assignment.
+
+The setup landing page does not duplicate those forms. It summarizes current readiness through `SchedulingSetupReadiness` and links operators to the authoritative surface for each decision.
+
+Staff/provider maintenance is likewise separated at `GET /scheduling/configuration/staff`. Hostless services remain valid; adding staff is optional unless explicit assignment or person-specific capacity is needed.
+
+The service editor links to service-scoped Availability using the existing `service_id` selection contract and links to the existing After Booking, Appointment Communications, and Resources workspaces rather than reimplementing those domains inside service authoring.
+
+Provider/system-owned services continue to use the same service detail route as a read-only workspace. Manual service write authority, optimistic version checks, generated stable keys, provider identity ownership, and SchedulingConfigurationWriter runtime semantics are unchanged.
+
 ## Universal public booking surface
 
 Scheduling provides every client with an optional generic public booking surface where visitors can discover public services, reserve one time through an authoritative short-lived hold, enter attendee details, and complete the hold into an Appointment.

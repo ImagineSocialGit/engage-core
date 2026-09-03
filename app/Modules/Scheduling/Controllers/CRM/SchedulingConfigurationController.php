@@ -7,6 +7,7 @@ use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Services\SchedulingConfigurationWriter;
 use App\Modules\Scheduling\Services\SchedulingReadService;
+use App\Modules\Scheduling\Services\SchedulingSetupReadiness;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,18 +20,89 @@ use LogicException;
 
 class SchedulingConfigurationController extends Controller
 {
-    public function index(SchedulingReadService $read): View
-    {
+    public function index(
+        SchedulingSetupReadiness $readiness,
+    ): View {
         return view('crm.scheduling.configuration', [
             'title' => 'Scheduling Setup',
             'heading' => 'Scheduling Setup',
-            'hosts' => $read->configurationHosts(),
+            'readiness' => $readiness->summary(),
+        ]);
+    }
+
+    public function services(SchedulingReadService $read): View
+    {
+        return view('crm.scheduling.services.index', [
+            'title' => 'Scheduling Services',
+            'heading' => 'Services',
             'services' => $read->configurationServices(),
+        ]);
+    }
+
+    public function editService(
+        BookableService $bookableService,
+        SchedulingReadService $read,
+    ): View {
+        $service = $read->configurationService($bookableService);
+        $locationDetails = is_array($service->location_details)
+            ? $service->location_details
+            : [];
+        $locationAddress = is_array($locationDetails['address'] ?? null)
+            ? $locationDetails['address']
+            : [];
+        $assignmentByHost = $service->hostAssignments
+            ->keyBy('scheduling_host_id');
+
+        $assignmentRows = $read->configurationHosts()
+            ->map(function (SchedulingHost $host) use ($assignmentByHost): array {
+                $assignment = $assignmentByHost->get($host->getKey());
+                $active = (bool) $assignment?->is_active;
+
+                return [
+                    'id' => (int) $host->getKey(),
+                    'name' => (string) $host->name,
+                    'status' => (string) $host->status,
+                    'timezone' => (string) $host->timezone,
+                    'selectable' => $host->status === SchedulingHost::STATUS_ACTIVE || $active,
+                    'active' => $active,
+                    'capacity_override' => $assignment?->capacity_override,
+                    'sort_order' => (int) ($assignment?->sort_order ?? $host->sort_order),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return view('crm.scheduling.services.edit', [
+            'title' => 'Edit Scheduling Service',
+            'heading' => $service->name,
+            'service' => $service,
+            'serviceEditable' => (bool) $service->getAttribute('crm_editable'),
+            'serviceStatuses' => [
+                BookableService::STATUS_ACTIVE,
+                BookableService::STATUS_INACTIVE,
+                BookableService::STATUS_ARCHIVED,
+            ],
             'timezones' => timezone_identifiers_list(),
-            'defaultTimezone' => config(
-                'client.timezone',
-                config('app.timezone', 'UTC'),
-            ),
+            'appointmentConfiguration' => $service->resolvedAppointmentConfiguration(),
+            'locationDetails' => $locationDetails,
+            'locationAddress' => $locationAddress,
+            'assignmentRows' => $assignmentRows,
+            'maxRangeDurationMinutes' => BookableService::MAX_RANGE_DURATION_MINUTES,
+        ]);
+    }
+
+    public function staff(SchedulingReadService $read): View
+    {
+        return view('crm.scheduling.staff.index', [
+            'title' => 'Scheduling Staff',
+            'heading' => 'Staff & Providers',
+            'hosts' => $read->configurationHosts(),
+            'hostStatuses' => [
+                SchedulingHost::STATUS_ACTIVE,
+                SchedulingHost::STATUS_INACTIVE,
+                SchedulingHost::STATUS_ARCHIVED,
+            ],
+            'timezones' => timezone_identifiers_list(),
         ]);
     }
 
@@ -60,7 +132,9 @@ class SchedulingConfigurationController extends Controller
             throw $this->configurationException($exception);
         }
 
-        return $this->configurationRedirect('host-created');
+        return redirect()
+            ->route('crm.scheduling.configuration.staff.index')
+            ->with('success', 'Scheduling staff member created.');
     }
 
     public function updateHost(
@@ -94,7 +168,9 @@ class SchedulingConfigurationController extends Controller
             throw $this->configurationException($exception);
         }
 
-        return $this->configurationRedirect('host-updated');
+        return redirect()
+            ->route('crm.scheduling.configuration.staff.index')
+            ->with('success', 'Scheduling staff member updated.');
     }
 
     public function storeService(
@@ -117,7 +193,9 @@ class SchedulingConfigurationController extends Controller
             throw $this->configurationException($exception);
         }
 
-        return $this->configurationRedirect('service-created');
+        return redirect()
+            ->route('crm.scheduling.configuration.services.index')
+            ->with('success', 'Scheduling service created.');
     }
 
     public function updateService(
@@ -145,7 +223,9 @@ class SchedulingConfigurationController extends Controller
             throw $this->configurationException($exception);
         }
 
-        return $this->configurationRedirect('service-updated');
+        return redirect()
+            ->route('crm.scheduling.configuration.services.edit', $bookableService)
+            ->with('success', 'Scheduling service updated.');
     }
 
     public function updateServiceHosts(
@@ -194,7 +274,9 @@ class SchedulingConfigurationController extends Controller
             throw $this->configurationException($exception);
         }
 
-        return $this->configurationRedirect('assignments-updated');
+        return redirect()
+            ->route('crm.scheduling.configuration.services.edit', $bookableService)
+            ->with('success', 'Service staff assignments updated.');
     }
 
     /**
@@ -645,19 +727,4 @@ class SchedulingConfigurationController extends Controller
         ]);
     }
 
-    private function configurationRedirect(string $event): RedirectResponse
-    {
-        $message = match ($event) {
-            'host-created' => 'Scheduling host created.',
-            'host-updated' => 'Scheduling host updated.',
-            'service-created' => 'Bookable service created.',
-            'service-updated' => 'Bookable service updated.',
-            'assignments-updated' => 'Service host assignments updated.',
-            default => 'Scheduling configuration updated.',
-        };
-
-        return redirect()
-            ->route('crm.scheduling.configuration.index')
-            ->with('success', $message);
-    }
 }

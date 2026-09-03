@@ -22,6 +22,15 @@ Route::middleware('module:scheduling')
         Route::get('/configuration', [SchedulingConfigurationController::class, 'index'])
             ->name('configuration.index');
 
+        Route::get('/configuration/services', [SchedulingConfigurationController::class, 'services'])
+            ->name('configuration.services.index');
+
+        Route::get('/configuration/services/{bookableService}/edit', [SchedulingConfigurationController::class, 'editService'])
+            ->name('configuration.services.edit');
+
+        Route::get('/configuration/staff', [SchedulingConfigurationController::class, 'staff'])
+            ->name('configuration.staff.index');
+
         Route::get('/configuration/after-booking', [SchedulingAfterBookingController::class, 'index'])
             ->name('configuration.after-booking.index');
 

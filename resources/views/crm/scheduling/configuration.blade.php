@@ -1,24 +1,8 @@
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
-    subheading="Choose what people can schedule, who can handle appointments, and when appointments can happen."
+    subheading="Manage the pieces that make Scheduling work without turning setup into one giant form."
 >
-    @php
-        $hostStatuses = [
-            \App\Modules\Scheduling\Models\SchedulingHost::STATUS_ACTIVE,
-            \App\Modules\Scheduling\Models\SchedulingHost::STATUS_INACTIVE,
-            \App\Modules\Scheduling\Models\SchedulingHost::STATUS_ARCHIVED,
-        ];
-        $serviceStatuses = [
-            \App\Modules\Scheduling\Models\BookableService::STATUS_ACTIVE,
-            \App\Modules\Scheduling\Models\BookableService::STATUS_INACTIVE,
-            \App\Modules\Scheduling\Models\BookableService::STATUS_ARCHIVED,
-        ];
-        $inputClass = 'mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200';
-        $labelClass = 'block text-sm font-medium text-slate-700';
-        $readOnlyClass = 'rounded-xl border border-slate-200 bg-slate-50 p-4';
-    @endphp
-
     <div class="space-y-6" data-scheduling-configuration>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <a
@@ -30,7 +14,7 @@
             </a>
 
             <p class="text-sm text-slate-500">
-                Start with a service. Scheduling fills in the rest with safe defaults.
+                Start with Services, then add availability. Staff assignment is optional.
             </p>
         </div>
 
@@ -50,799 +34,179 @@
             </x-ui.feedback.alert>
         @endif
 
-        <datalist id="scheduling-timezones">
-            @foreach ($timezones as $timezone)
-                <option value="{{ $timezone }}"></option>
-            @endforeach
-        </datalist>
-
-        <x-ui.card class="space-y-4" data-scheduling-communications-entry>
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <x-ui.card class="space-y-4" data-scheduling-setup-status>
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                        Appointment Communications
+                        Setup status
                     </div>
                     <h2 class="mt-3 text-lg font-semibold text-slate-900">
-                        Confirm appointments and remind people automatically
+                        {{ $readiness['internal_ready'] ? 'Scheduling is ready for appointments' : 'Finish the core booking setup' }}
                     </h2>
                     <p class="mt-1 max-w-2xl text-sm text-slate-500">
-                        Generate a sensible starting schedule, then change the timing, channels, or message whenever you need to.
+                        A service and usable availability are the only requirements for internal scheduling. Staff/provider records are optional unless appointments need explicit assignment.
                     </p>
                 </div>
+
+                <div class="grid grid-cols-2 gap-2 text-center sm:min-w-64">
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                        <div class="text-xl font-semibold text-slate-900">{{ $readiness['active_service_count'] }}</div>
+                        <div class="mt-1 text-xs text-slate-500">Active services</div>
+                    </div>
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                        <div class="text-xl font-semibold text-slate-900">{{ $readiness['active_host_count'] }}</div>
+                        <div class="mt-1 text-xs text-slate-500">Active staff</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid gap-3 sm:grid-cols-3">
+                <div class="rounded-xl border border-slate-200 p-3" data-scheduling-readiness-service="{{ $readiness['has_service'] ? 'ready' : 'needed' }}">
+                    <div class="text-sm font-semibold text-slate-900">Services</div>
+                    <div class="mt-1 text-xs text-slate-500">
+                        {{ $readiness['has_service'] ? 'At least one active service is ready.' : 'Add the first thing people can schedule.' }}
+                    </div>
+                </div>
+
+                <div class="rounded-xl border border-slate-200 p-3" data-scheduling-readiness-availability="{{ $readiness['has_availability'] ? 'ready' : 'needed' }}">
+                    <div class="text-sm font-semibold text-slate-900">Availability</div>
+                    <div class="mt-1 text-xs text-slate-500">
+                        {{ $readiness['has_availability'] ? 'Bookable hours are configured.' : 'Set the normal hours when appointments can happen.' }}
+                    </div>
+                </div>
+
+                <div class="rounded-xl border border-slate-200 p-3" data-scheduling-readiness-public="{{ $readiness['public_ready'] ? 'ready' : 'not_ready' }}">
+                    <div class="text-sm font-semibold text-slate-900">Public booking</div>
+                    <div class="mt-1 text-xs text-slate-500">
+                        @if (! $readiness['public_surface_enabled'])
+                            Public booking is not enabled for this deployment.
+                        @elseif ($readiness['public_ready'])
+                            Public booking has the required service and availability setup.
+                        @elseif ($readiness['has_incomplete_public_service'])
+                            One or more public services still need a complete appointment format.
+                        @else
+                            Choose at least one public service and finish the required setup.
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </x-ui.card>
+
+        <section class="space-y-4" data-scheduling-setup-areas>
+            <div>
+                <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
+                    Setup areas
+                </div>
+                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
+                    Configure one thing at a time
+                </h2>
+            </div>
+
+            <div class="grid gap-4 lg:grid-cols-2">
+                <a
+                    href="{{ route('crm.scheduling.configuration.services.index') }}"
+                    class="block rounded-2xl border border-teal-200 bg-white p-5 shadow-sm transition hover:border-teal-300 hover:shadow"
+                    data-scheduling-setup-area="services"
+                >
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <div class="text-sm font-semibold text-teal-700">1. Services</div>
+                            <h3 class="mt-1 text-lg font-semibold text-slate-900">What can people schedule?</h3>
+                            <p class="mt-2 text-sm text-slate-500">
+                                Add services, edit appointment format and booking rules, and choose who can handle each service.
+                            </p>
+                        </div>
+                        <span class="text-slate-400">→</span>
+                    </div>
+                </a>
+
+                <a
+                    href="{{ route('crm.scheduling.configuration.availability.index') }}"
+                    class="block rounded-2xl border border-teal-200 bg-white p-5 shadow-sm transition hover:border-teal-300 hover:shadow"
+                    data-scheduling-setup-area="availability"
+                    data-scheduling-availability-configuration-link
+                >
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <div class="text-sm font-semibold text-teal-700">2. Availability</div>
+                            <h3 class="mt-1 text-lg font-semibold text-slate-900">When can appointments happen?</h3>
+                            <p class="mt-2 text-sm text-slate-500">
+                                Set normal weekly hours, special dates, time off, and test the actual times Scheduling can offer.
+                            </p>
+                        </div>
+                        <span class="text-slate-400">→</span>
+                    </div>
+                </a>
+
+                <a
+                    href="{{ route('crm.scheduling.configuration.staff.index') }}"
+                    class="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow"
+                    data-scheduling-setup-area="staff"
+                >
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <div class="text-sm font-semibold text-slate-600">Optional</div>
+                            <h3 class="mt-1 text-lg font-semibold text-slate-900">Staff & providers</h3>
+                            <p class="mt-2 text-sm text-slate-500">
+                                Add people only when appointments need explicit assignment or person-specific capacity.
+                            </p>
+                        </div>
+                        <span class="text-slate-400">→</span>
+                    </div>
+                </a>
 
                 <a
                     href="{{ route('crm.scheduling.configuration.communications.index') }}"
-                    class="inline-flex w-full items-center justify-center rounded-lg border border-teal-600 bg-white px-4 py-2 text-sm font-semibold text-teal-700 shadow-sm hover:bg-teal-50 sm:w-auto"
+                    class="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow"
+                    data-scheduling-setup-area="communications"
                 >
-                    Manage appointment messages
-                </a>
-            </div>
-        </x-ui.card>
-
-        <x-ui.card class="space-y-4" data-scheduling-after-booking-entry>
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                        After Booking
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <div class="text-sm font-semibold text-slate-600">Appointment communications</div>
+                            <h3 class="mt-1 text-lg font-semibold text-slate-900">Confirmations & reminders</h3>
+                            <p class="mt-2 text-sm text-slate-500">
+                                Manage the confirmation and reminder schedule used for appointments.
+                            </p>
+                        </div>
+                        <span class="text-slate-400">→</span>
                     </div>
-                    <h2 class="mt-3 text-lg font-semibold text-slate-900">
-                        Decide what happens after an appointment is scheduled
-                    </h2>
-                    <p class="mt-1 max-w-2xl text-sm text-slate-500">
-                        Keep follow-up manual, use the available simple fallbacks, or hand richer automation to Flow Routes when it is enabled.
-                    </p>
-                </div>
+                </a>
 
                 <a
                     href="{{ route('crm.scheduling.configuration.after-booking.index') }}"
-                    class="inline-flex w-full items-center justify-center rounded-lg border border-teal-600 bg-white px-4 py-2 text-sm font-semibold text-teal-700 shadow-sm hover:bg-teal-50 sm:w-auto"
+                    class="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow"
+                    data-scheduling-setup-area="after_booking"
                 >
-                    Manage after booking
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <div class="text-sm font-semibold text-slate-600">After booking</div>
+                            <h3 class="mt-1 text-lg font-semibold text-slate-900">What happens after someone books?</h3>
+                            <p class="mt-2 text-sm text-slate-500">
+                                Keep follow-up manual or connect the appropriate automation behavior.
+                            </p>
+                        </div>
+                        <span class="text-slate-400">→</span>
+                    </div>
                 </a>
-            </div>
-        </x-ui.card>
 
-        <section class="space-y-5" id="services" data-configuration-section="services">
-            <div>
-                <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                    Services
-                </div>
-                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
-                    What can people schedule?
-                </h2>
-            </div>
-
-            <x-ui.card class="space-y-5">
-                <div>
-                    <h3 class="text-lg font-semibold text-slate-900">Add something people can schedule</h3>
-                    <p class="mt-1 text-sm text-slate-500">
-                        Start with the basics. Scheduling will fill in sensible defaults, and you can change advanced booking rules later.
-                    </p>
-                </div>
-
-                <form
-                    method="POST"
-                    action="{{ route('crm.scheduling.configuration.services.store') }}"
-                    class="grid gap-4 md:grid-cols-2"
-                    data-configuration-service-create
-                    x-data="{
-                        appointmentFormat: @js(old('appointment_format', '')),
-                        inPersonArrangement: @js(old('in_person_arrangement', '')),
-                        remoteMethod: @js(old('remote_method', '')),
-                        formatComplete() {
-                            return (this.appointmentFormat === 'in_person' && ['business_location', 'customer_address'].includes(this.inPersonArrangement))
-                                || (this.appointmentFormat === 'remote' && ['phone', 'virtual_meeting'].includes(this.remoteMethod));
-                        }
-                    }"
-                >
-                    @csrf
-
-                    <label class="{{ $labelClass }}">
-                        What can people schedule?
-                        <input class="{{ $inputClass }}" name="name" value="{{ old('name') }}" placeholder="30-minute consultation" required>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Appointment length (minutes)
-                        <input class="{{ $inputClass }}" type="number" min="1" max="1440" name="duration_minutes" value="{{ old('duration_minutes', 60) }}" required>
-                    </label>
-
-                    <label class="{{ $labelClass }} md:col-span-2">
-                        Description <span class="font-normal text-slate-400">(optional)</span>
-                        <textarea class="{{ $inputClass }}" name="description" rows="2" placeholder="What should a customer or staff member know about this appointment?">{{ old('description') }}</textarea>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Appointment format
-                        <select class="{{ $inputClass }}" name="appointment_format" x-model="appointmentFormat">
-                            <option value="">Decide later</option>
-                            <option value="in_person">In person</option>
-                            <option value="remote">Remote</option>
-                        </select>
-                        <span class="mt-1 block text-xs font-normal text-slate-500">
-                            Start with the big question: will the person meet you somewhere, or connect remotely?
-                        </span>
-                    </label>
-
-                    <label class="{{ $labelClass }}" x-show="appointmentFormat === 'in_person'" x-cloak>
-                        Where will you meet?
-                        <select class="{{ $inputClass }}" name="in_person_arrangement" x-model="inPersonArrangement" x-bind:disabled="appointmentFormat !== 'in_person'">
-                            <option value="">Choose one</option>
-                            <option value="business_location">At a business location</option>
-                            <option value="customer_address">At an address the customer provides</option>
-                        </select>
-                    </label>
-
-                    <label class="{{ $labelClass }}" x-show="appointmentFormat === 'remote'" x-cloak>
-                        How will the appointment happen?
-                        <select class="{{ $inputClass }}" name="remote_method" x-model="remoteMethod" x-bind:disabled="appointmentFormat !== 'remote'">
-                            <option value="">Choose one</option>
-                            <option value="phone">Phone call</option>
-                            <option value="virtual_meeting">Virtual meeting</option>
-                        </select>
-                    </label>
-
-                    <div class="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 md:col-span-2" x-show="appointmentFormat === 'remote' && remoteMethod === 'phone'" x-cloak>
-                        At the scheduled time, {{ config('client.name', 'the team') }} will call the phone number the customer provides.
-                    </div>
-
-                    <div class="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 md:col-span-2" x-show="appointmentFormat === 'in_person' && inPersonArrangement === 'customer_address'" x-cloak>
-                        The customer will enter the appointment address before available times are calculated.
-                    </div>
-
-                    <label class="{{ $labelClass }}" x-show="formatComplete()" x-cloak>
-                        Display name <span class="font-normal text-slate-400">(optional)</span>
-                        <input class="{{ $inputClass }}" name="location_label" value="{{ old('location_label') }}" placeholder="Main office" x-bind:disabled="!formatComplete()">
-                    </label>
-
-                    <label class="{{ $labelClass }} md:col-span-2" x-show="appointmentFormat === 'remote' && remoteMethod === 'virtual_meeting'" x-cloak>
-                        Meeting link <span class="font-normal text-slate-400">(optional)</span>
-                        <input class="{{ $inputClass }}" type="url" name="location_url" value="{{ old('location_url') }}" placeholder="https://…" x-bind:disabled="appointmentFormat !== 'remote' || remoteMethod !== 'virtual_meeting'">
-                    </label>
-
-                    <div class="grid gap-4 md:col-span-2 md:grid-cols-2" x-show="appointmentFormat === 'in_person' && inPersonArrangement === 'business_location'" x-cloak>
-                        <label class="{{ $labelClass }} md:col-span-2">
-                            Street address
-                            <input class="{{ $inputClass }}" name="location_address_line_1" value="{{ old('location_address_line_1') }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
-                        </label>
-                        <label class="{{ $labelClass }} md:col-span-2">
-                            Address line 2 <span class="font-normal text-slate-400">(optional)</span>
-                            <input class="{{ $inputClass }}" name="location_address_line_2" value="{{ old('location_address_line_2') }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
-                        </label>
-                        <label class="{{ $labelClass }}">
-                            City
-                            <input class="{{ $inputClass }}" name="location_city" value="{{ old('location_city') }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
-                        </label>
-                        <label class="{{ $labelClass }}">
-                            State / region
-                            <input class="{{ $inputClass }}" name="location_region" value="{{ old('location_region') }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
-                        </label>
-                        <label class="{{ $labelClass }}">
-                            Postal code
-                            <input class="{{ $inputClass }}" name="location_postal_code" value="{{ old('location_postal_code') }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
-                        </label>
-                        <label class="{{ $labelClass }}">
-                            Country code
-                            <input class="{{ $inputClass }}" name="location_country" value="{{ old('location_country', 'US') }}" maxlength="2" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
-                            <span class="mt-1 block text-xs font-normal text-slate-500">Use the two-letter country code, such as US or CA.</span>
-                        </label>
-                    </div>
-
-                    <label class="{{ $labelClass }} md:col-span-2" x-show="formatComplete()" x-cloak>
-                        What should the person know before the appointment? <span class="font-normal text-slate-400">(optional)</span>
-                        <textarea class="{{ $inputClass }}" name="location_instructions" rows="2" x-bind:disabled="!formatComplete()">{{ old('location_instructions') }}</textarea>
-                    </label>
-
-                    <div class="space-y-3 md:col-span-2">
-                        <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-3 text-sm text-slate-700">
-                            <input type="hidden" name="is_public" value="0">
-                            <input class="mt-0.5" type="checkbox" name="is_public" value="1" @checked(old('is_public')) x-bind:disabled="!formatComplete()">
-                            <span>
-                                <span class="block font-semibold text-slate-900">Let customers book this themselves</span>
-                                <span class="mt-0.5 block text-slate-500">Choose a complete appointment format first. Then this service can appear on the public booking page when public Scheduling is enabled.</span>
-                            </span>
-                        </label>
-
-                        <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-3 text-sm text-slate-700">
-                            <input type="hidden" name="requires_confirmation" value="0">
-                            <input class="mt-0.5" type="checkbox" name="requires_confirmation" value="1" @checked(old('requires_confirmation'))>
-                            <span>
-                                <span class="block font-semibold text-slate-900">Require staff confirmation</span>
-                                <span class="mt-0.5 block text-slate-500">New appointments start as awaiting confirmation instead of being immediately scheduled.</span>
-                            </span>
-                        </label>
-                    </div>
-
-                    <div class="md:col-span-2">
-                        <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
-                            Add service
-                        </button>
-                        <p class="mt-2 text-xs text-slate-500">
-                            Need a multi-day stay, variable-length booking, extra time between appointments, multiple appointments at once, or another uncommon rule? Add the service first, then open Advanced service settings.
-                        </p>
-                    </div>
-                </form>
-            </x-ui.card>
-
-            <div class="space-y-4">
-                @forelse ($services as $service)
-                    @php
-                        $serviceEditable = (bool) $service->getAttribute('crm_editable');
-                        $assignmentByHost = $service->hostAssignments->keyBy('scheduling_host_id');
-                        $locationDetails = is_array($service->location_details) ? $service->location_details : [];
-                        $locationAddress = is_array($locationDetails['address'] ?? null) ? $locationDetails['address'] : [];
-                        $appointmentConfiguration = $service->resolvedAppointmentConfiguration();
-                    @endphp
-
-                    <div
-                        data-bookable-service-id="{{ $service->id }}"
-                        data-crm-editable="{{ $serviceEditable ? '1' : '0' }}"
-                    >
-                        <x-ui.card class="space-y-5">
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <h3 class="font-semibold text-slate-900">{{ $service->name }}</h3>
-                            </div>
-                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                {{ str($service->status)->replace('_', ' ')->title() }}
-                            </span>
-                        </div>
-
-                        <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                            <div>
-                                <dt class="text-slate-500">Assigned people</dt>
-                                <dd class="font-medium text-slate-900" data-active-host-count="{{ $service->active_host_assignments_count }}">
-                                    {{ $service->active_host_assignments_count }}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt class="text-slate-500">Assignments</dt>
-                                <dd class="font-medium text-slate-900">{{ $service->host_assignments_count }}</dd>
-                            </div>
-                            <div>
-                                <dt class="text-slate-500">Appointments</dt>
-                                <dd class="font-medium text-slate-900" data-appointment-count="{{ $service->appointments_count }}">
-                                    {{ $service->appointments_count }}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt class="text-slate-500">Appointment format</dt>
-                                <dd class="font-medium text-slate-900">{{ $service->appointmentFormatLabel() ?? 'Not configured' }}</dd>
-                            </div>
-                        </dl>
-
-                        @if ($serviceEditable)
-                            <details>
-                                <summary class="cursor-pointer text-sm font-semibold text-teal-700">
-                                    Advanced service settings
-                                </summary>
-
-                                <form
-                                    method="POST"
-                                    action="{{ route('crm.scheduling.configuration.services.update', $service) }}"
-                                    class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
-                                    data-configuration-service-update="{{ $service->id }}"
-                                    x-data="{
-                                        appointmentFormat: @js($appointmentConfiguration['appointment_format'] ?? ''),
-                                        inPersonArrangement: @js($appointmentConfiguration['in_person_arrangement'] ?? ''),
-                                        remoteMethod: @js($appointmentConfiguration['remote_method'] ?? ''),
-                                        durationMode: @js($service->duration_mode ?? 'fixed'),
-                                        formatComplete() {
-                                            return (this.appointmentFormat === 'in_person' && ['business_location', 'customer_address'].includes(this.inPersonArrangement))
-                                                || (this.appointmentFormat === 'remote' && ['phone', 'virtual_meeting'].includes(this.remoteMethod));
-                                        }
-                                    }"
-                                >
-                                    @csrf
-                                    @method('PATCH')
-                                    <input type="hidden" name="current_version" value="{{ $service->updated_at?->toISOString() }}">
-
-                                    <label class="{{ $labelClass }}">
-                                        Name
-                                        <input class="{{ $inputClass }}" name="name" value="{{ $service->name }}" required>
-                                    </label>
-
-                                    <label class="{{ $labelClass }}">
-                                        Status
-                                        <select class="{{ $inputClass }}" name="status" required>
-                                            @foreach ($serviceStatuses as $status)
-                                                <option value="{{ $status }}" @selected($service->status === $status)>
-                                                    {{ str($status)->replace('_', ' ')->title() }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                    </label>
-
-                                    <label class="{{ $labelClass }} md:col-span-2">
-                                        Description
-                                        <textarea class="{{ $inputClass }}" name="description" rows="2">{{ $service->description }}</textarea>
-                                    </label>
-
-                                    <label class="{{ $labelClass }}">
-                                        Timezone
-                                        <input class="{{ $inputClass }}" name="timezone" list="scheduling-timezones" value="{{ $service->timezone }}" required>
-                                    </label>
-
-                                    <label class="{{ $labelClass }}">
-                                        Booking length
-                                        <select class="{{ $inputClass }}" name="duration_mode" x-model="durationMode" required>
-                                            <option value="fixed">One fixed length</option>
-                                            <option value="range">Flexible length / multi-day stay</option>
-                                        </select>
-                                    </label>
-
-                                    <label class="{{ $labelClass }}">
-                                        <span x-text="durationMode === 'range' ? 'Default booking length (minutes)' : 'Appointment length (minutes)'"></span>
-                                        <input class="{{ $inputClass }}" type="number" min="1" x-bind:max="durationMode === 'range' ? {{ \App\Modules\Scheduling\Models\BookableService::MAX_RANGE_DURATION_MINUTES }} : 1440" name="duration_minutes" value="{{ $service->duration_minutes }}" required>
-                                    </label>
-
-                                    <label class="{{ $labelClass }}" x-show="durationMode === 'range'" x-cloak>
-                                        Shortest allowed booking (minutes)
-                                        <input class="{{ $inputClass }}" type="number" min="1" max="{{ \App\Modules\Scheduling\Models\BookableService::MAX_RANGE_DURATION_MINUTES }}" name="minimum_duration_minutes" value="{{ $service->minimum_duration_minutes ?? $service->duration_minutes }}" x-bind:disabled="durationMode !== 'range'" x-bind:required="durationMode === 'range'">
-                                    </label>
-
-                                    <label class="{{ $labelClass }}" x-show="durationMode === 'range'" x-cloak>
-                                        Longest allowed booking (minutes)
-                                        <input class="{{ $inputClass }}" type="number" min="1" max="{{ \App\Modules\Scheduling\Models\BookableService::MAX_RANGE_DURATION_MINUTES }}" name="maximum_duration_minutes" value="{{ $service->maximum_duration_minutes ?? $service->duration_minutes }}" x-bind:disabled="durationMode !== 'range'" x-bind:required="durationMode === 'range'">
-                                    </label>
-
-                                    <label class="{{ $labelClass }}">
-                                        How often should start times be offered? (minutes)
-                                        <input class="{{ $inputClass }}" type="number" min="1" max="1440" name="slot_interval_minutes" value="{{ $service->slot_interval_minutes }}" required>
-                                        <span class="mt-1 block text-xs font-normal text-slate-500">
-                                            For example, 15 offers starts at 9:00, 9:15, 9:30, and so on when those times are available.
-                                        </span>
-                                    </label>
-
-                                    <label class="{{ $labelClass }}">
-                                        How many of these appointments can happen at the same time?
-                                        <input class="{{ $inputClass }}" type="number" min="1" max="100000" name="capacity" value="{{ $service->capacity }}" required>
-                                        <span class="mt-1 block text-xs font-normal text-slate-500">
-                                            Use 1 unless this service is designed to allow more than one appointment at the same time. Other staff and availability limits still apply.
-                                        </span>
-                                    </label>
-
-                                    <label class="{{ $labelClass }}">
-                                        Extra time kept free before each appointment (minutes)
-                                        <input class="{{ $inputClass }}" type="number" min="0" name="buffer_before_minutes" value="{{ $service->buffer_before_minutes }}" required>
-                                    </label>
-
-                                    <label class="{{ $labelClass }}">
-                                        Extra time kept free after each appointment (minutes)
-                                        <input class="{{ $inputClass }}" type="number" min="0" name="buffer_after_minutes" value="{{ $service->buffer_after_minutes }}" required>
-                                    </label>
-
-                                    <label class="{{ $labelClass }}">
-                                        Minimum advance notice before booking (minutes)
-                                        <input class="{{ $inputClass }}" type="number" min="0" name="minimum_notice_minutes" value="{{ $service->minimum_notice_minutes }}" required>
-                                    </label>
-
-                                    <label class="{{ $labelClass }}">
-                                        How far ahead can people book? (days)
-                                        <input class="{{ $inputClass }}" type="number" min="0" name="booking_horizon_days" value="{{ $service->booking_horizon_days }}" required>
-                                    </label>
-
-                                    <label class="{{ $labelClass }}">
-                                        Required notice to cancel (minutes)
-                                        <input class="{{ $inputClass }}" type="number" min="0" name="cancellation_notice_minutes" value="{{ $service->cancellation_notice_minutes }}" required>
-                                    </label>
-
-                                    <label class="{{ $labelClass }}">
-                                        Required notice to reschedule (minutes)
-                                        <input class="{{ $inputClass }}" type="number" min="0" name="reschedule_notice_minutes" value="{{ $service->reschedule_notice_minutes }}" required>
-                                    </label>
-
-                                    <input type="hidden" name="sort_order" value="{{ $service->sort_order }}">
-
-                                    <label class="{{ $labelClass }}">
-                                        Appointment format
-                                        <select class="{{ $inputClass }}" name="appointment_format" x-model="appointmentFormat">
-                                            <option value="">Not configured</option>
-                                            <option value="in_person">In person</option>
-                                            <option value="remote">Remote</option>
-                                        </select>
-                                    </label>
-
-                                    <label class="{{ $labelClass }}" x-show="appointmentFormat === 'in_person'" x-cloak>
-                                        Where will you meet?
-                                        <select class="{{ $inputClass }}" name="in_person_arrangement" x-model="inPersonArrangement" x-bind:disabled="appointmentFormat !== 'in_person'">
-                                            <option value="">Choose one</option>
-                                            <option value="business_location">At a business location</option>
-                                            <option value="customer_address">At an address the customer provides</option>
-                                        </select>
-                                    </label>
-
-                                    <label class="{{ $labelClass }}" x-show="appointmentFormat === 'remote'" x-cloak>
-                                        How will the appointment happen?
-                                        <select class="{{ $inputClass }}" name="remote_method" x-model="remoteMethod" x-bind:disabled="appointmentFormat !== 'remote'">
-                                            <option value="">Choose one</option>
-                                            <option value="phone">Phone call</option>
-                                            <option value="virtual_meeting">Virtual meeting</option>
-                                        </select>
-                                    </label>
-
-                                    <label class="{{ $labelClass }}" x-show="formatComplete()" x-cloak>
-                                        Display name <span class="font-normal text-slate-400">(optional)</span>
-                                        <input class="{{ $inputClass }}" name="location_label" value="{{ $locationDetails['label'] ?? '' }}" x-bind:disabled="!formatComplete()">
-                                    </label>
-
-                                    <div class="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 md:col-span-2 xl:col-span-4" x-show="appointmentFormat === 'remote' && remoteMethod === 'phone'" x-cloak>
-                                        At the scheduled time, {{ config('client.name', 'the team') }} will call the phone number the customer provides.
-                                    </div>
-
-                                    <div class="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 md:col-span-2 xl:col-span-4" x-show="appointmentFormat === 'in_person' && inPersonArrangement === 'customer_address'" x-cloak>
-                                        The customer will provide the appointment address before available times are calculated.
-                                    </div>
-
-                                    <label class="{{ $labelClass }} md:col-span-2 xl:col-span-4" x-show="appointmentFormat === 'remote' && remoteMethod === 'virtual_meeting'" x-cloak>
-                                        Meeting link <span class="font-normal text-slate-400">(optional)</span>
-                                        <input class="{{ $inputClass }}" type="url" name="location_url" value="{{ $locationDetails['url'] ?? '' }}" x-bind:disabled="appointmentFormat !== 'remote' || remoteMethod !== 'virtual_meeting'">
-                                    </label>
-
-                                    <div class="grid gap-4 md:col-span-2 md:grid-cols-2 xl:col-span-4 xl:grid-cols-4" x-show="appointmentFormat === 'in_person' && inPersonArrangement === 'business_location'" x-cloak>
-                                        <label class="{{ $labelClass }} md:col-span-2">
-                                            Street address
-                                            <input class="{{ $inputClass }}" name="location_address_line_1" value="{{ $locationAddress['address_line_1'] ?? '' }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
-                                        </label>
-                                        <label class="{{ $labelClass }} md:col-span-2">
-                                            Address line 2 <span class="font-normal text-slate-400">(optional)</span>
-                                            <input class="{{ $inputClass }}" name="location_address_line_2" value="{{ $locationAddress['address_line_2'] ?? '' }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
-                                        </label>
-                                        <label class="{{ $labelClass }}">
-                                            City
-                                            <input class="{{ $inputClass }}" name="location_city" value="{{ $locationAddress['city'] ?? '' }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
-                                        </label>
-                                        <label class="{{ $labelClass }}">
-                                            State / region
-                                            <input class="{{ $inputClass }}" name="location_region" value="{{ $locationAddress['region'] ?? '' }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
-                                        </label>
-                                        <label class="{{ $labelClass }}">
-                                            Postal code
-                                            <input class="{{ $inputClass }}" name="location_postal_code" value="{{ $locationAddress['postal_code'] ?? '' }}" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
-                                        </label>
-                                        <label class="{{ $labelClass }}">
-                                            Country code
-                                            <input class="{{ $inputClass }}" name="location_country" value="{{ $locationAddress['country'] ?? 'US' }}" maxlength="2" x-bind:disabled="appointmentFormat !== 'in_person' || inPersonArrangement !== 'business_location'">
-                                        </label>
-                                    </div>
-
-                                    <label class="{{ $labelClass }} md:col-span-2 xl:col-span-4" x-show="formatComplete()" x-cloak>
-                                        What should the person know before the appointment? <span class="font-normal text-slate-400">(optional)</span>
-                                        <textarea class="{{ $inputClass }}" name="location_instructions" rows="2" x-bind:disabled="!formatComplete()">{{ $locationDetails['instructions'] ?? '' }}</textarea>
-                                    </label>
-
-                                    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-5 md:col-span-2 xl:col-span-4">
-                                        <label class="inline-flex items-start gap-2 text-sm font-medium text-slate-700">
-                                            <input type="hidden" name="requires_confirmation" value="0">
-                                            <input type="checkbox" name="requires_confirmation" value="1" @checked($service->requires_confirmation)>
-                                            Requires confirmation
-                                        </label>
-
-                                        <label class="inline-flex items-start gap-2 text-sm font-medium text-slate-700">
-                                            <input type="hidden" name="is_public" value="0">
-                                            <input type="checkbox" name="is_public" value="1" @checked($service->is_public) x-bind:disabled="!formatComplete()">
-                                            Publicly bookable
-                                        </label>
-                                    </div>
-
-                                    <div class="md:col-span-2 xl:col-span-4">
-                                        <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto">
-                                            Save service
-                                        </button>
-                                    </div>
-                                </form>
-                            </details>
-
-                            <details>
-                                <summary class="cursor-pointer text-sm font-semibold text-teal-700">
-                                    Choose who can handle this
-                                </summary>
-
-                                <form
-                                    method="POST"
-                                    action="{{ route('crm.scheduling.configuration.services.hosts.update', $service) }}"
-                                    class="mt-4 space-y-3"
-                                    data-service-assignment-form="{{ $service->id }}"
-                                >
-                                    @csrf
-                                    @method('PUT')
-                                    <input type="hidden" name="current_version" value="{{ $service->updated_at?->toISOString() }}">
-
-                                    @forelse ($hosts as $host)
-                                        @php
-                                            $assignment = $assignmentByHost->get($host->id);
-                                            $assignmentActive = (bool) $assignment?->is_active;
-                                        @endphp
-
-                                        <div
-                                            class="grid gap-3 rounded-xl border border-slate-200 p-3 sm:grid-cols-[minmax(0,1fr)_140px_120px] sm:items-end"
-                                            data-assignment-host-id="{{ $host->id }}"
-                                        >
-                                            <div>
-                                                <input type="hidden" name="assignments[{{ $loop->index }}][scheduling_host_id]" value="{{ $host->id }}">
-                                                <input type="hidden" name="assignments[{{ $loop->index }}][is_active]" value="0">
-                                                <label class="inline-flex items-start gap-2 text-sm font-medium text-slate-900">
-                                                    <input
-                                                        type="checkbox"
-                                                        name="assignments[{{ $loop->index }}][is_active]"
-                                                        value="1"
-                                                        @checked($assignmentActive)
-                                                        @disabled($host->status !== \App\Modules\Scheduling\Models\SchedulingHost::STATUS_ACTIVE && ! $assignmentActive)
-                                                    >
-                                                    {{ $host->name }}
-                                                </label>
-                                                <p class="mt-1 text-xs text-slate-500">
-                                                    {{ str($host->status)->replace("_", " ")->title() }} · {{ $host->timezone }}
-                                                </p>
-                                            </div>
-
-                                            <label class="{{ $labelClass }}">
-                                                Maximum simultaneous appointments for this pairing <span class="font-normal text-slate-400">(optional)</span>
-                                                <input
-                                                    class="{{ $inputClass }}"
-                                                    type="number"
-                                                    min="1"
-                                                    max="100000"
-                                                    name="assignments[{{ $loop->index }}][capacity_override]"
-                                                    value="{{ $assignment?->capacity_override }}"
-                                                >
-                                                <span class="mt-1 block text-xs font-normal text-slate-500">
-                                                    Leave blank to use the normal service and staff limits.
-                                                </span>
-                                            </label>
-
-                                            <input
-                                                type="hidden"
-                                                name="assignments[{{ $loop->index }}][sort_order]"
-                                                value="{{ $assignment?->sort_order ?? $host->sort_order }}"
-                                            >
-                                        </div>
-                                    @empty
-                                        <div data-configuration-empty="assignment-hosts" class="rounded-xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">
-                                            Add a staff member or provider before assigning this service.
-                                        </div>
-                                    @endforelse
-
-                                    <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto">
-                                        Save assignments
-                                    </button>
-                                </form>
-                            </details>
-                        @else
-                            <div class="{{ $readOnlyClass }}" data-configuration-read-only="service">
-                                <p class="text-sm text-slate-600">
-                                    This service has provider or system ownership and is read-only here.
-                                </p>
-                            </div>
-                        @endif
-                        </x-ui.card>
-                    </div>
-                @empty
-                    <x-ui.card>
-                        <div data-configuration-empty="services" class="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
-                            No services are configured.
-                        </div>
-                    </x-ui.card>
-                @endforelse
-            </div>
-        </section>
-
-        <section class="space-y-5" id="people" data-configuration-section="hosts">
-            <div>
-                <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                    People
-                </div>
-                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
-                    Who can handle appointments?
-                </h2>
-            </div>
-
-            <x-ui.card class="space-y-5">
-                <div>
-                    <h3 class="text-lg font-semibold text-slate-900">Add staff or a provider</h3>
-                    <p class="mt-1 text-sm text-slate-500">
-                        This step is optional. Add someone here when appointments need to be assigned to a specific person or provider.
-                    </p>
-                </div>
-
-                <form
-                    method="POST"
-                    action="{{ route('crm.scheduling.configuration.hosts.store') }}"
-                    class="grid gap-4 md:grid-cols-3"
-                    data-configuration-host-create
-                >
-                    @csrf
-
-                    <label class="{{ $labelClass }}">
-                        Name
-                        <input class="{{ $inputClass }}" name="name" value="{{ old('name') }}" placeholder="Taylor Smith" required>
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Email <span class="font-normal text-slate-400">(optional)</span>
-                        <input class="{{ $inputClass }}" type="email" name="email" value="{{ old('email') }}">
-                    </label>
-
-                    <label class="{{ $labelClass }}">
-                        Phone <span class="font-normal text-slate-400">(optional)</span>
-                        <input class="{{ $inputClass }}" name="phone" value="{{ old('phone') }}">
-                    </label>
-
-                    <div class="md:col-span-3">
-                        <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
-                            Add staff or provider
-                        </button>
-                    </div>
-                </form>
-            </x-ui.card>
-
-            <div class="grid gap-4 xl:grid-cols-2">
-                @forelse ($hosts as $host)
-                    @php
-                        $hostEditable = (bool) $host->getAttribute('crm_editable');
-                    @endphp
-
-                    <div
-                        data-scheduling-host-id="{{ $host->id }}"
-                        data-crm-editable="{{ $hostEditable ? '1' : '0' }}"
-                    >
-                        <x-ui.card class="space-y-4">
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <h3 class="font-semibold text-slate-900">{{ $host->name }}</h3>
-                            </div>
-                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                {{ str($host->status)->replace('_', ' ')->title() }}
-                            </span>
-                        </div>
-
-                        <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
-                            <div>
-                                <dt class="text-slate-500">Services</dt>
-                                <dd class="font-medium text-slate-900" data-active-assignment-count="{{ $host->active_service_assignments_count }}">
-                                    {{ $host->active_service_assignments_count }}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt class="text-slate-500">Appointments</dt>
-                                <dd class="font-medium text-slate-900" data-appointment-count="{{ $host->appointments_count }}">
-                                    {{ $host->appointments_count }}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt class="text-slate-500">Availability rules</dt>
-                                <dd class="font-medium text-slate-900">{{ $host->availability_windows_count }}</dd>
-                            </div>
-                        </dl>
-
-                        @if ($hostEditable)
-                            <details>
-                                <summary class="cursor-pointer text-sm font-semibold text-teal-700">
-                                    Advanced staff / provider settings
-                                </summary>
-
-                                <form
-                                    method="POST"
-                                    action="{{ route('crm.scheduling.configuration.hosts.update', $host) }}"
-                                    class="mt-4 grid gap-4 sm:grid-cols-2"
-                                    data-configuration-host-update="{{ $host->id }}"
-                                >
-                                @csrf
-                                @method('PATCH')
-                                <input type="hidden" name="current_version" value="{{ $host->updated_at?->toISOString() }}">
-
-                                <label class="{{ $labelClass }}">
-                                    Name
-                                    <input class="{{ $inputClass }}" name="name" value="{{ $host->name }}" required>
-                                </label>
-
-                                <label class="{{ $labelClass }}">
-                                    Status
-                                    <select class="{{ $inputClass }}" name="status" required>
-                                        @foreach ($hostStatuses as $status)
-                                            <option value="{{ $status }}" @selected($host->status === $status)>
-                                                {{ str($status)->replace('_', ' ')->title() }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </label>
-
-                                <label class="{{ $labelClass }}">
-                                    Timezone
-                                    <input class="{{ $inputClass }}" name="timezone" list="scheduling-timezones" value="{{ $host->timezone }}" required>
-                                </label>
-
-                                <label class="{{ $labelClass }}">
-                                    How many appointments can this person handle at the same time?
-                                    <input class="{{ $inputClass }}" type="number" min="1" max="100000" name="capacity" value="{{ $host->capacity }}" required>
-                                    <span class="mt-1 block text-xs font-normal text-slate-500">
-                                        Use 1 for the normal case. Increase it only when this person can genuinely handle multiple appointments at once.
-                                    </span>
-                                </label>
-
-                                <label class="{{ $labelClass }}">
-                                    Email
-                                    <input class="{{ $inputClass }}" type="email" name="email" value="{{ $host->email }}">
-                                </label>
-
-                                <label class="{{ $labelClass }}">
-                                    Phone
-                                    <input class="{{ $inputClass }}" name="phone" value="{{ $host->phone }}">
-                                </label>
-
-                                <input type="hidden" name="sort_order" value="{{ $host->sort_order }}">
-
-                                <div class="self-end">
-                                    <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto">
-                                        Save changes
-                                    </button>
-                                </div>
-                            </form>
-                            </details>
-                        @else
-                            <div class="{{ $readOnlyClass }}" data-configuration-read-only="host">
-                                <p class="text-sm text-slate-600">
-                                    This person is managed automatically and cannot be edited here.
-                                </p>
-                            </div>
-                        @endif
-                        </x-ui.card>
-                    </div>
-                @empty
-                    <x-ui.card>
-                        <div data-configuration-empty="hosts" class="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
-                            No staff or providers have been added. That is fine when appointments do not need a specific assignee.
-                        </div>
-                    </x-ui.card>
-                @endforelse
-            </div>
-        </section>
-
-
-        <section id="availability" class="space-y-4">
-            <div>
-                <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                    Hours & availability
-                </div>
-                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
-                    When can appointments happen?
-                </h2>
-            </div>
-
-            <x-ui.card>
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between" data-scheduling-availability-configuration-link>
-                    <div>
-                        <p class="font-semibold text-slate-900">Set normal hours and exceptions</p>
-                        <p class="mt-1 text-sm text-slate-500">
-                            Tell Scheduling when appointments are normally available and when they should be blocked for exceptions.
-                        </p>
-                    </div>
-
-                    <a
-                        href="{{ route('crm.scheduling.configuration.availability.index') }}"
-                        class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
-                    >
-                        Set availability
-                    </a>
-                </div>
-            </x-ui.card>
-        </section>
-
-        <details class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-scheduling-resource-configuration-link>
-            <summary class="cursor-pointer text-sm font-semibold text-slate-800">
-                Advanced: rooms, equipment, and shared capacity
-            </summary>
-            <div class="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <p class="text-sm text-slate-500">
-                    Use Resources only when a booking depends on limited rooms, equipment, or another shared item. Most businesses do not need this for basic Scheduling setup.
-                </p>
                 <a
                     href="{{ route('crm.scheduling.configuration.resources.index') }}"
-                    class="inline-flex w-full justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto"
+                    class="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow"
+                    data-scheduling-setup-area="resources"
+                    data-scheduling-resource-configuration-link
                 >
-                    Manage advanced resources
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <div class="text-sm font-semibold text-slate-600">Advanced</div>
+                            <h3 class="mt-1 text-lg font-semibold text-slate-900">Rooms, equipment & shared capacity</h3>
+                            <p class="mt-2 text-sm text-slate-500">
+                                Configure limited shared resources only when a booking depends on them.
+                            </p>
+                        </div>
+                        <span class="text-slate-400">→</span>
+                    </div>
                 </a>
             </div>
-        </details>
+        </section>
     </div>
 </x-layouts.crm>

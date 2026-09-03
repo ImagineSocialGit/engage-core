@@ -185,6 +185,30 @@ class SchedulingReadService
         });
     }
 
+    public function configurationService(
+        BookableService $service,
+    ): BookableService {
+        $service->load([
+            'hostAssignments' => fn ($query) => $query
+                ->with('schedulingHost')
+                ->orderBy('sort_order')
+                ->orderBy('id'),
+        ])->loadCount([
+            'appointments',
+            'availabilityWindows',
+            'hostAssignments',
+            'hostAssignments as active_host_assignments_count' =>
+                fn ($query) => $query->where('is_active', true),
+        ]);
+
+        $service->setAttribute(
+            'crm_editable',
+            $this->configurationWriter->serviceIsEditable($service),
+        );
+
+        return $service;
+    }
+
     /**
      * @return Collection<int, SchedulingResource>
      */
