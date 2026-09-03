@@ -1473,3 +1473,32 @@ It does not implement waits, branching, campaigns, outbound message automation, 
 If Flow Routes becomes enabled while simple fallback metadata still exists, the simple listener does not execute it. Flow Routes becomes the active orchestration owner.
 
 The public Scheduling booking-page visual redesign remains a separate UX task. It must not be coupled to this automation/fallback architecture.
+
+## Public booking presentation contract
+
+The universal public Scheduling surface uses the shared module-neutral public-surface layout and primitives under `resources/views/components/public-surface` and `resources/views/components/layouts/public-surface.blade.php`. Scheduling owns the booking journey and its presentation data; shared components own only reusable page-shell/card/button treatment. Scheduling must not import Webinar configuration or Webinar-owned components to obtain the shared visual language.
+
+Fixed-duration availability is presented as a progressive time chooser. The controller provides already-grouped `availableTimePeriods` in morning/afternoon/evening order. The browser may switch the visible period and visually expand the selected start label to the full appointment interval, but the submitted booking fact remains only the selected `starts_at`. The server continues to recalculate availability and issue the short-lived offer; client-side period selection and interval display grant no booking authority.
+
+The fixed-duration selector keeps these stable presentation hooks:
+
+- `data-time-selector`
+- `data-day-period-tab`
+- `data-day-period-panel`
+- `data-time-option-input`
+- `data-time-option`
+- `data-time-continue`
+
+Time-period tabs are present only for periods with available times. With JavaScript enabled, the first available period (or the period containing restored old input) is selected and other period panels are hidden. With JavaScript unavailable, the radio inputs and single submit action remain normal form controls so the server-side booking contract still works.
+
+Public location presentation separates three concepts:
+
+1. meeting method / physical location name;
+2. the normalized physical address, rendered as compact address lines when structured address facts exist;
+3. preparation instructions under a separate `Before your appointment` block.
+
+For US physical addresses, the normal public presentation is a street line followed by a city/region/postal line. Optional address line 2 is joined to the street line. Non-US country codes may be appended to the locality line. Customer-site and fixed-location commitments use the same normalized address-line presenter. Arbitrary customer-site labels remain hidden; a fixed business location may expose its configured public location name.
+
+Offer and hold summaries carry `location_presentation` derived from the committed Scheduling location snapshot, so review/confirmation pages do not reread mutable service authoring to decide what address or instructions to show.
+
+The public booking page revision fallback is `scheduling-public-v4`. Existing reporting event keys and funnel semantics are unchanged.

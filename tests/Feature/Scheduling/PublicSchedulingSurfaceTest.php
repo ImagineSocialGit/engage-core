@@ -162,11 +162,17 @@ class PublicSchedulingSurfaceTest extends TestCase
             ->assertOk()
             ->assertSee('Strategy Session')
             ->assertSee('America/Chicago')
-            ->assertSee('9:00 AM–10:00 AM')
-            ->assertSee('10:00 AM–11:00 AM')
-            ->assertSee('11:00 AM–12:00 PM')
-            ->assertSee('data-day-period="morning"', false)
-            ->assertSee('<summary>9:00 AM</summary>', false)
+            ->assertSee('data-public-surface', false)
+            ->assertSee('data-scheduling-public-booking', false)
+            ->assertSee('data-time-selector', false)
+            ->assertSee('data-day-period-tab="morning"', false)
+            ->assertSee('data-day-period-panel="morning"', false)
+            ->assertSee('data-time-option-input', false)
+            ->assertSee('data-time-option', false)
+            ->assertSee('data-start-label="9:00 AM"', false)
+            ->assertSee('data-full-label="9:00–10:00 AM"', false)
+            ->assertSee('data-time-continue', false)
+            ->assertDontSee('<details class="time-option"', false)
             ->assertDontSee('Private Host Identity')
             ->assertDontSee('scheduling_host_id')
             ->assertDontSee('remaining_capacity')
@@ -213,11 +219,11 @@ class PublicSchedulingSurfaceTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSee('9:00 AM–10:00 AM', false);
+            ->assertSee('9:00–10:00 AM', false);
 
         $this->assertSame(
             1,
-            substr_count($response->getContent(), '9:00 AM–10:00 AM'),
+            substr_count($response->getContent(), '9:00–10:00 AM'),
         );
     }
 
@@ -240,7 +246,8 @@ class PublicSchedulingSurfaceTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('Example Client')
-            ->assertSee('--booking-primary: #123456', false)
+            ->assertSee('--public-primary: #123456', false)
+            ->assertSee('data-public-surface', false)
             ->assertSee('data-report-service-selected', false)
             ->assertDontSee('Step 1');
 
@@ -249,6 +256,45 @@ class PublicSchedulingSurfaceTest extends TestCase
             ->assertSee('id="scheduling-public-booking-config"', false)
             ->assertDontSee('opaque offer')
             ->assertDontSee('authoritative availability');
+    }
+
+    public function test_fixed_location_availability_separates_address_and_preparation_details(): void
+    {
+        CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
+        $this->registerPublicSurface('https://schedule.test');
+
+        BookableService::factory()->create([
+            'key' => 'office-consultation',
+            'name' => 'Office Consultation',
+            'timezone' => 'UTC',
+            'location_type' => BookableService::LOCATION_TYPE_FIXED,
+            'location_details' => [
+                'label' => 'Main Office',
+                'instructions' => 'Bring the documents requested by the team.',
+                'address' => [
+                    'address_line_1' => '123 Main Street',
+                    'address_line_2' => null,
+                    'city' => 'Nashville',
+                    'region' => 'TN',
+                    'postal_code' => '37201',
+                    'country' => 'US',
+                    'formatted_address' => '123 Main Street, Nashville, TN 37201, US',
+                ],
+            ],
+            'is_public' => true,
+        ]);
+
+        $response = $this->get('https://schedule.test/services/office-consultation');
+
+        $response
+            ->assertOk()
+            ->assertSee('data-booking-location', false)
+            ->assertSee('data-booking-location-address', false)
+            ->assertSee('data-booking-preparation', false)
+            ->assertSeeInOrder([
+                '123 Main Street',
+                'Nashville, TN 37201',
+            ]);
     }
 
     public function test_private_unknown_and_out_of_range_service_requests_are_rejected(): void

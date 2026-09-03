@@ -119,24 +119,148 @@ function enhanceVerificationChannel(page) {
     })
 }
 
-function enhanceTimeOptions(page) {
-    document.querySelectorAll('[data-time-option]').forEach((option) => {
-        option.addEventListener('toggle', () => {
-            if (!option.open) {
-                return
-            }
+function enhanceTimeSelector(page) {
+    document.querySelectorAll('[data-time-selector]').forEach((selector) => {
+        const tabs = Array.from(selector.querySelectorAll('[data-day-period-tab]'))
+        const panels = Array.from(selector.querySelectorAll('[data-day-period-panel]'))
+        const inputs = Array.from(selector.querySelectorAll('[data-time-option-input]'))
+        const labels = Array.from(selector.querySelectorAll('[data-time-option]'))
+        const continueButton = selector.querySelector('[data-time-continue]')
 
-            document.querySelectorAll('[data-time-option][open]').forEach((other) => {
-                if (other !== option) {
-                    other.open = false
+        if (tabs.length === 0 || panels.length === 0 || inputs.length === 0) {
+            return
+        }
+
+        const labelForInput = (input) => labels.find(
+            (label) => label.dataset.startsAt === input.value,
+        ) ?? null
+
+        const selectPeriod = (period) => {
+            tabs.forEach((tab) => {
+                const selected = tab.dataset.dayPeriodTab === period
+                tab.setAttribute('aria-selected', selected ? 'true' : 'false')
+                tab.tabIndex = selected ? 0 : -1
+            })
+
+            panels.forEach((panel) => {
+                panel.hidden = panel.dataset.dayPeriodPanel !== period
+            })
+        }
+
+        const renderSelection = () => {
+            const selectedInput = inputs.find((input) => input.checked) ?? null
+
+            labels.forEach((label) => {
+                const selected = selectedInput !== null
+                    && label.dataset.startsAt === selectedInput.value
+                const text = label.querySelector('[data-time-option-label]')
+
+                label.dataset.selected = selected ? 'true' : 'false'
+
+                if (text) {
+                    text.textContent = selected
+                        ? label.dataset.fullLabel || label.dataset.startLabel || ''
+                        : label.dataset.startLabel || ''
                 }
             })
 
-            record(page, 'scheduling.booking.time_selected', {
-                day_period: option.dataset.dayPeriod || 'morning',
+            if (continueButton) {
+                continueButton.disabled = selectedInput === null
+            }
+
+            return selectedInput
+        }
+
+        tabs.forEach((tab, index) => {
+            const activate = () => {
+                const period = tab.dataset.dayPeriodTab
+                    || tabs[0].dataset.dayPeriodTab
+                    || 'morning'
+                const selectedInput = inputs.find((input) => input.checked) ?? null
+
+                if (selectedInput && selectedInput.dataset.dayPeriod !== period) {
+                    selectedInput.checked = false
+                    renderSelection()
+                }
+
+                selectPeriod(period)
+            }
+
+            tab.addEventListener('click', activate)
+            tab.addEventListener('keydown', (event) => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+                    return
+                }
+
+                event.preventDefault()
+
+                const nextIndex = event.key === 'Home'
+                    ? 0
+                    : event.key === 'End'
+                        ? tabs.length - 1
+                        : event.key === 'ArrowRight'
+                            ? (index + 1) % tabs.length
+                            : (index - 1 + tabs.length) % tabs.length
+                const nextTab = tabs[nextIndex]
+
+                nextTab.focus()
+                nextTab.click()
             })
         })
+
+        inputs.forEach((input) => {
+            input.addEventListener('change', () => {
+                if (!input.checked) {
+                    return
+                }
+
+                const label = labelForInput(input)
+                const period = input.dataset.dayPeriod || label?.dataset.dayPeriod || 'morning'
+
+                selectPeriod(period)
+                renderSelection()
+
+                record(page, 'scheduling.booking.time_selected', {
+                    day_period: period,
+                })
+            })
+        })
+
+        const selectedInput = renderSelection()
+        const initialPeriod = selectedInput?.dataset.dayPeriod
+            || tabs[0]?.dataset.dayPeriodTab
+            || 'morning'
+
+        selectPeriod(initialPeriod)
     })
+}
+
+function enhanceCountdown() {
+    const element = document.querySelector('[data-countdown]')
+
+    if (!element) {
+        return
+    }
+
+    const expiresAt = Date.parse(element.dataset.expiresAt || '')
+
+    if (!Number.isFinite(expiresAt)) {
+        return
+    }
+
+    const render = () => {
+        const remaining = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000))
+
+        if (remaining === 0) {
+            element.textContent = element.dataset.expiredMessage || 'This time has expired.'
+            return
+        }
+
+        element.textContent = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')} remaining.`
+        window.setTimeout(render, 1000)
+    }
+
+    render()
 }
 
 function enhanceReporting(page) {
@@ -203,6 +327,7 @@ export default function initializeSchedulingPublicBooking() {
 
     enhancePhoneInputs()
     enhanceVerificationChannel(page)
-    enhanceTimeOptions(page)
+    enhanceTimeSelector(page)
+    enhanceCountdown()
     enhanceReporting(page)
 }

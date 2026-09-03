@@ -1808,3 +1808,19 @@ customer_first_name
 when those names make the authoring experience clearer for the current client. The UI should resolve those aliases to one canonical internal Contact field such as `contact.first_name`.
 
 The product should optimize for the user's vocabulary without duplicating runtime concepts, token sources, schema, or validation logic.
+
+## Shared public surfaces
+
+Public-facing product surfaces should start from the module-neutral public UI seam rather than duplicating a complete HTML document or importing another feature module's public views.
+
+Current shared primitives:
+
+- `x-layouts.public-surface` for the public page shell and named header/footer regions;
+- `x-public-surface.card` for the substantial rounded public content container;
+- `x-public-surface.button` for primary, secondary, and quiet public actions.
+
+The shared public shell is intentionally thin. It may own reusable layout, responsive spacing, brand-color CSS variables, focus treatment, and generic surface structure. It must not read `webinars.*`, `scheduling.*`, or another module's business configuration. Module-specific wrappers may translate their own configuration into the generic props/slots.
+
+Do not repurpose the existing `x-ui.*` CRM/general components solely to make a new public surface resemble Webinars. Several of those components still carry historical Webinar style configuration and have broad CRM usage. Migrate them only through an explicit shared-UI cleanup, not opportunistically during a feature surface redesign.
+
+Public forms should preserve progressive enhancement whenever practical. Client-side interaction may improve selection and presentation, but a normal HTML form must continue to submit the same server-owned facts and server validation remains authoritative.

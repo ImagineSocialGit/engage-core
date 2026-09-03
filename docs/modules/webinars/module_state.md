@@ -1035,3 +1035,9 @@ Post-event replay delivery has two independent safety layers. Clients may enable
 Replay-dependent scheduled messages are also revalidated at actual Messaging dispatch. Webinars contributes a Messaging recipient gate that recognizes WebinarRegistration context and templates containing `{webinar_playback_url}`. The normal Contact consent/suppression gate runs first; the Webinar gate then verifies that any required operator review is approved and asks the authoritative provider for the selected recording again. A missing/deleted recording skips the replay-dependent message with `webinar_recording_unavailable` rather than sending a stale replay. Provider failures other than an authoritative unavailable result continue through the normal Messaging retry/failure path.
 
 The dashboard review is the canonical operator surface. Internal Notifications may later link to the same review task, but Webinars does not depend on Internal Notifications for this lifecycle.
+
+## Shared public-surface shell
+
+The Webinar public layout remains Webinar-configurable, but its outer HTML page shell now delegates to the module-neutral `x-layouts.public-surface` component. Webinar-specific content, header/navigation configuration, compliance identity, hero, countdown, trust, and registration components remain Webinar-owned.
+
+This is a presentation reuse seam only. It does not make Scheduling depend on Webinars, and it does not move Webinar business behavior into shared UI code. New public product surfaces should prefer the shared public-surface shell/primitives for baseline spacing, card shape, typography, focus treatment, and responsive structure, then layer module-owned content and behavior on top.

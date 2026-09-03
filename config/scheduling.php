@@ -85,7 +85,7 @@ return [
             'accent_color' => null,
             'surface_color' => '#ffffff',
             'background_color' => '#f6f7f8',
-            'page_revision' => 'scheduling-public-v2',
+            'page_revision' => 'scheduling-public-v4',
             'disclosure_version' => '2',
             'consent_text' => 'By providing your email address or phone number, you agree to receive appointment confirmations, reminders, scheduling updates, and other messages related to this appointment. Message and data rates may apply. Reply STOP to opt out of texts or HELP for help.',
         ],

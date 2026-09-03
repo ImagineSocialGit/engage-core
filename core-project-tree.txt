@@ -614,6 +614,7 @@
 │   │   │   │       │   └── RevokeSmsConsentFromInboundMessageAction.php
 │   │   │   │       └── ProcessInboundSmsMessageAction.php
 │   │   │   ├── Automation
+│   │   │   │   ├── InboundEmailRouteAutomationTriggerAuthoringContributor.php
 │   │   │   │   ├── InboundMessagingAutomationPointAuthoringContributor.php
 │   │   │   │   ├── InboundMessagingAutomationPointDefinitionContributor.php
 │   │   │   │   ├── InboundReplyAutomationTriggerAuthoringContributor.php
@@ -1669,6 +1670,12 @@
 │       │   │   ├── Messaging
 │       │   │   │   └── GrantFormSubmissionMessagingConsent.php
 │       │   │   └── UnavailableFormSubmissionAutomationWorkspace.php
+│       │   ├── InboundMessaging
+│       │   │   ├── Contracts
+│       │   │   │   └── InboundEmailRouteAutomationWorkspace.php
+│       │   │   ├── FlowRoutes
+│       │   │   │   └── FlowRoutesInboundEmailRouteAutomationWorkspace.php
+│       │   │   └── UnavailableInboundEmailRouteAutomationWorkspace.php
 │       │   ├── InternalNotifications
 │       │   │   ├── InboundMessaging
 │       │   │   │   ├── InboundMessageNotificationRecipientResolver.php
@@ -1944,6 +1951,7 @@
 │   ├── sms.php
 │   ├── staging.php
 │   ├── theme
+│   ├── theme.php
 │   ├── webhooks.php
 │   ├── webinars
 │   │   ├── content.php
@@ -2394,12 +2402,16 @@
 │       │   │   ├── crm.blade.php
 │       │   │   ├── favicons.blade.php
 │       │   │   ├── messaging-public.blade.php
-│       │   │   └── public.blade.php
+│       │   │   ├── public.blade.php
+│       │   │   └── public-surface.blade.php
 │       │   ├── messaging
 │       │   │   ├── available-fields.blade.php
 │       │   │   ├── message-chain-carousel.blade.php
 │       │   │   ├── message-editor-carousel.blade.php
 │       │   │   └── route-message-template-picker.blade.php
+│       │   ├── public-surface
+│       │   │   ├── button.blade.php
+│       │   │   └── card.blade.php
 │       │   ├── section.blade.php
 │       │   ├── tasks
 │       │   ├── ui
@@ -2524,7 +2536,12 @@
 │       │   │   ├── index.blade.php
 │       │   │   ├── reschedule.blade.php
 │       │   │   ├── resources.blade.php
-│       │   │   └── show.blade.php
+│       │   │   ├── services
+│       │   │   │   ├── edit.blade.php
+│       │   │   │   └── index.blade.php
+│       │   │   ├── show.blade.php
+│       │   │   └── staff
+│       │   │       └── index.blade.php
 │       │   ├── settings
 │       │   │   └── index.blade.php
 │       │   ├── tasks
@@ -2561,6 +2578,7 @@
 │       │       └── partials
 │       │           ├── address-form.blade.php
 │       │           ├── appointment-summary.blade.php
+│       │           ├── location-details.blade.php
 │       │           └── verification-form.blade.php
 │       ├── staging
 │       │   └── login.blade.php
@@ -2830,6 +2848,8 @@
 │   │   │   ├── ContactConversationShowDataProviderTest.php
 │   │   │   ├── HandleInboundEmailWebhookActionTest.php
 │   │   │   ├── InboundAutoResponseAutomationTest.php
+│   │   │   ├── InboundEmailRouteAutomationTriggerAuthoringTest.php
+│   │   │   ├── InboundEmailRouteAutomationWorkspaceTest.php
 │   │   │   ├── InboundEmailRouteResolutionTest.php
 │   │   │   ├── InboundEmailRouteSetupValidationTest.php
 │   │   │   ├── InboundEmailRouteWorkspaceTest.php
@@ -3096,6 +3116,7 @@
 │   │   │   ├── SchedulingLocationSnapshotRuntimeTest.php
 │   │   │   ├── SchedulingReportingFunnelContractTest.php
 │   │   │   ├── SchedulingResourceConfigurationWorkspaceTest.php
+│   │   │   ├── SchedulingServiceWorkspaceTest.php
 │   │   │   ├── SchedulingSetupReadinessTest.php
 │   │   │   ├── SchedulingWorkspaceTest.php
 │   │   │   └── TravelAwareAvailabilityTest.php
@@ -3226,4 +3247,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-767 directories, 2460 files
+773 directories, 2475 files

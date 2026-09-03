@@ -1,3 +1,9 @@
+@props([
+    'title' => null,
+    'metaDescription' => null,
+    'robots' => null,
+])
+
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
@@ -8,6 +14,10 @@
 
     @if(!empty($metaDescription ?? null))
         <meta name="description" content="{{ $metaDescription }}">
+    @endif
+
+    @if(!empty($robots ?? null))
+        <meta name="robots" content="{{ $robots }}">
     @endif
 
     <x-layouts.favicons />

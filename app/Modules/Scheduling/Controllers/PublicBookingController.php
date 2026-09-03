@@ -29,6 +29,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Illuminate\Support\ViewErrorBag;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use InvalidArgumentException;
@@ -497,12 +498,13 @@ class PublicBookingController extends Controller
      */
     private function pageData(array $overrides = []): array
     {
-        return array_replace([
+        $data = array_replace([
             'services' => $this->publicServices(),
             'selectedService' => null,
             'selectedDate' => null,
             'displayTimezone' => null,
             'availableTimes' => [],
+            'availableTimePeriods' => [],
             'maximumDate' => null,
             'preparedLocation' => null,
             'publicPresentation' => $this->publicPresentation(),
@@ -511,12 +513,15 @@ class PublicBookingController extends Controller
             'destinationVerification' => [
                 'required' => false,
                 'available_channels' => [],
+                'single_channel' => null,
+                'default_channel' => 'email',
                 'verified' => false,
                 'verified_channel' => null,
                 'masked_destination' => null,
                 'challenge_active' => false,
                 'challenge_expires_at' => null,
                 'resend_available_at' => null,
+                'code_max_length' => $this->destinationVerificationCodeMaxLength(),
             ],
             'holdSummary' => null,
             'contactPrefill' => [
@@ -525,7 +530,95 @@ class PublicBookingController extends Controller
                 'phone' => null,
             ],
             'verificationCompletedChannel' => null,
+            'holdIdempotencyKey' => (string) Str::uuid(),
         ], $overrides);
+
+        $data['availableTimePeriods'] = $this->publicTimePeriods(
+            is_array($data['availableTimes']) ? $data['availableTimes'] : [],
+        );
+        $data['pageState'] = $this->publicPageState($data);
+        $data['availabilityState'] = $this->publicAvailabilityState($data);
+        $data['publicRobots'] = ($data['holdSummary'] || $data['offerSummary'])
+            ? 'noindex,nofollow'
+            : 'index,follow';
+        $data['reportingConfig'] = [
+            'reportingEnabled' => (bool) data_get($data, 'publicPresentation.reporting_enabled', false),
+            'pageRevision' => data_get($data, 'publicPresentation.page_revision'),
+            'state' => $data['pageState'],
+            'serviceKey' => data_get($data, 'holdSummary.service_key')
+                ?? data_get($data, 'offerSummary.service_key')
+                ?? ($data['selectedService'] instanceof BookableService
+                    ? $data['selectedService']->key
+                    : null),
+            'availabilityState' => $data['availabilityState'],
+            'verificationCompletedChannel' => $data['verificationCompletedChannel'],
+            'validationFields' => $this->publicValidationFields(),
+        ];
+
+        return $data;
+    }
+
+    /** @param array<string, mixed> $data */
+    private function publicPageState(array $data): string
+    {
+        $holdSummary = is_array($data['holdSummary'] ?? null)
+            ? $data['holdSummary']
+            : null;
+        $offerSummary = is_array($data['offerSummary'] ?? null)
+            ? $data['offerSummary']
+            : null;
+        $destinationVerification = is_array($data['destinationVerification'] ?? null)
+            ? $data['destinationVerification']
+            : [];
+
+        return match (true) {
+            $holdSummary !== null && ($holdSummary['status'] ?? null) === 'converted' => 'confirmation',
+            $holdSummary !== null && ($holdSummary['status'] ?? null) === 'active' => 'details',
+            $holdSummary !== null => 'expired',
+            $offerSummary !== null && ($offerSummary['status'] ?? null) !== 'active' => 'expired',
+            $offerSummary !== null && ($destinationVerification['required'] ?? false) => 'verification',
+            $offerSummary !== null => 'offer',
+            $data['selectedService'] instanceof BookableService
+                && (bool) ($data['requiresCustomerSitePreparation'] ?? false) => 'address',
+            $data['selectedService'] instanceof BookableService => 'availability',
+            default => 'catalog',
+        };
+    }
+
+    /** @param array<string, mixed> $data */
+    private function publicAvailabilityState(array $data): ?string
+    {
+        if (($data['pageState'] ?? null) === 'address') {
+            return 'address_required';
+        }
+
+        if (($data['pageState'] ?? null) !== 'availability') {
+            return null;
+        }
+
+        $service = $data['selectedService'] ?? null;
+
+        if ($service instanceof BookableService && $service->usesRangeDuration()) {
+            return 'range';
+        }
+
+        return ($data['availableTimes'] ?? []) === [] ? 'empty' : 'available';
+    }
+
+    /** @return array<int, string> */
+    private function publicValidationFields(): array
+    {
+        $errors = session('errors');
+
+        if (! $errors instanceof ViewErrorBag) {
+            return [];
+        }
+
+        return array_values(array_slice(
+            $errors->getBag('default')->keys(),
+            0,
+            16,
+        ));
     }
 
     /**
@@ -682,15 +775,13 @@ class PublicBookingController extends Controller
         $address = is_array($details['address'] ?? null)
             ? $details['address']
             : [];
+        $presentation = $this->publicLocationPresentation(
+            type: $location->type,
+            details: $details,
+        );
 
         return [
-            'type' => $location->type,
-            'label' => is_string($details['label'] ?? null)
-                ? $details['label']
-                : null,
-            'instructions' => is_string($details['instructions'] ?? null)
-                ? $details['instructions']
-                : null,
+            ...$presentation,
             'url' => is_string($details['url'] ?? null)
                 ? $details['url']
                 : null,
@@ -704,6 +795,100 @@ class PublicBookingController extends Controller
             'postal_code' => $address['postal_code'] ?? null,
             'country' => $address['country'] ?? 'US',
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     * @return array<string, mixed>
+     */
+    private function publicLocationPresentation(?string $type, array $details): array
+    {
+        $address = is_array($details['address'] ?? null)
+            ? $details['address']
+            : [];
+        $label = is_string($details['label'] ?? null)
+            ? trim($details['label'])
+            : '';
+        $instructions = is_string($details['instructions'] ?? null)
+            ? trim($details['instructions'])
+            : '';
+
+        return [
+            'type' => $type,
+            'method_label' => $this->publicAppointmentMethodLabel($type),
+            'method_detail' => match ($type) {
+                BookableService::LOCATION_TYPE_PHONE => 'The team will call the phone number you provide.',
+                BookableService::LOCATION_TYPE_VIRTUAL => 'Online meeting details will be provided by the team.',
+                default => null,
+            },
+            'name' => $type === BookableService::LOCATION_TYPE_FIXED && $label !== ''
+                ? $label
+                : null,
+            'instructions' => $instructions !== '' ? $instructions : null,
+            'address_lines' => $this->publicAddressLines($address),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $address
+     * @return array<int, string>
+     */
+    private function publicAddressLines(array $address): array
+    {
+        $lineOneParts = array_values(array_filter([
+            $this->nullablePresentationString($address['address_line_1'] ?? null),
+            $this->nullablePresentationString($address['address_line_2'] ?? null),
+        ]));
+        $lineOne = implode(', ', $lineOneParts);
+
+        $city = $this->nullablePresentationString($address['city'] ?? null);
+        $region = $this->nullablePresentationString($address['region'] ?? null);
+        $postalCode = $this->nullablePresentationString($address['postal_code'] ?? null);
+        $regionPostal = trim(implode(' ', array_values(array_filter([
+            $region,
+            $postalCode,
+        ]))));
+        $lineTwo = trim(implode(', ', array_values(array_filter([
+            $city,
+            $regionPostal !== '' ? $regionPostal : null,
+        ]))));
+
+        $country = strtoupper((string) ($this->nullablePresentationString(
+            $address['country'] ?? null,
+        ) ?? ''));
+
+        if ($country !== '' && ! in_array($country, ['US', 'USA'], true)) {
+            $lineTwo = trim(implode(', ', array_values(array_filter([
+                $lineTwo !== '' ? $lineTwo : null,
+                $country,
+            ]))));
+        }
+
+        $lines = array_values(array_filter([
+            $lineOne !== '' ? $lineOne : null,
+            $lineTwo !== '' ? $lineTwo : null,
+        ]));
+
+        if ($lines !== []) {
+            return $lines;
+        }
+
+        $formatted = $this->nullablePresentationString(
+            $address['formatted_address'] ?? null,
+        );
+
+        return $formatted !== null ? [$formatted] : [];
+    }
+
+    private function nullablePresentationString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
     }
 
     /**
@@ -764,6 +949,10 @@ class PublicBookingController extends Controller
         return [
             'required' => $channels !== [],
             'available_channels' => $channels,
+            'single_channel' => count($channels) === 1 ? $channels[0] : null,
+            'default_channel' => in_array('email', $channels, true)
+                ? 'email'
+                : ($channels[0] ?? 'email'),
             'verified' => $verified,
             'verified_channel' => $verified
                 && is_string($state['verified_channel'] ?? null)
@@ -779,7 +968,16 @@ class PublicBookingController extends Controller
             'resend_available_at' => $challengeActive
                 ? $resendAvailableAt?->toISOString()
                 : null,
+            'code_max_length' => $this->destinationVerificationCodeMaxLength(),
         ];
+    }
+
+    private function destinationVerificationCodeMaxLength(): int
+    {
+        return min(8, max(4, (int) config(
+            'scheduling.public.destination_verification.code_digits',
+            6,
+        )));
     }
 
     /**
@@ -863,6 +1061,8 @@ class PublicBookingController extends Controller
         return match ($locationType) {
             BookableService::LOCATION_TYPE_PHONE => 'Phone call',
             BookableService::LOCATION_TYPE_VIRTUAL => 'Virtual meeting',
+            BookableService::LOCATION_TYPE_FIXED,
+            BookableService::LOCATION_TYPE_CUSTOMER_SITE => 'In person',
             default => null,
         };
     }
@@ -950,7 +1150,7 @@ class PublicBookingController extends Controller
                 'starts_at' => $slot->startsAt->toISOString(),
                 'start_label' => $startsAt->format('g:i A'),
                 'end_label' => $endsAt->format('g:i A'),
-                'full_label' => $startsAt->format('g:i A').'–'.$endsAt->format('g:i A'),
+                'full_label' => $this->publicSelectedTimeLabel($startsAt, $endsAt),
                 'period' => match (true) {
                     (int) $startsAt->format('G') < 12 => 'morning',
                     (int) $startsAt->format('G') < 17 => 'afternoon',
@@ -960,6 +1160,57 @@ class PublicBookingController extends Controller
         }
 
         return array_values($times);
+    }
+
+    private function publicSelectedTimeLabel(
+        CarbonImmutable $startsAt,
+        CarbonImmutable $endsAt,
+    ): string {
+        if ($startsAt->format('A') === $endsAt->format('A')) {
+            return $startsAt->format('g:i').'–'.$endsAt->format('g:i A');
+        }
+
+        return $startsAt->format('g:i A').'–'.$endsAt->format('g:i A');
+    }
+
+    /**
+     * @param array<int, array{starts_at: string, start_label: string, end_label: string, full_label: string, period: string}> $times
+     * @return array<int, array{key: string, label: string, times: array<int, array<string, string>>}>
+     */
+    private function publicTimePeriods(array $times): array
+    {
+        $labels = [
+            'morning' => 'Morning',
+            'afternoon' => 'Afternoon',
+            'evening' => 'Evening',
+        ];
+        $grouped = [];
+
+        foreach ($times as $time) {
+            $period = $time['period'] ?? null;
+
+            if (! is_string($period) || ! array_key_exists($period, $labels)) {
+                continue;
+            }
+
+            $grouped[$period][] = $time;
+        }
+
+        $periods = [];
+
+        foreach ($labels as $key => $label) {
+            if (($grouped[$key] ?? []) === []) {
+                continue;
+            }
+
+            $periods[] = [
+                'key' => $key,
+                'label' => $label,
+                'times' => array_values($grouped[$key]),
+            ];
+        }
+
+        return $periods;
     }
 
     /**
@@ -982,6 +1233,7 @@ class PublicBookingController extends Controller
             'offer_id' => $offer->offer_id,
             'status' => $active ? 'active' : 'expired',
             'remaining_seconds' => $offer->remainingSeconds($now),
+            'remaining_minutes' => max(1, (int) ceil($offer->remainingSeconds($now) / 60)),
             'expires_at' => $offer->expires_at?->toISOString(),
             'service_key' => $service->key,
             'service_name' => $service->name,
@@ -1005,6 +1257,10 @@ class PublicBookingController extends Controller
             'location_address' => is_string(data_get($locationDetails, 'address.formatted_address'))
                 ? data_get($locationDetails, 'address.formatted_address')
                 : null,
+            'location_presentation' => $this->publicLocationPresentation(
+                type: $offer->location_type,
+                details: $locationDetails,
+            ),
         ];
     }
 
@@ -1040,6 +1296,7 @@ class PublicBookingController extends Controller
             'hold_id' => $hold->hold_id,
             'status' => $status,
             'remaining_seconds' => $hold->remainingSeconds($now),
+            'remaining_minutes' => max(1, (int) ceil($hold->remainingSeconds($now) / 60)),
             'expires_at' => $hold->expires_at?->toISOString(),
             'service_key' => $service->key,
             'service_name' => $service->name,
@@ -1063,6 +1320,10 @@ class PublicBookingController extends Controller
             'location_address' => is_string(data_get($locationDetails, 'address.formatted_address'))
                 ? data_get($locationDetails, 'address.formatted_address')
                 : null,
+            'location_presentation' => $this->publicLocationPresentation(
+                type: $hold->location_type,
+                details: $locationDetails,
+            ),
             'appointment_status' => $appointmentStatus,
             'confirmation_pending' => $appointmentStatus === Appointment::STATUS_PENDING,
             'public_submission_attempt_id' => $appointment instanceof Appointment
@@ -1180,7 +1441,7 @@ class PublicBookingController extends Controller
             'page_revision' => $this->presentationString(
                 config('scheduling.public.presentation.page_revision'),
                 null,
-                'scheduling-public-v3',
+                'scheduling-public-v4',
             ),
             'reporting_enabled' => (bool) config(
                 'scheduling.public.reporting_enabled',
