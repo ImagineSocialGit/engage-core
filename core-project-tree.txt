@@ -1164,6 +1164,7 @@
 │   │   │   │   ├── CRM
 │   │   │   │   │   ├── AppointmentCommunicationsController.php
 │   │   │   │   │   ├── AppointmentController.php
+│   │   │   │   │   ├── SchedulingAfterBookingController.php
 │   │   │   │   │   ├── SchedulingAvailabilityController.php
 │   │   │   │   │   ├── SchedulingConfigurationController.php
 │   │   │   │   │   ├── SchedulingController.php
@@ -1699,7 +1700,10 @@
 │       │       │   ├── ReconcileAppointmentHostNotifications.php
 │       │       │   └── ReconcileAppointmentTasks.php
 │       │       ├── Contracts
+│       │       │   ├── AppointmentAfterBookingWorkspace.php
 │       │       │   └── AppointmentCommunications.php
+│       │       ├── FlowRoutes
+│       │       │   └── FlowRoutesAppointmentAfterBookingWorkspace.php
 │       │       ├── Messaging
 │       │       │   ├── MessagingAppointmentCommunications.php
 │       │       │   ├── MessagingSchedulingDestinationVerificationTransport.php
@@ -1709,6 +1713,10 @@
 │       │       │   ├── SchedulingAppointmentTokenContextProvider.php
 │       │       │   ├── SchedulingAppointmentTokenSourceProvider.php
 │       │       │   └── SchedulingDestinationVerificationRecipientGate.php
+│       │       ├── Simple
+│       │       │   ├── ApplySimpleAppointmentAfterBookingActions.php
+│       │       │   └── SimpleAppointmentAfterBookingWorkspace.php
+│       │       ├── UnavailableAppointmentAfterBookingWorkspace.php
 │       │       └── UnavailableAppointmentCommunications.php
 │       ├── Modules
 │       │   ├── Migrations
@@ -2508,6 +2516,7 @@
 │       │   │   └── partials
 │       │   │       └── scheduling-public-booking.blade.php
 │       │   ├── scheduling
+│       │   │   ├── after-booking.blade.php
 │       │   │   ├── availability.blade.php
 │       │   │   ├── communications.blade.php
 │       │   │   ├── configuration.blade.php
@@ -3068,6 +3077,8 @@
 │   │   │   ├── RescheduleAppointmentActionTest.php
 │   │   │   ├── RescheduleSlotOfferAndBookingHoldActionTest.php
 │   │   │   ├── ResourceAwareOccupancyTest.php
+│   │   │   ├── SchedulingAfterBookingFallbackRuntimeTest.php
+│   │   │   ├── SchedulingAfterBookingWorkspaceTest.php
 │   │   │   ├── SchedulingAppointmentFormatTest.php
 │   │   │   ├── SchedulingAppointmentRescheduleWorkspaceTest.php
 │   │   │   ├── SchedulingAppointmentWorkspaceTest.php
@@ -3215,4 +3226,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-765 directories, 2451 files
+767 directories, 2460 files

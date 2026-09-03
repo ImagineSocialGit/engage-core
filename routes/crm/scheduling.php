@@ -2,6 +2,7 @@
 
 use App\Modules\Scheduling\Controllers\CRM\AppointmentCommunicationsController;
 use App\Modules\Scheduling\Controllers\CRM\AppointmentController;
+use App\Modules\Scheduling\Controllers\CRM\SchedulingAfterBookingController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingAvailabilityController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingConfigurationController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingResourceController;
@@ -20,6 +21,12 @@ Route::middleware('module:scheduling')
 
         Route::get('/configuration', [SchedulingConfigurationController::class, 'index'])
             ->name('configuration.index');
+
+        Route::get('/configuration/after-booking', [SchedulingAfterBookingController::class, 'index'])
+            ->name('configuration.after-booking.index');
+
+        Route::put('/configuration/after-booking/services/{bookableService}', [SchedulingAfterBookingController::class, 'update'])
+            ->name('configuration.after-booking.update');
 
         Route::get('/configuration/communications', [AppointmentCommunicationsController::class, 'index'])
             ->name('configuration.communications.index');

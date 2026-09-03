@@ -79,6 +79,29 @@
             </div>
         </x-ui.card>
 
+        <x-ui.card class="space-y-4" data-scheduling-after-booking-entry>
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
+                        After Booking
+                    </div>
+                    <h2 class="mt-3 text-lg font-semibold text-slate-900">
+                        Decide what happens after an appointment is scheduled
+                    </h2>
+                    <p class="mt-1 max-w-2xl text-sm text-slate-500">
+                        Keep follow-up manual, use the available simple fallbacks, or hand richer automation to Flow Routes when it is enabled.
+                    </p>
+                </div>
+
+                <a
+                    href="{{ route('crm.scheduling.configuration.after-booking.index') }}"
+                    class="inline-flex w-full items-center justify-center rounded-lg border border-teal-600 bg-white px-4 py-2 text-sm font-semibold text-teal-700 shadow-sm hover:bg-teal-50 sm:w-auto"
+                >
+                    Manage after booking
+                </a>
+            </div>
+        </x-ui.card>
+
         <section class="space-y-5" id="services" data-configuration-section="services">
             <div>
                 <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">

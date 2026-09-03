@@ -1397,3 +1397,51 @@ Reporting dashboards
 vertical-specific Scheduling interpretation
 client-specific webinar booking entry
 ```
+
+## After Booking workspace
+
+Scheduling exposes a dedicated CRM `After Booking` workspace for the question:
+
+```text
+What should happen after an appointment is scheduled?
+```
+
+The canonical neutral trigger remains:
+
+```text
+appointment.scheduled
+```
+
+`AppointmentAutomationTriggerAuthoringContributor` exposes the trigger to generic automation authoring and supports optional `bookable_service_id` scoping.
+
+When Flow Routes is enabled, Scheduling does not implement its own orchestration engine. The integration perimeter resolves `AppointmentAfterBookingWorkspace` to `FlowRoutesAppointmentAfterBookingWorkspace`, which uses `FlowRouteAuthoringLinkBuilder` to create ordinary Flow Routes prefilled with the Scheduling trigger. Guided shortcuts may start an add-tag, status-change, or appointment-task behavior when the corresponding capability is available. A knowledgeable user can create the same automation from Flow Routes directly.
+
+When Flow Routes is unavailable, Scheduling keeps only a narrow fallback stored in each `BookableService.meta.after_booking` record:
+
+```text
+tag
+contact_status_key
+task_template_key
+```
+
+The fallback deliberately stores stable keys rather than optional-module database IDs. An empty configuration means manual follow-up.
+
+The simple runtime listener lives outside the Scheduling module at:
+
+```text
+App\Support\ModuleIntegrations\Scheduling\Simple\ApplySimpleAppointmentAfterBookingActions
+```
+
+It consumes durable `appointment.scheduled` automation events idempotently and may:
+
+```text
+add a Contact tag
+change Contact status through UpdatesContactStatus when Workflow is available
+create a template-backed Task through CreateTaskFromTemplateAction when Tasks is available
+```
+
+It does not implement waits, branching, campaigns, outbound message automation, or other general orchestration. Those belong to Flow Routes and the contributing modules.
+
+If Flow Routes becomes enabled while simple fallback metadata still exists, the simple listener does not execute it. Flow Routes becomes the active orchestration owner.
+
+The public Scheduling booking-page visual redesign remains a separate UX task. It must not be coupled to this automation/fallback architecture.

@@ -11,9 +11,11 @@ use Illuminate\Validation\Rule;
 final class AppointmentAutomationTriggerAuthoringContributor implements AutomationTriggerAuthoringContributor
 {
     public const KEY = 'scheduling.appointment_activity';
+    public const EVENT_SCHEDULED = 'appointment.scheduled';
+    public const BOOKABLE_SERVICE_EVENT_PATH = 'automation_event.payload.bookable_service_id';
 
     private const EVENTS = [
-        'appointment.scheduled' => 'Appointment is scheduled',
+        self::EVENT_SCHEDULED => 'Appointment is scheduled',
         'appointment.confirmed' => 'Appointment is confirmed',
         'appointment.rescheduled' => 'Appointment is rescheduled',
         'appointment.canceled' => 'Appointment is canceled',
@@ -96,7 +98,7 @@ final class AppointmentAutomationTriggerAuthoringContributor implements Automati
             triggerKey: trim((string) $input['appointment_event_key']),
             entryConditions: $serviceId === null ? [] : [[
                 'source' => 'execution_meta',
-                'path' => 'automation_event.payload.bookable_service_id',
+                'path' => self::BOOKABLE_SERVICE_EVENT_PATH,
                 'operator' => 'equals',
                 'value' => $serviceId,
             ]],

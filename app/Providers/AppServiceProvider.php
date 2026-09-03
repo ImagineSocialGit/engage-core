@@ -20,6 +20,10 @@ use App\Support\ModuleIntegrations\Forms\UnavailableFormSubmissionAutomationWork
 use App\Support\ModuleIntegrations\Forms\Messaging\GrantFormSubmissionMessagingConsent;
 use App\Support\DestinationVerification\Contracts\DestinationVerificationTransport;
 use App\Support\DestinationVerification\UnavailableDestinationVerificationTransport;
+use App\Support\ModuleIntegrations\Scheduling\Contracts\AppointmentAfterBookingWorkspace;
+use App\Support\ModuleIntegrations\Scheduling\FlowRoutes\FlowRoutesAppointmentAfterBookingWorkspace;
+use App\Support\ModuleIntegrations\Scheduling\Simple\SimpleAppointmentAfterBookingWorkspace;
+use App\Support\ModuleIntegrations\Scheduling\UnavailableAppointmentAfterBookingWorkspace;
 use App\Support\ModuleIntegrations\Scheduling\Contracts\AppointmentCommunications;
 use App\Support\ModuleIntegrations\Messaging\Contracts\MessageMediaLibrary;
 use App\Support\ModuleIntegrations\Messaging\Media\MediaMessageMediaLibrary;
@@ -102,6 +106,24 @@ class AppServiceProvider extends ServiceProvider
                 }
 
                 return $app->make(UnavailableFormSubmissionAutomationWorkspace::class);
+            },
+        );
+
+        $this->app->singleton(
+            AppointmentAfterBookingWorkspace::class,
+            function ($app): AppointmentAfterBookingWorkspace {
+                $enabled = $app->make(ModuleManager::class)
+                    ->enabledKeysWithDependencies();
+
+                if (! in_array('scheduling', $enabled, true)) {
+                    return $app->make(UnavailableAppointmentAfterBookingWorkspace::class);
+                }
+
+                if (in_array('flow_routes', $enabled, true)) {
+                    return $app->make(FlowRoutesAppointmentAfterBookingWorkspace::class);
+                }
+
+                return $app->make(SimpleAppointmentAfterBookingWorkspace::class);
             },
         );
 

@@ -13,6 +13,7 @@ use App\Support\ModuleIntegrations\Scheduling\Automation\CreateAppointmentTaskAu
 use App\Support\ModuleIntegrations\Scheduling\Automation\NotifyAppointmentHostAutomationActionHandler;
 use App\Support\ModuleIntegrations\Scheduling\Automation\ReconcileAppointmentHostNotifications;
 use App\Support\ModuleIntegrations\Scheduling\Automation\ReconcileAppointmentTasks;
+use App\Support\ModuleIntegrations\Scheduling\Simple\ApplySimpleAppointmentAfterBookingActions;
 use App\Support\Modules\ModuleManager;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -41,6 +42,15 @@ class IntegrationsModuleServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $enabled = $this->app->make(ModuleManager::class)->enabledKeysWithDependencies();
+
+        if ($this->has($enabled, ['scheduling'])
+            && ! in_array('flow_routes', $enabled, true)
+        ) {
+            Event::listen(
+                AutomationEventRecorded::class,
+                ApplySimpleAppointmentAfterBookingActions::class,
+            );
+        }
 
         if ($this->has($enabled, ['scheduling', 'tasks'])) {
             Event::listen(AutomationEventRecorded::class, ReconcileAppointmentTasks::class);
