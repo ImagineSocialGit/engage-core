@@ -2,6 +2,7 @@
 
 namespace App\Modules\InboundMessaging\Providers;
 
+use App\Modules\InboundMessaging\Automation\InboundEmailRouteAutomationTriggerAuthoringContributor;
 use App\Modules\InboundMessaging\Automation\InboundMessagingAutomationPointDefinitionContributor;
 use App\Modules\InboundMessaging\Automation\InboundReplyAutomationTriggerAuthoringContributor;
 use App\Modules\InboundMessaging\Automation\MarkInboundMessageAutoRespondedActionHandler;
@@ -30,6 +31,7 @@ class InboundMessagingModuleServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->tag([
+            InboundEmailRouteAutomationTriggerAuthoringContributor::class,
             InboundReplyAutomationTriggerAuthoringContributor::class,
         ], 'automation.trigger_authoring_contributors');
 

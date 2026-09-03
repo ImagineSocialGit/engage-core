@@ -4,6 +4,7 @@ namespace App\Modules\InboundMessaging\Services\Email;
 
 use App\Modules\InboundMessaging\Data\InboundEmailRouteIdentity;
 use App\Modules\InboundMessaging\Models\InboundEmailRoute;
+use App\Support\ModuleIntegrations\InboundMessaging\Contracts\InboundEmailRouteAutomationWorkspace;
 use Throwable;
 
 final class InboundEmailRouteWorkspace
@@ -11,6 +12,7 @@ final class InboundEmailRouteWorkspace
     public function __construct(
         private readonly InboundEmailRouteResolver $resolver,
         private readonly RoutedInboundMessageConsumerRegistry $consumers,
+        private readonly InboundEmailRouteAutomationWorkspace $automation,
     ) {}
 
     /**
@@ -24,11 +26,22 @@ final class InboundEmailRouteWorkspace
             ->orderBy('label')
             ->orderBy('key')
             ->get();
+        $automationByRoute = $this->automation->readForRoutes(
+            $routes
+                ->map(fn (InboundEmailRoute $route): array => [
+                    'key' => (string) $route->key,
+                    'label' => (string) $route->label,
+                    'is_active' => (bool) $route->is_active,
+                ])
+                ->values()
+                ->all(),
+        );
 
         return [
             'domain' => $domain,
             'domain_ready' => $domain !== null,
             'active_count' => $routes->where('is_active', true)->count(),
+            'automation_available' => $this->automation->available(),
             'routes' => $routes
                 ->map(fn (InboundEmailRoute $route): array => [
                     'route' => $route,
@@ -36,6 +49,11 @@ final class InboundEmailRouteWorkspace
                         ? $route->local_part.'@'.$domain
                         : $route->local_part.'@{INBOUND_EMAIL_DOMAIN}',
                     'handling' => $this->handling($route),
+                    'automation' => $automationByRoute[(string) $route->key] ?? [
+                        'available' => false,
+                        'create_url' => null,
+                        'automations' => [],
+                    ],
                 ])
                 ->values()
                 ->all(),

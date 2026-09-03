@@ -213,7 +213,7 @@
 
                             <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                                 <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                                    What happens
+                                    Inbox and business handling
                                 </p>
                                 <div class="mt-1 flex flex-wrap items-center gap-2">
                                     <p class="text-sm font-semibold {{ $row['handling']['status'] === 'problem' ? 'text-amber-800' : 'text-slate-900' }}">
@@ -223,6 +223,67 @@
                                 <p class="mt-1 text-xs leading-5 text-slate-500">
                                     {{ $row['handling']['description'] }}
                                 </p>
+                            </div>
+
+                            <div
+                                class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-4"
+                                data-inbound-email-route-automation
+                            >
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div>
+                                        <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                                            Automation after receipt
+                                        </p>
+                                        <p class="mt-1 text-xs leading-5 text-slate-500">
+                                            The Inbox remains the human record. Flow Routes can continue work automatically when the inbound message is associated with a Contact.
+                                        </p>
+                                    </div>
+
+                                    @if($row['automation']['create_url'])
+                                        <a
+                                            href="{{ $row['automation']['create_url'] }}"
+                                            class="shrink-0 rounded-xl bg-blue-700 px-3.5 py-2 text-sm font-semibold text-white hover:bg-blue-600"
+                                        >
+                                            Automate after receipt
+                                        </a>
+                                    @endif
+                                </div>
+
+                                @if(! $row['automation']['available'])
+                                    <p class="mt-3 text-sm text-slate-600">
+                                        Enable Flow Routes to continue work automatically after email arrives here.
+                                    </p>
+                                @elseif($row['automation']['automations'] !== [])
+                                    <div class="mt-3 space-y-2">
+                                        @foreach($row['automation']['automations'] as $automation)
+                                            <a
+                                                href="{{ $automation['url'] }}"
+                                                class="flex flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 hover:border-slate-300 sm:flex-row sm:items-center sm:justify-between"
+                                            >
+                                                <span class="min-w-0">
+                                                    <span class="block truncate text-sm font-semibold text-slate-900">
+                                                        {{ $automation['name'] }}
+                                                    </span>
+                                                    <span class="mt-0.5 block text-xs text-slate-500">
+                                                        {{ $automation['scope'] === 'all_addresses' ? 'All inbound addresses' : 'This address' }}
+                                                        · {{ $automation['step_count'] }} {{ $automation['step_label'] }}
+                                                    </span>
+                                                </span>
+                                                <span class="text-xs font-semibold {{ $automation['is_enabled'] ? 'text-emerald-700' : 'text-slate-500' }}">
+                                                    {{ $automation['is_enabled'] ? 'On' : 'Off' }}
+                                                </span>
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                @elseif(! $route->is_active)
+                                    <p class="mt-3 text-sm text-slate-600">
+                                        Enable this inbound address before creating a new automation for it.
+                                    </p>
+                                @else
+                                    <p class="mt-3 text-sm text-slate-600">
+                                        No Flow Route is connected to this address yet.
+                                    </p>
+                                @endif
                             </div>
                         </div>
 

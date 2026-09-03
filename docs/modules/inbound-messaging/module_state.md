@@ -31,6 +31,14 @@ Signed Engage Reply-To correlation always wins. Only a non-correlated recipient 
 
 A resolved route emits the compact neutral `inbound_email.route_received` automation event. It may have no Contact yet; provider/domain integration code may use the internal route context to parse the normalized inbound message and establish Contact/business state later. The event never copies the inbound body or raw provider payload.
 
+### Optional Flow Routes handoff
+
+When Flow Routes is enabled, the Inbound Addresses workspace may hand an operator into normal Flow Route authoring for one named inbound address. The trigger authoring contribution is owned by InboundMessaging and selects the human-facing address while storing only its stable route key in the Route entry condition. InboundMessaging does not import FlowRoutes. The optional workspace adapter lives under `App\Support\ModuleIntegrations\InboundMessaging\FlowRoutes` and uses the FlowRoutes-owned authoring-link builder.
+
+The same trigger is available from the Flow Routes create surface, so an automation created from Inbound Addresses and one created directly in Flow Routes use the same `inbound_email.route_received` event plus the same `automation_event.payload.inbound_message.inbound_email_route_key` condition. The Inbound Addresses workspace also shows matching current Flow Routes and links back to their authoritative editor.
+
+The Inbox remains additive and authoritative for human review regardless of automation. A named address with no routed-message consumer may still be described as Inbox-only business handling while separately having Flow Route automation. Contact-aware Flow Routes start only when the inbound event carries a Contact ID; contactless messages remain visible for human review or may be interpreted by an owning routed-message consumer that establishes domain identity and emits its own business event.
+
 ## Routed-message consumer seam
 
 Named inbound addresses may optionally be connected to one owning business process through the provider-neutral `RoutedInboundMessageConsumer` seam.

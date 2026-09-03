@@ -13,6 +13,9 @@ use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Messaging\Import\MarketingPermissionContactImportPostProcessor;
 use App\Modules\InboundMessaging\Events\InboundMessageReceived;
+use App\Support\ModuleIntegrations\InboundMessaging\Contracts\InboundEmailRouteAutomationWorkspace;
+use App\Support\ModuleIntegrations\InboundMessaging\FlowRoutes\FlowRoutesInboundEmailRouteAutomationWorkspace;
+use App\Support\ModuleIntegrations\InboundMessaging\UnavailableInboundEmailRouteAutomationWorkspace;
 use App\Support\ModuleIntegrations\Forms\Contracts\FormSubmissionAutomationWorkspace;
 use App\Support\ModuleIntegrations\Forms\FlowRoutes\FlowRoutesFormSubmissionAutomationWorkspace;
 use App\Support\ModuleIntegrations\Forms\FormSubmissionConsentBridge;
@@ -92,6 +95,22 @@ class AppServiceProvider extends ServiceProvider
                 modules: $app->make(ModuleManager::class),
             );
         });
+
+        $this->app->singleton(
+            InboundEmailRouteAutomationWorkspace::class,
+            function ($app): InboundEmailRouteAutomationWorkspace {
+                $enabled = $app->make(ModuleManager::class)
+                    ->enabledKeysWithDependencies();
+
+                if (in_array('inbound_messaging', $enabled, true)
+                    && in_array('flow_routes', $enabled, true)
+                ) {
+                    return $app->make(FlowRoutesInboundEmailRouteAutomationWorkspace::class);
+                }
+
+                return $app->make(UnavailableInboundEmailRouteAutomationWorkspace::class);
+            },
+        );
 
         $this->app->singleton(
             FormSubmissionAutomationWorkspace::class,
