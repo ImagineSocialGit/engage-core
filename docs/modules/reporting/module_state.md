@@ -903,6 +903,27 @@ Do not add `REPORTING_ENABLED` as a competing environment toggle.
 
 Secrets used to key any approved external click-ID hash belong in environment/secret configuration, never in client source config.
 
+
+## Deployment environment contract
+
+Reporting has an explicit audited deployment-plan contributor with **zero Reporting-owned environment requirements**.
+
+That is intentional:
+
+```text
+browser collection policy        -> committed reporting config
+privacy/session ceilings         -> committed reporting config + setup validation
+ingestion/rate limits            -> committed reporting config + setup validation
+attribution allowlists           -> committed reporting config + setup validation
+classifier identity              -> committed reporting config + setup validation
+retention/projection behavior    -> committed reporting config + scheduler
+external-measurement CSV staging -> local application storage
+```
+
+Reporting derives the keyed hash used for approved external click identifiers from the already-required Core `APP_KEY` plus client identity. `APP_KEY` remains Core-owned; Reporting must not introduce a second deployment secret merely for that derived purpose.
+
+The zero-requirement contributor is still important: deployment-plan coverage can distinguish "Reporting was audited and needs no environment values" from "Reporting has not yet been reviewed." If Reporting later gains a genuine external provider, secret, host, or process-level deployment value, that key must first enter the environment catalog with Reporting ownership and then be claimed deliberately by this contributor.
+
 ## Projection and rebuild contract
 
 Reporting projections must be deterministic and idempotent.

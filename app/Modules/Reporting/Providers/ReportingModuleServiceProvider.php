@@ -6,6 +6,7 @@ use App\Modules\Reporting\Actions\PruneReportingImportFilesAction;
 use App\Modules\Reporting\Actions\RecordReportingObservationAction;
 use App\Modules\Reporting\Console\Commands\ProjectReportingMetricsCommand;
 use App\Modules\Reporting\Controllers\Public\ReportingObservationController;
+use App\Modules\Reporting\Deployment\ReportingDeploymentPlanContributor;
 use App\Modules\Reporting\EventDefinitions\ConfigReportingEventDefinitionContributor;
 use App\Modules\Reporting\Validation\ReportingSetupValidationContributor;
 use App\Support\Reporting\Contracts\ReportingObservationRecorder;
@@ -33,6 +34,12 @@ class ReportingModuleServiceProvider extends ServiceProvider
         $this->app->tag(
             ReportingSetupValidationContributor::class,
             'setup.validation_contributors',
+        );
+
+
+        $this->app->tag(
+            ReportingDeploymentPlanContributor::class,
+            'deployment.plan_contributors',
         );
     }
 

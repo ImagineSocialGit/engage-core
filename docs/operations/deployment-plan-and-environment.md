@@ -292,6 +292,16 @@ Unused values are informational. They are never deleted automatically.
 
 `ClientEnvironmentLoader` uses the same bootstrap-safe catalog to enforce client ownership. It clears every legal client-owned value before applying the selected client's `.env`, including when that `.env` file does not yet exist. This prevents stale root or previously selected client values from leaking across clients.
 
+## Reporting zero-environment contract
+
+Reporting is deployment-covered even though it currently contributes no environment requirements.
+
+Its browser collection policy, privacy/session ceilings, ingestion limits, rate limits, attribution allowlists, classifier identity, retention rules, and projection behavior are committed application configuration and are validated through Reporting setup validation where appropriate. External-measurement CSV staging currently uses local application storage.
+
+Reporting derives its approved external click-identifier HMAC subkey from the Core-owned `APP_KEY` and client identity. It does not own or require a separate Reporting secret.
+
+The Reporting deployment contributor therefore returns an empty requirement set deliberately. This explicit zero-requirement contributor marks the module as audited/covered so future install gating can distinguish a module that needs no deployment environment from one whose deployment contract has not been implemented yet.
+
 ## Current contributor coverage
 
 Current deployment-plan contributors cover:
@@ -303,8 +313,9 @@ Current deployment-plan contributors cover:
 - Internal Notifications sender requirements
 - Webinars / Zoom
 - Scheduling public-origin requirements
+- Reporting audited zero-environment contract
 - Media writable-storage requirements
 
-Forms resolves public intake enablement and its signing/identity requirements. Messaging resolves the selected email/SMS providers, live credentials, sender fallbacks, webhook verification, and operational defaults. Inbound Messaging resolves the live receiving domain required for signed Reply-To and semantic inbound-email routing without reclaiming Messaging-owned provider credentials. Internal Notifications resolves only its team-facing email sender overrides and requires an explicit live sender only when the shared Messaging fallback is unavailable. Webinars resolves Zoom provider readiness and post-event webhook requirements. Scheduling keeps public booking optional while validating any deliberately persisted public origin. Media activates storage-owner coverage only when its runtime upload capability is enabled, requiring writable Spaces and a stable CDN origin in staging/production.
+Forms resolves public intake enablement and its signing/identity requirements. Messaging resolves the selected email/SMS providers, live credentials, sender fallbacks, webhook verification, and operational defaults. Inbound Messaging resolves the live receiving domain required for signed Reply-To and semantic inbound-email routing without reclaiming Messaging-owned provider credentials. Internal Notifications resolves only its team-facing email sender overrides and requires an explicit live sender only when the shared Messaging fallback is unavailable. Webinars resolves Zoom provider readiness and post-event webhook requirements. Scheduling keeps public booking optional while validating any deliberately persisted public origin. Media activates storage-owner coverage only when its runtime upload capability is enabled, requiring writable Spaces and a stable CDN origin in staging/production. Reporting is explicitly covered with zero environment requirements because its current runtime contract is committed config/database state layered on Core-owned infrastructure.
 
 Additional module/provider contributors should continue to be added from fresh dependency cones. The Bash launcher should consume the resolved deployment plan rather than re-encoding module requirements itself.
