@@ -5,6 +5,9 @@
     'initialMessageId' => null,
     'formContext' => [],
     'tokenFallbacksEditable' => false,
+    'mediaAvailable' => false,
+    'mediaAssets' => [],
+    'mediaLibraryUrl' => null,
 ])
 
 @php
@@ -39,6 +42,17 @@
     $replyProfileOptions = is_array($presentation['reply_profile_options'] ?? null)
         ? $presentation['reply_profile_options']
         : [];
+    $mediaAssets = is_array($mediaAssets)
+        ? array_values(array_filter($mediaAssets, fn (mixed $asset): bool => is_array($asset)))
+        : [];
+    $mediaAssetUuids = array_values(array_filter(array_map(
+        fn (array $asset): ?string => is_string($asset['uuid'] ?? null) ? trim($asset['uuid']) : null,
+        $mediaAssets,
+    )));
+    $mediaImageAssets = array_values(array_filter(
+        $mediaAssets,
+        fn (array $asset): bool => ($asset['kind'] ?? null) === 'image',
+    ));
 
     if ($failedEditId !== '') {
         foreach ($channels as $channelKey => $channel) {
@@ -256,6 +270,12 @@
                             $failedThisMessage = $failedEditId !== '' && $failedEditId === $messageId;
                             $cta = is_array($payload['cta'] ?? null) ? $payload['cta'] : [];
                             $secondaryLink = is_array($payload['secondary_link'] ?? null) ? $payload['secondary_link'] : [];
+                            $media = is_array($payload['media'] ?? null) && ! array_is_list($payload['media']) ? $payload['media'] : [];
+                            $editMedia = is_array($editPayload['media'] ?? null) && ! array_is_list($editPayload['media']) ? $editPayload['media'] : [];
+                            $currentMediaUuid = is_string($editMedia['asset_uuid'] ?? null) ? trim($editMedia['asset_uuid']) : '';
+                            $currentPosterUuid = is_string($editMedia['poster_asset_uuid'] ?? null) ? trim($editMedia['poster_asset_uuid']) : '';
+                            $selectedMediaUuid = $failedThisMessage ? (string) old('payload.media_asset_uuid', $currentMediaUuid) : $currentMediaUuid;
+                            $selectedPosterUuid = $failedThisMessage ? (string) old('payload.media_poster_asset_uuid', $currentPosterUuid) : $currentPosterUuid;
                             $ctas = is_array($payload['ctas'] ?? null) && array_is_list($payload['ctas'])
                                 ? array_values(array_filter($payload['ctas'], fn (mixed $item): bool => is_array($item)))
                                 : [];
@@ -389,6 +409,23 @@
                                         </div>
 
                                         <div class="whitespace-pre-line text-sm leading-6 text-slate-800">{{ $payload['body'] ?? '' }}</div>
+
+                                        @if($media !== [])
+                                            <div data-message-media-preview class="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+                                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                                    <div>
+                                                        <div class="text-xs font-extrabold uppercase tracking-wide text-violet-700">{{ ucfirst((string) ($media['kind'] ?? 'media')) }}</div>
+                                                        <div class="mt-1 text-sm font-black text-slate-950">{{ $media['title'] ?? 'Media' }}</div>
+                                                    </div>
+                                                    @if(filled($media['url'] ?? null))
+                                                        <a href="{{ $media['url'] }}" target="_blank" rel="noopener noreferrer" class="text-xs font-extrabold text-violet-800 underline decoration-violet-300 underline-offset-4">Open media</a>
+                                                    @endif
+                                                </div>
+                                                @if(($media['kind'] ?? null) === 'video' && filled($media['poster_url'] ?? null))
+                                                    <img src="{{ $media['poster_url'] }}" alt="" class="mt-3 max-h-56 w-full rounded-xl object-cover">
+                                                @endif
+                                            </div>
+                                        @endif
 
                                         @if($cta !== [] && filled($cta['label'] ?? null))
                                             <div>
@@ -688,6 +725,7 @@
                                     x-cloak
                                     method="POST"
                                     action="{{ $updateAction }}"
+                                    enctype="multipart/form-data"
                                     x-on:input="dirty = true"
                                     x-on:change="dirty = true"
                                     data-message-editor-form
@@ -724,6 +762,71 @@
                                             >{{ $failedThisMessage ? old('payload.body', $editPayload['body'] ?? '') : ($editPayload['body'] ?? '') }}</textarea>
                                             @if($failedThisMessage) @error('payload.body')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror @endif
                                         </div>
+
+                                        @if($mediaAvailable)
+                                            <section data-message-media-authoring class="rounded-2xl border border-violet-200 bg-violet-50/70 p-4 sm:p-5">
+                                                <input type="hidden" name="payload[media_present]" value="1">
+
+                                                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                                    <div>
+                                                        <h4 class="text-sm font-black text-slate-950">Media</h4>
+                                                        <p class="mt-1 text-xs leading-5 text-slate-600">
+                                                            Choose a reusable asset or upload a new one. Put <code>{media}</code> in the body to choose its exact position; otherwise it is appended after the body copy.
+                                                        </p>
+                                                    </div>
+                                                    @if(is_string($mediaLibraryUrl) && trim($mediaLibraryUrl) !== '')
+                                                        <a href="{{ $mediaLibraryUrl }}" target="_blank" class="shrink-0 text-xs font-extrabold text-violet-800 underline decoration-violet-300 underline-offset-4">Open Media Library</a>
+                                                    @endif
+                                                </div>
+
+                                                <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                                                    <div>
+                                                        <label class="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Choose existing</label>
+                                                        <select name="payload[media_asset_uuid]" class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900">
+                                                            <option value="">No media</option>
+                                                            @if($currentMediaUuid !== '' && ! in_array($currentMediaUuid, $mediaAssetUuids, true))
+                                                                <option value="{{ $currentMediaUuid }}" @selected($selectedMediaUuid === $currentMediaUuid)>
+                                                                    Keep current archived asset — {{ $editMedia['title'] ?? $currentMediaUuid }}
+                                                                </option>
+                                                            @endif
+                                                            @foreach($mediaAssets as $asset)
+                                                                <option value="{{ $asset['uuid'] }}" @selected($selectedMediaUuid === (string) $asset['uuid'])>
+                                                                    {{ ucfirst((string) ($asset['kind'] ?? 'media')) }} — {{ $asset['title'] ?? $asset['uuid'] }}
+                                                                </option>
+                                                            @endforeach
+                                                        </select>
+                                                        @if($failedThisMessage) @error('payload.media_asset_uuid')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror @endif
+                                                    </div>
+
+                                                    <div>
+                                                        <label class="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Or upload new</label>
+                                                        <input type="file" name="payload[media_upload]" class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-full file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white">
+                                                        <input name="payload[media_title]" value="{{ $failedThisMessage ? old('payload.media_title', '') : '' }}" placeholder="Optional title for new upload" class="mt-2 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900">
+                                                        <p class="mt-2 text-xs leading-5 text-slate-500">A new upload takes precedence over the existing-asset selection.</p>
+                                                        @if($failedThisMessage) @error('payload.media_upload')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror @endif
+                                                    </div>
+                                                </div>
+
+                                                <div class="mt-4">
+                                                    <label class="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Video poster image <span class="normal-case font-semibold text-slate-400">(optional)</span></label>
+                                                    <select name="payload[media_poster_asset_uuid]" class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900">
+                                                        <option value="">Use generic video card</option>
+                                                        @if($currentPosterUuid !== '' && ! in_array($currentPosterUuid, array_column($mediaImageAssets, 'uuid'), true))
+                                                            <option value="{{ $currentPosterUuid }}" @selected($selectedPosterUuid === $currentPosterUuid)>
+                                                                Keep current archived poster
+                                                            </option>
+                                                        @endif
+                                                        @foreach($mediaImageAssets as $asset)
+                                                            <option value="{{ $asset['uuid'] }}" @selected($selectedPosterUuid === (string) $asset['uuid'])>
+                                                                {{ $asset['title'] ?? $asset['uuid'] }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                    <p class="mt-2 text-xs leading-5 text-slate-500">Poster images apply only to video. Without one, the email shows a safe play-card instead of relying on inconsistent in-inbox video playback.</p>
+                                                    @if($failedThisMessage) @error('payload.media_poster_asset_uuid')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror @endif
+                                                </div>
+                                            </section>
+                                        @endif
 
                                         <div class="grid gap-4 sm:grid-cols-2">
                                             <div>

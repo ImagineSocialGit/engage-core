@@ -160,6 +160,9 @@
                             :presentation="$messageLibrary"
                             :editable="true"
                             :token-fallbacks-editable="true"
+                            :media-available="$messageMediaAvailable"
+                            :media-assets="$messageMediaAssets"
+                            :media-library-url="$messageMediaLibraryUrl"
                             :initial-message-id="'preset:'.$selectedPreset->getKey()"
                             empty-message="No messages are available in this family."
                         />

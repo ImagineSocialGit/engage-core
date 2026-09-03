@@ -1355,3 +1355,11 @@ The 15A/15B implementation sequence is complete for the core Messaging persisten
 Separate future refactors may still remove bounded compatibility fields or migrate owning modules further, but they must be justified independently and must not be described as unfinished 15B work.
 
 Before production data migration, the export/import tool should treat the current post-15B schema as the target contract and explicitly map or drop historical legacy payload/terminal fields.
+
+## Reusable Media integration
+
+Messaging does not own uploaded files. When both `messaging` and the silent `media` module are enabled, the support integration layer supplies the canonical template editor with active reusable Media assets and runtime upload access.
+
+Published email content stores a resolved media snapshot rather than a live `MediaAsset` foreign key. Scheduled-message canonicalization pins that snapshot with the rest of the immutable payload, so later Media title changes or archive actions cannot rewrite existing message versions.
+
+The email renderer supports a `{media}` body marker. If a message has media and does not contain that marker, the media card is appended after the body. Video uses an email-safe poster/play card (or a generic play card when no poster is selected), and plain text includes the tracked destination URL. Media clicks use the existing CTA engagement route with the stable `media_primary` tracking key.

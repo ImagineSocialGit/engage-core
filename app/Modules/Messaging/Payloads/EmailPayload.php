@@ -8,6 +8,7 @@ use App\Modules\Messaging\Contracts\Email\ThreadedEmailMessage;
 use App\Modules\Messaging\Support\CtaTrackingLinkGenerator;
 use App\Modules\Messaging\Support\EmailConsentRevocationLinkGenerator;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
+use App\Modules\Messaging\Support\MessageMediaPayload;
 use App\Support\Clients\ViewResolver;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Arr;
@@ -33,6 +34,7 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
         public readonly array $cta = [],
         public readonly array $ctas = [],
         public readonly array $secondaryLink = [],
+        public readonly array $media = [],
         public readonly ?string $footer = null,
         public readonly ?string $unsubscribeUrl = null,
         public readonly ?string $transactionalOptOutUrl = null,
@@ -84,6 +86,8 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
             ctas: self::listArrayValue($payload['ctas'] ?? null),
 
             secondaryLink: self::arrayValue($payload['secondary_link'] ?? null),
+
+            media: self::arrayValue($payload['media'] ?? null),
 
             footer: self::nullableString($payload['footer'] ?? null),
 
@@ -143,6 +147,14 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
     public function plainText(): string
     {
         $body = $this->text();
+        $mediaBlock = $this->plainTextMediaBlock();
+
+        if (str_contains($body, '{media}')) {
+            $body = str_replace('{media}', $mediaBlock, $body);
+        } elseif ($mediaBlock !== '') {
+            $body = rtrim($body)."\n\n".$mediaBlock;
+        }
+
         $ctaBlock = $this->plainTextCtaBlock();
 
         if (str_contains($body, '{cta}')) {
@@ -192,7 +204,7 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
 
     public function html(): string
     {
-        return View::make(
+        $html = View::make(
             ViewResolver::resolve($this->view()),
             [
                 ...$this->tokens,
@@ -208,7 +220,7 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
 
                 'preheader' => $this->configValue('preheader'),
 
-                'body' => $this->bodyLines(),
+                'body' => $this->bodyLinesForHtml(),
 
                 'details' => $this->configArray('details'),
 
@@ -225,6 +237,8 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
                 'transactionalOptOutUrl' => $this->transactionalOptOutUrl(),
             ]
         )->render();
+
+        return str_replace('{media}', $this->mediaCardHtml(), $html);
     }
 
     public function mailable(): Mailable
@@ -327,6 +341,7 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
             'cta' => $this->resolvedArray('cta', $this->cta),
             'ctas' => $this->resolvedListArray('ctas', $this->ctas),
             'secondary_link' => $this->resolvedArray('secondary_link', $this->secondaryLink),
+            'media' => $this->resolvedMedia(),
             'footer' => $this->footer ?? $this->configValue('footer'),
             'unsubscribe_url' => $this->marketingUnsubscribeUrl(),
             'transactional_opt_out_url' => $this->transactionalOptOutUrl(),
@@ -353,6 +368,81 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
         return array_values(array_filter(
             preg_split('/\r\n|\n|\r/', $this->text()) ?: []
         ));
+    }
+
+    private function bodyLinesForHtml(): array
+    {
+        $lines = $this->bodyLines();
+        $hasMarker = collect($lines)->contains(
+            fn (mixed $line): bool => is_string($line) && str_contains($line, '{media}'),
+        );
+
+        if (! $hasMarker && $this->resolvedMedia() !== []) {
+            $lines[] = '{media}';
+        }
+
+        return $lines;
+    }
+
+    /** @return array<string, mixed> */
+    private function resolvedUntrackedMedia(): array
+    {
+        $media = $this->media !== [] ? $this->media : $this->configArray('media');
+
+        if (! is_array($media) || array_is_list($media)) {
+            return [];
+        }
+
+        $media = $this->interpolateRecursive($media);
+
+        return MessageMediaPayload::valid($media) ? $media : [];
+    }
+
+    /** @return array<string, mixed> */
+    private function resolvedMedia(): array
+    {
+        $media = $this->resolvedUntrackedMedia();
+
+        return $media === [] ? [] : $this->withTrackedDestination($media);
+    }
+
+    private function mediaCardHtml(): string
+    {
+        $media = $this->resolvedMedia();
+        $sourceMedia = $this->resolvedUntrackedMedia();
+
+        if ($media === [] || $sourceMedia === []) {
+            return '';
+        }
+
+        return View::make(
+            ViewResolver::resolve('email-media-card'),
+            [
+                'media' => $media,
+                'sourceUrl' => $sourceMedia['url'],
+            ],
+        )->render();
+    }
+
+    private function plainTextMediaBlock(): string
+    {
+        $media = $this->resolvedMedia();
+
+        if ($media === []) {
+            return '';
+        }
+
+        $title = trim((string) ($media['title'] ?? 'Media'));
+        $url = trim((string) ($media['url'] ?? ''));
+        $label = match ($media['kind'] ?? null) {
+            MessageMediaPayload::KIND_VIDEO => 'Watch',
+            MessageMediaPayload::KIND_AUDIO => 'Listen',
+            MessageMediaPayload::KIND_IMAGE => 'View image',
+            MessageMediaPayload::KIND_DOCUMENT => 'Open document',
+            default => 'Open file',
+        };
+
+        return $url !== '' ? "{$label} {$title}:\n{$url}" : '';
     }
 
     private function configValue(string $key): ?string
@@ -431,7 +521,7 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
             $value !== [] ? $value : $this->configArray($key)
         );
 
-        return in_array($key, ['cta', 'secondary_link'], true)
+        return in_array($key, ['cta', 'secondary_link', 'media'], true)
             ? $this->withTrackedDestination($resolved)
             : $resolved;
     }

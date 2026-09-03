@@ -57,6 +57,10 @@ final class PublishMessageTemplatePresetOverrideAction
             baseline: $messageTemplate->currentPayload(),
             submitted: $submittedPayload,
         );
+        $submittedPayload = $this->preserveMedia(
+            baseline: $messageTemplate->currentPayload(),
+            submitted: $submittedPayload,
+        );
         $submittedPayload = $this->preserveTrackingKeys(
             baseline: $messageTemplate->currentPayload(),
             submitted: $submittedPayload,
@@ -155,6 +159,26 @@ final class PublishMessageTemplatePresetOverrideAction
             && is_array($baseline['token_fallbacks'])
         ) {
             $submitted['token_fallbacks'] = $baseline['token_fallbacks'];
+        }
+
+        return $submitted;
+    }
+
+    /**
+     * Callers without Media authoring controls must not silently erase an
+     * already-published media snapshot. An explicit media key, including null
+     * to remove it, always wins.
+     *
+     * @param array<string, mixed> $baseline
+     * @param array<string, mixed> $submitted
+     * @return array<string, mixed>
+     */
+    private function preserveMedia(array $baseline, array $submitted): array
+    {
+        if (! array_key_exists('media', $submitted)
+            && is_array($baseline['media'] ?? null)
+        ) {
+            $submitted['media'] = $baseline['media'];
         }
 
         return $submitted;

@@ -189,6 +189,7 @@ class ScheduledMessagePayloadCanonicalizer
                 'cta',
                 'ctas',
                 'secondary_link',
+                'media',
                 'footer',
                 'unsubscribe_url',
                 'transactional_opt_out_url',
@@ -325,6 +326,7 @@ class ScheduledMessagePayloadCanonicalizer
             'secondary_link',
             $payload['secondary_link'] ?? null,
         );
+        $this->copyArray($canonical, 'media', $payload['media'] ?? null);
         $this->copyNullableString($canonical, 'footer', $payload['footer'] ?? null);
         $this->copyNullableString(
             $canonical,
@@ -478,7 +480,7 @@ class ScheduledMessagePayloadCanonicalizer
             $this->copyNullableString($canonical, $key, $payload[$key] ?? null);
         }
 
-        foreach (['cta', 'secondary_link'] as $key) {
+        foreach (['cta', 'secondary_link', 'media'] as $key) {
             $this->copyArray($canonical, $key, $payload[$key] ?? null);
         }
 
@@ -535,6 +537,7 @@ class ScheduledMessagePayloadCanonicalizer
             'cta',
             'ctas',
             'secondary_link',
+            'media',
             'footer',
             'unsubscribe_url',
             'transactional_opt_out_url',

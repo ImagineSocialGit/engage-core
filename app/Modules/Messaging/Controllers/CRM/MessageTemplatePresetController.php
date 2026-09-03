@@ -23,6 +23,7 @@ use App\Modules\Messaging\Services\MessageTemplateCompositionResolver;
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
 use App\Modules\Messaging\Services\MessageTemplatePublicationHookRegistry;
 use App\Modules\Messaging\Services\MessageTemplateUsageResolver;
+use App\Support\ModuleIntegrations\Messaging\Contracts\MessageMediaLibrary;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,6 +42,7 @@ class MessageTemplatePresetController extends Controller
         MessageTemplateCompositionEditorPresenter $compositionPresenter,
         MessageTemplateCatalogCarouselPresenter $catalogCarouselPresenter,
         MessageTemplateDisplayLabelResolver $displayLabels,
+        MessageMediaLibrary $messageMediaLibrary,
     ): View {
         $catalogEntries = MessageTemplateCatalogEntry::query()
             ->active()
@@ -136,6 +138,13 @@ class MessageTemplatePresetController extends Controller
             'sharedCompositionLayers' => $compositionState['shared_layers'],
             'messageOverrideLayer' => $compositionState['message_override'],
             'fieldSources' => $compositionState['field_sources'],
+            'messageMediaAvailable' => $messageMediaLibrary->available(),
+            'messageMediaAssets' => $messageMediaLibrary->available()
+                ? $messageMediaLibrary->selectableAssets()
+                : [],
+            'messageMediaLibraryUrl' => $messageMediaLibrary->available()
+                ? route('crm.media.index')
+                : null,
         ]);
     }
 
@@ -144,19 +153,26 @@ class MessageTemplatePresetController extends Controller
         MessageTemplatePreset $messageTemplatePreset,
         PublishMessageTemplatePresetOverrideAction $publishOverride,
         MessageTemplatePublicationHookRegistry $publicationHooks,
+        MessageMediaLibrary $messageMediaLibrary,
     ): RedirectResponse {
         $actor = $request->user();
         $actor = $actor instanceof User ? $actor : null;
+        $submittedPayload = $this->submittedPayloadWithMedia(
+            request: $request,
+            preset: $messageTemplatePreset,
+            messageMediaLibrary: $messageMediaLibrary,
+            actor: $actor,
+        );
         $result = DB::transaction(function () use (
             $messageTemplatePreset,
             $publishOverride,
             $publicationHooks,
-            $request,
+            $submittedPayload,
             $actor,
         ) {
             $result = $publishOverride->handle(
                 preset: $messageTemplatePreset,
-                submittedPayload: $request->safePayload(),
+                submittedPayload: $submittedPayload,
                 createdBy: $actor,
             );
 
@@ -452,6 +468,7 @@ class MessageTemplatePresetController extends Controller
                 'cta' => ['label' => Arr::get($payload, 'cta.label', ''), 'url' => Arr::get($payload, 'cta.url', '')],
                 'ctas' => $this->editableCtas(Arr::get($payload, 'ctas', [])),
                 'secondary_link' => ['label' => Arr::get($payload, 'secondary_link.label', ''), 'url' => Arr::get($payload, 'secondary_link.url', '')],
+                'media' => is_array(Arr::get($payload, 'media')) ? Arr::get($payload, 'media') : [],
             ];
         }
 
@@ -482,6 +499,94 @@ class MessageTemplatePresetController extends Controller
             },
             $ctas,
         )));
+    }
+
+    /** @return array<string, mixed> */
+    private function submittedPayloadWithMedia(
+        UpdateMessageTemplatePresetRequest $request,
+        MessageTemplatePreset $preset,
+        MessageMediaLibrary $messageMediaLibrary,
+        ?User $actor,
+    ): array {
+        $submitted = $request->safePayload();
+
+        if (! $request->hasMediaSubmission()) {
+            return $submitted;
+        }
+
+        if (! $messageMediaLibrary->available()) {
+            throw ValidationException::withMessages([
+                'payload.media_asset_uuid' => 'Enable the Media module before adding media to a message.',
+            ]);
+        }
+
+        $currentMedia = $this->currentMediaSnapshot($preset);
+        $upload = $request->mediaUpload();
+        $selectedUuid = $request->mediaAssetUuid();
+        $posterUuid = $request->mediaPosterAssetUuid();
+
+        try {
+            if ($upload !== null) {
+                $submitted['media'] = $messageMediaLibrary->store(
+                    file: $upload,
+                    title: $request->mediaTitle(),
+                    posterAssetUuid: $posterUuid,
+                    uploadedBy: $actor,
+                );
+
+                return $submitted;
+            }
+
+            if ($selectedUuid !== null) {
+                $currentUuid = is_string($currentMedia['asset_uuid'] ?? null)
+                    ? trim($currentMedia['asset_uuid'])
+                    : null;
+                $currentPosterUuid = is_string($currentMedia['poster_asset_uuid'] ?? null)
+                    ? trim($currentMedia['poster_asset_uuid'])
+                    : null;
+
+                if ($currentMedia !== []
+                    && $selectedUuid === $currentUuid
+                    && $posterUuid === $currentPosterUuid
+                ) {
+                    $submitted['media'] = $currentMedia;
+                } else {
+                    $submitted['media'] = $messageMediaLibrary->snapshot(
+                        assetUuid: $selectedUuid,
+                        posterAssetUuid: $posterUuid,
+                    );
+                }
+
+                return $submitted;
+            }
+        } catch (\RuntimeException|\InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'payload.media_asset_uuid' => $exception->getMessage(),
+            ]);
+        }
+
+        if ($currentMedia !== []) {
+            $submitted['media'] = null;
+        }
+
+        return $submitted;
+    }
+
+    /** @return array<string, mixed> */
+    private function currentMediaSnapshot(MessageTemplatePreset $preset): array
+    {
+        $template = MessageTemplate::query()
+            ->with('currentVersion')
+            ->where('key', $preset->key)
+            ->first();
+        $payload = $template instanceof MessageTemplate
+            ? $template->currentPayload()
+            : (is_array($preset->payload) ? $preset->payload : []);
+        $media = $payload['media'] ?? null;
+
+        return is_array($media) && ! array_is_list($media)
+            ? $media
+            : [];
     }
 
     private function safeReturnPath(Request $request): ?string

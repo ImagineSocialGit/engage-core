@@ -4,6 +4,7 @@ namespace App\Modules\Messaging\ConfigContracts;
 
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Services\MessageTokenFallbackResolver;
+use App\Modules\Messaging\Support\MessageMediaPayload;
 use App\Support\ConfigContracts\Data\ConfigField;
 use App\Support\ConfigContracts\Data\ConfigSchema;
 
@@ -59,6 +60,22 @@ class MessageDefinitionSchema
             'tracking_key' => ConfigField::optional(ConfigSchema::string()),
             'label' => ConfigField::required(ConfigSchema::string()),
             'url' => ConfigField::required(ConfigSchema::string()),
+        ]);
+    }
+
+    public static function media(): ConfigSchema
+    {
+        return ConfigSchema::object([
+            'asset_uuid' => ConfigField::required(ConfigSchema::string()),
+            'kind' => ConfigField::required(ConfigSchema::string(
+                allowedValues: MessageMediaPayload::KINDS,
+            )),
+            'title' => ConfigField::required(ConfigSchema::string()),
+            'url' => ConfigField::required(ConfigSchema::string()),
+            'mime_type' => ConfigField::optional(ConfigSchema::string(nullable: true)),
+            'poster_asset_uuid' => ConfigField::optional(ConfigSchema::string(nullable: true)),
+            'poster_url' => ConfigField::optional(ConfigSchema::string(nullable: true)),
+            'tracking_key' => ConfigField::optional(ConfigSchema::string()),
         ]);
     }
 }

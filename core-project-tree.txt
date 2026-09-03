@@ -992,7 +992,8 @@
 │   │   │   │   ├── CtaTrackingLinkGenerator.php
 │   │   │   │   ├── EmailConsentRevocationLinkGenerator.php
 │   │   │   │   ├── EmailReplyAddressGenerator.php
-│   │   │   │   └── MessageDefinitionConfigPath.php
+│   │   │   │   ├── MessageDefinitionConfigPath.php
+│   │   │   │   └── MessageMediaPayload.php
 │   │   │   ├── TokenContracts
 │   │   │   │   └── MessagingTokenContextProvider.php
 │   │   │   └── Validation
@@ -1659,6 +1660,12 @@
 │       │   │       ├── OnlyActiveTeamMemberTaskAssignmentStrategyResolver.php
 │       │   │       ├── TeamMemberTaskAssignedRecipientResolver.php
 │       │   │       └── TeamMemberTaskAssigneeOptionProvider.php
+│       │   ├── Messaging
+│       │   │   ├── Contracts
+│       │   │   │   └── MessageMediaLibrary.php
+│       │   │   ├── Media
+│       │   │   │   └── MediaMessageMediaLibrary.php
+│       │   │   └── UnavailableMessageMediaLibrary.php
 │       │   ├── RelationshipLocationAreaBridge.php
 │       │   ├── RelationshipLocationAreaImportHandler.php
 │       │   └── Scheduling
@@ -2506,6 +2513,7 @@
 │       │       │   └── index.blade.php
 │       │       └── post-event-review.blade.php
 │       ├── email.blade.php
+│       ├── email-media-card.blade.php
 │       ├── email-text.blade.php
 │       ├── messaging
 │       │   ├── permission-invitations
@@ -2842,6 +2850,7 @@
 │   │   │   ├── DispatchMessageActionTest.php
 │   │   │   ├── EmailHygieneServiceTest.php
 │   │   │   ├── EmailMessagingServiceTest.php
+│   │   │   ├── EmailPayloadMediaTest.php
 │   │   │   ├── EmailPayloadTest.php
 │   │   │   ├── EmailReplyAddressGeneratorTest.php
 │   │   │   ├── FlowRouteReusableMessageTemplateAuthoringTest.php
@@ -2872,6 +2881,7 @@
 │   │   │   ├── MessageDispatchDefinitionMatcherTest.php
 │   │   │   ├── MessageEligibilityGateTest.php
 │   │   │   ├── MessageEventWebhookOwnershipTest.php
+│   │   │   ├── MessageMediaPayloadValidationTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
 │   │   │   ├── MessageTemplateBehaviorOwnershipValidationTest.php
 │   │   │   ├── MessageTemplateCarouselEditorTest.php
@@ -2883,6 +2893,7 @@
 │   │   │   ├── MessageTemplateCompositionTest.php
 │   │   │   ├── MessageTemplateCompositionValidationTest.php
 │   │   │   ├── MessageTemplateEditorVersionCutoverTest.php
+│   │   │   ├── MessageTemplateMediaVersioningTest.php
 │   │   │   ├── MessageTemplatePresetAssignmentResolverTest.php
 │   │   │   ├── MessageTemplatePresetControllerTest.php
 │   │   │   ├── MessageTemplatePresetSyncActionTest.php
@@ -2926,6 +2937,8 @@
 │   │   │   └── TestingSurfaceBackgroundIsolationTest.php
 │   │   ├── ModuleFacts
 │   │   │   └── ModuleFactRegistryTest.php
+│   │   ├── ModuleIntegrations
+│   │   │   └── MessagingMediaLibraryTest.php
 │   │   ├── Modules
 │   │   │   ├── ContactShowModuleVisibilityTest.php
 │   │   │   ├── MigrationContractSourceOfTruthTest.php
@@ -3169,4 +3182,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-754 directories, 2416 files
+758 directories, 2425 files

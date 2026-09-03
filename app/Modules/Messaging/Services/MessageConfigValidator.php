@@ -5,6 +5,7 @@ namespace App\Modules\Messaging\Services;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Support\CtaTrackingLinkGenerator;
+use App\Modules\Messaging\Support\MessageMediaPayload;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Support\Queues\QueueContract;
 
@@ -580,6 +581,20 @@ class MessageConfigValidator
                         );
                     }
                 }
+            }
+        }
+
+        if (array_key_exists('media', $payload) && $payload['media'] !== null) {
+            foreach (MessageMediaPayload::validationErrors($payload['media']) as $mediaError) {
+                $mediaPath = is_string($mediaError['path'] ?? null)
+                    ? trim($mediaError['path'])
+                    : '';
+
+                $issues[] = $this->issue(
+                    'error',
+                    $mediaPath !== '' ? "{$path}.media.{$mediaPath}" : "{$path}.media",
+                    (string) ($mediaError['message'] ?? 'Payload media is invalid.'),
+                );
             }
         }
 

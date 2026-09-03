@@ -8,6 +8,7 @@ use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
 use App\Modules\Messaging\Services\MessageTokenFallbackResolver;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
@@ -37,6 +38,15 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
             'payload.secondary_link' => ['nullable', 'array'],
             'payload.secondary_link.label' => ['nullable', 'string', 'max:255'],
             'payload.secondary_link.url' => ['nullable', 'string', 'max:1000'],
+            'payload.media_present' => ['nullable', 'boolean'],
+            'payload.media_asset_uuid' => ['nullable', 'uuid'],
+            'payload.media_poster_asset_uuid' => ['nullable', 'uuid'],
+            'payload.media_title' => ['nullable', 'string', 'max:255'],
+            'payload.media_upload' => [
+                'nullable',
+                'file',
+                'max:'.max(1, (int) config('media.max_upload_kilobytes', 262144)),
+            ],
             'payload.token_fallbacks_present' => ['nullable', 'boolean'],
             'payload.token_fallbacks' => ['nullable', 'array', 'max:50'],
             'payload.token_fallbacks.*' => ['required', 'array'],
@@ -124,6 +134,53 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
     public function safePayload(): array
     {
         return $this->cleanPayload($this->validated('payload'));
+    }
+
+    public function hasMediaSubmission(): bool
+    {
+        $payload = $this->input('payload', []);
+        $payload = is_array($payload) ? $payload : [];
+
+        return $this->hasFile('payload.media_upload')
+            || in_array(
+                $payload['media_present'] ?? null,
+                [true, 1, '1', 'true', 'on'],
+                true,
+            );
+    }
+
+    public function mediaAssetUuid(): ?string
+    {
+        $value = $this->validated('payload.media_asset_uuid');
+
+        return is_string($value) && trim($value) !== ''
+            ? trim($value)
+            : null;
+    }
+
+    public function mediaPosterAssetUuid(): ?string
+    {
+        $value = $this->validated('payload.media_poster_asset_uuid');
+
+        return is_string($value) && trim($value) !== ''
+            ? trim($value)
+            : null;
+    }
+
+    public function mediaTitle(): ?string
+    {
+        $value = $this->validated('payload.media_title');
+
+        return is_string($value) && trim($value) !== ''
+            ? trim($value)
+            : null;
+    }
+
+    public function mediaUpload(): ?UploadedFile
+    {
+        $file = $this->file('payload.media_upload');
+
+        return $file instanceof UploadedFile ? $file : null;
     }
 
     /** @return array<string, mixed> */

@@ -18,6 +18,9 @@ use App\Support\ModuleIntegrations\Forms\Messaging\GrantFormSubmissionMessagingC
 use App\Support\DestinationVerification\Contracts\DestinationVerificationTransport;
 use App\Support\DestinationVerification\UnavailableDestinationVerificationTransport;
 use App\Support\ModuleIntegrations\Scheduling\Contracts\AppointmentCommunications;
+use App\Support\ModuleIntegrations\Messaging\Contracts\MessageMediaLibrary;
+use App\Support\ModuleIntegrations\Messaging\Media\MediaMessageMediaLibrary;
+use App\Support\ModuleIntegrations\Messaging\UnavailableMessageMediaLibrary;
 use App\Support\ModuleIntegrations\Scheduling\UnavailableAppointmentCommunications;
 use App\Support\ModuleIntegrations\Scheduling\Messaging\MessagingAppointmentCommunications;
 use App\Support\ModuleIntegrations\Scheduling\Messaging\MessagingSchedulingDestinationVerificationTransport;
@@ -135,6 +138,22 @@ class AppServiceProvider extends ServiceProvider
                 }
 
                 return $app->make(UnavailableAppointmentCommunications::class);
+            },
+        );
+
+        $this->app->singleton(
+            MessageMediaLibrary::class,
+            function ($app): MessageMediaLibrary {
+                $enabled = $app->make(ModuleManager::class)
+                    ->enabledKeysWithDependencies();
+
+                if (in_array('messaging', $enabled, true)
+                    && in_array('media', $enabled, true)
+                ) {
+                    return $app->make(MediaMessageMediaLibrary::class);
+                }
+
+                return $app->make(UnavailableMessageMediaLibrary::class);
             },
         );
 

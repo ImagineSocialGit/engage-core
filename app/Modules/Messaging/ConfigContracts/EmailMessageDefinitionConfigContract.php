@@ -33,6 +33,7 @@ class EmailMessageDefinitionConfigContract implements ConfigContract
             'cta' => ConfigField::optional(MessageDefinitionSchema::link()),
             'ctas' => ConfigField::optional(ConfigSchema::listOf(MessageDefinitionSchema::link())),
             'secondary_link' => ConfigField::optional(MessageDefinitionSchema::link()),
+            'media' => ConfigField::optional(MessageDefinitionSchema::media()),
             'footer' => ConfigField::optional(ConfigSchema::string(nullable: true)),
             'token_fallbacks' => ConfigField::optional(MessageDefinitionSchema::tokenFallbacks()),
         ]));

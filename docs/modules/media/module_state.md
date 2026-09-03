@@ -81,12 +81,17 @@ Project State does not transfer binary objects, so copying asset rows without th
 
 Consuming modules should not assume Project State currently transports the Media library.
 
-## Next integration
+## Messaging integration
 
-The next planned slice is Messaging integration:
+When both Media and Messaging are enabled, a support-layer bridge exposes active Media assets to the canonical Messaging template editor without making either module depend directly on the other.
 
-- select an existing Media asset while authoring email content;
+Messaging may:
+
+- select an existing active asset or upload a new asset while editing an email;
+- snapshot the selected asset UUID, public URL, title, kind, MIME type, and optional video poster into the immutable message version;
 - render video as a poster/play card linked to the public video URL rather than relying on inconsistent in-email HTML5 playback;
-- provide plain-text fallback URLs;
-- reuse existing Messaging CTA engagement tracking for media clicks;
-- support newsletter-signup greeting videos as the first client use case.
+- render image, audio, document, and file cards through the same media payload;
+- include a plain-text fallback URL; and
+- reuse Messaging CTA engagement tracking under the stable `media_primary` tracking key.
+
+Archived assets disappear from new selection but are not deleted. Already-published message versions retain their resolved media snapshot and therefore do not depend on a live Media lookup at send time.
