@@ -78,8 +78,14 @@
 # RESEND_FROM_EMAIL_MARKETING=
 # RESEND_FROM_NAME_MARKETING=
 # PERMISSION_INVITATION_PUBLIC_URL=
+#
+# Internal Notifications sender overrides. Normally omit these and inherit the
+# shared Messaging MAIL_FROM_ADDRESS / MAIL_FROM_NAME identity. In a live
+# deployment, INTERNAL_NOTIFICATION_FROM_ADDRESS becomes required only when the
+# shared address fallback is not configured.
 # INTERNAL_NOTIFICATION_FROM_ADDRESS=
 # INTERNAL_NOTIFICATION_FROM_NAME=
+#
 # Optional fallback recipient used only when Inbound Messaging and Internal
 # Notifications are both enabled and no assigned active team member resolves.
 # INBOUND_REPLY_DEFAULT_TEAM_MEMBER_EMAIL=

@@ -185,8 +185,11 @@ return [
     'internal_notifications' => [
 
         'email' => [
-            'from_address' => env('INTERNAL_NOTIFICATION_FROM_ADDRESS', env('MAIL_FROM_ADDRESS')),
-            'from_name' => env('INTERNAL_NOTIFICATION_FROM_NAME', env('MAIL_FROM_NAME', config('app.name'))),
+            'from_address' => env('INTERNAL_NOTIFICATION_FROM_ADDRESS')
+                ?: env('MAIL_FROM_ADDRESS'),
+            'from_name' => env('INTERNAL_NOTIFICATION_FROM_NAME')
+                ?: env('MAIL_FROM_NAME')
+                ?: config('app.name'),
         ],
 
         'sms' => [

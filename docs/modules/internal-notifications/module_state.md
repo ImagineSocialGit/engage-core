@@ -39,4 +39,15 @@ Good:
 
 Bad:
 
-    Messaging -> InternalNotifications model
+    Messaging -> InternalNotifications model## Deployment ownership
+
+InternalNotifications owns these selected-client environment overrides:
+
+- `INTERNAL_NOTIFICATION_FROM_ADDRESS`
+- `INTERNAL_NOTIFICATION_FROM_NAME`
+
+They do not create a second delivery-provider stack. Messaging continues to own email/SMS provider selection, credentials, webhook verification, and provider sender numbers.
+
+For live staging/production email notifications, `INTERNAL_NOTIFICATION_FROM_ADDRESS` is required only when the shared `MAIL_FROM_ADDRESS` fallback does not already resolve an internal-notification sender. The display-name override is always optional because the runtime falls back to `MAIL_FROM_NAME` and then the application name.
+
+Blank internal-notification sender overrides are treated like omission so they do not defeat the shared Messaging fallback chain.

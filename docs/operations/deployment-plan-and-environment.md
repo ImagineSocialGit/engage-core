@@ -200,6 +200,42 @@ The current Resend inbound runtime retrieves received email bodies with the same
 
 `INBOUND_REPLY_DEFAULT_TEAM_MEMBER_EMAIL` remains an optional selected-client fallback only when Internal Notifications is also enabled. It is not required for inbound capture, classification, routing, or reply correlation.
 
+## Internal Notifications sender requirements
+
+Internal Notifications is a team-facing capability built on Messaging rather than a second provider stack.
+
+It owns only these selected-client sender overrides:
+
+```text
+INTERNAL_NOTIFICATION_FROM_ADDRESS
+INTERNAL_NOTIFICATION_FROM_NAME
+```
+
+`INTERNAL_NOTIFICATION_FROM_NAME` is always optional. The runtime falls back to `MAIL_FROM_NAME` and then the application name.
+
+`INTERNAL_NOTIFICATION_FROM_ADDRESS` is normally optional because the runtime inherits the shared Messaging `MAIL_FROM_ADDRESS`. In staging/production, however, the Internal Notifications contributor requires its own address override when:
+
+- the internal-notification email surface is enabled; and
+- the effective shared sender fallback is unresolved.
+
+This matters when a client deliberately configures purpose-specific transactional/marketing email identities and therefore does not otherwise need `MAIL_FROM_ADDRESS`: those purpose-specific identities do not automatically become the Internal Notifications sender.
+
+Blank internal-notification sender overrides are treated as omitted, so they do not suppress the shared Messaging fallback.
+
+Internal Notifications does **not** reclaim Messaging-owned provider/runtime keys such as:
+
+```text
+EMAIL_PROVIDER
+RESEND_API_KEY
+RESEND_WEBHOOK_SECRET
+SMS_ENABLED
+SMS_PROVIDER
+TELNYX_API_KEY
+TELNYX_FROM_NOTIFICATIONS
+```
+
+`INBOUND_REPLY_DEFAULT_TEAM_MEMBER_EMAIL` also remains Inbound Messaging-owned because it controls inbound-reply recipient fallback rather than Internal Notifications delivery.
+
 ## Scheduling public-origin requirements
 
 Scheduling has one deployment-owned environment value: `SCHEDULING_APP_URL`.
@@ -264,10 +300,11 @@ Current deployment-plan contributors cover:
 - Forms
 - Messaging provider/runtime requirements
 - Inbound Messaging receiving-domain requirements
+- Internal Notifications sender requirements
 - Webinars / Zoom
 - Scheduling public-origin requirements
 - Media writable-storage requirements
 
-Forms resolves public intake enablement and its signing/identity requirements. Messaging resolves the selected email/SMS providers, live credentials, sender fallbacks, webhook verification, and operational defaults. Inbound Messaging resolves the live receiving domain required for signed Reply-To and semantic inbound-email routing without reclaiming Messaging-owned provider credentials. Webinars resolves Zoom provider readiness and post-event webhook requirements. Scheduling keeps public booking optional while validating any deliberately persisted public origin. Media activates storage-owner coverage only when its runtime upload capability is enabled, requiring writable Spaces and a stable CDN origin in staging/production.
+Forms resolves public intake enablement and its signing/identity requirements. Messaging resolves the selected email/SMS providers, live credentials, sender fallbacks, webhook verification, and operational defaults. Inbound Messaging resolves the live receiving domain required for signed Reply-To and semantic inbound-email routing without reclaiming Messaging-owned provider credentials. Internal Notifications resolves only its team-facing email sender overrides and requires an explicit live sender only when the shared Messaging fallback is unavailable. Webinars resolves Zoom provider readiness and post-event webhook requirements. Scheduling keeps public booking optional while validating any deliberately persisted public origin. Media activates storage-owner coverage only when its runtime upload capability is enabled, requiring writable Spaces and a stable CDN origin in staging/production.
 
 Additional module/provider contributors should continue to be added from fresh dependency cones. The Bash launcher should consume the resolved deployment plan rather than re-encoding module requirements itself.
