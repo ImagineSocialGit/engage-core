@@ -4,6 +4,7 @@ namespace App\Modules\Core\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Actions\Contacts\CreateManualContactAction;
+use App\Modules\Core\Actions\Contacts\UpdateContactAction;
 use App\Modules\Core\Contracts\Contacts\UpdatesContactStatus;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Jobs\ProcessContactImportBatchChunkJob;
@@ -11,6 +12,7 @@ use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Core\Models\ContactImportRun;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Core\Requests\StoreContactRequest;
+use App\Modules\Core\Requests\UpdateContactRequest;
 use App\Modules\Core\Services\Contacts\ContactImportProfileRegistry;
 use App\Modules\Core\Services\Contacts\ContactIndexFilterService;
 use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
@@ -93,6 +95,21 @@ class ContactController extends Controller
         return redirect()
             ->route('crm.contacts.show', $contact)
             ->with('success', config('contacts.labels.singular').' created.');
+    }
+
+    public function update(
+        UpdateContactRequest $request,
+        Contact $contact,
+        UpdateContactAction $updateContact,
+    ): RedirectResponse {
+        $validated = $request->validated();
+        unset($validated['contact_edit_context']);
+
+        $updateContact->handle($contact, $validated);
+
+        return redirect()
+            ->route('crm.contacts.show', $contact)
+            ->with('success', config('contacts.labels.singular').' updated.');
     }
 
     public function show(

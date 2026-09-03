@@ -73,6 +73,9 @@ Route::prefix(config('contacts.routes.plural'))
         Route::get('/{contact}', [ContactController::class, 'show'])
             ->name('show');
 
+        Route::patch('/{contact}', [ContactController::class, 'update'])
+            ->name('update');
+
         Route::patch('/{contact}/status', [ContactController::class, 'updateStatus'])
             ->middleware('module:workflow')
             ->name('status.update');

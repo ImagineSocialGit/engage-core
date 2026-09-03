@@ -90,6 +90,8 @@
             activityTab: new URLSearchParams(window.location.search).get('activity_tab') || @js($defaultActivityTab),
             messageTab: new URLSearchParams(window.location.search).get('messages_tab') || 'messages',
             taskModalOpen: @js($errors->has('assigned_to_id') || $errors->has('assigned_to_type') || $errors->has('links') || $errors->has('title') || $errors->has('description') || $errors->has('due_at')),
+            contactEditField: @js(old('contact_edit_context')),
+            contactDetailsModalOpen: @js(old('contact_edit_context') === 'details'),
         }"
     >
         @if(session('success'))
@@ -117,9 +119,50 @@
                             {{ $businessLabel }}
                         </p>
 
-                        <h2 class="mt-1 break-words text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-                            {{ $contactName }}
-                        </h2>
+                        <div class="mt-1 flex flex-wrap items-center gap-2" data-contact-quick-edit="name">
+                            <h2 class="break-words text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl" data-contact-name>
+                                {{ $contactName }}
+                            </h2>
+
+                            <button
+                                type="button"
+                                class="text-xs font-semibold text-slate-500 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
+                                x-on:click="contactEditField = contactEditField === 'name' ? null : 'name'"
+                                aria-label="Edit contact name"
+                            >
+                                Edit
+                            </button>
+                        </div>
+
+                        <form
+                            x-show="contactEditField === 'name'"
+                            x-cloak
+                            method="POST"
+                            action="{{ route('crm.contacts.update', $contact) }}"
+                            class="mt-3 max-w-xl"
+                            data-contact-quick-edit-form="name"
+                        >
+                            @csrf
+                            @method('PATCH')
+                            <input type="hidden" name="contact_edit_context" value="name">
+
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-start">
+                                <div class="min-w-0 flex-1">
+                                    <x-ui.form.input
+                                        id="contact_quick_name"
+                                        name="name"
+                                        value="{{ old('contact_edit_context') === 'name' ? old('name') : ($contact->name ?: $contactName) }}"
+                                        autocomplete="name"
+                                    />
+                                    <x-ui.form.error name="name" />
+                                </div>
+
+                                <div class="flex gap-2">
+                                    <x-ui.button type="submit" class="w-full sm:w-auto">Save</x-ui.button>
+                                    <x-ui.button type="button" variant="outline" class="w-full sm:w-auto" x-on:click="contactEditField = null">Cancel</x-ui.button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
 
                     @if($hasProgression)
@@ -283,14 +326,93 @@
                 </div>
 
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                    <div class="col-span-2">
-                        <p class="text-sm text-slate-500">Email</p>
-                        <p class="break-words font-medium text-slate-900">{{ $contact->email ?: '—' }}</p>
+                    <div class="col-span-2" data-contact-quick-edit="email">
+                        <div class="flex items-center gap-2">
+                            <p class="text-sm text-slate-500">Email</p>
+                            <button
+                                type="button"
+                                class="text-xs font-semibold text-slate-500 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
+                                x-on:click="contactEditField = contactEditField === 'email' ? null : 'email'"
+                                aria-label="Edit contact email"
+                            >
+                                Edit
+                            </button>
+                        </div>
+
+                        <p x-show="contactEditField !== 'email'" class="break-words font-medium text-slate-900">
+                            {{ $contact->email ?: '—' }}
+                        </p>
+
+                        <form
+                            x-show="contactEditField === 'email'"
+                            x-cloak
+                            method="POST"
+                            action="{{ route('crm.contacts.update', $contact) }}"
+                            class="mt-2"
+                            data-contact-quick-edit-form="email"
+                        >
+                            @csrf
+                            @method('PATCH')
+                            <input type="hidden" name="contact_edit_context" value="email">
+
+                            <x-ui.form.input
+                                id="contact_quick_email"
+                                name="email"
+                                type="email"
+                                value="{{ old('contact_edit_context') === 'email' ? old('email') : $contact->email }}"
+                                autocomplete="email"
+                            />
+                            <x-ui.form.error name="email" />
+
+                            <div class="mt-2 flex gap-2">
+                                <button type="submit" class="text-xs font-semibold text-indigo-600 hover:underline">Save</button>
+                                <button type="button" x-on:click="contactEditField = null" class="text-xs font-semibold text-slate-500 hover:underline">Cancel</button>
+                            </div>
+                        </form>
                     </div>
 
-                    <div>
-                        <p class="text-sm text-slate-500">Phone</p>
-                        <p class="font-medium text-slate-900">{{ $contact->phone ?: '—' }}</p>
+                    <div data-contact-quick-edit="phone">
+                        <div class="flex items-center gap-2">
+                            <p class="text-sm text-slate-500">Phone</p>
+                            <button
+                                type="button"
+                                class="text-xs font-semibold text-slate-500 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
+                                x-on:click="contactEditField = contactEditField === 'phone' ? null : 'phone'"
+                                aria-label="Edit contact phone"
+                            >
+                                Edit
+                            </button>
+                        </div>
+
+                        <p x-show="contactEditField !== 'phone'" class="font-medium text-slate-900">
+                            {{ $contact->phone ?: '—' }}
+                        </p>
+
+                        <form
+                            x-show="contactEditField === 'phone'"
+                            x-cloak
+                            method="POST"
+                            action="{{ route('crm.contacts.update', $contact) }}"
+                            class="mt-2"
+                            data-contact-quick-edit-form="phone"
+                        >
+                            @csrf
+                            @method('PATCH')
+                            <input type="hidden" name="contact_edit_context" value="phone">
+
+                            <x-ui.form.input
+                                id="contact_quick_phone"
+                                name="phone"
+                                value="{{ old('contact_edit_context') === 'phone' ? old('phone') : $contact->phone }}"
+                                autocomplete="tel"
+                            />
+                            <x-ui.form.error name="phone" />
+
+                            <div class="mt-2 flex gap-2">
+                                <button type="submit" class="text-xs font-semibold text-indigo-600 hover:underline">Save</button>
+                                <button type="button" x-on:click="contactEditField = null" class="text-xs font-semibold text-slate-500 hover:underline">Cancel</button>
+                            </div>
+                        </form>
                     </div>
 
                     <div>
@@ -330,6 +452,15 @@
                         x-on:click="activityTab = 'notes'; $nextTick(() => document.getElementById('contact-activity')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))"
                     >
                         Add Note
+                    </x-ui.button>
+
+                    <x-ui.button
+                        type="button"
+                        variant="outline"
+                        x-on:click="contactDetailsModalOpen = true"
+                        data-contact-details-edit
+                    >
+                        Edit details
                     </x-ui.button>
                 </div>
 
@@ -1076,5 +1207,147 @@
                 </div>
             </x-ui.card>
         @endif
+
+        <div
+            x-show="contactDetailsModalOpen"
+            x-cloak
+            x-on:keydown.escape.window="if (contactDetailsModalOpen) contactDetailsModalOpen = false"
+            x-on:click.self="contactDetailsModalOpen = false"
+            class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 px-3 py-4 sm:px-4"
+            data-contact-details-modal
+        >
+            <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="contact-details-modal-title"
+                class="my-auto max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl"
+            >
+                <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-6">
+                    <div>
+                        <h2 id="contact-details-modal-title" class="text-xl font-semibold tracking-tight text-slate-950">
+                            Edit contact details
+                        </h2>
+                    </div>
+
+                    <button
+                        type="button"
+                        x-on:click="contactDetailsModalOpen = false"
+                        class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-xl font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-950"
+                        aria-label="Close contact details editor"
+                    >
+                        ×
+                    </button>
+                </div>
+
+                <form
+                    method="POST"
+                    action="{{ route('crm.contacts.update', $contact) }}"
+                    class="space-y-5 px-5 py-5 sm:px-6 sm:py-6"
+                    data-contact-details-form
+                >
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="contact_edit_context" value="details">
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <x-ui.form.label for="contact_details_first_name">First name</x-ui.form.label>
+                            <x-ui.form.input
+                                id="contact_details_first_name"
+                                name="first_name"
+                                value="{{ old('contact_edit_context') === 'details' ? old('first_name') : $contact->first_name }}"
+                                autocomplete="given-name"
+                            />
+                            <x-ui.form.error name="first_name" />
+                        </div>
+
+                        <div>
+                            <x-ui.form.label for="contact_details_last_name">Last name</x-ui.form.label>
+                            <x-ui.form.input
+                                id="contact_details_last_name"
+                                name="last_name"
+                                value="{{ old('contact_edit_context') === 'details' ? old('last_name') : $contact->last_name }}"
+                                autocomplete="family-name"
+                            />
+                            <x-ui.form.error name="last_name" />
+                        </div>
+
+                        <div class="sm:col-span-2">
+                            <x-ui.form.label for="contact_details_name">Display name</x-ui.form.label>
+                            <x-ui.form.input
+                                id="contact_details_name"
+                                name="name"
+                                value="{{ old('contact_edit_context') === 'details' ? old('name') : $contact->name }}"
+                                autocomplete="name"
+                            />
+                            <x-ui.form.error name="name" />
+                        </div>
+
+                        <div>
+                            <x-ui.form.label for="contact_details_email">Email</x-ui.form.label>
+                            <x-ui.form.input
+                                id="contact_details_email"
+                                name="email"
+                                type="email"
+                                value="{{ old('contact_edit_context') === 'details' ? old('email') : $contact->email }}"
+                                autocomplete="email"
+                            />
+                            <x-ui.form.error name="email" />
+                        </div>
+
+                        <div>
+                            <x-ui.form.label for="contact_details_phone">Phone</x-ui.form.label>
+                            <x-ui.form.input
+                                id="contact_details_phone"
+                                name="phone"
+                                value="{{ old('contact_edit_context') === 'details' ? old('phone') : $contact->phone }}"
+                                autocomplete="tel"
+                            />
+                            <x-ui.form.error name="phone" />
+                        </div>
+
+                        <div>
+                            <x-ui.form.label for="contact_details_birthday">Birthday</x-ui.form.label>
+                            <x-ui.form.input
+                                id="contact_details_birthday"
+                                name="birthday"
+                                type="date"
+                                value="{{ old('contact_edit_context') === 'details' ? old('birthday') : $contact->birthday?->format('Y-m-d') }}"
+                            />
+                            <x-ui.form.error name="birthday" />
+                        </div>
+
+                        <div>
+                            <x-ui.form.label for="contact_details_source">Contact source</x-ui.form.label>
+                            <x-ui.form.input
+                                id="contact_details_source"
+                                name="source"
+                                value="{{ old('contact_edit_context') === 'details' ? old('source') : $contact->source }}"
+                            />
+                            <x-ui.form.error name="source" />
+                        </div>
+
+                        <div class="sm:col-span-2">
+                            <x-ui.form.label for="contact_details_subsource">Contact subsource</x-ui.form.label>
+                            <x-ui.form.input
+                                id="contact_details_subsource"
+                                name="subsource"
+                                value="{{ old('contact_edit_context') === 'details' ? old('subsource') : $contact->subsource }}"
+                            />
+                            <x-ui.form.error name="subsource" />
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
+                        <x-ui.button type="button" variant="outline" x-on:click="contactDetailsModalOpen = false">
+                            Cancel
+                        </x-ui.button>
+                        <x-ui.button type="submit">
+                            Save details
+                        </x-ui.button>
+                    </div>
+                </form>
+            </section>
+        </div>
     </div>
 </x-layouts.crm>

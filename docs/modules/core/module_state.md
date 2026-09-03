@@ -362,4 +362,6 @@ Modules contribute contact sections and panels through Core-owned registries.
 Contact show should lead with next action and use module-provided summaries below it.
 ```
 
+The Contact show page also owns fast editing for Core-owned contact identity fields. Display name, email, and phone have small in-place editors for routine corrections. A broader contact-details modal edits first name, last name, display name, email, phone, birthday, source, and subsource without sending the operator to a separate edit page. Updates address the existing Contact by its route-bound ID; changing email must not reuse email-based create/update resolution because email is itself editable identity data.
+
 Core may render module-provided DTOs/arrays/views, but it should not query module tables directly.
