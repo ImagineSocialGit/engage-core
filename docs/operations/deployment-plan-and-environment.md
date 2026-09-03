@@ -292,6 +292,21 @@ Unused values are informational. They are never deleted automatically.
 
 `ClientEnvironmentLoader` uses the same bootstrap-safe catalog to enforce client ownership. It clears every legal client-owned value before applying the selected client's `.env`, including when that `.env` file does not yet exist. This prevents stale root or previously selected client values from leaking across clients.
 
+## Flow Routes execution deployment requirements
+
+Flow Routes owns two root/process environment values:
+
+```text
+FLOW_ROUTE_CONTINUATION_QUEUE
+FLOW_ROUTE_IMMEDIATE_EXECUTION_BUDGET
+```
+
+Both have safe committed defaults and are therefore deployment-plan `defaulted` requirements rather than mandatory environment values. The continuation queue defaults to `default`. The immediate-execution budget defaults to `25`; when that many immediately advancing Points are consumed in one process slice, persisted progress continues through the configured queue.
+
+Persist these values only when deliberately tuning worker routing or the execution slice. A persisted immediate-execution budget must be a canonical positive integer. Invalid overrides block deployment instead of being silently cast/clamped by runtime configuration.
+
+These are Flow Routes-owned process controls. They do not belong in selected-client environment files.
+
 ## Reporting zero-environment contract
 
 Reporting is deployment-covered even though it currently contributes no environment requirements.
@@ -311,11 +326,14 @@ Current deployment-plan contributors cover:
 - Messaging provider/runtime requirements
 - Inbound Messaging receiving-domain requirements
 - Internal Notifications sender requirements
+- Flow Routes execution queue/budget defaults
 - Webinars / Zoom
 - Scheduling public-origin requirements
 - Reporting audited zero-environment contract
 - Media writable-storage requirements
 
-Forms resolves public intake enablement and its signing/identity requirements. Messaging resolves the selected email/SMS providers, live credentials, sender fallbacks, webhook verification, and operational defaults. Inbound Messaging resolves the live receiving domain required for signed Reply-To and semantic inbound-email routing without reclaiming Messaging-owned provider credentials. Internal Notifications resolves only its team-facing email sender overrides and requires an explicit live sender only when the shared Messaging fallback is unavailable. Webinars resolves Zoom provider readiness and post-event webhook requirements. Scheduling keeps public booking optional while validating any deliberately persisted public origin. Media activates storage-owner coverage only when its runtime upload capability is enabled, requiring writable Spaces and a stable CDN origin in staging/production. Reporting is explicitly covered with zero environment requirements because its current runtime contract is committed config/database state layered on Core-owned infrastructure.
+Forms resolves public intake enablement and its signing/identity requirements. Messaging resolves the selected email/SMS providers, live credentials, sender fallbacks, webhook verification, and operational defaults. Inbound Messaging resolves the live receiving domain required for signed Reply-To and semantic inbound-email routing without reclaiming Messaging-owned provider credentials. Internal Notifications resolves only its team-facing email sender overrides and requires an explicit live sender only when the shared Messaging fallback is unavailable. Flow Routes contributes its root/process execution queue and immediate-execution budget as safe defaults, while validating any deliberately persisted budget override as a positive integer. Webinars resolves Zoom provider readiness and post-event webhook requirements. Scheduling keeps public booking optional while validating any deliberately persisted public origin. Media activates storage-owner coverage only when its runtime upload capability is enabled, requiring writable Spaces and a stable CDN origin in staging/production. Reporting is explicitly covered with zero environment requirements because its current runtime contract is committed config/database state layered on Core-owned infrastructure.
 
-Additional module/provider contributors should continue to be added from fresh dependency cones. The Bash launcher should consume the resolved deployment plan rather than re-encoding module requirements itself.
+Deployment coverage is protected by a regression contract that registers every provider declared by the module registry and verifies that every owner appearing in `EnvironmentVariableCatalog` has at least one deployment contributor. Audited zero-environment contributors may appear as additional covered owners. This catches a newly introduced environment-owning subsystem that forgets to participate in deployment planning without maintaining another hard-coded module list.
+
+Future module/provider contributors should continue to be added from fresh dependency cones. The Bash launcher should consume the resolved deployment plan rather than re-encoding module requirements itself.

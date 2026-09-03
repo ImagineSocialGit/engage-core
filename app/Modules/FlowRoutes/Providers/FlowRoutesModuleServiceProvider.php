@@ -8,6 +8,7 @@ use App\Modules\FlowRoutes\ConfigContracts\FlowRoutePresetConfigContractTargetPr
 use App\Modules\FlowRoutes\ConfigContracts\FlowRoutePresetDefinitionConfigContract;
 use App\Modules\FlowRoutes\ConditionEvaluators\FlowRouteDataConditionEvaluator;
 use App\Modules\FlowRoutes\Console\Commands\SyncFlowRoutePresetsCommand;
+use App\Modules\FlowRoutes\Deployment\FlowRoutesDeploymentPlanContributor;
 use App\Modules\FlowRoutes\Listeners\HandleContactWorkflowStatusChanged;
 use App\Modules\FlowRoutes\Listeners\ResumeFlowRoutesFromAutomationEvent;
 use App\Modules\FlowRoutes\PointDefinitions\FlowRoutesAutomationPointDefinitionContributor;
@@ -38,6 +39,11 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->tag(
+            FlowRoutesDeploymentPlanContributor::class,
+            'deployment.plan_contributors',
+        );
+
         $this->app->singleton(AutomationTriggerAuthoringRegistry::class, function ($app): AutomationTriggerAuthoringRegistry {
             return new AutomationTriggerAuthoringRegistry(
                 contributors: $app->tagged('automation.trigger_authoring_contributors'),

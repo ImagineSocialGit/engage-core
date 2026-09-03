@@ -224,6 +224,7 @@ final class DeploymentPlanResolver
         return match ($valueRule) {
             EnvironmentRequirement::VALUE_RULE_HTTP_ORIGIN => $this->isHttpOrigin($value),
             EnvironmentRequirement::VALUE_RULE_EMAIL_DOMAIN => $this->isEmailDomain($value),
+            EnvironmentRequirement::VALUE_RULE_POSITIVE_INTEGER => $this->isPositiveInteger($value),
             default => false,
         };
     }
@@ -285,6 +286,29 @@ final class DeploymentPlanResolver
         return filter_var(
             'route@'.$domain,
             FILTER_VALIDATE_EMAIL,
+        ) !== false;
+    }
+
+    private function isPositiveInteger(mixed $value): bool
+    {
+        if (is_int($value)) {
+            return $value > 0;
+        }
+
+        if (! is_string($value)) {
+            return false;
+        }
+
+        $value = trim($value);
+
+        if (preg_match('/\A[1-9][0-9]*\z/D', $value) !== 1) {
+            return false;
+        }
+
+        return filter_var(
+            $value,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]],
         ) !== false;
     }
 

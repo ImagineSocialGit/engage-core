@@ -1495,3 +1495,9 @@ The Route index should not repeat assignment detail inside Route details. `Runs 
 One-step automatic behavior may be presented separately from multi-step Routes so a simple action is not forced into the same visual weight as a real Route.
 
 Route Management UX should explain available actions through `FlowRouteCapability` metadata and module-owned public seams rather than importing module internals.
+
+## Deployment environment contract
+
+Flow Routes owns the root/process execution controls `FLOW_ROUTE_CONTINUATION_QUEUE` and `FLOW_ROUTE_IMMEDIATE_EXECUTION_BUDGET`.
+
+Both have safe defaults (`default` and `25`) and are deployment-plan `defaulted` requirements. A persisted immediate-execution budget must be a canonical positive integer; malformed or non-positive overrides are deployment blockers. These process controls are not selected-client configuration and do not change FlowRoute authoring semantics.

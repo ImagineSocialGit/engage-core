@@ -12,6 +12,7 @@ final readonly class EnvironmentRequirement
 
     public const VALUE_RULE_HTTP_ORIGIN = 'http_origin';
     public const VALUE_RULE_EMAIL_DOMAIN = 'email_domain';
+    public const VALUE_RULE_POSITIVE_INTEGER = 'positive_integer';
 
     /**
      * @param array<int, string> $allowedValues
@@ -138,6 +139,7 @@ final readonly class EnvironmentRequirement
         return [
             self::VALUE_RULE_HTTP_ORIGIN,
             self::VALUE_RULE_EMAIL_DOMAIN,
+            self::VALUE_RULE_POSITIVE_INTEGER,
         ];
     }
 }
