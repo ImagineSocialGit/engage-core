@@ -13,7 +13,10 @@ use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Messaging\Import\MarketingPermissionContactImportPostProcessor;
 use App\Modules\InboundMessaging\Events\InboundMessageReceived;
+use App\Support\ModuleIntegrations\Forms\Contracts\FormSubmissionAutomationWorkspace;
+use App\Support\ModuleIntegrations\Forms\FlowRoutes\FlowRoutesFormSubmissionAutomationWorkspace;
 use App\Support\ModuleIntegrations\Forms\FormSubmissionConsentBridge;
+use App\Support\ModuleIntegrations\Forms\UnavailableFormSubmissionAutomationWorkspace;
 use App\Support\ModuleIntegrations\Forms\Messaging\GrantFormSubmissionMessagingConsent;
 use App\Support\DestinationVerification\Contracts\DestinationVerificationTransport;
 use App\Support\DestinationVerification\UnavailableDestinationVerificationTransport;
@@ -85,6 +88,22 @@ class AppServiceProvider extends ServiceProvider
                 modules: $app->make(ModuleManager::class),
             );
         });
+
+        $this->app->singleton(
+            FormSubmissionAutomationWorkspace::class,
+            function ($app): FormSubmissionAutomationWorkspace {
+                $enabled = $app->make(ModuleManager::class)
+                    ->enabledKeysWithDependencies();
+
+                if (in_array('forms', $enabled, true)
+                    && in_array('flow_routes', $enabled, true)
+                ) {
+                    return $app->make(FlowRoutesFormSubmissionAutomationWorkspace::class);
+                }
+
+                return $app->make(UnavailableFormSubmissionAutomationWorkspace::class);
+            },
+        );
 
         $this->app->singleton(
             FormSubmissionConsentBridge::class,

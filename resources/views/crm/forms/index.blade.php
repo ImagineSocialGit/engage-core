@@ -1,3 +1,4 @@
+
 @php
     $forms = collect($overview['forms'] ?? []);
     $outcomeLabels = [
@@ -119,6 +120,71 @@
                                 </ol>
                             </section>
                         </div>
+
+                        <section
+                            class="mt-6 border-t border-slate-100 pt-5"
+                            data-form-after-submission="{{ $form['key'] }}"
+                            data-form-after-submission-mode="{{ ($form['after_submission']['available'] ?? false) ? 'automation-available' : 'manual-only' }}"
+                        >
+                            <div>
+                                <h3 class="text-sm font-semibold text-slate-950">What should happen after someone submits this form?</h3>
+                                <p class="mt-1 text-sm leading-6 text-slate-600">
+                                    Manual follow-up is always available. Add automatic behavior only when it removes real follow-up work.
+                                </p>
+                            </div>
+
+                            <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4" data-form-manual-follow-up>
+                                <div class="text-sm font-semibold text-slate-950">Follow up manually</div>
+                                <p class="mt-1 text-xs leading-5 text-slate-600">
+                                    Keep the submission in the review queue and let a person decide what happens next.
+                                </p>
+                            </div>
+
+                            @if(($form['after_submission']['automations'] ?? []) !== [])
+                                <div class="mt-4 space-y-2" data-form-linked-automations>
+                                    @foreach($form['after_submission']['automations'] as $automation)
+                                        <a
+                                            href="{{ $automation['url'] }}"
+                                            class="flex items-center justify-between gap-3 rounded-2xl border border-orange-200 bg-orange-50/60 px-4 py-3 transition hover:bg-orange-50"
+                                            data-form-linked-automation="{{ $automation['id'] }}"
+                                        >
+                                            <span class="min-w-0">
+                                                <span class="block truncate text-sm font-semibold text-slate-950">{{ $automation['name'] }}</span>
+                                                <span class="mt-0.5 block text-xs text-slate-600">
+                                                    {{ $automation['step_count'] }} {{ \Illuminate\Support\Str::plural('step', $automation['step_count']) }} · {{ $automation['is_enabled'] ? 'On' : 'Off' }}
+                                                </span>
+                                            </span>
+                                            <span class="shrink-0 text-xs font-semibold text-orange-800">Edit</span>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @endif
+
+                            @if($form['after_submission']['available'] ?? false)
+                                @if(! ($form['after_submission']['contact_available'] ?? false))
+                                    <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900" data-form-automation-contact-required>
+                                        Automatic follow-up starts from a Contact. Add Contact mapping to this form before creating a form-submission automation.
+                                    </div>
+                                @else
+                                    <div class="mt-4 grid gap-3 sm:grid-cols-2" data-form-automation-actions>
+                                        @foreach($form['after_submission']['actions'] as $action)
+                                            <a
+                                                href="{{ $action['url'] }}"
+                                                class="rounded-2xl p-4 ring-1 transition hover:-translate-y-0.5 hover:shadow-sm {{ module_tone($action['module_key'], 'item') }}"
+                                                data-form-automation-action="{{ $action['key'] }}"
+                                            >
+                                                <span class="block text-sm font-semibold text-slate-950">{{ $action['label'] }}</span>
+                                                <span class="mt-1 block text-xs leading-5 text-slate-600">{{ $action['detail'] }}</span>
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            @else
+                                <p class="mt-4 text-xs leading-5 text-slate-500" data-form-automation-unavailable>
+                                    Automatic follow-up is not available in this installation.
+                                </p>
+                            @endif
+                        </section>
 
                         <div class="mt-6 border-t border-slate-100 pt-5">
                             <a

@@ -11,6 +11,8 @@ use Illuminate\Validation\Rule;
 final class FormSubmissionAutomationTriggerAuthoringContributor implements AutomationTriggerAuthoringContributor
 {
     public const KEY = 'forms.form_submitted';
+    public const EVENT_KEY = 'form.submitted';
+    public const FORM_KEY_EVENT_PATH = 'automation_event.payload.form.key';
 
     public function definitions(): iterable
     {
@@ -55,10 +57,10 @@ final class FormSubmissionAutomationTriggerAuthoringContributor implements Autom
     {
         return new AutomationTriggerSelection(
             triggerType: 'automation_event',
-            triggerKey: 'form.submitted',
+            triggerKey: self::EVENT_KEY,
             entryConditions: [[
                 'source' => 'execution_meta',
-                'path' => 'automation_event.payload.form.key',
+                'path' => self::FORM_KEY_EVENT_PATH,
                 'operator' => 'equals',
                 'value' => trim((string) $input['form_key']),
             ]],

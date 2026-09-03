@@ -4,6 +4,7 @@ namespace App\Modules\Forms\Services;
 
 use App\Modules\Forms\Data\ExternalFormIntakeClient;
 use App\Modules\Forms\Data\PublishedForm;
+use App\Support\ModuleIntegrations\Forms\Contracts\FormSubmissionAutomationWorkspace;
 use App\Support\ModuleIntegrations\Forms\FormSubmissionConsentBridge;
 use App\Support\Modules\ModuleManager;
 use Throwable;
@@ -17,6 +18,7 @@ final class FormsSurfaceReadService
         private readonly FormSubmissionContactMapper $contacts,
         private readonly FormSubmissionConsentIntentResolver $consentIntents,
         private readonly FormSubmissionConsentBridge $consentBridge,
+        private readonly FormSubmissionAutomationWorkspace $automationWorkspace,
         private readonly FormSubmissionVerificationPolicy $verifications,
         private readonly ModuleManager $modules,
     ) {}
@@ -33,7 +35,8 @@ final class FormsSurfaceReadService
      *         description: ?string,
      *         version: int,
      *         domains: array<int, string>,
-     *         outcome_keys: array<int, string>
+     *         outcome_keys: array<int, string>,
+     *         after_submission: array<string, mixed>
      *     }>
      * }
      */
@@ -91,6 +94,11 @@ final class FormsSurfaceReadService
                 'version' => $published->versionNumber,
                 'domains' => $domains,
                 'outcome_keys' => $this->outcomeKeys($published),
+                'after_submission' => $this->automationWorkspace->readForForm(
+                    formKey: $published->key,
+                    formName: $published->name,
+                    contactAvailable: $this->mapsContact($published),
+                ),
             ];
         }
 
@@ -126,6 +134,14 @@ final class FormsSurfaceReadService
         } catch (Throwable) {
             return null;
         }
+    }
+
+    private function mapsContact(PublishedForm $form): bool
+    {
+        $submission = $form->settings['submission'] ?? [];
+
+        return is_array($submission)
+            && is_array($submission['contact'] ?? null);
     }
 
     /**

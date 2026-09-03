@@ -31,6 +31,7 @@ class StoreFlowRouteRequest extends FormRequest
                 'string',
                 Rule::in($triggers->registeredKeys()),
             ],
+            'starter_capability_key' => ['nullable', 'string', 'max:255'],
         ];
 
         $key = trim((string) $this->input('trigger_authoring_key'));
@@ -71,6 +72,13 @@ class StoreFlowRouteRequest extends FormRequest
     public function triggerAuthoringKey(): string
     {
         return trim((string) $this->validated('trigger_authoring_key'));
+    }
+
+    public function starterCapabilityKey(): ?string
+    {
+        $key = trim((string) ($this->validated('starter_capability_key') ?? ''));
+
+        return $key !== '' ? $key : null;
     }
 
     public function authoringKind(): string

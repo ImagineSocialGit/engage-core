@@ -79,6 +79,9 @@
                 ],
             ])
         )"
+        x-init="@js($isCurrentEditor ? $openAddCapabilityId : null) !== null
+            ? $nextTick(() => openAddPoint(@js($isCurrentEditor ? $openAddCapabilityId : null)))
+            : null"
         @keydown.escape.window="if (pointModal) closePoint(); else if (addPointModal) closeAddPoint(); else if (openRouteEditor === {{ $flowRoute->getKey() }}) closeRoute()"
         @click.outside="if (! pointModal && ! addPointModal) closeRoute()"
         class="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/10 sm:max-h-[94vh]"

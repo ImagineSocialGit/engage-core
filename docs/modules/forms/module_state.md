@@ -312,7 +312,7 @@ Scheduling -> intake forms attached to booking flows
 Reporting -> submission reporting through public read/query services
 ```
 
-For the first foundation slice, Forms should depend only on Core. Portal, Messaging, Tasks, Documents, Scheduling, and InternalNotifications should remain optional later integrations through public seams.
+Forms still depends only on Core. Portal, Messaging, Tasks, Documents, Scheduling, InternalNotifications, and FlowRoutes remain optional integrations through public/shared seams; Forms must not import their private module internals.
 
 ## Consumed by
 
@@ -929,10 +929,15 @@ App\Support\AutomationEvents\Data\AutomationEventData
 App\Support\AutomationEvents\Events\AutomationEventRecorded
 ```
 
-Likely future Forms automation events:
+Current Forms automation event:
 
 ```text
 form.submitted
+```
+
+Possible later review-lifecycle events:
+
+```text
 form.reviewed
 form.approved
 form.rejected
@@ -1131,7 +1136,23 @@ field_label and field_type snapshot the submitted version's display context.
 
 ## FlowRoutes integration
 
-This module should integrate with FlowRoutes through the ownership-preserving automation extension pattern used across Engage Core.
+Forms integrates with FlowRoutes through the ownership-preserving automation extension pattern used across Engage Core.
+
+Current committed behavior:
+
+```text
+Forms records the successful submission and mapped Contact first.
+Forms records the durable neutral form.submitted automation event.
+Forms contributes forms.form_submitted trigger authoring through the shared trigger registry.
+The Forms CRM surface can show existing form-scoped automations and guided creation links when FlowRoutes is available.
+Guided one-action links may target registered shared capabilities such as tasks.create_task or messaging.send_message.
+A custom-automation link opens normal FlowRoutes authoring for the same form.submitted trigger.
+FlowRoutes remains the owner of the Route/Automatic behavior definition, activation, progression, and execution.
+```
+
+The CRM handoff is implemented through `App\Support\ModuleIntegrations\Forms` rather than by adding a Forms -> FlowRoutes module dependency. The integration reads shared automation capability registrations to decide which guided actions exist; it does not teach Forms about Tasks or Messaging private models/services.
+
+A form-submission Route starts only when the submission produced a Contact, because FlowRoutes contact progression requires `contact_id`. The Forms surface therefore keeps manual follow-up available for every form and only offers creation of automatic follow-up when the published form has Contact mapping.
 
 When this module has automation-worthy outcomes, it records its own domain state first and then emits neutral `AutomationEventRecorded` events. FlowRoutes listens to the generic automation-event seam, not module-specific events.
 
@@ -1166,11 +1187,9 @@ client-facing form builder UI
 internal/operator form builder UI
 public form rendering routes
 portal form submission routes
-form submission review UI
-form submission notifications
-form confirmation messages
-form-triggered task creation
-form-triggered automation events
+form submission notifications beyond the current guided automation handoff
+dedicated no-FlowRoutes confirmation-message fallback
+dedicated no-FlowRoutes task-creation fallback
 form attachment/file upload integration
 form reporting/export views
 field-level analytics
@@ -1185,7 +1204,7 @@ form request lifecycle table
 Should form_submissions.status and review_status be separate, or should one lifecycle field be enough?
 Should portal_user_id exist immediately, or wait until Portal runtime actions exist?
 Should file upload fields route through Documents from the beginning, or be blocked until Documents exists?
-When should `form.submitted` automation events be added after the durable submission transaction commits?
+Should Forms eventually provide narrow no-FlowRoutes fallbacks for a confirmation message or follow-up Task, or is manual follow-up sufficient for installations without FlowRoutes?
 ```
 
 ## Setup/config validation vs submission validation

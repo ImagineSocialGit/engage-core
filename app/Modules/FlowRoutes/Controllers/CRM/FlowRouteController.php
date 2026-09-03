@@ -81,6 +81,17 @@ class FlowRouteController extends Controller
         $requestedEditorId = $request->integer('edit_route');
         $requestedStatusKey = trim((string) $request->query('status', ''));
         $createTriggers = $this->triggerAuthoring->presentation();
+        $availableTriggerKeys = collect($createTriggers)
+            ->pluck('key')
+            ->filter(fn (mixed $key): bool => is_string($key) && trim($key) !== '')
+            ->values()
+            ->all();
+        $requestedTriggerKey = trim((string) $request->query('trigger_authoring_key', ''));
+
+        if (! in_array($requestedTriggerKey, $availableTriggerKeys, true)) {
+            $requestedTriggerKey = '';
+        }
+
         $statusTrigger = collect($createTriggers)->firstWhere(
             'key',
             CoreAutomationTriggerAuthoringContributor::CONTACT_STATUS,
@@ -93,9 +104,13 @@ class FlowRouteController extends Controller
             : null;
         $createTriggerValues = collect($createTriggers)
             ->flatMap(fn (array $trigger): array => $trigger['fields'] ?? [])
-            ->mapWithKeys(fn (array $field): array => [
-                (string) $field['name'] => old((string) $field['name'], ''),
-            ])
+            ->mapWithKeys(function (array $field) use ($request): array {
+                $name = (string) $field['name'];
+
+                return [
+                    $name => old($name, $request->query($name, '')),
+                ];
+            })
             ->all();
         $createTriggerValues['contact_status_id'] = old(
             'contact_status_id',
@@ -110,23 +125,52 @@ class FlowRouteController extends Controller
             $requestedCreateKind = FlowRoute::AUTHORING_KIND_ROUTE;
         }
 
+        $defaultTriggerKey = $requestedStatusKey !== ''
+            ? CoreAutomationTriggerAuthoringContributor::CONTACT_STATUS
+            : ($requestedTriggerKey !== ''
+                ? $requestedTriggerKey
+                : ($createTriggers[0]['key'] ?? null));
+        $requestedAddCapabilityKey = trim((string) $request->query('add_capability', ''));
+        $openAddCapabilityId = null;
+
+        if ($requestedEditorId > 0 && $requestedAddCapabilityKey !== '' && $routeEditors->has($requestedEditorId)) {
+            $editor = $routeEditors->get($requestedEditorId);
+            $capability = is_array($editor)
+                ? collect($editor['capabilities'] ?? [])->firstWhere('key', $requestedAddCapabilityKey)
+                : null;
+            $openAddCapabilityId = is_array($capability)
+                ? (int) ($capability['id'] ?? 0)
+                : null;
+
+            if ($openAddCapabilityId === 0) {
+                $openAddCapabilityId = null;
+            }
+        }
+
         return view('crm.flow-routes.index', [
             'routes' => $routes,
             'automaticBehaviors' => $automaticBehaviors,
             'routeEditors' => $routeEditors,
             'editorOptions' => $this->editorCatalog->editorOptions(),
             'openRouteEditorId' => $routeEditors->has($requestedEditorId) ? $requestedEditorId : null,
+            'openAddCapabilityId' => $openAddCapabilityId,
             'openCreateRoute' => $request->boolean('create')
                 || (string) $request->session()->getOldInput('_flow_route_create') === '1',
             'openCreateKind' => $requestedCreateKind,
             'createRouteTriggers' => $createTriggers,
             'createRouteTriggerKey' => old(
                 'trigger_authoring_key',
-                $requestedStatusKey !== ''
-                    ? CoreAutomationTriggerAuthoringContributor::CONTACT_STATUS
-                    : ($createTriggers[0]['key'] ?? null),
+                $defaultTriggerKey,
             ),
             'createRouteTriggerValues' => $createTriggerValues,
+            'createRouteName' => (string) old(
+                'name',
+                trim((string) $request->query('create_name', '')),
+            ),
+            'createRouteStarterCapabilityKey' => (string) old(
+                'starter_capability_key',
+                trim((string) $request->query('starter_capability_key', '')),
+            ),
             'routeSummary' => [
                 'routes' => $routes->count(),
                 'automatic_behaviors' => $automaticBehaviors->count(),
@@ -176,8 +220,15 @@ class FlowRouteController extends Controller
             ? 'Automatic behavior'
             : 'Route';
 
+        $redirect = ['edit_route' => $route->getKey()];
+        $starterCapabilityKey = $request->starterCapabilityKey();
+
+        if ($starterCapabilityKey !== null) {
+            $redirect['add_capability'] = $starterCapabilityKey;
+        }
+
         return redirect()
-            ->route('crm.flow-routes.index', ['edit_route' => $route->getKey()])
+            ->route('crm.flow-routes.index', $redirect)
             ->with('status', "{$label} created. Add its action, review it, and turn it on when it is ready.");
     }
 }

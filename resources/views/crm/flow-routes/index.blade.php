@@ -374,6 +374,7 @@
                         @csrf
                         <input type="hidden" name="_flow_route_create" value="1">
                         <input type="hidden" name="authoring_kind" x-bind:value="createKind">
+                        <input type="hidden" name="starter_capability_key" value="{{ $createRouteStarterCapabilityKey }}">
 
                         <fieldset>
                             <legend class="text-sm font-semibold text-slate-900">How much should happen? <span class="text-red-700">*</span></legend>
@@ -475,7 +476,7 @@
                                 id="create-route-name"
                                 name="name"
                                 type="text"
-                                value="{{ old('name') }}"
+                                value="{{ $createRouteName }}"
                                 required
                                 maxlength="255"
                                 x-bind:placeholder="createKind === 'automatic_behavior' ? 'Move scheduled appointments to Engaged' : 'Appointment follow-up'"
@@ -509,6 +510,7 @@
             @include('crm.flow-routes.partials.editor-modal', [
                 'editor' => $editor,
                 'editorOptions' => $editorOptions,
+                'openAddCapabilityId' => $openAddCapabilityId,
             ])
         @endforeach
     </div>
