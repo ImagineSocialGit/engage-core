@@ -620,6 +620,8 @@ Use prefixes and/or DB isolation deliberately. Never assume an unprefixed raw Re
 
 Disk/backend selection is root/process-owned; client-varying Spaces identity, credentials, bucket, and CDN values belong in `client/[CLIENT_KEY]/.env`.
 
+These values become deployment-blocking when an enabled runtime capability needs writable public object storage. The Media module is the first such capability. Static assets uploaded during development do not by themselves make the Media runtime contract active.
+
 Root/process selection:
 
 ```env
@@ -637,7 +639,7 @@ DO_SPACES_BUCKET=
 CDN_BASE_URL=
 ```
 
-`CDN_BASE_URL` falls back to the Spaces endpoint when absent, but an explicit CDN URL may be desirable when CDN delivery is enabled.
+`config/filesystems.php` still has a legacy fallback from `CDN_BASE_URL` to the Spaces endpoint for generic filesystem URL generation. When Media is enabled in staging/production, `CDN_BASE_URL` is explicitly required so reusable outbound assets have a stable public delivery origin rather than relying on that fallback.
 
 ---
 

@@ -182,6 +182,26 @@ invalid: https://booking.example.com?source=crm
 
 Scheduling hold lifetimes, destination-verification limits, public booking rate limits, travel defaults, reschedule suggestion limits, and expiration batch sizing remain committed application configuration. They are not deployment environment requirements merely because they affect Scheduling runtime behavior.
 
+## Media writable-storage requirements
+
+Media is a reusable runtime upload capability, so its live deployment requirements are different from static assets that were uploaded during development.
+
+When Media is enabled in staging/production, its provider activates the existing `storage` environment owner and requires:
+
+```text
+FILESYSTEM_DISK=spaces
+DO_SPACES_KEY
+DO_SPACES_SECRET
+DO_SPACES_ENDPOINT
+DO_SPACES_REGION
+DO_SPACES_BUCKET
+CDN_BASE_URL
+```
+
+`DO_SPACES_ENDPOINT` and `CDN_BASE_URL` use the deployment plan's HTTP-origin validation. Local/testing keeps these values optional so tests and development can use fake/local disks. The Media module does not add DigitalOcean-specific runtime code; it writes through Laravel Filesystem and the live deployment selects the existing `spaces` adapter.
+
+Media's application upload-size and accepted-file policy stay in committed `config/media.php`. Nginx/PHP request-size limits are server deployment configuration, not fake application environment variables.
+
 ## Adding a module
 
 Module/config changes are authored in development and committed. A staging or production deployment must not modify `client/[CLIENT_KEY]/config/modules.php` to make the target work.
@@ -207,7 +227,8 @@ Current deployment-plan contributors cover:
 - Messaging provider/runtime requirements
 - Webinars / Zoom
 - Scheduling public-origin requirements
+- Media writable-storage requirements
 
-Forms resolves public intake enablement and its signing/identity requirements. Messaging resolves the selected email/SMS providers, live credentials, sender fallbacks, webhook verification, and operational defaults. Webinars resolves Zoom provider readiness and post-event webhook requirements. Scheduling keeps public booking optional while validating any deliberately persisted public origin.
+Forms resolves public intake enablement and its signing/identity requirements. Messaging resolves the selected email/SMS providers, live credentials, sender fallbacks, webhook verification, and operational defaults. Webinars resolves Zoom provider readiness and post-event webhook requirements. Scheduling keeps public booking optional while validating any deliberately persisted public origin. Media activates storage-owner coverage only when its runtime upload capability is enabled, requiring writable Spaces and a stable CDN origin in staging/production.
 
 Additional module/provider contributors should continue to be added from fresh dependency cones. The Bash launcher should consume the resolved deployment plan rather than re-encoding module requirements itself.

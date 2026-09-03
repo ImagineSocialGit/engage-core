@@ -101,11 +101,14 @@ InboundMessaging
 InternalNotifications
 Workflow
 Location
+Media
 ```
 
 A silent module may still expose a narrow settings or diagnostics surface. That surface should appear inside shared settings or the consuming loud module unless administrators genuinely need to operate the silent capability independently.
 
 InboundMessaging's **Reply Handling** workspace is one deliberate exception. Reply profiles are shared by Campaign message journeys and Flow Routes, so placing the authoritative editor inside either consumer would imply false ownership. The narrow workspace exposes only the durable reply vocabulary, its recognition rules, and dependency-aware lifecycle controls; it is not a general InboundMessaging dashboard or inbox.
+
+Media's **Media Library** is the same kind of narrow authority surface. Reusable assets can be consumed by Messaging, Social Media, Sites, Portal, or other modules, so the shared upload/archive library belongs to Media rather than to any one consumer. The library is an asset-management surface, not a standalone business workflow, and primary product workflows remain owned by the consuming loud module.
 
 ## Core and integrations
 
@@ -274,6 +277,7 @@ This registry records the current product direction. Reclassification requires a
 | Portal | universal | loud | Provide a recognizable external user experience plus contextual administration. |
 | Forms | universal | loud | Provide form/submission workflows; complex form construction may remain developer/operator work. |
 | Documents | universal | loud | Provide request, upload, review, and checklist workflows; requirement design may remain developer/operator work. |
+| Media | universal | silent with narrow authority surface | Own reusable asset identity, storage, upload/archive management, and a shared Media Library; consuming modules own the workflows that select or publish those assets. |
 | Commerce | universal | loud | Provide custom storefront/offers, purchase history, provider-backed checkout orchestration, and cross-provider inventory coordination while specialized payment, shipping/warehouse, POS, and deep store operations remain external. |
 | Location | universal | silent | Provide normalized location facts and supporting contracts through consuming modules; no standalone Location product by default. |
 | Relationships | universal | loud | Provide relationship-scoped Contact workspaces; normal daily lists must not mix materially different relationship populations. |

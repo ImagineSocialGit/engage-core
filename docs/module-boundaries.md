@@ -556,6 +556,7 @@ Current ownership:
 | document_requests | Documents |
 | document_uploads | Documents |
 | document_review_events | Documents |
+| media_assets | Media |
 | commerce_customers | Commerce |
 | commerce_products | Commerce |
 | commerce_orders | Commerce |
@@ -691,6 +692,7 @@ Current universal modules include:
 - `Portal`
 - `Forms`
 - `Documents`
+- `Media`
 - `Commerce`
 - `Location`
 
@@ -762,6 +764,7 @@ Scheduling = universal appointment/booking capability.
 Portal = universal external/customer account capability.
 Forms = universal configurable form/submission capability.
 Documents = universal document request/upload/review capability.
+Media = universal reusable public asset library and storage capability.
 Commerce = universal catalog/storefront/offer/checkout-orchestration/purchase/inventory-effect capability.
 Location = universal normalized location/address facts and optional geographic-provider capability.
 Events = universal concrete-event catalog and reconciliation capability.
@@ -857,6 +860,7 @@ Scheduling -> Core
 Portal -> Core, optionally Messaging
 Forms -> Core when contact-linked
 Documents -> Core when contact-linked
+Media -> Core
 Commerce -> Core
 Location -> Core
 Events -> Core
@@ -1029,6 +1033,8 @@ Accepted dependency direction:
 - Forms may optionally use Portal for customer-submitted forms
 - Documents -> Core, when documents are contact-linked
 - Documents may optionally use Portal, Tasks, and Messaging through public services/contracts when those modules are enabled
+- Media -> Core
+- Media may be consumed by Messaging and other modules only through public contracts/integration seams; consuming modules must not own storage internals
 - Commerce -> Core, when commerce customers/orders are contact-linked
 - Commerce may optionally use Events through the Events public promotion gate for Event-linked offers
 - Commerce may optionally use Messaging, Broadcasts, Campaigns, FlowRoutes, Portal, and Reporting through public services/contracts when those modules are enabled

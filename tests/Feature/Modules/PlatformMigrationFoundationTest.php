@@ -17,28 +17,6 @@ class PlatformMigrationFoundationTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const COMPLETE_TEST_MODULE_KEYS = [
-        'core',
-        'relationships',
-        'messaging',
-        'inbound_messaging',
-        'internal_notifications',
-        'tasks',
-        'scheduling',
-        'portal',
-        'forms',
-        'documents',
-        'commerce',
-        'location',
-        'events',
-        'workflow',
-        'flow_routes',
-        'campaigns',
-        'broadcasts',
-        'webinars',
-        'reporting',
-    ];
-
     protected function tearDown(): void
     {
         CarbonImmutable::setTestNow();
@@ -61,17 +39,24 @@ class PlatformMigrationFoundationTest extends TestCase
         $registry = app(ModuleMigrationRegistry::class);
         $policy = app(ModuleMigrationPathPolicy::class);
         $paths = app(Migrator::class)->paths();
-        $expectedModulePaths = array_map(
-            static fn (string $moduleKey): string => $registry
-                ->requireModule($moduleKey)
-                ->path,
-            self::COMPLETE_TEST_MODULE_KEYS,
-        );
+
+        $expectedModulePaths = collect($registry->modules())
+            ->filter(
+                static fn ($scope): bool => str_starts_with(
+                    $scope->path,
+                    'database/migrations/modules/',
+                ),
+            )
+            ->pluck('path')
+            ->unique()
+            ->values()
+            ->all();
 
         $this->assertEquals(
             $expectedModulePaths,
             $policy->completeTestModulePaths(),
         );
+
         $this->assertContains(
             base_path($registry->platform()->path),
             $paths,
@@ -88,6 +73,7 @@ class PlatformMigrationFoundationTest extends TestCase
             base_path($registry->requireModule('mortgage')->path),
             $paths,
         );
+
         $this->assertTrue(Schema::hasTable('module_installations'));
     }
 

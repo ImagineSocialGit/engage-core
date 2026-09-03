@@ -1,3 +1,4 @@
+
 # Engage Core Module Docs
 
 Module-owned documentation lives under one directory per module:
@@ -32,6 +33,7 @@ Use `../module-boundaries.md` for platform-wide ownership/dependency rules, `../
 | Portal | Universal; loud | `portal/module_state.md` |
 | Forms | Universal; loud | `forms/module_state.md` |
 | Documents | Universal; loud | `documents/module_state.md` |
+| Media | Universal; silent with narrow asset-library authority surface | `media/module_state.md` |
 | Commerce | Universal; loud | `commerce/module_state.md` |
 | Location | Universal; silent | `location/module_state.md` |
 | Relationships | Universal; loud | `relationships/module_state.md` |

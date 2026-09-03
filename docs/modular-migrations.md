@@ -178,6 +178,7 @@ database/migrations/modules/location/
 database/migrations/modules/portal/
 database/migrations/modules/forms/
 database/migrations/modules/documents/
+database/migrations/modules/media/
 database/migrations/modules/commerce/
 database/migrations/modules/events/
 database/migrations/modules/workflow/
@@ -631,30 +632,33 @@ Current relocation and path-selection contract tests prove:
 
 ## Current ownership contract
 
-The registry classifies all 94 current migration files exactly once.
+The registry classifies all 120 current migration files exactly once after the Media foundation migration is added.
 
 Ownership totals:
 
 ```text
 platform                      11
-core                           6
-messaging                     12
-inbound_messaging              2
+core                          11
+relationships                  1
+messaging                     14
+inbound_messaging              8
 internal_notifications         2
 tasks                          3
-scheduling                    10
+scheduling                    11
 portal                         4
 forms                          4
 documents                      4
+media                          1
 commerce                       5
 location                       4
 events                         2
 workflow                       1
 flow_routes                    9
-campaigns                      3
-broadcasts                     2
-webinars                       8
-mortgage                       2
+campaigns                      8
+broadcasts                     3
+webinars                      10
+reporting                      1
+mortgage                       3
 ```
 
 Scheduling remains schema version 2, but the module is still pre-rollout. The range-duration policy columns are therefore consolidated into the authoritative clean-install service migration:

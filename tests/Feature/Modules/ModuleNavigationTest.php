@@ -7,7 +7,7 @@ use Tests\TestCase;
 
 class ModuleNavigationTest extends TestCase
 {
-    public function test_enabled_modules_expose_their_registered_navigation_routes(): void
+    public function test_enabled_modules_expose_deliberate_navigation_while_silent_media_does_not(): void
     {
         config()->set('modules.enabled', [
             'messaging',
@@ -16,6 +16,7 @@ class ModuleNavigationTest extends TestCase
             'workflow',
             'flow_routes',
             'broadcasts',
+            'media',
         ]);
 
         $routes = collect(app(ModuleManager::class)->navigationItems())
@@ -27,6 +28,7 @@ class ModuleNavigationTest extends TestCase
         $this->assertContains('crm.webinar-series.index', $routes);
         $this->assertContains('crm.flow-routes.index', $routes);
         $this->assertContains('crm.broadcasts.index', $routes);
+        $this->assertNotContains('crm.media.index', $routes);
         $this->assertContains('crm.settings.index', $routes);
     }
 
@@ -45,6 +47,7 @@ class ModuleNavigationTest extends TestCase
         $this->assertNotContains('crm.webinar-series.index', $routes);
         $this->assertNotContains('crm.flow-routes.index', $routes);
         $this->assertNotContains('crm.broadcasts.index', $routes);
+        $this->assertNotContains('crm.media.index', $routes);
     }
 
     public function test_campaign_navigation_does_not_require_messaging_to_be_explicitly_visible(): void

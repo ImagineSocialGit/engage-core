@@ -737,6 +737,22 @@
 │   │   │   ├── Services
 │   │   │   │   └── DeterministicLocationNormalizationProvider.php
 │   │   │   └── Support
+│   │   ├── Media
+│   │   │   ├── Actions
+│   │   │   │   └── StoreMediaAssetAction.php
+│   │   │   ├── Controllers
+│   │   │   │   └── CRM
+│   │   │   │       └── MediaAssetController.php
+│   │   │   ├── Deployment
+│   │   │   │   └── MediaStorageDeploymentPlanContributor.php
+│   │   │   ├── Models
+│   │   │   │   └── MediaAsset.php
+│   │   │   ├── Providers
+│   │   │   │   └── MediaModuleServiceProvider.php
+│   │   │   ├── Requests
+│   │   │   │   └── StoreMediaAssetRequest.php
+│   │   │   └── Services
+│   │   │       └── MediaUploadPolicy.php
 │   │   ├── Messaging
 │   │   │   ├── Actions
 │   │   │   │   ├── AssignMessageTemplatePresetAction.php
@@ -1824,6 +1840,7 @@
 │   ├── location.php
 │   ├── logging.php
 │   ├── mail.php
+│   ├── media.php
 │   ├── messaging
 │   │   ├── composition.php
 │   │   ├── delivery_consolidation.php
@@ -1959,6 +1976,7 @@
 │   │   ├── LocationAreaAssignmentFactory.php
 │   │   ├── LocationAreaFactory.php
 │   │   ├── LocationFactory.php
+│   │   ├── MediaAssetFactory.php
 │   │   ├── MessageTemplateCatalogEntryFactory.php
 │   │   ├── MessageTemplatePresetAssignmentFactory.php
 │   │   ├── MessageTemplatePresetFactory.php
@@ -2054,6 +2072,8 @@
 │   │   │   │   ├── 2026_04_15_195857_create_contact_locations_table.php
 │   │   │   │   ├── 2026_04_15_195858_create_location_areas_table.php
 │   │   │   │   └── 2026_04_15_195859_create_location_area_assignments_table.php
+│   │   │   ├── media
+│   │   │   │   └── 2026_09_03_010000_create_media_assets_table.php
 │   │   │   ├── messaging
 │   │   │   │   ├── 2026_05_15_215534_create_message_consents_table.php
 │   │   │   │   ├── 2026_05_15_215834_create_consent_revocations_table.php
@@ -2199,6 +2219,8 @@
 │   │   ├── location
 │   │   │   └── module_state.md
 │   │   ├── location-relationship-area-composition.md
+│   │   ├── media
+│   │   │   └── module_state.md
 │   │   ├── messaging
 │   │   │   ├── checklist.md
 │   │   │   ├── cta-engagement-tracking.md
@@ -2436,6 +2458,8 @@
 │       │   │   │   └── show.blade.php
 │       │   │   └── reply-profiles
 │       │   │       └── index.blade.php
+│       │   ├── media
+│       │   │   └── index.blade.php
 │       │   ├── messaging
 │       │   │   ├── delivery-issues
 │       │   │   │   └── index.blade.php
@@ -2523,6 +2547,7 @@
 │   │   ├── flow-routes.php
 │   │   ├── forms.php
 │   │   ├── inbound-messaging.php
+│   │   ├── media.php
 │   │   ├── messaging.php
 │   │   ├── relationships.php
 │   │   ├── reporting.php
@@ -2791,6 +2816,10 @@
 │   │   │   ├── LocationAreaAssignmentCapabilityTest.php
 │   │   │   ├── LocationFoundationTest.php
 │   │   │   └── LocationNormalizationCapabilityTest.php
+│   │   ├── Media
+│   │   │   ├── MediaDeploymentPlanContributorTest.php
+│   │   │   ├── MediaFoundationTest.php
+│   │   │   └── MediaWorkspaceTest.php
 │   │   ├── Messaging
 │   │   │   ├── AuditEmailHygieneCommandTest.php
 │   │   │   ├── BulkMessageDeliveryPolicyTest.php
@@ -3140,4 +3169,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-741 directories, 2400 files
+754 directories, 2416 files

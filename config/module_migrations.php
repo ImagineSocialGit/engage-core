@@ -168,6 +168,14 @@ return [
             ],
         ],
 
+        'media' => [
+            'path' => 'database/migrations/modules/media',
+            'schema_version' => 1,
+            'migrations' => [
+                '2026_09_03_010000_create_media_assets_table.php',
+            ],
+        ],
+
         'commerce' => [
             'path' => 'database/migrations/modules/commerce',
             'schema_version' => 1,

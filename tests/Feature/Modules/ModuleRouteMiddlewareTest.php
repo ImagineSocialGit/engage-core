@@ -119,6 +119,30 @@ class ModuleRouteMiddlewareTest extends TestCase
 
         $response->assertNotFound();
     }
+    public function test_disabled_media_module_returns_404_for_crm_media_workspace(): void
+    {
+        config()->set('modules.enabled', []);
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->withoutMiddleware(ForceStagingAccess::class)
+            ->get('http://crm.'.config('app.root_domain').'/media')
+            ->assertNotFound();
+    }
+
+    public function test_enabled_media_module_allows_crm_media_workspace(): void
+    {
+        config()->set('modules.enabled', ['media']);
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->withoutMiddleware(ForceStagingAccess::class)
+            ->get('http://crm.'.config('app.root_domain').'/media')
+            ->assertOk();
+    }
+
     public function test_disabled_tasks_module_returns_404_for_crm_task_workspace(): void
     {
         config()->set('modules.enabled', []);

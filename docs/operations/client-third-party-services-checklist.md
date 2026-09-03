@@ -142,7 +142,7 @@ A shared Cloudflare widget may authorize both staging and production hostnames, 
 
 Current Core storage path supports DigitalOcean Spaces through the Laravel S3 driver.
 
-Required values span root/process selection plus selected-client credentials. `FILESYSTEM_DISK` remains root/process-owned; the remaining Spaces values are selected-client deployment values.
+Spaces is not a universal requirement merely because static client assets may already be hosted there. When the Media module is enabled in staging/production, its deployment contributor activates writable-storage coverage: `FILESYSTEM_DISK` remains root/process-owned and the remaining Spaces/CDN values are selected-client deployment values. Clients without an enabled runtime upload capability are not forced to satisfy this block by Media.
 
 ```env
 FILESYSTEM_DISK=spaces

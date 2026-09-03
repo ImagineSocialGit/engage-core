@@ -53,6 +53,7 @@ class ModuleDependencyBoundaryTest extends TestCase
         $this->assertContains('workflow', $registered);
         $this->assertContains('flow_routes', $registered);
         $this->assertContains('forms', $registered);
+        $this->assertContains('media', $registered);
         $this->assertContains('campaigns', $registered);
         $this->assertContains('broadcasts', $registered);
         $this->assertContains('webinars', $registered);
@@ -84,6 +85,7 @@ class ModuleDependencyBoundaryTest extends TestCase
             'InboundMessaging',
             'InternalNotifications',
             'Location',
+            'Media',
             'Messaging',
             'Mortgage',
             'Music',
@@ -133,6 +135,7 @@ class ModuleDependencyBoundaryTest extends TestCase
             'Forms',
             'InboundMessaging',
             'InternalNotifications',
+            'Media',
             'Messaging',
             'Mortgage',
             'Portal',
@@ -146,6 +149,38 @@ class ModuleDependencyBoundaryTest extends TestCase
 
 
 
+
+    public function test_media_module_depends_only_on_core_and_does_not_import_optional_modules(): void
+    {
+        $definition = config('modules.modules.media');
+
+        $this->assertIsArray($definition);
+        $this->assertSame(['core'], $definition['depends_on']);
+
+        $this->assertModuleDoesNotImport('Media', [
+            'Broadcasts',
+            'Campaigns',
+            'Commerce',
+            'Documents',
+            'Events',
+            'FlowRoutes',
+            'Forms',
+            'InboundMessaging',
+            'InternalNotifications',
+            'Location',
+            'Messaging',
+            'Mortgage',
+            'Music',
+            'PetServices',
+            'Portal',
+            'Relationships',
+            'Reporting',
+            'Scheduling',
+            'Tasks',
+            'Webinars',
+            'Workflow',
+        ]);
+    }
 
     public function test_forms_module_does_not_import_domain_or_delivery_modules(): void
     {

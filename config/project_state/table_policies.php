@@ -162,6 +162,11 @@ return [
         'reason' => 'Documents transfer support has not been added yet.',
     ],
 
+    'media_assets' => [
+        'mode' => 'environment_owned',
+        'reason' => 'Media binary objects and their target storage identity remain environment-local until portable media transfer is implemented.',
+    ],
+
     'events' => [
         'mode' => 'must_be_empty',
         'reason' => 'Events transfer support has not been added yet.',
