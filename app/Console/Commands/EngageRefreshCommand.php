@@ -2,11 +2,14 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\InteractsWithDeploymentPlan;
+use App\Support\Deployment\DeploymentPlanResolver;
 use Illuminate\Console\Command;
 use Throwable;
 
 final class EngageRefreshCommand extends Command
 {
+    use InteractsWithDeploymentPlan;
     protected $signature = 'engage:refresh
         {--modules= : Comma-separated module keys passed to engage:install}
         {--preset= : Optional preset package key passed to engage:install}
@@ -14,7 +17,7 @@ final class EngageRefreshCommand extends Command
 
     protected $description = 'Destroy and rebuild a disposable Engage Core database from the current create migrations and client configuration.';
 
-    public function handle(): int
+    public function handle(DeploymentPlanResolver $deploymentPlanResolver): int
     {
         $environment = $this->laravel->environment();
 
@@ -24,6 +27,13 @@ final class EngageRefreshCommand extends Command
                 .'engage:refresh is allowed only in local or testing environments.',
             );
 
+            return self::FAILURE;
+        }
+
+        if (! $this->deploymentEnvironmentIsReady(
+            resolver: $deploymentPlanResolver,
+            operation: 'Database refresh',
+        )) {
             return self::FAILURE;
         }
 

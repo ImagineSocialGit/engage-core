@@ -1,19 +1,21 @@
 .
 ├── app
 │   ├── Console
-│   │   └── Commands
-│   │       ├── EngageDeploymentPlanCommand.php
-│   │       ├── EngageEnvironmentSyncCommand.php
-│   │       ├── EngageInstallCommand.php
-│   │       ├── EngageRefreshCommand.php
-│   │       ├── EngageUserAddCommand.php
-│   │       ├── EngageUserPasswordCommand.php
-│   │       ├── ModulesInstallCommand.php
-│   │       ├── ModulesMigrateCommand.php
-│   │       ├── ModulesReconcileCommand.php
-│   │       ├── ModulesStatusCommand.php
-│   │       ├── SyncPresetsCommand.php
-│   │       └── ValidateSetupCommand.php
+│   │   ├── Commands
+│   │   │   ├── EngageDeploymentPlanCommand.php
+│   │   │   ├── EngageEnvironmentSyncCommand.php
+│   │   │   ├── EngageInstallCommand.php
+│   │   │   ├── EngageRefreshCommand.php
+│   │   │   ├── EngageUserAddCommand.php
+│   │   │   ├── EngageUserPasswordCommand.php
+│   │   │   ├── ModulesInstallCommand.php
+│   │   │   ├── ModulesMigrateCommand.php
+│   │   │   ├── ModulesReconcileCommand.php
+│   │   │   ├── ModulesStatusCommand.php
+│   │   │   ├── SyncPresetsCommand.php
+│   │   │   └── ValidateSetupCommand.php
+│   │   └── Concerns
+│   │       └── InteractsWithDeploymentPlan.php
 │   ├── helpers.php
 │   ├── Http
 │   │   ├── Controllers
@@ -2293,6 +2295,7 @@
 │   ├── testing-tools.md
 │   ├── TODO.md
 │   └── ui-ux-guide.md
+├── e AppModulesCoreModelsContact
 ├── mkdir
 ├── ops
 │   └── observability
@@ -2727,6 +2730,7 @@
 │   │   │   ├── WebinarSeriesAuthoringGuardTest.php
 │   │   │   └── WebinarSyncTest.php
 │   │   ├── Deployment
+│   │   │   ├── CoreDeploymentPlanContributorTest.php
 │   │   │   ├── DeploymentPlanRegistrationTest.php
 │   │   │   ├── DeploymentPlanResolverTest.php
 │   │   │   ├── EngageDeploymentPlanCommandTest.php
@@ -3190,6 +3194,8 @@
 │   │       ├── RecordManualStatusTransitionAutomationBehaviorActionTest.php
 │   │       ├── TransitionContactWorkflowStatusActionTest.php
 │   │       └── WorkflowStatusAutomationOutboxTest.php
+│   ├── Support
+│   │   └── UsesSyntheticDeploymentEnvironment.php
 │   ├── TestCase.php
 │   └── Unit
 │       └── Support
@@ -3197,4 +3203,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-763 directories, 2435 files
+765 directories, 2439 files

@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\InteractsWithDeploymentPlan;
+use App\Support\Deployment\DeploymentPlanResolver;
 use App\Support\Modules\Migrations\ModuleMigrationExecutionResult;
 use App\Support\Modules\Migrations\ModuleMigrationExecutor;
 use App\Support\Modules\Migrations\ModuleMigrationPlan;
@@ -18,6 +20,7 @@ use Throwable;
 final class EngageInstallCommand extends Command
 {
     use ConfirmableTrait;
+    use InteractsWithDeploymentPlan;
 
     protected $signature = 'engage:install
         {--modules= : Comma-separated module keys; defaults to configured enabled schema-owning modules}
@@ -29,6 +32,7 @@ final class EngageInstallCommand extends Command
     protected $description = 'Install platform schema, selected module schema, presets, setup validation, and optional CRM user onboarding for a client.';
 
     public function handle(
+        DeploymentPlanResolver $deploymentPlanResolver,
         ModuleManager $modules,
         ModuleMigrationRegistry $registry,
         ModuleMigrationPlanner $planner,
@@ -52,6 +56,13 @@ final class EngageInstallCommand extends Command
         } catch (Throwable $exception) {
             $this->error($exception->getMessage());
 
+            return self::FAILURE;
+        }
+
+        if (! $this->deploymentEnvironmentIsReady(
+            resolver: $deploymentPlanResolver,
+            operation: 'Installation',
+        )) {
             return self::FAILURE;
         }
 

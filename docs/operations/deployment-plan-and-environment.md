@@ -100,6 +100,16 @@ Deployment contributors answer a different question:
 
 That distinction is required because selected-client `.env` loading happens before Laravel service providers and module contributor tags are available.
 
+## Client namespace isolation by environment
+
+`CACHE_PREFIX`, `REDIS_PREFIX`, and `HORIZON_PREFIX` are client-owned namespace overrides whose deployment necessity depends on the runtime environment.
+
+- local/testing may omit them when developer infrastructure is intentionally shared and per-client isolation is unnecessary;
+- staging/production require explicit values so client cache, Redis, and Horizon state cannot collide on shared infrastructure;
+- a local/testing deployment may still persist any of these keys when isolation is useful.
+
+The deployment plan therefore treats these keys as optional in local/testing and required in staging/production. Do not add fake per-client development prefixes solely to satisfy deployment validation.
+
 ## Messaging provider requirements
 
 Messaging contributes provider-aware deployment requirements instead of requiring credentials for every provider the codebase happens to support.
@@ -337,3 +347,13 @@ Forms resolves public intake enablement and its signing/identity requirements. M
 Deployment coverage is protected by a regression contract that registers every provider declared by the module registry and verifies that every owner appearing in `EnvironmentVariableCatalog` has at least one deployment contributor. Audited zero-environment contributors may appear as additional covered owners. This catches a newly introduced environment-owning subsystem that forgets to participate in deployment planning without maintaining another hard-coded module list.
 
 Future module/provider contributors should continue to be added from fresh dependency cones. The Bash launcher should consume the resolved deployment plan rather than re-encoding module requirements itself.
+
+## Installation and destructive-refresh gate
+
+`engage:install` resolves the configured runtime deployment plan after validating its requested schema selection and before production confirmation or any migration begins. If the plan contains a missing, unresolved, mismatched, or invalid blocking requirement, installation exits with failure and makes no database changes.
+
+The installer reports only requirement identity, scope, secret classification, and the contributor-owned reason. It never prints persisted secret values. Recovery remains explicit: inspect `php artisan engage:deployment-plan`, optionally use `php artisan engage:environment:sync --write-missing` to add missing required names, populate the real values, clear cached configuration when appropriate, and rerun the installer.
+
+`engage:refresh` performs the same read-only deployment preflight before `db:wipe`. This prevents a disposable-environment refresh from destroying the current database and then discovering that `engage:install` cannot rebuild it. The nested installer still rechecks deployment readiness after the wipe as defense in depth.
+
+The preflight always evaluates the configured runtime module set. `engage:install --modules=...` selects schema installation scope; it is not a way to narrow or bypass deployment requirements for capabilities that remain enabled in committed client configuration.

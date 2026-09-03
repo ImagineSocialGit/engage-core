@@ -1014,15 +1014,17 @@ Before deleting an existing live environment variable, search the full repositor
 
 # 22. Recommended environment-specific isolation
 
+Local/testing development may intentionally share cache/Redis/Horizon namespaces across client selections. Per-client `CACHE_PREFIX`, `REDIS_PREFIX`, and `HORIZON_PREFIX` values are optional there. Staging and production still require explicit unique client namespaces.
+
 | Concern | Local | Staging | Production |
 | --- | --- | --- | --- |
 | APP_ENV | local | staging | production |
 | APP_DEBUG | true | false | false |
 | APP_KEY | unique | unique | unique/preserved |
 | Database | local/disposable | separate | separate/real |
-| Redis prefix | unique | unique | unique |
-| Cache prefix | unique | unique | unique |
-| Horizon prefix | unique | unique | unique |
+| Redis prefix | optional/shared dev namespace | unique | unique |
+| Cache prefix | optional/shared dev namespace | unique | unique |
+| Horizon prefix | optional/shared dev namespace | unique | unique |
 | URLs | local/dev | staging | production |
 | Staging access credentials | optional | required when gate used | normally blank/not used |
 | Email provider | log/test or real test | safe test | production |
@@ -1049,9 +1051,9 @@ Before deleting an existing live environment variable, search the full repositor
 [ ] URLs correct
 [ ] `CRM_APP_URL` resolves to the actual registered CRM route host (including `app.` deployments)
 [ ] DB correct
-[ ] Redis DB/prefix isolation correct
-[ ] Cache prefix unique
-[ ] Horizon prefix unique
+[ ] Redis DB/prefix isolation correct for staging/production or any intentionally isolated local runtime
+[ ] Cache prefix unique where client isolation is required
+[ ] Horizon prefix unique where client isolation is required
 [ ] Horizon queue list covers executable queues
 [ ] Root logging resolves to the intended production channel/stack/level/retention
 [ ] Production observability is installed/verified when this deployment uses the Engage Core observability path

@@ -9,15 +9,47 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
+use Tests\Support\UsesSyntheticDeploymentEnvironment;
 use Tests\TestCase;
 
 class EngageRefreshCommandTest extends TestCase
 {
+    use UsesSyntheticDeploymentEnvironment;
     protected function setUp(): void
     {
         parent::setUp();
 
         Schema::dropAllTables();
+        $this->useSyntheticDeploymentEnvironment();
+    }
+
+    public function test_refresh_refuses_incomplete_deployment_environment_before_database_wipe(): void
+    {
+        config()->set('modules.enabled', ['tasks']);
+        $this->useSyntheticDeploymentEnvironment(
+            clientOverrides: ['DB_PASSWORD' => ''],
+        );
+
+        Schema::create('refresh_deployment_guard_marker', function (Blueprint $table): void {
+            $table->id();
+        });
+
+        $this->assertSame(1, Artisan::call('engage:refresh', [
+            '--modules' => 'tasks',
+            '--force' => true,
+        ]));
+
+        $output = Artisan::output();
+
+        $this->assertStringContainsString('Deployment preflight', $output);
+        $this->assertStringContainsString(
+            'Database refresh refused because deployment environment requirements are incomplete.',
+            $output,
+        );
+        $this->assertStringContainsString('DB_PASSWORD', $output);
+        $this->assertStringContainsString('No database changes were made.', $output);
+        $this->assertStringNotContainsString('[1/2] Database wipe', $output);
+        $this->assertTrue(Schema::hasTable('refresh_deployment_guard_marker'));
     }
 
     public function test_refresh_destroys_existing_schema_and_rebuilds_configured_engage_schema(): void

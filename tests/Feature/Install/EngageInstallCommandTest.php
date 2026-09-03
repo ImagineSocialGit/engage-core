@@ -11,15 +11,44 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Tests\Support\UsesSyntheticDeploymentEnvironment;
 use Tests\TestCase;
 
 class EngageInstallCommandTest extends TestCase
 {
+    use UsesSyntheticDeploymentEnvironment;
     protected function setUp(): void
     {
         parent::setUp();
 
         Schema::dropAllTables();
+        $this->useSyntheticDeploymentEnvironment();
+    }
+
+    public function test_incomplete_deployment_environment_refuses_install_before_database_mutation(): void
+    {
+        config()->set('modules.enabled', ['tasks']);
+        $this->useSyntheticDeploymentEnvironment(
+            rootOverrides: ['APP_KEY' => ''],
+        );
+
+        $this->assertSame(1, Artisan::call('engage:install', [
+            '--modules' => 'tasks',
+            '--no-create-user' => true,
+        ]));
+
+        $output = Artisan::output();
+
+        $this->assertStringContainsString('Deployment preflight', $output);
+        $this->assertStringContainsString(
+            'Installation refused because deployment environment requirements are incomplete.',
+            $output,
+        );
+        $this->assertStringContainsString('APP_KEY', $output);
+        $this->assertStringContainsString('No database changes were made.', $output);
+        $this->assertStringContainsString('php artisan engage:deployment-plan', $output);
+        $this->assertFalse(Schema::hasTable('migrations'));
+        $this->assertFalse(Schema::hasTable('module_installations'));
     }
 
     public function test_install_builds_platform_and_selected_scheduling_schema_without_location_then_runs_final_stages(): void
@@ -36,6 +65,8 @@ class EngageInstallCommandTest extends TestCase
 
         $output = Artisan::output();
 
+        $this->assertStringContainsString('Deployment preflight', $output);
+        $this->assertStringContainsString('Environment requirements: ready', $output);
         $this->assertStringContainsString('[1/4] Platform migrations', $output);
         $this->assertStringContainsString('[2/4] Module installation', $output);
         $this->assertStringContainsString('[3/4] Preset synchronization', $output);

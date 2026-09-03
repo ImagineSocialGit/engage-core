@@ -4,7 +4,6 @@ namespace App\Modules\Core\Deployment;
 
 use App\Support\Deployment\Contracts\DeploymentPlanContributor;
 use App\Support\Deployment\Data\EnvironmentRequirement;
-use Illuminate\Support\Env;
 
 final class CoreDeploymentPlanContributor implements DeploymentPlanContributor
 {
@@ -110,8 +109,7 @@ final class CoreDeploymentPlanContributor implements DeploymentPlanContributor
             );
         }
 
-        // Client deployment identity should be explicit because it must remain
-        // isolated from other clients sharing the same Core checkout/services.
+        // Client deployment identity remains explicit in every environment.
         foreach ([
             'ROOT_DOMAIN' => 'The client public root domain anchors generated URLs and domain policy.',
             'APP_URL' => 'The client application origin must be explicit for generated links.',
@@ -119,11 +117,23 @@ final class CoreDeploymentPlanContributor implements DeploymentPlanContributor
             'DB_DATABASE' => 'Each client deployment requires an explicit database identity.',
             'DB_USERNAME' => 'Each client deployment requires an explicit database user.',
             'DB_PASSWORD' => 'Each client deployment requires database credentials.',
+        ] as $key => $reason) {
+            yield EnvironmentRequirement::required($key, $reason);
+        }
+
+        $liveRuntime = in_array(app()->environment(), ['staging', 'production'], true);
+
+        foreach ([
             'CACHE_PREFIX' => 'Client cache keys must be isolated when infrastructure is shared.',
             'REDIS_PREFIX' => 'Client Redis keys must be isolated when infrastructure is shared.',
             'HORIZON_PREFIX' => 'Client Horizon keys must be isolated when infrastructure is shared.',
         ] as $key => $reason) {
-            yield EnvironmentRequirement::required($key, $reason);
+            yield $liveRuntime
+                ? EnvironmentRequirement::required($key, $reason)
+                : EnvironmentRequirement::optional(
+                    $key,
+                    'Local/testing may intentionally share developer infrastructure without a per-client namespace; persist this client override only when local isolation is desired.',
+                );
         }
 
         foreach ([

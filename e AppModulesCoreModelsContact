@@ -1,0 +1,37 @@
+[90m= [39m[
+    [34m"[39m[34mmessage_chain_statuses[39m[34m"[39m => [
+      [34m"[39m[34mactive[39m[34m"[39m => [35m4[39m,
+      [34m"[39m[34mcompleted[39m[34m"[39m => [35m20[39m,
+    ],
+    [34m"[39m[34mactive_enrollments[39m[34m"[39m => [
+      {#8530
+        +"[1mid[22m": [35m11[39m,
+        +"[1mrecipient_id[22m": [35m38[39m,
+        +"[1mcurrent_message_chain_step_id[22m": [35m6[39m,
+        +"[1mnext_action_at[22m": [32m"[39m[32m2026-09-07 00:00:00[39m[32m"[39m,
+      },
+      {#8500
+        +"[1mid[22m": [35m12[39m,
+        +"[1mrecipient_id[22m": [35m39[39m,
+        +"[1mcurrent_message_chain_step_id[22m": [35m6[39m,
+        +"[1mnext_action_at[22m": [32m"[39m[32m2026-09-07 00:00:00[39m[32m"[39m,
+      },
+      {#8532
+        +"[1mid[22m": [35m13[39m,
+        +"[1mrecipient_id[22m": [35m40[39m,
+        +"[1mcurrent_message_chain_step_id[22m": [35m6[39m,
+        +"[1mnext_action_at[22m": [32m"[39m[32m2026-09-07 00:00:00[39m[32m"[39m,
+      },
+      {#8534
+        +"[1mid[22m": [35m24[39m,
+        +"[1mrecipient_id[22m": [35m41[39m,
+        +"[1mcurrent_message_chain_step_id[22m": [35m6[39m,
+        +"[1mnext_action_at[22m": [32m"[39m[32m2026-09-07 00:00:00[39m[32m"[39m,
+      },
+    ],
+    [34m"[39m[34mscheduled_messages[39m[34m"[39m => [35m0[39m,
+    [34m"[39m[34mresume_items_pending[39m[34m"[39m => [35m0[39m,
+    [34m"[39m[34mresume_items_by_state[39m[34m"[39m => [
+      [34m"[39m[34mcompleted[39m[34m"[39m => [35m4[39m,
+    ],
+  ]

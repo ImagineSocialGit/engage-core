@@ -19,8 +19,14 @@ Normal application startup never runs migrations. Normal runtime bootstrap regis
 ## Command ownership
 
 ```text
+php artisan engage:deployment-plan
+    read-only runtime environment readiness for the configured client/module set
+
+php artisan engage:environment:sync --write-missing
+    add missing required variable names only; never invent values or overwrite/delete existing entries
+
 php artisan engage:install
-    new-client/new-environment orchestration: platform + selected modules + presets + validation
+    deployment preflight + new-client/new-environment orchestration: platform + selected modules + presets + validation
 
 php artisan migrate --force
     platform migrations only
@@ -80,6 +86,7 @@ After the intended client configuration, environment variables, dependencies, an
 ```bash
 cd [APP_PATH]
 php artisan optimize:clear
+php artisan engage:deployment-plan
 php artisan engage:install --force
 
 # Run every applicable entry from the module-specific post-install registry.
@@ -90,6 +97,8 @@ php artisan setup:validate
 ```
 
 `engage:install` defaults to the schema-owning portion of the configured enabled-module dependency closure and always includes Core. Use `--modules=` only when there is a deliberate reason to name an explicit superset; the installer rejects a selection that omits configured enabled schema.
+
+Before any migration, `engage:install` re-resolves the configured runtime deployment plan and refuses an incomplete environment without touching the database. The explicit `--modules=` option changes schema installation scope only; it does not narrow deployment validation for capabilities that remain enabled. The preflight reports blocking key names/reasons but never secret values.
 
 The installer does not rewrite client module configuration. Correct configuration first, then rerun the same command. Completed stages are designed to be idempotent.
 
@@ -162,6 +171,8 @@ php artisan setup:validate
 Bulk `modules:reconcile --force` may be used for a known existing database only after status has been reviewed. Partial scopes block reconciliation.
 
 ## Controlled Project State clean rebuild
+
+`engage:refresh` is local/testing-only and now resolves deployment readiness before `db:wipe`. If the configured deployment plan is incomplete, refresh refuses before destructive database mutation; the nested `engage:install` also rechecks readiness before rebuilding schema.
 
 Project State is not a normal deployment mechanism. Follow `project-state-transfer-runbook.md` for backup, write freeze, Redis cleanup, export, import, resume, and provider reconciliation.
 
