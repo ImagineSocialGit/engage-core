@@ -162,6 +162,44 @@ Do not add `MESSAGING_APP_URL`. Deployment must provision DNS, TLS, and web-serv
 
 Stable product decisions such as SMS enablement/provider selection are still environment-backed in the current runtime. A later product-config pass may move those non-secret decisions into committed client PHP config; this batch does not change that ownership yet.
 
+## Inbound Messaging receiving requirements
+
+Inbound Messaging owns the receiving identity for email replies, while Messaging continues to own the selected email/SMS provider credentials and webhook verification material.
+
+In staging/production, enabling `inbound_messaging` requires:
+
+```text
+INBOUND_EMAIL_DOMAIN
+```
+
+The value is the bare receiving domain only, commonly:
+
+```text
+replies.[ROOT_DOMAIN]
+```
+
+It must be a valid email domain with no scheme, mailbox/local-part, credentials, path, query, or fragment. The deployment plan applies an `email_domain` value rule so malformed persisted receiving domains block before installation/runtime work.
+
+The domain is required even when there are no authored semantic inbound-email routes. Signed per-message Reply-To correlation also uses `INBOUND_EMAIL_DOMAIN`, so a live Inbound Messaging deployment without the receiving domain would silently lose normal email-reply correlation.
+
+Local/testing deployment planning keeps the receiving domain optional.
+
+Inbound Messaging does **not** duplicate these Messaging-owned values:
+
+```text
+EMAIL_PROVIDER
+RESEND_API_KEY
+RESEND_WEBHOOK_SECRET
+SMS_ENABLED
+SMS_PROVIDER
+TELNYX_API_KEY
+TELNYX_WEBHOOK_PUBLIC_KEY
+```
+
+The current Resend inbound runtime retrieves received email bodies with the same `RESEND_API_KEY` already required by Messaging, so live inbound-email deployments still need that key to have Resend Full Access as an operational provider permission.
+
+`INBOUND_REPLY_DEFAULT_TEAM_MEMBER_EMAIL` remains an optional selected-client fallback only when Internal Notifications is also enabled. It is not required for inbound capture, classification, routing, or reply correlation.
+
 ## Scheduling public-origin requirements
 
 Scheduling has one deployment-owned environment value: `SCHEDULING_APP_URL`.
@@ -225,10 +263,11 @@ Current deployment-plan contributors cover:
 - Core
 - Forms
 - Messaging provider/runtime requirements
+- Inbound Messaging receiving-domain requirements
 - Webinars / Zoom
 - Scheduling public-origin requirements
 - Media writable-storage requirements
 
-Forms resolves public intake enablement and its signing/identity requirements. Messaging resolves the selected email/SMS providers, live credentials, sender fallbacks, webhook verification, and operational defaults. Webinars resolves Zoom provider readiness and post-event webhook requirements. Scheduling keeps public booking optional while validating any deliberately persisted public origin. Media activates storage-owner coverage only when its runtime upload capability is enabled, requiring writable Spaces and a stable CDN origin in staging/production.
+Forms resolves public intake enablement and its signing/identity requirements. Messaging resolves the selected email/SMS providers, live credentials, sender fallbacks, webhook verification, and operational defaults. Inbound Messaging resolves the live receiving domain required for signed Reply-To and semantic inbound-email routing without reclaiming Messaging-owned provider credentials. Webinars resolves Zoom provider readiness and post-event webhook requirements. Scheduling keeps public booking optional while validating any deliberately persisted public origin. Media activates storage-owner coverage only when its runtime upload capability is enabled, requiring writable Spaces and a stable CDN origin in staging/production.
 
 Additional module/provider contributors should continue to be added from fresh dependency cones. The Bash launcher should consume the resolved deployment plan rather than re-encoding module requirements itself.

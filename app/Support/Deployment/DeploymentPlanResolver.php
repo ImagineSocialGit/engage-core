@@ -223,6 +223,7 @@ final class DeploymentPlanResolver
 
         return match ($valueRule) {
             EnvironmentRequirement::VALUE_RULE_HTTP_ORIGIN => $this->isHttpOrigin($value),
+            EnvironmentRequirement::VALUE_RULE_EMAIL_DOMAIN => $this->isEmailDomain($value),
             default => false,
         };
     }
@@ -267,6 +268,24 @@ final class DeploymentPlanResolver
 
         return $port === null
             || (is_int($port) && $port >= 1 && $port <= 65535);
+    }
+
+    private function isEmailDomain(mixed $value): bool
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return false;
+        }
+
+        $domain = strtolower(trim($value));
+
+        if (str_contains($domain, '@')) {
+            return false;
+        }
+
+        return filter_var(
+            'route@'.$domain,
+            FILTER_VALIDATE_EMAIL,
+        ) !== false;
     }
 
     private function displayPath(string $path): string

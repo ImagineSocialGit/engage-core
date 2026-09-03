@@ -66,7 +66,10 @@
 # - inbound email receiving requires Full Access with the current runtime;
 # - RESEND_WEBHOOK_SECRET may contain multiple active endpoint secrets;
 # - INBOUND_EMAIL_DOMAIN is the bare Resend receiving domain, commonly
-#   replies.[ROOT_DOMAIN].
+#   replies.[ROOT_DOMAIN]. When Inbound Messaging is enabled, staging/production
+#   require this value; local/testing may omit it.
+# - Use only the bare receiving domain: no scheme, path, mailbox/local-part,
+#   credentials, query, or fragment.
 # RESEND_API_KEY=
 # RESEND_WEBHOOK_SECRET=
 # INBOUND_EMAIL_DOMAIN=
@@ -77,6 +80,8 @@
 # PERMISSION_INVITATION_PUBLIC_URL=
 # INTERNAL_NOTIFICATION_FROM_ADDRESS=
 # INTERNAL_NOTIFICATION_FROM_NAME=
+# Optional fallback recipient used only when Inbound Messaging and Internal
+# Notifications are both enabled and no assigned active team member resolves.
 # INBOUND_REPLY_DEFAULT_TEAM_MEMBER_EMAIL=
 
 ################################

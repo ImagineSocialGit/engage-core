@@ -7,6 +7,7 @@ use App\Modules\InboundMessaging\Automation\InboundReplyAutomationTriggerAuthori
 use App\Modules\InboundMessaging\Automation\MarkInboundMessageAutoRespondedActionHandler;
 use App\Modules\InboundMessaging\Capabilities\InboundMessagingAutomationCapabilityContributor;
 use App\Modules\InboundMessaging\Console\Commands\SyncInboundReplyProfilesCommand;
+use App\Modules\InboundMessaging\Deployment\InboundMessagingDeploymentPlanContributor;
 use App\Modules\InboundMessaging\Events\InboundMessageReceived;
 use App\Modules\InboundMessaging\Listeners\ConsumeRoutedInboundMessage;
 use App\Modules\InboundMessaging\Listeners\RecordInboundAutomaticMessage;
@@ -89,6 +90,10 @@ class InboundMessagingModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             InboundMessagingSetupValidationContributor::class,
         ], 'setup.validation_contributors');
+
+        $this->app->tag([
+            InboundMessagingDeploymentPlanContributor::class,
+        ], 'deployment.plan_contributors');
     }
 
     public function boot(): void

@@ -637,6 +637,8 @@
 │   │   │   │   │   └── ResolvedInboundEmailRoute.php
 │   │   │   │   ├── InboundEmailRouteIdentity.php
 │   │   │   │   └── RoutedInboundMessageConsumeResult.php
+│   │   │   ├── Deployment
+│   │   │   │   └── InboundMessagingDeploymentPlanContributor.php
 │   │   │   ├── Events
 │   │   │   │   └── InboundMessageReceived.php
 │   │   │   ├── Listeners
@@ -2724,6 +2726,7 @@
 │   │   │   ├── EngageDeploymentPlanCommandTest.php
 │   │   │   ├── EnvironmentFileSynchronizerTest.php
 │   │   │   ├── EnvironmentRequirementAllowedValuesTest.php
+│   │   │   ├── EnvironmentRequirementEmailDomainRuleTest.php
 │   │   │   ├── EnvironmentRequirementValueRuleTest.php
 │   │   │   └── EnvironmentVariableCatalogTest.php
 │   │   ├── Documents
@@ -2799,6 +2802,7 @@
 │   │   │   ├── InboundEmailRouteWorkspaceTest.php
 │   │   │   ├── InboundInboxWorkspaceTest.php
 │   │   │   ├── InboundMessageAutomationOutboxTest.php
+│   │   │   ├── InboundMessagingDeploymentPlanContributorTest.php
 │   │   │   ├── InboundNormalReplyAutomationEventTest.php
 │   │   │   ├── InboundReplyFoundationTest.php
 │   │   │   ├── InboundReplyOutcomeClassifierTest.php
@@ -3182,4 +3186,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-758 directories, 2425 files
+759 directories, 2428 files

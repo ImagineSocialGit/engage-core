@@ -11,6 +11,7 @@ final readonly class EnvironmentRequirement
     public const DEFAULTED = 'defaulted';
 
     public const VALUE_RULE_HTTP_ORIGIN = 'http_origin';
+    public const VALUE_RULE_EMAIL_DOMAIN = 'email_domain';
 
     /**
      * @param array<int, string> $allowedValues
@@ -136,6 +137,7 @@ final readonly class EnvironmentRequirement
     {
         return [
             self::VALUE_RULE_HTTP_ORIGIN,
+            self::VALUE_RULE_EMAIL_DOMAIN,
         ];
     }
 }
