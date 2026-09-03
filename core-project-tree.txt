@@ -502,6 +502,7 @@
 │   │   │   │   │   └── ContactRoutesVisibilityDataProvider.php
 │   │   │   │   ├── ContactStatusAutomationImpactResolver.php
 │   │   │   │   ├── FlowRouteActivationService.php
+│   │   │   │   ├── FlowRouteAuthoringLinkBuilder.php
 │   │   │   │   ├── FlowRouteBindingConflictDetector.php
 │   │   │   │   ├── FlowRouteConditionEvaluatorRegistry.php
 │   │   │   │   ├── FlowRouteEditorCatalog.php
@@ -2468,7 +2469,8 @@
 │       │   │   └── partials
 │       │   │       ├── editor-modal.blade.php
 │       │   │       ├── navigation.blade.php
-│       │   │       └── point-fields.blade.php
+│       │   │       ├── point-fields.blade.php
+│       │   │       └── trigger-fields.blade.php
 │       │   ├── forms
 │       │   │   ├── index.blade.php
 │       │   │   └── submissions
@@ -2764,6 +2766,7 @@
 │   │   │   ├── CompactFlowRoutePresetAuthoringTest.php
 │   │   │   ├── ContactStatusAutomationImpactResolverTest.php
 │   │   │   ├── ContactTagAutomationCapabilityTest.php
+│   │   │   ├── FlowRouteAuthoringExtensibilityTest.php
 │   │   │   ├── FlowRouteAutomationEventExecutionContextTest.php
 │   │   │   ├── FlowRouteAutomationEventPersistenceTest.php
 │   │   │   ├── FlowRouteAutomationLifecycleTest.php
@@ -3212,4 +3215,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-765 directories, 2448 files
+765 directories, 2451 files

@@ -560,7 +560,7 @@
 
                                     <div>
                                         <label for="point-name-{{ $point->id }}" class="text-sm font-semibold text-slate-900">
-                                            {{ $point->type === \App\Modules\FlowRoutes\Enums\FlowRoutePointType::BranchEvaluate->value ? 'Decision question' : 'Internal label' }}
+                                            {{ $presented['name_field_label'] ?? 'Internal label' }}
                                             <span class="font-normal text-slate-600">(optional)</span>
                                         </label>
                                         <input
@@ -728,7 +728,7 @@
 
                                     <div>
                                         <label for="point-name-{{ $flowRoute->id }}-{{ $capability['id'] }}" class="text-sm font-semibold text-slate-900">
-                                            {{ ($capability['point_type'] ?? '') === \App\Modules\FlowRoutes\Enums\FlowRoutePointType::BranchEvaluate->value ? 'Decision question' : 'Internal label' }}
+                                            {{ $capability['name_field_label'] ?? 'Internal label' }}
                                             <span class="font-normal text-slate-600">(optional)</span>
                                         </label>
                                         <input

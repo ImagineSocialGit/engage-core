@@ -19,5 +19,6 @@ final readonly class AutomationPointAuthoringDefinition
         public ?string $typeLabel = null,
         public array $genericLabels = [],
         public array $generatedPrefixes = [],
+        public string $nameFieldLabel = 'Internal label',
     ) {}
 }

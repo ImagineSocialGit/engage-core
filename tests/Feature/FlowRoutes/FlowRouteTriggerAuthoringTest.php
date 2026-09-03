@@ -178,9 +178,9 @@ class FlowRouteTriggerAuthoringTest extends TestCase
         $this->actingAs(User::factory()->create())
             ->get('http://crm.'.config('app.root_domain').'/flow-routes?create=1')
             ->assertOk()
-            ->assertSee('x-model="createTriggerValues.contact_status_id"', false)
+            ->assertSee('name="contact_status_id"', false)
+            ->assertSee('data-flow-route-trigger-field="contact_status_id"', false)
             ->assertSee('x-bind:disabled="createTriggerKey !==', false)
-            ->assertSee('x-bind:required="createTriggerKey ===', false)
-            ->assertDontSee('createTriggerValues[', false);
+            ->assertSee('x-bind:required="createTriggerKey ===', false);
     }
 }

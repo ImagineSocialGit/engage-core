@@ -3,6 +3,7 @@
 namespace App\Support\ModuleIntegrations\Forms\FlowRoutes;
 
 use App\Modules\FlowRoutes\Models\FlowRoute;
+use App\Modules\FlowRoutes\Services\FlowRouteAuthoringLinkBuilder;
 use App\Modules\Forms\Automation\FormSubmissionAutomationTriggerAuthoringContributor;
 use App\Support\AutomationCapabilities\AutomationCapabilityRegistry;
 use App\Support\ModuleIntegrations\Forms\Contracts\FormSubmissionAutomationWorkspace;
@@ -28,6 +29,7 @@ final class FlowRoutesFormSubmissionAutomationWorkspace implements FormSubmissio
     public function __construct(
         private readonly AutomationCapabilityRegistry $capabilities,
         private readonly ModuleManager $modules,
+        private readonly FlowRouteAuthoringLinkBuilder $authoringLinks,
     ) {}
 
     public function readForForm(
@@ -70,8 +72,9 @@ final class FlowRoutesFormSubmissionAutomationWorkspace implements FormSubmissio
                 'module_key' => $definition['module_key'],
                 'label' => $definition['label'],
                 'detail' => $definition['detail'],
-                'url' => $this->createUrl(
-                    formKey: $formKey,
+                'url' => $this->authoringLinks->createUrl(
+                    triggerAuthoringKey: FormSubmissionAutomationTriggerAuthoringContributor::KEY,
+                    triggerValues: ['form_key' => $formKey],
                     name: $definition['name_prefix'].' '.$formName,
                     kind: FlowRoute::AUTHORING_KIND_AUTOMATIC_BEHAVIOR,
                     starterCapabilityKey: $capabilityKey,
@@ -84,8 +87,9 @@ final class FlowRoutesFormSubmissionAutomationWorkspace implements FormSubmissio
             'module_key' => 'flow_routes',
             'label' => 'Build custom automation',
             'detail' => 'Use a Route when the form should start several actions, waits, or decisions.',
-            'url' => $this->createUrl(
-                formKey: $formKey,
+            'url' => $this->authoringLinks->createUrl(
+                triggerAuthoringKey: FormSubmissionAutomationTriggerAuthoringContributor::KEY,
+                triggerValues: ['form_key' => $formKey],
                 name: 'After '.$formName.' submission',
                 kind: FlowRoute::AUTHORING_KIND_ROUTE,
             ),
@@ -120,9 +124,7 @@ final class FlowRoutesFormSubmissionAutomationWorkspace implements FormSubmissio
                 'kind' => $route->authoringKind(),
                 'is_enabled' => (bool) $route->is_active,
                 'step_count' => (int) $route->active_flow_route_points_count,
-                'url' => route('crm.flow-routes.index', [
-                    'edit_route' => $route->getKey(),
-                ]),
+                'url' => $this->authoringLinks->editUrl($route),
             ])
             ->values()
             ->all();
@@ -151,26 +153,5 @@ final class FlowRoutesFormSubmissionAutomationWorkspace implements FormSubmissio
         }
 
         return false;
-    }
-
-    private function createUrl(
-        string $formKey,
-        string $name,
-        string $kind,
-        ?string $starterCapabilityKey = null,
-    ): string {
-        $parameters = [
-            'create' => 1,
-            'create_kind' => $kind,
-            'trigger_authoring_key' => FormSubmissionAutomationTriggerAuthoringContributor::KEY,
-            'form_key' => $formKey,
-            'create_name' => mb_substr($name, 0, 255),
-        ];
-
-        if ($starterCapabilityKey !== null) {
-            $parameters['starter_capability_key'] = $starterCapabilityKey;
-        }
-
-        return route('crm.flow-routes.index', $parameters);
     }
 }

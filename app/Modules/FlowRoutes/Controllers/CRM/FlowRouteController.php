@@ -102,15 +102,32 @@ class FlowRouteController extends Controller
         $createStatusId = is_array($selectedStatusOption)
             ? ($selectedStatusOption['value'] ?? null)
             : null;
-        $createTriggerValues = collect($createTriggers)
+        $createTriggerFields = collect($createTriggers)
             ->flatMap(fn (array $trigger): array => $trigger['fields'] ?? [])
+            ->filter(fn (mixed $field): bool => is_array($field))
+            ->values();
+        $createTriggerValues = $createTriggerFields
             ->mapWithKeys(function (array $field) use ($request): array {
-                $name = (string) $field['name'];
+                $name = trim((string) ($field['name'] ?? ''));
+
+                if ($name === '') {
+                    return [];
+                }
 
                 return [
-                    $name => old($name, $request->query($name, '')),
+                    $name => old(
+                        $name,
+                        $request->query($name, $field['value'] ?? ''),
+                    ),
                 ];
             })
+            ->all();
+        $createTriggerFieldNames = $createTriggerFields
+            ->pluck('name')
+            ->filter(fn (mixed $name): bool => is_string($name) && trim($name) !== '')
+            ->map(fn (mixed $name): string => trim((string) $name))
+            ->unique()
+            ->values()
             ->all();
         $createTriggerValues['contact_status_id'] = old(
             'contact_status_id',
@@ -163,6 +180,7 @@ class FlowRouteController extends Controller
                 $defaultTriggerKey,
             ),
             'createRouteTriggerValues' => $createTriggerValues,
+            'createRouteTriggerFieldNames' => $createTriggerFieldNames,
             'createRouteName' => (string) old(
                 'name',
                 trim((string) $request->query('create_name', '')),

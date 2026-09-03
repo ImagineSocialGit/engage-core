@@ -15,7 +15,6 @@
             openCreateRoute: @js((bool) $openCreateRoute),
             createKind: @js($openCreateKind),
             createTriggerKey: @js($createRouteTriggerKey),
-            createTriggerValues: @js($createRouteTriggerValues),
             search: '',
             state: 'all',
             openRoute(id) {
@@ -41,9 +40,15 @@
             closeCreate() {
                 this.openCreateRoute = false;
                 const url = new URL(window.location.href);
-                url.searchParams.delete('create');
-                url.searchParams.delete('create_kind');
-                url.searchParams.delete('status');
+                [
+                    'create',
+                    'create_kind',
+                    'status',
+                    'trigger_authoring_key',
+                    'create_name',
+                    'starter_capability_key',
+                    ...@js($createRouteTriggerFieldNames),
+                ].forEach((key) => url.searchParams.delete(key));
                 window.history.replaceState({}, '', url);
             },
             matches(element) {
@@ -427,46 +432,10 @@
                                     <p class="mt-1 text-xs leading-5 text-slate-600">{{ $trigger['description'] }}</p>
                                 </div>
 
-                                @foreach($trigger['fields'] as $field)
-                                    @php
-                                        $fieldName = (string) $field['name'];
-                                        $fieldId = 'create-route-'.str_replace('_', '-', $fieldName);
-                                        $fieldValue = old($fieldName, $createRouteTriggerValues[$fieldName] ?? '');
-                                        $fieldRequired = (bool) ($field['required'] ?? false);
-                                    @endphp
-
-                                    <div>
-                                        <label for="{{ $fieldId }}" class="text-sm font-semibold text-slate-900">
-                                            {{ $field['label'] }}
-                                            @if($fieldRequired)
-                                                <span class="text-red-700">*</span>
-                                            @endif
-                                        </label>
-                                        <select
-                                            id="{{ $fieldId }}"
-                                            name="{{ $fieldName }}"
-                                            x-model="createTriggerValues.{{ $fieldName }}"
-                                            x-bind:disabled="createTriggerKey !== @js($trigger['key'])"
-                                            @if($fieldRequired) x-bind:required="createTriggerKey === @js($trigger['key'])" @endif
-                                            class="mt-1 block w-full rounded-xl border-slate-300 text-sm shadow-sm focus:border-orange-500 focus:ring-orange-500"
-                                        >
-                                            <option value="">{{ $field['placeholder'] ?? 'Choose an option' }}</option>
-                                            @foreach(($field['options'] ?? []) as $option)
-                                                <option value="{{ $option['value'] }}" @selected((string) $fieldValue === (string) $option['value'])>
-                                                    {{ $option['label'] }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-
-                                        @if(filled($field['help'] ?? null))
-                                            <p class="mt-1 text-xs leading-5 text-slate-600">{{ $field['help'] }}</p>
-                                        @endif
-
-                                        @error($fieldName)
-                                            <p class="mt-1 text-sm text-red-700">{{ $message }}</p>
-                                        @enderror
-                                    </div>
-                                @endforeach
+                                @include('crm.flow-routes.partials.trigger-fields', [
+                                    'trigger' => $trigger,
+                                    'createRouteTriggerValues' => $createRouteTriggerValues,
+                                ])
                             </section>
                         @endforeach
 

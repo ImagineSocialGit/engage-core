@@ -1178,6 +1178,21 @@ FlowRoutes
 
 Do not add `flow_route_*` foreign keys to this module's artifacts merely for provenance symmetry. Add artifact-side provenance only when this module has an independently justified neutral provenance contract that is useful outside FlowRoutes.
 
+## After-submission authoring handoff
+
+The Forms workspace may expose guided after-submission choices, but Forms does
+not own a second automation engine.
+
+When Flow Routes is available, the Forms/FlowRoutes integration uses the shared
+`FlowRouteAuthoringLinkBuilder` with the registered `forms.form_submitted`
+trigger and the selected `form_key`. Guided Task or Messaging choices may also
+request a starter capability, while the custom path opens a normal multi-step
+Route.
+
+Forms must not assemble Flow Routes query parameters itself. Future changes to
+the Flow Routes authoring entry contract belong in the Flow Routes builder, not
+in this module's surface service.
+
 ## Deferred work
 
 Deferred until needed:

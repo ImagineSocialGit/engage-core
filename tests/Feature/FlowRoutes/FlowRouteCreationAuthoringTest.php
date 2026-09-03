@@ -4,6 +4,7 @@ namespace Tests\Feature\FlowRoutes;
 
 use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
+use App\Modules\Core\Automation\CoreAutomationTriggerAuthoringContributor;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
@@ -32,7 +33,15 @@ class FlowRouteCreationAuthoringTest extends TestCase
             ->get('http://crm.'.config('app.root_domain').'/flow-routes?create=1&status=past_client')
             ->assertOk()
             ->assertSee('data-flow-route-create-modal', false)
-            ->assertSee('value="'.$status->getKey().'" selected', false);
+            ->assertViewHas(
+                'createRouteTriggerKey',
+                CoreAutomationTriggerAuthoringContributor::CONTACT_STATUS,
+            )
+            ->assertViewHas(
+                'createRouteTriggerValues',
+                fn (array $values): bool =>
+                    (string) ($values['contact_status_id'] ?? '') === (string) $status->getKey(),
+            );
 
         $response = $this->actingAs($user)->post(
             'http://crm.'.config('app.root_domain').'/flow-routes',

@@ -1496,6 +1496,38 @@ One-step automatic behavior may be presented separately from multi-step Routes s
 
 Route Management UX should explain available actions through `FlowRouteCapability` metadata and module-owned public seams rather than importing module internals.
 
+## Authoring extensibility contract
+
+Flow Route authoring is registry-driven at both ends:
+
+```text
+AutomationTriggerAuthoringContributor
+    -> shared trigger registry
+    -> generic trigger field renderer
+
+AutomationPointAuthoringContributor
+    -> shared point registry
+    -> FlowRouteEditorCatalog
+    -> generic point field renderer
+```
+
+A module that contributes a new trigger or action should not require a new
+module-specific branch in the Flow Routes index or editor modal. Contributor-owned
+field definitions carry the authoring controls, while
+`AutomationPointAuthoringDefinition.nameFieldLabel` carries any point-name label
+that differs from the default `Internal label`.
+
+Cross-surface shortcuts must use `FlowRouteAuthoringLinkBuilder`. The builder
+accepts a registered trigger authoring key, contributor-owned trigger values,
+optional create name/kind, and an optional starter capability key. Integration
+classes may use that seam to start Flow Route authoring without teaching Forms,
+Scheduling, Inbound Messaging, or another owning module about Flow Routes query
+parameters.
+
+The integration perimeter may import Flow Routes to build that handoff. The
+owning module itself must continue to depend only on its declared module closure
+and shared contracts.
+
 ## Deployment environment contract
 
 Flow Routes owns the root/process execution controls `FLOW_ROUTE_CONTINUATION_QUEUE` and `FLOW_ROUTE_IMMEDIATE_EXECUTION_BUDGET`.

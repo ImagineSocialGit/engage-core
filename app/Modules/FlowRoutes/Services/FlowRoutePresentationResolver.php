@@ -85,6 +85,7 @@ class FlowRoutePresentationResolver
      *     type: string,
      *     module_key: string,
      *     type_label: string,
+     *     name_field_label: string,
      *     label: string|null,
      *     summary: string,
      *     condition_summaries: array<int, string>,
@@ -113,6 +114,8 @@ class FlowRoutePresentationResolver
                     'type' => (string) $point->type,
                     'module_key' => $this->pointModuleKey($point),
                     'type_label' => $this->pointTypeLabel($point->type),
+                    'name_field_label' => $this->authoring->get((string) $point->type)?->nameFieldLabel
+                        ?? 'Internal label',
                     'label' => $this->meaningfulPointLabel($point),
                     'summary' => $this->pointEditorSummary($point, $route),
                     'condition_summaries' => array_slice($summaries, 1),

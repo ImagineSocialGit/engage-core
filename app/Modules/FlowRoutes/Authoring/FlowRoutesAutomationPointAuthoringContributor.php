@@ -37,6 +37,7 @@ class FlowRoutesAutomationPointAuthoringContributor implements AutomationPointAu
             ],
             typeLabel: 'Decision',
             genericLabels: ['branch evaluate', 'evaluate branch', 'decision'],
+            nameFieldLabel: 'Decision question',
         );
 
         yield new AutomationPointAuthoringDefinition(

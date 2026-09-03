@@ -47,6 +47,7 @@ class FlowRouteEditorCatalog
                     'key' => (string) $capability->key,
                     'module_key' => (string) $capability->module_key,
                     'point_type' => $pointType,
+                    'name_field_label' => $definition?->nameFieldLabel ?? 'Internal label',
                     'name' => $this->stepLanguage($definition?->name ?? (string) $capability->name),
                     'description' => $this->stepLanguage(
                         $definition?->description ?? (string) ($capability->description ?? ''),
