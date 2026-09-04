@@ -54,6 +54,12 @@ CRM composition editing treats the tracking key as structural identity rather th
 
 `EmailPayload` wraps an opted-in link only when the runtime payload identifies the current ScheduledMessage.
 
+New redirects are generated on the dedicated public Messaging host:
+
+```text
+https://messaging.[ROOT_DOMAIN]/messaging/click/{scheduled_message}/{tracking_key}
+```
+
 The signed redirect binds:
 
 ```text
@@ -62,7 +68,9 @@ tracking key
 resolved destination
 ```
 
-The signature prevents destination or attribution tampering.
+The signature prevents destination or attribution tampering. The public click hostname intentionally matches the Messaging surface used by email preference/unsubscribe links instead of exposing the authenticated CRM hostname in newly delivered email.
+
+The former CRM-host route remains registered as `messaging.cta.redirect.legacy` only so already-delivered signed links continue to work. New link generation must use `messaging.cta.redirect`.
 
 Preview/editor rendering without a ScheduledMessage keeps the direct destination.
 
@@ -133,13 +141,13 @@ Requests to older messages still redirect to the signed destination but do not c
 
 A daily Messaging pruning job removes expired aggregate rows in bounded batches.
 
-## Initial consumer
+## Example consumer
 
-Rob The Mortgage Coach post-Webinar email CTAs opt in with:
+A post-event email may opt its replay and application CTAs into generic tracking with stable keys such as:
 
 ```text
 replay
 pre_approval
 ```
 
-This gives the paid Webinar funnel generic replay/application engagement evidence without creating Webinar-specific tracking infrastructure.
+This provides generic replay/application engagement evidence without creating producer-specific tracking infrastructure.

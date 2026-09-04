@@ -76,6 +76,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
             'sms/twilio',
             'email/resend',
             'forms/*/submissions',
+            'unsubscribe/*',
         ]);
 
         $middleware->web(

@@ -5,6 +5,7 @@ namespace App\Modules\Messaging\Payloads;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Contracts\Email\EmailMessage;
 use App\Modules\Messaging\Contracts\Email\ThreadedEmailMessage;
+use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Support\CtaTrackingLinkGenerator;
 use App\Modules\Messaging\Support\EmailConsentRevocationLinkGenerator;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
@@ -15,6 +16,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\View;
 use InvalidArgumentException;
 use Stringable;
+use Symfony\Component\Mime\Email;
 
 class EmailPayload implements EmailMessage, ThreadedEmailMessage
 {
@@ -243,7 +245,7 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
 
     public function mailable(): Mailable
     {
-        return new class(
+        $mailable = new class(
             $this->subject(),
             $this->html(),
             $this->plainText(),
@@ -269,6 +271,21 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
                     ]);
             }
         };
+
+        $headers = $this->deliverabilityHeaders();
+
+        if ($headers !== []) {
+            $mailable->withSymfonyMessage(
+                static function (Email $email) use ($headers): void {
+                    foreach ($headers as $name => $value) {
+                        $email->getHeaders()->remove($name);
+                        $email->getHeaders()->addTextHeader($name, $value);
+                    }
+                },
+            );
+        }
+
+        return $mailable;
     }
 
     public function kind(): string
@@ -623,6 +640,36 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
             && trim((string) $link['label']) !== ''
             && is_string($link['url'] ?? null)
             && trim((string) $link['url']) !== '';
+    }
+
+    /** @return array<string, string> */
+    private function deliverabilityHeaders(): array
+    {
+        if ($this->purpose !== MessagePurpose::Marketing->value) {
+            return [];
+        }
+
+        $contact = $this->contact();
+
+        if ($contact instanceof Contact) {
+            $unsubscribeUrl = app(EmailConsentRevocationLinkGenerator::class)
+                ->marketingUnsubscribeUrl($contact);
+
+            return [
+                'List-Unsubscribe' => '<'.trim($unsubscribeUrl).'>',
+                'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
+            ];
+        }
+
+        $unsubscribeUrl = $this->marketingUnsubscribeUrl();
+
+        if (! CtaTrackingLinkGenerator::isTrackableDestination($unsubscribeUrl)) {
+            return [];
+        }
+
+        return [
+            'List-Unsubscribe' => '<'.trim((string) $unsubscribeUrl).'>',
+        ];
     }
 
     private function marketingUnsubscribeUrl(): ?string

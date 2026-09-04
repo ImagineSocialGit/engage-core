@@ -37,6 +37,16 @@ Use for repeatable Messaging consent/channel checks. It is not backlog.
 
 See `provider-webhook-routing.md` for the technical contract and `../../operations/client-third-party-services-checklist.md` for provider-account provisioning.
 
+## Email deliverability surfaces
+
+- New tracked CTA redirects must use `messaging.[ROOT_DOMAIN]`, never the authenticated CRM hostname.
+- Keep the historical CRM tracking route only as a compatibility alias for already-delivered signed links.
+- Contact-backed marketing email must emit an HTTPS `List-Unsubscribe` header plus `List-Unsubscribe-Post: List-Unsubscribe=One-Click`.
+- The one-click POST reuses the signed Messaging marketing-unsubscribe URL and must remain CSRF-exempt while still requiring a valid temporary signature.
+- Browser unsubscribe GET continues to require explicit confirmation before the human flow revokes consent.
+- Transactional and internal email must not acquire marketing list-unsubscribe headers merely because they share the same transport/provider.
+- SPF, DKIM, DMARC, provider acceptance, and mailbox placement are separate concerns; these application-level headers/hosts improve the message contract but do not guarantee inbox placement.
+
 ## Bulk delivery
 
 - Large recipient sets use the shared bounded bulk-delivery policy rather than module-specific magic numbers.

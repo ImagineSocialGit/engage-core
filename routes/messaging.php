@@ -1,9 +1,16 @@
 <?php
 
 use App\Modules\Messaging\Controllers\Public\ConsentRevocationController;
+use App\Modules\Messaging\Controllers\Public\CtaEngagementRedirectController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('module:messaging')->group(function () {
+    Route::get('/messaging/click/{message}/{cta}', CtaEngagementRedirectController::class)
+        ->middleware('signed')
+        ->whereNumber('message')
+        ->where('cta', '[a-z0-9][a-z0-9._-]{0,95}')
+        ->name('messaging.cta.redirect');
+
     Route::get(
         '/unsubscribe/{contact}',
         [ConsentRevocationController::class, 'emailMarketingUnsubscribe']
