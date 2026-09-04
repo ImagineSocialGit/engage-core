@@ -82,6 +82,8 @@
 │   │   │   │   ├── MarkBroadcastRecipientFailed.php
 │   │   │   │   ├── MarkBroadcastRecipientSent.php
 │   │   │   │   └── MarkBroadcastRecipientSkipped.php
+│   │   │   ├── Messaging
+│   │   │   │   └── BroadcastReusableMessageTemplateAuthoringContributor.php
 │   │   │   ├── Models
 │   │   │   │   ├── Broadcast.php
 │   │   │   │   └── BroadcastRecipient.php
@@ -176,6 +178,8 @@
 │   │   │   ├── Listeners
 │   │   │   │   ├── ReconcileCampaignEligibilityFromAutomationEvent.php
 │   │   │   │   └── ReconcileCampaignEligibilityFromContactFilterFactsChanged.php
+│   │   │   ├── Messaging
+│   │   │   │   └── AnnualTouchReusableMessageTemplateAuthoringContributor.php
 │   │   │   ├── Models
 │   │   │   │   ├── CampaignEligibilityState.php
 │   │   │   │   ├── CampaignEnrollment.php
@@ -838,12 +842,14 @@
 │   │   │   │   ├── MessageRecipientGate.php
 │   │   │   │   ├── MessageRecipientPayloadProvider.php
 │   │   │   │   ├── MessageTemplatePublicationHook.php
+│   │   │   │   ├── ReusableMessageTemplateAuthoringOptionContributor.php
 │   │   │   │   └── Sms
 │   │   │   │       ├── SmsMessage.php
 │   │   │   │       └── SmsProvider.php
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
 │   │   │   │   │   ├── CreateFlowRouteMessageTemplateController.php
+│   │   │   │   │   ├── CreateReusableMessageTemplateController.php
 │   │   │   │   │   ├── MessageDeliveryIssueController.php
 │   │   │   │   │   └── MessageTemplatePresetController.php
 │   │   │   │   ├── Public
@@ -868,7 +874,8 @@
 │   │   │   │   ├── MessageData.php
 │   │   │   │   ├── MessageTemplatePresetPublicationResult.php
 │   │   │   │   ├── ResolvedMessageDispatch.php
-│   │   │   │   └── ReusableMessageTemplateAuthoringContext.php
+│   │   │   │   ├── ReusableMessageTemplateAuthoringContext.php
+│   │   │   │   └── ReusableMessageTemplateAuthoringOption.php
 │   │   │   ├── Deployment
 │   │   │   │   └── MessagingDeploymentPlanContributor.php
 │   │   │   ├── Enums
@@ -928,6 +935,7 @@
 │   │   │   │   └── MessagingModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   │   ├── CreateFlowRouteMessageTemplateRequest.php
+│   │   │   │   ├── CreateReusableMessageTemplateRequest.php
 │   │   │   │   ├── StoreContactPermissionInvitationConsentRequest.php
 │   │   │   │   ├── UpdateMessageTemplateCompositionLayerRequest.php
 │   │   │   │   └── UpdateMessageTemplatePresetRequest.php
@@ -1001,6 +1009,7 @@
 │   │   │   │   ├── ReplyProfiles
 │   │   │   │   │   └── MessagingReplyProfileDependencyContributor.php
 │   │   │   │   ├── ResolvedMessageDispatchBuilder.php
+│   │   │   │   ├── ReusableMessageTemplateAuthoringGuide.php
 │   │   │   │   ├── ReusableMessageTemplateCatalog.php
 │   │   │   │   ├── RouteAuthoringMessageTemplateEligibilityResolver.php
 │   │   │   │   ├── ScheduledMessageComponentComposer.php
@@ -1703,6 +1712,8 @@
 │       │   ├── Messaging
 │       │   │   ├── Contracts
 │       │   │   │   └── MessageMediaLibrary.php
+│       │   │   ├── FlowRoutes
+│       │   │   │   └── FlowRouteReusableMessageTemplateAuthoringContributor.php
 │       │   │   ├── Media
 │       │   │   │   └── MediaMessageMediaLibrary.php
 │       │   │   └── UnavailableMessageMediaLibrary.php
@@ -2533,6 +2544,7 @@
 │       │   │   ├── delivery-issues
 │       │   │   │   └── index.blade.php
 │       │   │   └── message-templates
+│       │   │       ├── create.blade.php
 │       │   │       └── index.blade.php
 │       │   ├── process-highway
 │       │   │   ├── _business-process.blade.php
@@ -2939,6 +2951,7 @@
 │   │   │   ├── EmailReplyAddressGeneratorTest.php
 │   │   │   ├── FlowRouteReusableMessageTemplateAuthoringTest.php
 │   │   │   ├── GrantMessageConsentActionTest.php
+│   │   │   ├── GuidedReusableMessageTemplateAuthoringTest.php
 │   │   │   ├── ImportMessageConsentActionTest.php
 │   │   │   ├── InternalNotificationChannelResolverTest.php
 │   │   │   ├── InternalNotificationGateTest.php
@@ -3277,4 +3290,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-781 directories, 2497 files
+784 directories, 2507 files

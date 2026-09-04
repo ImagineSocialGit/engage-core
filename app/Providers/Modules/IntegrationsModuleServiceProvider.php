@@ -3,6 +3,8 @@
 namespace App\Providers\Modules;
 
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
+use App\Modules\Messaging\Contracts\ReusableMessageTemplateAuthoringOptionContributor;
+use App\Support\ModuleIntegrations\Messaging\FlowRoutes\FlowRouteReusableMessageTemplateAuthoringContributor;
 use App\Support\ModuleIntegrations\Scheduling\Automation\AppointmentHostNotificationAutomationCapabilityContributor;
 use App\Support\ModuleIntegrations\Scheduling\Automation\AppointmentHostNotificationAutomationPointAuthoringContributor;
 use App\Support\ModuleIntegrations\Scheduling\Automation\AppointmentHostNotificationAutomationPointDefinitionContributor;
@@ -23,6 +25,13 @@ class IntegrationsModuleServiceProvider extends ServiceProvider
     public function register(): void
     {
         $enabled = $this->app->make(ModuleManager::class)->enabledKeysWithDependencies();
+
+        if ($this->has($enabled, ['flow_routes', 'messaging'])) {
+            $this->app->tag(
+                FlowRouteReusableMessageTemplateAuthoringContributor::class,
+                ReusableMessageTemplateAuthoringOptionContributor::TAG,
+            );
+        }
 
         if ($this->has($enabled, ['flow_routes', 'scheduling', 'tasks'])) {
             $this->app->tag(AppointmentTaskAutomationCapabilityContributor::class, 'automation.capability_contributors');

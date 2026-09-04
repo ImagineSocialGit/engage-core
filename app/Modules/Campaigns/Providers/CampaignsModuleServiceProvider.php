@@ -21,6 +21,7 @@ use App\Modules\Campaigns\Jobs\EmitDueAnnualTouchAutomationEventsJob;
 use App\Modules\Campaigns\Jobs\ReconcileAutomaticCampaignEligibilityJob;
 use App\Modules\Campaigns\Listeners\ReconcileCampaignEligibilityFromAutomationEvent;
 use App\Modules\Campaigns\Listeners\ReconcileCampaignEligibilityFromContactFilterFactsChanged;
+use App\Modules\Campaigns\Messaging\AnnualTouchReusableMessageTemplateAuthoringContributor;
 use App\Modules\Campaigns\Services\CampaignMessageChainExecutionContextProvider;
 use App\Modules\Campaigns\Services\ContactShow\ContactCampaignsVisibilityDataProvider;
 use App\Modules\Campaigns\Services\ProcessHighway\CampaignsProcessHighwayContributor;
@@ -28,6 +29,7 @@ use App\Modules\Campaigns\TokenContracts\CampaignTokenContextProvider;
 use App\Modules\Campaigns\TokenContracts\CampaignTokenSourceProvider;
 use App\Modules\Campaigns\Validation\CampaignsSetupValidationContributor;
 use App\Modules\Core\Events\ContactFilterFactsChanged;
+use App\Modules\Messaging\Contracts\ReusableMessageTemplateAuthoringOptionContributor;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Event;
@@ -42,6 +44,10 @@ class CampaignsModuleServiceProvider extends ServiceProvider
         $this->app->tag(CampaignTokenSourceProvider::class, 'token.source_providers');
         $this->app->tag(CampaignTokenContextProvider::class, 'token.context_providers');
         $this->app->tag(CampaignMessageChainExecutionContextProvider::class, 'messaging.message_chain_execution_context_providers');
+        $this->app->tag(
+            AnnualTouchReusableMessageTemplateAuthoringContributor::class,
+            ReusableMessageTemplateAuthoringOptionContributor::TAG,
+        );
         $this->app->tag([CampaignsAutomationCapabilityContributor::class], 'automation.capability_contributors');
         $this->app->tag([CampaignsAutomationPointDefinitionContributor::class], 'automation.point_definition_contributors');
         $this->app->tag([CampaignsAutomationPointAuthoringContributor::class], 'automation.point_authoring_contributors');

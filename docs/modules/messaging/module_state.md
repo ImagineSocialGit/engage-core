@@ -1319,6 +1319,25 @@ contract and does not require preset sync. Contextual selectors may ask
 for one surface does not automatically leak into an incompatible picker. Legacy saved
 Broadcast messages remain selectable in Broadcasts and Annual Touches for compatibility.
 
+### Purpose-guided standalone creation
+
+The Message Templates workspace exposes one guided standalone-creation entry point backed by
+`ReusableMessageTemplateAuthoringOptionContributor`. Enabled owning capabilities contribute
+server-resolved authoring options; `ReusableMessageTemplateAuthoringGuide` validates and presents
+those choices, and the generic creation controller passes only the operator-authored name and copy
+to `CreateReusableMessageTemplateAction`. Purpose, scope, dispatch key, message type, payload
+class, queue, catalog ownership, grouping, and selection contexts are never accepted as browser
+authority.
+
+The initial contributors intentionally cover only standalone reusable contexts that already have a
+valid downstream selection seam: Broadcast marketing messages, Campaign Annual Touches, and
+direct Route messages. Standard Campaign-step, Webinar-lifecycle, and Scheduling communication
+authoring remain owner-specific because their runtime identity is tied to Campaign/MessageChain or
+Scheduling lifecycle contracts rather than generic standalone selection. Add a new guided choice by
+contributing a real reusable-selection capability; do not add a generic module name that creates
+templates no owning surface can safely consume. Cross-module Route contribution is registered from
+the integration perimeter so FlowRoutes does not acquire a direct Messaging dependency.
+
 
 ### Direct Flow Route reusable messages
 

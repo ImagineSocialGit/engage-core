@@ -8,6 +8,7 @@ use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Messaging\Automation\MessagingAutomationPointAuthoringContributor;
 use App\Modules\Messaging\Automation\MessagingAutomationPointDefinitionContributor;
 use App\Modules\Messaging\Automation\SendMessageAutomationActionHandler;
+use App\Modules\Messaging\Contracts\ReusableMessageTemplateAuthoringOptionContributor;
 use App\Modules\Messaging\Capabilities\MessagingAutomationCapabilityContributor;
 use App\Modules\Messaging\ConfigContracts\EmailMessageDefinitionConfigContract;
 use App\Modules\Messaging\ConfigContracts\MessagingConfigContractTargetProvider;
@@ -41,6 +42,7 @@ use App\Modules\Messaging\Services\MessageRecipientGateRegistry;
 use App\Modules\Messaging\Services\MessageRecipientPayloadProviderRegistry;
 use App\Modules\Messaging\Services\MessageTemplatePublicationHookRegistry;
 use App\Modules\Messaging\Services\ReplyProfiles\MessagingReplyProfileDependencyContributor;
+use App\Modules\Messaging\Services\ReusableMessageTemplateAuthoringGuide;
 use App\Modules\Messaging\Services\Sms\SmsProviderManager;
 use App\Modules\Messaging\TokenContracts\MessagingTokenContextProvider;
 use App\Modules\Messaging\Validation\MessagingSetupValidationContributor;
@@ -144,6 +146,12 @@ class MessagingModuleServiceProvider extends ServiceProvider
         $this->app->singleton(MessageTemplatePublicationHookRegistry::class, function ($app) {
             return new MessageTemplatePublicationHookRegistry(
                 hooks: $app->tagged('messaging.message_template_publication_hooks'),
+            );
+        });
+
+        $this->app->singleton(ReusableMessageTemplateAuthoringGuide::class, function ($app) {
+            return new ReusableMessageTemplateAuthoringGuide(
+                contributors: $app->tagged(ReusableMessageTemplateAuthoringOptionContributor::TAG),
             );
         });
 

@@ -5,7 +5,9 @@ namespace App\Modules\Broadcasts\Providers;
 use App\Modules\Broadcasts\Listeners\MarkBroadcastRecipientFailed;
 use App\Modules\Broadcasts\Listeners\MarkBroadcastRecipientSent;
 use App\Modules\Broadcasts\Listeners\MarkBroadcastRecipientSkipped;
+use App\Modules\Broadcasts\Messaging\BroadcastReusableMessageTemplateAuthoringContributor;
 use App\Modules\Broadcasts\TokenContracts\BroadcastTokenContextProvider;
+use App\Modules\Messaging\Contracts\ReusableMessageTemplateAuthoringOptionContributor;
 use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
@@ -19,6 +21,11 @@ class BroadcastsModuleServiceProvider extends ServiceProvider
         $this->app->tag(
             BroadcastTokenContextProvider::class,
             'token.context_providers',
+        );
+
+        $this->app->tag(
+            BroadcastReusableMessageTemplateAuthoringContributor::class,
+            ReusableMessageTemplateAuthoringOptionContributor::TAG,
         );
     }
 

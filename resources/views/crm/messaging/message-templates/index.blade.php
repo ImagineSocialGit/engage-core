@@ -31,12 +31,22 @@
                     </p>
                 </div>
 
-                <div class="grid gap-2 sm:grid-cols-2 lg:min-w-80">
-                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                        <span class="font-bold text-slate-950">{{ $presets->count() }}</span> messages
-                    </div>
-                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                        <span class="font-bold text-slate-950">{{ $catalogGroups->count() }}</span> message families
+                <div class="space-y-3 lg:min-w-80">
+                    <a
+                        href="{{ route('crm.messaging.message-templates.create') }}"
+                        class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-extrabold text-white transition hover:bg-slate-800"
+                        data-create-reusable-message-template
+                    >
+                        Create message template
+                    </a>
+
+                    <div class="grid gap-2 sm:grid-cols-2">
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                            <span class="font-bold text-slate-950">{{ $presets->count() }}</span> messages
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                            <span class="font-bold text-slate-950">{{ $catalogGroups->count() }}</span> message families
+                        </div>
                     </div>
                 </div>
             </div>
@@ -45,7 +55,8 @@
         @if($presets->isEmpty())
             <section class="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
                 <h2 class="text-xl font-extrabold tracking-tight text-slate-950">No message templates are available yet.</h2>
-                <p class="mt-2 text-sm leading-6 text-slate-600">Run preset synchronization before editing message content.</p>
+                <p class="mt-2 text-sm leading-6 text-slate-600">Create a reusable message for an available business use, or run preset synchronization to install configured lifecycle messages.</p>
+                <a href="{{ route('crm.messaging.message-templates.create') }}" class="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-extrabold text-white" data-create-reusable-message-template-empty>Create message template</a>
             </section>
         @else
             <div class="grid gap-6 xl:grid-cols-[minmax(17rem,0.36fr)_minmax(0,1fr)] xl:items-start">

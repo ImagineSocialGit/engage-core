@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Messaging\Controllers\CRM\CreateFlowRouteMessageTemplateController;
+use App\Modules\Messaging\Controllers\CRM\CreateReusableMessageTemplateController;
 use App\Modules\Messaging\Controllers\CRM\MessageDeliveryIssueController;
 use App\Modules\Messaging\Controllers\CRM\MessageTemplatePresetController;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +23,12 @@ Route::middleware('module:messaging')
     ->group(function () {
         Route::get('/', [MessageTemplatePresetController::class, 'index'])
             ->name('index');
+
+        Route::get('/create', [CreateReusableMessageTemplateController::class, 'create'])
+            ->name('create');
+
+        Route::post('/reusable', [CreateReusableMessageTemplateController::class, 'store'])
+            ->name('store');
 
         Route::post('/reusable/flow-route', CreateFlowRouteMessageTemplateController::class)
             ->middleware('module:flow_routes')
