@@ -11,20 +11,6 @@ return [
         'card' => 'rounded-3xl border border-black/10 bg-white shadow-2xl shadow-black/15',
         'card_padding' => 'p-8 sm:p-10',
 
-        'header' => [
-            'wrap' => 'sticky top-0 z-40 border-b border-white/10 bg-secondary/95 backdrop-blur',
-            'inner' => 'mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4',
-            'brand' => 'text-lg font-extrabold tracking-tight text-white',
-            'brand_link' => 'max-w-24 max-h-24',
-            'brand_link_compact' => 'max-w-16 max-h-16',
-            'brand_image' => 'w-full h-full',
-            'nav' => 'hidden items-center gap-6 text-sm font-bold uppercase tracking-[0.12em] text-white/75 md:flex',
-            'nav_link' => 'transition hover:text-primary',
-            'primary_link' => [
-                'class' => 'rounded-full bg-primary px-5 py-2.5 text-xs font-extrabold uppercase tracking-[0.14em] text-white shadow-lg shadow-primary/25 transition hover:scale-[1.03] hover:brightness-110',
-            ],
-        ],
-
         'footer' => [
             'wrap' => 'border-t border-white/10 bg-secondary',
             'inner' => 'mx-auto w-full max-w-7xl px-6 py-8 text-sm text-white/60',

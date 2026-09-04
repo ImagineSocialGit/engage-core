@@ -211,6 +211,9 @@ class WebinarRegistrationControllerTest extends TestCase
         $response = $this->get(route('webinar.index'));
 
         $response->assertOk();
+        $response->assertSee('data-public-surface-header', false);
+        $response->assertSee('data-public-surface-brand', false);
+        $response->assertSee('data-public-surface-label', false);
 
         $response->assertViewIs('webinar.index');
 

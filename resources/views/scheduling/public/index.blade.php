@@ -7,33 +7,15 @@
     :background-color="$publicPresentation['background_color']"
 >
     <x-slot:header>
-        <div class="{{ $publicPresentation['style']['header_inner'] }}">
-            <a
-                href="{{ route('scheduling.public.index', [], false) }}"
-                class="{{ $publicPresentation['style']['brand_link'] }}"
-                aria-label="{{ $publicPresentation['brand_name'] }} appointments"
-            >
-                @if($publicPresentation['logo'])
-                    <x-ui.image
-                        :path="$publicPresentation['logo']"
-                        :alt="$publicPresentation['brand_name']"
-                        sizes="96px"
-                        class="{{ $publicPresentation['style']['brand_logo'] }}"
-                        :placeholder="false"
-                    />
-                @elseif($publicPresentation['logo_url'])
-                    <img
-                        src="{{ $publicPresentation['logo_url'] }}"
-                        alt="{{ $publicPresentation['brand_name'] }}"
-                        class="{{ $publicPresentation['style']['brand_logo'] }}"
-                    >
-                @else
-                    <span class="{{ $publicPresentation['style']['brand_text'] }}">
-                        {{ $publicPresentation['brand_name'] }}
-                    </span>
-                @endif
-            </a>
-        </div>
+        <x-public-surface.header
+            :brand-name="$publicPresentation['brand_name']"
+            :brand-logo="$publicPresentation['logo']"
+            :brand-logo-url="$publicPresentation['logo_url']"
+            :brand-alt="$publicPresentation['brand_name']"
+            :brand-href="route('scheduling.public.index', [], false)"
+            surface-label="Scheduling"
+            :surface-href="route('scheduling.public.index', [], false)"
+        />
     </x-slot:header>
 
     <x-slot:footer>

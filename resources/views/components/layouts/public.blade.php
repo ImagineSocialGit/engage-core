@@ -7,50 +7,19 @@
     :title="$title ?? data_get(config('webinars.content', []), 'brand.name', config('app.name'))"
     :meta-description="$metaDescription"
     :body-class="data_get(config('webinars.style', []), 'layout.body', config('public_surfaces.theme.layout.body', 'bg-white text-slate-900 font-sans'))"
-    :header-class="data_get(config('webinars.style', []), 'layout.header.wrap', config('public_surfaces.theme.layout.header', 'border-b border-slate-200 bg-white'))"
     :main-class="data_get(config('webinars.style', []), 'layout.main', config('public_surfaces.theme.layout.main', 'flex-1'))"
     :footer-class="data_get(config('webinars.style', []), 'layout.footer.wrap', config('public_surfaces.theme.layout.footer', 'border-t border-slate-200 bg-white'))"
 >
     <x-slot:header>
-        <div
-            x-data="{compactLogo: false}"
-            x-init="window.addEventListener('scroll', () => {
-                compactLogo = window.scrollY > 60;
-            }, { passive: true });"
-            class="{{ data_get(config('webinars.style', []), 'layout.header.inner', 'mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4') }}"
-        >
-            @if(data_get(config('webinars.content', []), 'brand.logo'))
-                <a
-                    href="{{ data_get(config('webinars.style', []), 'layout.header.primary_link.route') ? route(data_get(config('webinars.style', []), 'layout.header.primary_link.route')) : url('/') }}"
-                    class="transition-all"
-                    :class="compactLogo ? '{{ data_get(config('webinars.style', []), 'layout.header.brand_link_compact', 'max-w-16 max-h-16') }}' : '{{ data_get(config('webinars.style', []), 'layout.header.brand_link', 'max-w-20 max-h-20') }}'"
-                >
-                    <x-ui.image
-                        :path="data_get(config('webinars.content', []), 'brand.logo')"
-                        :alt="data_get(config('webinars.content', []), 'brand.image_alt', 'Logo')"
-                        :sizes="data_get(config('webinars.content', []), 'brand.image_sizes', '(min-width:1024px) 40vw,100vw')"
-                        class="{{ data_get(config('webinars.style', []), 'layout.header.brand_image', 'w-full rounded-3xl object-cover') }}"
-                        :placeholder="false"
-                    />
-                </a>
-            @else
-                <a
-                    href="{{ data_get(config('webinars.style', []), 'layout.header.primary_link.route') ? route(data_get(config('webinars.style', []), 'layout.header.primary_link.route')) : url('/') }}"
-                    class="{{ data_get(config('webinars.style', []), 'layout.header.brand', 'text-lg font-semibold tracking-tight') }}"
-                >
-                    {{ data_get(config('webinars.content', []), 'brand.name', config('app.name')) }}
-                </a>
-            @endif
-
-            <nav class="{{ data_get(config('webinars.style', []), 'layout.header.nav', 'hidden items-center gap-6 text-sm font-medium md:flex') }}">
-                <a
-                    href="{{ data_get(config('webinars.style', []), 'layout.header.primary_link.route') ? route(data_get(config('webinars.style', []), 'layout.header.primary_link.route')) : url('/') }}"
-                    class="{{ data_get(config('webinars.style', []), 'layout.header.nav_link', 'transition hover:opacity-70') }}"
-                >
-                    {{ data_get(config('webinars.style', []), 'layout.header.primary_link.label', 'Webinars') }}
-                </a>
-            </nav>
-        </div>
+        <x-public-surface.header
+            :brand-name="data_get(config('webinars.content', []), 'brand.name', config('app.name'))"
+            :brand-logo="data_get(config('webinars.content', []), 'brand.logo') ?: config('public_surfaces.theme.brand.logo')"
+            :brand-alt="data_get(config('webinars.content', []), 'brand.image_alt', data_get(config('webinars.content', []), 'brand.logo_alt', config('app.name')))"
+            :brand-sizes="data_get(config('webinars.content', []), 'brand.image_sizes', config('public_surfaces.theme.brand.image_sizes'))"
+            :brand-href="route('webinar.index')"
+            surface-label="Webinars"
+            :surface-href="route('webinar.index')"
+        />
     </x-slot:header>
 
     <x-slot:footer>

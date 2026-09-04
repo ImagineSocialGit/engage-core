@@ -1530,3 +1530,10 @@ Scheduling-specific public color
 The client-wide shared surface owns page/header/footer, generic card, and generic button presentation. Scheduling continues to own service catalog, booking state, location/method, fields, time-period tabs, time choices, review, verification, and confirmation semantics. Style config changes presentation only; it does not alter available slots, submitted `starts_at`, holds, destination verification, appointment creation, consent, reporting facts, or route behavior.
 
 The stable browser hook `data-scheduling-public-style-contract="1"` identifies the themed Scheduling public surface for smoke/regression tooling.
+
+### Shared public header
+
+Public Scheduling renders the module-neutral `x-public-surface.header`. Header
+geometry and brand/navigation styling are client-wide concerns owned by
+`public_surfaces.theme`; Scheduling no longer owns separate header width, logo
+height, compact-logo, brand-text, or navigation classes.

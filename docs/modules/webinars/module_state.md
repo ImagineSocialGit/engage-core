@@ -1056,3 +1056,11 @@ client-wide public surface theme
 ```
 
 Webinar hero, registration, urgency, event details, instructor, trust, consent, countdown, and series-specific presentation remain Webinar-owned. The shared public theme is not a replacement for those campaign-specific contracts.
+
+### Shared public header
+
+Webinar public pages render the module-neutral `x-public-surface.header`. The
+historical `webinars.style.layout.header` geometry is retired; client-wide
+header geometry and brand/navigation styling now come from
+`public_surfaces.theme`. Webinar-specific hero, registration, page content,
+and route semantics remain Webinar-owned.

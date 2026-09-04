@@ -1868,3 +1868,26 @@ Client files should override only the semantic keys that need a client-specific 
 Public presentation config may contain trusted Tailwind utility class strings because it is committed application/client configuration. It must not contain arbitrary Blade view paths, executable callbacks, HTML fragments, or booking/runtime behavior.
 
 Content ownership remains separate from presentation ownership. A Scheduling service name, description, address, preparation instructions, availability, booking rules, consent state, and appointment commitment remain Scheduling data/runtime facts. Styling config may change how those facts look; it must not redefine what they mean.
+
+## Shared public-surface header
+
+Public product surfaces that use the Engage Core public shell use
+`x-public-surface.header` instead of rebuilding brand/header geometry in a
+module view.
+
+The client-wide contract is:
+
+```text
+public_surfaces.theme.layout.header
+public_surfaces.theme.brand
+public_surfaces.theme.components.header
+```
+
+It owns the top-bar wrapper, maximum width, horizontal/vertical padding, brand
+text or image geometry, compact-on-scroll behavior, generated/literal logo
+rendering, and right-side public-surface navigation presentation.
+
+Modules supply semantic content only: brand identity data, the brand
+destination, the surface label (for example Webinars or Scheduling), and the
+surface destination. Do not duplicate header dimensions in module-specific
+style config.

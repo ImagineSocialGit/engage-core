@@ -17,6 +17,7 @@ return [
              * Individual public modules choose whether to render it.
              */
             'logo' => null,
+            'image_sizes' => '(min-width:1024px) 40vw,100vw',
         ],
 
         'colors' => [
@@ -28,12 +29,22 @@ return [
 
         'layout' => [
             'body' => 'bg-slate-50 text-slate-950 font-sans',
-            'header' => 'border-b border-slate-200/80 bg-white/95 backdrop-blur',
+            'header' => 'sticky top-0 z-40 border-b border-white/10 bg-secondary/95 backdrop-blur',
             'main' => 'flex-1',
             'footer' => 'border-t border-slate-200 bg-white',
         ],
 
         'components' => [
+            'header' => [
+                'inner' => 'mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4',
+                'brand' => 'text-lg font-extrabold tracking-tight text-white',
+                'brand_link' => 'max-w-24 max-h-24',
+                'brand_link_compact' => 'max-w-16 max-h-16',
+                'brand_image' => 'w-full h-full',
+                'nav' => 'hidden items-center gap-6 text-sm font-bold uppercase tracking-[0.12em] text-white/75 md:flex',
+                'nav_link' => 'transition hover:text-primary',
+            ],
+
             'card' => [
                 'base' => 'rounded-[2rem] border border-slate-200/80 bg-[var(--public-surface)] text-slate-950 shadow-xl shadow-slate-200/50',
                 'padding' => [

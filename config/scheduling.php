@@ -43,10 +43,6 @@ if ($publicUrlConfigured && is_string($publicUrl)) {
 }
 
 $publicPresentationStyleDefaults = [
-                'header_inner' => 'mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6',
-                'brand_link' => 'inline-flex min-h-12 items-center text-slate-950 no-underline',
-                'brand_logo' => 'max-h-12 max-w-52 object-contain',
-                'brand_text' => 'text-base font-extrabold tracking-tight sm:text-lg',
                 'footer_inner' => 'mx-auto w-full max-w-6xl px-4 py-6 text-center text-xs leading-5 text-slate-500 sm:px-6',
                 'page' => 'mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-12 lg:py-16',
                 'state_width' => 'mx-auto max-w-3xl',
