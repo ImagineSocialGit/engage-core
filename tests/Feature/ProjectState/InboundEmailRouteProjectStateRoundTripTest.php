@@ -24,6 +24,17 @@ class InboundEmailRouteProjectStateRoundTripTest extends TestCase
             'source' => 'arive',
             'context_key' => 'application',
             'is_active' => true,
+            'contact_extraction_enabled' => true,
+            'contact_extraction_definition' => [
+                'version' => 1,
+                'fields' => [
+                    'email' => [
+                        'source' => 'body_after_label',
+                        'label' => 'Email',
+                    ],
+                ],
+                'required_fields' => ['email'],
+            ],
         ]);
 
         $projectState = app(ProjectStateManager::class);
@@ -56,5 +67,13 @@ class InboundEmailRouteProjectStateRoundTripTest extends TestCase
         $this->assertSame('arive', $restored->source);
         $this->assertSame('application', $restored->context_key);
         $this->assertTrue($restored->is_active);
+        $this->assertTrue($restored->contact_extraction_enabled);
+        $this->assertSame(
+            'body_after_label',
+            data_get(
+                $restored->contact_extraction_definition,
+                'fields.email.source',
+            ),
+        );
     }
 }

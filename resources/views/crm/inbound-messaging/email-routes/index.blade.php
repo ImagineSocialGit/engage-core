@@ -227,6 +227,259 @@
 
                             <div
                                 class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-4"
+                                data-inbound-email-contact-extraction
+                                x-data="{ open: @js($row['contact_extraction']['enabled'] || old('form_mode') === 'contact_extraction:'.$route->getKey() || (int) data_get(session('contact_extraction_test'), 'route_id') === (int) $route->getKey()), testOpen: false }"
+                            >
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div>
+                                        <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                                            Create or update a person
+                                        </p>
+                                        <p class="mt-1 text-sm font-semibold text-slate-900">
+                                            {{ $row['contact_extraction']['status_label'] }}
+                                        </p>
+                                        <p class="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                                            {{ $row['contact_extraction']['description'] }}
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        class="shrink-0 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 hover:text-slate-950"
+                                        x-on:click="open = !open"
+                                    >
+                                        Configure
+                                    </button>
+                                </div>
+
+                                <div
+                                    x-cloak
+                                    x-show="open"
+                                    class="mt-4 border-t border-slate-200 pt-4"
+                                >
+                                    <form
+                                        method="POST"
+                                        action="{{ route('crm.inbound-messaging.email-routes.contact-extraction.update', $route) }}"
+                                        class="space-y-4"
+                                    >
+                                        @csrf
+                                        @method('PATCH')
+                                        <input
+                                            type="hidden"
+                                            name="form_mode"
+                                            value="contact_extraction:{{ $route->getKey() }}"
+                                        >
+                                        <input type="hidden" name="enabled" value="0">
+
+                                        <label class="flex items-start gap-3 rounded-xl bg-slate-50 px-4 py-3">
+                                            <input
+                                                name="enabled"
+                                                type="checkbox"
+                                                value="1"
+                                                class="mt-0.5 rounded border-slate-300 text-blue-700"
+                                                @checked(
+                                                    old('form_mode') === 'contact_extraction:'.$route->getKey()
+                                                        ? old('enabled')
+                                                        : $row['contact_extraction']['enabled']
+                                                )
+                                            >
+                                            <span>
+                                                <span class="block text-sm font-semibold text-slate-900">
+                                                    Automatically create or update a person
+                                                </span>
+                                                <span class="mt-1 block text-xs leading-5 text-slate-500">
+                                                    Engage extracts deterministic values from this email, resolves the person by email, links the Inbox message, then publishes the same inbound-address automation event with that person attached.
+                                                </span>
+                                            </span>
+                                        </label>
+
+                                        <div class="overflow-x-auto rounded-xl border border-slate-200">
+                                            <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
+                                                <thead class="bg-slate-50">
+                                                    <tr>
+                                                        <th class="px-3 py-2.5 font-semibold text-slate-700">Person field</th>
+                                                        <th class="px-3 py-2.5 font-semibold text-slate-700">Get value from</th>
+                                                        <th class="px-3 py-2.5 font-semibold text-slate-700">Label before value</th>
+                                                        <th class="px-3 py-2.5 font-semibold text-slate-700">Required</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="divide-y divide-slate-100 bg-white">
+                                                    @foreach($row['contact_extraction']['targets'] as $target)
+                                                        <tr>
+                                                            <td class="whitespace-nowrap px-3 py-3 font-semibold text-slate-900">
+                                                                {{ $target['label'] }}
+                                                            </td>
+                                                            <td class="min-w-52 px-3 py-3">
+                                                                <select
+                                                                    name="fields[{{ $target['key'] }}][source]"
+                                                                    class="block w-full rounded-lg border-slate-300 text-sm"
+                                                                >
+                                                                    @foreach($target['source_options'] as $sourceValue => $sourceLabel)
+                                                                        <option
+                                                                            value="{{ $sourceValue }}"
+                                                                            @selected(
+                                                                                (
+                                                                                    old('form_mode') === 'contact_extraction:'.$route->getKey()
+                                                                                        ? old('fields.'.$target['key'].'.source')
+                                                                                        : $target['source']
+                                                                                ) === $sourceValue
+                                                                            )
+                                                                        >
+                                                                            {{ $sourceLabel }}
+                                                                        </option>
+                                                                    @endforeach
+                                                                </select>
+                                                            </td>
+                                                            <td class="min-w-52 px-3 py-3">
+                                                                <input
+                                                                    name="fields[{{ $target['key'] }}][label]"
+                                                                    type="text"
+                                                                    value="{{ old('form_mode') === 'contact_extraction:'.$route->getKey() ? old('fields.'.$target['key'].'.label') : $target['marker_label'] }}"
+                                                                    placeholder="{{ $target['label'] }}"
+                                                                    class="block w-full rounded-lg border-slate-300 text-sm"
+                                                                >
+                                                            </td>
+                                                            <td class="px-3 py-3">
+                                                                @if($target['key'] === 'email')
+                                                                    <input type="hidden" name="required_fields[]" value="email">
+                                                                    <span class="text-xs font-semibold text-slate-500">Always</span>
+                                                                @else
+                                                                    <input
+                                                                        name="required_fields[]"
+                                                                        type="checkbox"
+                                                                        value="{{ $target['key'] }}"
+                                                                        class="rounded border-slate-300 text-blue-700"
+                                                                        @checked(
+                                                                            old('form_mode') === 'contact_extraction:'.$route->getKey()
+                                                                                ? in_array($target['key'], old('required_fields', []), true)
+                                                                                : $target['required']
+                                                                        )
+                                                                    >
+                                                                @endif
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <p class="text-xs leading-5 text-slate-500">
+                                            “Body after a label” accepts either <strong>Label: value</strong> on one line or a label on one line followed by the value on the next non-empty line. Body text uses the provider's plain text when available and normalized HTML text otherwise.
+                                        </p>
+
+                                        <div class="flex flex-wrap items-center justify-between gap-3">
+                                            <button
+                                                type="button"
+                                                class="text-sm font-semibold text-blue-700 hover:text-blue-900"
+                                                x-on:click="testOpen = !testOpen"
+                                            >
+                                                Test with an example email
+                                            </button>
+
+                                            <button
+                                                type="submit"
+                                                class="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
+                                            >
+                                                Save person extraction
+                                            </button>
+                                        </div>
+                                    </form>
+
+                                    <form
+                                        x-cloak
+                                        x-show="testOpen"
+                                        method="POST"
+                                        action="{{ route('crm.inbound-messaging.email-routes.contact-extraction.test', $route) }}"
+                                        class="mt-4 grid gap-3 rounded-xl bg-slate-50 p-4 sm:grid-cols-2"
+                                    >
+                                        @csrf
+
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-600">From</label>
+                                            <input
+                                                name="from"
+                                                type="text"
+                                                placeholder="Vendor &lt;notifications@example.com&gt;"
+                                                class="mt-1 block w-full rounded-lg border-slate-300 text-sm"
+                                            >
+                                        </div>
+
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-600">Reply-To</label>
+                                            <input
+                                                name="reply_to"
+                                                type="text"
+                                                placeholder="lead@example.com"
+                                                class="mt-1 block w-full rounded-lg border-slate-300 text-sm"
+                                            >
+                                        </div>
+
+                                        <div class="sm:col-span-2">
+                                            <label class="block text-xs font-semibold text-slate-600">Subject</label>
+                                            <input
+                                                name="subject"
+                                                type="text"
+                                                class="mt-1 block w-full rounded-lg border-slate-300 text-sm"
+                                            >
+                                        </div>
+
+                                        <div class="sm:col-span-2">
+                                            <label class="block text-xs font-semibold text-slate-600">Body</label>
+                                            <textarea
+                                                name="body"
+                                                rows="8"
+                                                class="mt-1 block w-full rounded-lg border-slate-300 text-sm"
+                                                placeholder="First Name: Jane&#10;Last Name: Doe&#10;Email: jane@example.com&#10;Phone: 555-555-1212"
+                                            ></textarea>
+                                        </div>
+
+                                        <div class="sm:col-span-2">
+                                            <button
+                                                type="submit"
+                                                class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                                            >
+                                                Test extraction
+                                            </button>
+                                        </div>
+                                    </form>
+
+                                    @if((int) data_get(session('contact_extraction_test'), 'route_id') === (int) $route->getKey())
+                                        <div @class([
+                                            'mt-4 rounded-xl border px-4 py-3 text-sm',
+                                            'border-emerald-200 bg-emerald-50 text-emerald-900' => data_get(session('contact_extraction_test'), 'ok'),
+                                            'border-amber-200 bg-amber-50 text-amber-900' => ! data_get(session('contact_extraction_test'), 'ok'),
+                                        ])>
+                                            <p class="font-semibold">
+                                                {{ data_get(session('contact_extraction_test'), 'ok') ? 'Example matched.' : 'Example needs attention.' }}
+                                            </p>
+
+                                            @if(data_get(session('contact_extraction_test'), 'values', []) !== [])
+                                                <dl class="mt-2 grid gap-2 sm:grid-cols-2">
+                                                    @foreach(data_get(session('contact_extraction_test'), 'values', []) as $field => $value)
+                                                        <div>
+                                                            <dt class="text-xs font-bold uppercase tracking-wide opacity-70">
+                                                                {{ \Illuminate\Support\Str::headline($field) }}
+                                                            </dt>
+                                                            <dd class="mt-0.5 break-words font-semibold">{{ $value }}</dd>
+                                                        </div>
+                                                    @endforeach
+                                                </dl>
+                                            @endif
+
+                                            @if(data_get(session('contact_extraction_test'), 'errors', []) !== [])
+                                                <ul class="mt-2 list-disc space-y-1 pl-5">
+                                                    @foreach(data_get(session('contact_extraction_test'), 'errors', []) as $error)
+                                                        <li>{{ $error }}</li>
+                                                    @endforeach
+                                                </ul>
+                                            @endif
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+
+                            <div
+                                class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-4"
                                 data-inbound-email-route-automation
                             >
                                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

@@ -3,6 +3,7 @@
 namespace App\Modules\InboundMessaging\Actions;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\InboundMessaging\Actions\Email\RecordInboundEmailRouteAutomationEventAction;
 use App\Modules\InboundMessaging\Models\InboundMessage;
 use App\Support\AutomationEvents\Data\AutomationEventData;
 use App\Support\AutomationEvents\Services\AutomationEventOutbox;
@@ -21,6 +22,7 @@ class RecordInboundMessageAction
 
     public function __construct(
         private readonly AutomationEventOutbox $automationEventOutbox,
+        private readonly RecordInboundEmailRouteAutomationEventAction $recordInboundEmailRouteAutomationEvent,
     ) {}
 
     /**
@@ -87,6 +89,7 @@ class RecordInboundMessageAction
             'message_id' => $data['message_id'] ?? null,
             'from_type' => $data['from_type'] ?? null,
             'from_value' => $data['from_value'] ?? null,
+            'reply_to_value' => $data['reply_to_value'] ?? null,
             'to_type' => $data['to_type'] ?? null,
             'to_value' => $data['to_value'] ?? null,
             'subject' => $data['subject'] ?? null,
@@ -120,10 +123,12 @@ class RecordInboundMessageAction
 
         $inboundMessage->save();
 
-        $this->recordRoutedEmailAutomationEvent(
-            inboundMessage: $inboundMessage,
-            sender: $sender,
-        );
+        if (! (bool) ($data['defer_routed_email_automation_event'] ?? false)) {
+            $this->recordInboundEmailRouteAutomationEvent->handle(
+                message: $inboundMessage,
+                contact: $sender instanceof Contact ? $sender : null,
+            );
+        }
 
         $this->recordNormalReplyAutomationEvent(
             inboundMessage: $inboundMessage,
@@ -304,55 +309,6 @@ class RecordInboundMessageAction
         $value = trim($value);
 
         return $value !== '' ? $value : null;
-    }
-
-    private function recordRoutedEmailAutomationEvent(
-        InboundMessage $inboundMessage,
-        ?Model $sender,
-    ): void {
-        if ($this->value($inboundMessage->channel) !== 'email'
-            || $this->nullableString($inboundMessage->inbound_email_route_key) === null
-        ) {
-            return;
-        }
-
-        $contactId = $sender instanceof Contact
-            ? (int) $sender->getKey()
-            : null;
-
-        $this->automationEventOutbox->record(
-            event: AutomationEventData::forSubject(
-                eventKey: self::ROUTED_EMAIL_AUTOMATION_EVENT_KEY,
-                subject: $inboundMessage,
-                contactId: $contactId,
-                occurredAt: $inboundMessage->received_at,
-                payload: [
-                    'inbound_message' => [
-                        'id' => $inboundMessage->getKey(),
-                        'channel' => $this->value($inboundMessage->channel),
-                        'classification' => $inboundMessage->classification,
-                        'purpose' => $this->value($inboundMessage->purpose),
-                        'scope' => $inboundMessage->scope,
-                        'inbound_email_route_key' =>
-                            $inboundMessage->inbound_email_route_key,
-                        'inbound_email_route_source' =>
-                            $inboundMessage->inbound_email_route_source,
-                        'inbound_email_route_context' =>
-                            $inboundMessage->inbound_email_route_context,
-                        'received_at' => $inboundMessage->received_at?->toISOString(),
-                    ],
-                ],
-                meta: [
-                    'source_module' => 'inbound_messaging',
-                    'source' => 'inbound_email_route',
-                ],
-            ),
-            idempotencyKey: implode(':', [
-                'inbound_messaging',
-                self::ROUTED_EMAIL_AUTOMATION_EVENT_KEY,
-                $inboundMessage->getKey(),
-            ]),
-        );
     }
 
     private function recordNormalReplyAutomationEvent(

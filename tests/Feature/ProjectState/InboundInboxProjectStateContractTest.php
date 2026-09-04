@@ -24,6 +24,7 @@ class InboundInboxProjectStateContractTest extends TestCase
         ]);
 
         $reviewedAt = now()->subHour()->startOfSecond();
+        $extractionAttemptedAt = now()->subMinutes(30)->startOfSecond();
 
         $message = InboundMessage::query()->create([
             'related_contact_id' => $contact->getKey(),
@@ -34,11 +35,17 @@ class InboundInboxProjectStateContractTest extends TestCase
             'provider_message_id' => 'msg-inbox-project-state',
             'from_type' => 'email',
             'from_value' => 'notifications@vendor.example',
+            'reply_to_value' => 'related@example.test',
             'to_type' => 'email',
             'to_value' => 'vendor-updates@inbound.example.test',
             'subject' => 'Vendor update',
             'body' => 'Please review this vendor update.',
             'classification' => InboundMessage::CLASSIFICATION_NORMAL_REPLY,
+            'contact_extraction_status' =>
+                InboundMessage::CONTACT_EXTRACTION_SUCCEEDED,
+            'contact_extraction_definition_hash' => str_repeat('a', 64),
+            'contact_extraction_error' => null,
+            'contact_extraction_attempted_at' => $extractionAttemptedAt,
             'inbox_status' => InboundMessage::INBOX_STATUS_REVIEWED,
             'reviewed_at' => $reviewedAt,
             'received_at' => $reviewedAt->copy()->subMinute(),
@@ -84,5 +91,18 @@ class InboundInboxProjectStateContractTest extends TestCase
             $restored->reviewed_at?->toISOString(),
         );
         $this->assertNull($restored->completed_at);
+        $this->assertSame('related@example.test', $restored->reply_to_value);
+        $this->assertSame(
+            InboundMessage::CONTACT_EXTRACTION_SUCCEEDED,
+            $restored->contact_extraction_status,
+        );
+        $this->assertSame(
+            str_repeat('a', 64),
+            $restored->contact_extraction_definition_hash,
+        );
+        $this->assertSame(
+            $extractionAttemptedAt->toISOString(),
+            $restored->contact_extraction_attempted_at?->toISOString(),
+        );
     }
 }

@@ -67,4 +67,43 @@ class InboundEmailRouteSetupValidationTest extends TestCase
             $codes,
         );
     }
+    public function test_enabled_contact_extraction_requires_a_valid_email_mapping(): void
+    {
+        config()->set(
+            'messaging.email.inbound_domain',
+            'replies.example.test',
+        );
+
+        InboundEmailRoute::query()->create([
+            'key' => 'lead_intake',
+            'local_part' => 'lead-intake',
+            'label' => 'Lead intake',
+            'source' => 'crm',
+            'context_key' => null,
+            'is_active' => true,
+            'contact_extraction_enabled' => true,
+            'contact_extraction_definition' => [
+                'version' => 1,
+                'fields' => [
+                    'first_name' => [
+                        'source' => 'body_after_label',
+                        'label' => 'First Name',
+                    ],
+                ],
+                'required_fields' => ['first_name'],
+            ],
+        ]);
+
+        $codes = collect(
+            app(InboundMessagingSetupValidationContributor::class)->findings(),
+        )
+            ->pluck('code')
+            ->all();
+
+        $this->assertContains(
+            'inbound_messaging.email_routes.contact_extraction_invalid',
+            $codes,
+        );
+    }
+
 }

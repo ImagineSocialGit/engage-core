@@ -176,6 +176,7 @@ class UniversalMessageMediaAuthoringTest extends TestCase
             'resources/views/components/messaging/route-message-template-picker.blade.php',
             'resources/views/crm/broadcasts/index.blade.php',
             'resources/views/crm/broadcasts/edit.blade.php',
+            'resources/views/crm/campaigns/create.blade.php',
         ];
 
         foreach ($messagingSurfaces as $path) {

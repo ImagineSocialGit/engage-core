@@ -118,6 +118,99 @@ class InboundEmailRouteWorkspaceTest extends TestCase
         );
     }
 
+    public function test_operator_can_configure_and_preview_contact_extraction_without_authoring_regex(): void
+    {
+        $route = InboundEmailRoute::query()->create([
+            'key' => 'website_leads',
+            'local_part' => 'website-leads',
+            'label' => 'Website Leads',
+            'source' => 'crm',
+            'context_key' => null,
+            'is_active' => true,
+        ]);
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->patch(
+                route(
+                    'crm.inbound-messaging.email-routes.contact-extraction.update',
+                    $route,
+                ),
+                [
+                    'enabled' => true,
+                    'fields' => [
+                        'email' => [
+                            'source' => 'body_after_label',
+                            'label' => 'Email',
+                        ],
+                        'first_name' => [
+                            'source' => 'body_after_label',
+                            'label' => 'First Name',
+                        ],
+                        'last_name' => [
+                            'source' => 'none',
+                            'label' => null,
+                        ],
+                        'name' => [
+                            'source' => 'none',
+                            'label' => null,
+                        ],
+                        'phone' => [
+                            'source' => 'none',
+                            'label' => null,
+                        ],
+                    ],
+                    'required_fields' => ['email', 'first_name'],
+                ],
+            )
+            ->assertRedirect();
+
+        $route->refresh();
+
+        $this->assertTrue($route->contact_extraction_enabled);
+        $this->assertSame(
+            'body_after_label',
+            data_get(
+                $route->contact_extraction_definition,
+                'fields.email.source',
+            ),
+        );
+        $this->assertEqualsCanonicalizing(
+            ['email', 'first_name'],
+            data_get(
+                $route->contact_extraction_definition,
+                'required_fields',
+            ),
+        );
+
+        $this->actingAs($user)
+            ->get(route('crm.inbound-messaging.email-routes.index'))
+            ->assertOk()
+            ->assertSee('data-inbound-email-contact-extraction', false);
+
+        $this->actingAs($user)
+            ->post(
+                route(
+                    'crm.inbound-messaging.email-routes.contact-extraction.test',
+                    $route,
+                ),
+                [
+                    'from' => 'Vendor <vendor@example.test>',
+                    'subject' => 'New lead',
+                    'body' => "First Name: Jane\nEmail: jane@example.com",
+                ],
+            )
+            ->assertRedirect()
+            ->assertSessionHas(
+                'contact_extraction_test',
+                fn (array $result): bool =>
+                    ($result['route_id'] ?? null) === $route->getKey()
+                    && ($result['ok'] ?? false) === true
+                    && data_get($result, 'values.email') === 'jane@example.com'
+                    && data_get($result, 'values.first_name') === 'Jane',
+            );
+    }
+
     public function test_signed_reply_namespace_cannot_be_created_as_semantic_address(): void
     {
         $this->actingAs(User::factory()->create())

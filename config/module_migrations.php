@@ -85,7 +85,7 @@ return [
 
         'inbound_messaging' => [
             'path' => 'database/migrations/modules/inbound_messaging',
-            'schema_version' => 7,
+            'schema_version' => 8,
             'migrations' => [
                 '2026_05_19_154535_create_inbound_messages_table.php',
                 '2026_07_19_031500_create_inbound_message_receipts_table.php',
@@ -95,6 +95,7 @@ return [
                 '2026_08_26_054500_add_inbox_triage_to_inbound_messages_table.php',
                 '2026_08_26_124500_consolidate_inbound_webhook_persistence.php',
                 '2026_08_30_163500_add_automated_response_tracking_to_inbound_messages_table.php',
+                '2026_09_04_081500_add_contact_extraction_to_inbound_email_routes_and_messages.php',
             ],
         ],
 

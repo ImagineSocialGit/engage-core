@@ -25,6 +25,7 @@ class RecordInboundEmailAction
         private readonly InboundEmailRouteResolver $emailRouteResolver,
         private readonly InboundReplyTextNormalizer $replyTextNormalizer,
         private readonly InboundReplyIntentClassifier $replyIntentClassifier,
+        private readonly ExtractInboundEmailContactAction $extractInboundEmailContact,
     ) {}
 
     /** @param array<int, string> $toAddresses */
@@ -39,6 +40,7 @@ class RecordInboundEmailAction
         ?string $subject = null,
         ?string $messageId = null,
         Carbon|string|null $receivedAt = null,
+        ?string $replyTo = null,
     ): InboundMessage {
         if (blank($providerEventId) && blank($providerMessageId)) {
             throw new InvalidArgumentException(
@@ -77,6 +79,7 @@ class RecordInboundEmailAction
                 'message_id' => $this->messageId($messageId),
                 'from_type' => 'email',
                 'from_value' => $fromAddress,
+                'reply_to_value' => $this->emailAddress($replyTo),
                 'to_type' => 'email',
                 'to_value' => $this->preferredToAddress(
                     $toAddresses,
@@ -96,14 +99,23 @@ class RecordInboundEmailAction
                 'inbound_email_route_key' => $route?->key,
                 'inbound_email_route_source' => $route?->source,
                 'inbound_email_route_context' => $route?->context_key,
+                'defer_routed_email_automation_event' =>
+                    (bool) ($route?->contact_extraction_enabled ?? false),
                 'received_at' => $receivedAt ? Carbon::parse($receivedAt) : now(),
             ],
             sender: $sender,
         );
 
+        if ($route !== null && $route->contact_extraction_enabled) {
+            $inboundMessage = $this->extractInboundEmailContact->handle(
+                message: $inboundMessage,
+                route: $route,
+            );
+        }
+
         $this->processInboundMessageAction->handle($inboundMessage);
 
-        return $inboundMessage;
+        return $inboundMessage->refresh();
     }
 
     private function contact(?string $email): ?Contact
@@ -198,8 +210,14 @@ class RecordInboundEmailAction
             return null;
         }
 
+        $html = preg_replace(
+            '/<\s*(?:br\s*\/?|\/p|\/div|\/li|\/tr|\/h[1-6])\s*>/iu',
+            "\n",
+            $html,
+        ) ?? $html;
+
         $plain = html_entity_decode(
-            strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $html)),
+            strip_tags($html),
             ENT_QUOTES | ENT_HTML5,
             'UTF-8',
         );

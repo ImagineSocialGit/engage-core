@@ -5,6 +5,7 @@ namespace App\Modules\InboundMessaging\Validation;
 use App\Modules\InboundMessaging\Data\InboundEmailRouteIdentity;
 use App\Modules\InboundMessaging\Models\InboundEmailRoute;
 use App\Modules\InboundMessaging\Models\InboundReplyProfile;
+use App\Modules\InboundMessaging\Services\Email\InboundEmailContactExtractor;
 use App\Modules\InboundMessaging\Services\Email\InboundEmailRouteResolver;
 use App\Modules\InboundMessaging\Services\Email\RoutedInboundMessageConsumerRegistry;
 use App\Modules\InboundMessaging\Services\ReplyProfiles\ReplyProfileDefinitionNormalizer;
@@ -22,6 +23,7 @@ final class InboundMessagingSetupValidationContributor implements SetupValidatio
         private readonly ReplyProfileDependencyRegistry $dependencies,
         private readonly InboundEmailRouteResolver $emailRouteResolver,
         private readonly RoutedInboundMessageConsumerRegistry $routedMessageConsumers,
+        private readonly InboundEmailContactExtractor $contactExtractor,
     ) {}
 
     public function findings(): iterable
@@ -166,6 +168,28 @@ final class InboundMessagingSetupValidationContributor implements SetupValidatio
                     path: "inbound_email_routes.{$route->key}.source",
                     context: ['route_key' => $route->key],
                 );
+            }
+
+            if ($route->contact_extraction_enabled) {
+                $definition = is_array($route->contact_extraction_definition)
+                    ? $route->contact_extraction_definition
+                    : [];
+                $errors = $this->contactExtractor->validationErrors($definition);
+
+                foreach ($errors as $field => $messages) {
+                    foreach ($messages as $message) {
+                        yield $this->error(
+                            code: 'inbound_messaging.email_routes.contact_extraction_invalid',
+                            message: "Inbound email route [{$route->label}] has invalid automatic person extraction: {$message}",
+                            source: 'inbound_email_routes',
+                            path: "inbound_email_routes.{$route->key}.contact_extraction_definition.{$field}",
+                            context: [
+                                'route_key' => $route->key,
+                                'field' => $field,
+                            ],
+                        );
+                    }
+                }
             }
         }
     }

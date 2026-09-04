@@ -3,29 +3,35 @@
 namespace App\Modules\Campaigns\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Modules\Campaigns\Actions\ActivateCampaignAction;
+use App\Modules\Campaigns\Actions\CreateCampaignAction;
 use App\Modules\Campaigns\Actions\DeactivateCampaignAction;
 use App\Modules\Campaigns\Actions\PublishCampaignMessageChainVersionAction;
 use App\Modules\Campaigns\Actions\UpdateCampaignEligibilityAction;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Requests\CampaignEligibilityAuthoringRequest;
+use App\Modules\Campaigns\Requests\StoreCampaignRequest;
 use App\Modules\Campaigns\Requests\UpdateCampaignMessageRequest;
 use App\Modules\Campaigns\Requests\UpdateCampaignMessageReplyHandlingRequest;
 use App\Modules\Campaigns\Requests\UpdateCampaignScheduleRequest;
+use App\Modules\Campaigns\Services\CampaignCreationGuide;
 use App\Modules\Campaigns\Services\CampaignEligibilityAuthoringService;
 use App\Modules\Campaigns\Services\CampaignMessageReviewPresenter;
 use App\Modules\Campaigns\Services\CampaignScheduleAuthoringPresenter;
 use App\Modules\Campaigns\Services\CampaignWorkspacePresenter;
-use App\Models\User;
 use App\Modules\Messaging\Actions\PublishMessageTemplatePresetOverrideAction;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\MessageChainStepVariant;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
+use App\Modules\Messaging\Services\MessageMediaAuthoringService;
+use App\Modules\Messaging\Services\MessageTemplateAuthoringFieldPresenter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 class CampaignController extends Controller
@@ -40,8 +46,11 @@ class CampaignController extends Controller
     public function index(): View
     {
         $campaigns = Campaign::query()
+            ->with([
+                'messageChain.currentVersion.steps',
+                'steps' => fn ($query) => $query->where('is_active', true),
+            ])
             ->withCount([
-                'steps as message_steps_count' => fn ($query) => $query->where('is_active', true),
                 'enrollments as open_enrollments_count' => fn ($query) => $query->whereHas(
                     'messageChainEnrollment',
                     fn ($chainQuery) => $chainQuery->whereIn('status', [
@@ -53,6 +62,20 @@ class CampaignController extends Controller
             ->orderBy('name')
             ->get();
 
+        $campaigns->each(function (Campaign $campaign): void {
+            $currentVersion = $campaign->messageChain?->currentVersion;
+
+            $currentVersionStepCount = $currentVersion?->isPublished()
+                ? $currentVersion->steps->where('is_active', true)->count()
+                : 0;
+
+            $messageStepCount = $currentVersionStepCount > 0
+                ? $currentVersionStepCount
+                : $campaign->steps->count();
+
+            $campaign->setAttribute('message_steps_count', $messageStepCount);
+        });
+
         return view('crm.campaigns.index', [
             'campaigns' => $campaigns,
             'statusCounts' => [
@@ -61,6 +84,87 @@ class CampaignController extends Controller
                 Campaign::STATUS_ARCHIVED => $campaigns->where('status', Campaign::STATUS_ARCHIVED)->count(),
             ],
         ]);
+    }
+
+    public function create(
+        Request $request,
+        CampaignCreationGuide $creationGuide,
+        MessageTemplateAuthoringFieldPresenter $authoringFields,
+    ): View {
+        $options = $creationGuide->options();
+        $requestedOption = $request->old('creation_intent');
+
+        if (! is_string($requestedOption) || trim($requestedOption) === '') {
+            $requestedOption = $request->query('use');
+        }
+
+        $selectedOption = $creationGuide->find($requestedOption)
+            ?? ($options[0] ?? null);
+
+        return view('crm.campaigns.create', [
+            'options' => $options,
+            'selectedOption' => $selectedOption,
+            'builderStages' => $creationGuide->builderStages(),
+            'availableFields' => $authoringFields->groupsForContext(
+                CreateCampaignAction::DISPATCH_KEY,
+            ),
+        ]);
+    }
+
+    public function store(
+        StoreCampaignRequest $request,
+        CampaignCreationGuide $creationGuide,
+        CreateCampaignAction $createCampaign,
+        MessageMediaAuthoringService $mediaAuthoring,
+    ): RedirectResponse {
+        $creationOption = $creationGuide->find($request->creationIntent());
+
+        if ($creationOption === null) {
+            throw ValidationException::withMessages([
+                'creation_intent' => 'Choose what this Campaign is for.',
+            ]);
+        }
+
+        try {
+            $payload = $request->payloadForChannel();
+
+            if ($request->channel() === 'email') {
+                $payload = $mediaAuthoring->apply(
+                    payload: $payload,
+                    submitted: $request->hasMessageMediaSubmission(),
+                    upload: $request->messageMediaUpload(),
+                    assetUuid: $request->messageMediaAssetUuid(),
+                    posterAssetUuid: $request->messageMediaPosterAssetUuid(),
+                    title: $request->messageMediaTitle(),
+                    uploadedBy: $request->user(),
+                );
+            }
+
+            $campaign = $createCampaign->handle(
+                name: $request->campaignName(),
+                description: $request->campaignDescription(),
+                channel: $request->channel(),
+                firstMessagePayload: $payload,
+                creationOption: $creationOption,
+                createdBy: $request->user() instanceof User
+                    ? $request->user()
+                    : null,
+            );
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'campaign' => $exception->getMessage(),
+            ]);
+        }
+
+        return redirect()
+            ->route('crm.campaigns.edit', [
+                'campaign' => $campaign,
+                'panel' => 'start',
+            ])
+            ->with(
+                'status',
+                'Campaign created as an inactive draft. Review Start, Schedule, Messages, and Review before turning it on.',
+            );
     }
 
     public function show(

@@ -44,6 +44,12 @@ Route::middleware('module:inbound_messaging')
 
         Route::patch('/{inboundEmailRoute}/state', [InboundEmailRouteController::class, 'state'])
             ->name('state');
+
+        Route::patch('/{inboundEmailRoute}/contact-extraction', [InboundEmailRouteController::class, 'contactExtraction'])
+            ->name('contact-extraction.update');
+
+        Route::post('/{inboundEmailRoute}/contact-extraction/test', [InboundEmailRouteController::class, 'testContactExtraction'])
+            ->name('contact-extraction.test');
     });
 
 Route::middleware('module:inbound_messaging')

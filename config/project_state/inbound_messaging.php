@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 8,
+    'version' => 9,
     'tables' => [
         'inbound_email_routes' => [
             'mode' => 'upsert',
@@ -16,8 +16,13 @@ return [
                 'source',
                 'context_key',
                 'is_active',
+                'contact_extraction_enabled',
+                'contact_extraction_definition',
                 'created_at',
                 'updated_at',
+            ],
+            'json_columns' => [
+                'contact_extraction_definition',
             ],
         ],
 
@@ -116,6 +121,7 @@ return [
                 'message_id',
                 'from_type',
                 'from_value',
+                'reply_to_value',
                 'to_type',
                 'to_value',
                 'subject',
@@ -130,6 +136,10 @@ return [
                 'inbound_email_route_key',
                 'inbound_email_route_source',
                 'inbound_email_route_context',
+                'contact_extraction_status',
+                'contact_extraction_definition_hash',
+                'contact_extraction_error',
+                'contact_extraction_attempted_at',
                 'received_at',
                 'processed_at',
                 'inbox_status',

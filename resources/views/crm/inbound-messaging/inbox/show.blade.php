@@ -140,6 +140,23 @@
             </div>
         </section>
 
+        @if($message->contact_extraction_status === \App\Modules\InboundMessaging\Models\InboundMessage::CONTACT_EXTRACTION_FAILED)
+            <section class="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm sm:p-7">
+                <p class="text-xs font-bold uppercase tracking-[0.14em] text-amber-700">
+                    Automatic person extraction
+                </p>
+                <h2 class="mt-2 text-lg font-semibold text-amber-950">
+                    This email could not be matched to a person automatically
+                </h2>
+                <p class="mt-2 text-sm leading-6 text-amber-900">
+                    {{ $message->contact_extraction_error ?: 'A required value was missing or invalid.' }}
+                </p>
+                <p class="mt-2 text-xs leading-5 text-amber-800">
+                    The message is still safely available in the Inbox. Review the inbound address extraction rules before relying on automation for future messages.
+                </p>
+            </section>
+        @endif
+
         <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
             <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div>

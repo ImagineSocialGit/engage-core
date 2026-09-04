@@ -14,6 +14,12 @@ Route::middleware('module:campaigns')
         Route::get('/', [CampaignController::class, 'index'])
             ->name('index');
 
+        Route::get('/create', [CampaignController::class, 'create'])
+            ->name('create');
+
+        Route::post('/', [CampaignController::class, 'store'])
+            ->name('store');
+
         Route::prefix('annual-touches')
             ->name('annual-touches.')
             ->group(function (): void {

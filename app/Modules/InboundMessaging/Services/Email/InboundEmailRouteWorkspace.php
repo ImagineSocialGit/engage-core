@@ -13,6 +13,7 @@ final class InboundEmailRouteWorkspace
         private readonly InboundEmailRouteResolver $resolver,
         private readonly RoutedInboundMessageConsumerRegistry $consumers,
         private readonly InboundEmailRouteAutomationWorkspace $automation,
+        private readonly InboundEmailContactExtractor $contactExtractor,
     ) {}
 
     /**
@@ -49,12 +50,66 @@ final class InboundEmailRouteWorkspace
                         ? $route->local_part.'@'.$domain
                         : $route->local_part.'@{INBOUND_EMAIL_DOMAIN}',
                     'handling' => $this->handling($route),
+                    'contact_extraction' => $this->contactExtraction($route),
                     'automation' => $automationByRoute[(string) $route->key] ?? [
                         'available' => false,
                         'create_url' => null,
                         'automations' => [],
                     ],
                 ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function contactExtraction(InboundEmailRoute $route): array
+    {
+        $definition = is_array($route->contact_extraction_definition)
+            ? $route->contact_extraction_definition
+            : $this->contactExtractor->defaultDefinition();
+        $definition = $this->contactExtractor->normalizeDefinition($definition);
+        $required = $definition['required_fields'] ?? [];
+        $fields = $definition['fields'] ?? [];
+        $labels = $this->contactExtractor->targetLabels();
+
+        return [
+            'enabled' => (bool) $route->contact_extraction_enabled,
+            'definition' => $definition,
+            'status_label' => $route->contact_extraction_enabled
+                ? 'Creates or updates a person'
+                : 'Off',
+            'description' => $route->contact_extraction_enabled
+                ? 'Engage extracts the configured fields before contact-aware automation continues.'
+                : 'Messages stay Inbox-only unless another connected business process handles them.',
+            'targets' => collect($this->contactExtractor->targetKeys())
+                ->map(function (string $target) use (
+                    $fields,
+                    $required,
+                    $labels,
+                ): array {
+                    $field = is_array($fields[$target] ?? null)
+                        ? $fields[$target]
+                        : [];
+
+                    return [
+                        'key' => $target,
+                        'label' => $labels[$target] ?? $target,
+                        'source' => is_string($field['source'] ?? null)
+                            ? $field['source']
+                            : InboundEmailContactExtractor::SOURCE_NONE,
+                        'marker_label' => is_string($field['label'] ?? null)
+                            ? $field['label']
+                            : '',
+                        'required' => $target === 'email'
+                            || in_array($target, $required, true),
+                        'source_options' =>
+                            $this->contactExtractor->sourceOptions($target),
+                    ];
+                })
                 ->values()
                 ->all(),
         ];

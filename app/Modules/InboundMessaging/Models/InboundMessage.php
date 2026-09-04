@@ -23,6 +23,9 @@ class InboundMessage extends Model
     public const INBOX_STATUS_REVIEWED = 'reviewed';
     public const INBOX_STATUS_DONE = 'done';
 
+    public const CONTACT_EXTRACTION_SUCCEEDED = 'succeeded';
+    public const CONTACT_EXTRACTION_FAILED = 'failed';
+
     protected $fillable = [
         'webhook_inbox_receipt_id',
         'sender_type',
@@ -39,6 +42,7 @@ class InboundMessage extends Model
         'message_id',
         'from_type',
         'from_value',
+        'reply_to_value',
         'to_type',
         'to_value',
         'subject',
@@ -53,6 +57,10 @@ class InboundMessage extends Model
         'inbound_email_route_key',
         'inbound_email_route_source',
         'inbound_email_route_context',
+        'contact_extraction_status',
+        'contact_extraction_definition_hash',
+        'contact_extraction_error',
+        'contact_extraction_attempted_at',
         'received_at',
         'processed_at',
         'inbox_status',
@@ -76,6 +84,7 @@ class InboundMessage extends Model
             'reviewed_at' => 'datetime',
             'completed_at' => 'datetime',
             'automated_handled_at' => 'datetime',
+            'contact_extraction_attempted_at' => 'datetime',
         ];
     }
 

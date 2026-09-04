@@ -76,6 +76,10 @@ class ResendWebhookHandler implements EmailWebhookHandler
                         receivedAt: $received['created_at']
                             ?? $payload->data('created_at')
                             ?? now(),
+                        replyTo: $this->firstAddress(
+                            $received['reply_to']
+                                ?? $payload->data('reply_to'),
+                        ),
                     );
 
                     return ['http_status' => 204];
@@ -90,6 +94,27 @@ class ResendWebhookHandler implements EmailWebhookHandler
                 return ['http_status' => 204];
             },
         );
+    }
+
+    private function firstAddress(mixed $value): ?string
+    {
+        if (is_string($value)) {
+            $value = trim($value);
+
+            return $value !== '' ? $value : null;
+        }
+
+        if (! is_array($value)) {
+            return null;
+        }
+
+        foreach ($value as $candidate) {
+            if (is_string($candidate) && trim($candidate) !== '') {
+                return trim($candidate);
+            }
+        }
+
+        return null;
     }
 
     private function stringHeader(

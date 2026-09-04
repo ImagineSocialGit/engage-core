@@ -62,6 +62,7 @@ class ResendInboundReplyEndToEndTest extends TestCase
                 'id' => 'received_email_1',
                 'from' => 'Reply Person <reply@example.com>',
                 'to' => [$replyTo],
+                'reply_to' => 'Reply Person <reply@example.com>',
                 'subject' => 'Re: Checking in',
                 'message_id' => '<received-email-1@example.test>',
                 'text' => "YES!\n\nOn Wed, Someone wrote:\n> old content",
@@ -91,6 +92,7 @@ class ResendInboundReplyEndToEndTest extends TestCase
         $this->assertSame(InboundMessage::CLASSIFICATION_NORMAL_REPLY, $inbound->classification);
         $this->assertSame($scheduled->getKey(), $inbound->correlated_scheduled_message_id);
         $this->assertSame('Re: Checking in', $inbound->subject);
+        $this->assertSame('reply@example.com', $inbound->reply_to_value);
         $this->assertSame('YES!', $inbound->body);
         $this->assertSame('<received-email-1@example.test>', $inbound->message_id);
         $this->assertSame('exact', $inbound->reply_correlation_method);

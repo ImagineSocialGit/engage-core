@@ -31,6 +31,48 @@ Signed Engage Reply-To correlation always wins. Only a non-correlated recipient 
 
 A resolved route emits the compact neutral `inbound_email.route_received` automation event. It may have no Contact yet; provider/domain integration code may use the internal route context to parse the normalized inbound message and establish Contact/business state later. The event never copies the inbound body or raw provider payload.
 
+### Deterministic Contact extraction
+
+A named Inbound Address may optionally own a deterministic Contact-extraction definition. This is route configuration, not a second reusable-profile registry: the address already represents one semantic intake lane, so the CRM keeps the extraction rules beside that address.
+
+The first supported sources are deliberately bounded and operator-readable:
+
+```text
+sender email address
+Reply-To email address
+entire subject
+subject value after a literal label
+body value after a literal label
+```
+
+Body extraction operates on the canonical normalized inbound body. The provider's plain text is preferred; when only HTML exists, common block boundaries are converted to line breaks before tags are removed. Operators author literal labels such as `First Name`, `Email`, or `Phone`; CRM users are not asked to write regular expressions.
+
+The route stores:
+
+```text
+contact_extraction_enabled
+contact_extraction_definition
+```
+
+The normalized inbound row records narrow extraction evidence:
+
+```text
+reply_to_value
+contact_extraction_status
+contact_extraction_definition_hash
+contact_extraction_error
+contact_extraction_attempted_at
+related_contact_id
+```
+
+No provider envelope or HTML copy is added to the normalized row.
+
+When extraction is enabled, the ordinary `inbound_email.route_received` automation event is deliberately deferred until extraction finishes. Successful extraction resolves/creates the Contact through Core authority, enriches the canonical Contact through `CreateOrUpdateContactAction`, stores the Contact in `related_contact_id`, and publishes the existing route event with that Contact ID. Existing Flow Route bindings therefore continue to use the same trigger/event contract without a FlowRoutes dependency inside InboundMessaging.
+
+A deterministic extraction miss is a safe business failure, not a reason to manufacture a partial Contact. The message remains `new` in the Inbox, records a bounded human-readable extraction error, and publishes the route event without a Contact. Flow Routes therefore cannot accidentally start contact-aware work for a junk identity. Provider/system failures may still fail normally and use webhook-inbox retry behavior.
+
+Extraction is idempotent per normalized `InboundMessage`: once a message records a success or deterministic failure, a provider replay does not create another Contact or another contact-extraction route event.
+
 ### Optional Flow Routes handoff
 
 When Flow Routes is enabled, the Inbound Addresses workspace may hand an operator into normal Flow Route authoring for one named inbound address. The trigger authoring contribution is owned by InboundMessaging and selects the human-facing address while storing only its stable route key in the Route entry condition. InboundMessaging does not import FlowRoutes. The optional workspace adapter lives under `App\Support\ModuleIntegrations\InboundMessaging\FlowRoutes` and uses the FlowRoutes-owned authoring-link builder.
@@ -143,6 +185,7 @@ InboundMessaging owns:
 - `InboundMessageReceived`;
 - neutral `inbound_message.normal_reply` automation events;
 - semantic inbound-email route persistence/resolution and neutral `inbound_email.route_received` automation events;
+- optional deterministic route-owned Contact extraction before contact-aware route automation;
 - durable inbound Inbox triage and related-Contact association;
 - reply-profile, reply-intent, and reply-rule persistence and authoring.
 
@@ -211,6 +254,7 @@ provider_event_key nullable unique
 provider_message_key nullable unique
 from_type nullable
 from_value nullable
+reply_to_value nullable
 to_type nullable
 to_value nullable
 subject nullable
@@ -221,6 +265,10 @@ scope nullable
 inbound_email_route_key nullable
 inbound_email_route_source nullable
 inbound_email_route_context nullable
+contact_extraction_status nullable
+contact_extraction_definition_hash nullable
+contact_extraction_error nullable
+contact_extraction_attempted_at nullable
 received_at nullable
 processed_at nullable
 inbox_status

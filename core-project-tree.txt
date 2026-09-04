@@ -109,6 +109,7 @@
 │   │   │   │   ├── ApplyAutomaticCampaignEligibilityAction.php
 │   │   │   │   ├── CancelCampaignEnrollmentAction.php
 │   │   │   │   ├── CancelCampaignFamilyEnrollmentsAction.php
+│   │   │   │   ├── CreateCampaignAction.php
 │   │   │   │   ├── DeactivateCampaignAction.php
 │   │   │   │   ├── EnrollContactInCampaignAction.php
 │   │   │   │   ├── EvaluateCampaignEligibilityAction.php
@@ -157,6 +158,7 @@
 │   │   │   │   │   ├── PauseCampaignAutomationDefinition.php
 │   │   │   │   │   ├── PauseCampaignFamilyAutomationDefinition.php
 │   │   │   │   │   └── ResumeCampaignAutomationDefinition.php
+│   │   │   │   ├── CampaignCreationOption.php
 │   │   │   │   ├── CampaignEligibilityEvaluationResult.php
 │   │   │   │   ├── CampaignEligibilityLifecycleResult.php
 │   │   │   │   ├── CampaignEligibilityPresetDefinition.php
@@ -195,12 +197,14 @@
 │   │   │   ├── Requests
 │   │   │   │   ├── CampaignEligibilityAuthoringRequest.php
 │   │   │   │   ├── CreateCampaignAnnualTouchMessageTemplateRequest.php
+│   │   │   │   ├── StoreCampaignRequest.php
 │   │   │   │   ├── UpdateCampaignMessageReplyHandlingRequest.php
 │   │   │   │   ├── UpdateCampaignMessageRequest.php
 │   │   │   │   ├── UpdateCampaignScheduleRequest.php
 │   │   │   │   └── UpdateCampaignStepMessageTemplateRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── CampaignAnnualTouchAudienceService.php
+│   │   │   │   ├── CampaignCreationGuide.php
 │   │   │   │   ├── CampaignEligibilityAuthoringService.php
 │   │   │   │   ├── CampaignEligibilityDependencyResolver.php
 │   │   │   │   ├── CampaignEligibilityEvaluator.php
@@ -594,9 +598,12 @@
 │   │   ├── InboundMessaging
 │   │   │   ├── Actions
 │   │   │   │   ├── Email
+│   │   │   │   │   ├── ExtractInboundEmailContactAction.php
 │   │   │   │   │   ├── HandleInboundEmailWebhookAction.php
-│   │   │   │   │   └── RecordInboundEmailAction.php
+│   │   │   │   │   ├── RecordInboundEmailAction.php
+│   │   │   │   │   └── RecordInboundEmailRouteAutomationEventAction.php
 │   │   │   │   ├── EmailRoutes
+│   │   │   │   │   ├── SaveInboundEmailContactExtractionAction.php
 │   │   │   │   │   └── SaveInboundEmailRouteAction.php
 │   │   │   │   ├── Inbox
 │   │   │   │   │   ├── CreateInboundMessageContactAction.php
@@ -665,6 +672,7 @@
 │   │   │   ├── Providers
 │   │   │   │   └── InboundMessagingModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   │   ├── SaveInboundEmailContactExtractionRequest.php
 │   │   │   │   ├── SaveInboundEmailRouteRequest.php
 │   │   │   │   ├── SaveInboundReplyProfileRequest.php
 │   │   │   │   └── StoreContactConversationReplyRequest.php
@@ -676,6 +684,7 @@
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailWebhookHandlerResolver.php
 │   │   │   │   │   ├── EmailWebhookPayload.php
+│   │   │   │   │   ├── InboundEmailContactExtractor.php
 │   │   │   │   │   ├── InboundEmailRouteResolver.php
 │   │   │   │   │   ├── InboundEmailRouteWorkspace.php
 │   │   │   │   │   └── RoutedInboundMessageConsumerRegistry.php
@@ -2141,7 +2150,8 @@
 │   │   │   │   ├── 2026_08_25_120000_create_inbound_email_routes_and_add_route_evidence.php
 │   │   │   │   ├── 2026_08_26_054500_add_inbox_triage_to_inbound_messages_table.php
 │   │   │   │   ├── 2026_08_26_124500_consolidate_inbound_webhook_persistence.php
-│   │   │   │   └── 2026_08_30_163500_add_automated_response_tracking_to_inbound_messages_table.php
+│   │   │   │   ├── 2026_08_30_163500_add_automated_response_tracking_to_inbound_messages_table.php
+│   │   │   │   └── 2026_09_04_081500_add_contact_extraction_to_inbound_email_routes_and_messages.php
 │   │   │   ├── internal_notifications
 │   │   │   │   ├── 2026_04_10_173406_create_team_members_table.php
 │   │   │   │   └── 2026_04_11_174215_create_team_member_notification_preferences_table.php
@@ -2506,6 +2516,7 @@
 │       │   ├── campaigns
 │       │   │   ├── annual-touches
 │       │   │   │   └── index.blade.php
+│       │   │   ├── create.blade.php
 │       │   │   ├── edit.blade.php
 │       │   │   ├── index.blade.php
 │       │   │   ├── message-templates
@@ -2725,6 +2736,7 @@
 │   │   │   ├── CampaignAnnualTouchAuthoringTest.php
 │   │   │   ├── CampaignAnnualTouchRuntimeTest.php
 │   │   │   ├── CampaignAutomaticEligibilityImportLaunchTest.php
+│   │   │   ├── CampaignCreationTest.php
 │   │   │   ├── CampaignEligibilityAuthoringTest.php
 │   │   │   ├── CampaignEligibilityFactReevaluationTest.php
 │   │   │   ├── CampaignEligibilityFamilyReconciliationTest.php
@@ -2897,6 +2909,7 @@
 │   │   │   ├── ContactConversationShowDataProviderTest.php
 │   │   │   ├── HandleInboundEmailWebhookActionTest.php
 │   │   │   ├── InboundAutoResponseAutomationTest.php
+│   │   │   ├── InboundEmailContactExtractionTest.php
 │   │   │   ├── InboundEmailRouteAutomationTriggerAuthoringTest.php
 │   │   │   ├── InboundEmailRouteAutomationWorkspaceTest.php
 │   │   │   ├── InboundEmailRouteResolutionTest.php
@@ -3306,4 +3319,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-787 directories, 2520 files
+787 directories, 2533 files

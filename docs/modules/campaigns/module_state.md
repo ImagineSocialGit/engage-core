@@ -56,6 +56,14 @@ See `docs/modules/campaigns/annual-touch-dates.md`.
 
 New Campaign enrollment creates a compact CampaignEnrollment wrapper, starts the selected immutable MessageChainVersion through Messaging, and stores `campaign_enrollments.message_chain_enrollment_id`. Explicit cancellation, Campaign deactivation, and enrollment pause/resume all delegate to Messaging-owned MessageChainEnrollment lifecycle actions. Campaign workspace/contact visibility and automation result metadata read progression/lifecycle facts from the linked MessageChainEnrollment. The old Campaign step scheduler, terminal-result progression listener, and duplicate CampaignEnrollment runtime columns have been removed.
 
+### CRM Campaign creation
+
+    The CRM now has a first-class purpose-guided Create Campaign entry point. Create mode reuses the shared Campaign Builder shell rather than introducing a parallel wizard or runtime. A new Campaign starts `inactive` with manual entry, records only generic authoring intent, creates one canonical Messaging-owned reusable MessageTemplate/MessageTemplateVersion for the first Email or SMS message, and publishes one direct immutable MessageChainVersion with an immediate first step. Email creation uses the universal Messaging Media authoring contract.
+
+    CRM-created Campaigns do not create new `campaign_steps` or `campaign_step_variants` rows. Those tables remain only the temporary legacy/preset authoring projection. The existing Start, Schedule, Messages, and Review editors operate on the selected direct MessageChain after creation. The Campaign index likewise reads message-step count from the published MessageChain first and falls back to the legacy projection only for records that still require it.
+
+    Creation deliberately defaults to manual entry and redirects to the existing Start editor so audience/eligibility choices remain explicit before activation. Technical identity such as `marketing` purpose, `campaign` scope, `campaign_step_due`, and the `marketing` queue is server-owned rather than browser-authored.
+
 Messaging also owns dependency-aware MessageChain execution, pending-message skipping, bounded bulk delivery, and provider submission pacing.
 
 ## Responsibility

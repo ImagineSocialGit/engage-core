@@ -14,12 +14,16 @@ class InboundEmailRoute extends Model
         'source',
         'context_key',
         'is_active',
+        'contact_extraction_enabled',
+        'contact_extraction_definition',
     ];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'contact_extraction_enabled' => 'boolean',
+            'contact_extraction_definition' => 'array',
         ];
     }
 

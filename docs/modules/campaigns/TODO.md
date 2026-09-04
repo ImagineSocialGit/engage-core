@@ -4,6 +4,7 @@ Work these in order. Keep Campaigns independent from FlowRoutes, Webinars, Forms
 
 ## 1. Finish direct MessageChain authoring
 
+- [x] Add first-class CRM Campaign creation through the shared Builder shell. New Campaigns start inactive/manual, create their first immutable Messaging template plus a direct published MessageChain version, and do not create new `campaign_steps` / `campaign_step_variants` projection rows.
 - [ ] Migrate Campaign Builder/preset authoring to direct Messaging MessageChain definitions, then remove the temporary `campaign_steps` / `campaign_step_variants` authoring projection.
 - [x] Keep Campaign message-copy editing inside Campaign Setup while publishing through Messaging's reusable immutable-template action.
 - [x] Add a payload-free schedule popup that can become the direct MessageChain schedule editor without changing the Campaign Setup navigation contract.
@@ -25,10 +26,11 @@ Work these in order. Keep Campaigns independent from FlowRoutes, Webinars, Forms
 
 ## 3. Campaign workspace and Builder
 
-- [ ] Extend the existing Campaign workspace/shared Builder shell into Copy and Create flows without creating separate wizards. The Edit flow is now actionable.
+- [x] Extend the existing Campaign workspace/shared Builder shell into Create flow without creating a separate wizard; the purpose-guided initializer creates the safe inactive draft and then hands off to the existing Builder.
+- [ ] Extend the same Builder shell into `Copy an existing campaign` flow without creating a separate wizard.
 - [x] Lead Edit with Campaign name, what starts it, message count/channels, a human-readable schedule preview, lifecycle state, and enrollment/message summaries.
 - [ ] Add `Copy an existing campaign` as the recommended new-Campaign path; copies must be independent and use Messaging copy-on-write/immutable MessageChain and MessageTemplate version semantics.
-- [ ] Add create-from-scratch mode using the same Builder stages, with guidance that it is best suited to short/simple campaigns.
+- [x] Add create-from-scratch mode using the same Builder stages. Creation seeds one real immediate MessageChain step so the draft is structurally valid, then Start/Schedule/Messages/Review remain the editing authority.
 - [x] Build the `What starts this campaign?` step from client/module-available shared Contact-filter criteria rather than hardcoded producer-module imports.
 - [x] Finish the human-readable schedule editor; allow add/remove/reorder/timing changes without exposing raw timing/config fields.
 - [x] Build guided message review/editing in a Campaign Setup modal while Messaging remains owner of reusable copy/template versions.

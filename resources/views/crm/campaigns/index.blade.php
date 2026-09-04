@@ -31,18 +31,30 @@
                     </p>
                 </div>
 
-                <div class="grid w-full min-w-0 gap-2 text-center sm:grid-cols-3 lg:w-auto lg:min-w-80">
-                    <div class="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3">
-                        <div class="text-xl font-bold text-emerald-950">{{ $statusCounts['active'] ?? 0 }}</div>
-                        <div class="mt-1 text-xs font-semibold text-emerald-800">Active</div>
+                <div class="w-full min-w-0 space-y-3 lg:w-auto">
+                    <div class="flex justify-stretch lg:justify-end">
+                        <a
+                            href="{{ route('crm.campaigns.create') }}"
+                            class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white transition hover:bg-slate-800 sm:w-auto"
+                            data-create-campaign-link
+                        >
+                            Create campaign
+                        </a>
                     </div>
-                    <div class="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                        <div class="text-xl font-bold text-slate-950">{{ $statusCounts['inactive'] ?? 0 }}</div>
-                        <div class="mt-1 text-xs font-semibold text-slate-600">Off</div>
-                    </div>
-                    <div class="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                        <div class="text-xl font-bold text-slate-950">{{ $statusCounts['archived'] ?? 0 }}</div>
-                        <div class="mt-1 text-xs font-semibold text-slate-600">Archived</div>
+
+                    <div class="grid w-full min-w-0 gap-2 text-center sm:grid-cols-3 lg:min-w-80">
+                        <div class="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3">
+                            <div class="text-xl font-bold text-emerald-950">{{ $statusCounts['active'] ?? 0 }}</div>
+                            <div class="mt-1 text-xs font-semibold text-emerald-800">Active</div>
+                        </div>
+                        <div class="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                            <div class="text-xl font-bold text-slate-950">{{ $statusCounts['inactive'] ?? 0 }}</div>
+                            <div class="mt-1 text-xs font-semibold text-slate-600">Off</div>
+                        </div>
+                        <div class="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                            <div class="text-xl font-bold text-slate-950">{{ $statusCounts['archived'] ?? 0 }}</div>
+                            <div class="mt-1 text-xs font-semibold text-slate-600">Archived</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -128,7 +140,7 @@
             @empty
                 <div class="p-6 text-center sm:p-10">
                     <h3 class="break-words text-lg font-semibold text-slate-950">No campaigns are available yet.</h3>
-                    <p class="mt-2 break-words text-sm text-slate-600">Campaigns created from presets or future CRM authoring will appear here.</p>
+                    <p class="mt-2 break-words text-sm text-slate-600">Create a campaign here or sync a preset-owned campaign to get started.</p>
                 </div>
             @endforelse
         </section>
