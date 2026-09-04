@@ -36,6 +36,32 @@ return [
         'text/plain',
     ],
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Progressive Image Derivatives
+    |--------------------------------------------------------------------------
+    |
+    | Original Media objects remain authoritative. Supported still images also
+    | receive deterministic WebP children for fast browser presentation. These
+    | files are derived/regenerable state and never participate in SHA-256 or
+    | perceptual duplicate identity. Animated GIFs remain original-only.
+    |
+    */
+
+    'image_variants' => [
+        'enabled' => true,
+        'medium_width' => 500,
+        'default_max_width' => 1920,
+        'webp_quality' => 82,
+        'max_source_pixels' => 40000000,
+        'supported_mime_types' => [
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+        ],
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Advisory Image Similarity

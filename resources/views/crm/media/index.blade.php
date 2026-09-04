@@ -127,7 +127,11 @@
                     <article class="space-y-4" data-media-asset-id="{{ $asset->getKey() }}" data-media-kind="{{ $asset->kind }}">
                         <div class="overflow-hidden rounded-xl bg-slate-100">
                             @if($asset->publicUrl() && $asset->kind === \App\Modules\Media\Models\MediaAsset::KIND_IMAGE)
-                                <img src="{{ $asset->publicUrl() }}" alt="{{ $asset->title }}" class="aspect-video w-full object-cover">
+                                <x-media.progressive-image
+                                    :asset="$asset"
+                                    :alt="$asset->title"
+                                    class="aspect-video w-full object-cover"
+                                />
                             @elseif($asset->publicUrl() && $asset->kind === \App\Modules\Media\Models\MediaAsset::KIND_VIDEO)
                                 <video controls preload="metadata" class="aspect-video w-full bg-black object-contain">
                                     <source src="{{ $asset->publicUrl() }}" type="{{ $asset->mime_type }}">

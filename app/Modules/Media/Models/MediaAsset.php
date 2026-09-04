@@ -77,14 +77,80 @@ class MediaAsset extends Model
         return $query->whereNotNull('archived_at');
     }
 
+    public function hasProgressiveImageVariants(): bool
+    {
+        if ($this->kind !== self::KIND_IMAGE) {
+            return false;
+        }
+
+        $variants = data_get($this->meta, 'image_variants');
+
+        if (! is_array($variants)
+            || (int) ($variants['version'] ?? 0) !== 1
+        ) {
+            return false;
+        }
+
+        foreach (['medium', 'default'] as $variant) {
+            $path = data_get($variants, "files.{$variant}.path");
+
+            if (! is_string($path) || trim($path) === '') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public function imageVariantPath(string $variant): ?string
+    {
+        if (! $this->hasProgressiveImageVariants()
+            || ! in_array($variant, ['medium', 'default'], true)
+        ) {
+            return null;
+        }
+
+        $path = data_get($this->meta, "image_variants.files.{$variant}.path");
+
+        return is_string($path) && trim($path) !== ''
+            ? trim($path)
+            : null;
+    }
+
+    public function imageVariantUrl(string $variant): ?string
+    {
+        $path = $this->imageVariantPath($variant);
+
+        return $path !== null ? $this->urlForPath($path) : null;
+    }
+
+    public function imagePreviewUrl(): ?string
+    {
+        return $this->imageVariantUrl('medium') ?? $this->publicUrl();
+    }
+
+    public function imageDisplayUrl(): ?string
+    {
+        return $this->imageVariantUrl('default') ?? $this->publicUrl();
+    }
+
     public function publicUrl(): ?string
     {
-        if ($this->disk === null || $this->path === null) {
+        if ($this->path === null) {
+            return null;
+        }
+
+        return $this->urlForPath((string) $this->path);
+    }
+
+    private function urlForPath(string $path): ?string
+    {
+        if ($this->disk === null || trim($path) === '') {
             return null;
         }
 
         try {
-            $url = Storage::disk($this->disk)->url($this->path);
+            $url = Storage::disk($this->disk)->url($path);
         } catch (Throwable) {
             return null;
         }

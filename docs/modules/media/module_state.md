@@ -74,13 +74,53 @@ The backfill reads the existing storage object and writes only fingerprint/dimen
 
 Video, audio, PDF, and other non-image perceptual matching are intentionally out of scope for this version.
 
+
+## Progressive image derivatives
+
+Supported still-image uploads retain the exact original Media object and also receive two deterministic WebP children in the same UUID directory:
+
+```text
+media/{uuid}/{uuid}.{original-extension}
+media/{uuid}/medium.webp
+media/{uuid}/default.webp
+```
+
+The original remains authoritative for SHA-256 identity, perceptual fingerprinting, downloads, Messaging snapshots, and future regeneration. Derivatives never replace `media_assets.path` and do not participate in duplicate identity.
+
+Version 1 deliberately mirrors the useful runtime behavior proven by Engage Artist Sites while adapting it to Core Media ownership:
+
+- `medium.webp` is capped at 500px wide;
+- `default.webp` is capped at 1920px wide;
+- neither derivative upscales an image smaller than its target;
+- both use WebP quality 82 by default;
+- PNG transparency is preserved through the GD resample/encode path;
+- animated GIFs remain original-only so Media does not silently flatten animation; and
+- source images above the configured pixel-safety ceiling remain original-only rather than risking excessive worker memory.
+
+Derivative generation is queued on the existing executable default queue after the original object and Media row have succeeded. Variant failure is intentionally non-fatal to the upload: the original remains a valid Media asset and can be repaired later.
+
+The generated file paths and dimensions are recorded under `media_assets.meta.image_variants` as regenerable presentation metadata. No schema migration is required. The deterministic child objects may be rebuilt without changing UUID, checksum, original path, archive state, or immutable Messaging snapshots.
+
+The shared `<x-media.progressive-image>` browser component uses the medium WebP as the blurred first paint and fades in the display WebP. If current derivative metadata is absent, it falls back to the original public URL.
+
+Existing image assets can be processed with:
+
+```bash
+php artisan media:image-variants:backfill
+```
+
+Use `--force` to rewrite the current derivative version when repairing missing objects or changing committed derivative policy.
+
+This browser-presentation layer is separate from the curated client/site image preprocessing pipeline under `client/{client-key}/resources/images`. The dev/site pipeline remains unchanged.
+
 ## Current committed behavior
 
 The narrow shared CRM Media workspace can:
 
 - upload supported image, video, audio, PDF/archive/text assets;
 - store them through Laravel Filesystem;
-- preview images, video, and audio when a public URL is available;
+- progressively preview supported still images when derivatives are ready, with original-image fallback;
+- preview video and audio when a public URL is available;
 - expose the public asset URL;
 - archive and restore assets without deleting the object;
 - reuse exact-content duplicates instead of creating another Media row or storage object;
@@ -111,7 +151,7 @@ CDN_BASE_URL
 
 Endpoint and CDN values must be root HTTP/HTTPS origins. The CDN origin is required because Media assets are intended for durable public consumption by outbound communications and other product surfaces.
 
-Perceptual image suggestions additionally benefit from the PHP GD extension. Missing GD is a setup warning rather than a deployment-blocking Media storage error because exact-content identity remains fully available without it.
+Perceptual image suggestions additionally benefit from the PHP GD extension. Progressive still-image derivatives require GD with WebP encoding support. Missing image-processing support is a setup warning rather than a deployment-blocking Media storage error because exact-content identity and original Media objects remain fully available without it.
 
 ## Product surface
 

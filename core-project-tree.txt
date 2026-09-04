@@ -752,19 +752,34 @@
 │   │   ├── Media
 │   │   │   ├── Actions
 │   │   │   │   └── StoreMediaAssetAction.php
+│   │   │   ├── Console
+│   │   │   │   └── Commands
+│   │   │   │       ├── BackfillMediaImageFingerprintsCommand.php
+│   │   │   │       └── BackfillMediaImageVariantsCommand.php
 │   │   │   ├── Controllers
 │   │   │   │   └── CRM
-│   │   │   │       └── MediaAssetController.php
+│   │   │   │       ├── MediaAssetController.php
+│   │   │   │       └── MediaUploadSimilarityController.php
+│   │   │   ├── Data
+│   │   │   │   └── ImagePerceptualFingerprint.php
 │   │   │   ├── Deployment
 │   │   │   │   └── MediaStorageDeploymentPlanContributor.php
+│   │   │   ├── Jobs
+│   │   │   │   └── GenerateMediaImageVariantsJob.php
 │   │   │   ├── Models
 │   │   │   │   └── MediaAsset.php
 │   │   │   ├── Providers
 │   │   │   │   └── MediaModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   │   └── StoreMediaAssetRequest.php
-│   │   │   └── Services
-│   │   │       └── MediaUploadPolicy.php
+│   │   │   ├── Services
+│   │   │   │   ├── ImagePerceptualHasher.php
+│   │   │   │   ├── MediaFileIdentity.php
+│   │   │   │   ├── MediaImageSimilarityInspector.php
+│   │   │   │   ├── MediaImageVariantGenerator.php
+│   │   │   │   └── MediaUploadPolicy.php
+│   │   │   └── Validation
+│   │   │       └── MediaSetupValidationContributor.php
 │   │   ├── Messaging
 │   │   │   ├── Actions
 │   │   │   │   ├── AssignMessageTemplatePresetAction.php
@@ -2115,7 +2130,8 @@
 │   │   │   │   └── 2026_04_15_195859_create_location_area_assignments_table.php
 │   │   │   ├── media
 │   │   │   │   ├── 2026_09_03_010000_create_media_assets_table.php
-│   │   │   │   └── 2026_09_04_010100_enforce_unique_media_asset_checksums.php
+│   │   │   │   ├── 2026_09_04_010100_enforce_unique_media_asset_checksums.php
+│   │   │   │   └── 2026_09_04_010200_add_image_similarity_fingerprints.php
 │   │   │   ├── messaging
 │   │   │   │   ├── 2026_05_15_215534_create_message_consents_table.php
 │   │   │   │   ├── 2026_05_15_215834_create_consent_revocations_table.php
@@ -2377,6 +2393,7 @@
 │   │   ├── app.js
 │   │   ├── pages
 │   │   │   ├── flow-route-editor.js
+│   │   │   ├── media-library.js
 │   │   │   ├── scheduling-public-booking.js
 │   │   │   └── webinar-registration.js
 │   │   └── reporting
@@ -2406,6 +2423,8 @@
 │       │   │   ├── messaging-public.blade.php
 │       │   │   ├── public.blade.php
 │       │   │   └── public-surface.blade.php
+│       │   ├── media
+│       │   │   └── progressive-image.blade.php
 │       │   ├── messaging
 │       │   │   ├── available-fields.blade.php
 │       │   │   ├── message-chain-carousel.blade.php
@@ -2889,6 +2908,8 @@
 │   │   ├── Media
 │   │   │   ├── MediaDeploymentPlanContributorTest.php
 │   │   │   ├── MediaFoundationTest.php
+│   │   │   ├── MediaImageSimilarityTest.php
+│   │   │   ├── MediaImageVariantsTest.php
 │   │   │   └── MediaWorkspaceTest.php
 │   │   ├── Messaging
 │   │   │   ├── AuditEmailHygieneCommandTest.php
@@ -3125,6 +3146,7 @@
 │   │   │   └── TravelAwareAvailabilityTest.php
 │   │   ├── SetupValidation
 │   │   │   ├── ConfigContractsSetupValidationContributorTest.php
+│   │   │   ├── MediaSetupValidationContributorTest.php
 │   │   │   ├── MessageConfigValidatorTest.php
 │   │   │   ├── MessagingSetupValidationContributorTest.php
 │   │   │   ├── ModuleDependenciesSetupValidationContributorTest.php
@@ -3135,6 +3157,8 @@
 │   │   │   ├── SetupValidationManagerTest.php
 │   │   │   ├── SetupValidationRegistrationTest.php
 │   │   │   └── ValidateSetupCommandTest.php
+│   │   ├── Storage
+│   │   │   └── ClientScopedSpacesFilesystemTest.php
 │   │   ├── Support
 │   │   │   └── AutomationEvents
 │   │   │       └── AutomationEventOutboxTest.php
@@ -3250,4 +3274,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-773 directories, 2478 files
+780 directories, 2495 files

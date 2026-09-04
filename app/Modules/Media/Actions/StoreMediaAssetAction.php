@@ -3,10 +3,12 @@
 namespace App\Modules\Media\Actions;
 
 use App\Modules\Media\Data\ImagePerceptualFingerprint;
+use App\Modules\Media\Jobs\GenerateMediaImageVariantsJob;
 use App\Modules\Media\Models\MediaAsset;
 use App\Modules\Media\Services\ImagePerceptualHasher;
 use App\Modules\Media\Services\MediaFileIdentity;
 use App\Modules\Media\Services\MediaUploadPolicy;
+use App\Support\Queues\QueueContract;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
@@ -21,6 +23,7 @@ final class StoreMediaAssetAction
         private readonly MediaUploadPolicy $uploadPolicy,
         private readonly MediaFileIdentity $fileIdentity,
         private readonly ImagePerceptualHasher $perceptualHasher,
+        private readonly QueueContract $queueContract,
     ) {}
 
     public function handle(
@@ -64,7 +67,7 @@ final class StoreMediaAssetAction
         }
 
         try {
-            return MediaAsset::query()->create([
+            $asset = MediaAsset::query()->create([
                 'uuid' => $uuid,
                 'uploaded_by_type' => $uploadedBy?->getMorphClass(),
                 'uploaded_by_id' => $uploadedBy?->getKey(),
@@ -82,6 +85,10 @@ final class StoreMediaAssetAction
                 'source' => 'crm',
                 'meta' => null,
             ]);
+
+            $this->queueImageVariants($asset);
+
+            return $asset;
         } catch (QueryException $exception) {
             Storage::disk($disk)->delete($storedPath);
 
@@ -125,7 +132,30 @@ final class StoreMediaAssetAction
             $asset->forceFill(['archived_at' => null])->save();
         }
 
+        $this->queueImageVariants($asset);
+
         return $asset;
+    }
+
+    private function queueImageVariants(MediaAsset $asset): void
+    {
+        if ($asset->kind !== MediaAsset::KIND_IMAGE
+            || ! (bool) config('media.image_variants.enabled', true)
+            || $asset->hasProgressiveImageVariants()
+        ) {
+            return;
+        }
+
+        try {
+            $queue = $this->queueContract->assertDispatchable(null);
+            $job = (new GenerateMediaImageVariantsJob(
+                (int) $asset->getKey(),
+            ))->onQueue($queue);
+
+            dispatch($job);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     private function isChecksumUniquenessViolation(QueryException $exception): bool

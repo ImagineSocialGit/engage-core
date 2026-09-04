@@ -3,6 +3,7 @@
 namespace App\Modules\Media\Providers;
 
 use App\Modules\Media\Console\Commands\BackfillMediaImageFingerprintsCommand;
+use App\Modules\Media\Console\Commands\BackfillMediaImageVariantsCommand;
 use App\Modules\Media\Deployment\MediaStorageDeploymentPlanContributor;
 use App\Modules\Media\Validation\MediaSetupValidationContributor;
 use Illuminate\Support\ServiceProvider;
@@ -27,6 +28,7 @@ final class MediaModuleServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 BackfillMediaImageFingerprintsCommand::class,
+                BackfillMediaImageVariantsCommand::class,
             ]);
         }
     }
