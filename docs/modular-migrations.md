@@ -814,6 +814,13 @@ preserve a pre-rollout migration consolidation assertion
 manufacture a historical partial state tied to one specific migration filename
 ```
 
+Media is also pre-rollout and now follows the same clean-install consolidation
+policy. Its original create migration directly owns exact checksum uniqueness
+and image-similarity fingerprint columns/indexes. The former
+`2026_09_04_010100_enforce_unique_media_asset_checksums.php` and
+`2026_09_04_010200_add_image_similarity_fingerprints.php` follow-up migrations
+are intentionally removed. Media remains schema version 3.
+
 Those checks may be useful while a migration reorganization is being developed
 or rolled out, but they should be removed after the transition is established
 unless the scenario represents a durable supported operator contract.

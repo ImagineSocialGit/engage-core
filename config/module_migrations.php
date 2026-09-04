@@ -174,8 +174,6 @@ return [
             'schema_version' => 3,
             'migrations' => [
                 '2026_09_03_010000_create_media_assets_table.php',
-                '2026_09_04_010100_enforce_unique_media_asset_checksums.php',
-                '2026_09_04_010200_add_image_similarity_fingerprints.php',
             ],
         ],
 

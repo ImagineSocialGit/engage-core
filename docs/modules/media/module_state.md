@@ -16,6 +16,8 @@ Storage access goes through Laravel Filesystem. DigitalOcean Spaces is the curre
 
 ## Schema
 
+Media is still pre-rollout. Its final current schema is therefore consolidated into the single authoritative clean-install migration `2026_09_03_010000_create_media_assets_table.php`. Exact checksum uniqueness and image-similarity fingerprint columns/indexes are created directly by that migration. Media remains schema version 3; schema version is the module schema generation, not the number of migration files.
+
 `media_assets` owns stable reusable asset identity and storage metadata:
 
 - UUID identity suitable for future cross-module references
