@@ -1,5 +1,23 @@
 # Webinars TODO
 
+- [x] Split the Webinar CRM into three task-oriented surfaces: Webinar Types,
+  Webinar Type Detail, and Specific Session Detail. Keep recurring setup/public
+  links on the type, and attendance/participation/registration detail on the
+  individual session.
+- [x] Make intentionally removed sessions inspectable and recoverable instead of
+  disappearing from normal operator wayfinding.
+- [ ] Extend the specific-session provider data contract for Zoom Q&A, polls,
+  and/or survey reporting if those provider facts are needed. Keep this separate
+  from registration questions and define durable DTO/persistence/redaction
+  semantics before exposing it in CRM.
+- [x] Add Webinar Type lifecycle controls to Type Detail. Empty types may be
+  permanently deleted; types with session, waitlist, or removed-provider history
+  are archived through the existing `inactive` series status and remain
+  restorable.
+- [x] Keep archived Webinar Types out of normal active browsing and Zoom sync,
+  while preserving registrations, attendance, waitlist history, removed-session
+  evidence, and already-scheduled communication.
+
 ## Message/readiness follow-up
 
 - [x] UX Phase / 23B1 Webinar workspace hierarchy: make the actual Webinar Workspace the primary CRM surface, keep upcoming sessions in a compact side panel with message/event quick actions, and move series refresh, setup, and testing controls behind task-oriented management.

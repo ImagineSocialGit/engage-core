@@ -124,6 +124,8 @@ class RemoveWebinarOccurrenceAction
                 'meta' => [
                     'source_webinar_id' => $webinar->getKey(),
                     'source_title' => $webinar->title,
+                    'source_starts_at' => $webinar->starts_at?->toIso8601String(),
+                    'source_timezone' => $webinar->timezone,
                 ],
             ],
         );

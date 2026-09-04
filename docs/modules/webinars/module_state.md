@@ -899,6 +899,74 @@ scope = webinar
 
 Marketing nurture remains Campaign-owned and starts through Campaign/FlowRoutes integration rather than being mislabeled as a transactional Webinar chain.
 
+### Webinar CRM information architecture
+
+The primary Webinar CRM is split by business object rather than exposing one
+large operational workspace.
+
+`crm.webinar-series.index` is the Webinar Types directory. A WebinarSeries is the
+recurring class/event definition and the directory is responsible for creating,
+syncing, and choosing that type.
+
+`crm.webinar-series.show` is Webinar Type Detail. It owns the series-based public
+registration URL and Reporting-supported paid-ad setup, the upcoming/past
+session directory, provider-missing attention, the effective message plan, and
+the operator-facing list of intentionally removed sessions.
+
+`crm.webinars.show` is Specific Session Detail. It owns one Webinar occurrence's
+registration/attendance totals, paginated participant records, canonical
+attendance evidence already persisted from the provider (duration/join/leave),
+registration-question responses, post-event navigation, and occurrence-only
+operations.
+
+Occurrence-removal persistence is unchanged: dependency-free synced occurrences
+are deleted after a `webinar_occurrence_suppressions` tombstone is recorded;
+history-bearing occurrences remain hidden with `hidden_at` / `hidden_reason`.
+Both states are now surfaced in Webinar Type Detail. Hidden occurrences may be
+made visible again, and suppression tombstones may be removed so a later normal
+provider sync can import that provider occurrence again.
+
+New suppression snapshots also retain the source title/start timestamp/timezone
+for operator explanation. This remains bounded normalized metadata, not raw
+provider payload.
+
+Zoom Q&A/poll/survey reports are not currently part of the durable Webinar
+provider reporting contract and must not be represented as though they are.
+Specific Session Detail currently shows the provider attendance facts that are
+actually retained plus Engage Core registration responses.
+
+### Webinar Type lifecycle
+
+A WebinarSeries uses its existing `status` field for operator lifecycle.
+`active` remains the only publicly registerable/syncable state. The CRM presents
+`inactive` as **Archived** rather than introducing a second archive column or
+state machine.
+
+Webinar Type Detail owns the Remove lifecycle decision. The server computes a
+`WebinarSeriesRemovalPlan`. A type is permanently deletable only when it has no
+Webinar/session rows, no WebinarWaitlistSignup rows, and no
+WebinarOccurrenceSuppression rows. Permanent deletion delegates to the existing
+`DeleteWebinarSeriesAction`, which already safely releases series-owned
+MessageChain bindings and deletes Messaging-owned chains/templates only when no
+other binding or runtime reference remains.
+
+If any session, waitlist, or removed-provider evidence exists, Remove archives
+the series by setting `status = inactive`. Archive blocks new public
+registrations and normal CRM provider sync, but it does not delete/cancel
+sessions, registrations, attendance, registration responses, waitlist history,
+removed-occurrence evidence, or already-scheduled communication. Those records
+continue to use their own dedicated lifecycle actions.
+
+The active Webinar Type directory shows only `status = active`. Archived Webinar
+Types are available at `/webinars?archived_types=1`, remain inspectable through
+the same Type Detail surface, and may be restored by setting `status = active`.
+The existing `archived=1` Webinar-occurrence query contract is intentionally not
+reused.
+
+Provider-missing schedule attention excludes archived Webinar Types because an
+archived type is no longer expected to mirror the live provider schedule.
+Registration recovery/post-event history remains preserved.
+
 ## Webinar workspace and message review UX
 
 The normal CRM surface is workspace-first. The top-level Webinar Workspace owns the primary operator hierarchy: current attention/recovery work is the main panel, while upcoming sessions are a compact side panel. Series creation, Zoom refresh, message-plan selection, and testing controls are secondary management tasks and stay below the normal operating surface.

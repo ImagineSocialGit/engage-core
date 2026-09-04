@@ -16,7 +16,7 @@ class WebinarCrmWorkspaceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_workspace_exposes_pending_follow_up_reviews_and_upcoming_webinar_state(): void
+    public function test_directory_keeps_summary_attention_without_mixing_session_detail_into_the_surface(): void
     {
         Config::set('webinars.post_event.review.required', true);
 
@@ -55,7 +55,7 @@ class WebinarCrmWorkspaceTest extends TestCase
 
         $upcoming = Webinar::factory()->create([
             'webinar_series_id' => $series->id,
-            'title' => 'Homebuyer Game Plan - August',
+            'title' => 'Homebuyer Game Plan - Next',
             'starts_at' => now()->addDays(3),
             'ends_at' => now()->addDays(3)->addHour(),
         ]);
@@ -68,13 +68,10 @@ class WebinarCrmWorkspaceTest extends TestCase
             ->assertOk()
             ->assertViewIs('crm.webinars.index')
             ->assertViewHas('pendingPostEventReviews', function (Collection $reviews) use ($completed): bool {
-                if ($reviews->count() !== 1) {
-                    return false;
-                }
-
                 $review = $reviews->first();
 
-                return $review instanceof Webinar
+                return $reviews->count() === 1
+                    && $review instanceof Webinar
                     && $review->is($completed)
                     && (int) $review->attended_registrations_count === 2
                     && (int) $review->missed_registrations_count === 1;
@@ -87,15 +84,13 @@ class WebinarCrmWorkspaceTest extends TestCase
                 return $webinar instanceof Webinar
                     && (int) $webinar->registrations_count === 1;
             })
-            ->assertViewHas('registrationAttentionCount', 0)
             ->assertViewHas('attentionCount', 1)
-            ->assertSee('data-webinar-workspace-shell', false)
-            ->assertSee('data-webinar-workspace-main', false)
-            ->assertSee('data-webinar-workspace-attention', false)
-            ->assertSee('data-upcoming-webinars-side-panel', false);
+            ->assertViewHas('series', fn (Collection $types): bool =>
+                $types->contains(fn (WebinarSeries $type): bool => $type->is($series))
+            );
     }
 
-    public function test_workspace_exposes_registration_recovery_as_attention_state(): void
+    public function test_directory_still_exposes_registration_recovery_as_attention_state(): void
     {
         $user = User::factory()->create();
         $webinar = Webinar::factory()->create([
@@ -115,7 +110,6 @@ class WebinarCrmWorkspaceTest extends TestCase
         $this->actingAs($user)
             ->get(route('crm.webinar-series.index', ['attention' => 1]))
             ->assertOk()
-            ->assertViewIs('crm.webinars.index')
             ->assertViewHas('showAttention', true)
             ->assertViewHas('registrationAttentionCount', 1)
             ->assertViewHas('attentionCount', 1)
@@ -124,7 +118,7 @@ class WebinarCrmWorkspaceTest extends TestCase
             ));
     }
 
-    public function test_workspace_surfaces_provider_missing_occurrence_and_removes_it_from_upcoming(): void
+    public function test_provider_missing_session_moves_to_its_webinar_type_detail(): void
     {
         $user = User::factory()->create();
         $series = WebinarSeries::factory()->create();
@@ -146,36 +140,43 @@ class WebinarCrmWorkspaceTest extends TestCase
             ->assertViewHas('upcomingWebinars', fn (Collection $webinars): bool => ! $webinars->contains(
                 fn (Webinar $candidate): bool => $candidate->is($missing),
             ))
-            ->assertViewHas('providerMissingCount', 1)
-            ->assertViewHas('attentionCount', 1)
-            ->assertSee('data-provider-missing-occurrence="'.$missing->getKey().'"', false);
+            ->assertViewHas('providerMissingCount', 1);
 
         $this->actingAs($user)
-            ->get(route('crm.webinar-series.index', ['attention' => 1]))
+            ->get(route('crm.webinar-series.show', $series))
             ->assertOk()
-            ->assertViewHas('webinars', fn (Collection $webinars): bool => $webinars->contains(
-                fn (Webinar $candidate): bool => $candidate->is($missing),
-            ));
+            ->assertViewIs('crm.webinars.series-show')
+            ->assertViewHas('providerMissingOccurrences', fn (Collection $sessions): bool =>
+                $sessions->contains(fn (Webinar $candidate): bool => $candidate->is($missing))
+            );
     }
 
-    public function test_workspace_exposes_remove_control_for_missing_occurrence_and_separates_series_setup_concerns(): void
+    public function test_session_detail_is_the_owner_of_specific_registration_and_recovery_context(): void
     {
         $user = User::factory()->create();
         $series = WebinarSeries::factory()->create();
-        $missing = Webinar::factory()->create([
-            'webinar_series_id' => $series->getKey(),
-            'provider_lifecycle_status' => WebinarProviderLifecycleStatus::Missing->value,
-            'provider_missing_at' => now(),
+        $webinar = Webinar::factory()->for($series, 'webinarSeries')->create();
+        $registration = WebinarRegistration::factory()->create([
+            'webinar_id' => $webinar->getKey(),
+            'meta' => [
+                'registration_finalization' => [
+                    'status' => 'reconciliation_required',
+                ],
+            ],
         ]);
 
-        $response = $this->actingAs($user)
-            ->get(route('crm.webinar-series.index', ['attention' => 1]));
-
-        $response
+        $this->actingAs($user)
+            ->get(route('crm.webinars.show', $webinar))
             ->assertOk()
-            ->assertSee('data-webinar-remove-control="'.$missing->getKey().'"', false)
-            ->assertSee('data-series-zoom-setup="'.$series->getKey().'"', false)
-            ->assertSee('data-series-message-plan="'.$series->getKey().'"', false)
-            ->assertSee('data-series-message-content="'.$series->getKey().'"', false);
+            ->assertViewIs('crm.webinars.show')
+            ->assertViewHas('registrations', function ($registrations) use ($registration): bool {
+                $loaded = $registrations->getCollection()->first();
+
+                return $loaded instanceof WebinarRegistration
+                    && $loaded->is($registration);
+            })
+            ->assertViewHas('registrationCounts', fn (array $counts): bool =>
+                $counts['total'] === 1
+            );
     }
 }

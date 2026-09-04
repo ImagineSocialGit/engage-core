@@ -3,15 +3,18 @@
 namespace App\Modules\Webinars\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Webinars\Actions\DeleteWebinarSeriesAction;
 use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
 use App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction;
 use App\Modules\Webinars\Actions\RemoveWebinarOccurrenceAction;
+use App\Modules\Webinars\Actions\RemoveWebinarSeriesAction;
+use App\Modules\Webinars\Actions\RestoreRemovedWebinarOccurrenceAction;
+use App\Modules\Webinars\Actions\RestoreWebinarSeriesAction;
 use App\Modules\Webinars\Actions\ReplaceWebinarOccurrenceAction;
 use App\Modules\Webinars\Actions\SyncWebinarSeriesFromProviderAction;
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
 use App\Modules\Webinars\Enums\WebinarProviderLifecycleStatus;
 use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Models\WebinarOccurrenceSuppression;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarSeries;
@@ -46,15 +49,42 @@ class WebinarController extends Controller
         PaidAdTrackingLinkGenerator $paidAdTrackingLinkGenerator,
     ): View {
 
+        $showArchivedTypes = $request->boolean('archived_types');
+
         $series = WebinarSeries::query()
+            ->where('status', $showArchivedTypes ? 'inactive' : 'active')
             ->with([
                 'webinarScheduleProfile',
                 'messageChainBindings' => fn ($query) => $query
                     ->active()
                     ->with('messageChain.currentVersion'),
+                'webinars' => fn ($query) => $query
+                    ->withCount('registrations')
+                    ->whereNull('hidden_at')
+                    ->where('provider_lifecycle_status', WebinarProviderLifecycleStatus::Active->value)
+                    ->where('ends_at', '>', now())
+                    ->orderBy('starts_at')
+                    ->orderBy('id'),
+            ])
+            ->withCount([
+                'webinars as upcoming_sessions_count' => fn ($query) => $query
+                    ->whereNull('hidden_at')
+                    ->where('provider_lifecycle_status', WebinarProviderLifecycleStatus::Active->value)
+                    ->where('ends_at', '>', now()),
+                'webinars as past_sessions_count' => fn ($query) => $query
+                    ->whereNull('hidden_at')
+                    ->whereNotNull('ends_at')
+                    ->where('ends_at', '<=', now()),
+                'webinars as removed_sessions_count' => fn ($query) => $query
+                    ->whereNotNull('hidden_at'),
+                'occurrenceSuppressions as suppressed_sessions_count',
             ])
             ->orderBy('title')
             ->get();
+
+        $archivedTypeCount = WebinarSeries::query()
+            ->where('status', 'inactive')
+            ->count();
 
         $scheduleProfiles = WebinarScheduleProfile::query()
             ->active()
@@ -69,6 +99,7 @@ class WebinarController extends Controller
             ])
             ->withCount('registrations')
             ->where('ends_at', '>', now())
+            ->whereHas('webinarSeries', fn ($query) => $query->where('status', 'active'))
             ->providerActive()
             ->visible()
             ->matchingCurrentSeriesProvider()
@@ -162,6 +193,7 @@ class WebinarController extends Controller
         $providerMissingOccurrences = Webinar::query()
             ->with('webinarSeries')
             ->withCount('registrations')
+            ->whereHas('webinarSeries', fn ($query) => $query->where('status', 'active'))
             ->providerMissing()
             ->visible()
             ->orderByRaw('starts_at IS NULL')
@@ -197,6 +229,7 @@ class WebinarController extends Controller
                 $query
                     ->where(function ($missingQuery): void {
                         $missingQuery
+                            ->whereHas('webinarSeries', fn ($seriesQuery) => $seriesQuery->where('status', 'active'))
                             ->where(
                                 'provider_lifecycle_status',
                                 WebinarProviderLifecycleStatus::Missing->value,
@@ -232,6 +265,40 @@ class WebinarController extends Controller
             )
             ->limit(50)
             ->get();
+
+        $archivedRecoveryRows = $showArchived
+            ? $webinars
+                ->map(function (Webinar $webinar): array {
+                    $providerCancellationFailures = $webinar->registrations
+                        ->filter(
+                            fn (WebinarRegistration $registration): bool =>
+                                data_get(
+                                    $registration->meta,
+                                    'provider_cancellation.status',
+                                ) === 'failed',
+                        )
+                        ->values();
+
+                    $followUpFailures = $webinar->registrations
+                        ->filter(
+                            fn (WebinarRegistration $registration): bool =>
+                                data_get(
+                                    $registration->meta,
+                                    'post_event_follow_up.status',
+                                ) === 'failed',
+                        )
+                        ->values();
+
+                    return [
+                        'webinar' => $webinar,
+                        'provider_cancellation_failures' => $providerCancellationFailures,
+                        'provider_cancellation_failure_count' => $providerCancellationFailures->count(),
+                        'follow_up_failures' => $followUpFailures,
+                        'follow_up_failure_count' => $followUpFailures->count(),
+                    ];
+                })
+                ->values()
+            : collect();
 
         $webinarLinkOptions = $upcomingWebinars
             ->concat($webinars)
@@ -269,6 +336,8 @@ class WebinarController extends Controller
             'heading' => 'Webinars',
             'webinars' => $webinars,
             'series' => $series,
+            'showArchivedTypes' => $showArchivedTypes,
+            'archivedTypeCount' => $archivedTypeCount,
             'scheduleProfiles' => $scheduleProfiles,
             'upcomingWebinars' => $upcomingWebinars,
             'upcomingMessageReviews' => $upcomingMessageReviews,
@@ -282,6 +351,7 @@ class WebinarController extends Controller
                 + $registrationAttentionCount
                 + $providerMissingOccurrences->count(),
             'showArchived' => $showArchived,
+            'archivedRecoveryRows' => $archivedRecoveryRows,
             'showAttention' => $showAttention,
             'providerEventTypeOptions' => $this->providerEventTypeOptions(),
             'replacementCandidatesBySourceId' => $this->replacementCandidatesBySourceId(
@@ -292,6 +362,255 @@ class WebinarController extends Controller
             'webinarLinkOptions' => $webinarLinkOptions,
             'paidAdTrackingPlatforms' => $paidAdTrackingPlatforms,
         ]);
+    }
+
+
+    public function showSeries(
+        WebinarSeries $series,
+        WebinarMessageChainPresentationService $messageChainPresentation,
+        WebinarScheduleProfileResolver $scheduleProfileResolver,
+        PaidAdTrackingLinkGenerator $paidAdTrackingLinkGenerator,
+        RemoveWebinarSeriesAction $removeWebinarSeries,
+    ): View {
+        $series->load([
+            'webinarScheduleProfile',
+            'messageChainBindings' => fn ($query) => $query
+                ->active()
+                ->with('messageChain.currentVersion'),
+            'occurrenceSuppressions' => fn ($query) => $query
+                ->latest('suppressed_at')
+                ->latest('id'),
+        ]);
+
+        $occurrences = $series->webinars()
+            ->withCount('registrations')
+            ->with([
+                'webinarScheduleProfile',
+                'replacementOf',
+                'replacement',
+            ])
+            ->orderBy('starts_at')
+            ->orderBy('id')
+            ->get();
+
+        $currentEventType = $series->providerEventTypeKey();
+
+        $currentTypeOccurrences = $occurrences
+            ->filter(fn (Webinar $webinar): bool =>
+                $webinar->providerEventTypeKey() === $currentEventType
+            );
+
+        $upcoming = $currentTypeOccurrences
+            ->filter(fn (Webinar $webinar): bool =>
+                ! $webinar->isHidden()
+                && $webinar->isProviderActive()
+                && $webinar->ends_at?->isFuture()
+            )
+            ->values();
+
+        $history = $occurrences
+            ->filter(fn (Webinar $webinar): bool =>
+                ! $webinar->isHidden()
+                && ($webinar->ends_at?->isPast() ?? false)
+            )
+            ->sortByDesc(fn (Webinar $webinar): string =>
+                $webinar->ends_at?->format('Y-m-d H:i:s') ?? ''
+            )
+            ->values();
+
+        $providerMissing = (string) $series->status === 'active'
+            ? $occurrences
+                ->filter(fn (Webinar $webinar): bool =>
+                    ! $webinar->isHidden()
+                    && $webinar->provider_lifecycle_status
+                        === WebinarProviderLifecycleStatus::Missing->value
+                )
+                ->values()
+            : collect();
+
+        $removed = $occurrences
+            ->filter(fn (Webinar $webinar): bool => $webinar->isHidden())
+            ->sortByDesc(fn (Webinar $webinar): string =>
+                $webinar->hidden_at?->format('Y-m-d H:i:s') ?? ''
+            )
+            ->values();
+
+        $messageReview = function_exists('module_enabled')
+            && module_enabled('messaging')
+                ? $messageChainPresentation->forSeries($series)
+                : [
+                    'message_count' => 0,
+                    'channels' => [],
+                    'chains' => [],
+                    'has_series_owned_messages' => false,
+                ];
+
+        $messageProfile = $scheduleProfileResolver->resolveForSeries($series);
+
+        $paidAdTrackingPlatforms = function_exists('module_enabled')
+            && module_enabled('reporting')
+                ? $paidAdTrackingLinkGenerator->platforms()
+                : [];
+
+        return view('crm.webinars.series-show', [
+            'title' => $series->title,
+            'heading' => $series->title,
+            'series' => $series,
+            'upcomingWebinars' => $upcoming,
+            'historyWebinars' => $history,
+            'providerMissingOccurrences' => $providerMissing,
+            'removedWebinars' => $removed,
+            'suppressedOccurrences' => $series->occurrenceSuppressions,
+            'messageReview' => $messageReview,
+            'messageProfile' => $messageProfile,
+            'registrationUrl' => route('webinar.show', [
+                'seriesSlug' => $series->slug,
+            ]),
+            'paidAdTrackingPlatforms' => $paidAdTrackingPlatforms,
+            'providerEventTypeLabel' => $this->providerEventTypeLabel(
+                $series->providerEventTypeKey(),
+            ),
+            'seriesRemovalPlan' => $removeWebinarSeries->plan($series),
+        ]);
+    }
+
+    public function showWebinar(
+        Webinar $webinar,
+        WebinarMessageChainPresentationService $messageChainPresentation,
+        WebinarScheduleProfileResolver $scheduleProfileResolver,
+    ): View {
+        $webinar->load([
+            'webinarSeries.webinarScheduleProfile',
+            'webinarScheduleProfile',
+            'replacementOf',
+            'replacement',
+        ]);
+
+        $registrations = $webinar->registrations()
+            ->with([
+                'contact',
+                'responses',
+            ])
+            ->latest('registered_at')
+            ->latest('id')
+            ->paginate(50);
+
+        $registrationCounts = [
+            'total' => $webinar->registrations()->count(),
+            'attended' => $webinar->registrations()
+                ->where(function ($query): void {
+                    $query
+                        ->where('status', 'attended')
+                        ->orWhereNotNull('attended_at');
+                })
+                ->count(),
+            'missed' => $webinar->registrations()
+                ->where('status', 'missed')
+                ->count(),
+            'cancelled' => $webinar->registrations()
+                ->whereNotNull('cancelled_at')
+                ->count(),
+        ];
+
+        $messageReview = function_exists('module_enabled')
+            && module_enabled('messaging')
+                ? $messageChainPresentation->forWebinar($webinar)
+                : [
+                    'message_count' => 0,
+                    'channels' => [],
+                    'chains' => [],
+                    'has_series_owned_messages' => false,
+                ];
+
+        $effectiveProfile = $scheduleProfileResolver->resolveForWebinar($webinar);
+        $inheritedProfile = $scheduleProfileResolver->resolveForSeries(
+            $webinar->webinarSeries,
+        );
+        $profileSource = 'default';
+
+        if (
+            $effectiveProfile !== null
+            && $webinar->webinarScheduleProfile?->is($effectiveProfile)
+        ) {
+            $profileSource = 'occurrence';
+        } elseif (
+            $effectiveProfile !== null
+            && $webinar->webinarSeries?->webinarScheduleProfile?->is(
+                $effectiveProfile,
+            )
+        ) {
+            $profileSource = 'series';
+        }
+
+        $replacementCandidates = collect();
+
+        if ($webinar->webinar_series_id !== null) {
+            $allOccurrences = Webinar::query()
+                ->where('webinar_series_id', $webinar->webinar_series_id)
+                ->with([
+                    'webinarSeries',
+                    'replacementOf',
+                    'replacement',
+                ])
+                ->orderBy('starts_at')
+                ->orderBy('id')
+                ->get();
+
+            $replacementCandidates = $this->replacementCandidatesBySourceId(
+                $allOccurrences,
+            )[(int) $webinar->getKey()] ?? collect();
+        }
+
+        return view('crm.webinars.show', [
+            'title' => $webinar->title,
+            'heading' => $webinar->title,
+            'webinar' => $webinar,
+            'series' => $webinar->webinarSeries,
+            'registrations' => $registrations,
+            'registrationCounts' => $registrationCounts,
+            'messageReview' => $messageReview,
+            'messageProfile' => [
+                'effective_profile_id' => $effectiveProfile?->getKey(),
+                'effective_profile_name' => $effectiveProfile?->name,
+                'inherited_profile_id' => $inheritedProfile?->getKey(),
+                'inherited_profile_name' => $inheritedProfile?->name,
+                'source' => $profileSource,
+            ],
+            'scheduleProfiles' => WebinarScheduleProfile::query()
+                ->active()
+                ->orderByDesc('is_default')
+                ->orderBy('name')
+                ->get(),
+            'replacementCandidates' => $replacementCandidates,
+            'webinarDevEnabled' => $this->devTestingAllowed(),
+        ]);
+    }
+
+    public function restoreOccurrence(
+        Webinar $webinar,
+        RestoreRemovedWebinarOccurrenceAction $restoreRemovedWebinarOccurrence,
+    ): RedirectResponse {
+        $series = $restoreRemovedWebinarOccurrence->restoreHidden($webinar);
+
+        return redirect()
+            ->route('crm.webinar-series.show', $series)
+            ->with('success', 'The session is visible again.');
+    }
+
+    public function restoreSuppressedOccurrence(
+        WebinarOccurrenceSuppression $suppression,
+        RestoreRemovedWebinarOccurrenceAction $restoreRemovedWebinarOccurrence,
+    ): RedirectResponse {
+        $series = $restoreRemovedWebinarOccurrence->restoreSuppression(
+            $suppression,
+        );
+
+        return redirect()
+            ->route('crm.webinar-series.show', $series)
+            ->with(
+                'success',
+                'The session can be imported again the next time this webinar type is synced from Zoom.',
+            );
     }
 
     public function storeSeries(StoreWebinarSeriesRequest $request): RedirectResponse
@@ -310,6 +629,13 @@ class WebinarController extends Controller
         SyncWebinarSeriesFromProviderAction $syncWebinarSeriesFromProviderAction,
     ): RedirectResponse {
         $series = WebinarSeries::query()->findOrFail($request->validated('webinar_series_id'));
+
+        if ((string) $series->status !== 'active') {
+            return redirect()
+                ->route('crm.webinar-series.show', $series)
+                ->with('error', 'Restore this webinar type before syncing it from Zoom.');
+        }
+
         $eventTypeLabel = $this->providerEventTypeLabel($series->providerEventTypeKey());
 
         try {
@@ -487,19 +813,39 @@ class WebinarController extends Controller
 
     public function destroySeries(
         WebinarSeries $series,
-        DeleteWebinarSeriesAction $deleteMessageChains,
+        RemoveWebinarSeriesAction $removeWebinarSeries,
     ): RedirectResponse {
-        if (Webinar::query()->where('webinar_series_id', $series->id)->exists()) {
+        $result = $removeWebinarSeries->handle($series);
+
+        if ($result === RemoveWebinarSeriesAction::RESULT_DELETED) {
             return redirect()
                 ->route('crm.webinar-series.index')
-                ->with('error', 'Cannot delete a series that has webinar events.');
+                ->with('success', 'Unused webinar type deleted.');
         }
 
-        $deleteMessageChains->handle($series);
+        return redirect()
+            ->route('crm.webinar-series.index', ['archived_types' => 1])
+            ->with(
+                'success',
+                'Webinar type archived. Existing registrations, session history, and scheduled communication were preserved.',
+            );
+    }
+
+    public function restoreSeries(
+        WebinarSeries $series,
+        RestoreWebinarSeriesAction $restoreWebinarSeries,
+    ): RedirectResponse {
+        try {
+            $restored = $restoreWebinarSeries->handle($series);
+        } catch (LogicException $exception) {
+            return redirect()
+                ->route('crm.webinar-series.show', $series)
+                ->with('error', $exception->getMessage());
+        }
 
         return redirect()
-            ->route('crm.webinar-series.index')
-            ->with('success', 'Webinar series deleted.');
+            ->route('crm.webinar-series.show', $restored)
+            ->with('success', 'Webinar type restored and available for new registrations again.');
     }
 
     /**

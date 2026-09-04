@@ -68,9 +68,10 @@ class WebinarLinkModalTest extends TestCase
         );
     }
 
-    public function test_workspace_limits_upcoming_panel_to_two_and_exposes_get_links_for_each_webinar(): void
+    public function test_get_links_live_on_the_webinar_type_detail_instead_of_individual_session_cards(): void
     {
         Config::set('modules.enabled', [
+            'core',
             'messaging',
             'webinars',
             'reporting',
@@ -82,58 +83,27 @@ class WebinarLinkModalTest extends TestCase
             'slug' => 'homebuyer-class',
         ]);
 
-        $first = $this->futureWebinar($series, 'September Class', 1);
-        $second = $this->futureWebinar($series, 'October Class', 2);
-        $third = $this->futureWebinar($series, 'November Class', 3);
+        $this->futureWebinar($series, 'September Class', 1);
+        $this->futureWebinar($series, 'October Class', 2);
+        $this->futureWebinar($series, 'November Class', 3);
 
-        $response = $this->actingAs($user)
-            ->get(route('crm.webinar-series.index'));
-
-        $response
+        $this->actingAs($user)
+            ->get(route('crm.webinar-series.show', $series))
             ->assertOk()
-            ->assertViewIs('crm.webinars.index')
-            ->assertViewHas('upcomingWebinars', function (Collection $webinars) use ($first, $second, $third): bool {
-                return $webinars->count() === 2
-                    && $webinars->contains(fn (Webinar $webinar): bool => $webinar->is($first))
-                    && $webinars->contains(fn (Webinar $webinar): bool => $webinar->is($second))
-                    && ! $webinars->contains(fn (Webinar $webinar): bool => $webinar->is($third));
-            })
-            ->assertViewHas('webinarLinkOptions', function (Collection $options) use ($first, $second, $third): bool {
-                foreach ([$first, $second, $third] as $webinar) {
-                    $option = $options->get((string) $webinar->getKey());
-
-                    if (! is_array($option)
-                        || $option['webinar_id'] !== (int) $webinar->getKey()
-                        || $option['destination_url'] !== route('webinar.show', ['seriesSlug' => 'homebuyer-class'])
-                    ) {
-                        return false;
-                    }
-                }
-
-                return true;
-            })
-            ->assertViewHas('paidAdTrackingPlatforms', fn (array $platforms): bool => array_keys($platforms) === [
-                'meta',
-                'tiktok',
-                'youtube',
-            ])
-            ->assertSee('data-webinar-links-modal', false)
-            ->assertSee('data-webinar-get-links="'.$first->getKey().'"', false)
-            ->assertSee('x-on:click="openLinksModal('.$first->getKey().')"', false)
-            ->assertSee('data-webinar-ad-reporting-links', false);
-
-        $this->assertGreaterThanOrEqual(
-            2,
-            substr_count(
-                $response->getContent(),
-                'data-webinar-get-links="'.$first->getKey().'"',
-            ),
-        );
+            ->assertViewIs('crm.webinars.series-show')
+            ->assertViewHas(
+                'registrationUrl',
+                route('webinar.show', ['seriesSlug' => 'homebuyer-class']),
+            )
+            ->assertViewHas('paidAdTrackingPlatforms', fn (array $platforms): bool =>
+                array_keys($platforms) === ['meta', 'tiktok', 'youtube']
+            );
     }
 
-    public function test_get_links_remains_available_when_reporting_is_disabled(): void
+    public function test_registration_link_remains_available_when_reporting_is_disabled(): void
     {
         Config::set('modules.enabled', [
+            'core',
             'messaging',
             'webinars',
         ]);
@@ -143,18 +113,16 @@ class WebinarLinkModalTest extends TestCase
             'title' => 'Homebuyer Class',
             'slug' => 'homebuyer-class',
         ]);
-        $webinar = $this->futureWebinar($series, 'September Class', 1);
+        $this->futureWebinar($series, 'September Class', 1);
 
         $this->actingAs($user)
-            ->get(route('crm.webinar-series.index'))
+            ->get(route('crm.webinar-series.show', $series))
             ->assertOk()
-            ->assertViewHas('webinarLinkOptions', fn (Collection $options): bool => $options->has(
-                (string) $webinar->getKey(),
-            ))
-            ->assertViewHas('paidAdTrackingPlatforms', [])
-            ->assertSee('data-webinar-links-modal', false)
-            ->assertSee('data-webinar-get-links="'.$webinar->getKey().'"', false)
-            ->assertDontSee('data-webinar-ad-reporting-section', false);
+            ->assertViewHas(
+                'registrationUrl',
+                route('webinar.show', ['seriesSlug' => 'homebuyer-class']),
+            )
+            ->assertViewHas('paidAdTrackingPlatforms', []);
     }
 
     private function futureWebinar(

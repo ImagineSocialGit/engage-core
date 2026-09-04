@@ -14,11 +14,18 @@ Route::middleware('module:webinars')->group(function () {
     Route::get('/webinars', [WebinarController::class, 'index'])
         ->name('crm.webinar-series.index');
 
+    Route::get('/webinar-series/{series}', [WebinarController::class, 'showSeries'])
+        ->name('crm.webinar-series.show');
+
     Route::get('/webinars/{webinar}/post-event-review', [WebinarPostEventReviewController::class, 'show'])
         ->name('crm.webinars.post-event-review.show');
 
     Route::patch('/webinars/{webinar}/post-event-review', [WebinarPostEventReviewController::class, 'update'])
         ->name('crm.webinars.post-event-review.update');
+
+    Route::get('/webinars/{webinar}', [WebinarController::class, 'showWebinar'])
+        ->whereNumber('webinar')
+        ->name('crm.webinars.show');
 
     Route::middleware('module:messaging')
         ->prefix('webinars/message-templates')
@@ -81,8 +88,17 @@ Route::middleware('module:webinars')->group(function () {
     Route::delete('/webinars/{webinar}', [WebinarController::class, 'removeOccurrence'])
         ->name('crm.webinars.destroy');
 
+    Route::patch('/webinars/{webinar}/restore', [WebinarController::class, 'restoreOccurrence'])
+        ->name('crm.webinars.restore');
+
+    Route::patch('/webinar-occurrence-suppressions/{suppression}/restore', [WebinarController::class, 'restoreSuppressedOccurrence'])
+        ->name('crm.webinar-occurrence-suppressions.restore');
+
     Route::delete('/webinar-series/{series}', [WebinarController::class, 'destroySeries'])
         ->name('crm.webinar-series.destroy');
+
+    Route::patch('/webinar-series/{series}/restore', [WebinarController::class, 'restoreSeries'])
+        ->name('crm.webinar-series.restore');
 
     Route::get('/webinar-registrations/{registration}/dev/message-options', [WebinarDevController::class, 'messageOptions'])
         ->name('crm.webinar-registrations.dev.message-options.index');

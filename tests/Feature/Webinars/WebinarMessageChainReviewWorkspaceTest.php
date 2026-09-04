@@ -32,7 +32,7 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
         );
     }
 
-    public function test_workspace_shell_keeps_upcoming_message_review_available(): void
+    public function test_specific_session_surface_keeps_message_review_available(): void
     {
         [$profile] = $this->profileAndChain();
         $series = WebinarSeries::factory()->create([
@@ -46,18 +46,13 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
             'ends_at' => now()->addDays(2)->addHour(),
         ]);
 
-        $response = $this->actingAs(User::factory()->create())
-            ->get(route('crm.webinar-series.index'));
-
-        $response
+        $this->actingAs(User::factory()->create())
+            ->get(route('crm.webinars.show', $webinar))
             ->assertOk()
-            ->assertViewIs('crm.webinars.index')
-            ->assertViewHas('upcomingMessageReviews', function ($reviews) use ($webinar): bool {
-                $presentation = $reviews->get((int) $webinar->getKey());
-
+            ->assertViewIs('crm.webinars.show')
+            ->assertViewHas('messageReview', function (array $presentation) use ($webinar): bool {
                 if (
-                    ! is_array($presentation)
-                    || $presentation['message_count'] !== 3
+                    $presentation['message_count'] !== 3
                     || array_keys($presentation['channels']) !== ['email', 'sms']
                     || count($presentation['channels']['email']['messages']) !== 2
                     || count($presentation['channels']['sms']['messages']) !== 1
@@ -90,52 +85,16 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
                         '{first_name}',
                     );
             })
-            ->assertViewHas('upcomingMessagePurposeReviews', function ($reviews) use ($webinar): bool {
-                $purposeReviews = $reviews->get((int) $webinar->getKey());
-
-                return is_array($purposeReviews)
-                    && array_keys($purposeReviews) === ['transactional']
-                    && (int) ($purposeReviews['transactional']['message_count'] ?? 0) === 3;
-            })
-            ->assertViewHas('upcomingMessageProfiles', function ($profiles) use ($webinar, $profile): bool {
-                $profileData = $profiles->get((int) $webinar->getKey());
-
-                return is_array($profileData)
-                    && (int) ($profileData['effective_profile_id'] ?? 0) === (int) $profile->getKey()
-                    && (int) ($profileData['inherited_profile_id'] ?? 0) === (int) $profile->getKey()
+            ->assertViewHas('messageProfile', function (array $profileData) use ($profile): bool {
+                return (int) ($profileData['effective_profile_id'] ?? 0)
+                        === (int) $profile->getKey()
+                    && (int) ($profileData['inherited_profile_id'] ?? 0)
+                        === (int) $profile->getKey()
                     && ($profileData['source'] ?? null) === 'series';
-            })
-            ->assertSee('data-webinar-workspace-shell', false)
-            ->assertSee('data-webinar-workspace-main', false)
-            ->assertSee('data-upcoming-webinars', false)
-            ->assertSee('data-upcoming-webinars-side-panel', false)
-            ->assertSee('data-webinar-message-review-button', false)
-            ->assertSee(
-                'data-webinar-message-review-modal="'.$webinar->getKey().'"',
-                false,
-            )
-            ->assertSee('data-message-editor-carousel', false)
-            ->assertSee('data-message-editor-channel="email"', false)
-            ->assertSee('data-message-editor-channel="sms"', false)
-            ->assertSee('data-message-editor-published-preview', false)
-            ->assertSee('data-message-editor-form', false)
-            ->assertSee('data-webinar-message-profile-form', false)
-            ->assertSee('data-webinar-message-profile-select', false)
-            ->assertSee('data-webinar-message-purpose-panel="transactional"', false);
-
-        $html = $response->getContent();
-        $workspacePosition = strpos($html, 'data-webinar-workspace-shell');
-        $workspaceMainPosition = strpos($html, 'data-webinar-workspace-main');
-        $upcomingPosition = strpos($html, 'data-upcoming-webinars-side-panel');
-
-        $this->assertNotFalse($workspacePosition);
-        $this->assertNotFalse($workspaceMainPosition);
-        $this->assertNotFalse($upcomingPosition);
-        $this->assertLessThan($workspaceMainPosition, $workspacePosition);
-        $this->assertLessThan($upcomingPosition, $workspaceMainPosition);
+            });
     }
 
-    public function test_occurrence_profile_controls_the_effective_message_review(): void
+    public function test_occurrence_profile_controls_the_specific_session_message_review(): void
     {
         [$seriesProfile] = $this->profileAndChain(
             profileKey: 'series_review_fixture',
@@ -160,10 +119,9 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
         ]);
 
         $this->actingAs(User::factory()->create())
-            ->get(route('crm.webinar-series.index'))
+            ->get(route('crm.webinars.show', $webinar))
             ->assertOk()
-            ->assertViewHas('upcomingMessageReviews', function ($reviews) use ($webinar): bool {
-                $presentation = $reviews->get((int) $webinar->getKey());
+            ->assertViewHas('messageReview', function (array $presentation) use ($webinar): bool {
                 $message = $presentation['channels']['email']['messages'][0] ?? [];
                 $previewSubject = (string) data_get($message, 'payload.subject', '');
                 $editSubject = (string) data_get($message, 'edit_payload.subject', '');
@@ -174,16 +132,14 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
                     && str_starts_with($editSubject, 'Occurrence ')
                     && str_contains($editSubject, '{webinar_title}');
             })
-            ->assertViewHas('upcomingMessageProfiles', function ($profiles) use (
-                $webinar,
+            ->assertViewHas('messageProfile', function (array $profileData) use (
                 $seriesProfile,
                 $occurrenceProfile,
             ): bool {
-                $profileData = $profiles->get((int) $webinar->getKey());
-
-                return is_array($profileData)
-                    && (int) ($profileData['effective_profile_id'] ?? 0) === (int) $occurrenceProfile->getKey()
-                    && (int) ($profileData['inherited_profile_id'] ?? 0) === (int) $seriesProfile->getKey()
+                return (int) ($profileData['effective_profile_id'] ?? 0)
+                        === (int) $occurrenceProfile->getKey()
+                    && (int) ($profileData['inherited_profile_id'] ?? 0)
+                        === (int) $seriesProfile->getKey()
                     && ($profileData['source'] ?? null) === 'occurrence';
             });
     }

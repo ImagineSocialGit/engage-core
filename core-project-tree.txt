@@ -1395,6 +1395,7 @@
 │   │   │   │   ├── QueueWebinarProviderCancellationAction.php
 │   │   │   │   ├── QueueWebinarRegistrationFinalizationAction.php
 │   │   │   │   ├── RemoveWebinarOccurrenceAction.php
+│   │   │   │   ├── RemoveWebinarSeriesAction.php
 │   │   │   │   ├── ReplaceWebinarOccurrenceAction.php
 │   │   │   │   ├── ResolveRegisterableWebinarAction.php
 │   │   │   │   ├── ResolveWebinarJoinUrlAction.php
@@ -1403,6 +1404,8 @@
 │   │   │   │   ├── ResolveWebinarRegistrationReconciliationAction.php
 │   │   │   │   ├── ResolveWebinarRegistrationReplacementChainAction.php
 │   │   │   │   ├── ResolveWebinarSeriesEditableMessageVariantAction.php
+│   │   │   │   ├── RestoreRemovedWebinarOccurrenceAction.php
+│   │   │   │   ├── RestoreWebinarSeriesAction.php
 │   │   │   │   ├── RetryWebinarRegistrationFinalizationAction.php
 │   │   │   │   ├── StartWebinarMessageChainEnrollmentAction.php
 │   │   │   │   ├── StoreWebinarRegistrationResponsesAction.php
@@ -1461,7 +1464,8 @@
 │   │   │   │   ├── WebinarRegistrationImportResult.php
 │   │   │   │   ├── WebinarRegistrationImportRow.php
 │   │   │   │   ├── WebinarRegistrationReplacementChain.php
-│   │   │   │   └── WebinarRegistrationResult.php
+│   │   │   │   ├── WebinarRegistrationResult.php
+│   │   │   │   └── WebinarSeriesRemovalPlan.php
 │   │   │   ├── Deployment
 │   │   │   │   └── WebinarsDeploymentPlanContributor.php
 │   │   │   ├── Enums
@@ -2613,7 +2617,9 @@
 │       │       │   └── show.blade.php
 │       │       ├── message-templates
 │       │       │   └── index.blade.php
-│       │       └── post-event-review.blade.php
+│       │       ├── post-event-review.blade.php
+│       │       ├── series-show.blade.php
+│       │       └── show.blade.php
 │       ├── email.blade.php
 │       ├── email-media-card.blade.php
 │       ├── email-text.blade.php
@@ -3253,6 +3259,7 @@
 │   │   │   ├── WebinarCurrentProviderOccurrenceTest.php
 │   │   │   ├── WebinarDevControllerEnvironmentGuardTest.php
 │   │   │   ├── WebinarFunnelFactContributorTest.php
+│   │   │   ├── WebinarInformationArchitectureTest.php
 │   │   │   ├── WebinarJoinBrowserProofTest.php
 │   │   │   ├── WebinarLinkModalTest.php
 │   │   │   ├── WebinarMessageAreaRegistryTest.php
@@ -3295,6 +3302,7 @@
 │   │   │   ├── WebinarScheduleProfileMessageChainSyncTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
 │   │   │   ├── WebinarsDeploymentPlanContributorTest.php
+│   │   │   ├── WebinarSeriesLifecycleTest.php
 │   │   │   ├── WebinarSeriesMessageChainOwnershipTest.php
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
 │   │   │   ├── WebinarStateCanonicalizerTest.php
@@ -3316,4 +3324,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-787 directories, 2530 files
+787 directories, 2538 files
