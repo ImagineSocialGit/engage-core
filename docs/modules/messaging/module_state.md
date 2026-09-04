@@ -323,6 +323,17 @@ the published preview in the same frame with populated operator-facing fields. S
 runs through the composition-aware publish path above, so the simple editing surface does not
 materialize inherited fields back into source config.
 
+The atomic copy-field primitive is the shared UI component `<x-ui.message-editor>`. It owns
+only the common Email subject/body and SMS message field presentation while accepting
+owner-supplied field names, Alpine bindings, required/visibility expressions, values, limits,
+and validation errors. Keeping this field shell in shared UI avoids making optional producers
+such as Scheduling depend directly on the Messaging module. Messaging continues to own the
+higher-level carousel, template composition, publication, Media, token fallback, and delivery
+semantics. The canonical carousel, Broadcast authoring, Scheduling communication steps, and
+Flow Route inline reusable-message creation reuse the field primitive while keeping their
+existing request and domain contracts. Campaigns and Webinars inherit it through the canonical
+carousel.
+
 ## Message chains
 
 ### `message_chains`

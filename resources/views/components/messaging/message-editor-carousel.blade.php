@@ -1,3 +1,4 @@
+
 @props([
     'presentation' => [],
     'editable' => true,
@@ -743,25 +744,21 @@
                                     @endforeach
 
                                     @if($channelKey === 'email')
-                                        <div>
-                                            <label class="mb-1.5 block text-sm font-extrabold text-slate-800">Subject</label>
-                                            <input
-                                                name="payload[subject]"
-                                                value="{{ $failedThisMessage ? old('payload.subject', $editPayload['subject'] ?? '') : ($editPayload['subject'] ?? '') }}"
-                                                class="block w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-0"
-                                            >
-                                            @if($failedThisMessage) @error('payload.subject')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror @endif
-                                        </div>
-
-                                        <div>
-                                            <label class="mb-1.5 block text-sm font-extrabold text-slate-800">Body</label>
-                                            <textarea
-                                                name="payload[body]"
-                                                rows="12"
-                                                class="block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-0"
-                                            >{{ $failedThisMessage ? old('payload.body', $editPayload['body'] ?? '') : ($editPayload['body'] ?? '') }}</textarea>
-                                            @if($failedThisMessage) @error('payload.body')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror @endif
-                                        </div>
+                                        <x-ui.message-editor
+                                            :subject="[
+                                                'label' => 'Subject',
+                                                'name' => 'payload[subject]',
+                                                'value' => $failedThisMessage ? old('payload.subject', $editPayload['subject'] ?? '') : ($editPayload['subject'] ?? ''),
+                                                'error' => $failedThisMessage ? $errors->first('payload.subject') : null,
+                                            ]"
+                                            :body="[
+                                                'label' => 'Body',
+                                                'name' => 'payload[body]',
+                                                'rows' => 12,
+                                                'value' => $failedThisMessage ? old('payload.body', $editPayload['body'] ?? '') : ($editPayload['body'] ?? ''),
+                                                'error' => $failedThisMessage ? $errors->first('payload.body') : null,
+                                            ]"
+                                        />
 
                                         @if($mediaAvailable)
                                             <section data-message-media-authoring class="rounded-2xl border border-violet-200 bg-violet-50/70 p-4 sm:p-5">
@@ -896,15 +893,15 @@
                                             >{{ $failedThisMessage ? old('payload.footer', $editPayload['footer'] ?? '') : ($editPayload['footer'] ?? '') }}</textarea>
                                         </div>
                                     @elseif($channelKey === 'sms')
-                                        <div>
-                                            <label class="mb-1.5 block text-sm font-extrabold text-slate-800">Message</label>
-                                            <textarea
-                                                name="payload[message]"
-                                                rows="9"
-                                                class="block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-0"
-                                            >{{ $failedThisMessage ? old('payload.message', $editPayload['message'] ?? '') : ($editPayload['message'] ?? '') }}</textarea>
-                                            @if($failedThisMessage) @error('payload.message')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror @endif
-                                        </div>
+                                        <x-ui.message-editor
+                                            :sms="[
+                                                'label' => 'Message',
+                                                'name' => 'payload[message]',
+                                                'rows' => 9,
+                                                'value' => $failedThisMessage ? old('payload.message', $editPayload['message'] ?? '') : ($editPayload['message'] ?? ''),
+                                                'error' => $failedThisMessage ? $errors->first('payload.message') : null,
+                                            ]"
+                                        />
                                     @endif
 
                                     @if($tokenFallbacksEditable && ($dynamicFields !== [] || array_key_exists('token_fallbacks', $editPayload)))

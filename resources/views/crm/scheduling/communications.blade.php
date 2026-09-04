@@ -1,3 +1,4 @@
+
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
@@ -214,27 +215,27 @@
                                 </div>
                             </fieldset>
 
-                            <label class="{{ $labelClass }}" x-show="step.channels.includes('email')" x-cloak>
-                                Email subject
-                                <input
-                                    class="{{ $inputClass }}"
-                                    x-bind:name="`steps[${index}][subject]`"
-                                    x-model="step.subject"
-                                    maxlength="255"
-                                >
-                            </label>
-
-                            <label class="{{ $labelClass }}">
-                                Message
-                                <textarea
-                                    class="{{ $inputClass }}"
-                                    rows="7"
-                                    maxlength="5000"
-                                    x-bind:name="`steps[${index}][message]`"
-                                    x-model="step.message"
-                                    required
-                                ></textarea>
-                            </label>
+                            <x-ui.message-editor
+                                :subject="[
+                                    'label' => 'Email subject',
+                                    'name_bind' => '`steps[${index}][subject]`',
+                                    'model' => 'step.subject',
+                                    'maxlength' => 255,
+                                    'visible_bind' => 'step.channels.includes(\'email\')',
+                                    'label_class' => $labelClass,
+                                    'input_class' => $inputClass,
+                                ]"
+                                :body="[
+                                    'label' => 'Message',
+                                    'name_bind' => '`steps[${index}][message]`',
+                                    'model' => 'step.message',
+                                    'rows' => 7,
+                                    'maxlength' => 5000,
+                                    'required' => true,
+                                    'label_class' => $labelClass,
+                                    'input_class' => $inputClass,
+                                ]"
+                            />
                         </div>
                     </template>
 

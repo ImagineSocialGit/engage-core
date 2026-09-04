@@ -2455,9 +2455,10 @@
 │       │   │   │   ├── select.blade.php
 │       │   │   │   └── textarea.blade.php
 │       │   │   ├── image.blade.php
-│       │   │   └── layout
-│       │   │       ├── page-header.blade.php
-│       │   │       └── section.blade.php
+│       │   │   ├── layout
+│       │   │   │   ├── page-header.blade.php
+│       │   │   │   └── section.blade.php
+│       │   │   └── message-editor.blade.php
 │       │   └── webinars
 │       │       ├── countdown.blade.php
 │       │       ├── event-details.blade.php
@@ -3175,6 +3176,8 @@
 │   │   │   ├── TasksSetupValidationContributorTest.php
 │   │   │   ├── TaskTemplateWorkspaceTest.php
 │   │   │   └── TaskWorkspaceTest.php
+│   │   ├── Ui
+│   │   │   └── MessageEditorComponentTest.php
 │   │   ├── Users
 │   │   │   └── CrmUserCommandsTest.php
 │   │   ├── Webhooks
@@ -3274,4 +3277,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-780 directories, 2495 files
+781 directories, 2497 files

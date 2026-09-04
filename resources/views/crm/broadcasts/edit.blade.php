@@ -1,3 +1,4 @@
+
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
@@ -225,66 +226,48 @@
                     <x-ui.form.error name="name" />
                 </div>
 
-                <div x-show="{{ $emailFieldVisibility }}">
-                    <x-ui.form.label for="subject">
-                        Email Subject
-                    </x-ui.form.label>
+                <x-ui.message-editor
+                    :subject="[
+                        'label' => 'Email Subject',
+                        'id' => 'subject',
+                        'name' => 'subject',
+                        'value' => old('subject', $broadcast->messagePayload()['subject'] ?? ''),
+                        'model' => 'subject',
+                        'required_bind' => $emailFieldVisibility,
+                        'visible_bind' => $emailFieldVisibility,
+                        'error' => $errors->first('subject'),
+                    ]"
+                    :body="[
+                        'label' => 'Email Body',
+                        'id' => 'body',
+                        'name' => 'body',
+                        'rows' => 10,
+                        'value' => old('body', $broadcast->messagePayload()['body'] ?? ''),
+                        'model' => 'body',
+                        'required_bind' => $emailFieldVisibility,
+                        'visible_bind' => $emailFieldVisibility,
+                        'error' => $errors->first('body'),
+                    ]"
+                    :sms="$broadcast->isPermissionInvitation() ? null : [
+                        'label' => 'SMS Message',
+                        'id' => 'message',
+                        'name' => 'message',
+                        'rows' => 5,
+                        'value' => old('message', $broadcast->messagePayload()['message'] ?? ''),
+                        'model' => 'message',
+                        'required_bind' => 'channel === \'sms\'',
+                        'visible_bind' => 'channel === \'sms\'',
+                        'help' => 'Keep SMS copy short. Normal Messaging SMS consent, suppression, revocation, and send guards still apply.',
+                        'error' => $errors->first('message'),
+                    ]"
+                />
 
-                    <x-ui.form.input
-                        id="subject"
-                        name="subject"
-                        value="{{ old('subject', $broadcast->messagePayload()['subject'] ?? '') }}"
-                        x-model="subject"
-                        x-bind:required="{{ $emailFieldVisibility }}"
-                    />
-
-                    <x-ui.form.error name="subject" />
-                </div>
-
-                <div x-show="{{ $emailFieldVisibility }}">
-                    <x-ui.form.label for="body">
-                        Email Body
-                    </x-ui.form.label>
-
-                    <x-ui.form.textarea
-                        id="body"
-                        name="body"
-                        rows="10"
-                        x-model="body"
-                        x-bind:required="{{ $emailFieldVisibility }}"
-                    >{{ old('body', $broadcast->messagePayload()['body'] ?? '') }}</x-ui.form.textarea>
-
-                    @if($broadcast->isPermissionInvitation())
-                        <p class="mt-2 text-xs text-slate-600">
-                            Use <span class="font-mono">{cta}</span> on its own line to render the opt-in button. Messaging injects the public preference URL at send time.
-                        </p>
-                    @endif
-
-                    <x-ui.form.error name="body" />
-                </div>
-
-                @if(! $broadcast->isPermissionInvitation())
+                @if($broadcast->isPermissionInvitation())
+                    <p class="text-xs text-slate-600">
+                        Use <span class="font-mono">{cta}</span> on its own line to render the opt-in button. Messaging injects the public preference URL at send time.
+                    </p>
+                @else
                     @include('crm.broadcasts.partials.cta-editor')
-
-                    <div x-show="channel === 'sms'">
-                        <x-ui.form.label for="message">
-                            SMS Message
-                        </x-ui.form.label>
-
-                        <x-ui.form.textarea
-                            id="message"
-                            name="message"
-                            rows="5"
-                            x-model="message"
-                            x-bind:required="channel === 'sms'"
-                        >{{ old('message', $broadcast->messagePayload()['message'] ?? '') }}</x-ui.form.textarea>
-
-                        <p class="mt-2 text-xs text-slate-500">
-                            Keep SMS copy short. Normal Messaging SMS consent, suppression, revocation, and send guards still apply.
-                        </p>
-
-                        <x-ui.form.error name="message" />
-                    </div>
                 @endif
 
                 @if(! $broadcast->isPermissionInvitation())

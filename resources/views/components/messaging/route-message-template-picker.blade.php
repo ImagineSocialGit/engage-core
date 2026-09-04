@@ -1,3 +1,4 @@
+
 @props([
     'field' => [],
     'fieldSuffix' => '',
@@ -210,25 +211,33 @@
                         <input x-ref="templateName" x-model="templateName" type="text" maxlength="191" placeholder="Past Client Check-In" class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm">
                     </div>
 
-                    <template x-if="channel === 'email'">
-                        <div class="space-y-4">
-                            <div>
-                                <label class="text-sm font-semibold text-slate-900">Subject</label>
-                                <input x-model="subject" x-on:focus="lastField = 'subject'" data-template-authoring-field="subject" type="text" maxlength="255" class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm">
-                            </div>
-                            <div>
-                                <label class="text-sm font-semibold text-slate-900">Message</label>
-                                <textarea x-model="body" x-on:focus="lastField = 'body'" data-template-authoring-field="body" rows="7" class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm"></textarea>
-                            </div>
-                        </div>
-                    </template>
-
-                    <template x-if="channel === 'sms'">
-                        <div>
-                            <label class="text-sm font-semibold text-slate-900">Message</label>
-                            <textarea x-model="message" x-on:focus="lastField = 'message'" data-template-authoring-field="message" rows="6" maxlength="1600" class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm"></textarea>
-                        </div>
-                    </template>
+                    <x-ui.message-editor
+                        :subject="[
+                            'label' => 'Subject',
+                            'model' => 'subject',
+                            'maxlength' => 255,
+                            'visible_bind' => 'channel === \'email\'',
+                            'focus' => 'lastField = \'subject\'',
+                            'data_field' => 'subject',
+                        ]"
+                        :body="[
+                            'label' => 'Message',
+                            'model' => 'body',
+                            'rows' => 7,
+                            'visible_bind' => 'channel === \'email\'',
+                            'focus' => 'lastField = \'body\'',
+                            'data_field' => 'body',
+                        ]"
+                        :sms="[
+                            'label' => 'Message',
+                            'model' => 'message',
+                            'rows' => 6,
+                            'maxlength' => 1600,
+                            'visible_bind' => 'channel === \'sms\'',
+                            'focus' => 'lastField = \'message\'',
+                            'data_field' => 'message',
+                        ]"
+                    />
 
                     <x-messaging.available-fields :groups="$availableFields" />
 

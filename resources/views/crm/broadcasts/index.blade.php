@@ -1,3 +1,4 @@
+
 @php
     $clientTimezone = config('client.timezone', config('app.timezone', 'UTC'));
 @endphp
@@ -150,59 +151,43 @@
                         <x-ui.form.error name="name" />
                     </div>
 
-                    <div x-show="channel === 'email'">
-                        <x-ui.form.label for="subject">
-                            Email Subject
-                        </x-ui.form.label>
-
-                        <x-ui.form.input
-                            id="subject"
-                            name="subject"
-                            value="{{ old('subject') }}"
-                            x-model="subject"
-                            x-bind:required="channel === 'email'"
-                        />
-
-                        <x-ui.form.error name="subject" />
-                    </div>
-
-                    <div x-show="channel === 'email'">
-                        <x-ui.form.label for="body">
-                            Email Body
-                        </x-ui.form.label>
-
-                        <x-ui.form.textarea
-                            id="body"
-                            name="body"
-                            rows="8"
-                            x-model="body"
-                            x-bind:required="channel === 'email'"
-                        >{{ old('body') }}</x-ui.form.textarea>
-
-                        <x-ui.form.error name="body" />
-                    </div>
+                    <x-ui.message-editor
+                        :subject="[
+                            'label' => 'Email Subject',
+                            'id' => 'subject',
+                            'name' => 'subject',
+                            'value' => old('subject'),
+                            'model' => 'subject',
+                            'required_bind' => 'channel === \'email\'',
+                            'visible_bind' => 'channel === \'email\'',
+                            'error' => $errors->first('subject'),
+                        ]"
+                        :body="[
+                            'label' => 'Email Body',
+                            'id' => 'body',
+                            'name' => 'body',
+                            'rows' => 8,
+                            'value' => old('body'),
+                            'model' => 'body',
+                            'required_bind' => 'channel === \'email\'',
+                            'visible_bind' => 'channel === \'email\'',
+                            'error' => $errors->first('body'),
+                        ]"
+                        :sms="[
+                            'label' => 'SMS Message',
+                            'id' => 'message',
+                            'name' => 'message',
+                            'rows' => 5,
+                            'value' => old('message'),
+                            'model' => 'message',
+                            'required_bind' => 'channel === \'sms\'',
+                            'visible_bind' => 'channel === \'sms\'',
+                            'help' => 'Keep SMS copy short (ideally <160 characters). Normal Messaging SMS consent, suppression, revocation, and send guards still apply.',
+                            'error' => $errors->first('message'),
+                        ]"
+                    />
 
                     @include('crm.broadcasts.partials.cta-editor')
-
-                    <div x-show="channel === 'sms'">
-                        <x-ui.form.label for="message">
-                            SMS Message
-                        </x-ui.form.label>
-
-                        <x-ui.form.textarea
-                            id="message"
-                            name="message"
-                            rows="5"
-                            x-model="message"
-                            x-bind:required="channel === 'sms'"
-                        >{{ old('message') }}</x-ui.form.textarea>
-
-                        <p class="mt-2 text-xs text-slate-500">
-                            Keep SMS copy short (ideally &lt;160 characters). Normal Messaging SMS consent, suppression, revocation, and send guards still apply.
-                        </p>
-
-                        <x-ui.form.error name="message" />
-                    </div>
 
                     @include('crm.broadcasts.partials.message-personalization', [
                         'broadcastMessageFields' => $broadcastMessageFields,
@@ -413,39 +398,29 @@
                         <x-ui.form.error name="name" />
                     </div>
 
-                    <div>
-                        <x-ui.form.label for="permission_invitation_subject">
-                            Email Subject
-                        </x-ui.form.label>
+                    <x-ui.message-editor
+                        :subject="[
+                            'label' => 'Email Subject',
+                            'id' => 'permission_invitation_subject',
+                            'name' => 'subject',
+                            'value' => old('subject', 'Please confirm how you want to hear from us'),
+                            'required' => true,
+                            'error' => $errors->first('subject'),
+                        ]"
+                        :body="[
+                            'label' => 'Email Body',
+                            'id' => 'permission_invitation_body',
+                            'name' => 'body',
+                            'rows' => 8,
+                            'value' => old('body', 'Hi,'.PHP_EOL.PHP_EOL.'We recently moved to a new communication system. Please confirm how you want to hear from us going forward.'.PHP_EOL.PHP_EOL.'{cta}'.PHP_EOL.PHP_EOL.'The link above lets you choose email, SMS, or both when available.'),
+                            'required' => true,
+                            'error' => $errors->first('body'),
+                        ]"
+                    />
 
-                        <x-ui.form.input
-                            id="permission_invitation_subject"
-                            name="subject"
-                            value="{{ old('subject', 'Please confirm how you want to hear from us') }}"
-                            required
-                        />
-
-                        <x-ui.form.error name="subject" />
-                    </div>
-
-                    <div>
-                        <x-ui.form.label for="permission_invitation_body">
-                            Email Body
-                        </x-ui.form.label>
-
-                        <x-ui.form.textarea
-                            id="permission_invitation_body"
-                            name="body"
-                            rows="8"
-                            required
-                        >{{ old('body', "Hi,\n\nWe recently moved to a new communication system. Please confirm how you want to hear from us going forward.\n\n{cta}\n\nThe link above lets you choose email, SMS, or both when available.") }}</x-ui.form.textarea>
-
-                        <p class="mt-2 text-xs text-slate-600">
-                            Include <span class="font-mono">{cta}</span> on its own line where the button should render. The public preference URL is injected by Messaging at send time.
-                        </p>
-
-                        <x-ui.form.error name="body" />
-                    </div>
+                    <p class="text-xs text-slate-600">
+                        Include <span class="font-mono">{cta}</span> on its own line where the button should render. The public preference URL is injected by Messaging at send time.
+                    </p>
 
                     <div>
                         <x-ui.form.label for="permission_invitation_send_at">
