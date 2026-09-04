@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Media\Controllers\CRM\MediaAssetController;
+use App\Modules\Media\Controllers\CRM\MediaUploadSimilarityController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('module:media')
@@ -9,6 +10,9 @@ Route::middleware('module:media')
     ->group(function (): void {
         Route::get('/', [MediaAssetController::class, 'index'])
             ->name('index');
+
+        Route::post('/similarity/inspect', MediaUploadSimilarityController::class)
+            ->name('similarity.inspect');
 
         Route::post('/', [MediaAssetController::class, 'store'])
             ->name('store');

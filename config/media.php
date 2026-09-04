@@ -35,4 +35,23 @@ return [
         'application/zip',
         'text/plain',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Advisory Image Similarity
+    |--------------------------------------------------------------------------
+    |
+    | SHA-256 remains the only hard duplicate identity. This second layer uses
+    | a compact image fingerprint only to suggest existing assets before a new
+    | image is stored. Operators may always choose to upload a legitimate visual
+    | variant. Values are product policy, not deployment environment secrets.
+    |
+    */
+
+    'near_duplicate_images' => [
+        'enabled' => true,
+        'max_hamming_distance' => 8,
+        'aspect_ratio_tolerance' => 0.08,
+        'max_candidates' => 3,
+    ],
 ];

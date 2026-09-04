@@ -23,6 +23,7 @@ Storage access goes through Laravel Filesystem. DigitalOcean Spaces is the curre
 - title and media kind
 - filesystem disk and object path
 - original filename, MIME type, extension, size, and SHA-256 exact-content identity
+- nullable image perceptual hash, fingerprint algorithm version, width, and height
 - public visibility
 - source/meta
 - archive timestamp
@@ -30,6 +31,48 @@ Storage access goes through Laravel Filesystem. DigitalOcean Spaces is the curre
 Archiving never deletes the underlying object. This preserves old and queued references. Permanent purge semantics are intentionally deferred.
 
 Exact byte-identical uploads are idempotent regardless of filename. Media calculates SHA-256 before permanent object storage, reuses an existing asset with the same checksum, restores it when archived, and relies on a database uniqueness contract to close concurrent-upload races. A race loser removes its just-written object before returning the winning asset identity.
+
+Image perceptual fingerprints are advisory metadata only. They never replace SHA-256 identity, never make an image unique, and never prevent an operator from storing an intentional visual variant.
+
+## Image near-duplicate suggestions
+
+When `media.near_duplicate_images.enabled` is true, Media can inspect an image before permanent storage and suggest existing active images that look substantially similar.
+
+Version 1 uses a 64-bit difference hash (`dhash64_v1`):
+
+- the uploaded image is decoded through PHP GD;
+- it is normalized to a 9×8 grayscale sample;
+- adjacent pixels produce a 64-bit visual fingerprint stored as 16 hexadecimal characters;
+- candidate images must use the same fingerprint algorithm;
+- candidates outside the configured aspect-ratio tolerance are ignored;
+- Hamming distance ranks remaining candidates;
+- only the configured top candidate count is returned.
+
+The default policy is:
+
+```text
+max Hamming distance:     8 / 64
+aspect-ratio tolerance:   8%
+maximum suggestions:      3
+```
+
+The Media upload workspace performs this inspection before the ordinary upload request. A near match pauses the browser flow and offers `Use existing` or `Upload anyway`. Choosing `Upload anyway` proceeds through the normal `StoreMediaAssetAction`; similarity is never a hard server-side block.
+
+The inspection endpoint is Media-owned and reusable by consuming authoring surfaces. Consumers must not implement their own perceptual hashing or query Media fingerprint columns directly.
+
+Exact SHA-256 matches remain stronger than perceptual matches. The ordinary storage action still owns exact reuse and archived restoration, so an exact duplicate cannot create another durable object even if a browser bypasses or cannot run the advisory preflight.
+
+GD is optional for the Media module as a whole. If GD is unavailable, setup validation emits a warning and perceptual comparison is unavailable, while exact SHA-256 deduplication and ordinary Media storage continue to work.
+
+Existing image rows can be fingerprinted after the schema upgrade with:
+
+```bash
+php artisan media:image-fingerprints:backfill
+```
+
+The backfill reads the existing storage object and writes only fingerprint/dimension metadata. It does not rename objects, replace checksums, or change Media identity.
+
+Video, audio, PDF, and other non-image perceptual matching are intentionally out of scope for this version.
 
 ## Current committed behavior
 
@@ -40,7 +83,9 @@ The narrow shared CRM Media workspace can:
 - preview images, video, and audio when a public URL is available;
 - expose the public asset URL;
 - archive and restore assets without deleting the object;
-- reuse exact-content duplicates instead of creating another Media row or storage object.
+- reuse exact-content duplicates instead of creating another Media row or storage object;
+- fingerprint new images when GD is available; and
+- suggest visually similar active images before a new image is stored.
 
 The application upload ceiling defaults to 256 MB and is committed config in `config/media.php`.
 
@@ -66,11 +111,13 @@ CDN_BASE_URL
 
 Endpoint and CDN values must be root HTTP/HTTPS origins. The CDN origin is required because Media assets are intended for durable public consumption by outbound communications and other product surfaces.
 
+Perceptual image suggestions additionally benefit from the PHP GD extension. Missing GD is a setup warning rather than a deployment-blocking Media storage error because exact-content identity remains fully available without it.
+
 ## Product surface
 
 Media is a silent universal module with one narrow shared asset-management surface when explicitly enabled for the selected client.
 
-The `Media` workspace aggregates upload, preview, archive, restore, and public-URL management because those operations belong to the shared asset authority rather than to any one consuming module. It is linked from shared Settings and may also be opened contextually by consuming modules such as Messaging or a future Social Media module.
+The `Media` workspace aggregates upload, preview, archive, restore, exact dedupe, near-duplicate suggestion, and public-URL management because those operations belong to the shared asset authority rather than to any one consuming module. It is linked from shared Settings and may also be opened contextually by consuming modules such as Messaging or a future Social Media module.
 
 Media does not own the recipient/publishing workflow that consumes an asset, and it does not receive a primary workflow navigation item merely because it is enabled.
 
@@ -96,5 +143,7 @@ Messaging may:
 - render image, audio, document, and file cards through the same media payload;
 - include a plain-text fallback URL; and
 - reuse Messaging CTA engagement tracking under the stable `media_primary` tracking key.
+
+All uploads still pass through Media's storage action, so new image uploads accumulate Media-owned perceptual fingerprints automatically. The canonical Messaging authoring surface should invoke Media's reusable similarity preflight before storing an image; it must not duplicate the similarity algorithm inside Messaging.
 
 Archived assets disappear from new selection but are not deleted. Already-published message versions retain their resolved media snapshot and therefore do not depend on a live Media lookup at send time.

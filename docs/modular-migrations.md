@@ -632,7 +632,7 @@ Current relocation and path-selection contract tests prove:
 
 ## Current ownership contract
 
-The registry classifies every current migration file exactly once, including the Media foundation and exact-content identity migrations.
+The registry classifies every current migration file exactly once, including the Media foundation, exact-content identity, and image-similarity metadata migrations.
 
 Ownership totals:
 
@@ -648,7 +648,7 @@ scheduling                    11
 portal                         4
 forms                          4
 documents                      4
-media                          1
+media                          3
 commerce                       5
 location                       4
 events                         2

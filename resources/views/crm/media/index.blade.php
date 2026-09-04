@@ -12,53 +12,99 @@
         @endif
 
         <x-ui.card>
-            <form
-                method="POST"
-                action="{{ route('crm.media.store') }}"
-                enctype="multipart/form-data"
-                class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end"
-                data-media-upload-form
-            >
-                @csrf
-
-                <div>
-                    <label for="media-title" class="block text-sm font-semibold text-slate-800">Title</label>
-                    <input
-                        id="media-title"
-                        name="title"
-                        type="text"
-                        value="{{ old('title') }}"
-                        maxlength="255"
-                        placeholder="Optional — filename is used when blank"
-                        class="mt-1 block w-full rounded-xl border-slate-300 text-sm shadow-sm"
-                    >
-                    @error('title')
-                        <p class="mt-1 text-xs font-medium text-red-700">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
-                    <label for="media-file" class="block text-sm font-semibold text-slate-800">File</label>
-                    <input
-                        id="media-file"
-                        name="file"
-                        type="file"
-                        required
-                        class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
-                    >
-                    <p class="mt-1 text-xs text-slate-500">Maximum application upload: {{ $maxUploadMegabytes }} MB.</p>
-                    @error('file')
-                        <p class="mt-1 text-xs font-medium text-red-700">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <button
-                    type="submit"
-                    class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
+            <div class="space-y-4" data-media-upload-workspace>
+                <form
+                    method="POST"
+                    action="{{ route('crm.media.store') }}"
+                    enctype="multipart/form-data"
+                    class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end"
+                    data-media-upload-form
+                    data-media-similarity-preflight-url="{{ route('crm.media.similarity.inspect') }}"
                 >
-                    Upload media
-                </button>
-            </form>
+                    @csrf
+
+                    <div>
+                        <label for="media-title" class="block text-sm font-semibold text-slate-800">Title</label>
+                        <input
+                            id="media-title"
+                            name="title"
+                            type="text"
+                            value="{{ old('title') }}"
+                            maxlength="255"
+                            placeholder="Optional — filename is used when blank"
+                            class="mt-1 block w-full rounded-xl border-slate-300 text-sm shadow-sm"
+                        >
+                        @error('title')
+                            <p class="mt-1 text-xs font-medium text-red-700">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label for="media-file" class="block text-sm font-semibold text-slate-800">File</label>
+                        <input
+                            id="media-file"
+                            name="file"
+                            type="file"
+                            required
+                            class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                        >
+                        <p class="mt-1 text-xs text-slate-500">Maximum application upload: {{ $maxUploadMegabytes }} MB.</p>
+                        @error('file')
+                            <p class="mt-1 text-xs font-medium text-red-700">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <button
+                        type="submit"
+                        class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60"
+                        data-media-upload-submit
+                    >
+                        Upload media
+                    </button>
+                </form>
+
+                <p
+                    class="hidden rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800"
+                    data-media-upload-local-status
+                ></p>
+
+                <section
+                    class="hidden rounded-2xl border border-amber-300 bg-amber-50 p-4"
+                    data-media-similarity-review
+                >
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                            <h2 class="text-sm font-bold text-amber-950">Similar Media found</h2>
+                            <p class="mt-1 max-w-3xl text-sm leading-6 text-amber-900" data-media-similarity-message>
+                                This image looks very similar to existing Media.
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="text-sm font-semibold text-amber-950 underline"
+                            data-media-cancel-upload
+                        >
+                            Cancel upload
+                        </button>
+                    </div>
+
+                    <div class="mt-4 grid gap-3" data-media-similarity-candidates></div>
+
+                    <div class="mt-4 flex flex-wrap items-center gap-3 border-t border-amber-200 pt-4">
+                        <button
+                            type="button"
+                            class="inline-flex min-h-10 items-center justify-center rounded-xl border border-amber-400 bg-white px-4 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-100"
+                            data-media-upload-anyway
+                        >
+                            Upload anyway
+                        </button>
+                        <p class="text-xs leading-5 text-amber-800">
+                            Use this only when the image is intentionally different, such as a distinct crop or edited variant.
+                        </p>
+                    </div>
+                </section>
+            </div>
         </x-ui.card>
 
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -77,20 +123,19 @@
 
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             @forelse($assets as $asset)
-                @php($publicUrl = $asset->publicUrl())
                 <x-ui.card>
                     <article class="space-y-4" data-media-asset-id="{{ $asset->getKey() }}" data-media-kind="{{ $asset->kind }}">
                         <div class="overflow-hidden rounded-xl bg-slate-100">
-                            @if($publicUrl && $asset->kind === \App\Modules\Media\Models\MediaAsset::KIND_IMAGE)
-                                <img src="{{ $publicUrl }}" alt="{{ $asset->title }}" class="aspect-video w-full object-cover">
-                            @elseif($publicUrl && $asset->kind === \App\Modules\Media\Models\MediaAsset::KIND_VIDEO)
+                            @if($asset->publicUrl() && $asset->kind === \App\Modules\Media\Models\MediaAsset::KIND_IMAGE)
+                                <img src="{{ $asset->publicUrl() }}" alt="{{ $asset->title }}" class="aspect-video w-full object-cover">
+                            @elseif($asset->publicUrl() && $asset->kind === \App\Modules\Media\Models\MediaAsset::KIND_VIDEO)
                                 <video controls preload="metadata" class="aspect-video w-full bg-black object-contain">
-                                    <source src="{{ $publicUrl }}" type="{{ $asset->mime_type }}">
+                                    <source src="{{ $asset->publicUrl() }}" type="{{ $asset->mime_type }}">
                                 </video>
-                            @elseif($publicUrl && $asset->kind === \App\Modules\Media\Models\MediaAsset::KIND_AUDIO)
+                            @elseif($asset->publicUrl() && $asset->kind === \App\Modules\Media\Models\MediaAsset::KIND_AUDIO)
                                 <div class="p-4">
                                     <audio controls preload="metadata" class="w-full">
-                                        <source src="{{ $publicUrl }}" type="{{ $asset->mime_type }}">
+                                        <source src="{{ $asset->publicUrl() }}" type="{{ $asset->mime_type }}">
                                     </audio>
                                 </div>
                             @else
@@ -106,10 +151,10 @@
                             <p class="mt-1 truncate text-xs text-slate-500">{{ $asset->original_filename }}</p>
                         </div>
 
-                        @if($publicUrl)
+                        @if($asset->publicUrl())
                             <div class="rounded-xl bg-slate-50 p-3">
-                                <p class="break-all text-xs text-slate-600" data-media-public-url>{{ $publicUrl }}</p>
-                                <a href="{{ $publicUrl }}" target="_blank" rel="noopener" class="mt-2 inline-flex text-xs font-semibold text-slate-900 underline">Open asset</a>
+                                <p class="break-all text-xs text-slate-600" data-media-public-url>{{ $asset->publicUrl() }}</p>
+                                <a href="{{ $asset->publicUrl() }}" target="_blank" rel="noopener" class="mt-2 inline-flex text-xs font-semibold text-slate-900 underline">Open asset</a>
                             </div>
                         @endif
 

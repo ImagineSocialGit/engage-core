@@ -29,7 +29,7 @@ class MediaFoundationTest extends TestCase
         );
     }
 
-    public function test_media_assets_have_stable_reusable_storage_identity(): void
+    public function test_media_assets_have_stable_reusable_storage_and_similarity_identity(): void
     {
         foreach ([
             'uuid',
@@ -44,6 +44,10 @@ class MediaFoundationTest extends TestCase
             'extension',
             'size_bytes',
             'checksum_sha256',
+            'perceptual_hash',
+            'perceptual_hash_algorithm',
+            'image_width',
+            'image_height',
             'visibility',
             'source',
             'meta',

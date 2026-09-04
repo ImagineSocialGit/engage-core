@@ -35,6 +35,10 @@ class MediaAsset extends Model
         'extension',
         'size_bytes',
         'checksum_sha256',
+        'perceptual_hash',
+        'perceptual_hash_algorithm',
+        'image_width',
+        'image_height',
         'visibility',
         'source',
         'meta',
@@ -51,6 +55,8 @@ class MediaAsset extends Model
         return [
             'uploaded_by_id' => 'integer',
             'size_bytes' => 'integer',
+            'image_width' => 'integer',
+            'image_height' => 'integer',
             'meta' => 'array',
             'archived_at' => 'datetime',
         ];

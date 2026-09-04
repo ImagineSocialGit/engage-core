@@ -2,19 +2,18 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Storage;
+
 if (! function_exists('cdn_image')) {
     function cdn_image(string $path, ?string $file = null): string
     {
-        $base = rtrim((string) config('filesystems.disks.spaces.url'), '/');
-        $path = trim($path, '/');
+        $relativePath = 'images/'.trim($path, '/');
 
         if ($file !== null) {
-            $file = ltrim($file, '/');
-
-            return "{$base}/images/{$path}/{$file}";
+            $relativePath .= '/'.ltrim($file, '/');
         }
 
-        return "{$base}/images/{$path}";
+        return Storage::disk('spaces')->url($relativePath);
     }
 }
 

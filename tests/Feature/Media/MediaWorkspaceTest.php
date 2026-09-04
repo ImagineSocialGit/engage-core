@@ -44,6 +44,18 @@ class MediaWorkspaceTest extends TestCase
         $this->assertNotContains('crm.media.index', $navigationRoutes);
     }
 
+    public function test_media_workspace_exposes_reusable_similarity_preflight_without_inline_php(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('crm.media.index'))
+            ->assertOk()
+            ->assertSee('data-media-similarity-preflight-url', false)
+            ->assertSee('data-media-similarity-review', false)
+            ->assertSee('data-media-upload-anyway', false);
+    }
+
     public function test_authenticated_operator_can_upload_a_reusable_video_asset(): void
     {
         $user = User::factory()->create();
@@ -68,6 +80,7 @@ class MediaWorkspaceTest extends TestCase
         $this->assertSame($user->getMorphClass(), $asset->uploaded_by_type);
         $this->assertSame($user->getKey(), $asset->uploaded_by_id);
         $this->assertNotSame('', $asset->checksum_sha256);
+        $this->assertNull($asset->perceptual_hash);
         Storage::disk('public')->assertExists($asset->path);
     }
 

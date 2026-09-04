@@ -2,7 +2,10 @@
 
 namespace App\Modules\Media\Actions;
 
+use App\Modules\Media\Data\ImagePerceptualFingerprint;
 use App\Modules\Media\Models\MediaAsset;
+use App\Modules\Media\Services\ImagePerceptualHasher;
+use App\Modules\Media\Services\MediaFileIdentity;
 use App\Modules\Media\Services\MediaUploadPolicy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
@@ -16,6 +19,8 @@ final class StoreMediaAssetAction
 {
     public function __construct(
         private readonly MediaUploadPolicy $uploadPolicy,
+        private readonly MediaFileIdentity $fileIdentity,
+        private readonly ImagePerceptualHasher $perceptualHasher,
     ) {}
 
     public function handle(
@@ -29,13 +34,17 @@ final class StoreMediaAssetAction
             throw new RuntimeException('The uploaded media type is not supported.');
         }
 
-        $checksum = $this->checksum($file);
+        $checksum = $this->fileIdentity->checksum($file);
         $existing = $this->existingAssetForChecksum($checksum);
 
         if ($existing instanceof MediaAsset) {
             return $this->restoreForReuse($existing);
         }
 
+        $kind = $this->uploadPolicy->kindForMimeType($mimeType);
+        $fingerprint = $kind === MediaAsset::KIND_IMAGE
+            ? $this->perceptualHasher->fingerprint($file)
+            : null;
         $disk = $this->disk();
         $uuid = (string) Str::uuid();
         $extension = $this->extension($file);
@@ -60,7 +69,7 @@ final class StoreMediaAssetAction
                 'uploaded_by_type' => $uploadedBy?->getMorphClass(),
                 'uploaded_by_id' => $uploadedBy?->getKey(),
                 'title' => $this->title($title, $file),
-                'kind' => $this->uploadPolicy->kindForMimeType($mimeType),
+                'kind' => $kind,
                 'disk' => $disk,
                 'path' => $storedPath,
                 'original_filename' => $file->getClientOriginalName(),
@@ -68,6 +77,7 @@ final class StoreMediaAssetAction
                 'extension' => $extension,
                 'size_bytes' => is_int($file->getSize()) ? $file->getSize() : null,
                 'checksum_sha256' => $checksum,
+                ...$this->fingerprintAttributes($fingerprint),
                 'visibility' => MediaAsset::VISIBILITY_PUBLIC,
                 'source' => 'crm',
                 'meta' => null,
@@ -91,18 +101,15 @@ final class StoreMediaAssetAction
         }
     }
 
-    private function checksum(UploadedFile $file): string
+    /** @return array<string, int|string|null> */
+    private function fingerprintAttributes(?ImagePerceptualFingerprint $fingerprint): array
     {
-        $path = $file->getRealPath();
-        $checksum = is_string($path) && $path !== ''
-            ? hash_file('sha256', $path)
-            : false;
-
-        if (! is_string($checksum) || $checksum === '') {
-            throw new RuntimeException('The uploaded media checksum could not be calculated.');
-        }
-
-        return strtolower($checksum);
+        return [
+            'perceptual_hash' => $fingerprint?->hash,
+            'perceptual_hash_algorithm' => $fingerprint?->algorithm,
+            'image_width' => $fingerprint?->width,
+            'image_height' => $fingerprint?->height,
+        ];
     }
 
     private function existingAssetForChecksum(string $checksum): ?MediaAsset
