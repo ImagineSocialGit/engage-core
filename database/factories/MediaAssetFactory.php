@@ -29,7 +29,7 @@ class MediaAssetFactory extends Factory
             'mime_type' => 'image/jpeg',
             'extension' => 'jpg',
             'size_bytes' => 1024,
-            'checksum_sha256' => str_repeat('a', 64),
+            'checksum_sha256' => hash('sha256', $uuid),
             'visibility' => MediaAsset::VISIBILITY_PUBLIC,
             'source' => 'crm',
             'meta' => null,

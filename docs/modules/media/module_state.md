@@ -22,12 +22,14 @@ Storage access goes through Laravel Filesystem. DigitalOcean Spaces is the curre
 - uploader polymorphic identity
 - title and media kind
 - filesystem disk and object path
-- original filename, MIME type, extension, size, and SHA-256 checksum
+- original filename, MIME type, extension, size, and SHA-256 exact-content identity
 - public visibility
 - source/meta
 - archive timestamp
 
 Archiving never deletes the underlying object. This preserves old and queued references. Permanent purge semantics are intentionally deferred.
+
+Exact byte-identical uploads are idempotent regardless of filename. Media calculates SHA-256 before permanent object storage, reuses an existing asset with the same checksum, restores it when archived, and relies on a database uniqueness contract to close concurrent-upload races. A race loser removes its just-written object before returning the winning asset identity.
 
 ## Current committed behavior
 
@@ -37,7 +39,8 @@ The narrow shared CRM Media workspace can:
 - store them through Laravel Filesystem;
 - preview images, video, and audio when a public URL is available;
 - expose the public asset URL;
-- archive and restore assets without deleting the object.
+- archive and restore assets without deleting the object;
+- reuse exact-content duplicates instead of creating another Media row or storage object.
 
 The application upload ceiling defaults to 256 MB and is committed config in `config/media.php`.
 

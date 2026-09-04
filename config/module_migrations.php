@@ -170,9 +170,10 @@ return [
 
         'media' => [
             'path' => 'database/migrations/modules/media',
-            'schema_version' => 1,
+            'schema_version' => 2,
             'migrations' => [
                 '2026_09_03_010000_create_media_assets_table.php',
+                '2026_09_04_010100_enforce_unique_media_asset_checksums.php',
             ],
         ],
 

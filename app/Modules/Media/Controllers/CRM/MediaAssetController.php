@@ -42,15 +42,23 @@ final class MediaAssetController extends Controller
         StoreMediaAssetRequest $request,
         StoreMediaAssetAction $storeMediaAsset,
     ): RedirectResponse {
-        $storeMediaAsset->handle(
+        $asset = $storeMediaAsset->handle(
             file: $request->file('file'),
             title: $request->input('title'),
             uploadedBy: $request->user(),
         );
 
+        $reused = ! $asset->wasRecentlyCreated;
+
         return redirect()
             ->route('crm.media.index')
-            ->with('success', 'Media uploaded.');
+            ->with(
+                'success',
+                $reused
+                    ? "This file is already in Media — using '{$asset->title}'."
+                    : 'Media uploaded.',
+            )
+            ->with('media_upload_status', $reused ? 'reused' : 'created');
     }
 
     public function archive(MediaAsset $mediaAsset): RedirectResponse

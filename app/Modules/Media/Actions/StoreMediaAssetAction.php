@@ -3,9 +3,9 @@
 namespace App\Modules\Media\Actions;
 
 use App\Modules\Media\Models\MediaAsset;
-use App\Support\Modules\ModuleManager;
 use App\Modules\Media\Services\MediaUploadPolicy;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -29,17 +29,19 @@ final class StoreMediaAssetAction
             throw new RuntimeException('The uploaded media type is not supported.');
         }
 
+        $checksum = $this->checksum($file);
+        $existing = $this->existingAssetForChecksum($checksum);
+
+        if ($existing instanceof MediaAsset) {
+            return $this->restoreForReuse($existing);
+        }
+
         $disk = $this->disk();
         $uuid = (string) Str::uuid();
         $extension = $this->extension($file);
         $filename = $uuid.($extension !== null ? '.'.$extension : '');
         $directory = trim((string) config('media.directory', 'media'), '/');
         $directory = ($directory !== '' ? $directory.'/' : '').$uuid;
-        $checksum = hash_file('sha256', $file->getRealPath());
-
-        if (! is_string($checksum) || $checksum === '') {
-            throw new RuntimeException('The uploaded media checksum could not be calculated.');
-        }
 
         $storedPath = Storage::disk($disk)->putFileAs(
             $directory,
@@ -70,11 +72,61 @@ final class StoreMediaAssetAction
                 'source' => 'crm',
                 'meta' => null,
             ]);
+        } catch (QueryException $exception) {
+            Storage::disk($disk)->delete($storedPath);
+
+            if ($this->isChecksumUniquenessViolation($exception)) {
+                $existing = $this->existingAssetForChecksum($checksum);
+
+                if ($existing instanceof MediaAsset) {
+                    return $this->restoreForReuse($existing);
+                }
+            }
+
+            throw $exception;
         } catch (Throwable $exception) {
             Storage::disk($disk)->delete($storedPath);
 
             throw $exception;
         }
+    }
+
+    private function checksum(UploadedFile $file): string
+    {
+        $path = $file->getRealPath();
+        $checksum = is_string($path) && $path !== ''
+            ? hash_file('sha256', $path)
+            : false;
+
+        if (! is_string($checksum) || $checksum === '') {
+            throw new RuntimeException('The uploaded media checksum could not be calculated.');
+        }
+
+        return strtolower($checksum);
+    }
+
+    private function existingAssetForChecksum(string $checksum): ?MediaAsset
+    {
+        return MediaAsset::query()
+            ->where('checksum_sha256', $checksum)
+            ->first();
+    }
+
+    private function restoreForReuse(MediaAsset $asset): MediaAsset
+    {
+        if ($asset->archived_at !== null) {
+            $asset->forceFill(['archived_at' => null])->save();
+        }
+
+        return $asset;
+    }
+
+    private function isChecksumUniquenessViolation(QueryException $exception): bool
+    {
+        return str_contains(
+            strtolower($exception->getMessage()),
+            'media_assets_checksum_sha256_unique',
+        );
     }
 
     private function disk(): string

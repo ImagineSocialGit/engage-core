@@ -62,6 +62,34 @@ class MessagingMediaLibraryTest extends TestCase
         $this->assertSame(2, MediaAsset::query()->count());
     }
 
+    public function test_media_bridge_reuses_exact_upload_content_across_different_filenames(): void
+    {
+        $this->configureMedia();
+        $library = app(MediaMessageMediaLibrary::class);
+        $contents = 'same messaging media bytes';
+
+        $first = $library->store(
+            file: UploadedFile::fake()->createWithContent(
+                'first-name.txt',
+                $contents,
+            ),
+            title: 'Original message asset',
+        );
+
+        $second = $library->store(
+            file: UploadedFile::fake()->createWithContent(
+                'renamed-copy.txt',
+                $contents,
+            ),
+            title: 'Duplicate title should not create a second asset',
+        );
+
+        $this->assertSame($first['asset_uuid'], $second['asset_uuid']);
+        $this->assertSame('Original message asset', $second['title']);
+        $this->assertSame(1, MediaAsset::query()->count());
+        $this->assertCount(1, Storage::disk('spaces')->allFiles());
+    }
+
     public function test_archived_assets_leave_new_selection_but_existing_snapshot_remains_self_contained(): void
     {
         $this->configureMedia();

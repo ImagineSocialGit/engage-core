@@ -71,6 +71,79 @@ class MediaWorkspaceTest extends TestCase
         Storage::disk('public')->assertExists($asset->path);
     }
 
+    public function test_exact_duplicate_upload_reuses_existing_asset_and_storage_object(): void
+    {
+        $user = User::factory()->create();
+        $contents = 'same reusable media bytes';
+
+        $this->actingAs($user)
+            ->post(route('crm.media.store'), [
+                'title' => 'Original reusable file',
+                'file' => UploadedFile::fake()->createWithContent(
+                    'original.txt',
+                    $contents,
+                ),
+            ])
+            ->assertRedirect(route('crm.media.index'))
+            ->assertSessionHas('media_upload_status', 'created');
+
+        $original = MediaAsset::query()->sole();
+
+        $this->actingAs($user)
+            ->post(route('crm.media.store'), [
+                'title' => 'Different filename and title',
+                'file' => UploadedFile::fake()->createWithContent(
+                    'renamed-copy.txt',
+                    $contents,
+                ),
+            ])
+            ->assertRedirect(route('crm.media.index'))
+            ->assertSessionHas('media_upload_status', 'reused');
+
+        $reused = MediaAsset::query()->sole();
+
+        $this->assertSame($original->getKey(), $reused->getKey());
+        $this->assertSame('Original reusable file', $reused->title);
+        $this->assertCount(1, Storage::disk('public')->allFiles());
+        Storage::disk('public')->assertExists($original->path);
+    }
+
+    public function test_exact_duplicate_upload_restores_archived_asset_instead_of_creating_another(): void
+    {
+        $user = User::factory()->create();
+        $contents = 'archived reusable media bytes';
+
+        $this->actingAs($user)
+            ->post(route('crm.media.store'), [
+                'title' => 'Archived reusable file',
+                'file' => UploadedFile::fake()->createWithContent(
+                    'archive-me.txt',
+                    $contents,
+                ),
+            ])
+            ->assertRedirect(route('crm.media.index'));
+
+        $original = MediaAsset::query()->sole();
+        $original->forceFill(['archived_at' => now()])->save();
+
+        $this->actingAs($user)
+            ->post(route('crm.media.store'), [
+                'file' => UploadedFile::fake()->createWithContent(
+                    'same-content-new-name.txt',
+                    $contents,
+                ),
+            ])
+            ->assertRedirect(route('crm.media.index'))
+            ->assertSessionHas('media_upload_status', 'reused');
+
+        $restored = MediaAsset::query()->sole();
+
+        $this->assertSame($original->getKey(), $restored->getKey());
+        $this->assertNull($restored->archived_at);
+        $this->assertCount(1, Storage::disk('public')->allFiles());
+        Storage::disk('public')->assertExists($original->path);
+    }
+
     public function test_media_workspace_lists_active_assets_and_can_archive_and_restore_them(): void
     {
         $user = User::factory()->create();

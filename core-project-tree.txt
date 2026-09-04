@@ -2114,7 +2114,8 @@
 │   │   │   │   ├── 2026_04_15_195858_create_location_areas_table.php
 │   │   │   │   └── 2026_04_15_195859_create_location_area_assignments_table.php
 │   │   │   ├── media
-│   │   │   │   └── 2026_09_03_010000_create_media_assets_table.php
+│   │   │   │   ├── 2026_09_03_010000_create_media_assets_table.php
+│   │   │   │   └── 2026_09_04_010100_enforce_unique_media_asset_checksums.php
 │   │   │   ├── messaging
 │   │   │   │   ├── 2026_05_15_215534_create_message_consents_table.php
 │   │   │   │   ├── 2026_05_15_215834_create_consent_revocations_table.php
@@ -2412,7 +2413,8 @@
 │       │   │   └── route-message-template-picker.blade.php
 │       │   ├── public-surface
 │       │   │   ├── button.blade.php
-│       │   │   └── card.blade.php
+│       │   │   ├── card.blade.php
+│       │   │   └── header.blade.php
 │       │   ├── section.blade.php
 │       │   ├── tasks
 │       │   ├── ui
@@ -3248,4 +3250,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-773 directories, 2476 files
+773 directories, 2478 files
