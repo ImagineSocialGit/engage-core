@@ -1,4 +1,3 @@
-
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
@@ -90,6 +89,7 @@
             <form
                 method="POST"
                 action="{{ route('crm.scheduling.configuration.communications.update') }}"
+                enctype="multipart/form-data"
                 data-appointment-communications-editor
                 class="space-y-6"
                 x-data="{
@@ -104,6 +104,10 @@
                             channels: @js($channels->where('provider_ready', true)->pluck('key')->values()->all() ?: $channels->take(1)->pluck('key')->values()->all()),
                             subject: 'Appointment reminder',
                             message: @js(config('scheduling.communications.default_message')),
+                            media: {},
+                            media_asset_uuid: '',
+                            media_poster_asset_uuid: '',
+                            media_title: '',
                         };
                     },
                     addStep() {
@@ -235,6 +239,15 @@
                                     'label_class' => $labelClass,
                                     'input_class' => $inputClass,
                                 ]"
+                            />
+
+                            <x-ui.message-media-editor
+                                :presentation="$plan['media_authoring'] ?? []"
+                                name-prefix-bind="`steps[${index}]`"
+                                visible-bind="step.channels.includes('email')"
+                                asset-model="step.media_asset_uuid"
+                                poster-model="step.media_poster_asset_uuid"
+                                title-model="step.media_title"
                             />
                         </div>
                     </template>

@@ -1,4 +1,3 @@
-
 @php
     $clientTimezone = config('client.timezone', config('app.timezone', 'UTC'));
 @endphp
@@ -39,6 +38,7 @@
                 <form
                     method="POST"
                     action="{{ route('crm.broadcasts.store') }}"
+                    enctype="multipart/form-data"
                     class="space-y-4"
                     x-data="{
                         recipientFilterType: @js(old('recipient_filter_type', 'all')),
@@ -187,6 +187,11 @@
                         ]"
                     />
 
+                    <x-messaging.message-media-authoring
+                        visible-bind="channel === 'email'"
+                        :failed="$errors->any() && old('broadcast_type', \App\Modules\Broadcasts\Models\Broadcast::BROADCAST_TYPE_REGULAR) === \App\Modules\Broadcasts\Models\Broadcast::BROADCAST_TYPE_REGULAR"
+                    />
+
                     @include('crm.broadcasts.partials.cta-editor')
 
                     @include('crm.broadcasts.partials.message-personalization', [
@@ -323,6 +328,7 @@
                 <form
                     method="POST"
                     action="{{ route('crm.broadcasts.store') }}"
+                    enctype="multipart/form-data"
                     class="space-y-4"
                 >
                     @csrf
@@ -416,6 +422,10 @@
                             'required' => true,
                             'error' => $errors->first('body'),
                         ]"
+                    />
+
+                    <x-messaging.message-media-authoring
+                        :failed="$errors->any() && old('broadcast_type') === \App\Modules\Broadcasts\Models\Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION"
                     />
 
                     <p class="text-xs text-slate-600">

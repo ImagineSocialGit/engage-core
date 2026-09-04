@@ -32,12 +32,14 @@ use App\Modules\Messaging\Listeners\MarkClaimedPermissionInvitationSentAfterSche
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Services\ContactPanels\ContactDirectMessagePanelProvider;
 use App\Modules\Messaging\Services\ContactPanels\MessageDeliveryIssueContactPanelProvider;
 use App\Modules\Messaging\Services\ContactShow\ContactMessagingShowDataProvider;
 use App\Modules\Messaging\Services\ContactShow\ContactScheduledMessagesVisibilityDataProvider;
 use App\Modules\Messaging\Services\Dashboard\MessagingDeliveryIssuesDashboardPanelProvider;
 use App\Modules\Messaging\Services\Email\EmailProviderManager;
 use App\Modules\Messaging\Services\MessageChainExecutionContextResolver;
+use App\Modules\Messaging\Services\MessageMediaAuthoringService;
 use App\Modules\Messaging\Services\MessageRecipientGateRegistry;
 use App\Modules\Messaging\Services\MessageRecipientPayloadProviderRegistry;
 use App\Modules\Messaging\Services\MessageTemplatePublicationHookRegistry;
@@ -46,10 +48,12 @@ use App\Modules\Messaging\Services\ReusableMessageTemplateAuthoringGuide;
 use App\Modules\Messaging\Services\Sms\SmsProviderManager;
 use App\Modules\Messaging\TokenContracts\MessagingTokenContextProvider;
 use App\Modules\Messaging\Validation\MessagingSetupValidationContributor;
+use App\Modules\Messaging\View\Components\MessageMediaAuthoring;
 use App\Support\Dashboard\DashboardPanelRegistry;
 use App\Support\ReplyHandling\ReplyProfileDependencyRegistry;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Twilio\Rest\Client;
@@ -58,6 +62,8 @@ class MessagingModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->scoped(MessageMediaAuthoringService::class);
+
         $this->mergeConfigFrom(config_path('messaging/sms.php'), 'messaging.sms');
         $this->mergeConfigFrom(config_path('messaging/email.php'), 'messaging.email');
 
@@ -163,7 +169,10 @@ class MessagingModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Blade::component('messaging.message-media-authoring', MessageMediaAuthoring::class);
+
         $this->app->make(ContactPanelRegistry::class)
+            ->register(ContactDirectMessagePanelProvider::class, 'messaging')
             ->register(MessageDeliveryIssueContactPanelProvider::class, 'messaging');
 
         $this->callAfterResolving(

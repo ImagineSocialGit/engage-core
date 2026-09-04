@@ -1,4 +1,3 @@
-
 @props([
     'field' => [],
     'fieldSuffix' => '',
@@ -33,6 +32,9 @@
         subject: '',
         body: '',
         message: '',
+        mediaAssetUuid: '',
+        mediaPosterAssetUuid: '',
+        mediaTitle: '',
         lastField: 'body',
         openCreateMessage() {
             this.error = '';
@@ -49,6 +51,9 @@
             this.subject = '';
             this.body = '';
             this.message = '';
+            this.mediaAssetUuid = '';
+            this.mediaPosterAssetUuid = '';
+            this.mediaTitle = '';
             this.lastField = this.channel === 'sms' ? 'message' : 'body';
         },
         insertField(syntax) {
@@ -72,24 +77,16 @@
             this.saving = true;
             this.error = '';
 
-            const payload = {
-                channel: this.channel,
-                purpose: this.purpose,
-                name: this.templateName,
-                subject: this.subject,
-                body: this.body,
-                message: this.message,
-            };
+            const payload = new FormData(this.$refs.createForm);
 
             try {
                 const response = await fetch(@js($createUrl), {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json',
-                        'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': @js(csrf_token()),
                     },
-                    body: JSON.stringify(payload),
+                    body: payload,
                 });
 
                 const data = await response.json();
@@ -185,11 +182,11 @@
                     <button type="button" x-on:click="closeCreateMessage()" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 hover:bg-slate-50" aria-label="Close"><span aria-hidden="true">×</span></button>
                 </header>
 
-                <div class="space-y-5 px-5 py-5 sm:px-6">
+                <form x-ref="createForm" x-on:submit.prevent="saveMessage()" enctype="multipart/form-data" class="space-y-5 px-5 py-5 sm:px-6">
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>
                             <label class="text-sm font-semibold text-slate-900">Channel</label>
-                            <select x-model="channel" x-on:change="lastField = channel === 'sms' ? 'message' : 'body'" class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm">
+                            <select name="channel" x-model="channel" x-on:change="lastField = channel === 'sms' ? 'message' : 'body'" class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm">
                                 @foreach($availableChannels as $channel)
                                     <option value="{{ $channel }}">{{ \Illuminate\Support\Str::headline($channel) }}</option>
                                 @endforeach
@@ -197,7 +194,7 @@
                         </div>
                         <div>
                             <label class="text-sm font-semibold text-slate-900">Purpose</label>
-                            <select x-model="purpose" class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm">
+                            <select name="purpose" x-model="purpose" class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm">
                                 @foreach($purposes as $purposeOption)
                                     <option value="{{ $purposeOption['value'] }}">{{ $purposeOption['label'] }}</option>
                                 @endforeach
@@ -208,12 +205,13 @@
 
                     <div>
                         <label class="text-sm font-semibold text-slate-900">Template name</label>
-                        <input x-ref="templateName" x-model="templateName" type="text" maxlength="191" placeholder="Past Client Check-In" class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm">
+                        <input name="name" x-ref="templateName" x-model="templateName" type="text" maxlength="191" placeholder="Past Client Check-In" class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm">
                     </div>
 
                     <x-ui.message-editor
                         :subject="[
                             'label' => 'Subject',
+                            'name' => 'subject',
                             'model' => 'subject',
                             'maxlength' => 255,
                             'visible_bind' => 'channel === \'email\'',
@@ -222,6 +220,7 @@
                         ]"
                         :body="[
                             'label' => 'Message',
+                            'name' => 'body',
                             'model' => 'body',
                             'rows' => 7,
                             'visible_bind' => 'channel === \'email\'',
@@ -230,6 +229,7 @@
                         ]"
                         :sms="[
                             'label' => 'Message',
+                            'name' => 'message',
                             'model' => 'message',
                             'rows' => 6,
                             'maxlength' => 1600,
@@ -239,15 +239,22 @@
                         ]"
                     />
 
+                    <x-messaging.message-media-authoring
+                        visible-bind="channel === 'email'"
+                        asset-model="mediaAssetUuid"
+                        poster-model="mediaPosterAssetUuid"
+                        title-model="mediaTitle"
+                    />
+
                     <x-messaging.available-fields :groups="$availableFields" />
 
                     <div x-show="error" x-text="error" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"></div>
 
                     <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
                         <button type="button" x-on:click="closeCreateMessage()" x-bind:disabled="saving" class="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50 disabled:opacity-50 sm:w-auto">Cancel</button>
-                        <button type="button" x-on:click="saveMessage()" x-bind:disabled="saving" class="inline-flex w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50 sm:w-auto"><span x-text="saving ? 'Creating…' : 'Create and select'"></span></button>
+                        <button type="submit" x-bind:disabled="saving" class="inline-flex w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50 sm:w-auto"><span x-text="saving ? 'Creating…' : 'Create and select'"></span></button>
                     </div>
-                </div>
+                </form>
             </section>
         </div>
     </template>

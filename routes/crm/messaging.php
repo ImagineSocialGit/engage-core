@@ -2,9 +2,19 @@
 
 use App\Modules\Messaging\Controllers\CRM\CreateFlowRouteMessageTemplateController;
 use App\Modules\Messaging\Controllers\CRM\CreateReusableMessageTemplateController;
+use App\Modules\Messaging\Controllers\CRM\ContactDirectMessageController;
 use App\Modules\Messaging\Controllers\CRM\MessageDeliveryIssueController;
 use App\Modules\Messaging\Controllers\CRM\MessageTemplatePresetController;
 use Illuminate\Support\Facades\Route;
+
+
+Route::middleware('module:messaging')
+    ->prefix(config('contacts.routes.plural'))
+    ->name('crm.messaging.contacts.')
+    ->group(function () {
+        Route::post('/{contact}/messages', [ContactDirectMessageController::class, 'store'])
+            ->name('messages.store');
+    });
 
 Route::middleware('module:messaging')
     ->prefix('messaging/delivery-issues')

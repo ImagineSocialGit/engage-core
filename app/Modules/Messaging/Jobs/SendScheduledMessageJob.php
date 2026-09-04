@@ -18,6 +18,7 @@ use App\Modules\Messaging\Services\ScheduledMessageDeliveryLeaseManager;
 use App\Modules\Messaging\Services\ScheduledMessageGate;
 use App\Modules\Messaging\Services\ScheduledMessagePayloadResolver;
 use App\Modules\Messaging\Services\Sms\SmsMessagingService;
+use App\Modules\Messaging\Support\MessageMediaPayload;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use InvalidArgumentException;
@@ -320,6 +321,12 @@ class SendScheduledMessageJob implements ShouldQueue
 
         foreach ($payload as $key => $value) {
             if (! is_string($key) || ! is_array($value)) {
+                continue;
+            }
+
+            if ($key === 'media' && MessageMediaPayload::validationErrors($value) === []) {
+                $tokens[] = '{media}';
+
                 continue;
             }
 

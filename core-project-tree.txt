@@ -812,6 +812,7 @@
 │   │   │   │   ├── ResumeMessageChainEnrollmentAction.php
 │   │   │   │   ├── RevokeMessageConsentAction.php
 │   │   │   │   ├── ScheduleMessageAction.php
+│   │   │   │   ├── SendContactDirectMessageAction.php
 │   │   │   │   ├── SkipScheduledMessagesAction.php
 │   │   │   │   ├── StartMessageChainEnrollmentAction.php
 │   │   │   │   ├── SyncMessageTemplateCompositionLayersAction.php
@@ -848,6 +849,7 @@
 │   │   │   │       └── SmsProvider.php
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
+│   │   │   │   │   ├── ContactDirectMessageController.php
 │   │   │   │   │   ├── CreateFlowRouteMessageTemplateController.php
 │   │   │   │   │   ├── CreateReusableMessageTemplateController.php
 │   │   │   │   │   ├── MessageDeliveryIssueController.php
@@ -934,8 +936,11 @@
 │   │   │   ├── Providers
 │   │   │   │   └── MessagingModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   │   ├── Concerns
+│   │   │   │   │   └── InteractsWithMessageMediaAuthoring.php
 │   │   │   │   ├── CreateFlowRouteMessageTemplateRequest.php
 │   │   │   │   ├── CreateReusableMessageTemplateRequest.php
+│   │   │   │   ├── SendContactDirectMessageRequest.php
 │   │   │   │   ├── StoreContactPermissionInvitationConsentRequest.php
 │   │   │   │   ├── UpdateMessageTemplateCompositionLayerRequest.php
 │   │   │   │   └── UpdateMessageTemplatePresetRequest.php
@@ -949,7 +954,9 @@
 │   │   │   │   │   └── MessageConsentStateResolver.php
 │   │   │   │   ├── ConsentDomainRegistry.php
 │   │   │   │   ├── ConsentOptInDefinitionResolver.php
+│   │   │   │   ├── ContactDirectMessageComposerPresenter.php
 │   │   │   │   ├── ContactPanels
+│   │   │   │   │   ├── ContactDirectMessagePanelProvider.php
 │   │   │   │   │   └── MessageDeliveryIssueContactPanelProvider.php
 │   │   │   │   ├── ContactPermissionInvitationEligibility.php
 │   │   │   │   ├── ContactPermissionInvitationService.php
@@ -984,6 +991,7 @@
 │   │   │   │   ├── MessageDispatchDefinitionNormalizer.php
 │   │   │   │   ├── MessageEligibilityGate.php
 │   │   │   │   ├── MessageGate.php
+│   │   │   │   ├── MessageMediaAuthoringService.php
 │   │   │   │   ├── MessagePlanningGate.php
 │   │   │   │   ├── MessageRecipientGateRegistry.php
 │   │   │   │   ├── MessageRecipientPayloadProviderRegistry.php
@@ -1032,8 +1040,11 @@
 │   │   │   │   └── MessageMediaPayload.php
 │   │   │   ├── TokenContracts
 │   │   │   │   └── MessagingTokenContextProvider.php
-│   │   │   └── Validation
-│   │   │       └── MessagingSetupValidationContributor.php
+│   │   │   ├── Validation
+│   │   │   │   └── MessagingSetupValidationContributor.php
+│   │   │   └── View
+│   │   │       └── Components
+│   │   │           └── MessageMediaAuthoring.php
 │   │   ├── Mortgage
 │   │   │   ├── Actions
 │   │   │   ├── AnnualDates
@@ -2440,6 +2451,7 @@
 │       │   │   ├── available-fields.blade.php
 │       │   │   ├── message-chain-carousel.blade.php
 │       │   │   ├── message-editor-carousel.blade.php
+│       │   │   ├── message-media-authoring.blade.php
 │       │   │   └── route-message-template-picker.blade.php
 │       │   ├── public-surface
 │       │   │   ├── button.blade.php
@@ -2469,7 +2481,8 @@
 │       │   │   ├── layout
 │       │   │   │   ├── page-header.blade.php
 │       │   │   │   └── section.blade.php
-│       │   │   └── message-editor.blade.php
+│       │   │   ├── message-editor.blade.php
+│       │   │   └── message-media-editor.blade.php
 │       │   └── webinars
 │       │       ├── countdown.blade.php
 │       │       ├── event-details.blade.php
@@ -2510,6 +2523,7 @@
 │       │   │   ├── index.blade.php
 │       │   │   ├── panels
 │       │   │   │   ├── messaging-delivery-issues.blade.php
+│       │   │   │   ├── messaging-direct-message.blade.php
 │       │   │   │   └── webinar-history.blade.php
 │       │   │   ├── partials
 │       │   │   │   └── post-import-inputs.blade.php
@@ -2934,6 +2948,7 @@
 │   │   │   ├── ConsentDomainRegistryTest.php
 │   │   │   ├── ConsentOptInDefinitionResolverTest.php
 │   │   │   ├── ConsentRevocationControllerTest.php
+│   │   │   ├── ContactDirectMessageTest.php
 │   │   │   ├── ContactImportMarketingPermissionControllerTest.php
 │   │   │   ├── ContactPermissionInvitationControllerTest.php
 │   │   │   ├── ContactPermissionInvitationServiceTest.php
@@ -3031,7 +3046,8 @@
 │   │   │   ├── SmsPayloadTest.php
 │   │   │   ├── SmsSendGuardTest.php
 │   │   │   ├── TeamMemberNotificationPreferenceTest.php
-│   │   │   └── TestingSurfaceBackgroundIsolationTest.php
+│   │   │   ├── TestingSurfaceBackgroundIsolationTest.php
+│   │   │   └── UniversalMessageMediaAuthoringTest.php
 │   │   ├── ModuleFacts
 │   │   │   └── ModuleFactRegistryTest.php
 │   │   ├── ModuleIntegrations
@@ -3290,4 +3306,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-784 directories, 2507 files
+787 directories, 2520 files

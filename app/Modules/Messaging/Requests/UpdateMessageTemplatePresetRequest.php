@@ -5,6 +5,7 @@ namespace App\Modules\Messaging\Requests;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
+use App\Modules\Messaging\Services\MessageMediaAuthoringService;
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
 use App\Modules\Messaging\Services\MessageTokenFallbackResolver;
 use Illuminate\Foundation\Http\FormRequest;
@@ -22,7 +23,7 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return [
+        return array_merge([
             'payload' => ['required', 'array'],
             'payload.subject' => ['nullable', 'string', 'max:255', Rule::requiredIf($this->isEmailPayload())],
             'payload.body' => ['nullable', 'string', 'max:10000', Rule::requiredIf($this->isEmailPayload())],
@@ -38,15 +39,6 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
             'payload.secondary_link' => ['nullable', 'array'],
             'payload.secondary_link.label' => ['nullable', 'string', 'max:255'],
             'payload.secondary_link.url' => ['nullable', 'string', 'max:1000'],
-            'payload.media_present' => ['nullable', 'boolean'],
-            'payload.media_asset_uuid' => ['nullable', 'uuid'],
-            'payload.media_poster_asset_uuid' => ['nullable', 'uuid'],
-            'payload.media_title' => ['nullable', 'string', 'max:255'],
-            'payload.media_upload' => [
-                'nullable',
-                'file',
-                'max:'.max(1, (int) config('media.max_upload_kilobytes', 262144)),
-            ],
             'payload.token_fallbacks_present' => ['nullable', 'boolean'],
             'payload.token_fallbacks' => ['nullable', 'array', 'max:50'],
             'payload.token_fallbacks.*' => ['required', 'array'],
@@ -63,7 +55,7 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
             ],
             'payload.token_fallbacks.*.fallback' => ['nullable', 'string', 'max:2000'],
             'payload.token_fallbacks.*.segment' => ['nullable', 'string', 'max:5000'],
-        ];
+        ], app(MessageMediaAuthoringService::class)->validationRules('payload'));
     }
 
     public function withValidator(Validator $validator): void

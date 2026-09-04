@@ -21,12 +21,14 @@ use App\Modules\Messaging\Models\MessageTemplateVersion;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
+use App\Modules\Messaging\Services\MessageMediaAuthoringService;
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
 use App\Modules\Messaging\Services\PhoneNumberNormalizer;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\AppointmentAttendee;
 use App\Support\ModuleIntegrations\Scheduling\Contracts\AppointmentCommunications;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -51,6 +53,7 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
         private readonly CancelMessageChainEnrollmentAction $cancelEnrollment,
         private readonly GrantMessageConsentsAction $grantConsents,
         private readonly MessageChannelAvailability $channelAvailability,
+        private readonly MessageMediaAuthoringService $mediaAuthoring,
         private readonly MessageTemplateTokenValidator $tokenValidator,
         private readonly PhoneNumberNormalizer $phoneNumbers,
     ) {}
@@ -63,16 +66,25 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
     public function plan(): array
     {
         $chain = $this->chain();
+        $steps = $chain instanceof MessageChain
+            ? $this->presentedSteps($chain)
+            : [];
+        $currentMedia = array_values(array_filter(array_map(
+            static fn (array $step): array => is_array($step['media'] ?? null)
+                && ! array_is_list($step['media'])
+                    ? $step['media']
+                    : [],
+            $steps,
+        ), static fn (array $media): bool => $media !== []));
 
         return [
             'available' => true,
             'configured' => $chain instanceof MessageChain
                 && $chain->isActive()
                 && $chain->current_version_id !== null,
-            'steps' => $chain instanceof MessageChain
-                ? $this->presentedSteps($chain)
-                : [],
+            'steps' => $steps,
             'channels' => $this->presentedChannels(),
+            'media_authoring' => $this->mediaAuthoring->presentation($currentMedia),
             'tokens' => [
                 '{first_name}',
                 '{appointment_date}',
@@ -80,6 +92,11 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
                 '{appointment_location_or_method}',
             ],
         ];
+    }
+
+    public function authoringRules(): array
+    {
+        return $this->mediaAuthoring->validationRules('steps.*');
     }
 
     public function generateDefaultSchedule(?User $actor = null): array
@@ -92,7 +109,7 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
 
     public function saveSchedule(array $steps, ?User $actor = null): array
     {
-        $steps = $this->normalizePlanSteps($steps);
+        $steps = $this->normalizePlanSteps($steps, $actor);
 
         if ($steps === []) {
             throw ValidationException::withMessages([
@@ -478,7 +495,7 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function normalizePlanSteps(array $steps): array
+    private function normalizePlanSteps(array $steps, ?User $actor = null): array
     {
         $normalized = [];
 
@@ -562,6 +579,43 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
                     : Str::headline($key);
             }
 
+            $currentMedia = $this->currentMediaSnapshot($key);
+            $media = $currentMedia !== [] ? $currentMedia : null;
+
+            if (in_array(MessageChannel::Email->value, $channels, true)) {
+                $submitted = ($step['media_upload'] ?? null) instanceof UploadedFile
+                    || filter_var(
+                        $step['media_present'] ?? false,
+                        FILTER_VALIDATE_BOOLEAN,
+                    );
+
+                try {
+                    $media = $this->mediaAuthoring->resolve(
+                        submitted: $submitted,
+                        upload: ($step['media_upload'] ?? null) instanceof UploadedFile
+                            ? $step['media_upload']
+                            : null,
+                        assetUuid: is_string($step['media_asset_uuid'] ?? null)
+                            ? $step['media_asset_uuid']
+                            : null,
+                        posterAssetUuid: is_string($step['media_poster_asset_uuid'] ?? null)
+                            ? $step['media_poster_asset_uuid']
+                            : null,
+                        title: is_string($step['media_title'] ?? null)
+                            ? $step['media_title']
+                            : null,
+                        currentMedia: $currentMedia,
+                        uploadedBy: $actor,
+                    );
+                } catch (InvalidArgumentException $exception) {
+                    throw ValidationException::withMessages([
+                        "steps.{$index}.media_asset_uuid" => $exception->getMessage(),
+                    ]);
+                }
+            } else {
+                $media = null;
+            }
+
             $normalized[] = [
                 'key' => $key,
                 'name' => mb_substr($name, 0, 80),
@@ -571,6 +625,7 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
                 'channels' => $channels,
                 'subject' => $subject !== '' ? $subject : 'Appointment reminder',
                 'message' => $message,
+                'media' => is_array($media) && ! array_is_list($media) ? $media : [],
             ];
         }
 
@@ -592,6 +647,14 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
             : [
                 'message' => $step['message'],
             ];
+
+        if ($channel === MessageChannel::Email->value
+            && is_array($step['media'] ?? null)
+            && ! array_is_list($step['media'])
+            && $step['media'] !== []
+        ) {
+            $payload['media'] = $step['media'];
+        }
 
         if (str_contains($step['message'], '{first_name}')
             || ($channel === MessageChannel::Email->value
@@ -1086,6 +1149,10 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
                 $subject = is_string($payload['subject'] ?? null)
                     ? $payload['subject']
                     : 'Appointment reminder';
+                $media = is_array($payload['media'] ?? null)
+                    && ! array_is_list($payload['media'])
+                        ? $payload['media']
+                        : [];
 
                 [$timing, $offsetValue, $offsetUnit] = $this->presentTiming($step);
 
@@ -1098,10 +1165,34 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
                     'channels' => $variants->pluck('channel')->values()->all(),
                     'subject' => $subject,
                     'message' => $message,
+                    'media' => $media,
+                    'media_asset_uuid' => is_string($media['asset_uuid'] ?? null) ? $media['asset_uuid'] : '',
+                    'media_poster_asset_uuid' => is_string($media['poster_asset_uuid'] ?? null) ? $media['poster_asset_uuid'] : '',
+                    'media_title' => '',
                 ];
             })
             ->values()
             ->all();
+    }
+
+
+    /** @return array<string, mixed> */
+    private function currentMediaSnapshot(string $stepKey): array
+    {
+        $template = MessageTemplate::query()
+            ->with('currentVersion')
+            ->where('key', $this->templateKey($stepKey, MessageChannel::Email->value))
+            ->first();
+
+        if (! $template instanceof MessageTemplate) {
+            return [];
+        }
+
+        $media = $template->currentPayload()['media'] ?? null;
+
+        return is_array($media) && ! array_is_list($media)
+            ? $media
+            : [];
     }
 
     /** @return array{0: string, 1: int|null, 2: string|null} */

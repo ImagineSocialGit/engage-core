@@ -6,6 +6,7 @@ use App\Modules\Messaging\Actions\CreateReusableMessageTemplateAction;
 use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
+use App\Modules\Messaging\Support\MessageMediaPayload;
 use Illuminate\Support\Collection;
 
 class ReusableMessageTemplateCatalog
@@ -170,6 +171,13 @@ class ReusableMessageTemplateCatalog
             && filled($payload['cta']['url'] ?? null)
         ) {
             $normalized['cta'] = $payload['cta'];
+        }
+
+        if ($channel === 'email'
+            && is_array($payload['media'] ?? null)
+            && MessageMediaPayload::valid($payload['media'])
+        ) {
+            $normalized['media'] = $payload['media'];
         }
 
         if (is_array($payload['token_fallbacks'] ?? null)) {

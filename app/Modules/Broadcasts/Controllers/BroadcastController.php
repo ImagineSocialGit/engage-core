@@ -23,6 +23,7 @@ use App\Modules\Messaging\Actions\CreateReusableMessageTemplateAction;
 use App\Modules\Messaging\Data\ReusableMessageTemplateAuthoringContext;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
+use App\Modules\Messaging\Services\MessageMediaAuthoringService;
 use App\Modules\Messaging\Services\MessageTemplateAuthoringFieldPresenter;
 use App\Modules\Messaging\Services\ReusableMessageTemplateCatalog;
 use Illuminate\Database\Eloquent\Collection;
@@ -95,13 +96,27 @@ class BroadcastController extends Controller
         StoreBroadcastRequest $request,
         ScheduleBroadcastAction $scheduleBroadcastAction,
         BroadcastMessageTemplateVersionService $messageTemplates,
+        MessageMediaAuthoringService $mediaAuthoring,
     ): RedirectResponse {
-        $broadcast = DB::transaction(function () use ($request, $messageTemplates): Broadcast {
+        $broadcast = DB::transaction(function () use ($request, $messageTemplates, $mediaAuthoring): Broadcast {
             $broadcast = Broadcast::query()->create($request->broadcastAttributes());
+            $payload = $request->messagePayload();
+
+            if ((string) $broadcast->channel === 'email') {
+                $payload = $mediaAuthoring->apply(
+                    payload: $payload,
+                    submitted: $request->hasMessageMediaSubmission(),
+                    upload: $request->messageMediaUpload(),
+                    assetUuid: $request->messageMediaAssetUuid(),
+                    posterAssetUuid: $request->messageMediaPosterAssetUuid(),
+                    title: $request->messageMediaTitle(),
+                    uploadedBy: $request->user(),
+                );
+            }
 
             $messageTemplates->saveDraft(
                 broadcast: $broadcast,
-                payload: $request->messagePayload(),
+                payload: $payload,
                 createdBy: $request->user(),
             );
 
@@ -338,6 +353,7 @@ class BroadcastController extends Controller
         UpdateBroadcastRequest $request,
         Broadcast $broadcast,
         BroadcastMessageTemplateVersionService $messageTemplates,
+        MessageMediaAuthoringService $mediaAuthoring,
     ): RedirectResponse {
         if ($broadcast->status !== Broadcast::STATUS_DRAFT) {
             return redirect()
@@ -345,11 +361,32 @@ class BroadcastController extends Controller
                 ->with('error', 'Only draft broadcasts can be edited.');
         }
 
-        DB::transaction(function () use ($request, $broadcast, $messageTemplates): void {
+        DB::transaction(function () use ($request, $broadcast, $messageTemplates, $mediaAuthoring): void {
+            $currentPayload = $broadcast->messagePayload();
+            $currentMedia = is_array($currentPayload['media'] ?? null)
+                && ! array_is_list($currentPayload['media'])
+                    ? $currentPayload['media']
+                    : [];
+
             $broadcast->forceFill($request->broadcastAttributes())->save();
+            $payload = $request->messagePayload();
+
+            if ((string) $broadcast->channel === 'email') {
+                $payload = $mediaAuthoring->apply(
+                    payload: $payload,
+                    submitted: $request->hasMessageMediaSubmission(),
+                    upload: $request->messageMediaUpload(),
+                    assetUuid: $request->messageMediaAssetUuid(),
+                    posterAssetUuid: $request->messageMediaPosterAssetUuid(),
+                    title: $request->messageMediaTitle(),
+                    currentMedia: $currentMedia,
+                    uploadedBy: $request->user(),
+                );
+            }
+
             $messageTemplates->saveDraft(
                 broadcast: $broadcast,
-                payload: $request->messagePayload(),
+                payload: $payload,
                 createdBy: $request->user(),
             );
         }, 3);

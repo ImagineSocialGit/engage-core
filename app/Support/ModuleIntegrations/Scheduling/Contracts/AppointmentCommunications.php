@@ -13,6 +13,9 @@ interface AppointmentCommunications
     public function plan(): array;
 
     /** @return array<string, mixed> */
+    public function authoringRules(): array;
+
+    /** @return array<string, mixed> */
     public function generateDefaultSchedule(?User $actor = null): array;
 
     /**

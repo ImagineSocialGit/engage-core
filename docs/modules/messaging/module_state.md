@@ -1388,8 +1388,26 @@ Before production data migration, the export/import tool should treat the curren
 
 ## Reusable Media integration
 
-Messaging does not own uploaded files. When both `messaging` and the silent `media` module are enabled, the support integration layer supplies the canonical template editor with active reusable Media assets and runtime upload access.
+Messaging does not own uploaded files. When both `messaging` and the silent `media` module are enabled, the support integration layer supplies email-capable message authoring with active reusable Media assets and runtime upload access. SMS authoring remains text-only.
 
-Published email content stores a resolved media snapshot rather than a live `MediaAsset` foreign key. Scheduled-message canonicalization pins that snapshot with the rest of the immutable payload, so later Media title changes or archive actions cannot rewrite existing message versions.
+`MessageMediaAuthoringService` is the single Messaging-owned authoring seam for Media presentation, validation, upload/selection resolution, removal, and immutable-snapshot preservation. The request-scoped service memoizes the selectable Media list so a carousel with several email messages does not repeatedly query the Media library. `<x-messaging.message-media-authoring>` supplies that capability to Messaging-owned/coupled authoring surfaces while `<x-ui.message-media-editor>` remains a dependency-neutral field renderer.
+
+The canonical message carousel resolves Media itself, so Message Templates, Campaign message editing, and Webinar message editing inherit the same authoring behavior without Campaigns or Webinars owning separate Media persistence. Guided reusable-template creation, Broadcast create/edit, and direct Route reusable-message creation use the same Messaging authoring seam. Broadcast draft Media is saved into the Broadcast's existing private immutable `MessageTemplateVersion`; Broadcasts does not own Media rows or a separate attachment schema.
+
+Scheduling remains dependency-safe: Scheduling itself receives only plain Media authoring data/rules through `AppointmentCommunications`. The Messaging-backed integration resolves the chosen/uploaded Media and publishes the snapshot into the Scheduling-owned email template version; the Scheduling Blade uses only the dependency-neutral UI component and does not import Messaging or Media module classes.
+
+Published email content stores a resolved media snapshot rather than a live `MediaAsset` foreign key. Scheduled-message canonicalization pins that snapshot with the rest of the immutable payload, so later Media title changes or archive actions cannot rewrite existing message versions. If an asset used by the current immutable version is later archived, authoring keeps that exact current snapshot available so an unrelated copy edit does not silently remove Media or require the archived asset to become selectable again. Operators may deliberately replace or remove it. A new upload takes precedence over an existing-asset selection.
+
+## Contact direct messages
+
+Messaging contributes a compact `Send message` action to the Core Contact show page through the existing `ContactPanelProvider` extension seam. Core remains unaware of Messaging. The modal is a Contact-scoped one-off composer only; there is no separate global compose workspace or recipient picker.
+
+`ContactDirectMessageComposerPresenter` exposes only provider-ready Contact channels and channel+purpose combinations that currently pass `MessageEligibilityGate`. `SendContactDirectMessageAction` repeats those checks server-side and schedules the result through the normal `ScheduleMessageAction` pipeline on the existing `emails`/`sms` queues. Delivery-time `ScheduledMessageGate`, suppressions, consent, provider attempts, reply-address generation, terminal events, and existing Contact message history remain unchanged and authoritative.
+
+A direct message does not create reusable template rows. An operator may optionally start from an active CRM-authored reusable template, but that template is only a source snapshot: its current payload is copied into the one-off message and then the operator's copy/Media choices are applied. The resulting `ScheduledMessage` does not pin the reusable template version and therefore may remove or customize template Media/copy without mutating the library item. Canonical meta retains source reusable-preset identity for audit when one was used. A request-scoped UUID dedupe key protects against accidental duplicate form submission.
+
+Email direct messages reuse universal Media authoring from 24E3; SMS remains text-only. Existing Contact scheduled-message/history providers surface the new delivery automatically, so direct messaging adds no second history or conversation persistence model.
+
+Reusable CRM-authored email normalization and catalog projection preserve valid `MessageMediaPayload` snapshots. This closes the 24E3 persistence gap where Media could be resolved by a creation surface but discarded by `CreateReusableMessageTemplateAction` or omitted by `ReusableMessageTemplateCatalog` before downstream reuse.
 
 The email renderer supports a `{media}` body marker. If a message has media and does not contain that marker, the media card is appended after the body. Video uses an email-safe poster/play card (or a generic play card when no poster is selected), and plain text includes the tracked destination URL. Media clicks use the existing CTA engagement route with the stable `media_primary` tracking key.

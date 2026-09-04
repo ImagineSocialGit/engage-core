@@ -1257,6 +1257,82 @@ Thanks.",
         );
     }
 
+    public function test_it_allows_valid_media_render_slot_before_email_send(): void
+    {
+        Event::fake([
+            ScheduledMessageSent::class,
+            ScheduledMessageSkipped::class,
+        ]);
+
+        $contact = Contact::factory()->create([
+            'email' => 'test@example.com',
+        ]);
+
+        $this->grantConsent($contact, 'email', 'transactional');
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'recipient_type' => Contact::class,
+            'recipient_id' => $contact->id,
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => EmailPayload::class,
+            'payload' => [
+                'to' => 'test@example.com',
+                'subject' => 'Media message',
+                'body' => "Before\n{media}\nAfter",
+                'media' => [
+                    'asset_uuid' => '33333333-3333-4333-8333-333333333333',
+                    'kind' => 'image',
+                    'title' => 'Welcome image',
+                    'url' => 'https://cdn.example.test/welcome.jpg',
+                    'mime_type' => 'image/jpeg',
+                    'tracking_key' => 'media_primary',
+                ],
+            ],
+            'status' => ScheduledMessage::STATUS_PENDING,
+            'meta' => [
+                'conditions' => [],
+            ],
+        ]);
+
+        $emailService = Mockery::mock(EmailMessagingService::class);
+        $emailService
+            ->shouldReceive('send')
+            ->once()
+            ->with(Mockery::on(
+                fn (EmailMessage $payload): bool =>
+                    $payload instanceof EmailPayload
+                    && ! str_contains($payload->plainText(), '{media}')
+                    && ! str_contains($payload->html(), '{media}')
+                    && str_contains(
+                        $payload->html(),
+                        'https://cdn.example.test/welcome.jpg',
+                    ),
+            ))
+            ->andReturn(MessageSendResult::sent(provider: 'test_email'));
+
+        app()->instance(EmailMessagingService::class, $emailService);
+
+        $this->handleScheduledMessage($scheduledMessage);
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame(
+            ScheduledMessage::STATUS_SENT,
+            $scheduledMessage->status,
+        );
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
+
+        Event::assertDispatched(
+            ScheduledMessageSent::class,
+            fn (ScheduledMessageSent $event): bool =>
+                $event->scheduledMessage->is($scheduledMessage),
+        );
+        Event::assertNotDispatched(ScheduledMessageSkipped::class);
+    }
+
     public function test_it_skips_email_before_send_when_payload_contains_unresolved_token(): void
     {
         Event::fake([ScheduledMessageSent::class]);

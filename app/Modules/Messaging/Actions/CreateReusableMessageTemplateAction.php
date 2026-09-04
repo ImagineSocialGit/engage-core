@@ -10,6 +10,7 @@ use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
 use App\Modules\Messaging\Services\MessageTokenFallbackResolver;
 use App\Modules\Messaging\Support\CtaTrackingLinkGenerator;
+use App\Modules\Messaging\Support\MessageMediaPayload;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -295,6 +296,11 @@ class CreateReusableMessageTemplateAction
 
             if ($cta !== []) {
                 $normalized['cta'] = $cta;
+            }
+
+            if (array_key_exists('media', $payload)) {
+                MessageMediaPayload::assertValid($payload['media']);
+                $normalized['media'] = $payload['media'];
             }
 
             if (array_key_exists('token_fallbacks', $payload)) {

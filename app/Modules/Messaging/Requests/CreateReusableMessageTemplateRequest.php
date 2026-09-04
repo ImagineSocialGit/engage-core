@@ -2,10 +2,12 @@
 
 namespace App\Modules\Messaging\Requests;
 
+use App\Modules\Messaging\Requests\Concerns\InteractsWithMessageMediaAuthoring;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class CreateReusableMessageTemplateRequest extends FormRequest
 {
+    use InteractsWithMessageMediaAuthoring;
     public function authorize(): bool
     {
         return true;
@@ -14,13 +16,13 @@ final class CreateReusableMessageTemplateRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return [
+        return array_merge([
             'authoring_option' => ['required', 'string', 'max:128'],
             'name' => ['required', 'string', 'max:191'],
             'subject' => ['nullable', 'string', 'max:255'],
             'body' => ['nullable', 'string', 'max:10000'],
             'message' => ['nullable', 'string', 'max:1600'],
-        ];
+        ], $this->messageMediaRules());
     }
 
     public function authoringOptionKey(): string

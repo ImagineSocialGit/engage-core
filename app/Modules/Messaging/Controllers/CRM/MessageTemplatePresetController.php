@@ -22,6 +22,7 @@ use App\Modules\Messaging\Services\MessageTemplateCompositionImpactResolver;
 use App\Modules\Messaging\Services\MessageTemplateCompositionResolver;
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
 use App\Modules\Messaging\Services\MessageTemplatePublicationHookRegistry;
+use App\Modules\Messaging\Services\MessageMediaAuthoringService;
 use App\Modules\Messaging\Services\MessageTemplateUsageResolver;
 use App\Support\ModuleIntegrations\Messaging\Contracts\MessageMediaLibrary;
 use Illuminate\Contracts\View\View;
@@ -153,14 +154,14 @@ class MessageTemplatePresetController extends Controller
         MessageTemplatePreset $messageTemplatePreset,
         PublishMessageTemplatePresetOverrideAction $publishOverride,
         MessageTemplatePublicationHookRegistry $publicationHooks,
-        MessageMediaLibrary $messageMediaLibrary,
+        MessageMediaAuthoringService $mediaAuthoring,
     ): RedirectResponse {
         $actor = $request->user();
         $actor = $actor instanceof User ? $actor : null;
         $submittedPayload = $this->submittedPayloadWithMedia(
             request: $request,
             preset: $messageTemplatePreset,
-            messageMediaLibrary: $messageMediaLibrary,
+            mediaAuthoring: $mediaAuthoring,
             actor: $actor,
         );
         $result = DB::transaction(function () use (
@@ -505,7 +506,7 @@ class MessageTemplatePresetController extends Controller
     private function submittedPayloadWithMedia(
         UpdateMessageTemplatePresetRequest $request,
         MessageTemplatePreset $preset,
-        MessageMediaLibrary $messageMediaLibrary,
+        MessageMediaAuthoringService $mediaAuthoring,
         ?User $actor,
     ): array {
         $submitted = $request->safePayload();
@@ -514,62 +515,22 @@ class MessageTemplatePresetController extends Controller
             return $submitted;
         }
 
-        if (! $messageMediaLibrary->available()) {
-            throw ValidationException::withMessages([
-                'payload.media_asset_uuid' => 'Enable the Media module before adding media to a message.',
-            ]);
-        }
-
-        $currentMedia = $this->currentMediaSnapshot($preset);
-        $upload = $request->mediaUpload();
-        $selectedUuid = $request->mediaAssetUuid();
-        $posterUuid = $request->mediaPosterAssetUuid();
-
         try {
-            if ($upload !== null) {
-                $submitted['media'] = $messageMediaLibrary->store(
-                    file: $upload,
-                    title: $request->mediaTitle(),
-                    posterAssetUuid: $posterUuid,
-                    uploadedBy: $actor,
-                );
-
-                return $submitted;
-            }
-
-            if ($selectedUuid !== null) {
-                $currentUuid = is_string($currentMedia['asset_uuid'] ?? null)
-                    ? trim($currentMedia['asset_uuid'])
-                    : null;
-                $currentPosterUuid = is_string($currentMedia['poster_asset_uuid'] ?? null)
-                    ? trim($currentMedia['poster_asset_uuid'])
-                    : null;
-
-                if ($currentMedia !== []
-                    && $selectedUuid === $currentUuid
-                    && $posterUuid === $currentPosterUuid
-                ) {
-                    $submitted['media'] = $currentMedia;
-                } else {
-                    $submitted['media'] = $messageMediaLibrary->snapshot(
-                        assetUuid: $selectedUuid,
-                        posterAssetUuid: $posterUuid,
-                    );
-                }
-
-                return $submitted;
-            }
-        } catch (\RuntimeException|\InvalidArgumentException $exception) {
+            return $mediaAuthoring->apply(
+                payload: $submitted,
+                submitted: true,
+                upload: $request->mediaUpload(),
+                assetUuid: $request->mediaAssetUuid(),
+                posterAssetUuid: $request->mediaPosterAssetUuid(),
+                title: $request->mediaTitle(),
+                currentMedia: $this->currentMediaSnapshot($preset),
+                uploadedBy: $actor,
+            );
+        } catch (\InvalidArgumentException $exception) {
             throw ValidationException::withMessages([
                 'payload.media_asset_uuid' => $exception->getMessage(),
             ]);
         }
-
-        if ($currentMedia !== []) {
-            $submitted['media'] = null;
-        }
-
-        return $submitted;
     }
 
     /** @return array<string, mixed> */

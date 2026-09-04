@@ -76,7 +76,7 @@
                                 <p class="mt-2 text-sm leading-6 text-slate-600">{{ $selectedOption->description }}</p>
                             </div>
 
-                            <form method="POST" action="{{ route('crm.messaging.message-templates.store') }}" class="space-y-5">
+                            <form method="POST" action="{{ route('crm.messaging.message-templates.store') }}" enctype="multipart/form-data" class="space-y-5">
                                 @csrf
                                 <input type="hidden" name="authoring_option" value="{{ $selectedOption->key }}">
 
@@ -125,6 +125,8 @@
                                             'rows' => 9,
                                         ]"
                                     />
+
+                                    <x-messaging.message-media-authoring :failed="$errors->any()" />
                                 @endif
 
                                 <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">

@@ -38,6 +38,7 @@ return [
             'surfaces' => [
                 'broadcasts' => true,
                 'campaigns' => true,
+                'contact_direct_messages' => true,
                 'permission_invitations' => true,
                 'webinar_registrations' => true,
                 'webinar_waitlists' => true,
@@ -60,6 +61,7 @@ return [
             'surfaces' => [
                 'broadcasts' => false,
                 'campaigns' => true,
+                'contact_direct_messages' => true,
                 'permission_invitations' => false,
                 'webinar_registrations' => true,
                 'webinar_waitlists' => true,

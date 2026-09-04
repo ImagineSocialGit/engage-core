@@ -7,6 +7,7 @@ use App\Modules\Messaging\Actions\CreateReusableMessageTemplateAction;
 use App\Modules\Messaging\Data\ReusableMessageTemplateAuthoringContext;
 use App\Modules\Messaging\Requests\CreateFlowRouteMessageTemplateRequest;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
+use App\Modules\Messaging\Services\MessageMediaAuthoringService;
 use App\Modules\Messaging\Services\RouteAuthoringMessageTemplateEligibilityResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
@@ -18,6 +19,7 @@ class CreateFlowRouteMessageTemplateController extends Controller
         CreateFlowRouteMessageTemplateRequest $request,
         CreateReusableMessageTemplateAction $createReusableMessageTemplate,
         MessageChannelAvailability $channelAvailability,
+        MessageMediaAuthoringService $mediaAuthoring,
     ): JsonResponse {
         $channel = $request->channel();
         $purpose = $request->purpose();
@@ -34,10 +36,24 @@ class CreateFlowRouteMessageTemplateController extends Controller
         }
 
         try {
+            $payload = $request->payload();
+
+            if ($channel === 'email') {
+                $payload = $mediaAuthoring->apply(
+                    payload: $payload,
+                    submitted: $request->hasMessageMediaSubmission(),
+                    upload: $request->messageMediaUpload(),
+                    assetUuid: $request->messageMediaAssetUuid(),
+                    posterAssetUuid: $request->messageMediaPosterAssetUuid(),
+                    title: $request->messageMediaTitle(),
+                    uploadedBy: $request->user(),
+                );
+            }
+
             $preset = $createReusableMessageTemplate->handle(
                 name: $request->templateName(),
                 channel: $channel,
-                payload: $request->payload(),
+                payload: $payload,
                 context: new ReusableMessageTemplateAuthoringContext(
                     contextKey: RouteAuthoringMessageTemplateEligibilityResolver::SELECTION_CONTEXT,
                     purpose: $purpose,

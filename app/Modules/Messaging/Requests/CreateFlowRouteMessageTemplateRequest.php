@@ -3,12 +3,14 @@
 namespace App\Modules\Messaging\Requests;
 
 use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Messaging\Requests\Concerns\InteractsWithMessageMediaAuthoring;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class CreateFlowRouteMessageTemplateRequest extends FormRequest
 {
+    use InteractsWithMessageMediaAuthoring;
     public function authorize(): bool
     {
         return true;
@@ -17,7 +19,7 @@ class CreateFlowRouteMessageTemplateRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return [
+        return array_merge([
             'channel' => ['required', 'string', Rule::in(['email', 'sms'])],
             'purpose' => ['required', 'string', Rule::in(['marketing', 'transactional'])],
             'name' => ['required', 'string', 'max:191'],
@@ -38,7 +40,7 @@ class CreateFlowRouteMessageTemplateRequest extends FormRequest
                 'string',
                 'max:1600',
             ],
-        ];
+        ], $this->messageMediaRules());
     }
 
     public function channel(): string

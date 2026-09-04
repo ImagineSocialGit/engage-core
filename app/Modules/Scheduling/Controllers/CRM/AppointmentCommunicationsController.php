@@ -50,7 +50,7 @@ final class AppointmentCommunicationsController extends Controller
             );
         }
 
-        $validated = $request->validate([
+        $validated = $request->validate(array_merge([
             'steps' => ['required', 'array', 'min:1', 'max:20'],
             'steps.*.key' => ['nullable', 'string', 'max:128', 'regex:/^[A-Za-z0-9_]+$/'],
             'steps.*.name' => ['required', 'string', 'max:80'],
@@ -61,7 +61,7 @@ final class AppointmentCommunicationsController extends Controller
             'steps.*.channels.*' => ['required', 'string', Rule::in(['email', 'sms']), 'distinct'],
             'steps.*.subject' => ['nullable', 'string', 'max:255'],
             'steps.*.message' => ['required', 'string', 'max:5000'],
-        ]);
+        ], $communications->authoringRules()));
 
         $communications->saveSchedule(
             steps: $validated['steps'],

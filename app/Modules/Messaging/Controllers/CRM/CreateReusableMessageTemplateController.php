@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Messaging\Actions\CreateReusableMessageTemplateAction;
 use App\Modules\Messaging\Data\ReusableMessageTemplateAuthoringOption;
 use App\Modules\Messaging\Requests\CreateReusableMessageTemplateRequest;
+use App\Modules\Messaging\Services\MessageMediaAuthoringService;
 use App\Modules\Messaging\Services\MessageTemplateAuthoringFieldPresenter;
 use App\Modules\Messaging\Services\ReusableMessageTemplateAuthoringGuide;
 use Illuminate\Http\RedirectResponse;
@@ -39,6 +40,7 @@ final class CreateReusableMessageTemplateController extends Controller
         CreateReusableMessageTemplateRequest $request,
         ReusableMessageTemplateAuthoringGuide $guide,
         CreateReusableMessageTemplateAction $createReusableMessageTemplate,
+        MessageMediaAuthoringService $mediaAuthoring,
     ): RedirectResponse {
         $option = $guide->find($request->authoringOptionKey());
 
@@ -49,10 +51,24 @@ final class CreateReusableMessageTemplateController extends Controller
         }
 
         try {
+            $payload = $request->payloadForChannel($option->channel);
+
+            if ($option->channel === 'email') {
+                $payload = $mediaAuthoring->apply(
+                    payload: $payload,
+                    submitted: $request->hasMessageMediaSubmission(),
+                    upload: $request->messageMediaUpload(),
+                    assetUuid: $request->messageMediaAssetUuid(),
+                    posterAssetUuid: $request->messageMediaPosterAssetUuid(),
+                    title: $request->messageMediaTitle(),
+                    uploadedBy: $request->user(),
+                );
+            }
+
             $preset = $createReusableMessageTemplate->handle(
                 name: $request->templateName(),
                 channel: $option->channel,
-                payload: $request->payloadForChannel($option->channel),
+                payload: $payload,
                 context: $option->context,
                 createdBy: $request->user(),
             );

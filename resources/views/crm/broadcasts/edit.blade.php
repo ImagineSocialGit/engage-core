@@ -1,4 +1,3 @@
-
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
@@ -114,6 +113,7 @@
             <form
                 method="POST"
                 action="{{ route('crm.broadcasts.update', $broadcast) }}"
+                enctype="multipart/form-data"
                 class="mt-5 space-y-4"
                 x-data="{
                     recipientFilterType: @js($recipientFilterType),
@@ -260,6 +260,12 @@
                         'help' => 'Keep SMS copy short. Normal Messaging SMS consent, suppression, revocation, and send guards still apply.',
                         'error' => $errors->first('message'),
                     ]"
+                />
+
+                <x-messaging.message-media-authoring
+                    :current-media="is_array($broadcast->messagePayload()['media'] ?? null) ? $broadcast->messagePayload()['media'] : []"
+                    :visible-bind="$emailFieldVisibility"
+                    :failed="$errors->any()"
                 />
 
                 @if($broadcast->isPermissionInvitation())

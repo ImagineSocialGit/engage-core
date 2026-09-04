@@ -20,7 +20,13 @@ final class UnavailableAppointmentCommunications implements AppointmentCommunica
             'configured' => false,
             'steps' => [],
             'channels' => [],
+            'media_authoring' => ['available' => false, 'assets' => [], 'image_assets' => []],
         ];
+    }
+
+    public function authoringRules(): array
+    {
+        return [];
     }
 
     public function generateDefaultSchedule(?User $actor = null): array

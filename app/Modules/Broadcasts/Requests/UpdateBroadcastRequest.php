@@ -8,6 +8,7 @@ use App\Modules\Broadcasts\Services\BroadcastMessageTokenValidator;
 use App\Modules\Core\Requests\Concerns\NormalizesContactFilter;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
+use App\Modules\Messaging\Requests\Concerns\InteractsWithMessageMediaAuthoring;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\MessageTokenFallbackResolver;
 use Illuminate\Foundation\Http\FormRequest;
@@ -17,6 +18,7 @@ use Illuminate\Validation\Validator;
 
 class UpdateBroadcastRequest extends FormRequest
 {
+    use InteractsWithMessageMediaAuthoring;
     use NormalizesContactFilter;
 
     public function authorize(): bool
@@ -87,7 +89,7 @@ class UpdateBroadcastRequest extends FormRequest
                 BroadcastRecipient::STATUS_SCHEDULED,
                 BroadcastRecipient::STATUS_SENT,
             ])],
-        ], $this->contactFilterRules(
+        ], $this->messageMediaRules(), $this->contactFilterRules(
             typeField: 'recipient_filter_type',
             tagField: 'recipient_tag',
             idsField: 'contact_ids',
