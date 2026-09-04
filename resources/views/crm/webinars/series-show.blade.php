@@ -5,6 +5,7 @@
         x-data="{
             copied: null,
             copyFailed: false,
+            messageReviewOpen: @js(request()->boolean('messages') || old('_editing_message_id') !== null),
             async copyValue(value, key) {
                 if (!value) return;
 
@@ -78,12 +79,14 @@
                 <div class="flex flex-wrap gap-2">
                     @if($series->status === 'active')
                         @if(function_exists('module_enabled') && module_enabled('messaging'))
-                            <a
-                                href="{{ route('crm.webinar-series.message-chains.show', $series) }}"
+                            <button
+                                type="button"
+                                x-on:click="messageReviewOpen = true"
                                 class="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                data-webinar-message-review-button
                             >
                                 Edit messages
-                            </a>
+                            </button>
                         @endif
                         <a
                             href="#links"
@@ -284,7 +287,7 @@
             </div>
         </section>
 
-        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7" data-webinar-type-message-plan>
+        <section id="message-plan" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7" data-webinar-type-message-plan>
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Messages</p>
@@ -295,9 +298,14 @@
                     </p>
                 </div>
                 @if(function_exists('module_enabled') && module_enabled('messaging'))
-                    <a href="{{ route('crm.webinar-series.message-chains.show', $series) }}" class="text-sm font-semibold text-slate-700 underline">
+                    <button
+                        type="button"
+                        x-on:click="messageReviewOpen = true"
+                        class="text-sm font-semibold text-slate-700 underline"
+                        data-webinar-message-review-button
+                    >
                         Review message content
-                    </a>
+                    </button>
                 @endif
             </div>
         </section>
@@ -412,6 +420,64 @@
                     </button>
                 </form>
             </section>
+        @endif
+
+        @if(function_exists('module_enabled') && module_enabled('messaging') && (int) ($messageReview['message_count'] ?? 0) > 0)
+            <div
+                x-show="messageReviewOpen"
+                x-cloak
+                x-on:keydown.escape.window="messageReviewOpen = false"
+                class="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 p-3 sm:p-6"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="webinar-message-review-title"
+                data-webinar-message-review-modal
+            >
+                <div
+                    class="mx-auto my-4 w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+                    x-on:click.outside="messageReviewOpen = false"
+                >
+                    <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-4 sm:px-6">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Message plan</p>
+                            <h2 id="webinar-message-review-title" class="mt-1 text-xl font-semibold text-slate-950">
+                                {{ $series->title }} message content
+                            </h2>
+                            <p class="mt-1 text-sm text-slate-600">
+                                Review and edit the messages used by this webinar type. Existing enrollments stay pinned to their already-published versions.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            x-on:click="messageReviewOpen = false"
+                            class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-300 text-xl text-slate-600 hover:bg-slate-50"
+                            aria-label="Close message review"
+                        >
+                            &times;
+                        </button>
+                    </div>
+
+                    <div class="max-h-[calc(100vh-10rem)] overflow-y-auto p-3 sm:p-5">
+                        <x-messaging.message-editor-carousel
+                            :presentation="$messageReview"
+                            :editable="true"
+                            :form-context="['return_surface' => 'series_detail']"
+                        />
+                    </div>
+
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
+                        <p class="text-xs leading-5 text-slate-500">
+                            Email messages can use Media when the Media module is enabled. SMS remains text-only.
+                        </p>
+                        <a
+                            href="{{ route('crm.webinar-series.message-chains.show', $series) }}"
+                            class="text-xs font-semibold text-slate-600 underline"
+                        >
+                            Open full message workspace
+                        </a>
+                    </div>
+                </div>
+            </div>
         @endif
     </div>
 </x-layouts.crm>

@@ -101,10 +101,16 @@ class UpdateWebinarSeriesMessageTemplateAction
                 );
             }
 
+            $removeMedia = array_key_exists('media', $payload)
+                && $payload['media'] === null;
             $mergedPayload = array_replace_recursive(
                 $currentTemplateVersion->payload(),
                 $payload,
             );
+
+            if ($removeMedia) {
+                unset($mergedPayload['media']);
+            }
 
             $this->assertValidTokens(
                 payload: $mergedPayload,

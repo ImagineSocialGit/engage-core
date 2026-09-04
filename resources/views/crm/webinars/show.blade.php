@@ -1,3 +1,4 @@
+
 <x-layouts.crm :title="$title" :heading="$heading">
     <div class="space-y-6" data-webinar-session-detail="{{ $webinar->getKey() }}">
         <div class="flex flex-wrap items-center gap-2 text-sm">
@@ -185,30 +186,26 @@
         @if((int) ($messageReview['message_count'] ?? 0) > 0)
             <section
                 class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"
-                data-webinar-message-review="{{ $webinar->getKey() }}"
+                data-webinar-message-summary="{{ $webinar->getKey() }}"
             >
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Messages</p>
-                        <h2 class="mt-2 text-xl font-semibold text-slate-950">Messages for this session</h2>
+                        <h2 class="mt-2 text-xl font-semibold text-slate-950">Message plan</h2>
                         <p class="mt-1 text-sm text-slate-600" data-webinar-message-profile>
-                            Effective plan: {{ $messageProfile['effective_profile_name'] ?? 'Default' }}
-                            · source: {{ $messageProfile['source'] ?? 'default' }}
+                            {{ $messageProfile['source'] === 'occurrence' ? 'This session has a custom schedule.' : 'Uses the webinar type schedule.' }}
+                            {{ $messageProfile['effective_profile_name'] ?? 'Default' }}
+                            · {{ (int) ($messageReview['message_count'] ?? 0) }} messages
                         </p>
                     </div>
                     @if($series)
-                        <a href="{{ route('crm.webinar-series.message-chains.show', $series) }}" class="text-sm font-semibold text-slate-700 underline">
-                            Open full message sequence
+                        <a
+                            href="{{ route('crm.webinar-series.show', ['series' => $series, 'messages' => 1]) }}#message-plan"
+                            class="text-sm font-semibold text-slate-700 underline"
+                        >
+                            Review webinar type messages
                         </a>
                     @endif
-                </div>
-
-                <div class="mt-5">
-                    <x-messaging.message-editor-carousel
-                        :presentation="$messageReview"
-                        :editable="true"
-                        :form-context="['webinar_id' => $webinar->getKey()]"
-                    />
                 </div>
             </section>
         @endif

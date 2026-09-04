@@ -2,6 +2,7 @@
 
 namespace App\Modules\Messaging\Services;
 
+use App\Modules\Messaging\Support\MessageMediaPayload;
 use App\Support\TokenContracts\Data\TokenContextDefinition;
 use App\Support\TokenContracts\TokenContractRegistry;
 use Illuminate\Support\Arr;
@@ -419,6 +420,12 @@ class MessageTemplateTokenValidator
      */
     private function isAllowedRenderSlot(string $token, array $payload): bool
     {
+        if ($token === 'media') {
+            return MessageMediaPayload::validationErrors(
+                $payload['media'] ?? null,
+            ) === [];
+        }
+
         if ($token !== 'cta') {
             $value = $payload[$token] ?? null;
 

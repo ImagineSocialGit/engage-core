@@ -1368,6 +1368,28 @@ Broadcasts registers `broadcast_send` as one of those executable contexts. The c
 
 `CreateReusableMessageTemplateAction` and `ReusableMessageTemplateCatalog` preserve `token_fallbacks` along with subject/body/message copy. Reusable email payloads also preserve a bounded first-class `cta` (`tracking_key`, `label`, `url`) when one is present. This is required for Broadcast promotion/reuse: a saved personalized message must not lose either the missing-field behavior or primary CTA that made up the authored message. The reusable template's immutable version remains the canonical copy for the library item; loading it into a Broadcast creates a draft copy and does not mutate the saved template.
 
+### Client email presentation
+
+`EmailPayload` resolves its semantic Blade view through
+`App\Support\Clients\ViewResolver`. A committed
+`client/<client-key>/resources/views/email.blade.php` therefore owns that
+client's normal HTML email shell, while Core `resources/views/email.blade.php`
+remains the fallback.
+
+Client email presentation is intentionally independent from message-content
+ownership. Webinar/Campaign/Broadcast/direct-message payloads continue to use
+their existing immutable Messaging content/runtime contracts; the client view
+only controls HTML presentation.
+
+Client email overrides must preserve the EmailPayload presentation slots they
+intend to support, including CTA(s), `{media}`, secondary links, footer,
+transactional opt-out, and marketing unsubscribe. Media card generation remains
+owned by EmailPayload / the semantic `email-media-card` view.
+
+The Slam Dunk and Rob client packages currently provide client-wide `email`
+overrides. Those layouts use their existing generated client logo assets and
+client brand language without changing message-definition content.
+
 ## Completed refactor boundary and remaining work
 
 The 15A/15B implementation sequence is complete for the core Messaging persistence contract:

@@ -50,6 +50,8 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
             ->get(route('crm.webinars.show', $webinar))
             ->assertOk()
             ->assertViewIs('crm.webinars.show')
+            ->assertSee('data-webinar-message-summary', false)
+            ->assertDontSee('data-message-editor-carousel', false)
             ->assertViewHas('messageReview', function (array $presentation) use ($webinar): bool {
                 if (
                     $presentation['message_count'] !== 3
@@ -92,6 +94,31 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
                         === (int) $profile->getKey()
                     && ($profileData['source'] ?? null) === 'series';
             });
+    }
+
+    public function test_webinar_type_detail_uses_the_canonical_message_carousel_popup(): void
+    {
+        [$profile] = $this->profileAndChain();
+        $series = WebinarSeries::factory()->create([
+            'title' => 'Popup Review Series',
+            'slug' => 'popup-review-series',
+            'webinar_schedule_profile_id' => $profile->getKey(),
+        ]);
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('crm.webinar-series.show', [
+                'series' => $series,
+                'messages' => 1,
+            ]))
+            ->assertOk()
+            ->assertViewIs('crm.webinars.series-show')
+            ->assertViewHas('messageReview', fn (array $presentation): bool =>
+                $presentation['message_count'] === 3
+            )
+            ->assertSee('data-webinar-message-review-modal', false)
+            ->assertSee('data-message-editor-carousel', false)
+            ->assertSee('name="return_surface"', false)
+            ->assertSee('value="series_detail"', false);
     }
 
     public function test_occurrence_profile_controls_the_specific_session_message_review(): void
@@ -168,9 +195,7 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
             ->patch(route('crm.webinars.schedule-profile.update', $webinar), [
                 'webinar_schedule_profile_id' => $overrideProfile->getKey(),
             ])
-            ->assertRedirect(route('crm.webinar-series.index', [
-                'messages' => $webinar->getKey(),
-            ]));
+            ->assertRedirect(route('crm.webinars.show', $webinar));
 
         $this->assertDatabaseHas('webinars', [
             'id' => $webinar->getKey(),
@@ -181,9 +206,7 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
             ->patch(route('crm.webinars.schedule-profile.update', $webinar), [
                 'webinar_schedule_profile_id' => null,
             ])
-            ->assertRedirect(route('crm.webinar-series.index', [
-                'messages' => $webinar->getKey(),
-            ]));
+            ->assertRedirect(route('crm.webinars.show', $webinar));
 
         $this->assertDatabaseHas('webinars', [
             'id' => $webinar->getKey(),

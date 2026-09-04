@@ -1,5 +1,7 @@
 # Webinars TODO
 
+## CRM Architecture
+
 - [x] Split the Webinar CRM into three task-oriented surfaces: Webinar Types,
   Webinar Type Detail, and Specific Session Detail. Keep recurring setup/public
   links on the type, and attendance/participation/registration detail on the
@@ -17,6 +19,13 @@
 - [x] Keep archived Webinar Types out of normal active browsing and Zoom sync,
   while preserving registrations, attendance, waitlist history, removed-session
   evidence, and already-scheduled communication.
+  - [x] Move full Webinar message-content review/editing to Webinar Type Detail
+  through the canonical Messaging carousel popup. Specific Session Detail keeps
+  only effective-plan/override context plus its occurrence-only schedule
+  override.
+- [x] Complete Webinar adoption of universal Email Media authoring so the
+  canonical carousel can select/upload/preserve/remove Media through series
+  copy-on-write immutable publication.
 
 ## Message/readiness follow-up
 

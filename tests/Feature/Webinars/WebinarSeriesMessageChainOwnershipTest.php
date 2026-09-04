@@ -11,6 +11,7 @@ use App\Modules\Messaging\Models\MessageChain;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\MessageChainStep;
 use App\Modules\Messaging\Models\MessageTemplate;
+use App\Support\ModuleIntegrations\Messaging\Contracts\MessageMediaLibrary;
 use App\Modules\Webinars\Actions\DeleteWebinarSeriesAction;
 use App\Modules\Webinars\Actions\DuplicateWebinarSeriesMessageChainsAction;
 use App\Modules\Webinars\Actions\StartWebinarMessageChainEnrollmentAction;
@@ -22,7 +23,9 @@ use App\Modules\Webinars\Models\WebinarScheduleProfileChainBinding;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Modules\Webinars\Models\WebinarSeriesMessageChainBinding;
 use App\Modules\Webinars\Validation\WebinarMessageChainSetupValidationContributor;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
 
@@ -245,6 +248,124 @@ class WebinarSeriesMessageChainOwnershipTest extends TestCase
             ->assertSee('data-webinar-message-ownership="series"', false)
             ->assertSee('Updated from CRM')
             ->assertSee('data-message-editor-form', false);
+    }
+
+    public function test_webinar_carousel_can_publish_and_remove_email_media_through_series_copy_on_write(): void
+    {
+        [$profile, $profileChain] = $this->registrationProfileAndChain();
+        $series = WebinarSeries::factory()->create([
+            'title' => 'Media Series',
+            'slug' => 'media-series',
+            'webinar_schedule_profile_id' => $profile->getKey(),
+        ]);
+        $user = User::factory()->create();
+        $sharedVariant = $profileChain
+            ->requireCurrentVersion()
+            ->steps
+            ->firstWhere('key', 'confirmation_email')
+            ?->variants
+            ->firstOrFail();
+
+        Config::set('modules.enabled', ['webinars', 'messaging', 'media']);
+        $this->app->instance(MessageMediaLibrary::class, new class implements MessageMediaLibrary {
+            public function available(): bool
+            {
+                return true;
+            }
+
+            public function selectableAssets(): array
+            {
+                return [];
+            }
+
+            public function snapshot(string $assetUuid, ?string $posterAssetUuid = null): array
+            {
+                return [
+                    'asset_uuid' => $assetUuid,
+                    'kind' => 'image',
+                    'title' => 'Webinar image',
+                    'url' => 'https://cdn.example.test/webinar.webp',
+                    'mime_type' => 'image/webp',
+                    'tracking_key' => 'media_primary',
+                ];
+            }
+
+            public function store(
+                UploadedFile $file,
+                ?string $title = null,
+                ?string $posterAssetUuid = null,
+                ?Model $uploadedBy = null,
+            ): array {
+                throw new \RuntimeException('Upload is not used in this test.');
+            }
+        });
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+        $this->withoutExceptionHandling();
+        
+        $this->actingAs($user)
+            ->patch('http://crm.'.config('app.root_domain').route(
+                'crm.webinar-series.message-chains.variants.update',
+                [$series, $sharedVariant],
+                false,
+            ), [
+                'return_surface' => 'series_detail',
+                'payload' => [
+                    'subject' => 'Media confirmation',
+                    'body' => "Body\n{media}",
+                    'media_present' => '1',
+                    'media_asset_uuid' => '11111111-1111-4111-8111-111111111111',
+                ],
+            ])
+            ->assertRedirect(route('crm.webinar-series.show', [
+                'series' => $series,
+                'messages' => 1,
+            ]).'#message-plan');
+
+        $seriesBinding = WebinarSeriesMessageChainBinding::query()
+            ->with('messageChain.currentVersion.steps.variants.messageTemplateVersion')
+            ->where('webinar_series_id', $series->getKey())
+            ->where('message_area_key', 'confirmation')
+            ->firstOrFail();
+        $seriesVariant = $seriesBinding->messageChain
+            ->requireCurrentVersion()
+            ->steps
+            ->firstWhere('key', 'confirmation_email')
+            ?->variants
+            ->firstOrFail();
+
+        $this->assertSame(
+            '11111111-1111-4111-8111-111111111111',
+            data_get($seriesVariant->messageTemplateVersion?->payload(), 'media.asset_uuid'),
+        );
+
+        $this->actingAs($user)
+            ->patch('http://crm.'.config('app.root_domain').route(
+                'crm.webinar-series.message-chains.variants.update',
+                [$series, $seriesVariant],
+                false,
+            ), [
+                'payload' => [
+                    'subject' => 'Media removed',
+                    'body' => 'Body without media.',
+                    'media_present' => '1',
+                    'media_asset_uuid' => '',
+                ],
+            ])
+            ->assertRedirect(route('crm.webinar-series.message-chains.show', $series));
+
+        $seriesBinding->messageChain->refresh();
+        $publishedVariant = $seriesBinding->messageChain
+            ->requireCurrentVersion()
+            ->steps
+            ->firstWhere('key', 'confirmation_email')
+            ?->variants
+            ->firstOrFail();
+
+        $this->assertArrayNotHasKey(
+            'media',
+            $publishedVariant->messageTemplateVersion?->payload() ?? [],
+        );
     }
 
     public function test_series_deletion_removes_unreferenced_owned_chains_and_templates(): void

@@ -3,6 +3,7 @@
 namespace App\Modules\Webinars\Requests;
 
 use App\Modules\Messaging\Models\MessageChainStepVariant;
+use App\Modules\Messaging\Requests\Concerns\InteractsWithMessageMediaAuthoring;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Foundation\Http\FormRequest;
@@ -10,6 +11,8 @@ use Illuminate\Validation\Rule;
 
 class UpdateWebinarSeriesMessageTemplateRequest extends FormRequest
 {
+    use InteractsWithMessageMediaAuthoring;
+
     public function authorize(): bool
     {
         return true;
@@ -21,6 +24,7 @@ class UpdateWebinarSeriesMessageTemplateRequest extends FormRequest
         return [
             '_editing_message_id' => ['nullable', 'string', 'max:191'],
             'webinar_id' => ['nullable', 'integer', 'exists:webinars,id'],
+            'return_surface' => ['nullable', Rule::in(['series_detail'])],
             'payload' => ['required', 'array'],
             'payload.subject' => [
                 'nullable',
@@ -51,6 +55,7 @@ class UpdateWebinarSeriesMessageTemplateRequest extends FormRequest
             'payload.secondary_link' => ['nullable', 'array'],
             'payload.secondary_link.label' => ['nullable', 'string', 'max:255'],
             'payload.secondary_link.url' => ['nullable', 'string', 'max:1000'],
+            ...$this->messageMediaRules('payload'),
         ];
     }
 
@@ -137,6 +142,7 @@ class UpdateWebinarSeriesMessageTemplateRequest extends FormRequest
     public function successRedirectUrl(WebinarSeries $series): string
     {
         return $this->webinarRedirectUrl($series)
+            ?? $this->seriesDetailRedirectUrl($series)
             ?? route('crm.webinar-series.message-chains.show', $series);
     }
 
@@ -149,6 +155,18 @@ class UpdateWebinarSeriesMessageTemplateRequest extends FormRequest
         }
 
         return parent::getRedirectUrl();
+    }
+
+    private function seriesDetailRedirectUrl(WebinarSeries $series): ?string
+    {
+        if ($this->input('return_surface') !== 'series_detail') {
+            return null;
+        }
+
+        return route('crm.webinar-series.show', [
+            'series' => $series,
+            'messages' => 1,
+        ]).'#message-plan';
     }
 
     private function webinarRedirectUrl(WebinarSeries $series): ?string

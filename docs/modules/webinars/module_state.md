@@ -935,6 +935,30 @@ provider reporting contract and must not be represented as though they are.
 Specific Session Detail currently shows the provider attendance facts that are
 actually retained plus Engage Core registration responses.
 
+### Webinar message authoring surface
+
+Webinar message copy is authored at Webinar Type scope. Webinar Type Detail
+opens the canonical Messaging message-editor carousel in a modal and retains the
+dedicated MessageChain workspace as a deeper authoring/fallback surface.
+
+Specific Session Detail does not duplicate that editor. It shows the effective
+message-plan summary and whether the occurrence inherits the Webinar Type
+schedule or has an occurrence-only schedule-profile override. The occurrence
+override control remains on Specific Session Detail and returns there after a
+successful change.
+
+The canonical Webinar carousel uses Messaging's universal Email Media authoring
+contract. Webinar's series copy-on-write update endpoint validates and resolves
+Media through `InteractsWithMessageMediaAuthoring` /
+`MessageMediaAuthoringService`, then publishes the resulting immutable
+MessageTemplateVersion and MessageChainVersion exactly like existing Webinar
+copy edits. SMS remains text-only.
+
+Explicit Media removal is represented internally as a transient null sentinel
+during the Webinar partial-payload merge and is removed before publication. A
+persisted Webinar MessageTemplateVersion therefore contains either a valid Media
+snapshot or no `media` key; it does not persist a null Media value.
+
 ### Webinar Type lifecycle
 
 A WebinarSeries uses its existing `status` field for operator lifecycle.

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Messaging;
 
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
+use App\Modules\Messaging\Support\MessageMediaPayload;
 use Tests\TestCase;
 
 class MessageTemplateTokenValidatorTest extends TestCase
@@ -145,6 +146,57 @@ class MessageTemplateTokenValidatorTest extends TestCase
         );
 
         $this->assertEquals([], $issues);
+    }
+
+    public function test_it_accepts_media_render_slot_when_backed_by_valid_media_payload(): void
+    {
+        $payload = [
+            'subject' => 'Example',
+            'body' => "Opening.\n{media}\nClosing.",
+            'media' => [
+                'asset_uuid' => '11111111-1111-4111-8111-111111111111',
+                'kind' => 'image',
+                'title' => 'Example image',
+                'url' => 'https://cdn.example.test/example.webp',
+                'mime_type' => 'image/webp',
+                'tracking_key' => MessageMediaPayload::TRACKING_KEY,
+            ],
+        ];
+
+        $validator = app(MessageTemplateTokenValidator::class);
+
+        $issues = $validator->validatePayload(
+            payload: $payload,
+            dispatchKeys: ['registration_created'],
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+            surface: 'webinar_registrations',
+        );
+
+        $this->assertEquals([], $issues);
+        $this->assertNotContains(
+            'media',
+            $validator->resolvableTokensFromPayload($payload),
+        );
+    }
+
+    public function test_it_does_not_exempt_media_marker_without_valid_media_payload(): void
+    {
+        $issues = app(MessageTemplateTokenValidator::class)->validatePayload(
+            payload: [
+                'subject' => 'Example',
+                'body' => 'Open this: {media}',
+            ],
+            dispatchKeys: ['registration_created'],
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+            surface: 'webinar_registrations',
+        );
+
+        $this->assertSame('error', $issues[0]['level']);
+        $this->assertSame('payload.body', $issues[0]['path']);
     }
 
     public function test_flow_route_send_message_context_exposes_only_runtime_safe_contact_copy_fields(): void

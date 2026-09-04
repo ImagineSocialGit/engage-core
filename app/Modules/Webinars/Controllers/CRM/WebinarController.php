@@ -805,9 +805,7 @@ class WebinarController extends Controller
         ])->save();
 
         return redirect()
-            ->route('crm.webinar-series.index', [
-                'messages' => $webinar->getKey(),
-            ])
+            ->route('crm.webinars.show', $webinar)
             ->with('success', 'Webinar message plan updated.');
     }
 
