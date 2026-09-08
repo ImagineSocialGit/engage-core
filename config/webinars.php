@@ -46,6 +46,7 @@ return [
                 'meeting' => [
                     'label' => 'Meeting',
                     'provider' => App\Integrations\Webinars\Zoom\ZoomMeetingProvider::class,
+                    'schedule_increment_minutes' => 15,
                 ],
             ],
 

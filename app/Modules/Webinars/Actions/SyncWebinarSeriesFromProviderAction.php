@@ -12,6 +12,7 @@ use App\Modules\Webinars\Models\WebinarOccurrenceSuppression;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use App\Modules\Webinars\Services\WebinarProviderManager;
+use App\Modules\Webinars\Services\WebinarProviderSchedulePolicy;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -21,6 +22,7 @@ class SyncWebinarSeriesFromProviderAction
         private readonly FlushWebinarCachesAction $flushWebinarCachesAction,
         private readonly GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction,
         private readonly WebinarProviderManager $webinarProviderManager,
+        private readonly WebinarProviderSchedulePolicy $providerSchedulePolicy,
     ) {}
 
     public function execute(WebinarSeries $series): array
@@ -38,20 +40,31 @@ class SyncWebinarSeriesFromProviderAction
         );
         $providerWebinars = collect($snapshot->webinars)->values();
 
-        $fetchedExternalIds = $providerWebinars
+        $providerReturnedExternalIds = $providerWebinars
             ->map(fn (ProviderWebinarData $webinar) => $webinar->externalId)
             ->filter()
             ->values()
             ->all();
 
+        $scheduleEligibleProviderWebinars = $providerWebinars
+            ->filter(fn (ProviderWebinarData $webinar): bool =>
+                $this->providerSchedulePolicy->allowsProviderOccurrence(
+                    $series,
+                    $webinar,
+                )
+            )
+            ->values();
+        $ignoredScheduleOutliers = $providerWebinars->count()
+            - $scheduleEligibleProviderWebinars->count();
+
         $suppressedExternalIds = $this->suppressedExternalIds(
             series: $series,
             provider: $provider,
             providerEventType: $providerEventType,
-            fetchedExternalIds: $fetchedExternalIds,
+            fetchedExternalIds: $providerReturnedExternalIds,
         );
 
-        $fetchedWebinars = $providerWebinars
+        $fetchedWebinars = $scheduleEligibleProviderWebinars
             ->reject(fn (ProviderWebinarData $webinar): bool => in_array(
                 $webinar->externalId,
                 $suppressedExternalIds,
@@ -128,7 +141,7 @@ class SyncWebinarSeriesFromProviderAction
                 series: $series,
                 provider: $provider,
                 providerEventType: $providerEventType,
-                fetchedExternalIds: $fetchedExternalIds,
+                fetchedExternalIds: $providerReturnedExternalIds,
             ) as $missingWebinar) {
                 $missingWebinar->forceFill([
                     'provider_lifecycle_status' => WebinarProviderLifecycleStatus::Missing->value,
@@ -183,6 +196,7 @@ class SyncWebinarSeriesFromProviderAction
             'deleted' => 0,
             'removed_from_provider' => count($missing),
             'suppressed' => count($suppressedExternalIds),
+            'ignored_schedule_outliers' => $ignoredScheduleOutliers,
             'conflicts' => [],
             'missing' => $missing,
             'reconciliation' => [
@@ -191,6 +205,7 @@ class SyncWebinarSeriesFromProviderAction
                 'provider' => $provider,
                 'provider_event_type' => $providerEventType,
                 'missing_candidates' => count($missing),
+                'ignored_schedule_outliers' => $ignoredScheduleOutliers,
             ],
         ];
     }

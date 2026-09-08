@@ -9,6 +9,7 @@ use App\Modules\Webinars\ConfigContracts\WebinarPostEventConfigContract;
 use App\Modules\Webinars\ConfigContracts\WebinarScheduleProfileConfigContract;
 use App\Modules\Webinars\ConfigContracts\WebinarsConfigContractTargetProvider;
 use App\Modules\Webinars\Console\Commands\ImportWebinarRegistrationsCommand;
+use App\Modules\Webinars\Console\Commands\ReconcileWebinarScheduleOutliersCommand;
 use App\Modules\Webinars\Console\Commands\SyncWebinarScheduleProfilesCommand;
 use App\Modules\Webinars\Deployment\WebinarsDeploymentPlanContributor;
 use App\Modules\Webinars\EventDefinitions\WebinarBehaviorEventDefinitionContributor;
@@ -116,6 +117,7 @@ class WebinarsModuleServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 ImportWebinarRegistrationsCommand::class,
+                ReconcileWebinarScheduleOutliersCommand::class,
                 SyncWebinarScheduleProfilesCommand::class,
             ]);
         }

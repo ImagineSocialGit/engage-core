@@ -9,6 +9,7 @@ use App\Modules\Webinars\Data\ProviderWebinarData;
 use App\Modules\Webinars\Data\ProviderWebinarSnapshot;
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
 use App\Modules\Webinars\Exceptions\ProviderRegistrationPreparationConnectionException;
+use App\Modules\Webinars\Services\WebinarProviderSchedulePolicy;
 use App\Modules\Webinars\Services\WebinarTimezoneResolver;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
@@ -362,6 +363,7 @@ class ZoomEventService
             description: $event['agenda'] ?? null,
             meta: [
                 'zoom_uuid' => $event['uuid'] ?? null,
+                'schedule_source' => WebinarProviderSchedulePolicy::PROVIDER_LIST_SCHEDULE_SOURCE,
             ],
         );
     }

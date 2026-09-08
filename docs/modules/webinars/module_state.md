@@ -98,6 +98,24 @@ Both adapters implement the same `WebinarProvider` contract and share the provid
 `zoom`. The Meeting adapter uses Meeting lookup, registrant, cancellation, attendance,
 and recording endpoints; the Webinar adapter uses the corresponding Webinar endpoints.
 
+Zoom Meeting synchronization also applies the configured provider scheduling grid before
+a same-title Zoom-list event is treated as a Webinar occurrence. The default Meeting grid
+is 15 minutes. Zoom list normalization stamps schedule provenance into provider metadata,
+so a same-title Meeting whose listed scheduled start falls outside that grid is treated as
+provider noise (for example an ad-hoc rehearsal/test meeting), is not imported, is not
+registerable, and is excluded from normal schedule/history presentation once stored.
+Generic provider adapters and synthetic/manual rows without that provenance are not silently
+classified as noise. Existing Zoom rows created before this provenance rule can be reviewed
+explicitly with `webinars:reconcile-schedule-outliers`; only `--apply` removes/hides them,
+through the normal occurrence-removal contract.
+
+Webinar Type history represents business sessions rather than every retained provider row.
+Visible past occurrences with the same exact scheduled start are collapsed to one canonical
+row. An explicit replacement wins; otherwise the row with the strongest registration
+history wins, then the series' current provider identity, then the newest row. The other
+provider rows remain persisted and directly resolvable so registration, attendance,
+Messaging, and replacement provenance are not destroyed.
+
 ## Explicit occurrence replacement
 
 A provider event-type switch is not an in-place conversion. Operators explicitly link

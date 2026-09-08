@@ -24,6 +24,8 @@ use App\Modules\Webinars\Requests\SyncWebinarSeriesRequest;
 use App\Modules\Webinars\Requests\UpdateWebinarSeriesProviderEventTypeRequest;
 use App\Modules\Webinars\Requests\UpdateWebinarSeriesScheduleProfileRequest;
 use App\Modules\Webinars\Services\WebinarMessageChainPresentationService;
+use App\Modules\Webinars\Services\WebinarProviderSchedulePolicy;
+use App\Modules\Webinars\Services\WebinarSeriesHistoryResolver;
 use App\Modules\Webinars\Services\WebinarScheduleProfileResolver;
 use App\Support\Reporting\PaidAdTrackingLinkGenerator;
 use Illuminate\Http\Client\ConnectionException;
@@ -47,6 +49,8 @@ class WebinarController extends Controller
         WebinarMessageChainPresentationService $messageChainPresentation,
         WebinarScheduleProfileResolver $scheduleProfileResolver,
         PaidAdTrackingLinkGenerator $paidAdTrackingLinkGenerator,
+        WebinarProviderSchedulePolicy $providerSchedulePolicy,
+        WebinarSeriesHistoryResolver $historyResolver,
     ): View {
 
         $showArchivedTypes = $request->boolean('archived_types');
@@ -61,26 +65,41 @@ class WebinarController extends Controller
                 'webinars' => fn ($query) => $query
                     ->withCount('registrations')
                     ->whereNull('hidden_at')
-                    ->where('provider_lifecycle_status', WebinarProviderLifecycleStatus::Active->value)
-                    ->where('ends_at', '>', now())
                     ->orderBy('starts_at')
                     ->orderBy('id'),
             ])
             ->withCount([
-                'webinars as upcoming_sessions_count' => fn ($query) => $query
-                    ->whereNull('hidden_at')
-                    ->where('provider_lifecycle_status', WebinarProviderLifecycleStatus::Active->value)
-                    ->where('ends_at', '>', now()),
-                'webinars as past_sessions_count' => fn ($query) => $query
-                    ->whereNull('hidden_at')
-                    ->whereNotNull('ends_at')
-                    ->where('ends_at', '<=', now()),
                 'webinars as removed_sessions_count' => fn ($query) => $query
                     ->whereNotNull('hidden_at'),
                 'occurrenceSuppressions as suppressed_sessions_count',
             ])
             ->orderBy('title')
             ->get();
+
+        $series->each(function (WebinarSeries $seriesItem) use (
+            $historyResolver,
+            $providerSchedulePolicy,
+        ): void {
+            $allOccurrences = $seriesItem->webinars;
+            $upcoming = $allOccurrences
+                ->filter(fn (Webinar $webinar): bool =>
+                    $webinar->matchesSeriesProviderIdentity($seriesItem)
+                    && $providerSchedulePolicy->allowsStoredOccurrence($webinar)
+                    && $webinar->isProviderActive()
+                    && ($webinar->ends_at?->isFuture() ?? false)
+                )
+                ->sortBy(fn (Webinar $webinar): string =>
+                    $webinar->starts_at?->format('Y-m-d H:i:s') ?? ''
+                )
+                ->values();
+
+            $seriesItem->setAttribute('upcoming_sessions_count', $upcoming->count());
+            $seriesItem->setAttribute(
+                'past_sessions_count',
+                $historyResolver->resolve($seriesItem, $allOccurrences)->count(),
+            );
+            $seriesItem->setRelation('webinars', $upcoming);
+        });
 
         $archivedTypeCount = WebinarSeries::query()
             ->where('status', 'inactive')
@@ -105,8 +124,12 @@ class WebinarController extends Controller
             ->matchingCurrentSeriesProvider()
             ->orderBy('starts_at')
             ->orderBy('id')
-            ->limit(2)
-            ->get();
+            ->get()
+            ->filter(fn (Webinar $webinar): bool =>
+                $providerSchedulePolicy->allowsStoredOccurrence($webinar)
+            )
+            ->take(2)
+            ->values();
 
         $upcomingMessageReviews = collect();
 
@@ -199,7 +222,11 @@ class WebinarController extends Controller
             ->orderByRaw('starts_at IS NULL')
             ->orderBy('starts_at')
             ->orderBy('id')
-            ->get();
+            ->get()
+            ->filter(fn (Webinar $webinar): bool =>
+                $providerSchedulePolicy->allowsStoredOccurrence($webinar)
+            )
+            ->values();
 
         $showArchived = $request->boolean('archived');
         $showAttention = $request->boolean('attention');
@@ -371,6 +398,8 @@ class WebinarController extends Controller
         WebinarScheduleProfileResolver $scheduleProfileResolver,
         PaidAdTrackingLinkGenerator $paidAdTrackingLinkGenerator,
         RemoveWebinarSeriesAction $removeWebinarSeries,
+        WebinarProviderSchedulePolicy $providerSchedulePolicy,
+        WebinarSeriesHistoryResolver $historyResolver,
     ): View {
         $series->load([
             'webinarScheduleProfile',
@@ -398,6 +427,7 @@ class WebinarController extends Controller
         $currentTypeOccurrences = $occurrences
             ->filter(fn (Webinar $webinar): bool =>
                 $webinar->providerEventTypeKey() === $currentEventType
+                && $providerSchedulePolicy->allowsStoredOccurrence($webinar)
             );
 
         $upcoming = $currentTypeOccurrences
@@ -408,20 +438,13 @@ class WebinarController extends Controller
             )
             ->values();
 
-        $history = $occurrences
-            ->filter(fn (Webinar $webinar): bool =>
-                ! $webinar->isHidden()
-                && ($webinar->ends_at?->isPast() ?? false)
-            )
-            ->sortByDesc(fn (Webinar $webinar): string =>
-                $webinar->ends_at?->format('Y-m-d H:i:s') ?? ''
-            )
-            ->values();
+        $history = $historyResolver->resolve($series, $occurrences);
 
         $providerMissing = (string) $series->status === 'active'
             ? $occurrences
                 ->filter(fn (Webinar $webinar): bool =>
                     ! $webinar->isHidden()
+                    && $providerSchedulePolicy->allowsStoredOccurrence($webinar)
                     && $webinar->provider_lifecycle_status
                         === WebinarProviderLifecycleStatus::Missing->value
                 )
@@ -665,6 +688,14 @@ class WebinarController extends Controller
         if ($suppressedCount > 0) {
             $syncSummary .= ' '.number_format($suppressedCount).' intentionally removed '
                 .Str::plural('event', $suppressedCount).' kept out.';
+        }
+
+        $ignoredScheduleOutliers = (int) ($result['ignored_schedule_outliers'] ?? 0);
+
+        if ($ignoredScheduleOutliers > 0) {
+            $syncSummary .= ' '.number_format($ignoredScheduleOutliers).' same-title '
+                .Str::plural('provider event', $ignoredScheduleOutliers)
+                .' outside the configured schedule grid ignored.';
         }
 
         $redirect = redirect()

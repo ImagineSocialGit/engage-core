@@ -62,7 +62,10 @@ class ZoomWebinarServiceSnapshotTest extends TestCase
         $this->assertCount(1, $snapshot);
         $this->assertSame('zoom-1001', $snapshot->webinars[0]->externalId);
         $this->assertSame(
-            ['zoom_uuid' => 'uuid-1001'],
+            [
+                'zoom_uuid' => 'uuid-1001',
+                'schedule_source' => 'zoom_list_api',
+            ],
             $snapshot->webinars[0]->meta,
         );
     }
