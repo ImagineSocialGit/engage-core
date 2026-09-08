@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 6,
+    'version' => 7,
     'tables' => [
         'message_template_presets' => [
             'mode' => 'upsert',
@@ -539,6 +539,7 @@ return [
                     'type_column' => 'context_type',
                     'id_column' => 'context_id',
                     'targets' => [
+                        'App\\Modules\\Core\\Models\\Contact' => 'contacts',
                         'App\\Modules\\Webinars\\Models\\WebinarRegistration' => 'webinar_registrations',
                         'App\\Modules\\Webinars\\Models\\WebinarWaitlistSignup' => 'webinar_waitlist_signups',
                         'App\\Modules\\Campaigns\\Models\\CampaignEnrollment' => 'campaign_enrollments',

@@ -3142,6 +3142,7 @@
 │   │   │   ├── CampaignAnnualTouchesProjectStateRoundTripTest.php
 │   │   │   ├── CampaignImportSourceReferenceContractTest.php
 │   │   │   ├── CampaignsBroadcastsProjectStateRoundTripTest.php
+│   │   │   ├── ContactDirectMessageProjectStateContractTest.php
 │   │   │   ├── CoreAccessProjectStateContractTest.php
 │   │   │   ├── CoreContactImportProvenanceProjectStateTest.php
 │   │   │   ├── FlowRoutesProjectStateRoundTripTest.php
@@ -3370,4 +3371,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-798 directories, 2573 files
+798 directories, 2574 files
