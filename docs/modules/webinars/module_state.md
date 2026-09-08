@@ -1189,3 +1189,11 @@ historical `webinars.style.layout.header` geometry is retired; client-wide
 header geometry and brand/navigation styling now come from
 `public_surfaces.theme`. Webinar-specific hero, registration, page content,
 and route semantics remain Webinar-owned.
+
+## Webinar audience filter presentation
+
+Operator-facing Contact audience work exposes one `Webinar details` category rather than separate flat Webinar outcome and historical-attendance fields. The hierarchy is outcome -> Webinar Type -> session scope/session selection. Outcome may be attended, missed, or either. Session controls are revealed only after one Webinar Type is selected, and session-range behavior such as `before_session` or `on_or_after_session` is presented as a modifier inside that hierarchy rather than as a top-level pseudo-series option.
+
+The audience presentation uses canonical historical sessions from `WebinarSeriesHistoryResolver`. Hidden/suppressed occurrences and configured provider-list schedule outliers do not appear as selectable sessions, and same-time provider-transition rows collapse to the same canonical logical session presentation. Exact-session audience matching uses the selected session's Webinar Type and start slot so historical provider identities at that same logical slot remain part of the session audience.
+
+`webinar_outcome` remains the latest-terminal-outcome-per-Webinar-Type contract used by Campaign eligibility and is hidden from generic audience/contact-index presentation. `webinar_attendance` remains the historical operator-facing criterion. The two runtime contracts remain separate even though the operator sees only one Webinar filtering concept.

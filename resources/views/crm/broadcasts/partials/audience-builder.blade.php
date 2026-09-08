@@ -2,11 +2,18 @@
     class="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4"
     x-data="{
         recipientFilterType: @js($audienceFormState['filter_type'] ?? 'criteria'),
+        includeCriterionKeys: @js(array_values($audienceFormState['active_include_criterion_keys'] ?? [])),
+        excludeCriterionKeys: @js(array_values($audienceFormState['active_exclude_criterion_keys'] ?? [])),
+        excludedBroadcastIds: @js(array_values(array_map('strval', $audienceFormState['exclude_broadcast_ids'] ?? []))),
+        excludedBroadcastStatuses: @js(array_values($audienceFormState['exclude_broadcast_statuses'] ?? [])),
         preview: null,
         previewLoading: false,
         previewError: null,
         previewContactsOpen: false,
         manualExcludedContactIds: @js($audienceFormState['exclude_contact_ids'] ?? []),
+        criterionActive(collection, key) {
+            return collection.includes(String(key));
+        },
         async previewAudience(openContacts = false) {
             this.previewLoading = true;
             this.previewError = null;
@@ -56,20 +63,43 @@
             await this.$nextTick();
             await this.previewAudience(this.previewContactsOpen);
         },
+        ensurePriorBroadcastStatuses() {
+            this.excludedBroadcastStatuses = ['scheduled', 'sent'];
+        },
+        async excludePriorBroadcast(broadcastId) {
+            const id = String(broadcastId);
+
+            if (! this.excludedBroadcastIds.includes(id)) {
+                this.excludedBroadcastIds.push(id);
+            }
+
+            this.ensurePriorBroadcastStatuses();
+            await this.$nextTick();
+            await this.previewAudience(false);
+        },
+        async excludeAllOverlaps() {
+            const ids = (this.preview?.overlapping_broadcast_ids ?? []).map((id) => String(id));
+            this.excludedBroadcastIds = [...new Set([...this.excludedBroadcastIds, ...ids])];
+            this.ensurePriorBroadcastStatuses();
+            await this.$nextTick();
+            await this.previewAudience(false);
+        },
         clearAudienceFilters() {
-            this.recipientFilterType = 'criteria';
+            this.recipientFilterType = 'all';
+            this.includeCriterionKeys = [];
+            this.excludeCriterionKeys = [];
             this.manualExcludedContactIds = [];
+            this.excludedBroadcastIds = [];
+            this.excludedBroadcastStatuses = [];
             this.preview = null;
             this.previewError = null;
             this.previewContactsOpen = false;
 
-            this.$root.querySelectorAll('[data-audience-filter-select], [data-audience-exclusion-select], [data-prior-broadcast-exclusion]').forEach((select) => {
-                [...select.options].forEach((option) => option.selected = false);
+            this.$root.querySelectorAll('[data-preserved-audience-criterion]').forEach((input) => {
+                input.disabled = true;
             });
 
-            this.$root.querySelectorAll('[data-prior-broadcast-status]').forEach((checkbox) => {
-                checkbox.checked = false;
-            });
+            this.$dispatch('audience-clear-filters');
         },
     }"
     x-on:keydown.escape.window="previewContactsOpen = false"
@@ -78,12 +108,42 @@
         <input type="hidden" name="exclude_contact_ids[]" x-bind:value="contactId">
     </template>
 
+    <template x-for="broadcastId in excludedBroadcastIds" :key="`exclude-broadcast-${broadcastId}`">
+        <input type="hidden" name="exclude_broadcast_ids[]" x-bind:value="broadcastId">
+    </template>
+
+    <template x-for="status in excludedBroadcastStatuses" :key="`exclude-broadcast-status-${status}`">
+        <input type="hidden" name="exclude_broadcast_statuses[]" x-bind:value="status">
+    </template>
+
+    @foreach($audienceFormState['preserved_hidden_include_criteria'] ?? [] as $criterionKey => $criterionValues)
+        @foreach($criterionValues as $criterionValue)
+            <input
+                type="hidden"
+                name="recipient_criteria[{{ $criterionKey }}][]"
+                value="{{ $criterionValue }}"
+                data-preserved-audience-criterion
+            >
+        @endforeach
+    @endforeach
+
+    @foreach($audienceFormState['preserved_hidden_exclude_criteria'] ?? [] as $criterionKey => $criterionValues)
+        @foreach($criterionValues as $criterionValue)
+            <input
+                type="hidden"
+                name="exclude_contact_criteria[{{ $criterionKey }}][]"
+                value="{{ $criterionValue }}"
+                data-preserved-audience-criterion
+            >
+        @endforeach
+    @endforeach
+
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">1. Who</p>
             <h3 class="mt-1 text-base font-semibold text-slate-900">Choose the audience first</h3>
             <p class="mt-1 text-sm text-slate-600">
-                Include criteria are combined with AND. Multiple choices inside one criterion are OR. Exclusions are subtracted afterward.
+                Turn on only the filter categories you need. Include categories are combined with AND; exclusions are subtracted afterward.
             </p>
         </div>
 
@@ -113,37 +173,45 @@
         <x-ui.form.error name="recipient_filter_type" />
     </div>
 
-    <div x-show="recipientFilterType === 'criteria'" x-cloak class="grid gap-4 lg:grid-cols-2">
-        @foreach($audienceCriteria as $criterion)
-            @if(($criterion['options'] ?? []) !== [])
-                <div>
-                    <x-ui.form.label for="recipient_criteria_{{ $criterion['key'] }}">
-                        {{ $criterion['label'] }}
-                    </x-ui.form.label>
+    <div x-show="recipientFilterType === 'criteria'" x-cloak class="space-y-4">
+        <fieldset class="rounded-xl border border-slate-200 bg-white p-3">
+            <legend class="px-1 text-sm font-semibold text-slate-800">Filter by</legend>
+            <div class="mt-2 flex flex-wrap gap-x-5 gap-y-3">
+                @foreach($audienceCriteria as $criterion)
+                    <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                            type="checkbox"
+                            value="{{ $criterion['key'] }}"
+                            x-model="includeCriterionKeys"
+                            data-filter-category-toggle="{{ $criterion['key'] }}"
+                            class="rounded border-slate-300"
+                        >
+                        <span>{{ $criterion['label'] }}</span>
+                    </label>
+                @endforeach
+            </div>
+        </fieldset>
 
-                    <select
-                        id="recipient_criteria_{{ $criterion['key'] }}"
-                        name="recipient_criteria[{{ $criterion['key'] }}][]"
-                        multiple
-                        data-audience-filter-select
-                        class="mt-1 block min-h-28 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-                    >
-                        @foreach($criterion['options'] as $option)
-                            <option
-                                value="{{ $option['value'] }}"
-                                @selected($option['included'] ?? false)
-                            >
-                                {{ $option['label'] }}
-                            </option>
-                        @endforeach
-                    </select>
-
-                    @if(filled($criterion['help'] ?? null))
-                        <p class="mt-1 text-xs text-slate-500">{{ $criterion['help'] }}</p>
-                    @endif
+        <div class="grid gap-4 lg:grid-cols-2">
+            @foreach($audienceCriteria as $criterion)
+                <div
+                    x-show="criterionActive(includeCriterionKeys, @js($criterion['key']))"
+                    x-cloak
+                    class="lg:col-span-2"
+                >
+                    <fieldset x-bind:disabled="! criterionActive(includeCriterionKeys, @js($criterion['key']))">
+                        <div class="mb-2 text-sm font-semibold text-slate-800">{{ $criterion['label'] }}</div>
+                        <x-dynamic-component
+                            :component="data_get($criterion, 'presentation.audience_builder.component', 'crm.contact-filter-multiselect')"
+                            :criterion="$criterion"
+                            :name="'recipient_criteria['.$criterion['key'].']'"
+                            :selected-values="$criterion['included_values'] ?? []"
+                            :id-prefix="'include_'.$criterion['key']"
+                        />
+                    </fieldset>
                 </div>
-            @endif
-        @endforeach
+            @endforeach
+        </div>
     </div>
 
     <div x-show="recipientFilterType === 'contact_ids'" x-cloak>
@@ -170,35 +238,45 @@
     <details class="rounded-xl border border-slate-200 bg-white p-3" @if($audienceFormState['has_contact_exclusions'] ?? false) open @endif>
         <summary class="cursor-pointer text-sm font-semibold text-slate-800">Exclude contacts</summary>
         <p class="mt-2 text-xs text-slate-500">
-            Subtract contacts by the same filter facts used to build the audience. You can also remove individual people after previewing the list.
+            Choose only the exclusion categories you need. The same filter hierarchy is used for including and excluding contacts.
         </p>
+
+        <fieldset class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <legend class="px-1 text-sm font-semibold text-slate-800">Exclude by</legend>
+            <div class="mt-2 flex flex-wrap gap-x-5 gap-y-3">
+                @foreach($audienceCriteria as $criterion)
+                    <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                            type="checkbox"
+                            value="{{ $criterion['key'] }}"
+                            x-model="excludeCriterionKeys"
+                            data-exclude-category-toggle="{{ $criterion['key'] }}"
+                            class="rounded border-slate-300"
+                        >
+                        <span>{{ $criterion['label'] }}</span>
+                    </label>
+                @endforeach
+            </div>
+        </fieldset>
 
         <div class="mt-3 grid gap-4 lg:grid-cols-2">
             @foreach($audienceCriteria as $criterion)
-                @if(($criterion['options'] ?? []) !== [])
-                    <div>
-                        <x-ui.form.label for="exclude_contact_criteria_{{ $criterion['key'] }}">
-                            Exclude by {{ str($criterion['label'])->lower() }}
-                        </x-ui.form.label>
-
-                        <select
-                            id="exclude_contact_criteria_{{ $criterion['key'] }}"
-                            name="exclude_contact_criteria[{{ $criterion['key'] }}][]"
-                            multiple
-                            data-audience-exclusion-select
-                            class="mt-1 block min-h-24 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-                        >
-                            @foreach($criterion['options'] as $option)
-                                <option
-                                    value="{{ $option['value'] }}"
-                                    @selected($option['excluded'] ?? false)
-                                >
-                                    {{ $option['label'] }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                @endif
+                <div
+                    x-show="criterionActive(excludeCriterionKeys, @js($criterion['key']))"
+                    x-cloak
+                    class="lg:col-span-2"
+                >
+                    <fieldset x-bind:disabled="! criterionActive(excludeCriterionKeys, @js($criterion['key']))">
+                        <div class="mb-2 text-sm font-semibold text-slate-800">{{ $criterion['label'] }}</div>
+                        <x-dynamic-component
+                            :component="data_get($criterion, 'presentation.audience_builder.component', 'crm.contact-filter-multiselect')"
+                            :criterion="$criterion"
+                            :name="'exclude_contact_criteria['.$criterion['key'].']'"
+                            :selected-values="$criterion['excluded_values'] ?? []"
+                            :id-prefix="'exclude_'.$criterion['key']"
+                        />
+                    </fieldset>
+                </div>
             @endforeach
         </div>
 
@@ -233,7 +311,7 @@
         </button>
 
         <p class="text-xs text-slate-500">
-            Preview before composing so you can inspect who is included, remove individual contacts, and review prior Broadcast overlap.
+            Preview before composing so you can inspect the resolved audience and remove contacts before scheduling.
         </p>
     </div>
 
@@ -255,10 +333,23 @@
             </div>
 
             <div>
-                <h4 class="text-sm font-semibold text-slate-900">Previous Broadcasts to people in this audience</h4>
-                <p class="mt-1 text-xs text-slate-500">
-                    This is audience overlap, not a claim that every matching person received every message successfully.
-                </p>
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h4 class="text-sm font-semibold text-slate-900">Previous Broadcast overlap</h4>
+                        <p class="mt-1 text-xs text-slate-500">
+                            Overlap means these contacts are already scheduled or sent on a previous Broadcast.
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        x-show="(preview.overlap_contact_count ?? 0) > 0"
+                        x-on:click="excludeAllOverlaps()"
+                    >
+                        Exclude all <span x-text="preview.overlap_contact_count"></span> overlapping contacts
+                    </button>
+                </div>
 
                 <template x-if="preview.previous_broadcasts.length === 0">
                     <p class="mt-3 text-sm text-slate-500">No prior scheduled/sent Broadcast overlap found.</p>
@@ -266,7 +357,7 @@
 
                 <div class="mt-3 space-y-2" x-show="preview.previous_broadcasts.length > 0">
                     <template x-for="item in preview.previous_broadcasts" :key="item.id">
-                        <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                        <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm">
                             <div>
                                 <div class="font-semibold text-slate-900" x-text="item.name"></div>
                                 <div class="text-xs text-slate-500">
@@ -275,8 +366,17 @@
                                     · <span x-text="item.scheduled_count"></span> still scheduled
                                 </div>
                             </div>
-                            <div class="font-semibold text-slate-700">
-                                <span x-text="item.overlap_count"></span> overlap
+                            <div class="flex items-center gap-3">
+                                <div class="font-semibold text-slate-700">
+                                    <span x-text="item.overlap_count"></span> overlap
+                                </div>
+                                <button
+                                    type="button"
+                                    class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                    x-on:click="excludePriorBroadcast(item.id)"
+                                >
+                                    Exclude these <span x-text="item.overlap_count"></span>
+                                </button>
                             </div>
                         </div>
                     </template>
@@ -290,26 +390,23 @@
     </template>
 
     @if($excludableBroadcasts->isNotEmpty())
-        <details class="rounded-xl border border-slate-200 bg-white p-3">
+        <details class="rounded-xl border border-slate-200 bg-white p-3" @if(($audienceFormState['exclude_broadcast_ids'] ?? []) !== []) open @endif>
             <summary class="cursor-pointer text-sm font-semibold text-slate-800">Avoid duplicate sends</summary>
             <p class="mt-2 text-xs text-slate-500">
-                Optionally exclude contacts who were already scheduled or sent selected previous Broadcasts.
+                You can also select previous Broadcasts directly. The overlap buttons above add selections here automatically.
             </p>
 
             <div class="mt-3">
                 <x-ui.form.label for="exclude_broadcast_ids">Previous Broadcasts to exclude</x-ui.form.label>
                 <select
                     id="exclude_broadcast_ids"
-                    name="exclude_broadcast_ids[]"
                     multiple
+                    x-model="excludedBroadcastIds"
                     data-prior-broadcast-exclusion
                     class="mt-1 block min-h-28 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
                 >
                     @foreach($excludableBroadcasts as $excludableBroadcast)
-                        <option
-                            value="{{ $excludableBroadcast->id }}"
-                            @selected(in_array((int) $excludableBroadcast->id, $audienceFormState['exclude_broadcast_ids'] ?? [], true))
-                        >
+                        <option value="{{ $excludableBroadcast->id }}">
                             {{ $excludableBroadcast->name }}
                             — {{ strtoupper($excludableBroadcast->channel) }}
                             — {{ str_replace('_', ' ', $excludableBroadcast->status) }}
@@ -322,10 +419,9 @@
                 <label class="flex items-center gap-2">
                     <input
                         type="checkbox"
-                        name="exclude_broadcast_statuses[]"
                         value="scheduled"
+                        x-model="excludedBroadcastStatuses"
                         data-prior-broadcast-status
-                        @checked($audienceFormState['exclude_scheduled'] ?? false)
                         class="rounded border-slate-300"
                     >
                     Scheduled
@@ -334,10 +430,9 @@
                 <label class="flex items-center gap-2">
                     <input
                         type="checkbox"
-                        name="exclude_broadcast_statuses[]"
                         value="sent"
+                        x-model="excludedBroadcastStatuses"
                         data-prior-broadcast-status
-                        @checked($audienceFormState['exclude_sent'] ?? false)
                         class="rounded border-slate-300"
                     >
                     Sent

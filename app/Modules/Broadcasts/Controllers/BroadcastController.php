@@ -558,7 +558,7 @@ class BroadcastController extends Controller
             ? array_values($excludeBroadcastStatuses)
             : [];
 
-        return [
+        $state = [
             'filter_type' => $request->session()->getOldInput('recipient_filter_type', $defaultType),
             'criteria' => is_array($criteria) ? $criteria : [],
             'tag' => $request->session()->getOldInput('recipient_tag', $filter['tags'][0] ?? ''),
@@ -586,6 +586,31 @@ class BroadcastController extends Controller
                 true,
             ),
         ];
+
+        $visibleCriterionKeys = array_map(
+            static fn (array $definition): string => (string) $definition['key'],
+            $this->visibleAudienceCriterionDefinitions(),
+        );
+        $visibleCriterionMap = array_fill_keys($visibleCriterionKeys, true);
+
+        $state['active_include_criterion_keys'] = array_values(array_intersect(
+            array_keys($state['criteria']),
+            $visibleCriterionKeys,
+        ));
+        $state['active_exclude_criterion_keys'] = array_values(array_intersect(
+            array_keys($state['exclude_criteria']),
+            $visibleCriterionKeys,
+        ));
+        $state['preserved_hidden_include_criteria'] = array_diff_key(
+            $state['criteria'],
+            $visibleCriterionMap,
+        );
+        $state['preserved_hidden_exclude_criteria'] = array_diff_key(
+            $state['exclude_criteria'],
+            $visibleCriterionMap,
+        );
+
+        return $state;
     }
 
     /**
@@ -678,6 +703,8 @@ class BroadcastController extends Controller
                         : [],
                 );
 
+                $criterion['included_values'] = array_values($included);
+                $criterion['excluded_values'] = array_values($excluded);
                 $criterion['options'] = array_map(
                     static fn (array $option): array => [
                         ...$option,
@@ -691,8 +718,18 @@ class BroadcastController extends Controller
 
                 return $criterion;
             },
-            $this->contactFilterCriteria->definitions(),
+            $this->visibleAudienceCriterionDefinitions(),
         );
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function visibleAudienceCriterionDefinitions(): array
+    {
+        return array_values(array_filter(
+            $this->contactFilterCriteria->definitions(),
+            static fn (array $definition): bool =>
+                data_get($definition, 'presentation.audience_builder.visible', true) !== false,
+        ));
     }
 
     /**

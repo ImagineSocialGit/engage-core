@@ -5,10 +5,9 @@ namespace App\Modules\Broadcasts\Services;
 use App\Models\User;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
-use App\Modules\Core\Access\Services\ContactVisibility;
 use App\Modules\Core\Models\Contact;
-use App\Modules\Core\Services\Contacts\ContactFilterResolver;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 
 class BroadcastAudiencePreviewService
@@ -16,8 +15,7 @@ class BroadcastAudiencePreviewService
     private const CONTACT_PREVIEW_LIMIT = 100;
 
     public function __construct(
-        private readonly ContactFilterResolver $contactFilterResolver,
-        private readonly ContactVisibility $contactVisibility,
+        private readonly BroadcastRecipientResolver $recipientResolver,
     ) {}
 
     /**
@@ -26,12 +24,17 @@ class BroadcastAudiencePreviewService
      */
     public function preview(array $filter, ?User $actor = null): array
     {
-        $audience = $this->contactFilterResolver->query($filter)->reorder();
+        $broadcast = new Broadcast([
+            'user_id' => $actor?->getKey(),
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'dispatch_key' => Broadcast::DEFAULT_DISPATCH_KEY,
+            'message_type' => Broadcast::DEFAULT_MESSAGE_TYPE,
+            'recipient_filter' => $filter,
+        ]);
 
-        if ($actor instanceof User) {
-            $audience = $this->contactVisibility->apply($audience, $actor);
-        }
-
+        $audience = $this->recipientResolver->query($broadcast)->reorder();
         $selectedCount = (int) (clone $audience)->count('contacts.id');
 
         if ($selectedCount === 0) {
@@ -39,6 +42,8 @@ class BroadcastAudiencePreviewService
                 'selected_count' => 0,
                 'without_any_consent_count' => 0,
                 'previous_broadcasts' => [],
+                'overlapping_broadcast_ids' => [],
+                'overlap_contact_count' => 0,
                 'contacts' => [],
                 'contacts_truncated' => false,
             ];
@@ -75,10 +80,14 @@ class BroadcastAudiencePreviewService
             ->values()
             ->all();
 
+        $overlap = $this->previousBroadcastOverlap($audience);
+
         return [
             'selected_count' => $selectedCount,
             'without_any_consent_count' => $withoutAnyConsentCount,
-            'previous_broadcasts' => $this->previousBroadcastOverlap($audience),
+            'previous_broadcasts' => $overlap['broadcasts'],
+            'overlapping_broadcast_ids' => $overlap['broadcast_ids'],
+            'overlap_contact_count' => $overlap['contact_count'],
             'contacts' => $contacts,
             'contacts_truncated' => $selectedCount > count($contacts),
         ];
@@ -86,25 +95,30 @@ class BroadcastAudiencePreviewService
 
     /**
      * @param Builder<Contact> $audience
-     * @return array<int, array<string, mixed>>
+     * @return array{
+     *     broadcasts: array<int, array<string, mixed>>,
+     *     broadcast_ids: array<int, int>,
+     *     contact_count: int
+     * }
      */
     private function previousBroadcastOverlap(Builder $audience): array
     {
         $audienceIds = (clone $audience)->select('contacts.id');
+        $base = $this->overlapQuery($audienceIds);
 
-        return DB::table('broadcast_recipients')
-            ->join('broadcasts', 'broadcasts.id', '=', 'broadcast_recipients.broadcast_id')
-            ->where('broadcasts.message_type', '!=', Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION)
-            ->whereIn('broadcasts.status', [
-                Broadcast::STATUS_SCHEDULED,
-                Broadcast::STATUS_SENDING,
-                Broadcast::STATUS_COMPLETED,
-            ])
-            ->whereIn('broadcast_recipients.status', [
-                BroadcastRecipient::STATUS_SCHEDULED,
-                BroadcastRecipient::STATUS_SENT,
-            ])
-            ->whereIn('broadcast_recipients.contact_id', $audienceIds)
+        $broadcastIds = (clone $base)
+            ->distinct()
+            ->orderBy('broadcasts.id')
+            ->pluck('broadcasts.id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->values()
+            ->all();
+
+        $contactCount = (int) (clone $base)
+            ->distinct()
+            ->count('broadcast_recipients.contact_id');
+
+        $broadcasts = (clone $base)
             ->groupBy('broadcasts.id', 'broadcasts.name', 'broadcasts.channel', 'broadcasts.created_at')
             ->orderByDesc('broadcasts.created_at')
             ->limit(10)
@@ -126,6 +140,32 @@ class BroadcastAudiencePreviewService
             ])
             ->values()
             ->all();
+
+        return [
+            'broadcasts' => $broadcasts,
+            'broadcast_ids' => $broadcastIds,
+            'contact_count' => $contactCount,
+        ];
+    }
+
+    /**
+     * @param Builder<Contact> $audienceIds
+     */
+    private function overlapQuery(Builder $audienceIds): QueryBuilder
+    {
+        return DB::table('broadcast_recipients')
+            ->join('broadcasts', 'broadcasts.id', '=', 'broadcast_recipients.broadcast_id')
+            ->where('broadcasts.message_type', '!=', Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION)
+            ->whereIn('broadcasts.status', [
+                Broadcast::STATUS_SCHEDULED,
+                Broadcast::STATUS_SENDING,
+                Broadcast::STATUS_COMPLETED,
+            ])
+            ->whereIn('broadcast_recipients.status', [
+                BroadcastRecipient::STATUS_SCHEDULED,
+                BroadcastRecipient::STATUS_SENT,
+            ])
+            ->whereIn('broadcast_recipients.contact_id', $audienceIds);
     }
 
     private function contactLabel(Contact $contact): string

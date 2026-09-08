@@ -3,17 +3,30 @@
 namespace App\Modules\Webinars\Services\Contacts\Filters;
 
 use App\Modules\Core\Contracts\Contacts\ContactFilterCriterion;
+use App\Modules\Core\Contracts\Contacts\ContactFilterCriterionPresentation;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Services\WebinarSeriesHistoryResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Collection;
 
-final class WebinarAttendanceContactFilterCriterion implements ContactFilterCriterion
+final class WebinarAttendanceContactFilterCriterion implements ContactFilterCriterion, ContactFilterCriterionPresentation
 {
     private const OUTCOMES = [
         'attended',
         'missed',
     ];
+
+    /** @var Collection<int, WebinarSeries>|null */
+    private ?Collection $seriesCache = null;
+
+    /** @var Collection<int, Webinar>|null */
+    private ?Collection $sessionCache = null;
+
+    public function __construct(
+        private readonly WebinarSeriesHistoryResolver $historyResolver,
+    ) {}
 
     public function key(): string
     {
@@ -27,15 +40,19 @@ final class WebinarAttendanceContactFilterCriterion implements ContactFilterCrit
 
     public function label(): string
     {
-        return 'Webinar attendance';
+        return 'Webinar details';
     }
 
     public function help(): ?string
     {
-        return 'Match historical attended/missed outcomes for any Webinar, one Webinar Type, one session, or sessions before a selected session.';
+        return 'Filter historical Webinar contacts by outcome, Webinar Type, and session.';
     }
 
     /**
+     * Keep a compact fallback option list for generic filter surfaces.
+     * The Broadcast audience builder uses presentation() for the hierarchical
+     * Webinar Type -> session experience instead of exposing these values flat.
+     *
      * @return array<int, array{value: string, label: string}>
      */
     public function options(): array
@@ -45,16 +62,10 @@ final class WebinarAttendanceContactFilterCriterion implements ContactFilterCrit
             ['value' => 'any:missed', 'label' => 'Any webinar — Missed'],
         ];
 
-        $seriesOptions = WebinarSeries::query()
-            ->whereNotNull('slug')
-            ->where('slug', '!=', '')
-            ->orderBy('title')
-            ->orderBy('id')
-            ->get(['slug', 'title'])
+        $seriesOptions = $this->series()
             ->flatMap(function (WebinarSeries $series): array {
                 $slug = trim((string) $series->slug);
-                $title = trim((string) $series->title);
-                $label = $title !== '' ? $title : $slug;
+                $label = $this->seriesLabel($series);
 
                 return array_map(
                     fn (string $outcome): array => [
@@ -67,42 +78,18 @@ final class WebinarAttendanceContactFilterCriterion implements ContactFilterCrit
             ->values()
             ->all();
 
-        $sessionOptions = Webinar::query()
-            ->with('webinarSeries:id,title,slug')
-            ->whereNotNull('webinar_series_id')
-            ->whereNotNull('starts_at')
-            ->visible()
-            ->orderByDesc('starts_at')
-            ->orderByDesc('id')
-            ->get(['id', 'webinar_series_id', 'title', 'starts_at', 'timezone'])
+        $sessionOptions = $this->sessions()
             ->flatMap(function (Webinar $webinar): array {
-                $seriesTitle = trim((string) ($webinar->webinarSeries?->title ?? ''));
-                $title = $seriesTitle !== ''
-                    ? $seriesTitle
-                    : trim((string) $webinar->title);
-                $startsAt = $webinar->starts_at?->copy()
-                    ->setTimezone($webinar->timezone)
-                    ->format('M j, Y · g:i A T');
-                $label = trim(implode(' — ', array_filter([$title, $startsAt])));
-
                 $id = (int) $webinar->getKey();
+                $label = $this->sessionLabel($webinar, includeSeries: true);
 
-                return [
-                    ...array_map(
-                        fn (string $outcome): array => [
-                            'value' => "session:{$id}:{$outcome}",
-                            'label' => $label.' — '.ucfirst($outcome),
-                        ],
-                        self::OUTCOMES,
-                    ),
-                    ...array_map(
-                        fn (string $outcome): array => [
-                            'value' => "before_session:{$id}:{$outcome}",
-                            'label' => 'Before '.$label.' — '.ucfirst($outcome),
-                        ],
-                        self::OUTCOMES,
-                    ),
-                ];
+                return array_map(
+                    fn (string $outcome): array => [
+                        'value' => "session:{$id}:{$outcome}",
+                        'label' => $label.' — '.ucfirst($outcome),
+                    ],
+                    self::OUTCOMES,
+                );
             })
             ->values()
             ->all();
@@ -111,6 +98,34 @@ final class WebinarAttendanceContactFilterCriterion implements ContactFilterCrit
             ...$options,
             ...$seriesOptions,
             ...$sessionOptions,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function presentation(): array
+    {
+        return [
+            'audience_builder' => [
+                'visible' => true,
+                'component' => 'webinars.audience-filter',
+                'series' => $this->series()
+                    ->map(fn (WebinarSeries $series): array => [
+                        'value' => trim((string) $series->slug),
+                        'label' => $this->seriesLabel($series),
+                    ])
+                    ->values()
+                    ->all(),
+                'sessions' => $this->sessions()
+                    ->map(fn (Webinar $webinar): array => [
+                        'id' => (int) $webinar->getKey(),
+                        'series' => trim((string) ($webinar->webinarSeries?->slug ?? '')),
+                        'label' => $this->sessionLabel($webinar),
+                        'search_label' => $this->sessionLabel($webinar, includeSeries: true),
+                    ])
+                    ->filter(fn (array $session): bool => $session['series'] !== '')
+                    ->values()
+                    ->all(),
+            ],
         ];
     }
 
@@ -152,7 +167,11 @@ final class WebinarAttendanceContactFilterCriterion implements ContactFilterCrit
                 continue;
             }
 
-            if (in_array($parts[0], ['session', 'before_session'], true)
+            if (in_array($parts[0], [
+                'session',
+                'before_session',
+                'on_or_after_session',
+            ], true)
                 && ctype_digit($parts[1])
                 && (int) $parts[1] > 0
             ) {
@@ -185,29 +204,51 @@ final class WebinarAttendanceContactFilterCriterion implements ContactFilterCrit
                     $subquery
                         ->selectRaw('1')
                         ->from('webinar_registrations as audience_wr')
-                        ->whereColumn('audience_wr.contact_id', 'contacts.id');
+                        ->join('webinars as audience_w', 'audience_w.id', '=', 'audience_wr.webinar_id')
+                        ->whereColumn('audience_wr.contact_id', 'contacts.id')
+                        ->whereNull('audience_w.hidden_at');
 
                     if ($target['scope'] === 'series') {
                         $subquery
-                            ->join('webinars as audience_w', 'audience_w.id', '=', 'audience_wr.webinar_id')
                             ->join('webinar_series as audience_ws', 'audience_ws.id', '=', 'audience_w.webinar_series_id')
                             ->where('audience_ws.slug', $target['identity']);
-                    } elseif ($target['scope'] === 'session') {
-                        $subquery->where('audience_wr.webinar_id', (int) $target['identity']);
-                    } elseif ($target['scope'] === 'before_session') {
-                        $subquery
-                            ->join('webinars as audience_w', 'audience_w.id', '=', 'audience_wr.webinar_id')
-                            ->where(
-                                'audience_w.starts_at',
-                                '<',
-                                function (QueryBuilder $anchor) use ($target): void {
-                                    $anchor
-                                        ->select('anchor_webinar.starts_at')
-                                        ->from('webinars as anchor_webinar')
-                                        ->where('anchor_webinar.id', (int) $target['identity'])
-                                        ->limit(1);
-                                },
-                            );
+                    } elseif (in_array($target['scope'], [
+                        'session',
+                        'before_session',
+                        'on_or_after_session',
+                    ], true)) {
+                        $anchorId = (int) $target['identity'];
+
+                        $subquery->where(
+                            'audience_w.webinar_series_id',
+                            function (QueryBuilder $anchor) use ($anchorId): void {
+                                $anchor
+                                    ->select('anchor_webinar.webinar_series_id')
+                                    ->from('webinars as anchor_webinar')
+                                    ->where('anchor_webinar.id', $anchorId)
+                                    ->whereNull('anchor_webinar.hidden_at')
+                                    ->limit(1);
+                            },
+                        );
+
+                        $operator = match ($target['scope']) {
+                            'before_session' => '<',
+                            'on_or_after_session' => '>=',
+                            default => '=',
+                        };
+
+                        $subquery->where(
+                            'audience_w.starts_at',
+                            $operator,
+                            function (QueryBuilder $anchor) use ($anchorId): void {
+                                $anchor
+                                    ->select('anchor_webinar.starts_at')
+                                    ->from('webinars as anchor_webinar')
+                                    ->where('anchor_webinar.id', $anchorId)
+                                    ->whereNull('anchor_webinar.hidden_at')
+                                    ->limit(1);
+                            },
+                        );
                     }
 
                     $this->applyOutcome($subquery, $target['outcome']);
@@ -216,9 +257,6 @@ final class WebinarAttendanceContactFilterCriterion implements ContactFilterCrit
         });
     }
 
-    /**
-     * @param QueryBuilder $query
-     */
     private function applyOutcome(QueryBuilder $query, string $outcome): void
     {
         if ($outcome === 'attended') {
@@ -263,5 +301,87 @@ final class WebinarAttendanceContactFilterCriterion implements ContactFilterCrit
         }
 
         return $targets;
+    }
+
+    /** @return Collection<int, WebinarSeries> */
+    private function series(): Collection
+    {
+        if ($this->seriesCache instanceof Collection) {
+            return $this->seriesCache;
+        }
+
+        return $this->seriesCache = WebinarSeries::query()
+            ->whereNotNull('slug')
+            ->where('slug', '!=', '')
+            ->orderBy('title')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /** @return Collection<int, Webinar> */
+    private function sessions(): Collection
+    {
+        if ($this->sessionCache instanceof Collection) {
+            return $this->sessionCache;
+        }
+
+        $series = $this->series();
+
+        if ($series->isEmpty()) {
+            return $this->sessionCache = collect();
+        }
+
+        $occurrences = Webinar::query()
+            ->with('webinarSeries:id,title,slug')
+            ->withCount('registrations')
+            ->whereIn('webinar_series_id', $series->pluck('id')->all())
+            ->whereNotNull('starts_at')
+            ->get();
+
+        $resolved = collect();
+
+        foreach ($series as $webinarSeries) {
+            $resolved = $resolved->concat(
+                $this->historyResolver->resolve(
+                    $webinarSeries,
+                    $occurrences
+                        ->where('webinar_series_id', $webinarSeries->getKey())
+                        ->values(),
+                ),
+            );
+        }
+
+        return $this->sessionCache = $resolved
+            ->sortByDesc(fn (Webinar $webinar): string =>
+                $webinar->starts_at?->format('Y-m-d H:i:s') ?? ''
+            )
+            ->values();
+    }
+
+    private function seriesLabel(WebinarSeries $series): string
+    {
+        $title = trim((string) $series->title);
+        $slug = trim((string) $series->slug);
+
+        return $title !== '' ? $title : $slug;
+    }
+
+    private function sessionLabel(Webinar $webinar, bool $includeSeries = false): string
+    {
+        $startsAt = $webinar->starts_at?->copy()
+            ->setTimezone($webinar->timezone)
+            ->format('M j, Y · g:i A T');
+
+        if (! $includeSeries) {
+            return $startsAt ?? 'Session #'.$webinar->getKey();
+        }
+
+        $seriesTitle = trim((string) ($webinar->webinarSeries?->title ?? ''));
+        $title = $seriesTitle !== ''
+            ? $seriesTitle
+            : trim((string) $webinar->title);
+
+        return trim(implode(' — ', array_filter([$title, $startsAt])))
+            ?: 'Session #'.$webinar->getKey();
     }
 }

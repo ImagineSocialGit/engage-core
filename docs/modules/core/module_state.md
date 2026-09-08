@@ -393,3 +393,11 @@ Settings → Team is intentionally simple: CRM login, active state, role preset,
 Access tables are environment-owned in Project State because they reference local CRM user identities. Contact assignment columns belong to the complete Contact schema contract but are set to null on import so raw environment-local User/Team IDs never cross environments.
 
 Meaningful Contact assignment and Team/access changes retain compact actor/time provenance in existing `meta` storage. This is an audit seam, not a full audit-log product.
+
+## Contact filter presentation metadata
+
+The Contact filter criterion registry may expose optional presentation metadata in addition to runtime normalization/query behavior. This metadata is consumer-facing only: a criterion still owns its durable key, normalization, and query semantics through `ContactFilterCriterion`.
+
+Generic audience builders should use progressive disclosure. Operators first choose the filter categories they need, then see only those controls. Exclusion builders should consume the same contributed category definitions and the same progressive-disclosure model rather than rendering every possible field at once. Searchable multi-select is the default presentation for ordinary option-backed criteria.
+
+A criterion may opt out of a generic surface without unregistering its runtime behavior. This is important when one durable criterion exists for an internal eligibility contract while another criterion provides the operator-facing audience experience. Consumers must not infer runtime semantics from the presentation metadata.

@@ -4,6 +4,7 @@ namespace Tests\Feature\Broadcasts;
 
 use App\Models\User;
 use App\Modules\Broadcasts\Models\Broadcast;
+use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Broadcasts\Requests\PreviewBroadcastAudienceRequest;
 use App\Modules\Broadcasts\Services\BroadcastAudiencePreviewService;
 use App\Modules\Broadcasts\Services\BroadcastRecipientResolver;
@@ -38,6 +39,7 @@ class BroadcastAudienceReviewAndExclusionTest extends TestCase
                 'tag' => 'missed_webinar',
             ]);
         }
+
         ContactTag::query()->create([
             'contact_id' => $excludedByTag->getKey(),
             'tag' => 'do_not_nurture',
@@ -82,10 +84,11 @@ class BroadcastAudienceReviewAndExclusionTest extends TestCase
         $this->assertNotContains($hidden->getKey(), $ids);
     }
 
-    public function test_preview_request_persists_shared_exclusion_shape(): void
+    public function test_preview_request_uses_shared_contact_exclusions_and_prior_broadcast_exclusion_shape(): void
     {
         $included = Contact::factory()->create();
         $excluded = Contact::factory()->create();
+        $prior = Broadcast::factory()->completed()->create();
 
         ContactTag::query()->create([
             'contact_id' => $included->getKey(),
@@ -105,6 +108,11 @@ class BroadcastAudienceReviewAndExclusionTest extends TestCase
                 'tag' => ['do_not_nurture'],
             ],
             'exclude_contact_ids' => [$excluded->getKey()],
+            'exclude_broadcast_ids' => [$prior->getKey()],
+            'exclude_broadcast_statuses' => [
+                BroadcastRecipient::STATUS_SCHEDULED,
+                BroadcastRecipient::STATUS_SENT,
+            ],
         ]);
         $request->setContainer($this->app);
         $request->setRedirector($this->app->make('redirect'));
@@ -119,6 +127,63 @@ class BroadcastAudienceReviewAndExclusionTest extends TestCase
                 'tag' => ['do_not_nurture'],
             ],
             'exclude_contact_ids' => [$excluded->getKey()],
+            'exclude' => [
+                'broadcast_ids' => [$prior->getKey()],
+                'statuses' => [
+                    BroadcastRecipient::STATUS_SCHEDULED,
+                    BroadcastRecipient::STATUS_SENT,
+                ],
+            ],
         ], $request->recipientFilter());
+    }
+
+    public function test_preview_reports_overlap_and_applies_one_click_prior_broadcast_exclusion_shape(): void
+    {
+        $actor = User::factory()->create();
+        $sentContact = Contact::factory()->create();
+        $scheduledContact = Contact::factory()->create();
+        $unrelatedContact = Contact::factory()->create();
+
+        $prior = Broadcast::factory()->completed()->create([
+            'user_id' => $actor->getKey(),
+            'name' => 'Previous audience',
+        ]);
+
+        BroadcastRecipient::factory()->create([
+            'broadcast_id' => $prior->getKey(),
+            'contact_id' => $sentContact->getKey(),
+            'status' => BroadcastRecipient::STATUS_SENT,
+        ]);
+        BroadcastRecipient::factory()->create([
+            'broadcast_id' => $prior->getKey(),
+            'contact_id' => $scheduledContact->getKey(),
+            'status' => BroadcastRecipient::STATUS_SCHEDULED,
+        ]);
+
+        $service = app(BroadcastAudiencePreviewService::class);
+        $initial = $service->preview(['type' => 'all'], $actor);
+
+        $this->assertSame(3, $initial['selected_count']);
+        $this->assertSame(2, $initial['overlap_contact_count']);
+        $this->assertSame([$prior->getKey()], $initial['overlapping_broadcast_ids']);
+        $this->assertSame($prior->getKey(), $initial['previous_broadcasts'][0]['id']);
+        $this->assertSame(2, $initial['previous_broadcasts'][0]['overlap_count']);
+
+        $afterExclusion = $service->preview([
+            'type' => 'all',
+            'exclude' => [
+                'broadcast_ids' => [$prior->getKey()],
+                'statuses' => [
+                    BroadcastRecipient::STATUS_SCHEDULED,
+                    BroadcastRecipient::STATUS_SENT,
+                ],
+            ],
+        ], $actor);
+
+        $this->assertSame(1, $afterExclusion['selected_count']);
+        $this->assertSame([$unrelatedContact->getKey()], array_column($afterExclusion['contacts'], 'id'));
+        $this->assertSame(0, $afterExclusion['overlap_contact_count']);
+        $this->assertSame([], $afterExclusion['overlapping_broadcast_ids']);
+        $this->assertSame([], $afterExclusion['previous_broadcasts']);
     }
 }

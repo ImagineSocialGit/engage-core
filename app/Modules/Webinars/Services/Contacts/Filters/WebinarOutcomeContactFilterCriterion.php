@@ -3,11 +3,12 @@
 namespace App\Modules\Webinars\Services\Contacts\Filters;
 
 use App\Modules\Core\Contracts\Contacts\ContactFilterCriterion;
+use App\Modules\Core\Contracts\Contacts\ContactFilterCriterionPresentation;
 use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 
-final class WebinarOutcomeContactFilterCriterion implements ContactFilterCriterion
+final class WebinarOutcomeContactFilterCriterion implements ContactFilterCriterion, ContactFilterCriterionPresentation
 {
     private const OUTCOMES = [
         'attended',
@@ -32,6 +33,19 @@ final class WebinarOutcomeContactFilterCriterion implements ContactFilterCriteri
     public function help(): ?string
     {
         return 'Match the latest resolved attended or missed outcome for a webinar series.';
+    }
+
+    /** @return array<string, mixed> */
+    public function presentation(): array
+    {
+        return [
+            'audience_builder' => [
+                'visible' => false,
+            ],
+            'contact_index' => [
+                'visible' => false,
+            ],
+        ];
     }
 
     /**

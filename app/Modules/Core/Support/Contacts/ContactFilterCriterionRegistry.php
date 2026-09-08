@@ -3,6 +3,7 @@
 namespace App\Modules\Core\Support\Contacts;
 
 use App\Modules\Core\Contracts\Contacts\ContactFilterCriterion;
+use App\Modules\Core\Contracts\Contacts\ContactFilterCriterionPresentation;
 use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
 
@@ -23,7 +24,8 @@ class ContactFilterCriterionRegistry
      *     key: string,
      *     label: string,
      *     help: string|null,
-     *     options: array<int, array{value: string, label: string}>
+     *     options: array<int, array{value: string, label: string}>,
+     *     presentation: array<string, mixed>
      * }>
      */
     public function definitions(): array
@@ -34,6 +36,7 @@ class ContactFilterCriterionRegistry
                 'label' => $criterion->label(),
                 'help' => $criterion->help(),
                 'options' => $criterion->options(),
+                'presentation' => $this->presentation($criterion),
             ],
             $this->all(),
         ));
@@ -138,5 +141,28 @@ class ContactFilterCriterionRegistry
         ]);
 
         return $this->resolved = $resolved;
+    }
+
+    /** @return array<string, mixed> */
+    private function presentation(ContactFilterCriterion $criterion): array
+    {
+        $defaults = [
+            'audience_builder' => [
+                'visible' => true,
+                'component' => 'crm.contact-filter-multiselect',
+            ],
+            'contact_index' => [
+                'visible' => true,
+            ],
+        ];
+
+        if (! $criterion instanceof ContactFilterCriterionPresentation) {
+            return $defaults;
+        }
+
+        return array_replace_recursive(
+            $defaults,
+            $criterion->presentation(),
+        );
     }
 }

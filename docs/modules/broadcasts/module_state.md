@@ -487,3 +487,11 @@ The Broadcast authoring/bookkeeping cutover is complete: message content is owne
 - remove generic Broadcast/BroadcastRecipient metadata only after each retained value is audited.
 
 Project State Broadcasts v2 transfers these first-class relationships. The runtime importer remains current-format-only, so refresh exports must be created from code using the current Project State contract.
+
+## Progressive audience builder and overlap actions
+
+The regular Broadcast audience builder consumes Core Contact filter presentation metadata. It starts with `Filter by` category toggles and reveals only selected controls. `Exclude contacts` mirrors the same `Exclude by` category toggles and contributed controls. Ordinary option-backed criteria use searchable selection; module-owned criteria such as Webinar details may provide a richer hierarchical component without making Broadcasts depend on that module's models.
+
+Audience preview and final recipient resolution share `BroadcastRecipientResolver`, including creator Contact visibility and prior-Broadcast exclusions. Prior scheduled/sent overlap is actionable: the operator may exclude one previous Broadcast's overlapping contacts or exclude all currently reported overlap in one action. Those actions add Broadcast-owned prior-send exclusions; they do not mutate Contacts or rewrite Core filter criteria.
+
+Manual Contact removals remain `exclude_contact_ids`, rule-based exclusions remain `exclude_criteria`, and prior-send exclusions remain under the nested Broadcast `exclude` namespace. Clear filters resets all three operator-selected exclusion forms as well as positive filters for the current authoring surface.

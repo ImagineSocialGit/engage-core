@@ -62,6 +62,10 @@ final class ContactIndexFilterService
                 continue;
             }
 
+            if (data_get($definition, 'presentation.contact_index.visible', true) === false) {
+                continue;
+            }
+
             $selected = $this->selectedValue(
                 input: $input[$key] ?? null,
                 options: $options,
