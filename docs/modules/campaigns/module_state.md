@@ -697,3 +697,13 @@ The Campaign runtime cutover is complete:
 `campaign_steps` and `campaign_step_variants` remain only as the temporary authoring projection consumed by the current Campaign message editor and preset bridge. They must not regain runtime meaning. A later Builder/authoring migration should make Messaging MessageChain definitions the direct authoring source, then remove these Campaign authoring tables.
 
 The dev-only fake-clock Campaign Simulator now exercises the real MessageChain/ScheduledMessage runtime locally through the shared testing-tool guard/runtime scope. Simulator-owned `testing:campaigns` enrollments are excluded from ordinary due scanning and Messaging recovery, local delivery is intercepted by `DevMessageSink`, and reset removes only simulator-owned runtime records. The reusable pattern is documented in `docs/testing-tools.md`. Inbound reply capture/attribution, stage-driven suppression/orchestration, client campaign definitions, and reporting can proceed as separate workstreams.
+
+## Contact result enrollment
+
+When Campaigns is enabled it contributes `Enroll in Campaign` to the Core Contact result-action registry. The action requires the registered `campaigns.enroll_contact_results` capability and exposes only active Campaigns.
+
+Submitting the action resolves the complete current visible Contact result set, freezes those Contact IDs into bounded queue chunks, and records one operation identifier for retry-safe enrollment. Each chunk re-checks the actor's capability and current Contact visibility before calling the existing `EnrollContactInCampaignAction`. The public Campaign enrollment action therefore remains authoritative for campaign availability, arbitration, existing-enrollment behavior, MessageChain enrollment, and timing; the bulk Contact action does not reproduce that logic.
+
+The result-set operation identifier is supplied as the Campaign entry key so queue retries can reuse the enrollment action's deterministic deduplication path. Actor/source provenance is passed through enrollment metadata/start context.
+
+This action-specific capability does not yet imply that every legacy Campaign management route has been migrated to granular Team/Access permissions. Broader Campaign authorization remains a separate module integration pass.

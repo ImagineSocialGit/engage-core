@@ -401,3 +401,27 @@ The Contact filter criterion registry may expose optional presentation metadata 
 Generic audience builders should use progressive disclosure. Operators first choose the filter categories they need, then see only those controls. Exclusion builders should consume the same contributed category definitions and the same progressive-disclosure model rather than rendering every possible field at once. Searchable multi-select is the default presentation for ordinary option-backed criteria.
 
 A criterion may opt out of a generic surface without unregistering its runtime behavior. This is important when one durable criterion exists for an internal eligibility contract while another criterion provides the operator-facing audience experience. Consumers must not infer runtime semantics from the presentation metadata.
+
+## Contact result sets and contributed actions
+
+The Contacts index may expose actions against the complete visible result set, not only the current pagination page. Core owns the reusable `ContactResultSetResolver` so the list query and result actions share one search/criterion interpretation and one server-side Contact visibility boundary.
+
+A result-set payload is intentionally small and transient:
+
+```text
+search
+criteria
+```
+
+It is not persisted to Contact metadata or to a generic saved-audience table in this slice. Result actions that mutate Contacts freeze the currently visible Contact IDs before queueing, then re-check actor capability and current Contact visibility when each queued chunk executes. CSV export streams only the visible query result. Stale or invalid criterion values must fail closed rather than broadening to all Contacts.
+
+Optional modules may add actions to the Core Contacts result surface only through `ContactResultActionContributor` and the Core-owned registry. Core renders the contributed action view but does not import Broadcasts, Campaigns, Webinars, or another optional module. Every contributed action declares a registered access capability; the registry hides actions the current CRM user cannot perform, and write endpoints enforce the same capability server-side.
+
+Current Core-owned actions are:
+
+```text
+Add tag    -> contacts.manage
+Export CSV -> contacts.export
+```
+
+The result-action registry is an integration seam, not a generic ACL or workflow engine.

@@ -14,6 +14,7 @@ use App\Modules\Core\Access\Services\UserAccessService;
 use App\Modules\Core\Access\Support\AccessCapabilityRegistry;
 use App\Modules\Core\Capabilities\CoreAutomationCapabilityContributor;
 use App\Modules\Core\ConfigContracts\ContactStatusConfigContractTargetProvider;
+use App\Modules\Core\Contacts\CoreContactResultActionContributor;
 use App\Modules\Core\ConfigContracts\ContactStatusDefinitionConfigContract;
 use App\Modules\Core\Console\Commands\SyncContactStatusPresetsCommand;
 use App\Modules\Core\Data\Contacts\ContactImportField;
@@ -37,6 +38,7 @@ use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportTreatmentRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
+use App\Modules\Core\Support\Contacts\ContactResultActionRegistry;
 use App\Modules\Core\Support\Contacts\ContactShowDataRegistry;
 use App\Modules\Core\TokenContracts\ContactTokenSourceProvider;
 use App\Modules\Core\TokenContracts\SiteSettingTokenSourceProvider;
@@ -67,6 +69,18 @@ class CoreModuleServiceProvider extends ServiceProvider
         });
 
         $this->app->scoped(UserAccessService::class);
+
+        $this->app->tag(
+            CoreContactResultActionContributor::class,
+            ContactResultActionRegistry::CONTRIBUTOR_TAG,
+        );
+
+        $this->app->scoped(ContactResultActionRegistry::class, function ($app): ContactResultActionRegistry {
+            return new ContactResultActionRegistry(
+                contributors: $app->tagged(ContactResultActionRegistry::CONTRIBUTOR_TAG),
+                access: $app->make(UserAccessService::class),
+            );
+        });
 
         $this->app->tag([
             SourceContactFilterCriterion::class,

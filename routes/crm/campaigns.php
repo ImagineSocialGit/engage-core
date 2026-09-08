@@ -3,7 +3,9 @@
 use App\Modules\Campaigns\Controllers\CRM\CampaignAnnualTouchController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignMessageTemplateController;
+use App\Modules\Campaigns\Access\CampaignsAccessCapabilityContributor;
 use App\Modules\Campaigns\Controllers\CRM\CampaignSimulatorController;
+use App\Modules\Campaigns\Controllers\CRM\ContactResultCampaignController;
 use App\Support\TestingTools\TestingToolGuard;
 use Illuminate\Support\Facades\Route;
 
@@ -19,6 +21,10 @@ Route::middleware('module:campaigns')
 
         Route::post('/', [CampaignController::class, 'store'])
             ->name('store');
+
+        Route::post('/from-contact-results', [ContactResultCampaignController::class, 'store'])
+            ->middleware('capability:'.CampaignsAccessCapabilityContributor::ENROLL_CONTACT_RESULTS)
+            ->name('contact-results.store');
 
         Route::prefix('annual-touches')
             ->name('annual-touches.')

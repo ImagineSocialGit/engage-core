@@ -2,6 +2,8 @@
 
 namespace App\Modules\Campaigns\Providers;
 
+use App\Modules\Campaigns\Access\CampaignsAccessCapabilityContributor;
+use App\Modules\Campaigns\Contacts\CampaignContactResultActionContributor;
 use App\Modules\Campaigns\Automation\CampaignAnnualTouchAutomationTriggerAuthoringContributor;
 use App\Modules\Campaigns\Automation\CampaignsAutomationPointAuthoringContributor;
 use App\Modules\Campaigns\Automation\CampaignsAutomationPointDefinitionContributor;
@@ -28,7 +30,9 @@ use App\Modules\Campaigns\Services\ProcessHighway\CampaignsProcessHighwayContrib
 use App\Modules\Campaigns\TokenContracts\CampaignTokenContextProvider;
 use App\Modules\Campaigns\TokenContracts\CampaignTokenSourceProvider;
 use App\Modules\Campaigns\Validation\CampaignsSetupValidationContributor;
+use App\Modules\Core\Access\Support\AccessCapabilityRegistry;
 use App\Modules\Core\Events\ContactFilterFactsChanged;
+use App\Modules\Core\Support\Contacts\ContactResultActionRegistry;
 use App\Modules\Messaging\Contracts\ReusableMessageTemplateAuthoringOptionContributor;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use Illuminate\Console\Scheduling\Schedule;
@@ -39,6 +43,16 @@ class CampaignsModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->tag(
+            CampaignsAccessCapabilityContributor::class,
+            AccessCapabilityRegistry::CONTRIBUTOR_TAG,
+        );
+
+        $this->app->tag(
+            CampaignContactResultActionContributor::class,
+            ContactResultActionRegistry::CONTRIBUTOR_TAG,
+        );
+
         $this->app->tag(CampaignPresetDefinitionConfigContract::class, 'config.contracts');
         $this->app->tag(CampaignPresetConfigContractTargetProvider::class, 'config.contract_target_providers');
         $this->app->tag(CampaignTokenSourceProvider::class, 'token.source_providers');

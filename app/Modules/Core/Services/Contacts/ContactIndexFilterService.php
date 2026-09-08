@@ -19,7 +19,7 @@ final class ContactIndexFilterService
 
     public function __construct(
         private readonly ContactFilterCriterionRegistry $criteria,
-        private readonly ContactFilterResolver $resolver,
+        private readonly ContactResultSetResolver $resultSets,
     ) {}
 
     /**
@@ -122,39 +122,21 @@ final class ContactIndexFilterService
      */
     public function query(array $state): Builder
     {
-        $criteria = is_array($state['criteria'] ?? null)
-            ? $state['criteria']
-            : [];
+        return $this->resultSets->query($this->resultPayload($state));
+    }
 
-        $query = $criteria === []
-            ? Contact::query()
-            : $this->resolver
-                ->query([
-                    'type' => 'criteria',
-                    'criteria' => $criteria,
-                ])
-                ->reorder();
-
-        $search = $this->searchTerm($state['search'] ?? null);
-
-        if ($search === '') {
-            return $query;
-        }
-
-        $pattern = '%'.$this->escapeLike($search).'%';
-
-        return $query->where(function (Builder $searchQuery) use ($pattern): void {
-            $searchQuery
-                ->where('contacts.name', 'like', $pattern)
-                ->orWhere('contacts.first_name', 'like', $pattern)
-                ->orWhere('contacts.last_name', 'like', $pattern)
-                ->orWhere('contacts.email', 'like', $pattern)
-                ->orWhere('contacts.phone', 'like', $pattern)
-                ->orWhereRaw(
-                    "CONCAT_WS(' ', COALESCE(contacts.first_name, ''), COALESCE(contacts.last_name, '')) LIKE ?",
-                    [$pattern],
-                );
-        });
+    /**
+     * @param array<string, mixed> $state
+     * @return array{search: string, criteria: array<string, array<int, string>>}
+     */
+    public function resultPayload(array $state): array
+    {
+        return $this->resultSets->normalize([
+            'search' => $state['search'] ?? '',
+            'criteria' => is_array($state['criteria'] ?? null)
+                ? $state['criteria']
+                : [],
+        ]);
     }
 
     private function searchTerm(mixed $value): string
@@ -202,12 +184,4 @@ final class ContactIndexFilterService
         return null;
     }
 
-    private function escapeLike(string $value): string
-    {
-        return str_replace(
-            ['\\', '%', '_'],
-            ['\\\\', '\\%', '\\_'],
-            $value,
-        );
-    }
 }

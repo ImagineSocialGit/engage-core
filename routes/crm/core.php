@@ -10,6 +10,7 @@ use App\Modules\Core\Controllers\ContactController;
 use App\Modules\Core\Controllers\ContactImportBatchController;
 use App\Modules\Core\Controllers\ContactLookupController;
 use App\Modules\Core\Controllers\ContactNoteController;
+use App\Modules\Core\Controllers\ContactResultActionController;
 use App\Modules\Core\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -97,6 +98,14 @@ Route::prefix(config('contacts.routes.plural'))
         Route::get('/import-batches/{contactImportBatch}', [ContactImportBatchController::class, 'show'])
             ->middleware('capability:contacts.import')
             ->name('import-batches.show');
+
+        Route::post('/results/tag', [ContactResultActionController::class, 'tag'])
+            ->middleware('capability:contacts.manage')
+            ->name('results.tag');
+
+        Route::post('/results/export', [ContactResultActionController::class, 'export'])
+            ->middleware('capability:contacts.export')
+            ->name('results.export');
 
         Route::get('/{contact}', [ContactController::class, 'show'])
             ->name('show');

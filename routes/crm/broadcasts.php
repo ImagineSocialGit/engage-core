@@ -1,6 +1,8 @@
 <?php
 
+use App\Modules\Broadcasts\Access\BroadcastsAccessCapabilityContributor;
 use App\Modules\Broadcasts\Controllers\BroadcastController;
+use App\Modules\Broadcasts\Controllers\ContactResultBroadcastController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('module:broadcasts')
@@ -12,6 +14,10 @@ Route::middleware('module:broadcasts')
 
         Route::post('/audience-preview', [BroadcastController::class, 'previewAudience'])
             ->name('audience-preview');
+
+        Route::post('/from-contact-results', ContactResultBroadcastController::class)
+            ->middleware('capability:'.BroadcastsAccessCapabilityContributor::CREATE_FROM_CONTACT_RESULTS)
+            ->name('from-contact-results');
 
         Route::post('/', [BroadcastController::class, 'store'])
             ->name('store');

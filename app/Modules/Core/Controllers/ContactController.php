@@ -22,6 +22,7 @@ use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportTreatmentRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
+use App\Modules\Core\Support\Contacts\ContactResultActionRegistry;
 use App\Modules\Core\Support\Contacts\ContactShowDataRegistry;
 use App\Support\Modules\ModuleManager;
 use Illuminate\Http\RedirectResponse;
@@ -41,6 +42,7 @@ class ContactController extends Controller
         Request $request,
         ContactIndexFilterService $contactIndexFilters,
         ContactVisibility $contactVisibility,
+        ContactResultActionRegistry $contactResultActions,
     ): View {
         $contactFilters = $contactIndexFilters->state($request->query());
         $contactsQuery = $contactVisibility->apply(
@@ -73,12 +75,57 @@ class ContactController extends Controller
             true,
         );
 
+        $contactFilters['active'] = collect($contactFilters['active'])
+            ->map(function (array $activeFilter) use ($request): array {
+                $query = $request->query();
+                unset($query[$activeFilter['key']], $query['page']);
+
+                return [
+                    ...$activeFilter,
+                    'remove_url' => route('crm.contacts.index', $query),
+                ];
+            })
+            ->all();
+
+        $contactRows = $contacts->getCollection()
+            ->mapWithKeys(function (Contact $contact): array {
+                $displayName = $contact->name
+                    ?: trim($contact->first_name.' '.$contact->last_name)
+                    ?: $contact->email
+                    ?: str((string) config('contacts.labels.singular'))->title().' #'.$contact->id;
+
+                return [
+                    (int) $contact->getKey() => [
+                        'display_name' => $displayName,
+                        'contact_method' => collect([$contact->email, $contact->phone])
+                            ->filter()
+                            ->join(' · '),
+                        'status_name' => module_enabled('workflow')
+                            ? $contact->workflowProfile?->contactStatus?->name
+                            : null,
+                    ],
+                ];
+            })
+            ->all();
+
+        $contactResultPayload = $contactIndexFilters->resultPayload($contactFilters);
+        $contactResultActions = $contactResultActions->actionsFor($request->user());
+        $contactResultCount = $contacts->total();
+        $leadSingular = (string) config('contacts.labels.singular');
+        $leadPlural = (string) config('contacts.labels.plural');
+
         return view('crm.contacts.index', compact(
             'contacts',
             'totalContacts',
             'contactFilters',
             'contactStatuses',
             'messagingAvailable',
+            'contactRows',
+            'contactResultPayload',
+            'contactResultActions',
+            'contactResultCount',
+            'leadSingular',
+            'leadPlural',
         ));
     }
 

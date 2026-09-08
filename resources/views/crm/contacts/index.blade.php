@@ -1,8 +1,3 @@
-@php
-    $leadSingular = config('contacts.labels.singular');
-    $leadPlural = config('contacts.labels.plural');
-@endphp
-
 <x-layouts.crm
     :title="str($leadPlural)->title()"
     :heading="str($leadPlural)->title()"
@@ -18,6 +13,18 @@
         @if (session('success'))
             <x-ui.feedback.alert type="success">
                 {{ session('success') }}
+            </x-ui.feedback.alert>
+        @endif
+
+        @if (session('error'))
+            <x-ui.feedback.alert type="error">
+                {{ session('error') }}
+            </x-ui.feedback.alert>
+        @endif
+
+        @if($errors->has('contact_result') || $errors->has('tag') || $errors->has('campaign_key'))
+            <x-ui.feedback.alert type="error">
+                {{ $errors->first('contact_result') ?: ($errors->first('tag') ?: $errors->first('campaign_key')) }}
             </x-ui.feedback.alert>
         @endif
 
@@ -311,13 +318,8 @@
             @if($contactFilters['has_filters'])
                 <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-4">
                     @foreach($contactFilters['active'] as $activeFilter)
-                        @php
-                            $removeFilterQuery = request()->query();
-                            unset($removeFilterQuery[$activeFilter['key']], $removeFilterQuery['page']);
-                        @endphp
-
                         <a
-                            href="{{ route('crm.contacts.index', $removeFilterQuery) }}"
+                            href="{{ $activeFilter['remove_url'] }}"
                             class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
                             aria-label="Remove {{ $activeFilter['label'] }} filter"
                         >
@@ -359,15 +361,33 @@
                 </div>
             </div>
 
+            @if($contactResultCount > 0 && $contactResultActions !== [])
+                <div class="border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-6">
+                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-950">
+                                Actions for this result set
+                            </p>
+                            <p class="mt-1 text-xs leading-5 text-slate-500">
+                                These actions use all {{ number_format($contactResultCount) }} matching Contacts you can see, not just the current page.
+                            </p>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                            @foreach($contactResultActions as $contactResultAction)
+                                @include($contactResultAction->view, [
+                                    'contactResultAction' => $contactResultAction,
+                                    'contactResultPayload' => $contactResultPayload,
+                                    'contactResultCount' => $contactResultCount,
+                                ])
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <div class="divide-y divide-slate-200">
                 @forelse ($contacts as $contact)
-                    @php
-                        $displayName = $contact->name ?: trim($contact->first_name.' '.$contact->last_name) ?: $contact->email ?: str($leadSingular)->title().' #'.$contact->id;
-                        $statusName = module_enabled('workflow')
-                            ? $contact->workflowProfile?->contactStatus?->name
-                            : null;
-                    @endphp
-
                     <a
                         href="{{ route('crm.contacts.show', $contact) }}"
                         class="block px-4 py-4 transition hover:bg-slate-50 sm:px-6"
@@ -375,11 +395,11 @@
                         <div class="grid gap-4 {{ module_enabled('workflow') ? 'md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(8rem,auto)]' : 'md:grid-cols-[minmax(0,1fr)_minmax(8rem,auto)]' }} md:items-center">
                             <div>
                                 <p class="font-semibold text-slate-950">
-                                    {{ $displayName }}
+                                    {{ $contactRows[$contact->id]['display_name'] }}
                                 </p>
 
                                 <p class="mt-1 break-words text-sm text-slate-500">
-                                    {{ collect([$contact->email, $contact->phone])->filter()->join(' · ') ?: 'No contact method saved' }}
+                                    {{ $contactRows[$contact->id]['contact_method'] ?: 'No contact method saved' }}
                                 </p>
                             </div>
 
@@ -390,7 +410,7 @@
                                     </p>
 
                                     <p class="mt-1 text-sm font-medium text-slate-800">
-                                        {{ $statusName ?: 'No status' }}
+                                        {{ $contactRows[$contact->id]['status_name'] ?: 'No status' }}
                                     </p>
                                 </div>
                             @endif

@@ -70,14 +70,19 @@
 │   │   └── User.php
 │   ├── Modules
 │   │   ├── Broadcasts
+│   │   │   ├── Access
+│   │   │   │   └── BroadcastsAccessCapabilityContributor.php
 │   │   │   ├── Actions
 │   │   │   │   ├── CancelBroadcastAction.php
 │   │   │   │   ├── DuplicateBroadcastAction.php
 │   │   │   │   ├── ScheduleBroadcastAction.php
 │   │   │   │   └── ScheduleBroadcastRecipientChunkAction.php
+│   │   │   ├── Contacts
+│   │   │   │   └── BroadcastContactResultActionContributor.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
-│   │   │   │   └── BroadcastController.php
+│   │   │   │   ├── BroadcastController.php
+│   │   │   │   └── ContactResultBroadcastController.php
 │   │   │   ├── Data
 │   │   │   ├── Jobs
 │   │   │   │   └── ScheduleBroadcastChunkJob.php
@@ -107,6 +112,8 @@
 │   │   │   └── TokenContracts
 │   │   │       └── BroadcastTokenContextProvider.php
 │   │   ├── Campaigns
+│   │   │   ├── Access
+│   │   │   │   └── CampaignsAccessCapabilityContributor.php
 │   │   │   ├── Actions
 │   │   │   │   ├── ActivateCampaignAction.php
 │   │   │   │   ├── ApplyAutomaticCampaignEligibilityAction.php
@@ -146,13 +153,16 @@
 │   │   │   │   └── Commands
 │   │   │   │       ├── DeactivateCampaignCommand.php
 │   │   │   │       └── SyncCampaignPresetsCommand.php
+│   │   │   ├── Contacts
+│   │   │   │   └── CampaignContactResultActionContributor.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   │   └── CRM
 │   │   │   │       ├── CampaignAnnualTouchController.php
 │   │   │   │       ├── CampaignController.php
 │   │   │   │       ├── CampaignMessageTemplateController.php
-│   │   │   │       └── CampaignSimulatorController.php
+│   │   │   │       ├── CampaignSimulatorController.php
+│   │   │   │       └── ContactResultCampaignController.php
 │   │   │   ├── Data
 │   │   │   │   ├── Automation
 │   │   │   │   │   ├── CancelCampaignAutomationDefinition.php
@@ -177,6 +187,7 @@
 │   │   │   │   └── CampaignLaunchTimingContactImportPostProcessor.php
 │   │   │   ├── Jobs
 │   │   │   │   ├── EmitDueAnnualTouchAutomationEventsJob.php
+│   │   │   │   ├── EnrollContactResultCampaignChunkJob.php
 │   │   │   │   ├── ProcessDueCampaignTouchDatesJob.php
 │   │   │   │   ├── ReconcileAutomaticCampaignEligibilityJob.php
 │   │   │   │   └── ReconcileContactCampaignEligibilityJob.php
@@ -301,9 +312,12 @@
 │   │   │   ├── Console
 │   │   │   │   └── Commands
 │   │   │   │       └── SyncContactStatusPresetsCommand.php
+│   │   │   ├── Contacts
+│   │   │   │   └── CoreContactResultActionContributor.php
 │   │   │   ├── Contracts
 │   │   │   │   └── Contacts
 │   │   │   │       ├── ContactFilterCriterion.php
+│   │   │   │       ├── ContactFilterCriterionPresentation.php
 │   │   │   │       ├── ContactImportHandler.php
 │   │   │   │       ├── ContactImportPostProcessorBatchFinalizer.php
 │   │   │   │       ├── ContactImportPostProcessorInputProvider.php
@@ -311,6 +325,7 @@
 │   │   │   │       ├── ContactImportPostProcessor.php
 │   │   │   │       ├── ContactImportTreatmentTarget.php
 │   │   │   │       ├── ContactPanelProvider.php
+│   │   │   │       ├── ContactResultActionContributor.php
 │   │   │   │       ├── ContactShowDataProvider.php
 │   │   │   │       └── UpdatesContactStatus.php
 │   │   │   ├── Controllers
@@ -319,6 +334,7 @@
 │   │   │   │   ├── ContactImportBatchController.php
 │   │   │   │   ├── ContactLookupController.php
 │   │   │   │   ├── ContactNoteController.php
+│   │   │   │   ├── ContactResultActionController.php
 │   │   │   │   └── SettingsController.php
 │   │   │   ├── Data
 │   │   │   │   └── Contacts
@@ -330,7 +346,8 @@
 │   │   │   │       ├── ContactImportTreatmentDefinition.php
 │   │   │   │       ├── ContactImportTreatmentResolution.php
 │   │   │   │       ├── ContactImportTreatmentSelection.php
-│   │   │   │       └── ContactPanel.php
+│   │   │   │       ├── ContactPanel.php
+│   │   │   │       └── ContactResultAction.php
 │   │   │   ├── Deployment
 │   │   │   │   └── CoreDeploymentPlanContributor.php
 │   │   │   ├── Enums
@@ -343,6 +360,7 @@
 │   │   │   │       ├── ContactStatusImportTreatmentTarget.php
 │   │   │   │       └── ContactTagsImportTreatmentTarget.php
 │   │   │   ├── Jobs
+│   │   │   │   ├── AddTagToContactResultChunkJob.php
 │   │   │   │   ├── EmitContactImportAutomationEventsJob.php
 │   │   │   │   ├── FinalizeContactImportBatchJob.php
 │   │   │   │   └── ProcessContactImportBatchChunkJob.php
@@ -385,6 +403,7 @@
 │   │   │   │   │   ├── ContactImportBatchProcessor.php
 │   │   │   │   │   ├── ContactImportProfileRegistry.php
 │   │   │   │   │   ├── ContactIndexFilterService.php
+│   │   │   │   │   ├── ContactResultSetResolver.php
 │   │   │   │   │   └── Filters
 │   │   │   │   │       ├── ImportBatchContactFilterCriterion.php
 │   │   │   │   │       ├── SourceContactFilterCriterion.php
@@ -401,6 +420,7 @@
 │   │   │   │       ├── ContactImportRegistry.php
 │   │   │   │       ├── ContactImportTreatmentRegistry.php
 │   │   │   │       ├── ContactPanelRegistry.php
+│   │   │   │       ├── ContactResultActionRegistry.php
 │   │   │   │       └── ContactShowDataRegistry.php
 │   │   │   ├── TokenContracts
 │   │   │   │   ├── ContactTokenSourceProvider.php
@@ -2471,7 +2491,9 @@
 │       │   ├── campaigns
 │       │   │   └── builder-shell.blade.php
 │       │   ├── crm
+│       │   │   ├── contact-filter-multiselect.blade.php
 │       │   │   ├── contact-picker.blade.php
+│       │   │   ├── contact-result-filter-fields.blade.php
 │       │   │   ├── contact-visibility.blade.php
 │       │   │   ├── dashboard
 │       │   │   │   ├── panel.blade.php
@@ -2529,6 +2551,7 @@
 │       │   │   ├── message-editor.blade.php
 │       │   │   └── message-media-editor.blade.php
 │       │   └── webinars
+│       │       ├── audience-filter.blade.php
 │       │       ├── countdown.blade.php
 │       │       ├── event-details.blade.php
 │       │       ├── floating-card.blade.php
@@ -2542,6 +2565,7 @@
 │       │   │   ├── index.blade.php
 │       │   │   ├── partials
 │       │   │   │   ├── audience-builder.blade.php
+│       │   │   │   ├── contact-result-action.blade.php
 │       │   │   │   ├── cta-editor.blade.php
 │       │   │   │   ├── message-personalization.blade.php
 │       │   │   │   └── reusable-message-picker.blade.php
@@ -2556,6 +2580,8 @@
 │       │   │   ├── index.blade.php
 │       │   │   ├── message-templates
 │       │   │   │   └── index.blade.php
+│       │   │   ├── partials
+│       │   │   │   └── contact-result-action.blade.php
 │       │   │   ├── show.blade.php
 │       │   │   └── simulator
 │       │   │       ├── index.blade.php
@@ -2574,6 +2600,9 @@
 │       │   │   │   └── webinar-history.blade.php
 │       │   │   ├── partials
 │       │   │   │   └── post-import-inputs.blade.php
+│       │   │   ├── result-actions
+│       │   │   │   ├── export.blade.php
+│       │   │   │   └── tag.blade.php
 │       │   │   └── show.blade.php
 │       │   ├── dashboard.blade.php
 │       │   ├── dashboard-tasks-print.blade.php
@@ -2768,6 +2797,7 @@
 │   │   │   ├── BroadcastTokenPersonalizationTest.php
 │   │   │   ├── BroadcastVersionedPersistenceTest.php
 │   │   │   ├── CancelBroadcastActionTest.php
+│   │   │   ├── ContactResultBroadcastActionTest.php
 │   │   │   ├── MarkBroadcastRecipientSentTest.php
 │   │   │   ├── MarkBroadcastRecipientTerminalStatusTest.php
 │   │   │   └── ScheduleBroadcastActionTest.php
@@ -2802,6 +2832,7 @@
 │   │   │   ├── CampaignVariantPresetSyncSpecificityTest.php
 │   │   │   ├── CampaignWorkspaceControllerTest.php
 │   │   │   ├── CompactCampaignPresetAuthoringTest.php
+│   │   │   ├── ContactResultCampaignEnrollmentTest.php
 │   │   │   ├── DeactivateCampaignCommandTest.php
 │   │   │   ├── EnrollCampaignAutomationActionHandlerTest.php
 │   │   │   ├── EnrollContactInCampaignActionTest.php
@@ -2853,6 +2884,7 @@
 │   │   │   ├── ContactIndexFilterTest.php
 │   │   │   ├── ContactLookupControllerTest.php
 │   │   │   ├── ContactQuickEditTest.php
+│   │   │   ├── ContactResultActionTest.php
 │   │   │   ├── ContactStatusImportTreatmentTest.php
 │   │   │   ├── ContactTagAutomationTest.php
 │   │   │   ├── CoreSetupValidationContributorTest.php
@@ -3371,4 +3403,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-798 directories, 2574 files
+805 directories, 2599 files

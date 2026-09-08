@@ -495,3 +495,11 @@ The regular Broadcast audience builder consumes Core Contact filter presentation
 Audience preview and final recipient resolution share `BroadcastRecipientResolver`, including creator Contact visibility and prior-Broadcast exclusions. Prior scheduled/sent overlap is actionable: the operator may exclude one previous Broadcast's overlapping contacts or exclude all currently reported overlap in one action. Those actions add Broadcast-owned prior-send exclusions; they do not mutate Contacts or rewrite Core filter criteria.
 
 Manual Contact removals remain `exclude_contact_ids`, rule-based exclusions remain `exclude_criteria`, and prior-send exclusions remain under the nested Broadcast `exclude` namespace. Clear filters resets all three operator-selected exclusion forms as well as positive filters for the current authoring surface.
+
+## Contact result handoff
+
+When Broadcasts is enabled it contributes `Send Broadcast` to the Core Contact result-action registry. The action requires the registered `broadcasts.create_from_contact_results` capability and opens the existing Broadcast authoring surface with the current Contact result set already loaded as the audience.
+
+Criteria-only Contact results remain criteria when handed off so the Broadcast preview can continue to use the shared Core resolver. Free-text Contact searches are materialized to the currently visible Contact IDs because free-text discovery is owned by the Contacts index rather than the durable Contact filter criterion contract. Final Broadcast preview/scheduling still applies `BroadcastRecipientResolver`, creator Contact visibility, manual exclusions, rule exclusions, and prior-Broadcast exclusions.
+
+This action-specific capability does not yet imply that every legacy Broadcast management route has been migrated to granular Team/Access permissions. Broader Broadcast authorization remains a separate module integration pass.
