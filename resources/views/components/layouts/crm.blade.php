@@ -1,19 +1,4 @@
-@props([
-    'title' => null,
-    'heading' => null,
-    'subheading' => null,
-    'metaDescription' => null,
-    'module' => null,
-])
-
 <x-layouts.app :title="$title ?? config('app.name')" :meta-description="$metaDescription">
-    @php
-        $moduleManager = app(\App\Support\Modules\ModuleManager::class);
-        $navigationItems = $moduleManager->navigationItems();
-        $navBaseClass = 'block rounded-lg px-3 py-2 font-medium text-slate-700 transition focus-visible:outline-none focus-visible:ring-2';
-        $mainSurfaceClass = $module ? module_tone($module, 'panel') : 'bg-slate-50';
-    @endphp
-
     <div
         x-data="{ mobileNavOpen: false }"
         x-on:keydown.escape.window="mobileNavOpen = false"
@@ -32,12 +17,40 @@
 
                 <nav class="flex-1 space-y-1 overflow-y-auto px-4 py-4 text-sm" aria-label="CRM navigation">
                     @foreach($navigationItems as $item)
-                        <a
-                            href="{{ $item['href'] }}"
-                            class="{{ $navBaseClass }} {{ module_tone($item['module'], 'nav') }} {{ $item['class'] }}"
-                        >
-                            {{ $item['label'] }}
-                        </a>
+                        <div>
+                            <a
+                                href="{{ $item['href'] }}"
+                                class="{{ $navBaseClass }} {{ module_tone($item['module'], 'nav') }} {{ $item['class'] }}"
+                                @if($item['description'] !== '')
+                                    title="{{ $item['description'] }}"
+                                    aria-describedby="crm-nav-description-desktop-{{ $loop->index }}"
+                                @endif
+                            >
+                                <span class="flex min-w-0 items-center justify-between gap-2">
+                                    <span class="min-w-0 truncate">{{ $item['label'] }}</span>
+
+                                    @if($item['description'] !== '')
+                                        <svg
+                                            viewBox="0 0 24 24"
+                                            class="h-4 w-4 shrink-0 text-slate-400"
+                                            aria-hidden="true"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                        >
+                                            <circle cx="12" cy="12" r="9" />
+                                            <path stroke-linecap="round" d="M12 10v6M12 7h.01" />
+                                        </svg>
+                                    @endif
+                                </span>
+                            </a>
+
+                            @if($item['description'] !== '')
+                                <span id="crm-nav-description-desktop-{{ $loop->index }}" class="sr-only">
+                                    {{ $item['description'] }}
+                                </span>
+                            @endif
+                        </div>
                     @endforeach
 
                     <form method="POST" action="/logout">
@@ -103,7 +116,13 @@
                                 class="{{ $navBaseClass }} {{ module_tone($item['module'], 'nav') }} {{ $item['class'] }}"
                                 x-on:click="mobileNavOpen = false"
                             >
-                                {{ $item['label'] }}
+                                <span class="block">{{ $item['label'] }}</span>
+
+                                @if($item['description'] !== '')
+                                    <span class="mt-1 block text-xs font-normal leading-4 text-slate-500">
+                                        {{ $item['description'] }}
+                                    </span>
+                                @endif
                             </a>
                         @endforeach
 

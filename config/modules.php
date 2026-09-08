@@ -451,6 +451,7 @@ return [
             ],
             'nav' => [
                 'label' => 'Dashboard',
+                'description' => 'See what needs your attention right now.',
                 'route' => 'crm.index',
                 'priority' => 10,
             ],
@@ -468,17 +469,20 @@ return [
             'nav' => [
                 [
                     'label_config' => 'contacts.labels.plural',
+                    'description' => 'Find and manage the people in your CRM.',
                     'route' => 'crm.contacts.index',
                     'priority' => 20,
                     'class' => 'capitalize',
                 ],
                 [
                     'label' => 'Process Highway',
+                    'description' => 'See what automatic stuff happens to contacts.',
                     'route' => 'crm.process-highway.index',
                     'priority' => 21,
                 ],
                 [
                     'label' => 'Settings & setup',
+                    'description' => 'Change shared CRM settings and setup.',
                     'route' => 'crm.settings.index',
                     'priority' => 900,
                 ],
@@ -519,6 +523,7 @@ return [
             ],
             'nav' => [
                 'label' => 'Message Templates',
+                'description' => 'Create and edit reusable email and text messages.',
                 'route' => 'crm.messaging.message-templates.index',
                 'priority' => 80,
             ],
@@ -543,6 +548,7 @@ return [
             ],
             'nav' => [
                 'label' => 'Reply Handling',
+                'description' => 'Choose what incoming replies mean and what happens next.',
                 'route' => 'crm.inbound-messaging.reply-profiles.index',
                 'priority' => 81,
             ],
@@ -578,6 +584,7 @@ return [
             ],
             'nav' => [
                 'label' => 'Tasks',
+                'description' => 'See and complete work that needs to be done.',
                 'route' => 'crm.tasks.index',
                 'priority' => 25,
             ],
@@ -605,6 +612,7 @@ return [
             ],
             'nav' => [
                 'label' => 'Scheduling',
+                'description' => 'Book and manage appointments.',
                 'route' => 'crm.scheduling.index',
                 'priority' => 30,
             ],
@@ -640,6 +648,7 @@ return [
             ],
             'nav' => [
                 'label' => 'Forms',
+                'description' => 'Create forms that collect information from people.',
                 'route' => 'crm.forms.index',
                 'priority' => 35,
             ],
@@ -744,6 +753,7 @@ return [
             ],
             'nav' => [
                 'label' => 'Routes',
+                'description' => 'Automate one or multiple things.',
                 'route' => 'crm.flow-routes.index',
                 'priority' => 90,
             ],
@@ -768,6 +778,7 @@ return [
             ],
             'nav' => [
                 'label' => 'Campaigns',
+                'description' => 'Send a series of messages to a group of contacts.',
                 'route' => 'crm.campaigns.index',
                 'priority' => 42,
             ],
@@ -792,6 +803,7 @@ return [
             ],
             'nav' => [
                 'label' => 'Broadcasts',
+                'description' => 'Send a one time message to a group of contacts.',
                 'route' => 'crm.broadcasts.index',
                 'priority' => 60,
             ],
@@ -808,6 +820,7 @@ return [
             ],
             'nav' => [
                 'label' => 'Webinars',
+                'description' => 'Manage webinars, registrations, and attendance.',
                 'route' => 'crm.webinar-series.index',
                 'priority' => 70,
             ],
@@ -857,6 +870,7 @@ return [
             ],
             'nav' => [
                 'label' => 'Reporting',
+                'description' => 'See results and activity across the CRM.',
                 'route' => 'crm.reporting.index',
                 'priority' => 75,
             ],

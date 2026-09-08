@@ -134,7 +134,7 @@ class ModuleManager
     }
 
     /**
-     * @return array<int, array{module: string, label: string, route: string, href: string, priority: int, class: string}>
+     * @return array<int, array{module: string, label: string, description: string, route: string, href: string, priority: int, class: string}>
      */
     public function navigationItems(): array
     {
@@ -151,10 +151,12 @@ class ModuleManager
                 }
 
                 $label = $this->navigationLabel($item, $definition, $moduleKey);
+                $description = $item['description'] ?? '';
 
                 $items[] = [
                     'module' => $moduleKey,
                     'label' => $label,
+                    'description' => is_string($description) ? trim($description) : '',
                     'route' => $route,
                     'href' => route($route),
                     'priority' => (int) ($item['priority'] ?? 100),

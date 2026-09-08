@@ -27,6 +27,7 @@ class ModuleDefinitionConfigContract implements ConfigContract
         $navItem = ConfigSchema::object([
             'label' => ConfigField::optional(ConfigSchema::string()),
             'label_config' => ConfigField::optional(ConfigSchema::string()),
+            'description' => ConfigField::optional(ConfigSchema::string()),
             'route' => ConfigField::required(ConfigSchema::string()),
             'priority' => ConfigField::defaulted(ConfigSchema::integer(), 100),
             'class' => ConfigField::optional(ConfigSchema::string()),

@@ -95,4 +95,31 @@ class ModuleNavigationTest extends TestCase
 
         $this->assertNull($campaignNavigation);
     }
+
+    public function test_every_visible_navigation_item_has_a_plain_english_description(): void
+    {
+        config()->set('modules.enabled', [
+            'messaging',
+            'inbound_messaging',
+            'tasks',
+            'scheduling',
+            'forms',
+            'campaigns',
+            'webinars',
+            'workflow',
+            'flow_routes',
+            'broadcasts',
+            'reporting',
+        ]);
+
+        $items = app(ModuleManager::class)->navigationItems();
+
+        $this->assertNotEmpty($items);
+
+        foreach ($items as $item) {
+            $this->assertArrayHasKey('description', $item);
+            $this->assertIsString($item['description']);
+            $this->assertNotSame('', trim($item['description']), $item['route']);
+        }
+    }
 }
