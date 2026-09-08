@@ -6,6 +6,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Support\Contacts\ContactFilterCriterionRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use InvalidArgumentException;
 
 class ContactFilterResolver
 {
@@ -28,7 +29,7 @@ class ContactFilterResolver
     {
         $type = $this->filterType($filter['type'] ?? null);
 
-        return match ($type) {
+        $query = match ($type) {
             'all' => $this->allContactsQuery(),
             'criteria' => $this->criteriaQuery($filter),
             'contact_ids' => $this->contactIdsQuery($filter),
@@ -37,6 +38,10 @@ class ContactFilterResolver
             'tag' => $this->tagsQuery($filter),
             default => $this->emptyContactsQuery(),
         };
+
+        $this->applyContactExclusions($query, $filter);
+
+        return $query;
     }
 
     /** @return Builder<Contact> */
@@ -131,6 +136,61 @@ class ContactFilterResolver
                 $query->whereIn('tag', $tags);
             })
             ->orderBy('id');
+    }
+
+    /**
+     * Apply reusable subtractive audience rules after the positive/base filter.
+     * Unknown or malformed exclusion criteria fail closed because silently
+     * dropping an exclusion can broaden a bulk audience unexpectedly.
+     *
+     * @param Builder<Contact> $query
+     * @param array<string, mixed> $filter
+     */
+    private function applyContactExclusions(Builder $query, array $filter): void
+    {
+        $excludedContactIds = $this->integerValues(
+            $filter['exclude_contact_ids'] ?? [],
+        );
+
+        if ($excludedContactIds !== []) {
+            $query->whereNotIn('contacts.id', $excludedContactIds);
+        }
+
+        $rawCriteria = $filter['exclude_criteria'] ?? [];
+
+        if ($rawCriteria === null || $rawCriteria === []) {
+            return;
+        }
+
+        if (! is_array($rawCriteria)) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        try {
+            $normalized = $this->criteria->normalize($rawCriteria);
+        } catch (InvalidArgumentException) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        if ($normalized === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $excluded = Contact::query();
+        $this->criteria->apply($excluded, $normalized);
+
+        $query->whereNotIn(
+            'contacts.id',
+            $excluded
+                ->reorder()
+                ->select('contacts.id'),
+        );
     }
 
     /** @return Builder<Contact> */

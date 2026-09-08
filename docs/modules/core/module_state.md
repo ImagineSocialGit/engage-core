@@ -312,6 +312,17 @@ The index consumes criterion definitions through the Core registry rather than h
 
 Filters are GET/query-string state. Pagination preserves the current search/filter query, active filters are removable individually, and the surface distinguishes filtered-empty results from a genuinely empty CRM. No filter selection is persisted to Contact metadata or another table.
 
+Reusable bulk-audience definitions may subtract Contacts after resolving the positive/base set. Core owns two generic exclusion keys:
+
+```text
+exclude_criteria
+exclude_contact_ids
+```
+
+`exclude_criteria` uses the same contributed criterion registry as positive criteria. Categories remain ANDed while multiple values inside one category remain ORed; the matching exclusion set is then subtracted from the positive audience. `exclude_contact_ids` is a final explicit per-Contact subtraction. Unknown, malformed, or non-empty-but-unresolvable exclusion criteria fail closed so a stale exclusion cannot silently broaden a bulk audience.
+
+Audience consumers should distinguish filter exclusions from one-off manual removals in their UX even when both ultimately use this Core resolver. Filter surfaces should always provide an obvious reset/clear action. Core does not give Broadcasts, Campaigns, Webinars, or another optional module ownership of these generic resolution semantics.
+
 
 ## Automation opportunity producer boundary
 

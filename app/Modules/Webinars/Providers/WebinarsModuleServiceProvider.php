@@ -15,6 +15,7 @@ use App\Modules\Webinars\Deployment\WebinarsDeploymentPlanContributor;
 use App\Modules\Webinars\EventDefinitions\WebinarBehaviorEventDefinitionContributor;
 use App\Modules\Webinars\Jobs\RecoverWebinarRegistrationFinalizationsJob;
 use App\Modules\Webinars\ReadModels\WebinarFunnelFactContributor;
+use App\Modules\Webinars\Services\Contacts\Filters\WebinarAttendanceContactFilterCriterion;
 use App\Modules\Webinars\Services\Contacts\Filters\WebinarOutcomeContactFilterCriterion;
 use App\Modules\Webinars\Services\ContactPanels\WebinarContactPanelProvider;
 use App\Modules\Webinars\Services\Dashboard\WebinarActivityDashboardPanelProvider;
@@ -93,10 +94,10 @@ class WebinarsModuleServiceProvider extends ServiceProvider
             'reporting.projection_fact_contributors',
         );
 
-        $this->app->tag(
+        $this->app->tag([
             WebinarOutcomeContactFilterCriterion::class,
-            'core.contact_filter_criteria',
-        );
+            WebinarAttendanceContactFilterCriterion::class,
+        ], 'core.contact_filter_criteria');
     }
 
     public function boot(): void

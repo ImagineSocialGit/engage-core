@@ -54,6 +54,7 @@ class BroadcastController extends Controller
             ->latest()
             ->limit(50)
             ->get();
+        $audienceFormState = $this->audienceFormState($request);
 
         return view('crm.broadcasts.index', [
             'title' => 'Broadcasts',
@@ -68,7 +69,8 @@ class BroadcastController extends Controller
             'broadcastMessageFields' => $this->messageTemplateAuthoringFields->groupsForContext(
                 Broadcast::DEFAULT_DISPATCH_KEY,
             ),
-            'audienceCriteria' => $this->contactFilterCriteria->definitions(),
+            'audienceCriteria' => $this->audienceCriteriaForState($audienceFormState),
+            'audienceFormState' => $audienceFormState,
             'permissionInvitationPreview' => $this->newPermissionInvitationPreview($request),
             'importBatches' => $this->importBatches(),
             'selectedImportBatchIds' => $this->selectedImportBatchIds($request->session()->getOldInput('import_batch_ids', [])),
@@ -155,7 +157,10 @@ class BroadcastController extends Controller
     public function previewAudience(PreviewBroadcastAudienceRequest $request): JsonResponse
     {
         return response()->json(
-            $this->broadcastAudiencePreview->preview($request->recipientFilter()),
+            $this->broadcastAudiencePreview->preview(
+                $request->recipientFilter(),
+                $request->user(),
+            ),
         );
     }
 
@@ -305,13 +310,15 @@ class BroadcastController extends Controller
         ]);
     }
 
-    public function edit(Broadcast $broadcast): View|RedirectResponse
+    public function edit(Request $request, Broadcast $broadcast): View|RedirectResponse
     {
         if ($broadcast->status !== Broadcast::STATUS_DRAFT) {
             return redirect()
                 ->route('crm.broadcasts.show', $broadcast)
                 ->with('error', 'Only draft broadcasts can be edited.');
         }
+
+        $audienceFormState = $this->audienceFormState($request, $broadcast);
 
         return view('crm.broadcasts.edit', [
             'title' => $broadcast->isPermissionInvitation() ? 'Edit Opt-In Invitation' : 'Edit Broadcast',
@@ -326,7 +333,8 @@ class BroadcastController extends Controller
             'broadcastMessageFields' => $broadcast->isRegularBroadcast()
                 ? $this->messageTemplateAuthoringFields->groupsForContext(Broadcast::DEFAULT_DISPATCH_KEY)
                 : [],
-            'audienceCriteria' => $this->contactFilterCriteria->definitions(),
+            'audienceCriteria' => $this->audienceCriteriaForState($audienceFormState),
+            'audienceFormState' => $audienceFormState,
             'selectedRecipientContacts' => $this->selectedContactOptions(
                 session()->getOldInput('contact_ids', $broadcast->recipient_filter['contact_ids'] ?? []),
             ),
@@ -508,6 +516,78 @@ class BroadcastController extends Controller
         return $this->broadcastRecipientResolver->permissionInvitationPreview($broadcast);
     }
 
+
+    /** @return array<string, mixed> */
+    private function audienceFormState(Request $request, ?Broadcast $broadcast = null): array
+    {
+        $filter = $broadcast?->recipient_filter ?? [];
+        $queryCriteria = $request->query('recipient_criteria');
+        $queryType = $request->query('recipient_filter_type');
+
+        $defaultType = is_string($queryType) && trim($queryType) !== ''
+            ? trim($queryType)
+            : (string) ($filter['type'] ?? 'criteria');
+        $defaultCriteria = is_array($queryCriteria)
+            ? $queryCriteria
+            : (is_array($filter['criteria'] ?? null) ? $filter['criteria'] : []);
+
+        $criteria = $request->session()->getOldInput(
+            'recipient_criteria',
+            $defaultCriteria,
+        );
+        $excludeCriteria = $request->session()->getOldInput(
+            'exclude_contact_criteria',
+            is_array($filter['exclude_criteria'] ?? null) ? $filter['exclude_criteria'] : [],
+        );
+        $excludeContactIds = $this->selectedImportBatchIds(
+            $request->session()->getOldInput(
+                'exclude_contact_ids',
+                is_array($filter['exclude_contact_ids'] ?? null) ? $filter['exclude_contact_ids'] : [],
+            ),
+        );
+        $excludeBroadcastStatuses = $request->session()->getOldInput(
+            'exclude_broadcast_statuses',
+            is_array(data_get($filter, 'exclude.statuses'))
+                ? data_get($filter, 'exclude.statuses')
+                : [
+                    BroadcastRecipient::STATUS_SCHEDULED,
+                    BroadcastRecipient::STATUS_SENT,
+                ],
+        );
+        $excludeBroadcastStatuses = is_array($excludeBroadcastStatuses)
+            ? array_values($excludeBroadcastStatuses)
+            : [];
+
+        return [
+            'filter_type' => $request->session()->getOldInput('recipient_filter_type', $defaultType),
+            'criteria' => is_array($criteria) ? $criteria : [],
+            'tag' => $request->session()->getOldInput('recipient_tag', $filter['tags'][0] ?? ''),
+            'exclude_criteria' => is_array($excludeCriteria) ? $excludeCriteria : [],
+            'exclude_contact_ids' => $excludeContactIds,
+            'has_contact_exclusions' => (is_array($excludeCriteria) && $excludeCriteria !== [])
+                || $excludeContactIds !== [],
+            'exclude_broadcast_ids' => $this->selectedImportBatchIds(
+                $request->session()->getOldInput(
+                    'exclude_broadcast_ids',
+                    is_array(data_get($filter, 'exclude.broadcast_ids'))
+                        ? data_get($filter, 'exclude.broadcast_ids')
+                        : [],
+                ),
+            ),
+            'exclude_broadcast_statuses' => $excludeBroadcastStatuses,
+            'exclude_scheduled' => in_array(
+                BroadcastRecipient::STATUS_SCHEDULED,
+                $excludeBroadcastStatuses,
+                true,
+            ),
+            'exclude_sent' => in_array(
+                BroadcastRecipient::STATUS_SENT,
+                $excludeBroadcastStatuses,
+                true,
+            ),
+        ];
+    }
+
     /**
      * @param array<int, mixed> $contactIds
      * @return Collection<int, Contact>
@@ -567,6 +647,52 @@ class BroadcastController extends Controller
             ->latest()
             ->limit(50)
             ->get();
+    }
+
+    /**
+     * @param array<string, mixed> $state
+     * @return array<int, array<string, mixed>>
+     */
+    private function audienceCriteriaForState(array $state): array
+    {
+        $includedCriteria = is_array($state['criteria'] ?? null)
+            ? $state['criteria']
+            : [];
+        $excludedCriteria = is_array($state['exclude_criteria'] ?? null)
+            ? $state['exclude_criteria']
+            : [];
+
+        return array_map(
+            static function (array $criterion) use ($includedCriteria, $excludedCriteria): array {
+                $key = (string) ($criterion['key'] ?? '');
+                $included = array_map(
+                    'strval',
+                    is_array($includedCriteria[$key] ?? null)
+                        ? $includedCriteria[$key]
+                        : [],
+                );
+                $excluded = array_map(
+                    'strval',
+                    is_array($excludedCriteria[$key] ?? null)
+                        ? $excludedCriteria[$key]
+                        : [],
+                );
+
+                $criterion['options'] = array_map(
+                    static fn (array $option): array => [
+                        ...$option,
+                        'included' => in_array((string) ($option['value'] ?? ''), $included, true),
+                        'excluded' => in_array((string) ($option['value'] ?? ''), $excluded, true),
+                    ],
+                    is_array($criterion['options'] ?? null)
+                        ? $criterion['options']
+                        : [],
+                );
+
+                return $criterion;
+            },
+            $this->contactFilterCriteria->definitions(),
+        );
     }
 
     /**

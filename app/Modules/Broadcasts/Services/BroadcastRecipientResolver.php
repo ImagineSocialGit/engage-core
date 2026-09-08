@@ -3,7 +3,9 @@
 namespace App\Modules\Broadcasts\Services;
 
 use App\Modules\Broadcasts\Models\Broadcast;
+use App\Models\User;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
+use App\Modules\Core\Access\Services\ContactVisibility;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Services\Contacts\ContactFilterResolver;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
@@ -15,6 +17,7 @@ class BroadcastRecipientResolver
 {
     public function __construct(
         private readonly ContactFilterResolver $contactFilterResolver,
+        private readonly ContactVisibility $contactVisibility,
     ) {}
 
     /**
@@ -26,6 +29,7 @@ class BroadcastRecipientResolver
             $broadcast->recipient_filter ?? [],
         );
 
+        $this->applyCreatorVisibility($broadcast, $query);
         $this->applyPriorBroadcastExclusions($broadcast, $query);
 
         if ($this->shouldExcludePermissionInvitationIneligibleContacts($broadcast)) {
@@ -98,6 +102,7 @@ class BroadcastRecipientResolver
         $candidateQuery = $this->contactFilterResolver->query(
             $broadcast->recipient_filter ?? [],
         );
+        $this->applyCreatorVisibility($broadcast, $candidateQuery);
         $candidateCount = (int) (clone $candidateQuery)
             ->reorder()
             ->count('contacts.id');
@@ -159,6 +164,21 @@ class BroadcastRecipientResolver
             'eligible_contacts_count' => $eligibleCount,
             'excluded_by_prior_broadcast_count' => max(0, $candidateCount - $afterPriorCount),
         ];
+    }
+
+
+    /** @param Builder<Contact> $query */
+    private function applyCreatorVisibility(Broadcast $broadcast, Builder $query): void
+    {
+        if (! is_numeric($broadcast->user_id)) {
+            return;
+        }
+
+        $user = User::query()->find((int) $broadcast->user_id);
+
+        if ($user instanceof User) {
+            $this->contactVisibility->apply($query, $user);
+        }
     }
 
     /**

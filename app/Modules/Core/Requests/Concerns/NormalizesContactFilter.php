@@ -18,6 +18,8 @@ trait NormalizesContactFilter
         string $idsField = 'contact_ids',
         string $importBatchIdsField = 'import_batch_ids',
         string $criteriaField = 'contact_criteria',
+        string $excludeCriteriaField = 'exclude_contact_criteria',
+        string $excludeIdsField = 'exclude_contact_ids',
     ): array {
         return [
             $typeField => ['required', 'string', Rule::in(['all', 'criteria', 'tag', 'contact_ids', 'imported', 'import_batch'])],
@@ -29,6 +31,11 @@ trait NormalizesContactFilter
             $criteriaField => ['nullable', 'array', 'required_if:'.$typeField.',criteria'],
             $criteriaField.'.*' => ['nullable', 'array'],
             $criteriaField.'.*.*' => ['nullable', 'string', 'max:191'],
+            $excludeCriteriaField => ['nullable', 'array'],
+            $excludeCriteriaField.'.*' => ['nullable', 'array'],
+            $excludeCriteriaField.'.*.*' => ['nullable', 'string', 'max:191'],
+            $excludeIdsField => ['nullable', 'array'],
+            $excludeIdsField.'.*' => ['integer', Rule::exists('contacts', 'id')],
         ];
     }
 
@@ -43,10 +50,12 @@ trait NormalizesContactFilter
         string $idsField = 'contact_ids',
         string $importBatchIdsField = 'import_batch_ids',
         string $criteriaField = 'contact_criteria',
+        string $excludeCriteriaField = 'exclude_contact_criteria',
+        string $excludeIdsField = 'exclude_contact_ids',
     ): array {
         $type = $this->normalizedContactFilterType($validated[$typeField] ?? null);
 
-        return match ($type) {
+        $filter = match ($type) {
             'criteria' => [
                 'type' => 'criteria',
                 'criteria' => $this->normalizedContactCriteria(
@@ -75,6 +84,24 @@ trait NormalizesContactFilter
                 'type' => 'all',
             ],
         };
+
+        $excludeCriteria = $this->normalizedContactCriteria(
+            $validated[$excludeCriteriaField] ?? [],
+            $excludeCriteriaField,
+        );
+        $excludeContactIds = $this->normalizedContactFilterIds(
+            $validated[$excludeIdsField] ?? [],
+        );
+
+        if ($excludeCriteria !== []) {
+            $filter['exclude_criteria'] = $excludeCriteria;
+        }
+
+        if ($excludeContactIds !== []) {
+            $filter['exclude_contact_ids'] = $excludeContactIds;
+        }
+
+        return $filter;
     }
 
     private function normalizedContactFilterType(mixed $value): string

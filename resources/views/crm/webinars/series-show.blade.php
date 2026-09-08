@@ -124,6 +124,21 @@
                     <div class="text-xs text-slate-500">Removed</div>
                 </div>
             </div>
+
+            <div class="mt-4 flex flex-wrap gap-2" data-webinar-type-contact-audiences>
+                <a
+                    href="{{ route('crm.contacts.index', ['webinar_attendance' => 'series:'.$series->slug.':attended']) }}"
+                    class="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
+                >
+                    View attended contacts
+                </a>
+                <a
+                    href="{{ route('crm.contacts.index', ['webinar_attendance' => 'series:'.$series->slug.':missed']) }}"
+                    class="inline-flex items-center justify-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100"
+                >
+                    View missed contacts
+                </a>
+            </div>
         </section>
 
         @if($series->status !== 'active')

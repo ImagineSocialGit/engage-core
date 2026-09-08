@@ -221,6 +221,31 @@ Core owns the generic `ContactFilterCriterion` / registry/query seam. Core contr
 
 Empty, unknown, or stale criteria fail closed to zero Contacts rather than broadening to all Contacts.
 
+Reusable Contact exclusions use Core-owned sibling keys rather than the Broadcast-owned prior-send `exclude` namespace:
+
+```json
+{
+  "type": "criteria",
+  "criteria": {
+    "tag": ["missed_webinar"]
+  },
+  "exclude_criteria": {
+    "tag": ["do_not_nurture"]
+  },
+  "exclude_contact_ids": [41, 52],
+  "exclude": {
+    "broadcast_ids": [12],
+    "statuses": ["scheduled", "sent"]
+  }
+}
+```
+
+`exclude_criteria` and `exclude_contact_ids` are resolved by Core after the positive audience. The nested Broadcast `exclude` object continues to mean prior-Broadcast delivery exclusion only. These concepts must not be conflated.
+
+The CRM audience builder should provide a clear/reset action, a resolved-audience preview, and a Contact-list modal. Removing one Contact from that modal adds the Contact only to this Broadcast's `exclude_contact_ids`; it does not edit the Contact, tags, statuses, or the reusable filter criterion itself. The preview may cap rendered Contact rows for operator usability, but the stored filter still resolves the complete audience at scheduling time.
+
+Broadcast audience resolution is also constrained by the creating CRM user's Core Contact visibility when that user identity exists. A Team Member cannot make a Broadcast reach Contacts they could not otherwise access merely by selecting `all` or a broad criterion. Legacy Broadcast rows without a resolvable creator retain compatibility behavior.
+
 The one-time imported-contact permission invitation remains Messaging-owned. Broadcasts may surface that special path only when the existing canonical eligibility preview reports eligible Contacts.
 
 ## BroadcastRecipient persistence

@@ -2,8 +2,10 @@
 
 namespace App\Modules\Broadcasts\Services;
 
+use App\Models\User;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
+use App\Modules\Core\Access\Services\ContactVisibility;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Services\Contacts\ContactFilterResolver;
 use Illuminate\Database\Eloquent\Builder;
@@ -11,28 +13,25 @@ use Illuminate\Support\Facades\DB;
 
 class BroadcastAudiencePreviewService
 {
+    private const CONTACT_PREVIEW_LIMIT = 100;
+
     public function __construct(
         private readonly ContactFilterResolver $contactFilterResolver,
+        private readonly ContactVisibility $contactVisibility,
     ) {}
 
     /**
      * @param array<string, mixed> $filter
-     * @return array{
-     *     selected_count: int,
-     *     without_any_consent_count: int,
-     *     previous_broadcasts: array<int, array{
-     *         id: int,
-     *         name: string,
-     *         channel: string,
-     *         sent_count: int,
-     *         scheduled_count: int,
-     *         overlap_count: int
-     *     }>
-     * }
+     * @return array<string, mixed>
      */
-    public function preview(array $filter): array
+    public function preview(array $filter, ?User $actor = null): array
     {
         $audience = $this->contactFilterResolver->query($filter)->reorder();
+
+        if ($actor instanceof User) {
+            $audience = $this->contactVisibility->apply($audience, $actor);
+        }
+
         $selectedCount = (int) (clone $audience)->count('contacts.id');
 
         if ($selectedCount === 0) {
@@ -40,6 +39,8 @@ class BroadcastAudiencePreviewService
                 'selected_count' => 0,
                 'without_any_consent_count' => 0,
                 'previous_broadcasts' => [],
+                'contacts' => [],
+                'contacts_truncated' => false,
             ];
         }
 
@@ -52,24 +53,40 @@ class BroadcastAudiencePreviewService
             })
             ->count('contacts.id');
 
+        $contacts = (clone $audience)
+            ->orderBy('contacts.name')
+            ->orderBy('contacts.email')
+            ->orderBy('contacts.id')
+            ->limit(self::CONTACT_PREVIEW_LIMIT)
+            ->get([
+                'contacts.id',
+                'contacts.name',
+                'contacts.first_name',
+                'contacts.last_name',
+                'contacts.email',
+                'contacts.phone',
+            ])
+            ->map(fn (Contact $contact): array => [
+                'id' => (int) $contact->getKey(),
+                'name' => $this->contactLabel($contact),
+                'email' => is_string($contact->email) ? $contact->email : null,
+                'phone' => is_string($contact->phone) ? $contact->phone : null,
+            ])
+            ->values()
+            ->all();
 
         return [
             'selected_count' => $selectedCount,
             'without_any_consent_count' => $withoutAnyConsentCount,
             'previous_broadcasts' => $this->previousBroadcastOverlap($audience),
+            'contacts' => $contacts,
+            'contacts_truncated' => $selectedCount > count($contacts),
         ];
     }
 
     /**
      * @param Builder<Contact> $audience
-     * @return array<int, array{
-     *     id: int,
-     *     name: string,
-     *     channel: string,
-     *     sent_count: int,
-     *     scheduled_count: int,
-     *     overlap_count: int
-     * }>
+     * @return array<int, array<string, mixed>>
      */
     private function previousBroadcastOverlap(Builder $audience): array
     {
@@ -109,5 +126,27 @@ class BroadcastAudiencePreviewService
             ])
             ->values()
             ->all();
+    }
+
+    private function contactLabel(Contact $contact): string
+    {
+        $name = trim((string) $contact->name);
+
+        if ($name !== '') {
+            return $name;
+        }
+
+        $splitName = trim(implode(' ', array_filter([
+            trim((string) $contact->first_name),
+            trim((string) $contact->last_name),
+        ])));
+
+        if ($splitName !== '') {
+            return $splitName;
+        }
+
+        $email = trim((string) $contact->email);
+
+        return $email !== '' ? $email : 'Contact #'.$contact->getKey();
     }
 }

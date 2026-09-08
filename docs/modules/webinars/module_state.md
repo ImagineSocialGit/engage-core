@@ -1066,6 +1066,21 @@ Contact show webinar history panel.
 
 These surfaces should summarize webinar activity in business terms and hide empty passive context where appropriate. They should not make Webinars decide Campaign, Workflow, Task, or FlowRoute orchestration.
 
+Webinars also contributes two distinct Contact-filter concepts and their semantics must remain separate:
+
+```text
+webinar_outcome
+    Campaign/eligibility-oriented latest resolved terminal outcome per Webinar Type.
+
+webinar_attendance
+    Historical audience filtering across any Webinar, one Webinar Type,
+    one specific session, or sessions before a selected session.
+```
+
+`webinar_attendance` supports attended and missed outcomes and is intended for operator audience work such as Contacts discovery, Broadcast selection/exclusion, exports, and other Core filter consumers. Specific Webinar Type and Session CRM surfaces may deep-link into the corresponding Contact result. A `before_session` value compares historical Webinar start times against the selected anchor session and is useful for subtracting older attendee/missed cohorts without converting Webinar history into tags.
+
+Do not change `webinar_outcome` to historical-any semantics merely to satisfy audience filtering. Campaign eligibility depends on its latest-outcome contract. Both criteria are contributed through Core's generic Contact filter registry; Core must not import Webinar models or query rules directly.
+
 ## Routes webinar usage
 
 Webinar outcomes should continue to emit neutral automation events such as:
