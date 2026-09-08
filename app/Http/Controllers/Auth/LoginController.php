@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Modules\Core\Access\Services\UserAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +15,10 @@ use Illuminate\View\View;
 
 class LoginController extends Controller
 {
+    public function __construct(
+        private readonly UserAccessService $access,
+    ) {}
+
     public function create(): View
     {
         return view('crm.auth.login');
@@ -28,14 +34,16 @@ class LoginController extends Controller
         ]);
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
-            RateLimiter::hit(
-                $this->throttleKey($request),
-                (int) config('security.crm_login.decay_seconds', 60)
-            );
+            $this->recordFailedAttempt($request);
+        }
 
-            throw ValidationException::withMessages([
-                'email' => 'Invalid credentials.',
-            ]);
+        $user = Auth::user();
+
+        if (! $user instanceof User || ! $this->access->isActive($user)) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            $this->recordFailedAttempt($request);
         }
 
         RateLimiter::clear($this->throttleKey($request));
@@ -55,6 +63,18 @@ class LoginController extends Controller
         $request->session()->regenerateToken();
 
         return redirect('/login');
+    }
+
+    private function recordFailedAttempt(Request $request): never
+    {
+        RateLimiter::hit(
+            $this->throttleKey($request),
+            (int) config('security.crm_login.decay_seconds', 60),
+        );
+
+        throw ValidationException::withMessages([
+            'email' => 'Invalid credentials.',
+        ]);
     }
 
     protected function ensureIsNotRateLimited(Request $request): void

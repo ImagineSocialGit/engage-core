@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 4,
+    'version' => 5,
     'tables' => [
         'business_calendars' => [
             'mode' => 'upsert',
@@ -102,6 +102,8 @@ return [
                 'source',
                 'subsource',
                 'contact_import_batch_id',
+                'assigned_user_id',
+                'assigned_team_id',
                 'last_contacted_at',
                 'last_activity_at',
                 'meta',
@@ -109,6 +111,10 @@ return [
                 'updated_at',
             ],
             'json_columns' => ['meta'],
+            'null_on_import' => [
+                'assigned_user_id',
+                'assigned_team_id',
+            ],
             'references' => [
                 'contact_import_batch_id' => 'contact_import_batches',
             ],

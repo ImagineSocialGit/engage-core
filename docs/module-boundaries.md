@@ -999,6 +999,19 @@ php artisan test tests/Feature/Modules tests/Feature/Core
 
 Adjust the command to the actual test locations added by the slice.
 
+
+### Core Team/access boundary
+
+Core owns authenticated CRM access because `User` is the platform authentication identity and Core is always installed. Core may own environment-local Teams, user access profiles, registered capability contracts, Contact assignment, and server-side Contact visibility.
+
+InternalNotifications `TeamMember` is not a second authorization identity. It remains an optional notification-recipient/profile model and may link to a Core CRM `User` when that person should receive internal notifications. Tasks may continue consuming TeamMember assignment/notification adapters through their existing public extension seams until a deliberate Tasks integration slice changes that contract.
+
+Optional modules may contribute capability definitions through the Core-owned access registry because they already depend on Core. Core must not import optional module classes in order to know their capability keys. Role presets are convenience defaults; authorization checks are made against registered capability keys.
+
+Contact ownership is a justified Core-column exception to the general preference for module-owned tables linked to Contact. `assigned_user_id` and `assigned_team_id` answer a universal CRM visibility question that must be enforced before any optional module is allowed to render or mutate a Contact.
+
+Do not implement Contact visibility only in navigation or Blade. Core CRM query/search surfaces must apply the shared visibility service, and route-bound CRM Contacts must be rejected server-side before higher-level module controllers run.
+
 ## Dependency Direction
 
 Orthogonal modules do not mean zero dependencies.

@@ -1,8 +1,14 @@
 <?php
 
+use App\Http\Middleware\EnsureCrmContactVisibility;
+use App\Http\Middleware\EnsureCrmUserActive;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('auth')->group(function () {
+Route::middleware([
+    'auth',
+    EnsureCrmUserActive::class,
+    EnsureCrmContactVisibility::class,
+])->group(function () {
     require __DIR__.'/crm/core.php';
     require __DIR__.'/crm/forms.php';
     require __DIR__.'/crm/media.php';

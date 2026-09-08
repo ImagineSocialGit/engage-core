@@ -22,6 +22,18 @@ return [
         'mode' => 'environment_owned',
         'reason' => 'CRM accounts and credentials are recreated per environment.',
     ],
+    'teams' => [
+        'mode' => 'environment_owned',
+        'reason' => 'CRM Teams are tied to environment-local CRM user identities and are recreated per environment.',
+    ],
+    'user_access_profiles' => [
+        'mode' => 'environment_owned',
+        'reason' => 'CRM access roles and capability overrides are tied to environment-local CRM user identities.',
+    ],
+    'team_user' => [
+        'mode' => 'environment_owned',
+        'reason' => 'CRM Team membership maps environment-local CRM users to environment-local Teams.',
+    ],
     'password_reset_tokens' => [
         'mode' => 'environment_owned',
         'reason' => 'Password-reset credentials are environment-local and short-lived.',

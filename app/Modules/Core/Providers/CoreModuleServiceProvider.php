@@ -7,6 +7,11 @@ use App\Modules\Core\Automation\ContactTagAutomationPointAuthoringContributor;
 use App\Modules\Core\Automation\ContactTagAutomationPointDefinitionContributor;
 use App\Modules\Core\Automation\CoreAutomationTriggerAuthoringContributor;
 use App\Modules\Core\Automation\RemoveContactTagAutomationActionHandler;
+use App\Modules\Core\Access\Capabilities\CoreAccessCapabilityContributor;
+use App\Modules\Core\Access\Policies\ContactPolicy;
+use App\Modules\Core\Access\Services\ContactPanels\CoreContactAssignmentPanelProvider;
+use App\Modules\Core\Access\Services\UserAccessService;
+use App\Modules\Core\Access\Support\AccessCapabilityRegistry;
 use App\Modules\Core\Capabilities\CoreAutomationCapabilityContributor;
 use App\Modules\Core\ConfigContracts\ContactStatusConfigContractTargetProvider;
 use App\Modules\Core\ConfigContracts\ContactStatusDefinitionConfigContract;
@@ -38,6 +43,7 @@ use App\Modules\Core\TokenContracts\SiteSettingTokenSourceProvider;
 use App\Modules\Core\Validation\CoreSetupValidationContributor;
 use App\Support\ProcessHighway\ProcessHighwayEntryRampInspector;
 use App\Support\ModuleFacts\ModuleFactRegistry;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Event;
 
@@ -48,6 +54,19 @@ class CoreModuleServiceProvider extends ServiceProvider
         $this->app->singleton(ContactPanelRegistry::class);
         $this->app->singleton(ContactImportTreatmentRegistry::class);
         $this->app->singleton(ContactImportPostProcessorRegistry::class);
+
+        $this->app->tag(
+            CoreAccessCapabilityContributor::class,
+            AccessCapabilityRegistry::CONTRIBUTOR_TAG,
+        );
+
+        $this->app->singleton(AccessCapabilityRegistry::class, function ($app): AccessCapabilityRegistry {
+            return new AccessCapabilityRegistry(
+                contributors: $app->tagged(AccessCapabilityRegistry::CONTRIBUTOR_TAG),
+            );
+        });
+
+        $this->app->scoped(UserAccessService::class);
 
         $this->app->tag([
             SourceContactFilterCriterion::class,
@@ -213,8 +232,22 @@ class CoreModuleServiceProvider extends ServiceProvider
         );
     }
 
-    public function boot(ContactImportTreatmentRegistry $treatments): void
-    {
+    public function boot(
+        ContactImportTreatmentRegistry $treatments,
+        ContactPanelRegistry $contactPanels,
+        AccessCapabilityRegistry $capabilities,
+    ): void {
+        Gate::policy(Contact::class, ContactPolicy::class);
+
+        foreach ($capabilities->keys() as $capability) {
+            Gate::define(
+                $capability,
+                fn ($user): bool => $user instanceof \App\Models\User
+                    && app(UserAccessService::class)->allows($user, $capability),
+            );
+        }
+
+        $contactPanels->register(CoreContactAssignmentPanelProvider::class, 'core');
         Contact::observe(ContactEligibilityFactObserver::class);
         ContactTag::observe(ContactTagEligibilityFactObserver::class);
         Event::listen(

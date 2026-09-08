@@ -147,3 +147,14 @@ If a client uses Internal Notifications, create and manage TeamMember state thro
 Do not use `db:seed` as a client-user bootstrap mechanism.
 
 The retired `UserSeeder` and `config/setup.php` should not exist after this cutover.
+
+
+## Team and access administration
+
+Authenticated CRM identity remains `App\Models\User`. When the Core Team/access schema is installed, `CrmUserManager::create()` also creates a `user_access_profiles` row and defaults to the Owner preset unless an explicit role is supplied. Existing users are backfilled as Owners by the Core migration.
+
+Day-to-day access administration belongs in **Settings → Team**. Owners/Admins can create CRM users, choose a role preset, activate/deactivate access, create Teams, and change Team membership. Do not create a second authentication identity from InternalNotifications `TeamMember`; that model remains an optional notification-recipient/profile adapter linked to a CRM User.
+
+Role presets are not the final authorization primitive. Runtime checks use registered capability keys. Custom capability overrides are retained as an advanced seam but are not part of the first ordinary Team settings UX.
+
+When deploying this schema to an already-installed Core module, use the normal Core migration path (`php artisan modules:migrate core`). Do not reinstall Core.

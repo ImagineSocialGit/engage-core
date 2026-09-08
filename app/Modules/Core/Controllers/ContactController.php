@@ -5,6 +5,9 @@ namespace App\Modules\Core\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Actions\Contacts\CreateManualContactAction;
 use App\Modules\Core\Actions\Contacts\UpdateContactAction;
+use App\Modules\Core\Access\Actions\AssignContactOwnershipAction;
+use App\Modules\Core\Access\Services\ContactVisibility;
+use App\Modules\Core\Access\Services\UserAccessService;
 use App\Modules\Core\Contracts\Contacts\UpdatesContactStatus;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Jobs\ProcessContactImportBatchChunkJob;
@@ -37,9 +40,13 @@ class ContactController extends Controller
     public function index(
         Request $request,
         ContactIndexFilterService $contactIndexFilters,
+        ContactVisibility $contactVisibility,
     ): View {
         $contactFilters = $contactIndexFilters->state($request->query());
-        $contactsQuery = $contactIndexFilters->query($contactFilters);
+        $contactsQuery = $contactVisibility->apply(
+            $contactIndexFilters->query($contactFilters),
+            $request->user(),
+        );
 
         if (module_enabled('workflow')) {
             $contactsQuery->with('workflowProfile.contactStatus');
@@ -51,7 +58,9 @@ class ContactController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $totalContacts = Contact::query()->count();
+        $totalContacts = $contactVisibility
+            ->apply(Contact::query(), $request->user())
+            ->count();
 
         $contactStatuses = ContactStatus::query()
             ->active()
@@ -76,6 +85,8 @@ class ContactController extends Controller
     public function store(
         StoreContactRequest $request,
         CreateManualContactAction $createManualContact,
+        UserAccessService $access,
+        AssignContactOwnershipAction $assignOwnership,
     ): RedirectResponse {
         $validated = $request->validated();
         unset($validated['existing_relationship_confirmed']);
@@ -91,6 +102,15 @@ class ContactController extends Controller
             ipAddress: $request->ip(),
             userAgent: $request->userAgent(),
         );
+
+        if ($request->user() !== null && ! $access->allows($request->user(), 'contacts.view_all')) {
+            $contact = $assignOwnership->handle(
+                contact: $contact,
+                assignedUser: $request->user(),
+                assignedTeam: null,
+                actor: $request->user(),
+            );
+        }
 
         return redirect()
             ->route('crm.contacts.show', $contact)

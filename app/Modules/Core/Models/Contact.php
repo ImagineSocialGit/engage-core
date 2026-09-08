@@ -2,6 +2,8 @@
 
 namespace App\Modules\Core\Models;
 
+use App\Models\User;
+use App\Modules\Core\Access\Models\Team;
 use Database\Factories\ContactFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -28,6 +30,8 @@ class Contact extends Model
         'source',
         'subsource',
         'contact_import_batch_id',
+        'assigned_user_id',
+        'assigned_team_id',
         'last_contacted_at',
         'last_activity_at',
         'meta',
@@ -71,6 +75,16 @@ class Contact extends Model
             'contacts.id',
             $occurrenceContactIds->union($legacyContactIds),
         );
+    }
+
+    public function assignedUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_user_id');
+    }
+
+    public function assignedTeam(): BelongsTo
+    {
+        return $this->belongsTo(Team::class, 'assigned_team_id');
     }
 
     public function importBatch(): BelongsTo

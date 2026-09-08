@@ -183,6 +183,11 @@ return [
 
     'settings' => [
         'categories' => [
+            'people_access' => [
+                'label' => 'People and access',
+                'description' => 'CRM logins, Team membership, and who is responsible for which Contacts.',
+                'priority' => 5,
+            ],
             'business_operations' => [
                 'label' => 'Business operations',
                 'description' => 'Shared timing and operating choices used across more than one part of the CRM.',
@@ -479,12 +484,22 @@ return [
                 ],
             ],
             'settings' => [
-                'key' => 'business_days',
-                'category' => 'business_operations',
-                'label' => 'Business days',
-                'description' => 'Choose the weekdays and specific dates that business-day delays skip. Changes affect waits that begin later.',
-                'route' => 'crm.business-calendar.edit',
-                'priority' => 10,
+                [
+                    'key' => 'team',
+                    'category' => 'people_access',
+                    'label' => 'Team',
+                    'description' => 'Manage CRM logins, role presets, Team membership, and Contact responsibility.',
+                    'route' => 'crm.settings.team.index',
+                    'priority' => 5,
+                ],
+                [
+                    'key' => 'business_days',
+                    'category' => 'business_operations',
+                    'label' => 'Business days',
+                    'description' => 'Choose the weekdays and specific dates that business-day delays skip. Changes affect waits that begin later.',
+                    'route' => 'crm.business-calendar.edit',
+                    'priority' => 10,
+                ],
             ],
             'always_on' => true,
             'depends_on' => [],

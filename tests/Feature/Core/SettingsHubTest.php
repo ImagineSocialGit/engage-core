@@ -30,6 +30,7 @@ class SettingsHubTest extends TestCase
         $items = collect(app(ModuleManager::class)->settingsItems());
 
         $this->assertSame([
+            'core.team',
             'core.business_days',
             'tasks.task_templates',
             'flow_routes.route_assignments',
@@ -40,7 +41,7 @@ class SettingsHubTest extends TestCase
     public function test_settings_hub_ignores_contributions_without_a_registered_route(): void
     {
         $definition = config('modules.modules.core');
-        $definition['settings']['route'] = 'crm.settings.missing';
+        $definition['settings'][1]['route'] = 'crm.settings.missing';
         config()->set('modules.modules.core', $definition);
 
         $items = collect(app(ModuleManager::class)->settingsItems());
@@ -75,7 +76,8 @@ class SettingsHubTest extends TestCase
             ->assertViewHas('settingsGroups', function (array $groups): bool {
                 $items = collect($groups)->pluck('items')->flatten(1);
 
-                return $items->contains('key', 'core.business_days')
+                return $items->contains('key', 'core.team')
+                    && $items->contains('key', 'core.business_days')
                     && $items->contains('key', 'tasks.task_templates')
                     && $items->contains('key', 'messaging.message_templates')
                     && $items->contains('key', 'flow_routes.route_assignments');

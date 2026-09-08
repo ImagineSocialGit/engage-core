@@ -365,3 +365,20 @@ Contact show should lead with next action and use module-provided summaries belo
 The Contact show page also owns fast editing for Core-owned contact identity fields. Display name, email, and phone have small in-place editors for routine corrections. A broader contact-details modal edits first name, last name, display name, email, phone, birthday, source, and subsource without sending the operator to a separate edit page. Updates address the existing Contact by its route-bound ID; changing email must not reuse email-based create/update resolution because email is itself editable identity data.
 
 Core may render module-provided DTOs/arrays/views, but it should not query module tables directly.
+
+
+## Team and access foundation
+
+Core `User` is the authenticated CRM identity. Core owns environment-local `teams`, `team_user`, and `user_access_profiles`, plus the capability registry and Contact ownership/visibility contract. Internal Notifications may retain its separate `TeamMember` notification profile, but that model is not a second login or authorization identity.
+
+Role presets (`owner`, `admin`, `manager`, `member`, `viewer`) are convenience defaults. Registered capability keys are the authorization contract. Missing access profiles remain legacy-compatible Owner access so a code deploy cannot lock an existing CRM user before the Core migration runs; the migration materializes every existing user as Owner. New users created through `CrmUserManager` materialize an access profile when the access schema exists.
+
+Contact ownership is represented by nullable `contacts.assigned_user_id` and `contacts.assigned_team_id`. Owner/Admin users can see all Contacts. Managers can see directly assigned Contacts, Contacts assigned to their active Teams, and unassigned Contacts. Team Members can see directly assigned Contacts. Viewers can read Team-visible Contacts without mutation capabilities.
+
+Visibility is server-side. Contact index and lookup queries use the shared Contact visibility service, and CRM route-bound Contact parameters are checked before higher-level module controllers run. Mutation routes additionally require registered capabilities. A restricted user who creates a Contact receives direct assignment automatically so the create-and-open flow remains usable.
+
+Settings → Team is intentionally simple: CRM login, active state, role preset, Team membership, and Team lifecycle. Capability overrides exist as a persistence seam but are not exposed as a giant per-record ACL UI in this foundation.
+
+Access tables are environment-owned in Project State because they reference local CRM user identities. Contact assignment columns belong to the complete Contact schema contract but are set to null on import so raw environment-local User/Team IDs never cross environments.
+
+Meaningful Contact assignment and Team/access changes retain compact actor/time provenance in existing `meta` storage. This is an audit seam, not a full audit-log product.

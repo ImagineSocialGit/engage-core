@@ -27,9 +27,12 @@
 │   │   │       ├── ProcessHighwayController.php
 │   │   │       └── ProjectStateController.php
 │   │   └── Middleware
+│   │       ├── EnsureCrmContactVisibility.php
+│   │       ├── EnsureCrmUserActive.php
 │   │       ├── EnsureModuleEnabled.php
 │   │       ├── ForceStagingAccess.php
-│   │       └── RequestCorrelation.php
+│   │       ├── RequestCorrelation.php
+│   │       └── RequireCapability.php
 │   ├── Integrations
 │   │   ├── Messaging
 │   │   │   ├── Email
@@ -247,6 +250,31 @@
 │   │   │   ├── Services
 │   │   │   └── Support
 │   │   ├── Core
+│   │   │   ├── Access
+│   │   │   │   ├── Actions
+│   │   │   │   │   └── AssignContactOwnershipAction.php
+│   │   │   │   ├── Capabilities
+│   │   │   │   │   └── CoreAccessCapabilityContributor.php
+│   │   │   │   ├── Contracts
+│   │   │   │   │   └── AccessCapabilityContributor.php
+│   │   │   │   ├── Controllers
+│   │   │   │   │   ├── ContactAssignmentController.php
+│   │   │   │   │   └── TeamAccessController.php
+│   │   │   │   ├── Data
+│   │   │   │   │   └── AccessCapabilityDefinition.php
+│   │   │   │   ├── Models
+│   │   │   │   │   ├── Team.php
+│   │   │   │   │   └── UserAccessProfile.php
+│   │   │   │   ├── Policies
+│   │   │   │   │   └── ContactPolicy.php
+│   │   │   │   ├── Services
+│   │   │   │   │   ├── ContactPanels
+│   │   │   │   │   │   └── CoreContactAssignmentPanelProvider.php
+│   │   │   │   │   ├── ContactVisibility.php
+│   │   │   │   │   ├── TeamAccessManager.php
+│   │   │   │   │   └── UserAccessService.php
+│   │   │   │   └── Support
+│   │   │   │       └── AccessCapabilityRegistry.php
 │   │   │   ├── Actions
 │   │   │   │   ├── Contacts
 │   │   │   │   │   ├── CreateManualContactAction.php
@@ -1913,6 +1941,7 @@
 ├── composer.json
 ├── composer.lock
 ├── config
+│   ├── access.php
 │   ├── app.php
 │   ├── auth.php
 │   ├── brand.php
@@ -2125,7 +2154,8 @@
 │   │   │   │   ├── 2026_08_22_113500_add_birthday_to_contacts_table.php
 │   │   │   │   ├── 2026_08_26_145500_create_business_calendars_table.php
 │   │   │   │   ├── 2026_08_28_214500_create_contact_import_runs_table.php
-│   │   │   │   └── 2026_08_29_191700_add_batch_contact_index_to_contact_import_occurrences_table.php
+│   │   │   │   ├── 2026_08_29_191700_add_batch_contact_index_to_contact_import_occurrences_table.php
+│   │   │   │   └── 2026_09_04_210000_add_team_access_foundation.php
 │   │   │   ├── documents
 │   │   │   │   ├── 2026_07_02_000001_create_document_requirement_definitions_table.php
 │   │   │   │   ├── 2026_07_02_000002_create_document_requests_table.php
@@ -2537,6 +2567,7 @@
 │       │   │   ├── import-preview.blade.php
 │       │   │   ├── index.blade.php
 │       │   │   ├── panels
+│       │   │   │   ├── assignment.blade.php
 │       │   │   │   ├── messaging-delivery-issues.blade.php
 │       │   │   │   ├── messaging-direct-message.blade.php
 │       │   │   │   └── webinar-history.blade.php
@@ -2607,7 +2638,8 @@
 │       │   │   └── staff
 │       │   │       └── index.blade.php
 │       │   ├── settings
-│       │   │   └── index.blade.php
+│       │   │   ├── index.blade.php
+│       │   │   └── team.blade.php
 │       │   ├── tasks
 │       │   │   ├── index.blade.php
 │       │   │   ├── show.blade.php
@@ -2795,6 +2827,7 @@
 │   │   │   └── WebinarRegistrationConsentContentConfigTest.php
 │   │   ├── Core
 │   │   │   ├── BusinessCalendarTest.php
+│   │   │   ├── ContactAccessVisibilityTest.php
 │   │   │   ├── ContactBirthdayFoundationTest.php
 │   │   │   ├── ContactControllerTest.php
 │   │   │   ├── ContactFilterCriteriaTest.php
@@ -2828,7 +2861,9 @@
 │   │   │   ├── ProcessHighwaySurfaceTest.php
 │   │   │   ├── ProcessHighwayUsabilitySurfaceTest.php
 │   │   │   ├── SettingsHubTest.php
-│   │   │   └── SyncContactStatusPresetsActionTest.php
+│   │   │   ├── SyncContactStatusPresetsActionTest.php
+│   │   │   ├── TeamAccessFoundationTest.php
+│   │   │   └── TeamSettingsAccessTest.php
 │   │   ├── CRM
 │   │   │   ├── DashboardControllerTest.php
 │   │   │   ├── UpdateContactStatusActionTest.php
@@ -3104,6 +3139,7 @@
 │   │   │   ├── CampaignAnnualTouchesProjectStateRoundTripTest.php
 │   │   │   ├── CampaignImportSourceReferenceContractTest.php
 │   │   │   ├── CampaignsBroadcastsProjectStateRoundTripTest.php
+│   │   │   ├── CoreAccessProjectStateContractTest.php
 │   │   │   ├── CoreContactImportProvenanceProjectStateTest.php
 │   │   │   ├── FlowRoutesProjectStateRoundTripTest.php
 │   │   │   ├── InboundEmailRouteProjectStateRoundTripTest.php
@@ -3330,4 +3366,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-787 directories, 2544 files
+798 directories, 2569 files

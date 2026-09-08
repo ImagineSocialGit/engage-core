@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Http\Middleware\ForceStagingAccess;
 use App\Http\Middleware\RequestCorrelation;
+use App\Http\Middleware\RequireCapability;
 use App\Support\Clients\ClientEnvironmentLoader;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -64,6 +65,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'staging.access' => ForceStagingAccess::class,
             'module' => EnsureModuleEnabled::class,
+            'capability' => RequireCapability::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [

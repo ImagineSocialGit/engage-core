@@ -3,25 +3,26 @@
 namespace App\Modules\Core\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Access\Services\ContactVisibility;
 use App\Modules\Core\Models\Contact;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ContactLookupController extends Controller
 {
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(Request $request, ContactVisibility $visibility): JsonResponse
     {
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
             'ids' => ['nullable', 'array'],
-            'ids.*' => ['integer', 'exists:contacts,id'],
+            'ids.*' => ['integer'],
         ]);
 
         $ids = $this->normalizedIds($validated['ids'] ?? []);
 
         if ($ids !== []) {
             return response()->json([
-                'contacts' => $this->contactsByIds($ids),
+                'contacts' => $this->contactsByIds($ids, $request, $visibility),
             ]);
         }
 
@@ -33,7 +34,7 @@ class ContactLookupController extends Controller
             ]);
         }
 
-        $contacts = Contact::query()
+        $contacts = $visibility->apply(Contact::query(), $request->user())
             ->where(function ($query) use ($search): void {
                 $query
                     ->where('name', 'like', "%{$search}%")
@@ -71,9 +72,12 @@ class ContactLookupController extends Controller
      * @param array<int, int> $ids
      * @return array<int, array<string, mixed>>
      */
-    private function contactsByIds(array $ids): array
-    {
-        return Contact::query()
+    private function contactsByIds(
+        array $ids,
+        Request $request,
+        ContactVisibility $visibility,
+    ): array {
+        return $visibility->apply(Contact::query(), $request->user())
             ->whereIn('id', $ids)
             ->orderBy('last_name')
             ->orderBy('first_name')
