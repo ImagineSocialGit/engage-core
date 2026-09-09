@@ -9,6 +9,7 @@ final readonly class DeploymentPlan
      * @param array<int, ResolvedEnvironmentRequirement> $environmentRequirements
      * @param array<int, string> $unusedEnvironmentKeys
      * @param array<int, string> $coveredOwners
+     * @param array<int, ResolvedDeploymentSetupStep> $setupSteps
      */
     public function __construct(
         public string $environment,
@@ -17,6 +18,7 @@ final readonly class DeploymentPlan
         public array $environmentRequirements,
         public array $unusedEnvironmentKeys,
         public array $coveredOwners,
+        public array $setupSteps = [],
     ) {}
 
     /** @return array<int, ResolvedEnvironmentRequirement> */
@@ -45,6 +47,10 @@ final readonly class DeploymentPlan
             'environment_requirements' => array_map(
                 static fn (ResolvedEnvironmentRequirement $requirement): array => $requirement->toArray(),
                 $this->environmentRequirements,
+            ),
+            'setup_steps' => array_map(
+                static fn (ResolvedDeploymentSetupStep $step): array => $step->toArray(),
+                $this->setupSteps,
             ),
             'unused_environment_keys' => $this->unusedEnvironmentKeys,
         ];

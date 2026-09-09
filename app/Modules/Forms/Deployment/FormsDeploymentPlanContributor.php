@@ -3,12 +3,14 @@
 namespace App\Modules\Forms\Deployment;
 
 use App\Support\Deployment\Contracts\DeploymentPlanContributor;
+use App\Support\Deployment\Contracts\DeploymentSetupContributor;
+use App\Support\Deployment\Data\DeploymentSetupStep;
 use App\Support\Deployment\Data\EnvironmentRequirement;
 use App\Support\Presets\Enums\PresetDomain;
 use App\Support\Presets\PresetCompositionResolver;
 use App\Support\Presets\PresetPackageResolver;
 
-final class FormsDeploymentPlanContributor implements DeploymentPlanContributor
+final class FormsDeploymentPlanContributor implements DeploymentPlanContributor, DeploymentSetupContributor
 {
     public function __construct(
         private readonly PresetPackageResolver $packages,
@@ -71,6 +73,55 @@ final class FormsDeploymentPlanContributor implements DeploymentPlanContributor
             'FORMS_EXTERNAL_INTAKE_DOMAINS',
             'Optional bare-domain overrides are only needed when Forms should advertise domains beyond ROOT_DOMAIN.',
         );
+    }
+
+    public function setupSteps(): iterable
+    {
+        if (! in_array(app()->environment(), ['staging', 'production'], true)
+            || ! (bool) config('forms.external_intake.enabled', false)
+        ) {
+            return;
+        }
+
+        $rootDomain = $this->rootDomain();
+        $publicForms = $this->selectedPublicFormKeys();
+
+        yield new DeploymentSetupStep(
+            key: 'forms.external_intake',
+            title: 'Trusted external Forms intake',
+            reason: 'This client allows an approved first-party site application to read and submit Core-backed Forms through the signed server-to-server boundary.',
+            instructions: [
+                'Confirm the approved caller identity, source/provider labels, and exact allowed public Form keys for this environment.',
+                'If the shared signing credential has not been issued yet, run php artisan forms:external-intake:issue-secret [client] and install the matching Core/caller credential blocks in their matching environments.',
+                "Give the caller the signed endpoints on https://webhooks.{$rootDomain}/forms/{form_key} and https://webhooks.{$rootDomain}/forms/{form_key}/submissions.",
+                'Do not reuse a staging signing credential in production unless that sharing is deliberate and documented.',
+            ],
+            environmentKeys: [
+                'FORMS_EXTERNAL_INTAKE_CLIENT_ID',
+                'FORMS_EXTERNAL_INTAKE_CLIENT_SECRET',
+                'FORMS_EXTERNAL_INTAKE_SOURCE',
+                'FORMS_EXTERNAL_INTAKE_PROVIDER',
+                'FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS',
+                'FORMS_EXTERNAL_INTAKE_DOMAINS',
+            ],
+            verification: [
+                'Run php artisan setup:validate after both sides have the matching credential.',
+                'Verify an unsigned GET to one configured Form endpoint reaches Core and returns 401 authentication_failed.',
+                ...($publicForms !== []
+                    ? ['Run the approved external caller probe for: '.implode(', ', $publicForms).'.']
+                    : []),
+            ],
+            priority: 70,
+        );
+    }
+
+    private function rootDomain(): string
+    {
+        $domain = config('app.root_domain');
+
+        return is_string($domain) && trim($domain) !== ''
+            ? trim($domain)
+            : '[ROOT_DOMAIN]';
     }
 
     /** @return array<int, string> */

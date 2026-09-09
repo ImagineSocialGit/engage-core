@@ -3,9 +3,11 @@
 namespace App\Modules\Core\Deployment;
 
 use App\Support\Deployment\Contracts\DeploymentPlanContributor;
+use App\Support\Deployment\Contracts\DeploymentSetupContributor;
+use App\Support\Deployment\Data\DeploymentSetupStep;
 use App\Support\Deployment\Data\EnvironmentRequirement;
 
-final class CoreDeploymentPlanContributor implements DeploymentPlanContributor
+final class CoreDeploymentPlanContributor implements DeploymentPlanContributor, DeploymentSetupContributor
 {
     public function owner(): string
     {
@@ -172,5 +174,34 @@ final class CoreDeploymentPlanContributor implements DeploymentPlanContributor
                 'Configure this client-owned secret when public human verification is enabled.',
             );
         }
+    }
+
+    public function setupSteps(): iterable
+    {
+        if (! in_array(app()->environment(), ['staging', 'production'], true)
+            || ! (bool) config('human_verification.enabled', false)
+        ) {
+            return;
+        }
+
+        yield new DeploymentSetupStep(
+            key: 'core.turnstile',
+            title: 'Cloudflare Turnstile',
+            reason: 'Public human verification is enabled for this client, so the live browser-facing hosts need a Turnstile widget and matching credentials.',
+            instructions: [
+                'Open the client Cloudflare Turnstile account and create or select the widget for this environment.',
+                'Authorize the client public browser hostnames that will render protected forms or booking/registration surfaces. Do not add the webhooks host merely because it shares the root domain.',
+                'Copy the site key and secret key only after the widget hostnames match this deployment.',
+            ],
+            environmentKeys: [
+                'TURNSTILE_SITE_KEY',
+                'TURNSTILE_SECRET_KEY',
+            ],
+            verification: [
+                'Run php artisan setup:validate and confirm the human-verification contributor is clean.',
+                'Complete one staging-safe browser submission through a protected public surface.',
+            ],
+            priority: 20,
+        );
     }
 }

@@ -3,9 +3,11 @@
 namespace App\Modules\Media\Deployment;
 
 use App\Support\Deployment\Contracts\DeploymentPlanContributor;
+use App\Support\Deployment\Contracts\DeploymentSetupContributor;
+use App\Support\Deployment\Data\DeploymentSetupStep;
 use App\Support\Deployment\Data\EnvironmentRequirement;
 
-final class MediaStorageDeploymentPlanContributor implements DeploymentPlanContributor
+final class MediaStorageDeploymentPlanContributor implements DeploymentPlanContributor, DeploymentSetupContributor
 {
     public function owner(): string
     {
@@ -78,5 +80,37 @@ final class MediaStorageDeploymentPlanContributor implements DeploymentPlanContr
             'DO_SPACES_BUCKET',
             'CDN_BASE_URL',
         ];
+    }
+
+    public function setupSteps(): iterable
+    {
+        if (! in_array(app()->environment(), ['staging', 'production'], true)) {
+            return;
+        }
+
+        yield new DeploymentSetupStep(
+            key: 'storage.digitalocean_spaces',
+            title: 'DigitalOcean Spaces storage',
+            reason: 'Media is enabled in a live runtime and needs client-scoped writable object storage plus a stable public CDN origin.',
+            instructions: [
+                'Open DigitalOcean and create or select the client Spaces bucket for this environment.',
+                'Enable or confirm the CDN endpoint used for public media URLs.',
+                'Create or select access credentials with only the access needed for this client bucket.',
+                'Record the region, root Spaces endpoint, bucket name, CDN origin, access key, and secret.',
+            ],
+            environmentKeys: [
+                'DO_SPACES_KEY',
+                'DO_SPACES_SECRET',
+                'DO_SPACES_ENDPOINT',
+                'DO_SPACES_REGION',
+                'DO_SPACES_BUCKET',
+                'CDN_BASE_URL',
+            ],
+            verification: [
+                'Run php artisan setup:validate and confirm Media storage is clean.',
+                'Upload one staging-safe image and verify the generated public URL uses the configured CDN origin.',
+            ],
+            priority: 30,
+        );
     }
 }

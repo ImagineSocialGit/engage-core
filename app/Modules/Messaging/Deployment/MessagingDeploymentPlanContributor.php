@@ -3,11 +3,13 @@
 namespace App\Modules\Messaging\Deployment;
 
 use App\Support\Deployment\Contracts\DeploymentPlanContributor;
+use App\Support\Deployment\Contracts\DeploymentSetupContributor;
+use App\Support\Deployment\Data\DeploymentSetupStep;
 use App\Support\Deployment\Data\EnvironmentRequirement;
 use App\Support\Modules\ModuleManager;
 use Illuminate\Support\Env;
 
-final class MessagingDeploymentPlanContributor implements DeploymentPlanContributor
+final class MessagingDeploymentPlanContributor implements DeploymentPlanContributor, DeploymentSetupContributor
 {
     public function __construct(
         private readonly ModuleManager $modules,
@@ -23,6 +25,80 @@ final class MessagingDeploymentPlanContributor implements DeploymentPlanContribu
         yield from $this->generalRuntimeRequirements();
         yield from $this->emailRequirements();
         yield from $this->smsRequirements();
+    }
+
+    public function setupSteps(): iterable
+    {
+        if (! $this->usesExternalTransport()) {
+            return;
+        }
+
+        $rootDomain = $this->rootDomain();
+
+        if ($this->selectedString('EMAIL_PROVIDER') === 'resend') {
+            $instructions = [
+                'Open the client Resend account and create or select the sending domain for this environment.',
+                'Keep Open Tracking and Click Tracking disabled for the current Messaging contract.',
+                "Create the delivery/lifecycle webhook at https://webhooks.{$rootDomain}/message-events/email/resend.",
+                'Subscribe that webhook to: email.sent, email.delivered, email.delivery_delayed, email.bounced, email.complained, email.suppressed, email.failed, and contact.updated.',
+            ];
+
+            if ($this->moduleEnabled('inbound_messaging')) {
+                $instructions[] = 'Configure the receiving domain used by INBOUND_EMAIL_DOMAIN and ensure the Resend API key has Full Access so received messages can be retrieved.';
+                $instructions[] = "Create a separate inbound-email webhook at https://webhooks.{$rootDomain}/inbound/email/resend and subscribe only to email.received.";
+                $instructions[] = 'Each Resend webhook may have a different signing secret; store every active trusted secret in RESEND_WEBHOOK_SECRET as the supported delimited list.';
+            }
+
+            yield new DeploymentSetupStep(
+                key: 'messaging.resend',
+                title: 'Resend email delivery'.($this->moduleEnabled('inbound_messaging') ? ' and receiving' : ''),
+                reason: 'Live Messaging uses Resend for client email delivery and provider lifecycle evidence; Inbound Messaging also needs the receiving path when enabled.',
+                instructions: $instructions,
+                environmentKeys: array_values(array_filter([
+                    'RESEND_API_KEY',
+                    'RESEND_WEBHOOK_SECRET',
+                    $this->moduleEnabled('inbound_messaging') ? 'INBOUND_EMAIL_DOMAIN' : null,
+                ])),
+                verification: [
+                    'Run php artisan setup:validate and confirm Messaging'.($this->moduleEnabled('inbound_messaging') ? ' and Inbound Messaging are' : ' is').' clean.',
+                    'Send one provider-safe email and verify the signed lifecycle webhook is accepted.',
+                    ...($this->moduleEnabled('inbound_messaging')
+                        ? ['Send a real reply and verify email.received is retrieved and recorded through the inbound path.']
+                        : []),
+                ],
+                priority: 40,
+            );
+        }
+
+        if ($this->selectedBoolean('SMS_ENABLED') === true
+            && $this->selectedString('SMS_PROVIDER') === 'telnyx'
+        ) {
+            yield new DeploymentSetupStep(
+                key: 'messaging.telnyx',
+                title: 'Telnyx SMS',
+                reason: 'Live SMS uses Telnyx and must support both outbound delivery evidence and the inbound STOP/HELP/START compliance path.',
+                instructions: [
+                    'Open the client Telnyx account and create or select the Messaging Profile and phone number(s) for this environment.',
+                    "Configure the outbound delivery/lifecycle callback at https://webhooks.{$rootDomain}/message-events/sms/telnyx.",
+                    "Configure the inbound SMS callback at https://webhooks.{$rootDomain}/inbound/sms/telnyx.",
+                    'Record the Telnyx API key, webhook public key, required sender number(s), and Messaging Profile IDs when purpose-specific profile mapping is used.',
+                ],
+                environmentKeys: [
+                    'TELNYX_API_KEY',
+                    'TELNYX_WEBHOOK_PUBLIC_KEY',
+                    'TELNYX_FROM_TRANSACTIONAL',
+                    'TELNYX_FROM_MARKETING',
+                    'MESSAGING_SMS_TRANSACTIONAL_PROFILE_ID',
+                    'MESSAGING_SMS_MARKETING_PROFILE_ID',
+                ],
+                verification: [
+                    'Run php artisan setup:validate and confirm the live SMS channel is available for the intended surfaces and purposes.',
+                    'Send one staging-safe SMS and confirm delivery evidence reaches the Messaging callback.',
+                    'Send inbound STOP and HELP tests and confirm the Inbound Messaging compliance path handles them deterministically.',
+                ],
+                priority: 50,
+            );
+        }
     }
 
     /** @return iterable<int, EnvironmentRequirement> */
@@ -421,5 +497,14 @@ final class MessagingDeploymentPlanContributor implements DeploymentPlanContribu
             $this->modules->enabledKeysWithDependencies(),
             true,
         );
+    }
+
+    private function rootDomain(): string
+    {
+        $domain = config('app.root_domain');
+
+        return is_string($domain) && trim($domain) !== ''
+            ? trim($domain)
+            : '[ROOT_DOMAIN]';
     }
 }

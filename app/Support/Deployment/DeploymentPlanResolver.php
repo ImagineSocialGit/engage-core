@@ -3,8 +3,11 @@
 namespace App\Support\Deployment;
 
 use App\Support\Deployment\Contracts\DeploymentPlanContributor;
+use App\Support\Deployment\Contracts\DeploymentSetupContributor;
 use App\Support\Deployment\Data\DeploymentPlan;
+use App\Support\Deployment\Data\DeploymentSetupStep;
 use App\Support\Deployment\Data\EnvironmentRequirement;
+use App\Support\Deployment\Data\ResolvedDeploymentSetupStep;
 use App\Support\Deployment\Data\ResolvedEnvironmentRequirement;
 use App\Support\Environment\Data\EnvironmentVariableDefinition;
 use App\Support\Environment\EnvironmentVariableCatalog;
@@ -26,6 +29,8 @@ final class DeploymentPlanResolver
     {
         $requirements = [];
         $owners = [];
+        $setupSteps = [];
+        $setupStepKeys = [];
 
         foreach ($this->contributors as $contributor) {
             if (! $contributor instanceof DeploymentPlanContributor) {
@@ -86,7 +91,53 @@ final class DeploymentPlanResolver
 
                 $requirements[$definition->key] = [$owner, $definition, $requirement];
             }
+
+            if ($contributor instanceof DeploymentSetupContributor) {
+                foreach ($contributor->setupSteps() as $step) {
+                    if (! $step instanceof DeploymentSetupStep) {
+                        throw new InvalidArgumentException(sprintf(
+                            'Deployment setup contributor [%s] returned invalid setup step [%s].',
+                            $contributor::class,
+                            get_debug_type($step),
+                        ));
+                    }
+
+                    if (isset($setupStepKeys[$step->key])) {
+                        throw new InvalidArgumentException(
+                            "Deployment setup step [{$step->key}] was contributed more than once.",
+                        );
+                    }
+
+                    foreach ($step->environmentKeys as $environmentKey) {
+                        if (! EnvironmentVariableCatalog::has($environmentKey)) {
+                            throw new InvalidArgumentException(
+                                "Deployment setup step [{$step->key}] references unknown environment key [{$environmentKey}].",
+                            );
+                        }
+                    }
+
+                    $setupStepKeys[$step->key] = true;
+                    $setupSteps[] = new ResolvedDeploymentSetupStep(
+                        owner: $owner,
+                        step: $step,
+                    );
+                }
+            }
         }
+
+        usort(
+            $setupSteps,
+            static fn (
+                ResolvedDeploymentSetupStep $left,
+                ResolvedDeploymentSetupStep $right,
+            ): int => [
+                $left->step->priority,
+                $left->step->key,
+            ] <=> [
+                $right->step->priority,
+                $right->step->key,
+            ],
+        );
 
         $resolved = [];
 
@@ -122,6 +173,7 @@ final class DeploymentPlanResolver
                 claimedKeys: array_keys($requirements),
             ),
             coveredOwners: $coveredOwners,
+            setupSteps: $setupSteps,
         );
     }
 

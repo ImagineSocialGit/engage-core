@@ -88,6 +88,21 @@ final class EngageDeploymentPlanCommand extends Command
             $this->line('No environment values were removed.');
         }
 
+        if ($plan->setupSteps !== []) {
+            $this->newLine();
+            $this->info('Operator/external setup steps for this deployment:');
+
+            foreach ($plan->setupSteps as $resolvedStep) {
+                $this->line(sprintf(
+                    '  - [%s] %s',
+                    $resolvedStep->owner,
+                    $resolvedStep->step->title,
+                ));
+            }
+
+            $this->line('Use [engage:deployment-plan --json] for the structured instructions, environment inputs, and verification checklist.');
+        }
+
         $blocking = $plan->blockingEnvironmentRequirements();
 
         if ($blocking !== []) {

@@ -3,9 +3,11 @@
 namespace App\Modules\Webinars\Deployment;
 
 use App\Support\Deployment\Contracts\DeploymentPlanContributor;
+use App\Support\Deployment\Contracts\DeploymentSetupContributor;
+use App\Support\Deployment\Data\DeploymentSetupStep;
 use App\Support\Deployment\Data\EnvironmentRequirement;
 
-final class WebinarsDeploymentPlanContributor implements DeploymentPlanContributor
+final class WebinarsDeploymentPlanContributor implements DeploymentPlanContributor, DeploymentSetupContributor
 {
     public function owner(): string
     {
@@ -33,6 +35,55 @@ final class WebinarsDeploymentPlanContributor implements DeploymentPlanContribut
         if ($provider === 'zoom') {
             yield from $this->zoomRequirements();
         }
+    }
+
+    public function setupSteps(): iterable
+    {
+        if (! $this->usesExternalProvider() || $this->selectedProvider() !== 'zoom') {
+            return;
+        }
+
+        $rootDomain = $this->rootDomain();
+        $instructions = [
+            'Open the Zoom App Marketplace in the client Zoom account and create or select the Server-to-Server OAuth application for this environment.',
+            'Add Meeting scopes: meeting:read:list_meetings:admin, meeting:write:registrant:admin, meeting:delete:registrant:admin.',
+            'Add Webinar scopes: webinar:read:list_webinars:admin, webinar:write:registrant:admin, webinar:delete:registrant:admin.',
+            'Add attendance scopes: report:read:list_meeting_participants:admin and report:read:list_webinar_participants:admin.',
+            'Add cloud recording scope: cloud_recording:read:list_recording_files:admin.',
+        ];
+
+        $environmentKeys = [
+            'ZOOM_ACCOUNT_ID',
+            'ZOOM_CLIENT_ID',
+            'ZOOM_CLIENT_SECRET',
+        ];
+
+        if ($this->zoomWebhookCapabilitiesEnabled()) {
+            $instructions[] = "Set the event notification endpoint to https://webhooks.{$rootDomain}/webinar/zoom.";
+            $instructions[] = 'Subscribe to the native events: webinar.ended, meeting.ended, and recording.completed.';
+            $instructions[] = 'Copy the webhook secret from this same Zoom app/environment.';
+            $environmentKeys[] = 'ZOOM_WEBHOOK_SECRET';
+        }
+
+        $instructions[] = 'Activate or reactivate the Server-to-Server OAuth app after changing scopes or event subscriptions.';
+        $instructions[] = 'Confirm the app owner/role can access account Reports; basic Meeting/Webinar access does not imply participant-report access.';
+
+        yield new DeploymentSetupStep(
+            key: 'webinars.zoom',
+            title: 'Zoom Server-to-Server OAuth and event subscriptions',
+            reason: 'Live Webinar and Meeting registration, attendance reconciliation, and replay handling require the client Zoom app to expose the exact runtime scopes and callbacks.',
+            instructions: $instructions,
+            environmentKeys: $environmentKeys,
+            verification: [
+                'Run php artisan setup:validate and confirm the Webinar provider, credential, webhook, token-TTL, and timestamp-drift checks are clean.',
+                'Verify one Webinar lookup/registration path and one Meeting lookup/registration path when both event types are used.',
+                'Verify participant-report retrieval through the same provider calls used by runtime.',
+                ...($this->zoomWebhookCapabilitiesEnabled()
+                    ? ['Deliver one real signed Zoom event to the environment and confirm it reaches the webhooks queue and intended domain action.']
+                    : []),
+            ],
+            priority: 60,
+        );
     }
 
     /** @return iterable<int, EnvironmentRequirement> */
@@ -161,5 +212,14 @@ final class WebinarsDeploymentPlanContributor implements DeploymentPlanContribut
     private function usesExternalProvider(): bool
     {
         return ! app()->environment(['local', 'testing']);
+    }
+
+    private function rootDomain(): string
+    {
+        $domain = config('app.root_domain');
+
+        return is_string($domain) && trim($domain) !== ''
+            ? trim($domain)
+            : '[ROOT_DOMAIN]';
     }
 }
