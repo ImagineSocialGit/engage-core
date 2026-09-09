@@ -281,9 +281,9 @@ configure_staging_access() {
 configure_local_staging_database() {
     local current_password
     current_password="$(env_get "$CLIENT_ENV" DB_PASSWORD)"
-    if [[ -z "$current_password" ]]; then
+    if [[ -z "$current_password" || "$current_password" =~ ^[0-9a-f]{40}$ ]]; then
         require_command openssl
-        current_password="$(openssl rand -hex 20)"
+        current_password="A9!a$(openssl rand -hex 30)"
     fi
 
     env_set "$ROOT_ENV" DB_CONNECTION mysql
