@@ -50,15 +50,23 @@ class RecordWebinarAttendanceAction
                 ? mb_strtolower(trim($registration->contact->email))
                 : null;
 
-            $match = $attendanceRecords->first(
-                fn (WebinarAttendanceRecord $record) => $this->matchesRegistration(
-                    registrationRegistrantId: $registrationRegistrantId,
-                    registrationEmail: $registrationEmail,
-                    attendanceRecord: $record,
+            $matches = $attendanceRecords
+                ->filter(
+                    fn (WebinarAttendanceRecord $record): bool => $this->matchesRegistration(
+                        registrationRegistrantId: $registrationRegistrantId,
+                        registrationEmail: $registrationEmail,
+                        attendanceRecord: $record,
+                    ),
                 )
-            );
+                ->values();
 
-            if (! $match) {
+            if ($matches->isEmpty()) {
+                continue;
+            }
+
+            $match = $this->aggregateAttendanceRecords($matches);
+
+            if (! $match instanceof WebinarAttendanceRecord) {
                 continue;
             }
 
@@ -68,10 +76,10 @@ class RecordWebinarAttendanceAction
                 registration: $registration,
                 provider: $provider,
                 match: $match,
-                matchedBy: $this->matchMethod(
+                matchedBy: $this->aggregateMatchMethod(
                     registrationRegistrantId: $registrationRegistrantId,
                     registrationEmail: $registrationEmail,
-                    attendanceRecord: $match,
+                    attendanceRecords: $matches,
                 ),
             );
         }
@@ -96,13 +104,21 @@ class RecordWebinarAttendanceAction
         WebinarAttendanceRecord $match,
         string $matchedBy,
     ): void {
-        if ($registration->attended_at !== null && $registration->status === 'attended') {
-            return;
-        }
+        $wasAlreadyAttended = $registration->attended_at !== null
+            && $registration->status === 'attended';
 
-        DB::transaction(function () use ($registration, $provider, $match, $matchedBy): void {
+        DB::transaction(function () use (
+            $registration,
+            $provider,
+            $match,
+            $matchedBy,
+            $wasAlreadyAttended,
+        ): void {
             $recordedAt = now();
-            $attendedAt = $this->attendedAt($match->joinTime);
+            $attendedAt = $this->attendedAt(
+                joinTime: $match->joinTime,
+                existingAttendedAt: $registration->attended_at,
+            );
 
             $meta = is_array($registration->meta)
                 ? $registration->meta
@@ -124,6 +140,10 @@ class RecordWebinarAttendanceAction
                 'attended_at' => $attendedAt,
                 'meta' => $meta,
             ])->save();
+
+            if ($wasAlreadyAttended) {
+                return;
+            }
 
             $this->emitWebinarAutomationEvent->forRegistration(
                 eventKey: config('webinars.post_event.automation_events.attended.event_key', 'webinar.attended'),
@@ -206,6 +226,127 @@ class RecordWebinarAttendanceAction
         }
     }
 
+    protected function aggregateAttendanceRecords(
+        Collection $attendanceRecords,
+    ): ?WebinarAttendanceRecord {
+        $attendanceRecords = $attendanceRecords
+            ->filter(fn (mixed $record): bool => $record instanceof WebinarAttendanceRecord)
+            ->values();
+
+        if ($attendanceRecords->isEmpty()) {
+            return null;
+        }
+
+        $registrantId = $attendanceRecords
+            ->map(fn (WebinarAttendanceRecord $record): ?string => filled($record->registrantId)
+                ? (string) $record->registrantId
+                : null
+            )
+            ->filter()
+            ->unique()
+            ->values()
+            ->first();
+
+        $email = $attendanceRecords
+            ->map(fn (WebinarAttendanceRecord $record): ?string => filled($record->email)
+                ? mb_strtolower(trim((string) $record->email))
+                : null
+            )
+            ->filter()
+            ->unique()
+            ->values()
+            ->first();
+
+        return new WebinarAttendanceRecord(
+            registrantId: is_string($registrantId) ? $registrantId : null,
+            email: is_string($email) ? $email : null,
+            status: 'attended',
+            duration: $this->aggregateDuration($attendanceRecords),
+            joinTime: $this->earliestJoinTime($attendanceRecords),
+            leaveTime: $this->latestLeaveTime($attendanceRecords),
+            raw: [],
+        );
+    }
+
+    protected function aggregateDuration(Collection $attendanceRecords): ?int
+    {
+        $intervals = [];
+        $fallbackDuration = 0;
+        $hasDurationEvidence = false;
+
+        foreach ($attendanceRecords as $record) {
+            if (! $record instanceof WebinarAttendanceRecord) {
+                continue;
+            }
+
+            if ($record->joinTime !== null && $record->leaveTime !== null) {
+                $start = $record->joinTime->getTimestamp();
+                $end = $record->leaveTime->getTimestamp();
+
+                if ($end > $start) {
+                    $intervals[] = [$start, $end];
+                    $hasDurationEvidence = true;
+
+                    continue;
+                }
+            }
+
+            if ($record->duration !== null) {
+                $fallbackDuration += max(0, $record->duration);
+                $hasDurationEvidence = true;
+            }
+        }
+
+        if ($intervals === []) {
+            return $hasDurationEvidence ? $fallbackDuration : null;
+        }
+
+        usort(
+            $intervals,
+            static fn (array $left, array $right): int =>
+                $left[0] <=> $right[0] ?: $left[1] <=> $right[1],
+        );
+
+        [$currentStart, $currentEnd] = $intervals[0];
+        $mergedDuration = 0;
+
+        foreach (array_slice($intervals, 1) as [$start, $end]) {
+            if ($start <= $currentEnd) {
+                $currentEnd = max($currentEnd, $end);
+
+                continue;
+            }
+
+            $mergedDuration += $currentEnd - $currentStart;
+            $currentStart = $start;
+            $currentEnd = $end;
+        }
+
+        $mergedDuration += $currentEnd - $currentStart;
+
+        return $mergedDuration + $fallbackDuration;
+    }
+
+    protected function earliestJoinTime(
+        Collection $attendanceRecords,
+    ): ?CarbonInterface {
+        return $attendanceRecords
+            ->map(fn (WebinarAttendanceRecord $record): ?CarbonInterface => $record->joinTime)
+            ->filter()
+            ->sortBy(fn (CarbonInterface $value): int => $value->getTimestamp())
+            ->first();
+    }
+
+    protected function latestLeaveTime(
+        Collection $attendanceRecords,
+    ): ?CarbonInterface {
+        return $attendanceRecords
+            ->map(fn (WebinarAttendanceRecord $record): ?CarbonInterface => $record->leaveTime)
+            ->filter()
+            ->sortByDesc(fn (CarbonInterface $value): int => $value->getTimestamp())
+            ->first();
+    }
+
     protected function matchesRegistration(
         mixed $registrationRegistrantId,
         ?string $registrationEmail,
@@ -216,6 +357,28 @@ class RecordWebinarAttendanceAction
             registrationEmail: $registrationEmail,
             attendanceRecord: $attendanceRecord,
         ) !== null;
+    }
+
+    protected function aggregateMatchMethod(
+        mixed $registrationRegistrantId,
+        ?string $registrationEmail,
+        Collection $attendanceRecords,
+    ): string {
+        $methods = $attendanceRecords
+            ->map(fn (WebinarAttendanceRecord $record): ?string => $this->matchMethod(
+                registrationRegistrantId: $registrationRegistrantId,
+                registrationEmail: $registrationEmail,
+                attendanceRecord: $record,
+            ))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($methods->contains('provider_registrant_id')) {
+            return 'provider_registrant_id';
+        }
+
+        return 'email';
     }
 
     protected function matchMethod(
@@ -238,9 +401,19 @@ class RecordWebinarAttendanceAction
         return null;
     }
 
-    protected function attendedAt(?CarbonInterface $joinTime): CarbonInterface
-    {
-        return $joinTime ?: now();
+    protected function attendedAt(
+        ?CarbonInterface $joinTime,
+        ?CarbonInterface $existingAttendedAt = null,
+    ): CarbonInterface {
+        if ($joinTime !== null && $existingAttendedAt !== null) {
+            return $joinTime->getTimestamp() < $existingAttendedAt->getTimestamp()
+                ? $joinTime
+                : $existingAttendedAt;
+        }
+
+        return $joinTime
+            ?? $existingAttendedAt
+            ?? now();
     }
 
     protected function dateTimeString(?CarbonInterface $value): ?string
