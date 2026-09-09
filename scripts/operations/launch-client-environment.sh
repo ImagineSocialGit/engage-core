@@ -811,9 +811,8 @@ EOF
     if [[ ${#served[@]} -gt 0 ]]; then
         cat >> "$tmp" <<EOF
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    http2 on;
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name ${served[*]};
     root ${APP_PATH}/public;
     index index.php;
