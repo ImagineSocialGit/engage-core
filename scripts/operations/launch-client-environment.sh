@@ -350,8 +350,27 @@ configure_remote_production_database() {
     fi
 }
 
+ensure_application_key() {
+    local current_key
+    current_key="$(env_get "$ROOT_ENV" APP_KEY)"
+    [[ -n "$current_key" ]] && return
+
+    note "Generate environment APP_KEY"
+
+    if ! grep -q '^APP_KEY=' "$ROOT_ENV"; then
+        printf '\nAPP_KEY=\n' >> "$ROOT_ENV"
+    fi
+
+    cd "$APP_PATH"
+    "$PHP_BIN" artisan key:generate --force
+
+    current_key="$(env_get "$ROOT_ENV" APP_KEY)"
+    [[ -n "$current_key" ]] || fail "APP_KEY generation did not populate $ROOT_ENV."
+}
+
 ensure_environment() {
     if phase_done environment; then
+        ensure_application_key
         return
     fi
 
@@ -394,11 +413,8 @@ ensure_environment() {
     ensure_env_permissions
     validate_client_env_contract
 
+    ensure_application_key
     cd "$APP_PATH"
-    if [[ -z "$(env_get "$ROOT_ENV" APP_KEY)" ]]; then
-        note "Generate environment APP_KEY"
-        "$PHP_BIN" artisan key:generate --force
-    fi
     "$PHP_BIN" artisan optimize:clear
 
     mark_phase environment
@@ -705,7 +721,7 @@ render_nginx_site_config() {
     local access_log="$2"
     local error_log="$3"
 
-    local -a desired tls served pending
+    local -a desired=() tls=() served=() pending=()
     mapfile -t desired < <(core_hosts)
     mapfile -t tls < <(stored_tls_hosts)
 
