@@ -296,10 +296,11 @@ configure_local_staging_database() {
     note "Local Core staging database"
     echo "Database: $DB_DATABASE_DERIVED"
     echo "Application user: $DB_USERNAME_DERIVED"
-    echo "Provisioning client-scoped local MySQL database/user through sudo mysql."
+    echo "Provisioning client-scoped local MySQL database/user through sudo mysql -p."
+    echo "Enter the privileged MySQL password when prompted; the launcher does not store it."
 
     require_command mysql
-    if ! sudo mysql <<SQL
+    if ! sudo mysql -p <<SQL
 CREATE DATABASE IF NOT EXISTS \`$DB_DATABASE_DERIVED\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$DB_USERNAME_DERIVED'@'127.0.0.1' IDENTIFIED BY '$current_password';
 ALTER USER '$DB_USERNAME_DERIVED'@'127.0.0.1' IDENTIFIED BY '$current_password';
@@ -310,7 +311,7 @@ GRANT ALL PRIVILEGES ON \`$DB_DATABASE_DERIVED\`.* TO '$DB_USERNAME_DERIVED'@'lo
 FLUSH PRIVILEGES;
 SQL
     then
-        fail "Local MySQL provisioning failed. Fix local MySQL/admin access and resume; the generated application credential is already stored in the client .env."
+        fail "Local MySQL provisioning through sudo mysql -p failed. Fix privileged MySQL access and resume; the generated application credential is already stored in the client .env."
     fi
 }
 
