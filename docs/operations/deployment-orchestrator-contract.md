@@ -2,9 +2,15 @@
 
 ## Purpose
 
-This document defines the host-side deployment direction for Core, SEO Sites, and Artist Sites. The deployment orchestrator should automate repeatable server work, derive names consistently, consume application-owned deployment contracts, and stop at explicit operator gates for third-party dashboards or credentials that cannot safely be created from committed source.
+The deployment orchestrator automates repeatable host/server work, derives operational names from stable client identity, consumes application-owned deployment requirements, and stops only when an external provider dashboard or operator credential cannot safely be automated.
 
-The orchestrator must not duplicate module requirement logic already owned by the application. For Core, `php artisan engage:deployment-plan --json` is the machine contract for enabled modules, environment requirements, and module/provider setup steps.
+For Core, the machine authority is:
+
+```bash
+php artisan engage:deployment-plan --json
+```
+
+The launcher must not carry a second list of module requirements, provider requirements, or Horizon queues.
 
 ## Environment and database topology
 
@@ -16,7 +22,7 @@ Use this standard topology unless a client has an explicitly documented exceptio
 | SEO Sites | Local database | Shared production database in preview mode | Remote client database |
 | Artist Sites | Local database | Shared production database in preview mode | Remote client database |
 
-SEO/Artist staging is a preview surface over production content. It is not an independently mutable copy of production data.
+SEO/Artist staging is a preview surface over production content, not a disposable staging database.
 
 For shared-data preview staging:
 
@@ -40,66 +46,77 @@ Recommended model:
 - shared-preview SEO/Artist staging should use a separate read-only credential when practical;
 - remote database provisioning remains an operator gate unless a future database-management integration is explicitly approved.
 
-The orchestrator may test connectivity and effective database identity after credentials are supplied. It should not assume it can create remote users/databases.
+Core staging is the exception: the launcher may provision the local staging database and local client-scoped application user through `sudo mysql` because that database is deliberately local/disposable.
 
 ## Deployment topology
 
-The deployment must explicitly distinguish whether the platform owns the root website.
+The deployment explicitly records whether the platform owns the root website.
 
-Supported topology concepts:
+Supported Core-launch topology values:
 
 - `core_services_only`: Core owns CRM and enabled Core public/service hosts; the root website is external and must not be changed.
-- `managed_main_site`: the deployment also owns the root website through an SEO Site, Artist Site, or another explicitly supported site application.
+- `managed_main_site`: the organization also owns the root website through an SEO Site, Artist Site, or another explicitly supported application.
 
-The orchestrator must never infer root-site ownership from enabled Core modules alone.
+The Core launcher records `managed_main_site` but does not point the root host at Core. SEO/Artist deployment entry points will eventually be orchestrated above this Core launcher.
 
-Root-site ownership affects:
+Root-site ownership affects DNS instructions, certificate host lists, smoke checks, and which Nginx hosts the deployment is authorized to modify.
 
-- which repositories are deployed;
-- DNS instructions;
-- Nginx server blocks;
-- certificate SAN/host lists;
-- HTTP smoke tests;
-- which hostnames the deployment is authorized to modify.
+## Canonical naming
 
-## Naming contract
+The launcher derives names from:
 
-Derive operational names from stable deployment identity instead of asking the operator to invent each value.
-
-Inputs should be kept small. Typical stable inputs are:
-
-- environment (`staging` or `production`);
-- client repository URL/slug;
+- environment;
+- client repository URL/basename;
 - root domain;
-- root-site ownership/topology;
-- an explicit client-key override only when the repository convention cannot determine it safely.
+- optional explicit client-key override.
 
-Derived names include:
+Example production identity:
 
-- runtime stem;
-- application path;
-- database recommendation;
-- Redis prefix;
-- cache prefix;
-- Horizon prefix;
-- Supervisor/Horizon program name;
-- Scheduler identity/entry marker;
-- log names/paths;
-- Core-owned hostnames.
+```text
+client repository    git@github.com:ImagineSocialGit/slam-dunk-crm.git
+root domain          slamdunkhomeloans.com
+client key           slam-dunk-crm
+runtime stem         slam_dunk_crm
+app path             /var/www/slamdunkhomeloans.com/engage-core
+Redis prefix         slam_dunk_crm_
+cache prefix         slam_dunk_crm_cache_
+Horizon prefix       slam_dunk_crm_horizon:
+Supervisor program   slamdunkhomeloans.com-horizon
+```
 
-Normalization and length limits must be deterministic. If a platform limit requires truncation, use a deterministic short hash rather than silent ambiguous clipping.
+Staging adds `_staging` to the runtime namespace while the staging root domain naturally keeps Supervisor/Nginx names distinct.
 
-The executable queue list is application-owned. Do not require an operator-maintained Horizon queue list when the runtime can resolve it from `QueueContract`/Horizon configuration.
+When a platform length limit applies, identifiers are truncated only through deterministic hash-suffixed normalization. Silent ambiguous clipping is not allowed.
+
+The executable queue list remains application-owned through `QueueContract`/Horizon configuration. The launcher never accepts an operator-maintained queue list.
+
+## Runtime environment files
+
+The launcher creates minimal runtime files. It does not copy `.env.example` wholesale.
+
+Root `.env` owns process/server values such as:
+
+- `APP_ENV`;
+- `APP_KEY`;
+- `CLIENT_KEY`;
+- DB host/transport;
+- Redis transport;
+- queue/cache/session process defaults;
+- root logging/Horizon process overrides.
+
+The selected-client `.env` owns client-varying values such as:
+
+- URLs/root domain;
+- database name/user/password;
+- Redis/cache/Horizon prefixes;
+- provider credentials;
+- selected sender identities and client-owned public keys/secrets.
+
+`engage:environment:sync --write-missing` remains the application authority for missing required variable names.
 
 ## Core deployment-plan machine contract
 
-Core exposes:
-
-```bash
-php artisan engage:deployment-plan --json
-```
-
-The JSON payload includes:
+`engage:deployment-plan --json` supplies:
 
 - environment;
 - client key;
@@ -110,83 +127,127 @@ The JSON payload includes:
 - operator/external setup steps;
 - present-but-unused environment keys.
 
-The launcher should iterate the plan until blocking requirements are resolved. Provider/capability selectors may reveal additional requirements on a later pass; do not assume the first plan contains every conditional key.
+Non-secret requirements may expose their `expected_value` to the launcher. Secret expected values are never serialized.
+
+The launcher iterates the plan because provider/capability selectors may reveal additional requirements on a later pass.
 
 ## Operator/external setup steps
 
-Deployment-plan contributors may also implement `DeploymentSetupContributor`. These steps describe actions that must happen in an external dashboard or on another first-party application and therefore cannot be completed only by writing environment variables.
+Deployment-plan contributors may implement `DeploymentSetupContributor`.
 
-A setup step contains:
+Current setup-step families include:
 
-- stable step key;
-- owner;
-- title and reason;
-- ordered instructions;
-- related environment keys to collect after the external work;
-- verification checklist;
-- priority.
+- Cloudflare Turnstile;
+- DigitalOcean Spaces;
+- Resend;
+- Telnyx;
+- Zoom;
+- signed external Forms intake.
 
-Current recipe families include:
+For each active step, the launcher:
 
-- Cloudflare Turnstile when public human verification is enabled;
-- DigitalOcean Spaces when live Media storage is enabled;
-- Resend for live email delivery and inbound receiving when enabled;
-- Telnyx when live SMS is enabled;
-- Zoom Server-to-Server OAuth and event subscriptions when Webinars is enabled;
-- signed external Forms intake when configured.
+1. prints the contributor-owned reason/instructions;
+2. pauses while the operator works in the external dashboard;
+3. collects related environment values afterward;
+4. hides secret input;
+5. writes values directly to the correct runtime environment file;
+6. records the step as completed in the non-secret launch state;
+7. reruns the application plan.
 
-The launcher should render each active step as an explicit pause. It should show exact current URLs/scopes/events when the contributor provides them, wait for the operator to finish the external work, then collect the related environment values using hidden input for secrets.
+The operator may stop with Ctrl+C at any pause and resume later from the state file.
 
-## Core host defaults
+## Core public hosts
 
-Core-owned hostnames are derived from the selected client domain and committed/runtime URL configuration. Typical roles are:
+The launcher provisions only Core-owned hosts.
 
-- CRM/admin host from `CRM_APP_URL`;
-- `webhooks.<ROOT_DOMAIN>` for provider/server-to-server callbacks;
-- `webinar.<ROOT_DOMAIN>` when Webinars uses its normal derived host;
-- `messaging.<ROOT_DOMAIN>` for Messaging public preference routes;
-- the configured `SCHEDULING_APP_URL` when generic public Scheduling is exposed.
+Typical roles:
 
-Only provision hosts that the enabled/configured runtime actually uses. The root domain must not be pointed at Core when another application owns the main website.
+- CRM/admin host from `CRM_APP_URL` (default derived as `crm.<ROOT_DOMAIN>`);
+- `messaging.<ROOT_DOMAIN>` when Messaging is enabled;
+- `webinar.<ROOT_DOMAIN>` when Webinars is enabled;
+- `webhooks.<ROOT_DOMAIN>` when enabled modules expose provider/server-to-server callbacks;
+- the host from `SCHEDULING_APP_URL` when generic public Scheduling is deliberately enabled.
 
-## Orchestrator lifecycle
+The root domain is never pointed at Core merely because Core is installed.
 
-The finished deployment flow should be resumable and roughly follow this order:
+## Implemented Core launcher lifecycle
 
-1. Confirm deployment identity/topology and derive canonical names.
-2. Verify the approved Core/client/site repositories and revisions.
-3. Install dependencies and build assets where applicable.
-4. Create minimal runtime environment files; do not copy every example key into live environment files.
-5. Populate deterministic non-secret infrastructure values.
-6. Resolve `engage:deployment-plan --json`.
-7. Iterate blocking application requirements, collecting operator values securely.
-8. Render and complete active external/provider setup steps.
-9. Re-resolve the plan until environment readiness is clean.
-10. Connect/test the correct local or remote database according to the topology matrix.
-11. Install or migrate platform/module schema through the application-owned commands.
-12. Sync presets and run setup validation.
-13. Configure runtime permissions, Supervisor/Horizon, Scheduler, logging/observability, and PHP-FPM integration.
-14. Generate/validate only the authorized Nginx hosts.
-15. Pause for DNS changes that cannot be automated through an approved provider API.
-16. Acquire/verify TLS after DNS resolves.
-17. Run HTTP, provider, queue, Scheduler, and application smoke checks.
-18. Create/verify the initial CRM owner when Core is newly installed.
-19. Present an explicit final launch gate and record the deployed revisions/configuration.
+The current Core launcher supports:
 
-Production application tests are not part of the production deployment flow. Tests run in development/staging/CI; production uses focused read-only/safe smoke checks and setup validation.
+```text
+new
+resume
+update
+add-modules
+verify
+derive
+```
+
+A new environment follows this sequence:
+
+1. collect/derive identity and topology;
+2. clone/pull clean Core and client repositories;
+3. install production dependencies and build assets;
+4. create minimal root/client environment files;
+5. provision the local database for Core staging, or collect remote DB credentials for Core production;
+6. generate/preserve `APP_KEY`;
+7. resolve the enabled-module host set from the current plan even while provider requirements are still incomplete;
+8. generate the Nginx site for Core-owned hosts only and install/refresh the existing Core observability integration when available;
+9. display exact DNS A records, wait for resolution, and acquire the exact Core TLS certificate through a deterministic Certbot webroot flow;
+10. iterate `engage:deployment-plan --json` and `engage:environment:sync --write-missing`;
+11. complete provider/external setup steps against already-live HTTPS callback hosts and securely collect values;
+12. run `engage:install --force --no-create-user`, `modules:status`, and `setup:validate`;
+13. optionally create the initial CRM owner through `engage:user:add`;
+14. set runtime permissions;
+15. install/update the derived Supervisor/Horizon program;
+16. install the exact marked Laravel Scheduler cron entry;
+17. run final deployment-plan, module, setup, Horizon, Scheduler, and HTTP checks.
+
+## Launch state
+
+The launcher writes a mode-0600 JSON state file under the deploy user's local state directory.
+
+It contains only non-secret identity/checkpoint information such as:
+
+- client/environment identity;
+- derived names/paths;
+- topology;
+- completed phases;
+- completed external setup-step fingerprints;
+- DNS/certificate operator metadata.
+
+Secrets never belong in the state file.
+
+## Normal updates
+
+`update <state-file>`:
+
+- pulls approved Core/client commits;
+- installs dependencies/builds assets;
+- reruns the deployment-plan/setup-step loop for any newly required environment/provider values;
+- runs platform migrations, installed-module migrations, preset sync, status, and setup validation;
+- refreshes runtime processes/host configuration;
+- runs safe verification.
+
+Production tests are not part of this procedure.
 
 ## Later module additions
 
-Module changes are authored and tested in development, committed, and pushed. Production/staging deployment must not edit `client/<CLIENT_KEY>/config/modules.php` to enable a module.
+Module enablement is authored/tested in development and committed in the client repository.
 
 After the approved commit is pulled:
 
-1. resolve the new deployment plan;
-2. show only the newly active environment/provider obligations;
-3. complete newly active setup steps;
-4. install the missing module dependency closure with the module installation command;
-5. sync presets and validate;
-6. update runtime/public-host configuration only when the new capability requires it;
-7. run focused smoke verification.
+```bash
+bash scripts/operations/launch-client-environment.sh add-modules /path/to/state.json \
+  --module scheduling
+```
 
-A future `add-modules` deployment mode should orchestrate this delta without becoming a second source of module truth.
+The launcher refuses a requested module that is not enabled by the pulled client configuration. For each requested module it runs the application-owned `modules:install <module> --force` dependency closure, then preset sync/status/setup validation and runtime/host verification.
+
+This flow may activate new deployment-plan requirements or provider setup steps before schema installation.
+
+## Remaining higher-level work
+
+The Core launcher deliberately does not yet deploy an SEO Site or Artist Site. A later host/client orchestrator can call compatible sub-deployment entry points for those platforms while retaining the topology/data-mode rules defined here.
+
+Shared-production-data SEO/Artist preview staging must remain protected from migrations, destructive resets, and production-side-effect workers even when that higher-level orchestrator is added.

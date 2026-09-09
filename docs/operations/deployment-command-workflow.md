@@ -14,6 +14,26 @@ Use it alongside:
 
 Staging and production consume approved source; they are not normal editing environments. Application code and version-controlled client configuration must be changed/tested in development, committed/pushed, then pulled/deployed to the target. Environment files, secrets, Nginx/Supervisor/cron configuration, and other host-owned runtime state remain target-environment concerns.
 
+## Host-side orchestrator
+
+For a new Core staging/production environment, prefer the resumable host-side launcher over manually reproducing the command sequence:
+
+```bash
+bash scripts/operations/launch-client-environment.sh new
+```
+
+The launcher derives operational names, creates the minimal runtime environment shape, uses `engage:deployment-plan --json` as the machine authority, pauses for active provider setup recipes, configures Core runtime services/hosts, and runs the application commands below in the correct lifecycle stage.
+
+After launch:
+
+```bash
+bash scripts/operations/launch-client-environment.sh update /path/to/state.json
+bash scripts/operations/launch-client-environment.sh add-modules /path/to/state.json --module <module>
+bash scripts/operations/launch-client-environment.sh verify /path/to/state.json
+```
+
+The command-level contracts below remain authoritative. The Bash launcher orchestrates them; it does not replace their ownership. See `client-launch-orchestrated-runbook.md` and `deployment-orchestrator-contract.md`.
+
 Normal application startup never runs migrations. Normal runtime bootstrap registers only the platform migration path. Optional module schema is selected explicitly by the module migration commands.
 
 ## Command ownership

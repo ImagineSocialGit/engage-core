@@ -51,6 +51,9 @@ final readonly class ResolvedEnvironmentRequirement
             'reason' => $this->requirement->reason,
             'status' => $this->status,
             'allowed_values' => $this->requirement->allowedValues,
+            'expected_value' => $this->definition->secret
+                ? null
+                : $this->requirement->expectedValue,
             'value_rule' => $this->requirement->valueRule,
             'target_path' => $this->targetPath,
             'persisted' => $this->persisted,
