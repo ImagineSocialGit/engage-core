@@ -144,5 +144,7 @@
             </div>
         </section>
     </main>
+
+    <x-public-surface.human-verification surface="messaging_permissions" />
 </body>
 </html>

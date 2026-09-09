@@ -30,6 +30,10 @@ return [
             'enabled' => true,
             'action' => 'scheduling',
         ],
+        'messaging_permissions' => [
+            'enabled' => true,
+            'action' => 'messaging_permissions',
+        ],
     ],
 
     'providers' => [

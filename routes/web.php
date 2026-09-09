@@ -18,6 +18,7 @@ Route::get('/preferences/{token}', [ContactPermissionInvitationController::class
     ->name('messaging.permission-invitations.show');
 
 Route::post('/preferences/{token}', [ContactPermissionInvitationController::class, 'store'])
+    ->middleware('public-human:messaging_permissions')
     ->name('messaging.permission-invitations.store');
 
 Route::get('/messaging/click/{message}/{cta}', CtaEngagementRedirectController::class)
