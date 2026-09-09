@@ -67,6 +67,9 @@ Route::middleware('module:scheduling')
         Route::put('/configuration/availability/services/{bookableService}/regular-hours', [SchedulingAvailabilityController::class, 'saveRegularHours'])
             ->name('configuration.availability.regular-hours');
 
+        Route::put('/configuration/availability/services/{bookableService}/booking-timing', [SchedulingAvailabilityController::class, 'saveBookingTiming'])
+            ->name('configuration.availability.booking-timing');
+
         Route::put('/configuration/availability/services/{bookableService}/special-hours', [SchedulingAvailabilityController::class, 'saveSpecialHours'])
             ->name('configuration.availability.special-hours');
 

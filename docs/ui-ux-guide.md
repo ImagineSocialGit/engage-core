@@ -354,11 +354,55 @@ Full-page submits are still acceptable when the action naturally changes the who
 
 This is a UX pattern first, not a schema requirement. Only add persisted state when the workflow proves that user-specific selections, filters, acknowledgements, dismissals, or saved views need to survive beyond the current page session.
 
+### Match page structure to page purpose
+
+Index, show, create, and edit pages have different jobs. Do not make one screen perform all four jobs merely because the underlying controller can expose the data.
+
+Use these defaults:
+
+```text
+Index page
+    Prioritize scanning, filtering, status, summaries, and next actions.
+    Creation usually opens a focused modal or a dedicated create page.
+    Editing usually opens a dedicated edit page; use a modal only for compact edits.
+    Inline editing is uncommon and should be limited to truly small fields.
+
+Show/detail page
+    Prioritize the record's current state, context, history, and likely next action.
+    Small routine fields may edit inline.
+    Compact multi-field edits usually belong in a modal.
+    Substantial configuration belongs on a dedicated edit page.
+
+Create/edit page
+    May use a sequence of focused panels when the user is configuring one record.
+    Keep required decisions before optional or advanced ones.
+    When the workflow contains more than roughly 3-4 substantial steps, use a stepped/paginated flow and show progress at the top instead of one very long form.
+```
+
+Do not place a long create/edit workflow in a narrow index/show sidebar simply to keep everything on one page. A dense side column should not force an otherwise short information area to become a tall empty page. If one column becomes a full workflow, move that workflow into a modal or its own create/edit surface.
+
 ## Visual wayfinding
 
 Module colors are quiet orientation cues, not decoration.
 
+Every module-owned CRM page should include breadcrumbs that make the current location and path back to the module root obvious. Breadcrumbs should use client-facing nouns and page names, not controller, route, or internal model terminology.
+
 Use muted tints, borders, rings, badges, rails, and background washes to help users recognize which module contributed a card, panel, or section.
+
+Within one module, visual depth should strengthen as the user moves deeper into the module. The invariant is **darker/stronger means deeper**, not a hard-coded Tailwind shade number:
+
+```text
+module index / overview
+    lightest useful module background wash
+
+show / detail
+    one perceptual step stronger
+
+edit / focused configuration / deeper detail
+    another perceptual step stronger when the page remains recognizably in that module
+```
+
+Choose actual shades by perceptual contrast and accessibility; different palettes do not produce equal visual steps at the same numeric shade. Module-depth styling must remain quieter than validation, warning, blocked, overdue, or destructive states.
 
 Do not use bright module colors as large attention-grabbing blocks. Reserve high-saturation amber/red treatments for true urgency, failed/blocked states, overdue work, or business-critical warnings.
 
@@ -1590,6 +1634,8 @@ What does this do?
 When would I use it?
 What happens if I change it?
 ```
+
+When the reason for a feature or setting is not immediately obvious, include one or more concise industry-generic examples of when it is useful before asking the user to configure it. Examples should teach the business situation, not the implementation. Advanced or optional functionality should not appear as unexplained machinery that the user has to reverse-engineer.
 
 Hints should not expose schema names, raw config keys, event keys, class names, or implementation details as the primary explanation.
 

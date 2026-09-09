@@ -1,7 +1,7 @@
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
-    subheading="Set up one appointment type from start to finish, with the common decisions first and advanced controls out of the way until you need them."
+    subheading="Finish one appointment type in order. Required steps stay visible, while recommended and advanced options explain when they matter."
 >
     <div class="space-y-6" data-scheduling-service-editor="{{ $service->id }}">
         <datalist id="scheduling-timezones">
@@ -142,38 +142,7 @@
             </div>
         </x-ui.card>
 
-        <x-ui.card class="space-y-4" data-scheduling-service-setup-path>
-            <div>
-                <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                    Setup path
-                </div>
-                <h2 class="mt-3 text-lg font-semibold text-slate-900">Work through the appointment type in order</h2>
-                <p class="mt-1 text-sm text-slate-500">
-                    The common decisions stay up front. Booking rules, shared resources, and other uncommon controls stay in Advanced.
-                </p>
-            </div>
-
-            <nav class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" aria-label="Appointment type setup">
-                <a href="#basics" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:bg-teal-50/40">
-                    1. Basics
-                </a>
-                <a href="#availability" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:bg-teal-50/40">
-                    2. Availability
-                </a>
-                <a href="#booking-form" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:bg-teal-50/40">
-                    3. Booking form
-                </a>
-                <a href="#communications" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:bg-teal-50/40">
-                    4. Confirmation & reminders
-                </a>
-                <a href="#after-booking" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:bg-teal-50/40">
-                    5. After booking
-                </a>
-                <a href="#advanced" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:bg-teal-50/40">
-                    6. Advanced
-                </a>
-            </nav>
-        </x-ui.card>
+        @include('crm.scheduling.partials.setup-progress', ['setupProgress' => $setupProgress])
 
         @if ($serviceEditable)
             <form
@@ -196,11 +165,14 @@
                 @method('PATCH')
                 <input type="hidden" name="current_version" value="{{ $service->updated_at?->toISOString() }}">
                 <input type="hidden" name="sort_order" value="{{ $service->sort_order }}">
+                <input type="hidden" name="slot_interval_minutes" value="{{ old('slot_interval_minutes', $service->slot_interval_minutes) }}">
+                <input type="hidden" name="buffer_before_minutes" value="{{ old('buffer_before_minutes', $service->buffer_before_minutes) }}">
+                <input type="hidden" name="buffer_after_minutes" value="{{ old('buffer_after_minutes', $service->buffer_after_minutes) }}">
 
                 <x-ui.card id="basics" class="scroll-mt-6 space-y-5" data-scheduling-service-section="basics">
                     <div>
                         <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                            Service
+                            Appointment type
                         </div>
                         <h2 class="mt-3 text-lg font-semibold text-slate-900">Basics</h2>
                         <p class="mt-1 text-sm text-slate-500">
@@ -270,7 +242,7 @@
                             >
                             <span>
                                 <span class="block font-semibold text-slate-900">Let customers book this themselves</span>
-                                <span class="mt-0.5 block text-slate-500">A complete appointment format is required before a service can be public.</span>
+                                <span class="mt-0.5 block text-slate-500">A complete appointment format is required before an appointment type can be public.</span>
                             </span>
                         </label>
                     </div>
@@ -513,7 +485,7 @@
                 <x-ui.card class="space-y-4" data-scheduling-service-section="advanced_booking_rules">
                     <details>
                         <summary class="cursor-pointer text-sm font-semibold text-teal-700">
-                            Advanced booking rules
+                            Other booking rules
                         </summary>
 
                         <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -528,21 +500,7 @@
                                 >
                             </label>
 
-                            <label class="block text-sm font-medium text-slate-700">
-                                Start-time interval (minutes)
-                                <input
-                                    class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
-                                    type="number"
-                                    min="1"
-                                    max="1440"
-                                    name="slot_interval_minutes"
-                                    value="{{ old('slot_interval_minutes', $service->slot_interval_minutes) }}"
-                                    required
-                                >
-                                <span class="mt-1 block text-xs font-normal text-slate-500">
-                                    For example, 15 allows starts at 9:00, 9:15, 9:30, and so on when available.
-                                </span>
-                            </label>
+                            
 
                             <label class="block text-sm font-medium text-slate-700">
                                 Simultaneous capacity
@@ -558,29 +516,9 @@
                                 <span class="mt-1 block text-xs font-normal text-slate-500">Use 1 for the normal case.</span>
                             </label>
 
-                            <label class="block text-sm font-medium text-slate-700">
-                                Buffer before (minutes)
-                                <input
-                                    class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
-                                    type="number"
-                                    min="0"
-                                    name="buffer_before_minutes"
-                                    value="{{ old('buffer_before_minutes', $service->buffer_before_minutes) }}"
-                                    required
-                                >
-                            </label>
+                            
 
-                            <label class="block text-sm font-medium text-slate-700">
-                                Buffer after (minutes)
-                                <input
-                                    class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
-                                    type="number"
-                                    min="0"
-                                    name="buffer_after_minutes"
-                                    value="{{ old('buffer_after_minutes', $service->buffer_after_minutes) }}"
-                                    required
-                                >
-                            </label>
+                            
 
                             <label class="block text-sm font-medium text-slate-700">
                                 Minimum booking notice (minutes)
@@ -636,13 +574,13 @@
                 <div class="sticky bottom-4 z-10 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <p class="text-sm text-slate-500">
-                            Save the service before changing availability or related setup.
+                            Save the appointment type before changing availability or related setup.
                         </p>
                         <button
                             type="submit"
                             class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
                         >
-                            Save service
+                            Save appointment type
                         </button>
                     </div>
                 </div>
@@ -650,20 +588,29 @@
         @else
             <x-ui.card data-configuration-read-only="service">
                 <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                    This service is managed by a provider or system integration. Its business settings are shown here, but they cannot be edited from this CRM surface.
+                    This appointment type is managed by a provider or system integration. Its business settings are shown here, but they cannot be edited from this CRM surface.
                 </div>
             </x-ui.card>
         @endif
 
-        <x-ui.card class="space-y-5" data-scheduling-service-staff>
+        <x-ui.card id="staff" class="scroll-mt-6 space-y-5" data-scheduling-service-staff>
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                    <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                        Staff & providers
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
+                            Staff & providers
+                        </div>
+                        <span @class([
+                            'rounded-full px-2 py-1 text-xs font-semibold',
+                            'bg-orange-100 text-orange-900' => $setupProgress['staff_guidance']['recommended'],
+                            'bg-slate-100 text-slate-700' => ! $setupProgress['staff_guidance']['recommended'],
+                        ])>
+                            {{ $setupProgress['staff_guidance']['label'] }}
+                        </span>
                     </div>
-                    <h2 class="mt-3 text-lg font-semibold text-slate-900">Who can handle this service?</h2>
+                    <h2 class="mt-3 text-lg font-semibold text-slate-900">Who can handle this appointment type?</h2>
                     <p class="mt-1 max-w-2xl text-sm text-slate-500">
-                        Leave every person unselected when this service does not need explicit assignment.
+                        {{ $setupProgress['staff_guidance']['description'] }}
                     </p>
                 </div>
 
@@ -722,7 +669,7 @@
                                     name="assignments[{{ $loop->index }}][capacity_override]"
                                     value="{{ old("assignments.{$loop->index}.capacity_override", $row['capacity_override']) }}"
                                 >
-                                <span class="mt-1 block text-xs font-normal text-slate-500">Leave blank to use the normal service and staff limits.</span>
+                                <span class="mt-1 block text-xs font-normal text-slate-500">Leave blank to use the normal appointment-type and staff limits.</span>
                             </label>
 
                             <input
@@ -736,7 +683,7 @@
                             class="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500"
                             data-configuration-empty="assignment-hosts"
                         >
-                            No staff or providers have been added. This service can remain unassigned.
+                            No staff or providers have been added. This appointment type can remain unassigned.
                         </div>
                     @endforelse
 
@@ -749,7 +696,7 @@
                 </form>
             @else
                 <p class="text-sm text-slate-500">
-                    Staff assignment for this provider-managed service is read-only here.
+                    Staff assignment for this provider-managed appointment type is read-only here.
                 </p>
             @endif
         </x-ui.card>
@@ -766,7 +713,7 @@
                         <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">2. Availability</div>
                         <h2 class="mt-2 text-lg font-semibold text-slate-900">When can people book this?</h2>
                         <p class="mt-1 max-w-2xl text-sm text-slate-500">
-                            Set normal hours, date-specific changes, and time off for this appointment type.
+                            Set normal hours, date-specific changes, start-time spacing, preparation time, and time to leave free afterward.
                         </p>
                     </div>
                     @if ($service->status === 'active')
@@ -774,7 +721,7 @@
                             href="{{ route('crm.scheduling.configuration.availability.index', ['service_id' => $service->id]) }}"
                             class="inline-flex w-full items-center justify-center rounded-lg border border-teal-600 bg-white px-3 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50 sm:w-auto"
                         >
-                            Manage availability
+                            Set hours & booking timing
                         </a>
                     @endif
                 </div>
@@ -897,8 +844,8 @@
                         class="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm hover:border-teal-300"
                         data-scheduling-service-related="resources"
                     >
-                        <div class="font-semibold text-slate-900">Rooms & resources</div>
-                        <div class="mt-1 text-slate-500">Shared rooms, equipment, and capacity constraints.</div>
+                        <div class="font-semibold text-slate-900">Rooms, equipment & shared capacity</div>
+                        <div class="mt-1 text-slate-500">Use this only when appointments compete for something limited, such as one conference room, two courts, a specialized machine, or a small vehicle fleet.</div>
                     </a>
 
                     <a

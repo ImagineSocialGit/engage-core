@@ -21,13 +21,111 @@ class SchedulingResourceController extends Controller
 {
     public function index(SchedulingReadService $read): View
     {
+        $resources = $read->configurationResources();
+        $hosts = $read->configurationResourceHosts();
+        $services = $read->configurationResourceServices();
+        $effects = $read->resourceConfigurationEffects();
+        $reasonLabels = [
+            'service_inactive' => 'The appointment type is not active.',
+            'host_inactive' => 'The assigned staff member is not active.',
+            'resource_inactive' => 'A shared item required by this appointment type is not active.',
+            'host_capacity_missing' => 'The staff member has no active capacity for a required shared item.',
+            'quantity_exceeds_capacity' => 'This appointment type requires more of a shared item than the staff member can use.',
+        ];
+
         return view('crm.scheduling.resources', [
-            'title' => 'Scheduling Resources',
-            'heading' => 'Scheduling Resources',
-            'resources' => $read->configurationResources(),
-            'hosts' => $read->configurationResourceHosts(),
-            'services' => $read->configurationResourceServices(),
-            'effects' => $read->resourceConfigurationEffects(),
+            'title' => 'Rooms, Equipment & Shared Capacity',
+            'heading' => 'Rooms, Equipment & Shared Capacity',
+            'inputClass' => 'mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200',
+            'labelClass' => 'block text-sm font-medium text-slate-700',
+            'resourceStatuses' => [
+                SchedulingResource::STATUS_ACTIVE,
+                SchedulingResource::STATUS_INACTIVE,
+                SchedulingResource::STATUS_ARCHIVED,
+            ],
+            'resourceStats' => [
+                'total' => $resources->count(),
+                'active' => $resources
+                    ->where('status', SchedulingResource::STATUS_ACTIVE)
+                    ->count(),
+                'hosts' => $hosts->count(),
+                'services' => $services->count(),
+            ],
+            'resources' => $resources,
+            'resourceRows' => $resources
+                ->map(fn (SchedulingResource $resource): array => [
+                    'model' => $resource,
+                    'editable' => (bool) $resource->getAttribute('crm_editable'),
+                ])
+                ->all(),
+            'hostRows' => $hosts
+                ->map(function (SchedulingHost $host) use ($resources): array {
+                    $configured = $host->resourceCapacities->keyBy('scheduling_resource_id');
+                    $editableIndex = 0;
+                    $rows = [];
+
+                    foreach ($resources as $resource) {
+                        $row = $configured->get($resource->getKey());
+                        $editable = $row === null
+                            || (bool) $row->getAttribute('crm_editable');
+
+                        $rows[] = [
+                            'resource' => $resource,
+                            'model' => $row,
+                            'editable' => $editable,
+                            'form_index' => $editable ? $editableIndex++ : null,
+                            'active' => (bool) ($row?->is_active ?? false),
+                            'capacity' => $row?->capacity ?? 1,
+                            'sort_order' => $row?->sort_order ?? $resource->sort_order,
+                            'source' => $row?->source ?? 'manual',
+                        ];
+                    }
+
+                    return [
+                        'host' => $host,
+                        'rows' => $rows,
+                    ];
+                })
+                ->all(),
+            'serviceRows' => $services
+                ->map(function (BookableService $service) use ($resources): array {
+                    $configured = $service->resourceRequirements
+                        ->keyBy('scheduling_resource_id');
+                    $editableIndex = 0;
+                    $rows = [];
+
+                    foreach ($resources as $resource) {
+                        $row = $configured->get($resource->getKey());
+                        $editable = $row === null
+                            || (bool) $row->getAttribute('crm_editable');
+
+                        $rows[] = [
+                            'resource' => $resource,
+                            'model' => $row,
+                            'editable' => $editable,
+                            'form_index' => $editable ? $editableIndex++ : null,
+                            'active' => (bool) ($row?->is_active ?? false),
+                            'quantity' => $row?->quantity ?? 1,
+                            'sort_order' => $row?->sort_order ?? $resource->sort_order,
+                            'source' => $row?->source ?? 'manual',
+                        ];
+                    }
+
+                    return [
+                        'service' => $service,
+                        'rows' => $rows,
+                    ];
+                })
+                ->all(),
+            'effects' => $effects
+                ->map(fn (array $effect): array => [
+                    ...$effect,
+                    'reason_label' => isset($effect['reason'])
+                        ? ($reasonLabels[$effect['reason']]
+                            ?? str((string) $effect['reason'])->replace('_', ' ')->title())
+                        : null,
+                ])
+                ->all(),
         ]);
     }
 
@@ -283,11 +381,11 @@ class SchedulingResourceController extends Controller
     private function resourceRedirect(string $event): RedirectResponse
     {
         $message = match ($event) {
-            'resource-created' => 'Scheduling resource created.',
-            'resource-updated' => 'Scheduling resource updated.',
-            'host-resources-updated' => 'Host resource capacities updated.',
-            'service-requirements-updated' => 'Service resource requirements updated.',
-            default => 'Scheduling resource configuration updated.',
+            'resource-created' => 'Shared item created.',
+            'resource-updated' => 'Shared item updated.',
+            'host-resources-updated' => 'Staff shared capacity updated.',
+            'service-requirements-updated' => 'Appointment shared-capacity requirements updated.',
+            default => 'Shared-capacity setup updated.',
         };
 
         return redirect()

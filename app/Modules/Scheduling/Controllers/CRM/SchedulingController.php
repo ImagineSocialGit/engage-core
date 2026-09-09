@@ -35,13 +35,19 @@ class SchedulingController extends Controller
         SchedulingReadService $read,
         SchedulingSetupReadiness $setupReadiness,
         SchedulingAvailableStartRangeBuilder $startRanges,
-    ): View {
+    ): View|RedirectResponse {
         $query = $request->validate([
             'contact_id' => ['nullable', 'integer', 'exists:contacts,id'],
             'bookable_service_id' => ['nullable', 'integer'],
             'scheduling_host_id' => ['nullable', 'integer'],
             'date' => ['nullable', 'date_format:Y-m-d'],
         ]);
+        $setupSummary = $setupReadiness->summary();
+
+        if (($setupSummary['has_service'] ?? false) !== true) {
+            return redirect()
+                ->route('crm.scheduling.configuration.services.index');
+        }
 
         $services = $read->activeServices();
         $requestedServiceId = $this->oldOrQueryInteger(
@@ -142,7 +148,7 @@ class SchedulingController extends Controller
             'pendingCount' => $upcomingAppointments
                 ->where('status', Appointment::STATUS_PENDING)
                 ->count(),
-            'setupReadiness' => $setupReadiness->summary(),
+            'setupReadiness' => $setupSummary,
             'selectedContact' => $selectedContact,
             'selectedContactLabel' => $selectedContactLabel,
             'idempotencyKey' => $request->old(

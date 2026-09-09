@@ -1,25 +1,8 @@
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
-    subheading="Configure selective-overlap resources, host capacities, and service requirements."
+    subheading="Use shared-capacity controls only when otherwise separate appointments compete for the same limited room, equipment, vehicle, or facility."
 >
-    @php
-        $resourceStatuses = [
-            \App\Modules\Scheduling\Models\SchedulingResource::STATUS_ACTIVE,
-            \App\Modules\Scheduling\Models\SchedulingResource::STATUS_INACTIVE,
-            \App\Modules\Scheduling\Models\SchedulingResource::STATUS_ARCHIVED,
-        ];
-        $inputClass = 'mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200';
-        $labelClass = 'block text-sm font-medium text-slate-700';
-        $reasonLabels = [
-            'service_inactive' => 'Service is not active',
-            'host_inactive' => 'Host is not active',
-            'resource_inactive' => 'A required resource is not active',
-            'host_capacity_missing' => 'The host lacks an active required capacity',
-            'quantity_exceeds_capacity' => 'A required quantity exceeds host capacity',
-        ];
-    @endphp
-
     <div class="space-y-6" data-scheduling-resource-configuration>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <a
@@ -35,7 +18,7 @@
                 class="inline-flex w-full items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
                 data-scheduling-resource-availability-link
             >
-                Preview availability
+                Review availability
             </a>
         </div>
 
@@ -55,32 +38,64 @@
             </x-ui.feedback.alert>
         @endif
 
+        <x-ui.card class="space-y-5" data-resource-purpose>
+            <div>
+                <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
+                    Advanced
+                </div>
+                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
+                    Do appointments compete for something limited?
+                </h2>
+                <p class="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+                    Most businesses do not need this page. Use it only when two appointments could otherwise happen at the same time but cannot because they share the same limited thing.
+                </p>
+            </div>
+
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                    <div class="font-semibold text-slate-900">One conference room</div>
+                    <div class="mt-1 text-slate-600">Several consultants can work at once, but only one appointment can use the room.</div>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                    <div class="font-semibold text-slate-900">Two courts or work areas</div>
+                    <div class="mt-1 text-slate-600">Multiple staff members can take bookings, but the facility only supports two at a time.</div>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                    <div class="font-semibold text-slate-900">Specialized equipment</div>
+                    <div class="mt-1 text-slate-600">An appointment type needs one machine or device that several staff members share.</div>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                    <div class="font-semibold text-slate-900">Limited vehicles</div>
+                    <div class="mt-1 text-slate-600">Field appointments can overlap only while enough shared vehicles are available.</div>
+                </div>
+            </div>
+
+            <div class="rounded-xl border border-teal-200 bg-teal-50 p-4 text-sm text-teal-900">
+                If none of those situations resemble your business, there is nothing to configure here.
+            </div>
+        </x-ui.card>
+
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <x-ui.card>
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Resources</p>
-                <p class="mt-2 text-3xl font-semibold text-slate-900" data-resource-count="{{ $resources->count() }}">
-                    {{ $resources->count() }}
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Shared items</p>
+                <p class="mt-2 text-3xl font-semibold text-slate-900" data-resource-count="{{ $resourceStats['total'] }}">
+                    {{ $resourceStats['total'] }}
                 </p>
             </x-ui.card>
-
             <x-ui.card>
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Active resources</p>
-                <p class="mt-2 text-3xl font-semibold text-slate-900">
-                    {{ $resources->where('status', \App\Modules\Scheduling\Models\SchedulingResource::STATUS_ACTIVE)->count() }}
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Active shared items</p>
+                <p class="mt-2 text-3xl font-semibold text-slate-900">{{ $resourceStats['active'] }}</p>
+            </x-ui.card>
+            <x-ui.card>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Staff records</p>
+                <p class="mt-2 text-3xl font-semibold text-slate-900" data-resource-host-count="{{ $resourceStats['hosts'] }}">
+                    {{ $resourceStats['hosts'] }}
                 </p>
             </x-ui.card>
-
             <x-ui.card>
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Configured hosts</p>
-                <p class="mt-2 text-3xl font-semibold text-slate-900" data-resource-host-count="{{ $hosts->count() }}">
-                    {{ $hosts->count() }}
-                </p>
-            </x-ui.card>
-
-            <x-ui.card>
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Configured services</p>
-                <p class="mt-2 text-3xl font-semibold text-slate-900" data-resource-service-count="{{ $services->count() }}">
-                    {{ $services->count() }}
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Appointment types</p>
+                <p class="mt-2 text-3xl font-semibold text-slate-900" data-resource-service-count="{{ $resourceStats['services'] }}">
+                    {{ $resourceStats['services'] }}
                 </p>
             </x-ui.card>
         </div>
@@ -88,15 +103,16 @@
         <section class="space-y-5" data-resource-section="identities">
             <div>
                 <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                    Resource identities
+                    Step 1
                 </div>
-                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
-                    Selective-overlap resource definitions
-                </h2>
+                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">What limited thing is being shared?</h2>
+                <p class="mt-1 text-sm text-slate-500">
+                    Create one shared item for each room, equipment pool, vehicle pool, or other capacity that can block overlapping appointments.
+                </p>
             </div>
 
             <x-ui.card class="space-y-4">
-                <h3 class="font-semibold text-slate-900">Create a manual resource</h3>
+                <h3 class="font-semibold text-slate-900">Add a shared item</h3>
 
                 <form
                     method="POST"
@@ -108,12 +124,13 @@
 
                     <label class="{{ $labelClass }}">
                         Key
-                        <input class="{{ $inputClass }}" name="key" value="{{ old('key') }}" required pattern="[a-z0-9]+(?:[-_][a-z0-9]+)*">
+                        <input class="{{ $inputClass }}" name="key" value="{{ old('key') }}" required pattern="[a-z0-9]+(?:[-_][a-z0-9]+)*" placeholder="conference_room">
+                        <span class="mt-1 block text-xs font-normal text-slate-500">Stable internal name; lowercase letters, numbers, dashes, and underscores.</span>
                     </label>
 
                     <label class="{{ $labelClass }}">
                         Name
-                        <input class="{{ $inputClass }}" name="name" value="{{ old('name') }}" required>
+                        <input class="{{ $inputClass }}" name="name" value="{{ old('name') }}" required placeholder="Conference room">
                     </label>
 
                     <label class="{{ $labelClass }}">
@@ -134,316 +151,276 @@
 
                     <div class="md:col-span-2 xl:col-span-4">
                         <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
-                            Create resource
+                            Add shared item
                         </button>
                     </div>
                 </form>
             </x-ui.card>
 
             <div class="grid gap-4 xl:grid-cols-2">
-                @forelse ($resources as $resource)
-                    @php
-                        $resourceEditable = (bool) $resource->getAttribute('crm_editable');
-                    @endphp
-
+                @forelse ($resourceRows as $resourceRow)
                     <div
-                        data-scheduling-resource-id="{{ $resource->id }}"
-                        data-resource-editable="{{ $resourceEditable ? '1' : '0' }}"
+                        data-scheduling-resource-id="{{ $resourceRow['model']->id }}"
+                        data-resource-editable="{{ $resourceRow['editable'] ? '1' : '0' }}"
                     >
                         <x-ui.card class="space-y-4">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
-                                    <h3 class="font-semibold text-slate-900">{{ $resource->name }}</h3>
-                                    <p class="mt-1 font-mono text-xs text-slate-500">{{ $resource->key }}</p>
+                                    <h3 class="font-semibold text-slate-900">{{ $resourceRow['model']->name }}</h3>
+                                    <p class="mt-1 font-mono text-xs text-slate-500">{{ $resourceRow['model']->key }}</p>
                                 </div>
                                 <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                    {{ str($resource->status)->replace('_', ' ')->title() }}
+                                    {{ str($resourceRow['model']->status)->replace('_', ' ')->title() }}
                                 </span>
                             </div>
 
-                            <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-4">
+                            <dl class="grid gap-3 text-sm sm:grid-cols-3">
                                 <div>
-                                    <dt class="text-slate-500">Source</dt>
-                                    <dd class="font-medium text-slate-900">{{ $resource->source }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-slate-500">Active host capacities</dt>
-                                    <dd class="font-medium text-slate-900" data-resource-active-host-count="{{ $resource->active_host_capacities_count }}">
-                                        {{ $resource->active_host_capacities_count }}
+                                    <dt class="text-slate-500">Staff capacities</dt>
+                                    <dd class="font-medium text-slate-900" data-resource-active-host-count="{{ $resourceRow['model']->active_host_capacities_count }}">
+                                        {{ $resourceRow['model']->active_host_capacities_count }}
                                     </dd>
                                 </div>
                                 <div>
-                                    <dt class="text-slate-500">Active requirements</dt>
-                                    <dd class="font-medium text-slate-900" data-resource-active-requirement-count="{{ $resource->active_service_requirements_count }}">
-                                        {{ $resource->active_service_requirements_count }}
+                                    <dt class="text-slate-500">Appointment requirements</dt>
+                                    <dd class="font-medium text-slate-900" data-resource-active-requirement-count="{{ $resourceRow['model']->active_service_requirements_count }}">
+                                        {{ $resourceRow['model']->active_service_requirements_count }}
                                     </dd>
                                 </div>
                                 <div>
-                                    <dt class="text-slate-500">Committed snapshots</dt>
-                                    <dd class="font-medium text-slate-900" data-resource-occupancy-count="{{ $resource->occupancies_count }}">
-                                        {{ $resource->occupancies_count }}
+                                    <dt class="text-slate-500">Committed bookings</dt>
+                                    <dd class="font-medium text-slate-900" data-resource-occupancy-count="{{ $resourceRow['model']->occupancies_count }}">
+                                        {{ $resourceRow['model']->occupancies_count }}
                                     </dd>
                                 </div>
                             </dl>
 
-                            @if ($resourceEditable)
+                            @if ($resourceRow['editable'])
                                 <form
                                     method="POST"
-                                    action="{{ route('crm.scheduling.configuration.resources.update', $resource) }}"
-                                    class="grid gap-4 sm:grid-cols-3"
-                                    data-resource-update="{{ $resource->id }}"
+                                    action="{{ route('crm.scheduling.configuration.resources.update', $resourceRow['model']) }}"
+                                    class="grid gap-3 sm:grid-cols-3"
                                 >
                                     @csrf
                                     @method('PATCH')
-                                    <input type="hidden" name="current_version" value="{{ $resource->updated_at?->toISOString() }}">
+                                    <input type="hidden" name="current_version" value="{{ $resourceRow['model']->updated_at?->toISOString() }}">
 
                                     <label class="{{ $labelClass }} sm:col-span-2">
                                         Name
-                                        <input class="{{ $inputClass }}" name="name" value="{{ $resource->name }}" required>
+                                        <input class="{{ $inputClass }}" name="name" value="{{ $resourceRow['model']->name }}" required>
                                     </label>
-
                                     <label class="{{ $labelClass }}">
                                         Status
                                         <select class="{{ $inputClass }}" name="status" required>
                                             @foreach ($resourceStatuses as $status)
-                                                <option value="{{ $status }}" @selected($resource->status === $status)>
+                                                <option value="{{ $status }}" @selected($resourceRow['model']->status === $status)>
                                                     {{ str($status)->replace('_', ' ')->title() }}
                                                 </option>
                                             @endforeach
                                         </select>
                                     </label>
-
                                     <label class="{{ $labelClass }}">
                                         Sort order
-                                        <input class="{{ $inputClass }}" type="number" min="0" max="100000" name="sort_order" value="{{ $resource->sort_order }}" required>
+                                        <input class="{{ $inputClass }}" type="number" min="0" max="100000" name="sort_order" value="{{ $resourceRow['model']->sort_order }}" required>
                                     </label>
-
                                     <div class="sm:col-span-3">
-                                        <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
-                                            Save resource
+                                        <button type="submit" class="inline-flex rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+                                            Save shared item
                                         </button>
                                     </div>
                                 </form>
                             @else
-                                <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600" data-resource-read-only="{{ $resource->id }}">
-                                    This resource is controlled outside the manual CRM configuration boundary.
-                                </div>
+                                <p class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                                    This shared item is managed externally and is read-only here.
+                                </p>
                             @endif
                         </x-ui.card>
                     </div>
                 @empty
                     <x-ui.card>
-                        <p class="text-sm text-slate-500">No resource identities are configured.</p>
+                        <p class="text-sm text-slate-500">No shared items are configured. If appointments do not compete for anything limited, leave this page empty.</p>
                     </x-ui.card>
                 @endforelse
             </div>
         </section>
 
-        <section class="space-y-5" data-resource-section="host-capacities">
+        <section class="space-y-5" data-resource-section="host_capacities">
             <div>
                 <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                    Host capacities
+                    Step 2
                 </div>
-                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
-                    Resource units owned by each host
-                </h2>
+                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">How much shared capacity can each staff member use?</h2>
+                <p class="mt-1 text-sm text-slate-500">
+                    Example: if a trainer can supervise two courts at once, give that trainer a capacity of 2 for the Courts shared item.
+                </p>
             </div>
 
-            <div class="space-y-4">
-                @forelse ($hosts as $host)
-                    @php
-                        $hostRows = $host->getRelation('resourceCapacities')->keyBy('scheduling_resource_id');
-                        $editableResourceIndex = 0;
-                    @endphp
-
-                    <x-ui.card class="space-y-4" data-resource-host-id="{{ $host->id }}">
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <h3 class="font-semibold text-slate-900">{{ $host->name }}</h3>
-                                <p class="mt-1 font-mono text-xs text-slate-500">{{ $host->key }}</p>
-                            </div>
-                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                {{ str($host->status)->replace('_', ' ')->title() }}
-                            </span>
+            <div class="grid gap-4 xl:grid-cols-2">
+                @forelse ($hostRows as $hostRow)
+                    <x-ui.card class="space-y-4" data-resource-host-id="{{ $hostRow['host']->id }}">
+                        <div>
+                            <h3 class="font-semibold text-slate-900">{{ $hostRow['host']->name }}</h3>
+                            <p class="mt-1 text-sm text-slate-500">{{ str($hostRow['host']->status)->replace('_', ' ')->title() }}</p>
                         </div>
 
-                        <form
-                            method="POST"
-                            action="{{ route('crm.scheduling.configuration.resources.hosts.update', $host) }}"
-                            class="space-y-3"
-                            data-resource-host-form="{{ $host->id }}"
-                        >
-                            @csrf
-                            @method('PUT')
-                            <input type="hidden" name="current_version" value="{{ $host->updated_at?->toISOString() }}">
+                        @if ($resources->isEmpty())
+                            <p class="text-sm text-slate-500">Add a shared item first.</p>
+                        @else
+                            <form
+                                method="POST"
+                                action="{{ route('crm.scheduling.configuration.resources.hosts.update', $hostRow['host']) }}"
+                                class="space-y-3"
+                                data-resource-host-form="{{ $hostRow['host']->id }}"
+                            >
+                                @csrf
+                                @method('PUT')
+                                <input type="hidden" name="current_version" value="{{ $hostRow['host']->updated_at?->toISOString() }}">
 
-                            <div class="overflow-x-auto">
-                                <table class="min-w-[680px] divide-y divide-slate-200 text-sm">
-                                    <thead>
-                                        <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                            <th class="px-3 py-2">Resource</th>
-                                            <th class="px-3 py-2">Active</th>
-                                            <th class="px-3 py-2">Capacity</th>
-                                            <th class="px-3 py-2">Sort</th>
-                                            <th class="px-3 py-2">Ownership</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-100">
-                                        @foreach ($resources as $resource)
-                                            @php
-                                                $row = $hostRows->get($resource->id);
-                                                $rowEditable = ! $row || (bool) $row->getAttribute('crm_editable');
-                                                $active = $row?->is_active ?? false;
-                                            @endphp
-                                            <tr data-host-resource-row="{{ $host->id }}:{{ $resource->id }}">
-                                                <td class="px-3 py-3">
-                                                    <div class="font-medium text-slate-900">{{ $resource->name }}</div>
-                                                    <div class="font-mono text-xs text-slate-500">{{ $resource->key }}</div>
-                                                </td>
-                                                @if ($rowEditable)
-                                                    <td class="px-3 py-3">
-                                                        <input type="hidden" name="resources[{{ $editableResourceIndex }}][scheduling_resource_id]" value="{{ $resource->id }}">
-                                                        <input type="hidden" name="resources[{{ $editableResourceIndex }}][is_active]" value="0">
-                                                        <input
-                                                            type="checkbox"
-                                                            name="resources[{{ $editableResourceIndex }}][is_active]"
-                                                            value="1"
-                                                            @checked($active)
-                                                        >
-                                                    </td>
-                                                    <td class="px-3 py-3">
-                                                        <input class="w-28 rounded-lg border border-slate-300 px-2 py-1.5" type="number" min="1" max="100000" name="resources[{{ $editableResourceIndex }}][capacity]" value="{{ $row?->capacity ?? 1 }}">
-                                                    </td>
-                                                    <td class="px-3 py-3">
-                                                        <input class="w-24 rounded-lg border border-slate-300 px-2 py-1.5" type="number" min="0" max="100000" name="resources[{{ $editableResourceIndex }}][sort_order]" value="{{ $row?->sort_order ?? $resource->sort_order }}" required>
-                                                    </td>
-                                                    <td class="px-3 py-3 text-slate-500">{{ $row?->source ?? 'manual' }}</td>
-                                                    @php $editableResourceIndex++; @endphp
-                                                @else
-                                                    <td class="px-3 py-3 font-medium text-slate-900">{{ $active ? 'Yes' : 'No' }}</td>
-                                                    <td class="px-3 py-3 font-medium text-slate-900">{{ $row->capacity }}</td>
-                                                    <td class="px-3 py-3 font-medium text-slate-900">{{ $row->sort_order }}</td>
-                                                    <td class="px-3 py-3 text-slate-500" data-host-resource-read-only="{{ $row->id }}">{{ $row->source }}</td>
-                                                @endif
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-[640px] divide-y divide-slate-200 text-sm">
+                                        <thead>
+                                            <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                <th class="px-3 py-2">Shared item</th>
+                                                <th class="px-3 py-2">Uses it</th>
+                                                <th class="px-3 py-2">Capacity</th>
+                                                <th class="px-3 py-2">Ownership</th>
                                             </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-100">
+                                            @foreach ($hostRow['rows'] as $row)
+                                                <tr data-host-resource-row="{{ $hostRow['host']->id }}:{{ $row['resource']->id }}">
+                                                    <td class="px-3 py-3">
+                                                        <div class="font-medium text-slate-900">{{ $row['resource']->name }}</div>
+                                                        <div class="font-mono text-xs text-slate-500">{{ $row['resource']->key }}</div>
+                                                    </td>
 
-                            <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
-                                Save host capacities
-                            </button>
-                        </form>
+                                                    @if ($row['editable'])
+                                                        <td class="px-3 py-3">
+                                                            <input type="hidden" name="resources[{{ $row['form_index'] }}][scheduling_resource_id]" value="{{ $row['resource']->id }}">
+                                                            <input type="hidden" name="resources[{{ $row['form_index'] }}][is_active]" value="0">
+                                                            <input
+                                                                type="checkbox"
+                                                                name="resources[{{ $row['form_index'] }}][is_active]"
+                                                                value="1"
+                                                                @checked($row['active'])
+                                                            >
+                                                        </td>
+                                                        <td class="px-3 py-3">
+                                                            <input class="w-28 rounded-lg border border-slate-300 px-2 py-1.5" type="number" min="1" max="100000" name="resources[{{ $row['form_index'] }}][capacity]" value="{{ $row['capacity'] }}">
+                                                            <input type="hidden" name="resources[{{ $row['form_index'] }}][sort_order]" value="{{ $row['sort_order'] }}">
+                                                        </td>
+                                                        <td class="px-3 py-3 text-slate-500">{{ $row['source'] }}</td>
+                                                    @else
+                                                        <td class="px-3 py-3 font-medium text-slate-900">{{ $row['active'] ? 'Yes' : 'No' }}</td>
+                                                        <td class="px-3 py-3 font-medium text-slate-900">{{ $row['capacity'] }}</td>
+                                                        <td class="px-3 py-3 text-slate-500" data-host-resource-read-only="{{ $row['model']->id }}">{{ $row['source'] }}</td>
+                                                    @endif
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
+                                    Save staff capacity
+                                </button>
+                            </form>
+                        @endif
                     </x-ui.card>
                 @empty
                     <x-ui.card>
-                        <p class="text-sm text-slate-500">Create a scheduling host before assigning resource capacity.</p>
+                        <p class="text-sm text-slate-500">Add Scheduling staff before assigning person-specific shared capacity.</p>
                     </x-ui.card>
                 @endforelse
             </div>
         </section>
 
-        <section class="space-y-5" data-resource-section="service-requirements">
+        <section class="space-y-5" data-resource-section="service_requirements">
             <div>
                 <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                    Service requirements
+                    Step 3
                 </div>
-                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
-                    Resource units consumed by one Appointment
-                </h2>
+                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">What does each appointment type require?</h2>
+                <p class="mt-1 text-sm text-slate-500">
+                    Example: a Consultation might require one Conference room, while a Training session might require two Courts.
+                </p>
             </div>
 
-            <div class="space-y-4">
-                @forelse ($services as $service)
-                    @php
-                        $serviceRows = $service->getRelation('resourceRequirements')->keyBy('scheduling_resource_id');
-                        $editableResourceIndex = 0;
-                    @endphp
-
-                    <x-ui.card class="space-y-4" data-resource-service-id="{{ $service->id }}">
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <h3 class="font-semibold text-slate-900">{{ $service->name }}</h3>
-                                <p class="mt-1 font-mono text-xs text-slate-500">{{ $service->key }}</p>
-                            </div>
-                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                {{ str($service->status)->replace('_', ' ')->title() }}
-                            </span>
+            <div class="grid gap-4 xl:grid-cols-2">
+                @forelse ($serviceRows as $serviceRow)
+                    <x-ui.card class="space-y-4" data-resource-service-id="{{ $serviceRow['service']->id }}">
+                        <div>
+                            <h3 class="font-semibold text-slate-900">{{ $serviceRow['service']->name }}</h3>
+                            <p class="mt-1 text-sm text-slate-500">{{ str($serviceRow['service']->status)->replace('_', ' ')->title() }}</p>
                         </div>
 
-                        <form
-                            method="POST"
-                            action="{{ route('crm.scheduling.configuration.resources.services.update', $service) }}"
-                            class="space-y-3"
-                            data-resource-service-form="{{ $service->id }}"
-                        >
-                            @csrf
-                            @method('PUT')
-                            <input type="hidden" name="current_version" value="{{ $service->updated_at?->toISOString() }}">
+                        @if ($resources->isEmpty())
+                            <p class="text-sm text-slate-500">Add a shared item first.</p>
+                        @else
+                            <form
+                                method="POST"
+                                action="{{ route('crm.scheduling.configuration.resources.services.update', $serviceRow['service']) }}"
+                                class="space-y-3"
+                                data-resource-service-form="{{ $serviceRow['service']->id }}"
+                            >
+                                @csrf
+                                @method('PUT')
+                                <input type="hidden" name="current_version" value="{{ $serviceRow['service']->updated_at?->toISOString() }}">
 
-                            <div class="overflow-x-auto">
-                                <table class="min-w-[680px] divide-y divide-slate-200 text-sm">
-                                    <thead>
-                                        <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                            <th class="px-3 py-2">Resource</th>
-                                            <th class="px-3 py-2">Required</th>
-                                            <th class="px-3 py-2">Quantity</th>
-                                            <th class="px-3 py-2">Sort</th>
-                                            <th class="px-3 py-2">Ownership</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-100">
-                                        @foreach ($resources as $resource)
-                                            @php
-                                                $row = $serviceRows->get($resource->id);
-                                                $rowEditable = ! $row || (bool) $row->getAttribute('crm_editable');
-                                                $active = $row?->is_active ?? false;
-                                            @endphp
-                                            <tr data-service-resource-row="{{ $service->id }}:{{ $resource->id }}">
-                                                <td class="px-3 py-3">
-                                                    <div class="font-medium text-slate-900">{{ $resource->name }}</div>
-                                                    <div class="font-mono text-xs text-slate-500">{{ $resource->key }}</div>
-                                                </td>
-                                                @if ($rowEditable)
-                                                    <td class="px-3 py-3">
-                                                        <input type="hidden" name="resources[{{ $editableResourceIndex }}][scheduling_resource_id]" value="{{ $resource->id }}">
-                                                        <input type="hidden" name="resources[{{ $editableResourceIndex }}][is_active]" value="0">
-                                                        <input
-                                                            type="checkbox"
-                                                            name="resources[{{ $editableResourceIndex }}][is_active]"
-                                                            value="1"
-                                                            @checked($active)
-                                                        >
-                                                    </td>
-                                                    <td class="px-3 py-3">
-                                                        <input class="w-28 rounded-lg border border-slate-300 px-2 py-1.5" type="number" min="1" max="100000" name="resources[{{ $editableResourceIndex }}][quantity]" value="{{ $row?->quantity ?? 1 }}">
-                                                    </td>
-                                                    <td class="px-3 py-3">
-                                                        <input class="w-24 rounded-lg border border-slate-300 px-2 py-1.5" type="number" min="0" max="100000" name="resources[{{ $editableResourceIndex }}][sort_order]" value="{{ $row?->sort_order ?? $resource->sort_order }}" required>
-                                                    </td>
-                                                    <td class="px-3 py-3 text-slate-500">{{ $row?->source ?? 'manual' }}</td>
-                                                    @php $editableResourceIndex++; @endphp
-                                                @else
-                                                    <td class="px-3 py-3 font-medium text-slate-900">{{ $active ? 'Yes' : 'No' }}</td>
-                                                    <td class="px-3 py-3 font-medium text-slate-900">{{ $row->quantity }}</td>
-                                                    <td class="px-3 py-3 font-medium text-slate-900">{{ $row->sort_order }}</td>
-                                                    <td class="px-3 py-3 text-slate-500" data-service-resource-read-only="{{ $row->id }}">{{ $row->source }}</td>
-                                                @endif
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-[640px] divide-y divide-slate-200 text-sm">
+                                        <thead>
+                                            <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                <th class="px-3 py-2">Shared item</th>
+                                                <th class="px-3 py-2">Required</th>
+                                                <th class="px-3 py-2">Quantity</th>
+                                                <th class="px-3 py-2">Ownership</th>
                                             </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-100">
+                                            @foreach ($serviceRow['rows'] as $row)
+                                                <tr data-service-resource-row="{{ $serviceRow['service']->id }}:{{ $row['resource']->id }}">
+                                                    <td class="px-3 py-3">
+                                                        <div class="font-medium text-slate-900">{{ $row['resource']->name }}</div>
+                                                        <div class="font-mono text-xs text-slate-500">{{ $row['resource']->key }}</div>
+                                                    </td>
 
-                            <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
-                                Save service requirements
-                            </button>
-                        </form>
+                                                    @if ($row['editable'])
+                                                        <td class="px-3 py-3">
+                                                            <input type="hidden" name="resources[{{ $row['form_index'] }}][scheduling_resource_id]" value="{{ $row['resource']->id }}">
+                                                            <input type="hidden" name="resources[{{ $row['form_index'] }}][is_active]" value="0">
+                                                            <input
+                                                                type="checkbox"
+                                                                name="resources[{{ $row['form_index'] }}][is_active]"
+                                                                value="1"
+                                                                @checked($row['active'])
+                                                            >
+                                                        </td>
+                                                        <td class="px-3 py-3">
+                                                            <input class="w-28 rounded-lg border border-slate-300 px-2 py-1.5" type="number" min="1" max="100000" name="resources[{{ $row['form_index'] }}][quantity]" value="{{ $row['quantity'] }}">
+                                                            <input type="hidden" name="resources[{{ $row['form_index'] }}][sort_order]" value="{{ $row['sort_order'] }}">
+                                                        </td>
+                                                        <td class="px-3 py-3 text-slate-500">{{ $row['source'] }}</td>
+                                                    @else
+                                                        <td class="px-3 py-3 font-medium text-slate-900">{{ $row['active'] ? 'Yes' : 'No' }}</td>
+                                                        <td class="px-3 py-3 font-medium text-slate-900">{{ $row['quantity'] }}</td>
+                                                        <td class="px-3 py-3 text-slate-500" data-service-resource-read-only="{{ $row['model']->id }}">{{ $row['source'] }}</td>
+                                                    @endif
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
+                                    Save appointment requirements
+                                </button>
+                            </form>
+                        @endif
                     </x-ui.card>
                 @empty
                     <x-ui.card>
-                        <p class="text-sm text-slate-500">Create a bookable service before assigning resource requirements.</p>
+                        <p class="text-sm text-slate-500">Create an appointment type before assigning shared requirements.</p>
                     </x-ui.card>
                 @endforelse
             </div>
@@ -452,40 +429,44 @@
         <section class="space-y-5" data-resource-section="effects">
             <div>
                 <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                    Live effects
+                    Booking effect
                 </div>
-                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
-                    Configured resource result by active service-host assignment
-                </h2>
+                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">How these limits affect booking</h2>
+                <p class="mt-1 text-sm text-slate-500">
+                    This shows whether each active appointment-type/staff pairing has enough shared capacity to offer times.
+                </p>
             </div>
 
             <div class="grid gap-4 xl:grid-cols-2">
                 @forelse ($effects as $effect)
-                    <x-ui.card class="space-y-3" data-resource-effect="{{ $effect['service_id'] }}:{{ $effect['host_id'] }}" data-resource-effect-state="{{ $effect['state'] }}">
+                    <x-ui.card
+                        class="space-y-3"
+                        data-resource-effect="{{ $effect['service_id'] }}:{{ $effect['host_id'] }}"
+                        data-resource-effect-state="{{ $effect['state'] }}"
+                    >
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h3 class="font-semibold text-slate-900">{{ $effect['service_name'] }}</h3>
                                 <p class="mt-1 text-sm text-slate-500">{{ $effect['host_name'] }}</p>
                             </div>
+
                             @if ($effect['state'] === 'available')
                                 <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800" data-resource-effect-ceiling="{{ $effect['resource_ceiling'] }}">
-                                    {{ $effect['resource_ceiling'] }} concurrent by resources
+                                    Up to {{ $effect['resource_ceiling'] }} at once by shared capacity
                                 </span>
                             @elseif ($effect['state'] === 'no_limit')
                                 <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                    No resource requirement
+                                    No shared limit
                                 </span>
                             @else
-                                <span class="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-800" data-resource-effect-reason="{{ $effect['reason'] }}">
-                                    Closed
+                                <span class="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800" data-resource-effect-reason="{{ $effect['reason'] }}">
+                                    Cannot book
                                 </span>
                             @endif
                         </div>
 
                         @if ($effect['state'] === 'closed')
-                            <p class="text-sm text-rose-700">
-                                {{ $reasonLabels[$effect['reason']] ?? str($effect['reason'])->replace('_', ' ')->title() }}
-                            </p>
+                            <p class="text-sm text-red-700">{{ $effect['reason_label'] }}</p>
                         @endif
 
                         @if ($effect['requirements'] !== [])
@@ -493,16 +474,16 @@
                                 @foreach ($effect['requirements'] as $requirement)
                                     <div class="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 px-3 py-2 sm:grid-cols-4" data-resource-effect-requirement="{{ $requirement['resource_id'] }}">
                                         <div class="col-span-2">
-                                            <dt class="text-slate-500">Resource</dt>
+                                            <dt class="text-slate-500">Shared item</dt>
                                             <dd class="font-medium text-slate-900">{{ $requirement['resource_name'] ?? $requirement['resource_key'] }}</dd>
                                         </div>
                                         <div>
-                                            <dt class="text-slate-500">Host / required</dt>
-                                            <dd class="font-medium text-slate-900">{{ $requirement['host_capacity'] }} / {{ $requirement['quantity'] }}</dd>
+                                            <dt class="text-slate-500">Needed</dt>
+                                            <dd class="font-medium text-slate-900">{{ $requirement['quantity'] }}</dd>
                                         </div>
                                         <div>
-                                            <dt class="text-slate-500">Ceiling</dt>
-                                            <dd class="font-medium text-slate-900">{{ $requirement['ceiling'] }}</dd>
+                                            <dt class="text-slate-500">Available</dt>
+                                            <dd class="font-medium text-slate-900">{{ $requirement['host_capacity'] ?? 'None' }}</dd>
                                         </div>
                                     </div>
                                 @endforeach
@@ -511,7 +492,7 @@
                     </x-ui.card>
                 @empty
                     <x-ui.card>
-                        <p class="text-sm text-slate-500">No active service-host assignments are available for a resource-effect summary.</p>
+                        <p class="text-sm text-slate-500">No active appointment-type/staff pairings are available for a shared-capacity summary.</p>
                     </x-ui.card>
                 @endforelse
             </div>

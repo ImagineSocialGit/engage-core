@@ -1345,7 +1345,9 @@
 │   │   │   │   ├── SchedulingLocationSnapshotResolver.php
 │   │   │   │   ├── SchedulingReadService.php
 │   │   │   │   ├── SchedulingResourceConfigurationWriter.php
-│   │   │   │   └── SchedulingSetupReadiness.php
+│   │   │   │   ├── SchedulingSetupProgress.php
+│   │   │   │   ├── SchedulingSetupReadiness.php
+│   │   │   │   └── SchedulingUserHostSynchronizer.php
 │   │   │   ├── Support
 │   │   │   └── Validation
 │   │   │       └── SchedulingSetupValidationContributor.php
@@ -1799,11 +1801,12 @@
 │   │   │   │   ├── InboundMessaging
 │   │   │   │   │   ├── InboundMessageNotificationRecipientResolver.php
 │   │   │   │   │   └── ScheduleInboundMessageInternalNotification.php
-│   │   │   │   └── Tasks
-│   │   │   │       ├── InternalNotificationTaskScheduler.php
-│   │   │   │       ├── OnlyActiveTeamMemberTaskAssignmentStrategyResolver.php
-│   │   │   │       ├── TeamMemberTaskAssignedRecipientResolver.php
-│   │   │   │       └── TeamMemberTaskAssigneeOptionProvider.php
+│   │   │   │   ├── Tasks
+│   │   │   │   │   ├── InternalNotificationTaskScheduler.php
+│   │   │   │   │   ├── OnlyActiveTeamMemberTaskAssignmentStrategyResolver.php
+│   │   │   │   │   ├── TeamMemberTaskAssignedRecipientResolver.php
+│   │   │   │   │   └── TeamMemberTaskAssigneeOptionProvider.php
+│   │   │   │   └── UserTeamMemberBridge.php
 │   │   │   ├── Messaging
 │   │   │   │   ├── Contracts
 │   │   │   │   │   └── MessageMediaLibrary.php
@@ -2688,6 +2691,8 @@
 │       │   │   ├── configuration.blade.php
 │       │   │   ├── contact-panel.blade.php
 │       │   │   ├── index.blade.php
+│       │   │   ├── partials
+│       │   │   │   └── setup-progress.blade.php
 │       │   │   ├── reschedule.blade.php
 │       │   │   ├── resources.blade.php
 │       │   │   ├── services
@@ -3294,6 +3299,7 @@
 │   │   │   ├── SchedulingDeploymentPlanContributorTest.php
 │   │   │   ├── SchedulingDestinationVerificationMessagingBridgeTest.php
 │   │   │   ├── SchedulingFoundationTest.php
+│   │   │   ├── SchedulingGuidedSetupUxTest.php
 │   │   │   ├── SchedulingHostAndServiceFoundationTest.php
 │   │   │   ├── SchedulingLocalDateTimeResolverTest.php
 │   │   │   ├── SchedulingLocationSnapshotRuntimeTest.php
@@ -3301,6 +3307,7 @@
 │   │   │   ├── SchedulingResourceConfigurationWorkspaceTest.php
 │   │   │   ├── SchedulingServiceWorkspaceTest.php
 │   │   │   ├── SchedulingSetupReadinessTest.php
+│   │   │   ├── SchedulingUserHostIdentityBridgeTest.php
 │   │   │   ├── SchedulingWorkspaceTest.php
 │   │   │   └── TravelAwareAvailabilityTest.php
 │   │   ├── SetupValidation
@@ -3441,4 +3448,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-816 directories, 2626 files
+817 directories, 2632 files

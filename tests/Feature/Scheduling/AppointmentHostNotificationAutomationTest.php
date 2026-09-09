@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Scheduling;
 
+use App\Models\User;
 use App\Modules\InternalNotifications\Actions\ScheduleInternalNotificationAction;
 use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\Messaging\Models\ScheduledMessage;
@@ -22,10 +23,17 @@ class AppointmentHostNotificationAutomationTest extends TestCase
 
     public function test_notification_is_scheduled_for_host_relative_to_start(): void
     {
-        $teamMember = TeamMember::factory()->create(['email' => 'host@example.com', 'is_active' => true]);
+        $hostUser = User::factory()->create([
+            'name' => 'Appointment Host',
+            'email' => 'host@example.com',
+        ]);
+        $teamMember = TeamMember::factory()->forUser($hostUser)->create([
+            'email' => 'host@example.com',
+            'is_active' => true,
+        ]);
         $host = SchedulingHost::factory()->create([
-            'hostable_type' => $teamMember->getMorphClass(),
-            'hostable_id' => $teamMember->getKey(),
+            'hostable_type' => $hostUser->getMorphClass(),
+            'hostable_id' => $hostUser->getKey(),
         ]);
         $appointment = Appointment::factory()->create([
             'scheduling_host_id' => $host->getKey(),

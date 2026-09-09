@@ -321,6 +321,20 @@ class BookableService extends Model
         };
     }
 
+    public function slotStartAnchorTime(): string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $value = data_get($meta, 'availability.slot_start_anchor_time');
+
+        if (! is_string($value)
+            || preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $value) !== 1
+        ) {
+            return '09:00';
+        }
+
+        return $value;
+    }
+
     protected function casts(): array
     {
         return [

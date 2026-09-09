@@ -2,11 +2,12 @@
 
 namespace App\Support\ModuleIntegrations\Scheduling\Automation;
 
+use App\Models\User;
 use App\Modules\InternalNotifications\Actions\ScheduleInternalNotificationAction;
-use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\InternalNotifications\Services\InternalNotificationRecipient;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Scheduling\Models\Appointment;
+use App\Support\ModuleIntegrations\InternalNotifications\UserTeamMemberBridge;
 use Illuminate\Support\Carbon;
 
 class AppointmentHostNotificationScheduler
@@ -15,14 +16,21 @@ class AppointmentHostNotificationScheduler
 
     public function __construct(
         private readonly ScheduleInternalNotificationAction $scheduleInternalNotification,
+        private readonly UserTeamMemberBridge $teamMembers,
     ) {}
 
     public function schedule(Appointment $appointment, array $definition, ?int $flowRoutePointId): ?ScheduledMessage
     {
         $appointment->loadMissing(['schedulingHost.hostable', 'contact']);
-        $host = $appointment->schedulingHost?->hostable;
+        $hostUser = $appointment->schedulingHost?->hostable;
 
-        if (! $host instanceof TeamMember || ! $host->is_active || $appointment->starts_at === null) {
+        if (! $hostUser instanceof User || $appointment->starts_at === null) {
+            return null;
+        }
+
+        $teamMember = $this->teamMembers->resolveActive($hostUser);
+
+        if ($teamMember === null) {
             return null;
         }
 
@@ -44,12 +52,12 @@ class AppointmentHostNotificationScheduler
 
         return $this->scheduleInternalNotification->handle(
             recipient: new InternalNotificationRecipient(
-                source: $host,
-                name: trim((string) $host->name) ?: ($host->email ?: 'Appointment host'),
-                email: $host->email,
-                phone: $host->phone,
+                source: $teamMember,
+                name: trim((string) $teamMember->name) ?: ($teamMember->email ?: 'Appointment host'),
+                email: $teamMember->email,
+                phone: $teamMember->phone,
                 notificationType: self::NOTIFICATION_TYPE,
-                preferenceOwner: $host,
+                preferenceOwner: $teamMember,
             ),
             scope: 'appointment_host_reminders',
             messageType: self::NOTIFICATION_TYPE,

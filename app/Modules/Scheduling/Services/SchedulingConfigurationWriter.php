@@ -2,6 +2,8 @@
 
 namespace App\Modules\Scheduling\Services;
 
+use App\Models\User;
+use App\Modules\Core\Access\Services\UserAccessService;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookableServiceHost;
 use App\Modules\Scheduling\Models\SchedulingHost;
@@ -17,19 +19,25 @@ class SchedulingConfigurationWriter
 {
     public function __construct(
         private readonly SchedulingLocationSnapshotResolver $locationSnapshots,
+        private readonly UserAccessService $access,
     ) {}
 
     /**
      * @param array<string, mixed> $attributes
      */
-    public function createHost(array $attributes): SchedulingHost
+    public function createHost(User $user, array $attributes): SchedulingHost
     {
-        return DB::transaction(function () use ($attributes): SchedulingHost {
+        return DB::transaction(function () use ($user, $attributes): SchedulingHost {
+            $this->assertUserCanHost($user, $attributes);
+            $this->assertUserNotAlreadyBound($user);
+
             return SchedulingHost::query()->create([
                 'key' => $this->requiredKey($attributes['key'] ?? null),
                 ...$this->hostAttributes($attributes),
-                'hostable_type' => null,
-                'hostable_id' => null,
+                ...$this->userIdentityAttributes($user),
+                'phone' => null,
+                'hostable_type' => $user->getMorphClass(),
+                'hostable_id' => $user->getKey(),
                 'source' => SchedulingHost::SOURCE_MANUAL,
                 'meta' => null,
             ])->refresh();
@@ -41,11 +49,13 @@ class SchedulingConfigurationWriter
      */
     public function updateHost(
         SchedulingHost $host,
+        User $user,
         array $attributes,
         string $expectedUpdatedAt,
     ): SchedulingHost {
         return DB::transaction(function () use (
             $host,
+            $user,
             $attributes,
             $expectedUpdatedAt,
         ): SchedulingHost {
@@ -57,8 +67,16 @@ class SchedulingConfigurationWriter
             $this->assertHostEditable($locked);
             $this->assertFresh($locked, $expectedUpdatedAt, 'Scheduling host');
             $this->assertImmutableKey($locked, $attributes);
+            $this->assertHostIdentityAssignable($locked, $user);
+            $this->assertUserCanHost($user, $attributes);
+            $this->assertUserNotAlreadyBound($user, $locked);
 
-            $locked->forceFill($this->hostAttributes($attributes));
+            $locked->forceFill([
+                ...$this->hostAttributes($attributes),
+                ...$this->userIdentityAttributes($user),
+                'hostable_type' => $user->getMorphClass(),
+                'hostable_id' => $user->getKey(),
+            ]);
             $this->saveWithVersionBump($locked);
 
             return $locked->refresh();
@@ -78,7 +96,11 @@ class SchedulingConfigurationWriter
                 'provider' => null,
                 'external_id' => null,
                 'external_url' => null,
-                'meta' => null,
+                'meta' => [
+                    'availability' => [
+                        'slot_start_anchor_time' => '09:00',
+                    ],
+                ],
             ])->refresh();
         });
     }
@@ -108,6 +130,58 @@ class SchedulingConfigurationWriter
             $locked->forceFill(
                 $this->serviceAttributes($attributes, $locked),
             );
+            $this->saveWithVersionBump($locked);
+
+            return $locked->refresh();
+        });
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     */
+    public function updateAvailabilityPolicy(
+        BookableService $service,
+        array $attributes,
+        string $expectedUpdatedAt,
+    ): BookableService {
+        return DB::transaction(function () use (
+            $service,
+            $attributes,
+            $expectedUpdatedAt,
+        ): BookableService {
+            $locked = BookableService::withTrashed()
+                ->whereKey($service->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->assertServiceEditable($locked);
+            $this->assertFresh($locked, $expectedUpdatedAt, 'Bookable service');
+
+            $meta = is_array($locked->meta) ? $locked->meta : [];
+            data_set(
+                $meta,
+                'availability.slot_start_anchor_time',
+                $this->clockTime(
+                    $attributes['slot_start_anchor_time'] ?? null,
+                    'start-time pattern anchor',
+                ),
+            );
+
+            $locked->forceFill([
+                'slot_interval_minutes' => $this->positiveInteger(
+                    $attributes['slot_interval_minutes'] ?? null,
+                    'slot interval',
+                ),
+                'buffer_before_minutes' => $this->nonNegativeInteger(
+                    $attributes['buffer_before_minutes'] ?? 0,
+                    'buffer before',
+                ),
+                'buffer_after_minutes' => $this->nonNegativeInteger(
+                    $attributes['buffer_after_minutes'] ?? 0,
+                    'buffer after',
+                ),
+                'meta' => $meta,
+            ]);
             $this->saveWithVersionBump($locked);
 
             return $locked->refresh();
@@ -220,10 +294,16 @@ class SchedulingConfigurationWriter
 
     public function hostIsEditable(SchedulingHost $host): bool
     {
-        return ! $host->trashed()
-            && $host->source === SchedulingHost::SOURCE_MANUAL
-            && $host->hostable_type === null
-            && $host->hostable_id === null;
+        if ($host->trashed() || $host->source !== SchedulingHost::SOURCE_MANUAL) {
+            return false;
+        }
+
+        if ($host->hostable_type === null && $host->hostable_id === null) {
+            return true;
+        }
+
+        return $host->hostable_type === (new User())->getMorphClass()
+            && is_numeric($host->hostable_id);
     }
 
     public function serviceIsEditable(BookableService $service): bool
@@ -239,7 +319,55 @@ class SchedulingConfigurationWriter
     {
         if (! $this->hostIsEditable($host)) {
             throw new DomainException(
-                'Provider-, system-, or model-owned scheduling hosts are read-only in CRM configuration.',
+                'Provider- or system-owned scheduling hosts are read-only in CRM configuration.',
+            );
+        }
+    }
+
+    private function assertHostIdentityAssignable(SchedulingHost $host, User $user): void
+    {
+        if ($host->hostable_type === null && $host->hostable_id === null) {
+            return;
+        }
+
+        if ($host->hostable_type === $user->getMorphClass()
+            && (int) $host->hostable_id === (int) $user->getKey()
+        ) {
+            return;
+        }
+
+        throw new DomainException(
+            'A Scheduling staff record cannot be moved to a different CRM user after its identity is linked.',
+        );
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function assertUserCanHost(User $user, array $attributes): void
+    {
+        $status = $attributes['status'] ?? null;
+
+        if ($status === SchedulingHost::STATUS_ACTIVE && ! $this->access->isActive($user)) {
+            throw new DomainException(
+                'Only active CRM users can be active Scheduling staff.',
+            );
+        }
+    }
+
+    private function assertUserNotAlreadyBound(
+        User $user,
+        ?SchedulingHost $except = null,
+    ): void {
+        $query = SchedulingHost::withTrashed()
+            ->where('hostable_type', $user->getMorphClass())
+            ->where('hostable_id', $user->getKey());
+
+        if ($except instanceof SchedulingHost) {
+            $query->whereKeyNot($except->getKey());
+        }
+
+        if ($query->exists()) {
+            throw new DomainException(
+                'That CRM user already has a Scheduling staff record.',
             );
         }
     }
@@ -321,13 +449,22 @@ class SchedulingConfigurationWriter
     private function hostAttributes(array $attributes): array
     {
         return [
-            'name' => $this->requiredString($attributes['name'] ?? null, 'host name'),
             'status' => $this->hostStatus($attributes['status'] ?? null),
             'timezone' => $this->timezone($attributes['timezone'] ?? null),
             'capacity' => $this->positiveInteger($attributes['capacity'] ?? null, 'host capacity'),
-            'email' => $this->nullableEmail($attributes['email'] ?? null),
-            'phone' => $this->nullableString($attributes['phone'] ?? null),
             'sort_order' => $this->nonNegativeInteger($attributes['sort_order'] ?? 0, 'host sort order'),
+        ];
+    }
+
+    /** @return array{name: string, email: string} */
+    private function userIdentityAttributes(User $user): array
+    {
+        $name = trim((string) $user->name);
+        $email = strtolower(trim((string) $user->email));
+
+        return [
+            'name' => $name !== '' ? $name : ($email !== '' ? $email : 'CRM user #'.$user->getKey()),
+            'email' => $email,
         ];
     }
 
@@ -890,6 +1027,19 @@ class SchedulingConfigurationWriter
         }
 
         return (int) $value;
+    }
+
+    private function clockTime(mixed $value, string $label): string
+    {
+        $value = $this->requiredString($value, $label);
+
+        if (preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $value) !== 1) {
+            throw new InvalidArgumentException(
+                ucfirst($label).' must use 24-hour HH:MM format.',
+            );
+        }
+
+        return $value;
     }
 
     private function timezone(mixed $value): string

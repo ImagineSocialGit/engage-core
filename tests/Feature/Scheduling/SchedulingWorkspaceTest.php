@@ -47,17 +47,11 @@ class SchedulingWorkspaceTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_empty_workspace_leads_with_guided_setup_instead_of_zero_state_dashboard(): void
+    public function test_empty_workspace_redirects_to_the_single_first_appointment_type_action(): void
     {
-        $response = $this->actingAs(User::factory()->create())
-            ->get(route('crm.scheduling.index'));
-
-        $response
-            ->assertOk()
-            ->assertSee('data-scheduling-setup-readiness', false)
-            ->assertSee('data-scheduling-setup-step="service"', false)
-            ->assertSee('data-scheduling-setup-step="availability"', false)
-            ->assertDontSee('data-scheduling-routine-workspace', false);
+        $this->actingAs(User::factory()->create())
+            ->get(route('crm.scheduling.index'))
+            ->assertRedirect(route('crm.scheduling.configuration.services.index'));
     }
 
     public function test_workspace_hides_setup_guide_once_service_and_availability_are_ready(): void

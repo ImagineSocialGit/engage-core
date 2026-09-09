@@ -10,6 +10,8 @@ use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Services\SchedulingAvailabilityConfigurationWriter;
 use App\Modules\Scheduling\Services\SchedulingAvailableStartRangeBuilder;
 use App\Modules\Scheduling\Services\SchedulingReadService;
+use App\Modules\Scheduling\Services\SchedulingSetupProgress;
+use App\Modules\Scheduling\Services\SchedulingConfigurationWriter;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
@@ -26,6 +28,7 @@ class SchedulingAvailabilityController extends Controller
         Request $request,
         SchedulingReadService $read,
         SchedulingAvailableStartRangeBuilder $startRanges,
+        SchedulingSetupProgress $progress,
     ): View {
         $validated = $request->validate([
             'service_id' => [
@@ -36,6 +39,7 @@ class SchedulingAvailabilityController extends Controller
                         ->whereNull('deleted_at')
                         ->where('status', BookableService::STATUS_ACTIVE)),
             ],
+            'guided' => ['nullable', 'boolean'],
             'preview_host_id' => [
                 'nullable',
                 'integer',
@@ -55,12 +59,17 @@ class SchedulingAvailabilityController extends Controller
             ->values();
         $selectedService = isset($validated['service_id'])
             ? $activeServices->firstWhere('id', (int) $validated['service_id'])
-            : $activeServices->first();
+            : null;
 
         if (! $selectedService instanceof BookableService) {
             $selectedService = null;
         }
 
+        $guided = $selectedService instanceof BookableService
+            && (bool) ($validated['guided'] ?? false);
+        $setupProgress = $selectedService instanceof BookableService
+            ? $progress->forService($selectedService, 'availability')
+            : null;
         $previewHosts = $selectedService instanceof BookableService
             ? $read->eligibleHosts($selectedService)
             : collect();
@@ -76,7 +85,7 @@ class SchedulingAvailabilityController extends Controller
 
             if (! $previewHost instanceof SchedulingHost) {
                 throw ValidationException::withMessages([
-                    'preview_host_id' => 'The selected staff member or provider is not actively assigned to that service.',
+                    'preview_host_id' => 'The selected staff member or provider is not actively assigned to that appointment type.',
                 ]);
             }
         } elseif ($previewRequiresHost) {
@@ -94,8 +103,7 @@ class SchedulingAvailabilityController extends Controller
         $previewSlots = [];
 
         if ($selectedService instanceof BookableService
-            && (! $read->serviceRequiresHost($selectedService)
-                || $previewHost instanceof SchedulingHost)
+            && (! $previewRequiresHost || $previewHost instanceof SchedulingHost)
         ) {
             $previewSlots = $read->availabilityForDate(
                 service: $selectedService,
@@ -116,23 +124,101 @@ class SchedulingAvailabilityController extends Controller
                 )
                 : [];
 
+        $scopeOptions = [
+            SchedulingAvailabilityConfigurationWriter::SCOPE_SERVICE => 'Appointment type',
+            SchedulingAvailabilityConfigurationWriter::SCOPE_HOST => 'Staff/provider',
+            SchedulingAvailabilityConfigurationWriter::SCOPE_SERVICE_HOST => 'Appointment type + staff/provider',
+        ];
+        $activeWindows = $windows
+            ->reject(fn (SchedulingAvailabilityWindow $window): bool => $window->trashed())
+            ->values();
+        $archivedWindows = $windows
+            ->filter(fn (SchedulingAvailabilityWindow $window): bool => $window->trashed())
+            ->values();
+
+        $this->decorateWindowPresentation($activeWindows, $scopeOptions, false);
+        $this->decorateWindowPresentation($archivedWindows, $scopeOptions, true);
+
+        $regularHoursState = $this->regularHoursForService(
+            $windows,
+            $selectedService,
+        );
+        $oldRegularHours = old('regular_hours');
+
+        if (is_array($oldRegularHours)) {
+            foreach ($regularHoursState as &$day) {
+                $submitted = $oldRegularHours[$day['weekday']] ?? null;
+
+                if (is_array($submitted)) {
+                    $day['ranges'] = is_array($submitted['ranges'] ?? null)
+                        ? array_values($submitted['ranges'])
+                        : [];
+                }
+            }
+
+            unset($day);
+        }
+
+        $intervalChoices = [15, 30, 60, 120];
+        $currentInterval = $selectedService instanceof BookableService
+            ? max(1, (int) $selectedService->slot_interval_minutes)
+            : 15;
+        $slotIntervalChoice = in_array($currentInterval, $intervalChoices, true)
+            ? (string) $currentInterval
+            : 'custom';
+
         return view('crm.scheduling.availability', [
             'title' => 'Scheduling Availability',
             'heading' => 'Availability',
             'services' => $services,
             'activeServices' => $activeServices,
             'hosts' => $hosts,
-            'windows' => $windows,
             'timezones' => timezone_identifiers_list(),
             'defaultTimezone' => config(
                 'client.timezone',
                 config('app.timezone', 'UTC'),
             ),
+            'inputClass' => 'mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200',
+            'labelClass' => 'block text-sm font-medium text-slate-700',
+            'weekdays' => [
+                0 => 'Sunday',
+                1 => 'Monday',
+                2 => 'Tuesday',
+                3 => 'Wednesday',
+                4 => 'Thursday',
+                5 => 'Friday',
+                6 => 'Saturday',
+            ],
+            'scopeOptions' => $scopeOptions,
+            'activeWindows' => $activeWindows,
+            'archivedWindows' => $archivedWindows,
             'selectedService' => $selectedService,
-            'regularHours' => $this->regularHoursForService(
-                $windows,
-                $selectedService,
-            ),
+            'guided' => $guided,
+            'setupProgress' => $setupProgress,
+            'availabilityOverview' => $activeServices
+                ->map(function (BookableService $service) use ($progress): array {
+                    $serviceProgress = $progress->forService($service, 'availability');
+
+                    return [
+                        'id' => (int) $service->getKey(),
+                        'name' => (string) $service->name,
+                        'has_availability' => (bool) $serviceProgress['has_availability'],
+                        'interval_label' => $this->slotIntervalLabel(
+                            (int) $service->slot_interval_minutes,
+                        ),
+                        'buffer_label' => $this->bufferLabel($service),
+                        'host_summary' => (string) $service->getAttribute('active_host_summary'),
+                        'url' => route('crm.scheduling.configuration.availability.index', [
+                            'service_id' => $service->getKey(),
+                        ]),
+                    ];
+                })
+                ->values()
+                ->all(),
+            'regularHoursState' => $regularHoursState,
+            'specialHoursState' => old('ranges', [
+                ['start' => '09:00', 'end' => '17:00'],
+            ]),
             'dateChanges' => $this->dateChangesForService(
                 $windows,
                 $selectedService,
@@ -142,8 +228,90 @@ class SchedulingAvailabilityController extends Controller
             'previewHost' => $previewHost,
             'previewDate' => $previewDate,
             'previewSlots' => $previewSlots,
-            'previewStartRanges' => $previewStartRanges,
+            'previewStartRanges' => array_map(
+                fn (array $range): array => [
+                    ...$range,
+                    'first_iso' => $range['starts_at']->toISOString(),
+                    'last_iso' => $range['last_start_at']->toISOString(),
+                    'display_label' => $this->startRangeLabel($range),
+                    'cadence_label' => $range['slot_count'] > 1
+                        ? $this->slotIntervalLabel((int) $range['interval_minutes'])
+                        : 'One available start',
+                    'capacity_label' => $range['remaining_capacity'].' open '.
+                        ($range['remaining_capacity'] === 1 ? 'spot' : 'spots').' per start',
+                ],
+                $previewStartRanges,
+            ),
+            'slotIntervalChoice' => old('slot_interval_choice', $slotIntervalChoice),
+            'slotIntervalCustomMinutes' => old(
+                'slot_interval_custom_minutes',
+                $slotIntervalChoice === 'custom' ? $currentInterval : null,
+            ),
+            'slotStartAnchorTime' => old(
+                'slot_start_anchor_time',
+                $selectedService?->slotStartAnchorTime() ?? '09:00',
+            ),
         ]);
+    }
+
+    public function saveBookingTiming(
+        Request $request,
+        BookableService $bookableService,
+        SchedulingConfigurationWriter $writer,
+    ): RedirectResponse {
+        $this->assertActiveService($bookableService);
+        $this->assertAllowedFields($request, [
+            'current_version',
+            'slot_interval_choice',
+            'slot_interval_custom_minutes',
+            'slot_start_anchor_time',
+            'buffer_before_minutes',
+            'buffer_after_minutes',
+            'guided',
+        ]);
+        $validated = $request->validate([
+            'current_version' => ['required', 'string', 'max:80'],
+            'slot_interval_choice' => [
+                'required',
+                'string',
+                Rule::in(['15', '30', '60', '120', 'custom']),
+            ],
+            'slot_interval_custom_minutes' => [
+                'nullable',
+                'required_if:slot_interval_choice,custom',
+                'integer',
+                'min:1',
+                'max:1440',
+            ],
+            'slot_start_anchor_time' => ['required', 'date_format:H:i'],
+            'buffer_before_minutes' => ['required', 'integer', 'min:0', 'max:10080'],
+            'buffer_after_minutes' => ['required', 'integer', 'min:0', 'max:10080'],
+            'guided' => ['nullable', 'boolean'],
+        ]);
+        $slotIntervalMinutes = $validated['slot_interval_choice'] === 'custom'
+            ? (int) $validated['slot_interval_custom_minutes']
+            : (int) $validated['slot_interval_choice'];
+
+        try {
+            $writer->updateAvailabilityPolicy(
+                service: $bookableService,
+                attributes: [
+                    'slot_interval_minutes' => $slotIntervalMinutes,
+                    'slot_start_anchor_time' => $validated['slot_start_anchor_time'],
+                    'buffer_before_minutes' => (int) $validated['buffer_before_minutes'],
+                    'buffer_after_minutes' => (int) $validated['buffer_after_minutes'],
+                ],
+                expectedUpdatedAt: $validated['current_version'],
+            );
+        } catch (DomainException|InvalidArgumentException|LogicException $exception) {
+            throw $this->availabilityException($exception);
+        }
+
+        return $this->businessRedirect(
+            service: $bookableService,
+            message: 'Booking timing updated.',
+            guided: (bool) ($validated['guided'] ?? false),
+        );
     }
 
     public function saveRegularHours(
@@ -152,8 +320,9 @@ class SchedulingAvailabilityController extends Controller
         SchedulingAvailabilityConfigurationWriter $writer,
     ): RedirectResponse {
         $this->assertActiveService($bookableService);
-        $this->assertAllowedFields($request, ['regular_hours']);
+        $this->assertAllowedFields($request, ['regular_hours', 'guided']);
         $validated = $request->validate([
+            'guided' => ['nullable', 'boolean'],
             'regular_hours' => ['required', 'array', 'size:7'],
             'regular_hours.*.weekday' => [
                 'required',
@@ -193,6 +362,7 @@ class SchedulingAvailabilityController extends Controller
         return $this->businessRedirect(
             service: $bookableService,
             message: 'Regular hours updated.',
+            guided: (bool) ($validated['guided'] ?? false),
         );
     }
 
@@ -202,9 +372,10 @@ class SchedulingAvailabilityController extends Controller
         SchedulingAvailabilityConfigurationWriter $writer,
     ): RedirectResponse {
         $this->assertActiveService($bookableService);
-        $this->assertAllowedFields($request, ['date', 'ranges']);
+        $this->assertAllowedFields($request, ['date', 'ranges', 'guided']);
         $validated = $request->validate([
             'date' => ['required', 'date_format:Y-m-d'],
+            'guided' => ['nullable', 'boolean'],
             'ranges' => ['required', 'array', 'min:1', 'max:8'],
             'ranges.*.start' => ['required', 'date_format:H:i'],
             'ranges.*.end' => ['required', 'date_format:H:i'],
@@ -231,6 +402,7 @@ class SchedulingAvailabilityController extends Controller
         return $this->businessRedirect(
             service: $bookableService,
             message: 'Special hours saved for '.$validated['date'].'.',
+            guided: (bool) ($validated['guided'] ?? false),
         );
     }
 
@@ -242,10 +414,11 @@ class SchedulingAvailabilityController extends Controller
         $this->assertActiveService($bookableService);
         $this->assertAllowedFields(
             $request,
-            ['date', 'all_day', 'start_time', 'end_time'],
+            ['date', 'all_day', 'start_time', 'end_time', 'guided'],
         );
         $validated = $request->validate([
             'date' => ['required', 'date_format:Y-m-d'],
+            'guided' => ['nullable', 'boolean'],
             'all_day' => ['nullable', 'boolean'],
             'start_time' => ['nullable', 'date_format:H:i'],
             'end_time' => ['nullable', 'date_format:H:i'],
@@ -280,17 +453,23 @@ class SchedulingAvailabilityController extends Controller
         return $this->businessRedirect(
             service: $bookableService,
             message: $allDay
-                ? 'The service is unavailable for the selected day.'
+                ? 'This appointment type is unavailable for the selected day.'
                 : 'Unavailable time added.',
+            guided: (bool) ($validated['guided'] ?? false),
         );
     }
 
     public function clearDateChanges(
+        Request $request,
         BookableService $bookableService,
         string $date,
         SchedulingAvailabilityConfigurationWriter $writer,
     ): RedirectResponse {
         $this->assertActiveService($bookableService);
+        $this->assertAllowedFields($request, ['guided']);
+        $validated = $request->validate([
+            'guided' => ['nullable', 'boolean'],
+        ]);
 
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
             throw ValidationException::withMessages([
@@ -310,6 +489,7 @@ class SchedulingAvailabilityController extends Controller
         return $this->businessRedirect(
             service: $bookableService,
             message: 'The one-off change was removed. Regular hours apply again.',
+            guided: (bool) ($validated['guided'] ?? false),
         );
     }
 
@@ -519,7 +699,7 @@ class SchedulingAvailabilityController extends Controller
     {
         if ($service->status !== BookableService::STATUS_ACTIVE) {
             throw ValidationException::withMessages([
-                'service' => 'Choose an active service before setting normal availability.',
+                'service' => 'Choose an active appointment type before setting normal availability.',
             ]);
         }
     }
@@ -805,6 +985,76 @@ class SchedulingAvailabilityController extends Controller
         return sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
     }
 
+    /**
+     * @param \Illuminate\Database\Eloquent\Collection<int, SchedulingAvailabilityWindow> $windows
+     * @param array<string, string> $scopeOptions
+     */
+    private function decorateWindowPresentation(
+        $windows,
+        array $scopeOptions,
+        bool $archived,
+    ): void {
+        foreach ($windows as $window) {
+            $scope = (string) $window->getAttribute('crm_scope');
+            $window->setAttribute(
+                'crm_scope_label',
+                $scopeOptions[$scope] ?? str($scope)->replace('_', ' ')->title(),
+            );
+            $window->setAttribute(
+                'crm_view_editable',
+                (bool) $window->getAttribute('crm_editable'),
+            );
+            $window->setAttribute(
+                'crm_view_shape',
+                $window->window_type->value,
+            );
+            $window->setAttribute(
+                'crm_local_start',
+                $window->starts_at?->setTimezone($window->timezone)->format('Y-m-d\TH:i'),
+            );
+            $window->setAttribute(
+                'crm_local_end',
+                $window->ends_at?->setTimezone($window->timezone)->format('Y-m-d\TH:i'),
+            );
+            $window->setAttribute('crm_view_archived', $archived);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $range
+     */
+    private function startRangeLabel(array $range): string
+    {
+        $start = $range['starts_at']->setTimezone($range['display_timezone']);
+        $end = $range['last_start_at']->setTimezone($range['display_timezone']);
+
+        return $start->format('M j, Y g:i A')
+            .($range['slot_count'] > 1 ? '–'.$end->format('g:i A') : '');
+    }
+
+    private function slotIntervalLabel(int $minutes): string
+    {
+        return match ($minutes) {
+            15 => 'Every 15 minutes',
+            30 => 'Every 30 minutes',
+            60 => 'Every hour',
+            120 => 'Every 2 hours',
+            default => 'Every '.$minutes.' minutes',
+        };
+    }
+
+    private function bufferLabel(BookableService $service): string
+    {
+        $before = max(0, (int) $service->buffer_before_minutes);
+        $after = max(0, (int) $service->buffer_after_minutes);
+
+        if ($before === 0 && $after === 0) {
+            return 'No time blocked before or after';
+        }
+
+        return $before.' min before · '.$after.' min after';
+    }
+
     private function availabilityException(\Throwable $exception): ValidationException
     {
         return ValidationException::withMessages([
@@ -815,11 +1065,13 @@ class SchedulingAvailabilityController extends Controller
     private function businessRedirect(
         BookableService $service,
         string $message,
+        bool $guided = false,
     ): RedirectResponse {
         return redirect()
-            ->route('crm.scheduling.configuration.availability.index', [
+            ->route('crm.scheduling.configuration.availability.index', array_filter([
                 'service_id' => $service->getKey(),
-            ])
+                'guided' => $guided ? 1 : null,
+            ], static fn (mixed $value): bool => $value !== null))
             ->with('success', $message);
     }
 

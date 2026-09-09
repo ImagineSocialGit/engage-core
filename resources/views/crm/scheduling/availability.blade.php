@@ -1,47 +1,8 @@
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
-    subheading="Set when each service can be booked. Start with regular weekly hours, then add one-off changes when needed."
+    subheading="Set when each appointment type can be booked, how often starts are offered, and how much time stays free around appointments."
 >
-    @php
-        $inputClass = 'mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200';
-        $labelClass = 'block text-sm font-medium text-slate-700';
-        $weekdays = [
-            0 => 'Sunday',
-            1 => 'Monday',
-            2 => 'Tuesday',
-            3 => 'Wednesday',
-            4 => 'Thursday',
-            5 => 'Friday',
-            6 => 'Saturday',
-        ];
-        $scopeOptions = [
-            \App\Modules\Scheduling\Services\SchedulingAvailabilityConfigurationWriter::SCOPE_SERVICE => 'Service',
-            \App\Modules\Scheduling\Services\SchedulingAvailabilityConfigurationWriter::SCOPE_HOST => 'Staff/provider',
-            \App\Modules\Scheduling\Services\SchedulingAvailabilityConfigurationWriter::SCOPE_SERVICE_HOST => 'Service + staff/provider',
-        ];
-        $activeWindows = $windows->reject(fn ($window) => $window->trashed())->values();
-        $archivedWindows = $windows->filter(fn ($window) => $window->trashed())->values();
-        $regularHoursState = $regularHours;
-        $oldRegularHours = old('regular_hours');
-
-        if (is_array($oldRegularHours)) {
-            foreach ($regularHoursState as &$day) {
-                $submitted = $oldRegularHours[$day['weekday']] ?? null;
-
-                if (is_array($submitted)) {
-                    $day['ranges'] = is_array($submitted['ranges'] ?? null)
-                        ? array_values($submitted['ranges'])
-                        : [];
-                }
-            }
-            unset($day);
-        }
-
-        $specialHoursState = old('ranges', [
-            ['start' => '09:00', 'end' => '17:00'],
-        ]);
-    @endphp
 
     <div class="space-y-6" data-scheduling-availability-configuration>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -79,12 +40,12 @@
         @if ($activeServices->isEmpty())
             <x-ui.card>
                 <div class="rounded-xl border border-dashed border-slate-300 p-6 text-center" data-availability-no-services>
-                    <h2 class="text-lg font-semibold text-slate-900">Add a service first</h2>
+                    <h2 class="text-lg font-semibold text-slate-900">Add an appointment type first</h2>
                     <p class="mt-2 text-sm text-slate-500">
-                        Availability belongs to something people can schedule. Create a service, then come back here to set its hours.
+                        Availability belongs to something people can schedule. Create an appointment type, then come back here to set its hours.
                     </p>
                     <a
-                        href="{{ route('crm.scheduling.configuration.index') }}#services"
+                        href="{{ route('crm.scheduling.configuration.services.index') }}"
                         class="mt-4 inline-flex rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
                     >
                         Add a service
@@ -92,35 +53,101 @@
                 </div>
             </x-ui.card>
         @else
-            <x-ui.card class="space-y-4" data-availability-service-selector>
-                <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                    <div class="max-w-2xl">
+            @if ($selectedService)
+                @include('crm.scheduling.partials.setup-progress', ['setupProgress' => $setupProgress])
+
+                @if ($guided)
+                    <x-ui.card class="space-y-3" data-availability-guided-first-time>
                         <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                            Service
+                            First appointment type
                         </div>
-                        <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
-                            Which service are you setting hours for?
+                        <h2 class="text-xl font-semibold tracking-tight text-slate-900">
+                            Next, set when {{ $selectedService->name }} can be booked
                         </h2>
-                        <p class="mt-1 text-sm text-slate-500">
-                            Each service can have its own regular hours and one-off changes.
+                        <p class="text-sm leading-6 text-slate-500">
+                            Start with normal weekly hours. Then set how often appointments can start and how much time you need around each appointment.
                         </p>
+                    </x-ui.card>
+                @else
+                    <x-ui.card class="space-y-4" data-availability-service-selector>
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                            <div class="max-w-2xl">
+                                <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
+                                    Appointment type
+                                </div>
+                                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
+                                    Which appointment type are you setting hours for?
+                                </h2>
+                                <p class="mt-1 text-sm text-slate-500">
+                                    Each appointment type can have its own hours, date changes, start-time pattern, and buffer time.
+                                </p>
+                            </div>
+
+                            <form method="GET" action="{{ route('crm.scheduling.configuration.availability.index') }}" class="flex w-full max-w-xl flex-col gap-2 sm:flex-row">
+                                <label class="sr-only" for="availability-service">Appointment type</label>
+                                <select id="availability-service" class="{{ $inputClass }} mt-0" name="service_id" required>
+                                    @foreach ($activeServices as $service)
+                                        <option value="{{ $service->id }}" @selected((int) $selectedService->id === (int) $service->id)>
+                                            {{ $service->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <button type="submit" class="inline-flex justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+                                    View availability
+                                </button>
+                            </form>
+                        </div>
+                    </x-ui.card>
+                @endif
+            @else
+                <x-ui.card class="space-y-5" data-availability-all-services>
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
+                                All appointment types
+                            </div>
+                            <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">Availability at a glance</h2>
+                            <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                                Review which appointment types have hours, how often starts are offered, and whether time is reserved before or after them.
+                            </p>
+                        </div>
                     </div>
 
-                    <form method="GET" action="{{ route('crm.scheduling.configuration.availability.index') }}" class="flex w-full max-w-xl flex-col gap-2 sm:flex-row">
-                        <label class="sr-only" for="availability-service">Service</label>
-                        <select id="availability-service" class="{{ $inputClass }} mt-0" name="service_id" required>
-                            @foreach ($activeServices as $service)
-                                <option value="{{ $service->id }}" @selected((int) $selectedService?->id === (int) $service->id)>
-                                    {{ $service->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                        <button type="submit" class="inline-flex justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
-                            View hours
-                        </button>
-                    </form>
-                </div>
-            </x-ui.card>
+                    <div class="grid gap-3 lg:grid-cols-2">
+                        @foreach ($availabilityOverview as $row)
+                            <a
+                                href="{{ $row['url'] }}"
+                                class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-teal-300"
+                                data-availability-overview-service="{{ $row['id'] }}"
+                            >
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <h3 class="font-semibold text-slate-900">{{ $row['name'] }}</h3>
+                                        <p class="mt-1 text-sm text-slate-500">{{ $row['interval_label'] }}</p>
+                                    </div>
+                                    <span @class([
+                                        'rounded-full px-2.5 py-1 text-xs font-semibold',
+                                        'bg-emerald-100 text-emerald-800' => $row['has_availability'],
+                                        'bg-red-100 text-red-800' => ! $row['has_availability'],
+                                    ])>
+                                        {{ $row['has_availability'] ? 'Hours set' : 'Required: set hours' }}
+                                    </span>
+                                </div>
+                                <div class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                                    <div class="rounded-lg bg-slate-50 px-3 py-2">
+                                        <div class="text-xs text-slate-500">Time around appointments</div>
+                                        <div class="mt-1 font-medium text-slate-800">{{ $row['buffer_label'] }}</div>
+                                    </div>
+                                    <div class="rounded-lg bg-slate-50 px-3 py-2">
+                                        <div class="text-xs text-slate-500">Staff</div>
+                                        <div class="mt-1 font-medium text-slate-800">{{ $row['host_summary'] }}</div>
+                                    </div>
+                                </div>
+                            </a>
+                        @endforeach
+                    </div>
+                </x-ui.card>
+            @endif
 
             @if ($selectedService)
                 <x-ui.card class="space-y-5" data-availability-regular-hours>
@@ -133,14 +160,14 @@
                                 When can people normally book {{ $selectedService->name }}?
                             </h2>
                             <p class="mt-1 text-sm text-slate-500">
-                                Add one or more time ranges to any day. Leave a day empty when the service is normally unavailable.
+                                Add one or more time ranges to any day. Leave a day empty when the appointment type is normally unavailable.
                             </p>
                         </div>
                     </div>
 
                     <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                         Times below use <strong class="font-semibold text-slate-800">{{ $selectedService->timezone }}</strong>,
-                        the timezone configured for this service.
+                        the timezone configured for this appointment type.
                     </div>
 
                     <form
@@ -164,6 +191,9 @@
                     >
                         @csrf
                         @method('PUT')
+                        @if ($guided)
+                            <input type="hidden" name="guided" value="1">
+                        @endif
 
                         <div class="flex flex-wrap gap-2">
                             <button
@@ -263,6 +293,9 @@
                         >
                             @csrf
                             @method('PUT')
+                        @if ($guided)
+                            <input type="hidden" name="guided" value="1">
+                        @endif
 
                             <label class="{{ $labelClass }}">
                                 Date
@@ -330,7 +363,7 @@
                                 Make a date or part of a date unavailable
                             </h2>
                             <p class="mt-1 text-sm text-slate-500">
-                                Use this for holidays, appointments, vacations, or any one-off time when this service should not be booked.
+                                Use this for holidays, appointments, vacations, or any one-off time when this appointment type should not be booked.
                             </p>
                         </div>
 
@@ -341,6 +374,9 @@
                             x-data="{ allDay: @js((bool) old('all_day', true)) }"
                         >
                             @csrf
+                        @if ($guided)
+                            <input type="hidden" name="guided" value="1">
+                        @endif
                             <input type="hidden" name="all_day" value="0">
 
                             <label class="{{ $labelClass }}">
@@ -392,7 +428,154 @@
                     </x-ui.card>
                 </div>
 
-                <section class="space-y-4" data-availability-date-changes>
+                <x-ui.card
+                class="space-y-5"
+                data-availability-booking-timing
+                x-data="{ intervalChoice: @js($slotIntervalChoice) }"
+            >
+                <div>
+                    <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
+                        Booking timing
+                    </div>
+                    <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">How should available times be spaced?</h2>
+                    <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                        These settings control possible start times and the time protected around an appointment. They do not change the appointment's actual length.
+                    </p>
+                </div>
+
+                @if ($selectedService->getAttribute('crm_editable'))
+                    <form
+                        method="POST"
+                        action="{{ route('crm.scheduling.configuration.availability.booking-timing', $selectedService) }}"
+                        class="grid gap-4 md:grid-cols-2"
+                    >
+                        @csrf
+                        @method('PUT')
+                        <input type="hidden" name="current_version" value="{{ $selectedService->updated_at?->toISOString() }}">
+                        @if ($guided)
+                            <input type="hidden" name="guided" value="1">
+                        @endif
+
+                        <label class="{{ $labelClass }}">
+                            How often can appointments start?
+                            <select
+                                class="{{ $inputClass }}"
+                                name="slot_interval_choice"
+                                x-model="intervalChoice"
+                                required
+                            >
+                                <option value="15" @selected((string) old('slot_interval_choice', $slotIntervalChoice) === '15')>Every 15 minutes</option>
+                                <option value="30" @selected((string) old('slot_interval_choice', $slotIntervalChoice) === '30')>Every 30 minutes</option>
+                                <option value="60" @selected((string) old('slot_interval_choice', $slotIntervalChoice) === '60')>Every hour</option>
+                                <option value="120" @selected((string) old('slot_interval_choice', $slotIntervalChoice) === '120')>Every 2 hours</option>
+                                <option value="custom" @selected((string) old('slot_interval_choice', $slotIntervalChoice) === 'custom')>Custom interval</option>
+                            </select>
+                            <span class="mt-1 block text-xs font-normal text-slate-500">
+                                A 60-minute appointment can still start every 30 minutes. Length and start frequency are separate.
+                            </span>
+                        </label>
+
+                        <label class="{{ $labelClass }}" x-show="intervalChoice === 'custom'" x-cloak>
+                            Custom start interval (minutes)
+                            <input
+                                class="{{ $inputClass }}"
+                                type="number"
+                                min="1"
+                                max="1440"
+                                name="slot_interval_custom_minutes"
+                                value="{{ $slotIntervalCustomMinutes }}"
+                                x-bind:required="intervalChoice === 'custom'"
+                                x-bind:disabled="intervalChoice !== 'custom'"
+                            >
+                        </label>
+
+                        <label class="{{ $labelClass }}">
+                            Start the pattern at
+                            <input
+                                class="{{ $inputClass }}"
+                                type="time"
+                                name="slot_start_anchor_time"
+                                value="{{ $slotStartAnchorTime }}"
+                                required
+                            >
+                            <span class="mt-1 block text-xs font-normal text-slate-500">
+                                Example: every 2 hours starting at 9:00 AM offers 9:00, 11:00, 1:00, 3:00, and so on when those times fit your hours.
+                            </span>
+                        </label>
+
+                        <label class="{{ $labelClass }}">
+                            How long do you need to prepare beforehand?
+                            <div class="mt-1 flex items-center gap-2">
+                                <input
+                                    class="{{ $inputClass }} mt-0"
+                                    type="number"
+                                    min="0"
+                                    max="10080"
+                                    name="buffer_before_minutes"
+                                    value="{{ old('buffer_before_minutes', $selectedService->buffer_before_minutes) }}"
+                                    required
+                                >
+                                <span class="shrink-0 text-sm text-slate-500">minutes</span>
+                            </div>
+                            <span class="mt-1 block text-xs font-normal text-slate-500">
+                                Useful for preparation, travel, setup, or reviewing notes before the appointment.
+                            </span>
+                        </label>
+
+                        <label class="{{ $labelClass }}">
+                            How much time should stay free after an appointment?
+                            <div class="mt-1 flex items-center gap-2">
+                                <input
+                                    class="{{ $inputClass }} mt-0"
+                                    type="number"
+                                    min="0"
+                                    max="10080"
+                                    name="buffer_after_minutes"
+                                    value="{{ old('buffer_after_minutes', $selectedService->buffer_after_minutes) }}"
+                                    required
+                                >
+                                <span class="shrink-0 text-sm text-slate-500">minutes</span>
+                            </div>
+                            <span class="mt-1 block text-xs font-normal text-slate-500">
+                                Leave room for meetings that run over, cleanup, travel, notes, or resetting before the next appointment.
+                            </span>
+                        </label>
+
+                        <div class="md:col-span-2">
+                            <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
+                                Save booking timing
+                            </button>
+                        </div>
+                    </form>
+                @else
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                        This appointment type is managed externally. Its start-time spacing and buffer rules are shown here but must be changed by its owner.
+                    </div>
+                @endif
+            </x-ui.card>
+
+            @if ($guided && $setupProgress['next_action'])
+                <x-ui.card class="border-yellow-300 bg-yellow-50" data-availability-guided-next>
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <div class="text-sm font-semibold text-yellow-950">Required availability is in place.</div>
+                            <div class="mt-1 text-sm text-yellow-900">
+                                {{ $setupProgress['staff_guidance']['recommended']
+                                    ? 'Staff is recommended next so appointments, tasks, and enabled team notifications can reach the right person.'
+                                    : 'Continue to the next useful setup step, or test booking now.' }}
+                            </div>
+                        </div>
+                        <a
+                            href="{{ $setupProgress['next_action']['url'] }}"
+                            class="inline-flex w-full shrink-0 justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
+                        >
+                            {{ $setupProgress['next_action']['label'] }}
+                        </a>
+                    </div>
+                </x-ui.card>
+            @endif
+
+            <section class="space-y-4" data-availability-date-changes>
                     <div>
                         <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
                             One-off changes
@@ -438,6 +621,9 @@
                                 >
                                     @csrf
                                     @method('DELETE')
+                                    @if ($guided)
+                                        <input type="hidden" name="guided" value="1">
+                                    @endif
                                     <button
                                         type="submit"
                                         class="text-sm font-semibold text-rose-700 hover:text-rose-800"
@@ -453,7 +639,7 @@
                         @empty
                             <x-ui.card>
                                 <div class="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
-                                    No upcoming one-off changes for this service.
+                                    No upcoming one-off changes for this appointment type.
                                 </div>
                             </x-ui.card>
                         @endforelse
@@ -475,6 +661,9 @@
 
                     <form method="GET" action="{{ route('crm.scheduling.configuration.availability.index').'#availability-preview' }}" class="grid gap-4 md:grid-cols-2">
                         <input type="hidden" name="service_id" value="{{ $selectedService->id }}">
+                        @if ($guided)
+                            <input type="hidden" name="guided" value="1">
+                        @endif
 
                         <label class="{{ $labelClass }}">
                             Staff/provider
@@ -527,28 +716,24 @@
                         </div>
 
                         @forelse ($previewStartRanges as $range)
-                            @php
-                                $rangeStart = $range['starts_at']->setTimezone($range['display_timezone']);
-                                $rangeEnd = $range['last_start_at']->setTimezone($range['display_timezone']);
-                            @endphp
                             <div
                                 class="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between"
                                 data-preview-start-range
-                                data-preview-range-first="{{ $range['starts_at']->toISOString() }}"
-                                data-preview-range-last="{{ $range['last_start_at']->toISOString() }}"
+                                data-preview-range-first="{{ $range['first_iso'] }}"
+                                data-preview-range-last="{{ $range['last_iso'] }}"
                                 data-preview-range-count="{{ $range['slot_count'] }}"
                                 data-preview-range-remaining="{{ $range['remaining_capacity'] }}"
                             >
                                 <div>
                                     <p class="text-sm font-semibold text-slate-900">
-                                        {{ $rangeStart->format('M j, Y g:i A') }}{{ $range['slot_count'] > 1 ? '–'.$rangeEnd->format('g:i A') : '' }}
+                                        {{ $range['display_label'] }}
                                     </p>
                                     <p class="mt-1 text-xs text-slate-500">
-                                        {{ $range['slot_count'] > 1 ? 'Start every '.$range['interval_minutes'].' minutes' : 'One available start' }} · {{ $range['display_timezone'] }}
+                                        {{ $range['cadence_label'] }} · {{ $range['display_timezone'] }}
                                     </p>
                                 </div>
                                 <p class="text-sm font-semibold text-slate-700">
-                                    {{ $range['remaining_capacity'] }} open {{ $range['remaining_capacity'] === 1 ? 'spot' : 'spots' }} per start
+                                    {{ $range['capacity_label'] }}
                                 </p>
                             </div>
                         @empty
@@ -652,9 +837,9 @@
                 </label>
 
                 <label class="{{ $labelClass }}" x-show="scope === 'service' || scope === 'service_host'">
-                    Service
+                    Appointment type
                     <select class="{{ $inputClass }}" name="bookable_service_id" x-bind:disabled="scope === 'host'">
-                        <option value="">Select a service</option>
+                        <option value="">Select an appointment type</option>
                         @foreach ($services as $service)
                             <option value="{{ $service->id }}" @selected((int) old('bookable_service_id') === (int) $service->id)>
                                 {{ $service->name }} · {{ $service->status }}
@@ -720,7 +905,7 @@
                 <label class="{{ $labelClass }}">
                     Capacity limit
                     <input class="{{ $inputClass }}" type="number" min="1" max="100000" name="capacity" value="{{ old('capacity') }}">
-                    <span class="mt-1 block text-xs font-normal text-slate-500">Leave blank to use the service and staff limits that already apply.</span>
+                    <span class="mt-1 block text-xs font-normal text-slate-500">Leave blank to use the appointment-type and staff limits that already apply.</span>
                 </label>
 
                 <div class="md:col-span-2 xl:col-span-4">
@@ -743,13 +928,6 @@
 
             <div class="grid gap-4 xl:grid-cols-2">
                 @forelse ($activeWindows as $window)
-                    @php
-                        $editable = (bool) $window->getAttribute('crm_editable');
-                        $scope = (string) $window->getAttribute('crm_scope');
-                        $shape = $window->window_type->value;
-                        $localStart = $window->starts_at?->setTimezone($window->timezone)->format('Y-m-d\TH:i');
-                        $localEnd = $window->ends_at?->setTimezone($window->timezone)->format('Y-m-d\TH:i');
-                    @endphp
 
                     <div
                         data-availability-window-id="{{ $window->id }}"
@@ -760,10 +938,10 @@
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                     <h3 class="font-semibold text-slate-900">
-                                        {{ $window->is_available ? 'Available' : 'Unavailable' }} · {{ $scopeOptions[$scope] ?? $scope }}
+                                        {{ $window->is_available ? 'Available' : 'Unavailable' }} · {{ $window->getAttribute('crm_scope_label') }}
                                     </h3>
                                     <p class="mt-1 text-sm text-slate-500">
-                                        {{ $window->bookableService?->name ?? 'All services for host' }}
+                                        {{ $window->bookableService?->name ?? 'All appointment types for staff/provider' }}
                                         @if ($window->schedulingHost)
                                             · {{ $window->schedulingHost->name }}
                                         @endif
@@ -777,7 +955,7 @@
                             <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-4">
                                 <div>
                                     <dt class="text-slate-500">Repeats</dt>
-                                    <dd class="font-medium text-slate-900">{{ $shape }}</dd>
+                                    <dd class="font-medium text-slate-900">{{ $window->getAttribute('crm_view_shape') }}</dd>
                                 </div>
                                 <div>
                                     <dt class="text-slate-500">Timezone</dt>
@@ -793,7 +971,7 @@
                                 </div>
                             </dl>
 
-                            @if ($editable)
+                            @if ($window->getAttribute('crm_view_editable'))
                                 <details>
                                     <summary class="cursor-pointer text-sm font-semibold text-teal-700">Edit advanced rule</summary>
 
@@ -802,7 +980,7 @@
                                         action="{{ route('crm.scheduling.configuration.availability.update', $window) }}"
                                         class="mt-4 grid gap-4 md:grid-cols-2"
                                         data-availability-update="{{ $window->id }}"
-                                        x-data="{ scope: @js($scope), shape: @js($shape) }"
+                                        x-data="{ scope: @js($window->getAttribute('crm_scope')), shape: @js($window->getAttribute('crm_view_shape')) }"
                                     >
                                         @csrf
                                         @method('PATCH')
@@ -826,9 +1004,9 @@
                                         </label>
 
                                         <label class="{{ $labelClass }}" x-show="scope === 'service' || scope === 'service_host'">
-                                            Service
+                                            Appointment type
                                             <select class="{{ $inputClass }}" name="bookable_service_id" x-bind:disabled="scope === 'host'">
-                                                <option value="">Select a service</option>
+                                                <option value="">Select an appointment type</option>
                                                 @foreach ($services as $service)
                                                     <option value="{{ $service->id }}" @selected((int) $window->bookable_service_id === (int) $service->id)>
                                                         {{ $service->name }} · {{ $service->status }}
@@ -883,12 +1061,12 @@
 
                                         <label class="{{ $labelClass }}" x-show="shape === 'absolute'">
                                             Local start
-                                            <input class="{{ $inputClass }}" type="datetime-local" name="local_starts_at" x-bind:disabled="shape !== 'absolute'" value="{{ $localStart }}">
+                                            <input class="{{ $inputClass }}" type="datetime-local" name="local_starts_at" x-bind:disabled="shape !== 'absolute'" value="{{ $window->getAttribute('crm_local_start') }}">
                                         </label>
 
                                         <label class="{{ $labelClass }}" x-show="shape === 'absolute'">
                                             Local end
-                                            <input class="{{ $inputClass }}" type="datetime-local" name="local_ends_at" x-bind:disabled="shape !== 'absolute'" value="{{ $localEnd }}">
+                                            <input class="{{ $inputClass }}" type="datetime-local" name="local_ends_at" x-bind:disabled="shape !== 'absolute'" value="{{ $window->getAttribute('crm_local_end') }}">
                                         </label>
 
                                         <label class="{{ $labelClass }}">
@@ -943,10 +1121,6 @@
 
             <div class="grid gap-4 xl:grid-cols-2">
                 @forelse ($archivedWindows as $window)
-                    @php
-                        $editable = (bool) $window->getAttribute('crm_editable');
-                        $scope = (string) $window->getAttribute('crm_scope');
-                    @endphp
 
                     <div
                         data-availability-window-id="{{ $window->id }}"
@@ -956,10 +1130,10 @@
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                     <h3 class="font-semibold text-slate-900">
-                                        {{ $window->is_available ? 'Available' : 'Unavailable' }} · {{ $scopeOptions[$scope] ?? $scope }}
+                                        {{ $window->is_available ? 'Available' : 'Unavailable' }} · {{ $window->getAttribute('crm_scope_label') }}
                                     </h3>
                                     <p class="mt-1 text-sm text-slate-500">
-                                        {{ $window->bookableService?->name ?? 'All services for host' }}
+                                        {{ $window->bookableService?->name ?? 'All appointment types for staff/provider' }}
                                         @if ($window->schedulingHost)
                                             · {{ $window->schedulingHost->name }}
                                         @endif
@@ -968,7 +1142,7 @@
                                 <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">archived</span>
                             </div>
 
-                            @if ($editable)
+                            @if ($window->getAttribute('crm_view_editable'))
                                 <form
                                     method="POST"
                                     action="{{ route('crm.scheduling.configuration.availability.restore', $window) }}"

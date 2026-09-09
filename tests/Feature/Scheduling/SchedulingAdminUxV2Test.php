@@ -101,15 +101,11 @@ final class SchedulingAdminUxV2Test extends TestCase
         $response
             ->assertOk()
             ->assertViewIs('crm.scheduling.services.edit')
-            ->assertSee('data-scheduling-service-setup-path', false)
-            ->assertSeeInOrder([
-                '1. Basics',
-                '2. Availability',
-                '3. Booking form',
-                '4. Confirmation &amp; reminders',
-                '5. After booking',
-                '6. Advanced',
-            ], false)
+            ->assertSee('data-scheduling-setup-progress', false)
+            ->assertSee('data-scheduling-progress-step="appointment_type"', false)
+            ->assertSee('data-scheduling-progress-step="availability"', false)
+            ->assertSee('data-scheduling-progress-step="staff"', false)
+            ->assertSee('data-scheduling-progress-step="ready"', false)
             ->assertSee('id="basics"', false)
             ->assertSee('id="availability"', false)
             ->assertSee('id="booking-form"', false)

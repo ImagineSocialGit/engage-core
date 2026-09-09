@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Scheduling;
 
+use App\Models\User;
 use App\Modules\Core\Models\Contact;
-use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Tasks\Models\Task;
@@ -24,10 +24,10 @@ class AppointmentTaskAutomationRuntimeTest extends TestCase
     public function test_task_is_host_assigned_and_follows_reschedule_and_cancellation(): void
     {
         $contact = Contact::factory()->create();
-        $hostMember = TeamMember::factory()->create();
+        $hostUser = User::factory()->create();
         $host = SchedulingHost::factory()->create([
-            'hostable_type' => $hostMember->getMorphClass(),
-            'hostable_id' => $hostMember->getKey(),
+            'hostable_type' => $hostUser->getMorphClass(),
+            'hostable_id' => $hostUser->getKey(),
         ]);
         $appointment = Appointment::factory()->create([
             'contact_id' => $contact->getKey(),
@@ -51,8 +51,8 @@ class AppointmentTaskAutomationRuntimeTest extends TestCase
 
         $this->assertSame('completed', $result->status);
         $task = Task::query()->firstOrFail();
-        $this->assertSame($hostMember->getMorphClass(), $task->assigned_to_type);
-        $this->assertSame($hostMember->getKey(), $task->assigned_to_id);
+        $this->assertSame($hostUser->getMorphClass(), $task->assigned_to_type);
+        $this->assertSame($hostUser->getKey(), $task->assigned_to_id);
         $this->assertTrue($task->due_at->equalTo($appointment->starts_at->copy()->subDay()));
 
         $replacement = Appointment::factory()->create([

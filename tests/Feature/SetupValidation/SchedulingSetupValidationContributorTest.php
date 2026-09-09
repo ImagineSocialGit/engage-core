@@ -2,14 +2,19 @@
 
 namespace Tests\Feature\SetupValidation;
 
+use App\Models\User;
+use App\Modules\Core\Access\Models\UserAccessProfile;
+use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Providers\SchedulingModuleServiceProvider;
 use App\Modules\Scheduling\Validation\SchedulingSetupValidationContributor;
 use App\Support\SetupValidation\SetupValidationManager;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
 
 class SchedulingSetupValidationContributorTest extends TestCase
 {
+    use RefreshDatabase;
     public function test_missing_public_url_is_valid_because_public_booking_is_optional(): void
     {
         config()->set('scheduling.public.configured', false);
@@ -48,6 +53,67 @@ class SchedulingSetupValidationContributorTest extends TestCase
         config()->set('scheduling.public.scheme', 'https');
 
         $this->assertEquals([], $this->findings());
+    }
+
+    public function test_active_manual_host_without_user_identity_is_reported(): void
+    {
+        $this->disablePublicBooking();
+
+        $host = SchedulingHost::factory()->create([
+            'source' => SchedulingHost::SOURCE_MANUAL,
+            'status' => SchedulingHost::STATUS_ACTIVE,
+            'hostable_type' => null,
+            'hostable_id' => null,
+        ]);
+
+        $finding = collect($this->findings())
+            ->firstWhere('code', 'scheduling.staff_user_identity_missing');
+
+        $this->assertNotNull($finding);
+        $this->assertSame('error', $finding['severity']);
+        $this->assertSame('scheduling.staff', $finding['source']);
+        $this->assertSame(
+            'scheduling_hosts.'.$host->getKey().'.hostable',
+            $finding['path'],
+        );
+    }
+
+    public function test_active_user_backed_host_has_no_staff_identity_finding(): void
+    {
+        $this->disablePublicBooking();
+
+        $user = User::factory()->create();
+        SchedulingHost::factory()->forHostable($user)->create([
+            'source' => SchedulingHost::SOURCE_MANUAL,
+            'status' => SchedulingHost::STATUS_ACTIVE,
+        ]);
+
+        $codes = collect($this->findings())->pluck('code')->all();
+
+        $this->assertNotContains('scheduling.staff_user_identity_missing', $codes);
+        $this->assertNotContains('scheduling.staff_user_identity_unavailable', $codes);
+    }
+
+    public function test_active_host_linked_to_inactive_crm_user_is_reported(): void
+    {
+        $this->disablePublicBooking();
+
+        $user = User::factory()->create();
+        UserAccessProfile::query()->create([
+            'user_id' => $user->getKey(),
+            'role_key' => 'member',
+            'is_active' => false,
+        ]);
+        SchedulingHost::factory()->forHostable($user)->create([
+            'source' => SchedulingHost::SOURCE_MANUAL,
+            'status' => SchedulingHost::STATUS_ACTIVE,
+        ]);
+
+        $finding = collect($this->findings())
+            ->firstWhere('code', 'scheduling.staff_user_identity_unavailable');
+
+        $this->assertNotNull($finding);
+        $this->assertSame('error', $finding['severity']);
     }
 
     public function test_scheduling_provider_registers_setup_validation_contributor(): void
@@ -98,6 +164,15 @@ class SchedulingSetupValidationContributorTest extends TestCase
             '[scheduling | scheduling.public | scheduling.public.url]',
             $output,
         );
+    }
+
+    private function disablePublicBooking(): void
+    {
+        config()->set('scheduling.public.configured', false);
+        config()->set('scheduling.public.enabled', false);
+        config()->set('scheduling.public.url', null);
+        config()->set('scheduling.public.host', null);
+        config()->set('scheduling.public.scheme', null);
     }
 
     /**

@@ -193,6 +193,7 @@ class FindBookableAvailabilityAction
                 instant: $runStartsAt,
                 intervalMinutes: $search->slotIntervalMinutes(),
                 timezone: $search->serviceTimezone(),
+                anchorTime: $search->service->slotStartAnchorTime(),
             );
 
             while ($slotStartsAt->lessThan($runEndsAt)) {
@@ -265,6 +266,7 @@ class FindBookableAvailabilityAction
                 instant: $startInterval->startsAt,
                 intervalMinutes: $search->slotIntervalMinutes(),
                 timezone: $search->serviceTimezone(),
+                anchorTime: $search->service->slotStartAnchorTime(),
             );
 
             while ($slotStartsAt->lessThan($startInterval->endsAt)) {
@@ -572,17 +574,32 @@ class FindBookableAvailabilityAction
         CarbonImmutable $instant,
         int $intervalMinutes,
         string $timezone,
+        string $anchorTime,
     ): CarbonImmutable {
         $local = $instant->setTimezone($timezone);
         $stepSeconds = max(1, $intervalMinutes) * 60;
+        [$anchorHour, $anchorMinute] = array_map(
+            static fn (string $part): int => (int) $part,
+            explode(':', $anchorTime),
+        );
+        $anchorSeconds = ($anchorHour * 3600) + ($anchorMinute * 60);
         $secondsOfDay = ($local->hour * 3600)
             + ($local->minute * 60)
             + $local->second;
-        $alignedSeconds = (int) (ceil($secondsOfDay / $stepSeconds) * $stepSeconds);
+        $stepsFromAnchor = (int) ceil(
+            ($secondsOfDay - $anchorSeconds) / $stepSeconds,
+        );
+        $alignedSeconds = $anchorSeconds + ($stepsFromAnchor * $stepSeconds);
 
         for ($attempt = 0; $attempt < 2000; $attempt++, $alignedSeconds += $stepSeconds) {
-            $dayOffset = intdiv($alignedSeconds, 86400);
-            $timeSeconds = $alignedSeconds % 86400;
+            $dayOffset = (int) floor($alignedSeconds / 86400);
+            $timeSeconds = $alignedSeconds - ($dayOffset * 86400);
+
+            if ($timeSeconds < 0) {
+                $dayOffset--;
+                $timeSeconds += 86400;
+            }
+
             $date = $local->startOfDay()->addDays($dayOffset);
             $normalized = sprintf(
                 '%s %02d:%02d:%02d',

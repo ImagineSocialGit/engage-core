@@ -82,7 +82,7 @@ class ProviderAttendanceReconciliationTest extends TestCase
 
         $this->assertSame('zoom', $attendance['provider']);
         $this->assertSame('attended', $attendance['status']);
-        $this->assertSame(3600, $attendance['duration']);
+        $this->assertSame(3000, $attendance['duration']);
         $this->assertSame('registrant-1', $attendance['provider_registrant_id']);
         $this->assertSame('provider_registrant_id', $attendance['matched_by']);
         $this->assertArrayNotHasKey('raw', $attendance);

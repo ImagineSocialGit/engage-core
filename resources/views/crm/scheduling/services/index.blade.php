@@ -1,7 +1,7 @@
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
-    subheading="Create the appointment types people can book, then open one to finish availability, reminders, follow-up, and advanced setup."
+    subheading="Create what people can book. Required setup comes first, with recommended and advanced options clearly separated."
 >
     <div class="space-y-6" data-scheduling-services-workspace data-scheduling-appointment-type-workspace>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -13,12 +13,14 @@
                 Back to Scheduling Setup
             </a>
 
-            <a
-                href="{{ route('crm.scheduling.configuration.availability.index') }}"
-                class="inline-flex w-full items-center justify-center rounded-lg border border-teal-600 bg-white px-3 py-2 text-sm font-semibold text-teal-700 shadow-sm hover:bg-teal-50 sm:w-auto"
-            >
-                Manage availability
-            </a>
+            @unless ($firstRun)
+                <a
+                    href="{{ route('crm.scheduling.configuration.availability.index') }}"
+                    class="inline-flex w-full items-center justify-center rounded-lg border border-teal-600 bg-white px-3 py-2 text-sm font-semibold text-teal-700 shadow-sm hover:bg-teal-50 sm:w-auto"
+                >
+                    Manage availability
+                </a>
+            @endunless
         </div>
 
         @if (session('success'))
@@ -37,6 +39,11 @@
             </x-ui.feedback.alert>
         @endif
 
+        @if ($firstRun)
+            @include('crm.scheduling.partials.setup-progress', ['setupProgress' => $setupProgress])
+        @endif
+
+        @unless ($firstRun)
         <x-ui.card class="space-y-4">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div class="max-w-3xl">
@@ -231,20 +238,26 @@
             </div>
         </section>
 
+        @endunless
+
         <x-ui.card class="space-y-5" data-configuration-service-create>
-            <details @if ($services->isEmpty() || $errors->any()) open @endif>
+            <details @if ($firstRun || $errors->any()) open @endif>
                 <summary class="cursor-pointer list-none">
                     <div class="flex items-center justify-between gap-4">
                         <div>
                             <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                                New appointment type
+                                {{ $firstRun ? 'Step 1' : 'New appointment type' }}
                             </div>
-                            <h2 class="mt-3 text-lg font-semibold text-slate-900">Add something people can schedule</h2>
+                            <h2 class="mt-3 text-lg font-semibold text-slate-900">
+                                {{ $firstRun ? 'Add the first appointment type' : 'Add another appointment type' }}
+                            </h2>
                             <p class="mt-1 max-w-2xl text-sm text-slate-500">
-                                Start with a name and normal length. Open it afterward to choose how it happens, who handles it, when it can be booked, and what happens next.
+                                {{ $firstRun
+                                    ? 'Start with a name and normal length. After you save it, you will go directly to Availability for the required next step.'
+                                    : 'Start with a name and normal length. After you save it, open setup will show what still needs attention.' }}
                             </p>
                         </div>
-                        <span class="text-sm font-semibold text-teal-700">Open form</span>
+                        <span class="text-sm font-semibold text-teal-700">{{ $firstRun ? 'Start here' : 'Open form' }}</span>
                     </div>
                 </summary>
 
@@ -294,7 +307,7 @@
                             type="submit"
                             class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto"
                         >
-                            Add appointment type
+                            {{ $firstRun ? 'Add the first appointment type' : 'Add appointment type' }}
                         </button>
                     </div>
                 </form>

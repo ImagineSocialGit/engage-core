@@ -5,6 +5,7 @@ namespace Tests\Feature\Tasks;
 use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Support\ModuleIntegrations\InternalNotifications\Tasks\OnlyActiveTeamMemberTaskAssignmentStrategyResolver;
 use App\Support\ModuleIntegrations\InternalNotifications\Tasks\TeamMemberTaskAssignedRecipientResolver;
+use App\Support\ModuleIntegrations\InternalNotifications\UserTeamMemberBridge;
 use App\Modules\Tasks\Actions\BuildTaskDigestsAction;
 use App\Modules\Tasks\Actions\CreateTaskAction;
 use App\Modules\Tasks\Actions\NotifyAssignedTaskRecipientsAction;
@@ -142,7 +143,7 @@ class TaskNotificationAndDigestBehaviorTest extends TestCase
     private function teamMemberRecipients(): TaskAssignedRecipientsResolver
     {
         return new TaskAssignedRecipientsResolver([
-            new TeamMemberTaskAssignedRecipientResolver(),
+            new TeamMemberTaskAssignedRecipientResolver(app(UserTeamMemberBridge::class)),
         ]);
     }
 

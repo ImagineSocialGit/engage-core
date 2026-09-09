@@ -1,7 +1,7 @@
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
-    subheading="Add people only when appointments need explicit assignment."
+    subheading="Choose which CRM users can be assigned to appointments."
 >
     <div class="space-y-6" data-scheduling-staff-workspace>
         <datalist id="scheduling-timezones">
@@ -19,12 +19,20 @@
                 Back to Scheduling Setup
             </a>
 
-            <a
-                href="{{ route('crm.scheduling.configuration.services.index') }}"
-                class="inline-flex w-full items-center justify-center rounded-lg border border-teal-600 bg-white px-3 py-2 text-sm font-semibold text-teal-700 shadow-sm hover:bg-teal-50 sm:w-auto"
-            >
-                Manage services
-            </a>
+            <div class="flex flex-col gap-2 sm:flex-row">
+                <a
+                    href="{{ route('crm.settings.team.index') }}"
+                    class="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto"
+                >
+                    Team & Access
+                </a>
+                <a
+                    href="{{ route('crm.scheduling.configuration.services.index') }}"
+                    class="inline-flex w-full items-center justify-center rounded-lg border border-teal-600 bg-white px-3 py-2 text-sm font-semibold text-teal-700 shadow-sm hover:bg-teal-50 sm:w-auto"
+                >
+                    Manage appointment types
+                </a>
+            </div>
         </div>
 
         @if (session('success'))
@@ -46,60 +54,51 @@
         <x-ui.card class="space-y-5" data-configuration-host-create>
             <div>
                 <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                    Optional assignment
+                    Appointment assignment
                 </div>
-                <h2 class="mt-3 text-lg font-semibold text-slate-900">Add staff or a provider</h2>
+                <h2 class="mt-3 text-lg font-semibold text-slate-900">Add scheduling staff</h2>
                 <p class="mt-1 max-w-2xl text-sm text-slate-500">
-                    Hostless services are valid. Add a person only when an appointment should be tied to a specific staff member or provider.
+                    Scheduling staff come from Team & Access. Add a CRM user here only when appointments should be assigned to that person.
                 </p>
             </div>
 
-            <form
-                method="POST"
-                action="{{ route('crm.scheduling.configuration.hosts.store') }}"
-                class="grid gap-4 md:grid-cols-3"
-            >
-                @csrf
+            @if ($availableHostUsers->isNotEmpty())
+                <form
+                    method="POST"
+                    action="{{ route('crm.scheduling.configuration.hosts.store') }}"
+                    class="flex flex-col gap-4 sm:flex-row sm:items-end"
+                >
+                    @csrf
 
-                <label class="block text-sm font-medium text-slate-700">
-                    Name
-                    <input
-                        class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
-                        name="name"
-                        value="{{ old('name') }}"
-                        placeholder="Taylor Smith"
-                        required
-                    >
-                </label>
+                    <label class="block min-w-0 flex-1 text-sm font-medium text-slate-700">
+                        CRM user
+                        <select
+                            class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
+                            name="user_id"
+                            required
+                        >
+                            <option value="">Choose a person</option>
+                            @foreach ($availableHostUsers as $user)
+                                <option value="{{ $user->id }}" @selected((string) old('user_id') === (string) $user->id)>
+                                    {{ $user->name }}{{ $user->email ? ' — '.$user->email : '' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
 
-                <label class="block text-sm font-medium text-slate-700">
-                    Email <span class="font-normal text-slate-400">(optional)</span>
-                    <input
-                        class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
-                        type="email"
-                        name="email"
-                        value="{{ old('email') }}"
-                    >
-                </label>
-
-                <label class="block text-sm font-medium text-slate-700">
-                    Phone <span class="font-normal text-slate-400">(optional)</span>
-                    <input
-                        class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
-                        name="phone"
-                        value="{{ old('phone') }}"
-                    >
-                </label>
-
-                <div class="md:col-span-3">
                     <button
                         type="submit"
                         class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto"
                     >
-                        Add staff or provider
+                        Add to Scheduling
                     </button>
+                </form>
+            @else
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                    Every active CRM user is already linked to Scheduling, or there are no active users available. Add or reactivate people in
+                    <a href="{{ route('crm.settings.team.index') }}" class="font-semibold text-teal-700 hover:text-teal-800">Team & Access</a>.
                 </div>
-            </form>
+            @endif
         </x-ui.card>
 
         <section class="space-y-4" data-scheduling-staff-list>
@@ -123,8 +122,8 @@
                                     @if ($host->email)
                                         <p class="mt-1 text-sm text-slate-500">{{ $host->email }}</p>
                                     @endif
-                                    @if ($host->phone)
-                                        <p class="mt-0.5 text-sm text-slate-500">{{ $host->phone }}</p>
+                                    @if ($host->getAttribute('identity_user_id'))
+                                        <p class="mt-1 text-xs font-medium text-teal-700">Linked to Team & Access</p>
                                     @endif
                                 </div>
                                 <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
@@ -132,9 +131,24 @@
                                 </span>
                             </div>
 
+                            @if ($host->getAttribute('identity_reconnect_required'))
+                                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4" data-scheduling-host-reconnect-required>
+                                    <p class="text-sm font-semibold text-amber-900">Reconnect this staff record</p>
+                                    <p class="mt-1 text-sm text-amber-800">
+                                        Its environment-specific CRM user link is missing. Choose the matching active user before relying on host-assigned tasks or reminders.
+                                    </p>
+                                </div>
+                            @elseif ($host->getAttribute('identity_user_id') && ! $host->getAttribute('identity_user_active'))
+                                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                                    <p class="text-sm text-amber-900">
+                                        This CRM user is inactive in Team & Access. Reactivate the user before making this Scheduling staff record active.
+                                    </p>
+                                </div>
+                            @endif
+
                             <dl class="mt-4 grid grid-cols-3 gap-3 text-sm">
                                 <div>
-                                    <dt class="text-slate-500">Services</dt>
+                                    <dt class="text-slate-500">Appointment types</dt>
                                     <dd class="font-medium text-slate-900" data-active-assignment-count="{{ $host->active_service_assignments_count }}">
                                         {{ $host->active_service_assignments_count }}
                                     </dd>
@@ -152,9 +166,9 @@
                             </dl>
 
                             @if ($host->getAttribute('crm_editable'))
-                                <details class="mt-4">
+                                <details class="mt-4" @if ($host->getAttribute('identity_reconnect_required')) open @endif>
                                     <summary class="cursor-pointer text-sm font-semibold text-teal-700">
-                                        Edit staff settings
+                                        {{ $host->getAttribute('identity_reconnect_required') ? 'Reconnect staff identity' : 'Edit scheduling settings' }}
                                     </summary>
 
                                     <form
@@ -168,15 +182,25 @@
                                         <input type="hidden" name="current_version" value="{{ $host->updated_at?->toISOString() }}">
                                         <input type="hidden" name="sort_order" value="{{ $host->sort_order }}">
 
-                                        <label class="block text-sm font-medium text-slate-700">
-                                            Name
-                                            <input
-                                                class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
-                                                name="name"
-                                                value="{{ $host->name }}"
-                                                required
-                                            >
-                                        </label>
+                                        @if ($host->getAttribute('identity_reconnect_required'))
+                                            <label class="block text-sm font-medium text-slate-700 sm:col-span-2">
+                                                CRM user
+                                                <select
+                                                    class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
+                                                    name="user_id"
+                                                    required
+                                                >
+                                                    <option value="">Choose the matching person</option>
+                                                    @foreach ($availableHostUsers as $user)
+                                                        <option value="{{ $user->id }}">
+                                                            {{ $user->name }}{{ $user->email ? ' — '.$user->email : '' }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </label>
+                                        @else
+                                            <input type="hidden" name="user_id" value="{{ $host->getAttribute('identity_user_id') }}">
+                                        @endif
 
                                         <label class="block text-sm font-medium text-slate-700">
                                             Status
@@ -217,31 +241,12 @@
                                             >
                                         </label>
 
-                                        <label class="block text-sm font-medium text-slate-700">
-                                            Email
-                                            <input
-                                                class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
-                                                type="email"
-                                                name="email"
-                                                value="{{ $host->email }}"
-                                            >
-                                        </label>
-
-                                        <label class="block text-sm font-medium text-slate-700">
-                                            Phone
-                                            <input
-                                                class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200"
-                                                name="phone"
-                                                value="{{ $host->phone }}"
-                                            >
-                                        </label>
-
                                         <div class="sm:col-span-2">
                                             <button
                                                 type="submit"
                                                 class="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
                                             >
-                                                Save changes
+                                                {{ $host->getAttribute('identity_reconnect_required') ? 'Reconnect staff' : 'Save changes' }}
                                             </button>
                                         </div>
                                     </form>
@@ -249,7 +254,7 @@
                             @else
                                 <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4" data-configuration-read-only="host">
                                     <p class="text-sm text-slate-600">
-                                        This person is managed automatically and cannot be edited here.
+                                        This provider-managed staff record is read-only here.
                                     </p>
                                 </div>
                             @endif
@@ -261,7 +266,7 @@
                             class="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500"
                             data-configuration-empty="hosts"
                         >
-                            No staff or providers have been added. That is fine when appointments do not need a specific assignee.
+                            No scheduling staff have been added. That is fine when appointment types do not need a specific assignee.
                         </div>
                     </x-ui.card>
                 @endforelse

@@ -2,6 +2,8 @@
 
 namespace App\Modules\Scheduling\Services;
 
+use App\Models\User;
+use App\Modules\Core\Access\Services\UserAccessService;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Scheduling\Actions\FindBookableAvailabilityAction;
 use App\Modules\Scheduling\Data\AvailabilitySearch;
@@ -29,6 +31,7 @@ class SchedulingReadService
         private readonly SchedulingAvailabilityConfigurationWriter $availabilityConfigurationWriter,
         private readonly SchedulingResourceConfigurationWriter $resourceConfigurationWriter,
         private readonly SchedulingDurationResolver $durations,
+        private readonly UserAccessService $access,
     ) {}
 
     /**
@@ -132,6 +135,7 @@ class SchedulingReadService
                     ),
                 'appointments_count',
             )
+            ->with('hostable')
             ->withCount([
                 'serviceAssignments',
                 'serviceAssignments as active_service_assignments_count' =>
@@ -145,11 +149,62 @@ class SchedulingReadService
             ->get();
 
         return $hosts->each(function (SchedulingHost $host): void {
+            $user = $host->hostable;
+
+            if ($user instanceof User) {
+                $host->setAttribute('identity_user_id', (int) $user->getKey());
+                $host->setAttribute('identity_user_active', $this->access->isActive($user));
+                $host->setAttribute('identity_reconnect_required', false);
+
+                $name = trim((string) $user->name);
+                $email = strtolower(trim((string) $user->email));
+
+                if ($name !== '') {
+                    $host->setAttribute('name', $name);
+                }
+
+                if ($email !== '') {
+                    $host->setAttribute('email', $email);
+                }
+            } else {
+                $host->setAttribute('identity_user_id', null);
+                $host->setAttribute('identity_user_active', false);
+                $host->setAttribute(
+                    'identity_reconnect_required',
+                    $host->source === SchedulingHost::SOURCE_MANUAL,
+                );
+            }
+
             $host->setAttribute(
                 'crm_editable',
                 $this->configurationWriter->hostIsEditable($host),
             );
         });
+    }
+
+    /**
+     * @return SupportCollection<int, User>
+     */
+    public function availableHostUsers(): SupportCollection
+    {
+        $userMorphClass = (new User())->getMorphClass();
+        $boundUserIds = SchedulingHost::withTrashed()
+            ->where('hostable_type', $userMorphClass)
+            ->whereNotNull('hostable_id')
+            ->pluck('hostable_id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->all();
+
+        return User::query()
+            ->orderBy('name')
+            ->orderBy('email')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (User $user): bool =>
+                $this->access->isActive($user)
+                && ! in_array((int) $user->getKey(), $boundUserIds, true)
+            )
+            ->values();
     }
 
     /**

@@ -1,7 +1,7 @@
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
-    subheading="Manage the pieces that make Scheduling work without turning setup into one giant form."
+    subheading="Set up appointment types in a clear order, with required steps first and optional tools explained when they matter."
 >
     <div class="space-y-6" data-scheduling-configuration>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -14,7 +14,7 @@
             </a>
 
             <p class="text-sm text-slate-500">
-                Start with Services, then add availability. Staff assignment is optional.
+                Start with Appointment Types, then Availability. Staff comes next when person-specific assignment or team follow-up is useful.
             </p>
         </div>
 
@@ -44,14 +44,14 @@
                         {{ $readiness['internal_ready'] ? 'Scheduling is ready for appointments' : 'Finish the core booking setup' }}
                     </h2>
                     <p class="mt-1 max-w-2xl text-sm text-slate-500">
-                        A service and usable availability are the only requirements for internal scheduling. Staff/provider records are optional unless appointments need explicit assignment.
+                        An appointment type and usable availability are the required foundation. Staff is recommended when appointments, tasks, or team notifications should reach a specific person.
                     </p>
                 </div>
 
                 <div class="grid grid-cols-2 gap-2 text-center sm:min-w-64">
                     <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                         <div class="text-xl font-semibold text-slate-900">{{ $readiness['active_service_count'] }}</div>
-                        <div class="mt-1 text-xs text-slate-500">Active services</div>
+                        <div class="mt-1 text-xs text-slate-500">Active appointment types</div>
                     </div>
                     <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                         <div class="text-xl font-semibold text-slate-900">{{ $readiness['active_host_count'] }}</div>
@@ -62,9 +62,9 @@
 
             <div class="grid gap-3 sm:grid-cols-3">
                 <div class="rounded-xl border border-slate-200 p-3" data-scheduling-readiness-service="{{ $readiness['has_service'] ? 'ready' : 'needed' }}">
-                    <div class="text-sm font-semibold text-slate-900">Services</div>
+                    <div class="text-sm font-semibold text-slate-900">Appointment types</div>
                     <div class="mt-1 text-xs text-slate-500">
-                        {{ $readiness['has_service'] ? 'At least one active service is ready.' : 'Add the first thing people can schedule.' }}
+                        {{ $readiness['has_service'] ? 'At least one active appointment type is ready.' : 'Add the first thing people can schedule.' }}
                     </div>
                 </div>
 
@@ -81,11 +81,11 @@
                         @if (! $readiness['public_surface_enabled'])
                             Public booking is not enabled for this deployment.
                         @elseif ($readiness['public_ready'])
-                            Public booking has the required service and availability setup.
+                            Public booking has the required appointment-type and availability setup.
                         @elseif ($readiness['has_incomplete_public_service'])
-                            One or more public services still need a complete appointment format.
+                            One or more public appointment types still need a complete appointment format.
                         @else
-                            Choose at least one public service and finish the required setup.
+                            Choose at least one public appointment type and finish the required setup.
                         @endif
                     </div>
                 </div>
@@ -110,10 +110,10 @@
                 >
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <div class="text-sm font-semibold text-teal-700">1. Services</div>
+                            <div class="text-sm font-semibold text-teal-700">1. Appointment types</div>
                             <h3 class="mt-1 text-lg font-semibold text-slate-900">What can people schedule?</h3>
                             <p class="mt-2 text-sm text-slate-500">
-                                Add services, edit appointment format and booking rules, and choose who can handle each service.
+                                Create what people can schedule, set the normal length and meeting method, then finish its required availability.
                             </p>
                         </div>
                         <span class="text-slate-400">→</span>
@@ -131,7 +131,7 @@
                             <div class="text-sm font-semibold text-teal-700">2. Availability</div>
                             <h3 class="mt-1 text-lg font-semibold text-slate-900">When can appointments happen?</h3>
                             <p class="mt-2 text-sm text-slate-500">
-                                Set normal weekly hours, special dates, time off, and test the actual times Scheduling can offer.
+                                Set normal weekly hours, special dates, time off, start-time spacing, preparation time, and the actual times people can book.
                             </p>
                         </div>
                         <span class="text-slate-400">→</span>
@@ -145,10 +145,10 @@
                 >
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <div class="text-sm font-semibold text-slate-600">Optional</div>
+                            <div class="text-sm font-semibold text-slate-600">{{ $staffGuidance['label'] }}</div>
                             <h3 class="mt-1 text-lg font-semibold text-slate-900">Staff & providers</h3>
                             <p class="mt-2 text-sm text-slate-500">
-                                Add people only when appointments need explicit assignment or person-specific capacity.
+                                {{ $staffGuidance['description'] }}
                             </p>
                         </div>
                         <span class="text-slate-400">→</span>
@@ -200,7 +200,7 @@
                             <div class="text-sm font-semibold text-slate-600">Advanced</div>
                             <h3 class="mt-1 text-lg font-semibold text-slate-900">Rooms, equipment & shared capacity</h3>
                             <p class="mt-2 text-sm text-slate-500">
-                                Configure limited shared resources only when a booking depends on them.
+                                Most businesses do not need this. Use it when appointments compete for something limited, such as one conference room, two courts, a specialized machine, or a small vehicle fleet.
                             </p>
                         </div>
                         <span class="text-slate-400">→</span>

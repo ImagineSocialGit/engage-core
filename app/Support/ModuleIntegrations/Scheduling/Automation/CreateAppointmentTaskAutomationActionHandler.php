@@ -2,6 +2,7 @@
 
 namespace App\Support\ModuleIntegrations\Scheduling\Automation;
 
+use App\Models\User;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Tasks\Actions\CreateTaskFromTemplateAction;
 use App\Modules\Tasks\Models\Task;
@@ -50,7 +51,7 @@ class CreateAppointmentTaskAutomationActionHandler implements AutomationActionHa
             $appointment->loadMissing('schedulingHost.hostable');
             $assignee = $appointment->schedulingHost?->hostable;
 
-            if (! $assignee instanceof Model) {
+            if (! $assignee instanceof User) {
                 return AutomationActionResult::blocked('appointment_host_assignee_unavailable');
             }
         }

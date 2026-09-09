@@ -160,22 +160,32 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
     public function test_first_use_create_paths_generate_technical_defaults_from_business_inputs(): void
     {
         $user = User::factory()->create();
+        $staffUser = User::factory()->create([
+            'name' => 'Taylor Smith',
+            'email' => 'taylor@example.test',
+        ]);
 
-        $this->actingAs($user)
+        $response = $this->actingAs($user)
             ->post(route('crm.scheduling.configuration.services.store'), [
                 'name' => 'Planning Call',
                 'duration_minutes' => 30,
-            ])
-            ->assertRedirect(route('crm.scheduling.configuration.services.index'))
-            ->assertSessionHasNoErrors();
+            ]);
 
         $service = BookableService::query()->sole();
+
+        $response
+            ->assertRedirect(route('crm.scheduling.configuration.availability.index', [
+                'service_id' => $service->getKey(),
+                'guided' => 1,
+            ]))
+            ->assertSessionHasNoErrors();
 
         $this->assertSame('planning_call', $service->key);
         $this->assertSame(BookableService::STATUS_ACTIVE, $service->status);
         $this->assertSame(BookableService::DURATION_MODE_FIXED, $service->duration_mode);
         $this->assertSame(30, $service->duration_minutes);
         $this->assertSame(15, $service->slot_interval_minutes);
+        $this->assertSame('09:00', $service->slotStartAnchorTime());
         $this->assertSame(1, $service->capacity);
         $this->assertFalse($service->requires_confirmation);
         $this->assertFalse($service->is_public);
@@ -183,8 +193,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('crm.scheduling.configuration.hosts.store'), [
-                'name' => 'Taylor Smith',
-                'email' => 'taylor@example.test',
+                'user_id' => $staffUser->getKey(),
             ])
             ->assertRedirect(route('crm.scheduling.configuration.staff.index'))
             ->assertSessionHasNoErrors();
@@ -192,26 +201,27 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
         $host = SchedulingHost::query()->sole();
 
         $this->assertSame('taylor_smith', $host->key);
+        $this->assertSame('Taylor Smith', $host->name);
         $this->assertSame(SchedulingHost::STATUS_ACTIVE, $host->status);
         $this->assertSame(1, $host->capacity);
         $this->assertSame(10, $host->sort_order);
         $this->assertSame('taylor@example.test', $host->email);
+        $this->assertSame($staffUser->getMorphClass(), $host->hostable_type);
+        $this->assertSame($staffUser->getKey(), $host->hostable_id);
     }
 
-    public function test_manual_hosts_are_created_and_updated_without_caller_owned_internals(): void
+    public function test_manual_hosts_are_user_backed_and_keep_identity_server_owned(): void
     {
-        $user = User::factory()->create();
+        $actor = User::factory()->create();
+        $staffUser = User::factory()->create([
+            'name' => 'Primary Advisor',
+            'email' => 'ADVISOR@EXAMPLE.TEST',
+        ]);
 
-        $this->actingAs($user)
-            ->post(
-                route('crm.scheduling.configuration.hosts.store'),
-                $this->hostPayload([
-                    'key' => 'primary_advisor',
-                    'name' => 'Primary Advisor',
-                    'capacity' => 3,
-                    'email' => 'ADVISOR@EXAMPLE.TEST',
-                ]),
-            )
+        $this->actingAs($actor)
+            ->post(route('crm.scheduling.configuration.hosts.store'), [
+                'user_id' => $staffUser->getKey(),
+            ])
             ->assertRedirect(route('crm.scheduling.configuration.staff.index'))
             ->assertSessionHasNoErrors();
 
@@ -219,23 +229,21 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
 
         $this->assertSame('primary_advisor', $host->key);
         $this->assertSame('Primary Advisor', $host->name);
-        $this->assertSame(3, $host->capacity);
         $this->assertSame('advisor@example.test', $host->email);
         $this->assertSame(SchedulingHost::SOURCE_MANUAL, $host->source);
-        $this->assertNull($host->hostable_type);
-        $this->assertNull($host->hostable_id);
+        $this->assertSame($staffUser->getMorphClass(), $host->hostable_type);
+        $this->assertSame($staffUser->getKey(), $host->hostable_id);
         $this->assertNull($host->meta);
 
-        $this->actingAs($user)
+        $this->actingAs($actor)
             ->patch(
                 route('crm.scheduling.configuration.hosts.update', $host),
-                $this->hostPayload([
+                $this->hostPayload($staffUser, [
                     'current_version' => $host->updated_at->toISOString(),
-                    'name' => 'Updated Advisor',
                     'status' => SchedulingHost::STATUS_INACTIVE,
                     'capacity' => 4,
                     'sort_order' => 20,
-                ], includeKey: false),
+                ]),
             )
             ->assertRedirect(route('crm.scheduling.configuration.staff.index'))
             ->assertSessionHasNoErrors();
@@ -243,18 +251,25 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
         $host->refresh();
 
         $this->assertSame('primary_advisor', $host->key);
-        $this->assertSame('Updated Advisor', $host->name);
+        $this->assertSame('Primary Advisor', $host->name);
         $this->assertSame(SchedulingHost::STATUS_INACTIVE, $host->status);
         $this->assertSame(4, $host->capacity);
         $this->assertSame(20, $host->sort_order);
+        $this->assertSame($staffUser->getKey(), $host->hostable_id);
     }
 
-    public function test_host_updates_reject_immutable_internal_owned_and_stale_changes(): void
+    public function test_host_updates_reconnect_imported_identity_and_reject_provider_stale_or_forged_changes(): void
     {
-        $user = User::factory()->create();
-        $manual = SchedulingHost::factory()->create([
-            'key' => 'manual_host',
+        $actor = User::factory()->create();
+        $staffUser = User::factory()->create([
             'name' => 'Manual Host',
+            'email' => 'manual-host@example.test',
+        ]);
+        $imported = SchedulingHost::factory()->create([
+            'key' => 'manual_host',
+            'name' => 'Imported Host Snapshot',
+            'hostable_type' => null,
+            'hostable_id' => null,
         ]);
         $provider = SchedulingHost::factory()->create([
             'key' => 'provider_host',
@@ -262,54 +277,52 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
             'source' => SchedulingHost::SOURCE_PROVIDER,
         ]);
 
-        $this->actingAs($user)
+        $this->actingAs($actor)
             ->patch(
-                route('crm.scheduling.configuration.hosts.update', $manual),
-                $this->hostPayload([
-                    'current_version' => $manual->updated_at->toISOString(),
-                    'key' => 'changed_key',
+                route('crm.scheduling.configuration.hosts.update', $imported),
+                $this->hostPayload($staffUser, [
+                    'current_version' => $imported->updated_at->toISOString(),
+                ]),
+            )
+            ->assertRedirect(route('crm.scheduling.configuration.staff.index'))
+            ->assertSessionHasNoErrors();
+
+        $imported->refresh();
+        $this->assertSame($staffUser->getMorphClass(), $imported->hostable_type);
+        $this->assertSame($staffUser->getKey(), $imported->hostable_id);
+        $this->assertSame('Manual Host', $imported->name);
+        $this->assertSame('manual-host@example.test', $imported->email);
+
+        $this->actingAs($actor)
+            ->patch(
+                route('crm.scheduling.configuration.hosts.update', $provider),
+                $this->hostPayload($staffUser, [
+                    'current_version' => $provider->updated_at->toISOString(),
                 ]),
             )
             ->assertSessionHasErrors('configuration');
 
-        $this->actingAs($user)
-            ->patch(
-                route('crm.scheduling.configuration.hosts.update', $provider),
-                $this->hostPayload([
-                    'current_version' => $provider->updated_at->toISOString(),
-                    'name' => 'Changed Provider Host',
-                ], includeKey: false),
-            )
-            ->assertSessionHasErrors('configuration');
-
-        $staleVersion = $manual->updated_at->toISOString();
-        $manual->forceFill([
-            'name' => 'Concurrent Change',
-            'updated_at' => $manual->updated_at->addMinute(),
+        $staleVersion = $imported->updated_at->toISOString();
+        $imported->forceFill([
+            'updated_at' => $imported->updated_at->addMinute(),
         ])->saveQuietly();
 
-        $this->actingAs($user)
+        $this->actingAs($actor)
             ->patch(
-                route('crm.scheduling.configuration.hosts.update', $manual),
-                $this->hostPayload([
+                route('crm.scheduling.configuration.hosts.update', $imported),
+                $this->hostPayload($staffUser, [
                     'current_version' => $staleVersion,
-                    'name' => 'Stale Change',
-                ], includeKey: false),
+                ]),
             )
             ->assertSessionHasErrors('configuration');
 
-        $this->actingAs($user)
-            ->post(
-                route('crm.scheduling.configuration.hosts.store'),
-                [
-                    ...$this->hostPayload(['key' => 'forged_host']),
-                    'source' => SchedulingHost::SOURCE_PROVIDER,
-                ],
-            )
+        $this->actingAs($actor)
+            ->post(route('crm.scheduling.configuration.hosts.store'), [
+                'user_id' => User::factory()->create()->getKey(),
+                'source' => SchedulingHost::SOURCE_PROVIDER,
+            ])
             ->assertSessionHasErrors('configuration');
 
-        $this->assertSame('manual_host', $manual->refresh()->key);
-        $this->assertSame('Concurrent Change', $manual->name);
         $this->assertSame('Provider Host', $provider->refresh()->name);
         $this->assertSame(2, SchedulingHost::query()->count());
     }
@@ -318,7 +331,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $this->actingAs($user)
+        $response = $this->actingAs($user)
             ->post(
                 route('crm.scheduling.configuration.services.store'),
                 $this->servicePayload([
@@ -331,11 +344,16 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
                     'requires_confirmation' => true,
                     'is_public' => true,
                 ]),
-            )
-            ->assertRedirect(route('crm.scheduling.configuration.services.index'))
-            ->assertSessionHasNoErrors();
+            );
 
         $service = BookableService::query()->sole();
+
+        $response
+            ->assertRedirect(route('crm.scheduling.configuration.availability.index', [
+                'service_id' => $service->getKey(),
+                'guided' => 1,
+            ]))
+            ->assertSessionHasNoErrors();
 
         $this->assertSame('planning_call', $service->key);
         $this->assertSame('Planning Call', $service->name);
@@ -345,7 +363,8 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
         $this->assertNull($service->provider);
         $this->assertNull($service->external_id);
         $this->assertNull($service->external_url);
-        $this->assertNull($service->meta);
+        $this->assertSame('09:00', $service->slotStartAnchorTime());
+        $this->assertSame('09:00', data_get($service->meta, 'availability.slot_start_anchor_time'));
         $this->assertEquals([
             'label' => 'Video Room',
             'url' => 'https://example.test/room',
@@ -385,7 +404,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $this->actingAs($user)
+        $response = $this->actingAs($user)
             ->post(
                 route('crm.scheduling.configuration.services.store'),
                 $this->servicePayload([
@@ -396,11 +415,16 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
                     'minimum_duration_minutes' => 1440,
                     'maximum_duration_minutes' => 10080,
                 ]),
-            )
-            ->assertRedirect(route('crm.scheduling.configuration.services.index'))
-            ->assertSessionHasNoErrors();
+            );
 
         $service = BookableService::query()->sole();
+
+        $response
+            ->assertRedirect(route('crm.scheduling.configuration.availability.index', [
+                'service_id' => $service->getKey(),
+                'guided' => 1,
+            ]))
+            ->assertSessionHasNoErrors();
 
         $this->assertSame(BookableService::DURATION_MODE_RANGE, $service->duration_mode);
         $this->assertSame(2880, $service->duration_minutes);
@@ -719,17 +743,14 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
      * @return array<string, mixed>
      */
     private function hostPayload(
+        User $user,
         array $overrides = [],
-        bool $includeKey = true,
     ): array {
         return [
-            ...($includeKey ? ['key' => 'configuration_host'] : []),
-            'name' => 'Configuration Host',
+            'user_id' => $user->getKey(),
             'status' => SchedulingHost::STATUS_ACTIVE,
             'timezone' => 'UTC',
             'capacity' => 1,
-            'email' => null,
-            'phone' => null,
             'sort_order' => 0,
             ...$overrides,
         ];

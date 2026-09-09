@@ -3,11 +3,13 @@
 namespace App\Modules\Scheduling\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Services\SchedulingConfigurationWriter;
 use App\Modules\Scheduling\Services\SchedulingReadService;
 use App\Modules\Scheduling\Services\SchedulingSetupReadiness;
+use App\Modules\Scheduling\Services\SchedulingSetupProgress;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,22 +24,31 @@ class SchedulingConfigurationController extends Controller
 {
     public function index(
         SchedulingSetupReadiness $readiness,
+        SchedulingSetupProgress $progress,
     ): View {
         return view('crm.scheduling.configuration', [
             'title' => 'Scheduling Setup',
             'heading' => 'Scheduling Setup',
             'readiness' => $readiness->summary(),
+            'staffGuidance' => $progress->staffGuidance(),
         ]);
     }
 
-    public function services(SchedulingReadService $read): View
-    {
+    public function services(
+        SchedulingReadService $read,
+        SchedulingSetupProgress $progress,
+    ): View {
         $services = $read->configurationServices();
+        $firstRun = $services->isEmpty();
 
         return view('crm.scheduling.services.index', [
             'title' => 'Appointment Types',
             'heading' => 'Appointment Types',
             'services' => $services,
+            'firstRun' => $firstRun,
+            'setupProgress' => $firstRun
+                ? $progress->forService(null, 'appointment_type')
+                : null,
             'shareableServiceCount' => $services
                 ->filter(fn (BookableService $service): bool =>
                     (bool) $service->getAttribute('public_booking_ready')
@@ -49,6 +60,7 @@ class SchedulingConfigurationController extends Controller
     public function editService(
         BookableService $bookableService,
         SchedulingReadService $read,
+        SchedulingSetupProgress $progress,
     ): View {
         $service = $read->configurationService($bookableService);
         $locationDetails = is_array($service->location_details)
@@ -94,6 +106,7 @@ class SchedulingConfigurationController extends Controller
             'locationDetails' => $locationDetails,
             'locationAddress' => $locationAddress,
             'assignmentRows' => $assignmentRows,
+            'setupProgress' => $progress->forService($service, 'appointment_type'),
             'maxRangeDurationMinutes' => BookableService::MAX_RANGE_DURATION_MINUTES,
         ]);
     }
@@ -104,6 +117,7 @@ class SchedulingConfigurationController extends Controller
             'title' => 'Scheduling Staff',
             'heading' => 'Staff & Providers',
             'hosts' => $read->configurationHosts(),
+            'availableHostUsers' => $read->availableHostUsers(),
             'hostStatuses' => [
                 SchedulingHost::STATUS_ACTIVE,
                 SchedulingHost::STATUS_INACTIVE,
@@ -118,30 +132,33 @@ class SchedulingConfigurationController extends Controller
         SchedulingConfigurationWriter $writer,
     ): RedirectResponse {
         $this->assertAllowedFields($request, [
-            'key',
-            'name',
-            'status',
-            'timezone',
-            'capacity',
-            'email',
-            'phone',
-            'sort_order',
+            'user_id',
         ]);
 
-        $validated = validator(
-            $this->hostCreatePayload($request),
-            $this->hostRules(includeKey: true),
-        )->validate();
+        $validated = $request->validate([
+            'user_id' => [
+                'required',
+                'integer',
+                Rule::exists('users', 'id'),
+            ],
+        ]);
+        $user = User::query()->findOrFail((int) $validated['user_id']);
 
         try {
-            $writer->createHost($validated);
+            $writer->createHost($user, [
+                'key' => $this->generatedHostKey((string) $user->name),
+                'status' => SchedulingHost::STATUS_ACTIVE,
+                'timezone' => $this->defaultTimezone(),
+                'capacity' => 1,
+                'sort_order' => $this->nextHostSortOrder(),
+            ]);
         } catch (DomainException|InvalidArgumentException|LogicException $exception) {
             throw $this->configurationException($exception);
         }
 
         return redirect()
             ->route('crm.scheduling.configuration.staff.index')
-            ->with('success', 'Scheduling staff member created.');
+            ->with('success', 'Scheduling staff member added.');
     }
 
     public function updateHost(
@@ -151,23 +168,28 @@ class SchedulingConfigurationController extends Controller
     ): RedirectResponse {
         $this->assertAllowedFields($request, [
             'current_version',
-            'name',
+            'user_id',
             'status',
             'timezone',
             'capacity',
-            'email',
-            'phone',
             'sort_order',
         ]);
 
         $validated = $request->validate([
             'current_version' => ['required', 'string', 'max:80'],
-            ...$this->hostRules(includeKey: false),
+            'user_id' => [
+                'required',
+                'integer',
+                Rule::exists('users', 'id'),
+            ],
+            ...$this->hostUpdateRules(),
         ]);
+        $user = User::query()->findOrFail((int) $validated['user_id']);
 
         try {
             $writer->updateHost(
                 host: $schedulingHost,
+                user: $user,
                 attributes: $validated,
                 expectedUpdatedAt: $validated['current_version'],
             );
@@ -194,15 +216,26 @@ class SchedulingConfigurationController extends Controller
             $this->serviceRules(includeKey: true),
         )->validate();
 
+        $firstService = ! BookableService::withTrashed()->exists();
+
         try {
-            $writer->createService($validated);
+            $service = $writer->createService($validated);
         } catch (DomainException|InvalidArgumentException|LogicException $exception) {
             throw $this->configurationException($exception);
         }
 
+        if ($firstService) {
+            return redirect()
+                ->route('crm.scheduling.configuration.availability.index', [
+                    'service_id' => $service->getKey(),
+                    'guided' => 1,
+                ])
+                ->with('success', 'Appointment type created. Next, set when it can be booked.');
+        }
+
         return redirect()
-            ->route('crm.scheduling.configuration.services.index')
-            ->with('success', 'Scheduling service created.');
+            ->route('crm.scheduling.configuration.services.edit', $service)
+            ->with('success', 'Appointment type created. Finish its setup below.');
     }
 
     public function updateService(
@@ -232,7 +265,7 @@ class SchedulingConfigurationController extends Controller
 
         return redirect()
             ->route('crm.scheduling.configuration.services.edit', $bookableService)
-            ->with('success', 'Scheduling service updated.');
+            ->with('success', 'Appointment type updated.');
     }
 
     public function updateServiceHosts(
@@ -283,30 +316,7 @@ class SchedulingConfigurationController extends Controller
 
         return redirect()
             ->route('crm.scheduling.configuration.services.edit', $bookableService)
-            ->with('success', 'Service staff assignments updated.');
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function hostCreatePayload(Request $request): array
-    {
-        $payload = $request->all();
-
-        if (! is_string($payload['key'] ?? null) || trim((string) $payload['key']) === '') {
-            $payload['key'] = $this->generatedHostKey((string) ($payload['name'] ?? ''));
-        }
-
-        $payload += [
-            'status' => SchedulingHost::STATUS_ACTIVE,
-            'timezone' => $this->defaultTimezone(),
-            'capacity' => 1,
-            'email' => null,
-            'phone' => null,
-            'sort_order' => $this->nextHostSortOrder(),
-        ];
-
-        return $payload;
+            ->with('success', 'Appointment-type staff assignments updated.');
     }
 
     /**
@@ -432,19 +442,9 @@ class SchedulingConfigurationController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function hostRules(bool $includeKey): array
+    private function hostUpdateRules(): array
     {
-        return array_filter([
-            'key' => $includeKey
-                ? [
-                    'required',
-                    'string',
-                    'max:191',
-                    'regex:/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/',
-                    Rule::unique('scheduling_hosts', 'key'),
-                ]
-                : null,
-            'name' => ['required', 'string', 'max:255'],
+        return [
             'status' => [
                 'required',
                 'string',
@@ -460,10 +460,8 @@ class SchedulingConfigurationController extends Controller
                 Rule::in(timezone_identifiers_list()),
             ],
             'capacity' => ['required', 'integer', 'min:1', 'max:100000'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:255'],
             'sort_order' => ['required', 'integer', 'min:0', 'max:100000'],
-        ], static fn (mixed $rules): bool => is_array($rules));
+        ];
     }
 
     /**

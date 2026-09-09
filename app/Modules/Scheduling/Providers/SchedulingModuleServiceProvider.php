@@ -2,6 +2,8 @@
 
 namespace App\Modules\Scheduling\Providers;
 
+use App\Models\User;
+use App\Modules\Core\Access\Models\UserAccessProfile;
 use App\Modules\Scheduling\Automation\AppointmentAutomationTriggerAuthoringContributor;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Scheduling\Console\Commands\SyncAppointmentCommunicationsCatalogCommand;
@@ -12,6 +14,7 @@ use App\Modules\Scheduling\ReadModels\SchedulingBookingFunnelFactContributor;
 use App\Modules\Scheduling\Services\ContactShow\SchedulingContactPanelProvider;
 use App\Modules\Scheduling\Services\Dashboard\TodayAppointmentsDashboardPanelProvider;
 use App\Modules\Scheduling\Services\Dashboard\TomorrowAppointmentsDashboardPanelProvider;
+use App\Modules\Scheduling\Services\SchedulingUserHostSynchronizer;
 use App\Modules\Scheduling\Validation\SchedulingSetupValidationContributor;
 use App\Support\Dashboard\DashboardPanelRegistry;
 use Illuminate\Console\Scheduling\Schedule;
@@ -55,6 +58,7 @@ class SchedulingModuleServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerContactPanel();
+        $this->registerUserHostSynchronization();
         $this->registerBookingHoldExpiration();
         $this->registerPublicRoutes();
 
@@ -69,6 +73,18 @@ class SchedulingModuleServiceProvider extends ServiceProvider
     {
         $this->app->make(ContactPanelRegistry::class)
             ->register(SchedulingContactPanelProvider::class, 'scheduling');
+    }
+
+
+    private function registerUserHostSynchronization(): void
+    {
+        User::saved(function (User $user): void {
+            app(SchedulingUserHostSynchronizer::class)->syncUser($user);
+        });
+
+        UserAccessProfile::saved(function (UserAccessProfile $profile): void {
+            app(SchedulingUserHostSynchronizer::class)->syncAccessProfile($profile);
+        });
     }
 
     private function registerBookingHoldExpiration(): void
