@@ -197,8 +197,13 @@ identity_preflight() {
 
 ensure_env_permissions() {
     [[ -f "$ROOT_ENV" && -f "$CLIENT_ENV" ]] || fail "Runtime environment files are missing."
-    sudo chown "$DEPLOY_USER:$WEB_GROUP" "$ROOT_ENV" "$CLIENT_ENV"
-    sudo chmod 640 "$ROOT_ENV" "$CLIENT_ENV"
+
+    local deploy_group
+    deploy_group="$(id -gn "$DEPLOY_USER")"
+
+    sudo chown "$DEPLOY_USER:$deploy_group" "$ROOT_ENV" "$CLIENT_ENV"
+    sudo chmod 664 "$ROOT_ENV" "$CLIENT_ENV"
+
     sudo -u "$DEPLOY_USER" test -r "$ROOT_ENV" || fail "$DEPLOY_USER cannot read $ROOT_ENV"
     sudo -u "$WEB_USER" test -r "$ROOT_ENV" || fail "$WEB_USER cannot read $ROOT_ENV"
     sudo -u "$DEPLOY_USER" test -r "$CLIENT_ENV" || fail "$DEPLOY_USER cannot read $CLIENT_ENV"
