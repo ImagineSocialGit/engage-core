@@ -32,10 +32,17 @@ class SchedulingConfigurationController extends Controller
 
     public function services(SchedulingReadService $read): View
     {
+        $services = $read->configurationServices();
+
         return view('crm.scheduling.services.index', [
-            'title' => 'Scheduling Services',
-            'heading' => 'Services',
-            'services' => $read->configurationServices(),
+            'title' => 'Appointment Types',
+            'heading' => 'Appointment Types',
+            'services' => $services,
+            'shareableServiceCount' => $services
+                ->filter(fn (BookableService $service): bool =>
+                    (bool) $service->getAttribute('public_booking_ready')
+                )
+                ->count(),
         ]);
     }
 
@@ -73,7 +80,7 @@ class SchedulingConfigurationController extends Controller
             ->all();
 
         return view('crm.scheduling.services.edit', [
-            'title' => 'Edit Scheduling Service',
+            'title' => 'Edit Appointment Type',
             'heading' => $service->name,
             'service' => $service,
             'serviceEditable' => (bool) $service->getAttribute('crm_editable'),

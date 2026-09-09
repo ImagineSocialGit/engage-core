@@ -3074,6 +3074,7 @@
 │   │   │   ├── ContactDirectMessageTest.php
 │   │   │   ├── ContactImportMarketingPermissionControllerTest.php
 │   │   │   ├── ContactPermissionInvitationControllerTest.php
+│   │   │   ├── ContactPermissionInvitationHumanVerificationTest.php
 │   │   │   ├── ContactPermissionInvitationServiceTest.php
 │   │   │   ├── ContactScheduledMessagesTerminalResultTest.php
 │   │   │   ├── ContextualMessageFieldCatalogTest.php
@@ -3278,6 +3279,7 @@
 │   │   │   ├── RescheduleAppointmentActionTest.php
 │   │   │   ├── RescheduleSlotOfferAndBookingHoldActionTest.php
 │   │   │   ├── ResourceAwareOccupancyTest.php
+│   │   │   ├── SchedulingAdminUxV2Test.php
 │   │   │   ├── SchedulingAfterBookingFallbackRuntimeTest.php
 │   │   │   ├── SchedulingAfterBookingWorkspaceTest.php
 │   │   │   ├── SchedulingAppointmentFormatTest.php
@@ -3358,6 +3360,7 @@
 │   │   │   │   ├── ProviderAttendanceReconciliationTest.php
 │   │   │   │   ├── WebinarFollowUpOutcomeAccountingTest.php
 │   │   │   │   ├── WebinarFutureAvailabilitySubscriptionTest.php
+│   │   │   │   ├── WebinarParticipationAggregationTest.php
 │   │   │   │   ├── WebinarPostEventReviewTest.php
 │   │   │   │   ├── WebinarProviderEventTargetResolutionTest.php
 │   │   │   │   └── WebinarReplayDispatchPreflightTest.php
@@ -3438,4 +3441,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-816 directories, 2623 files
+816 directories, 2626 files

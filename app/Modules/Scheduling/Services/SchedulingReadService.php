@@ -157,7 +157,51 @@ class SchedulingReadService
      */
     public function configurationServices(): Collection
     {
-        $services = BookableService::query()
+        $services = $this->configurationServicesQuery()->get();
+
+        return $services->each(
+            fn (BookableService $service): BookableService =>
+                $this->decorateConfigurationService($service),
+        );
+    }
+
+    public function configurationService(
+        BookableService $service,
+    ): BookableService {
+        $service = $this->configurationServicesQuery()
+            ->whereKey($service->getKey())
+            ->firstOrFail();
+
+        return $this->decorateConfigurationService($service);
+    }
+
+    /** @return Builder<BookableService> */
+    private function configurationServicesQuery(): Builder
+    {
+        return BookableService::query()
+            ->select('bookable_services.*')
+            ->selectSub(
+                Appointment::query()
+                    ->select('starts_at')
+                    ->whereColumn(
+                        'appointments.bookable_service_id',
+                        'bookable_services.id',
+                    )
+                    ->whereIn('appointments.status', [
+                        Appointment::STATUS_PENDING,
+                        Appointment::STATUS_SCHEDULED,
+                        Appointment::STATUS_CONFIRMED,
+                    ])
+                    ->where(
+                        'appointments.starts_at',
+                        '>=',
+                        CarbonImmutable::now('UTC'),
+                    )
+                    ->orderBy('appointments.starts_at')
+                    ->orderBy('appointments.id')
+                    ->limit(1),
+                'next_appointment_at',
+            )
             ->with([
                 'hostAssignments' => fn ($query) => $query
                     ->with('schedulingHost')
@@ -174,39 +218,96 @@ class SchedulingReadService
             ->orderByRaw("case status when 'active' then 0 when 'inactive' then 1 else 2 end")
             ->orderBy('sort_order')
             ->orderBy('name')
-            ->orderBy('id')
-            ->get();
-
-        return $services->each(function (BookableService $service): void {
-            $service->setAttribute(
-                'crm_editable',
-                $this->configurationWriter->serviceIsEditable($service),
-            );
-        });
+            ->orderBy('id');
     }
 
-    public function configurationService(
+    private function decorateConfigurationService(
         BookableService $service,
     ): BookableService {
-        $service->load([
-            'hostAssignments' => fn ($query) => $query
-                ->with('schedulingHost')
-                ->orderBy('sort_order')
-                ->orderBy('id'),
-        ])->loadCount([
-            'appointments',
-            'availabilityWindows',
-            'hostAssignments',
-            'hostAssignments as active_host_assignments_count' =>
-                fn ($query) => $query->where('is_active', true),
-        ]);
-
         $service->setAttribute(
             'crm_editable',
             $this->configurationWriter->serviceIsEditable($service),
         );
 
+        $activeHostNames = $service->hostAssignments
+            ->filter(fn (BookableServiceHost $assignment): bool =>
+                (bool) $assignment->is_active
+            )
+            ->map(fn (BookableServiceHost $assignment): string =>
+                trim((string) $assignment->schedulingHost?->name)
+            )
+            ->filter(fn (string $name): bool => $name !== '')
+            ->unique()
+            ->values();
+
+        $service->setAttribute(
+            'active_host_names',
+            $activeHostNames->all(),
+        );
+        $service->setAttribute(
+            'active_host_summary',
+            match ($activeHostNames->count()) {
+                0 => 'No host assigned',
+                1 => (string) $activeHostNames->first(),
+                2 => $activeHostNames->join(' and '),
+                default => $activeHostNames->take(2)->join(', ')
+                    .' +'.($activeHostNames->count() - 2).' more',
+            },
+        );
+
+        $nextAppointmentAt = $service->getAttribute('next_appointment_at');
+
+        $service->setAttribute(
+            'next_appointment_label',
+            $this->configurationAppointmentLabel($nextAppointmentAt),
+        );
+
+        $publicBaseUrl = trim((string) config('scheduling.public.url', ''));
+        $publicBookingUrl = $publicBaseUrl !== ''
+            ? rtrim($publicBaseUrl, '/').'/services/'.rawurlencode((string) $service->key)
+            : null;
+        $publicEnabled = (bool) config('scheduling.public.enabled', false)
+            && $publicBookingUrl !== null;
+        $publicBookingReady = $publicEnabled
+            && $service->status === BookableService::STATUS_ACTIVE
+            && (bool) $service->is_public
+            && $service->hasCompleteAppointmentFormat();
+
+        $service->setAttribute(
+            'public_booking_url',
+            $publicBookingUrl,
+        );
+        $service->setAttribute(
+            'public_booking_ready',
+            $publicBookingReady,
+        );
+        $service->setAttribute(
+            'public_booking_issue',
+            match (true) {
+                ! $publicEnabled =>
+                    'Public booking is not configured for this environment.',
+                $service->status !== BookableService::STATUS_ACTIVE =>
+                    'Activate this appointment type before sharing it.',
+                ! $service->hasCompleteAppointmentFormat() =>
+                    'Choose how the appointment happens before sharing it.',
+                ! (bool) $service->is_public =>
+                    'Turn on customer self-booking to get a shareable link.',
+                default => null,
+            },
+        );
+
         return $service;
+    }
+
+    private function configurationAppointmentLabel(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return CarbonImmutable::parse($value)
+            ->timezone(config('client.timezone', config('app.timezone', 'UTC')))
+            ->format('M j, g:i A');
     }
 
     /**

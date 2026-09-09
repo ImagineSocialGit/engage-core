@@ -1,7 +1,7 @@
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
-    subheading="Keep the service itself in one place, then jump to availability, follow-up, or advanced resources when needed."
+    subheading="Set up one appointment type from start to finish, with the common decisions first and advanced controls out of the way until you need them."
 >
     <div class="space-y-6" data-scheduling-service-editor="{{ $service->id }}">
         <datalist id="scheduling-timezones">
@@ -19,22 +19,58 @@
                 Back to Services
             </a>
 
-            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <div
+                class="flex flex-col gap-2 sm:flex-row sm:flex-wrap"
+                @if ($service->getAttribute('public_booking_ready'))
+                    x-data="{ copied: false }"
+                @endif
+            >
+                @if ($service->getAttribute('public_booking_ready'))
+                    <input
+                        x-ref="bookingLink"
+                        class="sr-only"
+                        type="text"
+                        value="{{ $service->getAttribute('public_booking_url') }}"
+                        readonly
+                        tabindex="-1"
+                        aria-hidden="true"
+                    >
+                    <a
+                        href="{{ $service->getAttribute('public_booking_url') }}"
+                        target="_blank"
+                        rel="noopener"
+                        class="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto"
+                        data-scheduling-service-preview
+                    >
+                        Preview booking page
+                    </a>
+                    <button
+                        type="button"
+                        class="inline-flex w-full items-center justify-center rounded-lg border border-teal-600 bg-white px-3 py-2 text-sm font-semibold text-teal-700 shadow-sm hover:bg-teal-50 sm:w-auto"
+                        data-scheduling-service-copy-link
+                        x-on:click="
+                            if (navigator.clipboard) {
+                                navigator.clipboard.writeText($refs.bookingLink.value);
+                            } else {
+                                $refs.bookingLink.select();
+                                document.execCommand('copy');
+                            }
+                            copied = true;
+                            setTimeout(() => copied = false, 1600);
+                        "
+                    >
+                        <span x-text="copied ? 'Copied' : 'Copy booking link'">Copy booking link</span>
+                    </button>
+                @endif
+
                 @if ($service->status === 'active')
                     <a
                         href="{{ route('crm.scheduling.configuration.availability.index', ['service_id' => $service->id]) }}"
-                        class="inline-flex w-full items-center justify-center rounded-lg border border-teal-600 bg-white px-3 py-2 text-sm font-semibold text-teal-700 shadow-sm hover:bg-teal-50 sm:w-auto"
+                        class="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto"
                     >
                         Availability
                     </a>
                 @endif
-
-                <a
-                    href="{{ route('crm.scheduling.configuration.after-booking.index') }}"
-                    class="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto"
-                >
-                    After Booking
-                </a>
             </div>
         </div>
 
@@ -74,14 +110,14 @@
                     @endif
                 </div>
 
-                <dl class="grid min-w-0 grid-cols-2 gap-3 text-sm sm:min-w-80">
+                <dl class="grid min-w-0 grid-cols-2 gap-3 text-sm sm:min-w-96">
                     <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                        <dt class="text-slate-500">Appointments</dt>
-                        <dd class="mt-1 font-semibold text-slate-900">{{ $service->appointments_count }}</dd>
+                        <dt class="text-slate-500">Hosts</dt>
+                        <dd class="mt-1 font-semibold text-slate-900">{{ $service->getAttribute('active_host_summary') }}</dd>
                     </div>
                     <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                        <dt class="text-slate-500">Assigned staff</dt>
-                        <dd class="mt-1 font-semibold text-slate-900">{{ $service->active_host_assignments_count }}</dd>
+                        <dt class="text-slate-500">Next appointment</dt>
+                        <dd class="mt-1 font-semibold text-slate-900">{{ $service->getAttribute('next_appointment_label') ?? 'None scheduled' }}</dd>
                     </div>
                 </dl>
             </div>
@@ -106,6 +142,39 @@
             </div>
         </x-ui.card>
 
+        <x-ui.card class="space-y-4" data-scheduling-service-setup-path>
+            <div>
+                <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
+                    Setup path
+                </div>
+                <h2 class="mt-3 text-lg font-semibold text-slate-900">Work through the appointment type in order</h2>
+                <p class="mt-1 text-sm text-slate-500">
+                    The common decisions stay up front. Booking rules, shared resources, and other uncommon controls stay in Advanced.
+                </p>
+            </div>
+
+            <nav class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" aria-label="Appointment type setup">
+                <a href="#basics" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:bg-teal-50/40">
+                    1. Basics
+                </a>
+                <a href="#availability" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:bg-teal-50/40">
+                    2. Availability
+                </a>
+                <a href="#booking-form" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:bg-teal-50/40">
+                    3. Booking form
+                </a>
+                <a href="#communications" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:bg-teal-50/40">
+                    4. Confirmation & reminders
+                </a>
+                <a href="#after-booking" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:bg-teal-50/40">
+                    5. After booking
+                </a>
+                <a href="#advanced" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:bg-teal-50/40">
+                    6. Advanced
+                </a>
+            </nav>
+        </x-ui.card>
+
         @if ($serviceEditable)
             <form
                 method="POST"
@@ -128,7 +197,7 @@
                 <input type="hidden" name="current_version" value="{{ $service->updated_at?->toISOString() }}">
                 <input type="hidden" name="sort_order" value="{{ $service->sort_order }}">
 
-                <x-ui.card class="space-y-5" data-scheduling-service-section="basics">
+                <x-ui.card id="basics" class="scroll-mt-6 space-y-5" data-scheduling-service-section="basics">
                     <div>
                         <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
                             Service
@@ -686,52 +755,172 @@
         </x-ui.card>
 
         <section class="space-y-4" data-scheduling-service-related-setup>
-            <div>
-                <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                    Related setup
+            <x-ui.card
+                id="availability"
+                class="scroll-mt-6 space-y-4"
+                data-scheduling-service-related="availability"
+                data-scheduling-service-workflow-step="availability"
+            >
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">2. Availability</div>
+                        <h2 class="mt-2 text-lg font-semibold text-slate-900">When can people book this?</h2>
+                        <p class="mt-1 max-w-2xl text-sm text-slate-500">
+                            Set normal hours, date-specific changes, and time off for this appointment type.
+                        </p>
+                    </div>
+                    @if ($service->status === 'active')
+                        <a
+                            href="{{ route('crm.scheduling.configuration.availability.index', ['service_id' => $service->id]) }}"
+                            class="inline-flex w-full items-center justify-center rounded-lg border border-teal-600 bg-white px-3 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50 sm:w-auto"
+                        >
+                            Manage availability
+                        </a>
+                    @endif
                 </div>
-                <h2 class="mt-3 text-lg font-semibold text-slate-900">Finish the rest where it belongs</h2>
-            </div>
 
-            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                @if ($service->status === 'active')
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                    <span class="text-slate-600">Saved availability rules:</span>
+                    <span class="font-semibold text-slate-900">{{ $service->availability_windows_count }}</span>
+                </div>
+            </x-ui.card>
+
+            <x-ui.card
+                id="booking-form"
+                class="scroll-mt-6 space-y-4"
+                data-scheduling-service-workflow-step="booking_form"
+                data-scheduling-booking-form-summary
+            >
+                <div>
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">3. Booking form</div>
+                    <h2 class="mt-2 text-lg font-semibold text-slate-900">What will the person be asked?</h2>
+                    <p class="mt-1 max-w-2xl text-sm text-slate-500">
+                        The public booking form stays short: first name, last name, email, and phone. Phone is required for phone appointments.
+                    </p>
+                </div>
+
+                <div class="grid gap-3 text-sm sm:grid-cols-2">
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <div class="font-semibold text-slate-900">Contact details</div>
+                        <div class="mt-1 text-slate-600">First name, last name, email, and phone.</div>
+                    </div>
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <div class="font-semibold text-slate-900">Appointment details</div>
+                        <div class="mt-1 text-slate-600">
+                            @if (($appointmentConfiguration['location_type'] ?? null) === 'customer_site')
+                                The appointment address is collected before available times are shown.
+                            @else
+                                The meeting method and preparation details come from Basics above.
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                @if ($service->getAttribute('public_booking_ready'))
                     <a
-                        href="{{ route('crm.scheduling.configuration.availability.index', ['service_id' => $service->id]) }}"
-                        class="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm hover:border-teal-300"
-                        data-scheduling-service-related="availability"
+                        href="{{ $service->getAttribute('public_booking_url') }}"
+                        target="_blank"
+                        rel="noopener"
+                        class="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto"
                     >
-                        <div class="font-semibold text-slate-900">Availability</div>
-                        <div class="mt-1 text-slate-500">Normal hours, exceptions, and live time testing.</div>
+                        Preview booking form
                     </a>
+                @else
+                    <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+                        {{ $service->getAttribute('public_booking_issue') }}
+                    </div>
                 @endif
+            </x-ui.card>
 
-                <a
-                    href="{{ route('crm.scheduling.configuration.after-booking.index') }}"
-                    class="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm hover:border-teal-300"
-                    data-scheduling-service-related="after_booking"
-                >
-                    <div class="font-semibold text-slate-900">After Booking</div>
-                    <div class="mt-1 text-slate-500">Follow-up and automation after an appointment is scheduled.</div>
-                </a>
+            <x-ui.card
+                id="communications"
+                class="scroll-mt-6 space-y-4"
+                data-scheduling-service-related="communications"
+                data-scheduling-service-workflow-step="communications"
+            >
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">4. Confirmation & reminders</div>
+                        <h2 class="mt-2 text-lg font-semibold text-slate-900">Keep people on track after they book</h2>
+                        <p class="mt-1 max-w-2xl text-sm text-slate-500">
+                            Appointment confirmations and reminders use one shared schedule across appointment types, so you only maintain the timing and message once.
+                        </p>
+                    </div>
+                    <a
+                        href="{{ route('crm.scheduling.configuration.communications.index') }}"
+                        class="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto"
+                    >
+                        Manage messages
+                    </a>
+                </div>
+            </x-ui.card>
 
-                <a
-                    href="{{ route('crm.scheduling.configuration.communications.index') }}"
-                    class="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm hover:border-teal-300"
-                    data-scheduling-service-related="communications"
-                >
-                    <div class="font-semibold text-slate-900">Communications</div>
-                    <div class="mt-1 text-slate-500">Confirmation and reminder behavior.</div>
-                </a>
+            <x-ui.card
+                id="after-booking"
+                class="scroll-mt-6 space-y-4"
+                data-scheduling-service-related="after_booking"
+                data-scheduling-service-workflow-step="after_booking"
+            >
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">5. After booking</div>
+                        <h2 class="mt-2 text-lg font-semibold text-slate-900">What should happen next?</h2>
+                        <p class="mt-1 max-w-2xl text-sm text-slate-500">
+                            Send this appointment type into its follow-up path, or use the simple fallback actions available in this setup.
+                        </p>
+                    </div>
+                    <a
+                        href="{{ route('crm.scheduling.configuration.after-booking.index') }}"
+                        class="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto"
+                    >
+                        Manage after booking
+                    </a>
+                </div>
+            </x-ui.card>
 
-                <a
-                    href="{{ route('crm.scheduling.configuration.resources.index') }}"
-                    class="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm hover:border-teal-300"
-                    data-scheduling-service-related="resources"
-                >
-                    <div class="font-semibold text-slate-900">Resources</div>
-                    <div class="mt-1 text-slate-500">Advanced rooms, equipment, and shared capacity.</div>
-                </a>
-            </div>
+            <x-ui.card
+                id="advanced"
+                class="scroll-mt-6 space-y-4"
+                data-scheduling-service-workflow-step="advanced"
+            >
+                <div>
+                    <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">6. Advanced</div>
+                    <h2 class="mt-2 text-lg font-semibold text-slate-900">Only open these when the appointment needs them</h2>
+                    <p class="mt-1 max-w-2xl text-sm text-slate-500">
+                        Shared rooms, equipment, staff-directory maintenance, and CRM access stay out of the normal appointment-type setup.
+                    </p>
+                </div>
+
+                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <a
+                        href="{{ route('crm.scheduling.configuration.resources.index') }}"
+                        class="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm hover:border-teal-300"
+                        data-scheduling-service-related="resources"
+                    >
+                        <div class="font-semibold text-slate-900">Rooms & resources</div>
+                        <div class="mt-1 text-slate-500">Shared rooms, equipment, and capacity constraints.</div>
+                    </a>
+
+                    <a
+                        href="{{ route('crm.scheduling.configuration.staff.index') }}"
+                        class="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm hover:border-teal-300"
+                        data-scheduling-service-related="staff"
+                    >
+                        <div class="font-semibold text-slate-900">Appointment hosts</div>
+                        <div class="mt-1 text-slate-500">Maintain the people and providers that can receive appointments.</div>
+                    </a>
+
+                    <a
+                        href="{{ route('crm.settings.team.index') }}"
+                        class="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm hover:border-teal-300"
+                        data-scheduling-service-related="team_access"
+                    >
+                        <div class="font-semibold text-slate-900">Team access</div>
+                        <div class="mt-1 text-slate-500">Control who can sign in to the CRM and what they can access.</div>
+                    </a>
+                </div>
+            </x-ui.card>
         </section>
+
     </div>
 </x-layouts.crm>
