@@ -21,12 +21,12 @@ Route::get('/services/{serviceKey}', [PublicBookingController::class, 'show'])
 
 Route::post('/services/{serviceKey}/prepare', [PublicBookingController::class, 'prepare'])
     ->where('serviceKey', '[A-Za-z0-9][A-Za-z0-9_-]*')
-    ->middleware("throttle:{$reservationLimit},1")
+    ->middleware(["throttle:{$reservationLimit},1", 'public-human:scheduling'])
     ->name('scheduling.public.services.prepare');
 
 Route::post('/services/{serviceKey}/offers', [PublicBookingController::class, 'offer'])
     ->where('serviceKey', '[A-Za-z0-9][A-Za-z0-9_-]*')
-    ->middleware("throttle:{$reservationLimit},1")
+    ->middleware(["throttle:{$reservationLimit},1", 'public-human:scheduling'])
     ->name('scheduling.public.services.offers.store');
 
 Route::get('/offers/{offerId}', [PublicBookingController::class, 'reviewOffer'])
@@ -36,22 +36,22 @@ Route::get('/offers/{offerId}', [PublicBookingController::class, 'reviewOffer'])
 
 Route::post('/offers/{offerId}/verification', [PublicBookingController::class, 'issueDestinationVerification'])
     ->whereUuid('offerId')
-    ->middleware("throttle:{$reservationLimit},1")
+    ->middleware(["throttle:{$reservationLimit},1", 'public-human:scheduling'])
     ->name('scheduling.public.offers.verification.issue');
 
 Route::post('/offers/{offerId}/verification/verify', [PublicBookingController::class, 'verifyDestination'])
     ->whereUuid('offerId')
-    ->middleware("throttle:{$reservationLimit},1")
+    ->middleware(["throttle:{$reservationLimit},1", 'public-human:scheduling'])
     ->name('scheduling.public.offers.verification.verify');
 
 Route::post('/offers/{offerId}/verification/resend', [PublicBookingController::class, 'resendDestinationVerification'])
     ->whereUuid('offerId')
-    ->middleware("throttle:{$reservationLimit},1")
+    ->middleware(["throttle:{$reservationLimit},1", 'public-human:scheduling'])
     ->name('scheduling.public.offers.verification.resend');
 
 Route::post('/offers/{offerId}/hold', [PublicBookingController::class, 'hold'])
     ->whereUuid('offerId')
-    ->middleware("throttle:{$reservationLimit},1")
+    ->middleware(["throttle:{$reservationLimit},1", 'public-human:scheduling'])
     ->name('scheduling.public.offers.hold');
 
 Route::get('/book/{holdId}', [PublicBookingController::class, 'review'])
@@ -61,5 +61,5 @@ Route::get('/book/{holdId}', [PublicBookingController::class, 'review'])
 
 Route::post('/book/{holdId}', [PublicBookingController::class, 'complete'])
     ->whereUuid('holdId')
-    ->middleware("throttle:{$reservationLimit},1")
+    ->middleware(["throttle:{$reservationLimit},1", 'public-human:scheduling'])
     ->name('scheduling.public.holds.complete');

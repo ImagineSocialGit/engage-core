@@ -43,6 +43,7 @@ use App\Modules\Core\Support\Contacts\ContactShowDataRegistry;
 use App\Modules\Core\TokenContracts\ContactTokenSourceProvider;
 use App\Modules\Core\TokenContracts\SiteSettingTokenSourceProvider;
 use App\Modules\Core\Validation\CoreSetupValidationContributor;
+use App\Modules\Core\Validation\PublicHumanVerificationSetupValidationContributor;
 use App\Support\ProcessHighway\ProcessHighwayEntryRampInspector;
 use App\Support\ModuleFacts\ModuleFactRegistry;
 use Illuminate\Support\Facades\Gate;
@@ -210,10 +211,10 @@ class CoreModuleServiceProvider extends ServiceProvider
             ]);
         });
 
-        $this->app->tag(
+        $this->app->tag([
             CoreSetupValidationContributor::class,
-            'setup.validation_contributors',
-        );
+            PublicHumanVerificationSetupValidationContributor::class,
+        ], 'setup.validation_contributors');
 
         $this->app->tag(
             CoreDeploymentPlanContributor::class,

@@ -32,8 +32,12 @@
 │   │       ├── EnsureModuleEnabled.php
 │   │       ├── ForceStagingAccess.php
 │   │       ├── RequestCorrelation.php
-│   │       └── RequireCapability.php
+│   │       ├── RequireCapability.php
+│   │       └── RequirePublicHumanVerification.php
 │   ├── Integrations
+│   │   ├── HumanVerification
+│   │   │   └── Turnstile
+│   │   │       └── TurnstileHumanVerificationProvider.php
 │   │   ├── Messaging
 │   │   │   ├── Email
 │   │   │   │   └── Resend
@@ -427,7 +431,8 @@
 │   │   │   │   ├── SiteSettingComputedTokenValueProvider.php
 │   │   │   │   └── SiteSettingTokenSourceProvider.php
 │   │   │   └── Validation
-│   │   │       └── CoreSetupValidationContributor.php
+│   │   │       ├── CoreSetupValidationContributor.php
+│   │   │       └── PublicHumanVerificationSetupValidationContributor.php
 │   │   ├── Documents
 │   │   │   ├── Actions
 │   │   │   ├── Contracts
@@ -1747,6 +1752,17 @@
 │   │   │   └── EnvironmentVariableCatalog.php
 │   │   ├── Guidance
 │   │   │   └── FirstUseGuidance.php
+│   │   ├── HumanVerification
+│   │   │   ├── Contracts
+│   │   │   │   └── HumanVerificationProvider.php
+│   │   │   ├── Data
+│   │   │   │   ├── HumanVerificationRequest.php
+│   │   │   │   ├── HumanVerificationResult.php
+│   │   │   │   └── HumanVerificationWidget.php
+│   │   │   ├── Exceptions
+│   │   │   │   └── HumanVerificationConfigurationException.php
+│   │   │   ├── HumanVerificationManager.php
+│   │   │   └── PublicHumanVerificationGrantStore.php
 │   │   ├── ModuleFacts
 │   │   │   ├── Contracts
 │   │   │   │   ├── ModuleFactProvider.php
@@ -1956,8 +1972,10 @@
 │   │           └── WebhookInbox.php
 │   └── View
 │       └── Components
-│           └── Layouts
-│               └── Crm.php
+│           ├── Layouts
+│           │   └── Crm.php
+│           └── PublicSurface
+│               └── HumanVerification.php
 ├── artisan
 ├── BASH-AUDIT.md
 ├── bootstrap
@@ -1985,6 +2003,7 @@
 │   ├── forms.php
 │   ├── generated
 │   ├── horizon.php
+│   ├── human_verification.php
 │   ├── inbound_messaging.php
 │   ├── location.php
 │   ├── logging.php
@@ -2490,6 +2509,7 @@
 │   │   │   ├── media-library.js
 │   │   │   ├── scheduling-public-booking.js
 │   │   │   └── webinar-registration.js
+│   │   ├── public-human-verification.js
 │   │   └── reporting
 │   │       └── client.js
 │   └── views
@@ -2530,7 +2550,8 @@
 │       │   ├── public-surface
 │       │   │   ├── button.blade.php
 │       │   │   ├── card.blade.php
-│       │   │   └── header.blade.php
+│       │   │   ├── header.blade.php
+│       │   │   └── human-verification.blade.php
 │       │   ├── section.blade.php
 │       │   ├── tasks
 │       │   ├── ui
@@ -2980,6 +3001,7 @@
 │   │   │   ├── FormPresetSyncTest.php
 │   │   │   ├── FormsDeploymentPlanContributorTest.php
 │   │   │   ├── FormsFoundationTest.php
+│   │   │   ├── FormsPublicHumanVerificationBoundaryTest.php
 │   │   │   ├── FormsSetupValidationContributorTest.php
 │   │   │   ├── FormsSurfaceTest.php
 │   │   │   ├── FormSubmissionAutomationEventTest.php
@@ -2989,6 +3011,8 @@
 │   │   │   ├── FormSubmissionWorkspaceTest.php
 │   │   │   ├── IssueExternalFormIntakeSecretCommandTest.php
 │   │   │   └── PublishedFormRuntimeTest.php
+│   │   ├── HumanVerification
+│   │   │   └── PublicHumanVerificationTest.php
 │   │   ├── InboundMessaging
 │   │   │   ├── ContactConversationReplyControllerTest.php
 │   │   │   ├── ContactConversationShowDataProviderTest.php
@@ -3248,6 +3272,7 @@
 │   │   │   ├── PublicBookingDestinationVerificationEnforcementTest.php
 │   │   │   ├── PublicBookingDestinationVerificationServiceTest.php
 │   │   │   ├── PublicBookingHoldTest.php
+│   │   │   ├── PublicSchedulingHumanVerificationTest.php
 │   │   │   ├── PublicSchedulingSurfaceTest.php
 │   │   │   ├── RangeDurationBookingFoundationTest.php
 │   │   │   ├── RescheduleAppointmentActionTest.php
@@ -3346,6 +3371,7 @@
 │   │   │   ├── WebinarCurrentProviderOccurrenceTest.php
 │   │   │   ├── WebinarDevControllerEnvironmentGuardTest.php
 │   │   │   ├── WebinarFunnelFactContributorTest.php
+│   │   │   ├── WebinarHumanVerificationRoutingTest.php
 │   │   │   ├── WebinarInformationArchitectureTest.php
 │   │   │   ├── WebinarJoinBrowserProofTest.php
 │   │   │   ├── WebinarLinkModalTest.php
@@ -3412,4 +3438,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-808 directories, 2605 files
+816 directories, 2623 files

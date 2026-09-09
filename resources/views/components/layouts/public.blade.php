@@ -38,4 +38,12 @@
     </x-slot:footer>
 
     {{ $slot }}
+
+    <x-public-surface.human-verification
+        surface="webinars"
+        :excluded-path-prefixes="[
+            '/unsubscribe/',
+            '/email-preferences/',
+        ]"
+    />
 </x-layouts.public-surface>

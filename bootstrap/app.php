@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsureModuleEnabled;
 use App\Http\Middleware\ForceStagingAccess;
 use App\Http\Middleware\RequestCorrelation;
 use App\Http\Middleware\RequireCapability;
+use App\Http\Middleware\RequirePublicHumanVerification;
 use App\Support\Clients\ClientEnvironmentLoader;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -66,6 +67,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
             'staging.access' => ForceStagingAccess::class,
             'module' => EnsureModuleEnabled::class,
             'capability' => RequireCapability::class,
+            'public-human' => RequirePublicHumanVerification::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [

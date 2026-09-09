@@ -44,6 +44,12 @@ final class CoreDeploymentPlanContributor implements DeploymentPlanContributor
             'STAGING_PASSWORD',
             'CRM_LOGIN_MAX_ATTEMPTS',
             'CRM_LOGIN_DECAY_SECONDS',
+            'PUBLIC_HUMAN_VERIFICATION_PROVIDER',
+            'PUBLIC_HUMAN_VERIFICATION_GRANT_TTL_SECONDS',
+            'TURNSTILE_TIMEOUT_SECONDS',
+            'TURNSTILE_CONNECT_TIMEOUT_SECONDS',
+            'TURNSTILE_RETRY_ATTEMPTS',
+            'TURNSTILE_RETRY_SLEEP_MILLISECONDS',
             'LOG_CHANNEL',
             'LOG_STACK',
             'LOG_DEPRECATIONS_CHANNEL',
@@ -139,10 +145,31 @@ final class CoreDeploymentPlanContributor implements DeploymentPlanContributor
         foreach ([
             'SESSION_DOMAIN',
             'PROJECT_STATE_ADMIN_EMAIL',
+            'PUBLIC_HUMAN_VERIFICATION_ENABLED',
         ] as $key) {
             yield EnvironmentRequirement::optional(
                 $key,
                 'This is a client-owned Core override and is only needed when the corresponding optional behavior is intentionally enabled.',
+            );
+        }
+
+        if ((bool) config('human_verification.enabled', false)) {
+            yield EnvironmentRequirement::required(
+                'TURNSTILE_SITE_KEY',
+                'Public human verification is enabled, so the browser-facing Turnstile site key must be configured for this client environment.',
+            );
+            yield EnvironmentRequirement::required(
+                'TURNSTILE_SECRET_KEY',
+                'Public human verification is enabled, so the Turnstile server-validation secret must be configured for this client environment.',
+            );
+        } else {
+            yield EnvironmentRequirement::optional(
+                'TURNSTILE_SITE_KEY',
+                'Configure this client-owned public key when public human verification is enabled.',
+            );
+            yield EnvironmentRequirement::optional(
+                'TURNSTILE_SECRET_KEY',
+                'Configure this client-owned secret when public human verification is enabled.',
             );
         }
     }

@@ -18,7 +18,7 @@ Route::middleware('module:webinars')->group(function () {
         ->name('webinar.join.redirect');
 
     Route::post('/j/{token}', [WebinarJoinRedirectController::class, 'store'])
-        ->middleware(['signed:relative', 'throttle:6,1'])
+        ->middleware(['signed:relative', 'throttle:6,1', 'public-human:webinars'])
         ->name('webinar.join.continue');
 
     Route::get('/p/{token}', WebinarPlaybackRedirectController::class)
@@ -29,7 +29,7 @@ Route::middleware('module:webinars')->group(function () {
         ->name('webinar.registration.cancellation.show');
 
     Route::post('/registrations/{registration}/cancel', [WebinarRegistrationCancellationController::class, 'store'])
-        ->middleware(['signed:relative', 'throttle:6,1'])
+        ->middleware(['signed:relative', 'throttle:6,1', 'public-human:webinars'])
         ->name('webinar.registration.cancellation.store');
 
     Route::pattern('seriesSlug', '(?!staging-login$)[a-z0-9-]+');
@@ -43,11 +43,11 @@ Route::middleware('module:webinars')->group(function () {
         ->name('webinar.show');
 
     Route::post('/{seriesSlug}/waitlist', WebinarWaitlistSignupController::class)
-        ->middleware('throttle:webinar-waitlist')
+        ->middleware(['throttle:webinar-waitlist', 'public-human:webinars'])
         ->name('webinar.waitlist.store');
 
     Route::post('/{seriesSlug}', [WebinarRegistrationController::class, 'store'])
-        ->middleware(['signed:relative', 'throttle:webinar-registration'])
+        ->middleware(['signed:relative', 'throttle:webinar-registration', 'public-human:webinars'])
         ->name('webinar.registration.store');
 
     Route::get('/{seriesSlug}/thank-you/{registration}/questions', [WebinarPostRegistrationQuestionController::class, 'show'])
@@ -56,7 +56,7 @@ Route::middleware('module:webinars')->group(function () {
         ->name('webinar.registration.questions.show');
 
     Route::post('/{seriesSlug}/thank-you/{registration}/questions', [WebinarPostRegistrationQuestionController::class, 'store'])
-        ->middleware(['signed:relative', 'throttle:12,1'])
+        ->middleware(['signed:relative', 'throttle:12,1', 'public-human:webinars'])
         ->whereNumber('registration')
         ->name('webinar.registration.questions.store');
 

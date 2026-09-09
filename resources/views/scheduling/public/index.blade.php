@@ -541,5 +541,5 @@
 
     <script type="application/json" id="scheduling-public-booking-config">@json($reportingConfig)</script>
 
-
+    <x-public-surface.human-verification surface="scheduling" />
 </x-layouts.public-surface>

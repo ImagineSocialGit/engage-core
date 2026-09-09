@@ -107,6 +107,12 @@ final class EnvironmentVariableCatalog
             ['STAGING_PASSWORD', $root, 'core', true],
             ['CRM_LOGIN_MAX_ATTEMPTS', $root, 'core', false],
             ['CRM_LOGIN_DECAY_SECONDS', $root, 'core', false],
+            ['PUBLIC_HUMAN_VERIFICATION_PROVIDER', $root, 'core', false],
+            ['PUBLIC_HUMAN_VERIFICATION_GRANT_TTL_SECONDS', $root, 'core', false],
+            ['TURNSTILE_TIMEOUT_SECONDS', $root, 'core', false],
+            ['TURNSTILE_CONNECT_TIMEOUT_SECONDS', $root, 'core', false],
+            ['TURNSTILE_RETRY_ATTEMPTS', $root, 'core', false],
+            ['TURNSTILE_RETRY_SLEEP_MILLISECONDS', $root, 'core', false],
 
             // Logging.
             ['LOG_CHANNEL', $root, 'core', false],
@@ -232,6 +238,9 @@ final class EnvironmentVariableCatalog
             ['REDIS_PREFIX', $client, 'core', false],
             ['HORIZON_PREFIX', $client, 'core', false],
             ['SESSION_DOMAIN', $client, 'core', false],
+            ['PUBLIC_HUMAN_VERIFICATION_ENABLED', $client, 'core', false],
+            ['TURNSTILE_SITE_KEY', $client, 'core', false],
+            ['TURNSTILE_SECRET_KEY', $client, 'core', true],
 
             // Client storage transport/identity.
             ['DO_SPACES_KEY', $client, 'storage', true],
