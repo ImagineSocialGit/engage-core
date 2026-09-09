@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Modules\InboundMessaging\Actions\EmailRoutes\SaveInboundEmailContactExtractionAction;
 use App\Modules\InboundMessaging\Actions\EmailRoutes\SaveInboundEmailRouteAction;
 use App\Modules\InboundMessaging\Models\InboundEmailRoute;
+use App\Modules\InboundMessaging\Requests\AssistInboundEmailContactExtractionRequest;
 use App\Modules\InboundMessaging\Requests\SaveInboundEmailContactExtractionRequest;
 use App\Modules\InboundMessaging\Requests\SaveInboundEmailRouteRequest;
+use App\Modules\InboundMessaging\Services\Email\InboundEmailContactExtractionAssistant;
 use App\Modules\InboundMessaging\Services\Email\InboundEmailContactExtractor;
 use App\Modules\InboundMessaging\Services\Email\InboundEmailRouteWorkspace;
 use Illuminate\Contracts\View\View;
@@ -18,9 +20,7 @@ final class InboundEmailRouteController extends Controller
 {
     public function index(InboundEmailRouteWorkspace $workspace): View
     {
-        return view('crm.inbound-messaging.email-routes.index', [
-            'workspace' => $workspace->build(),
-        ]);
+        return $this->workspaceView($workspace);
     }
 
     public function store(
@@ -67,6 +67,21 @@ final class InboundEmailRouteController extends Controller
                     ? 'Automatic person extraction saved.'
                     : 'Automatic person extraction turned off.',
             );
+    }
+
+    public function assistContactExtraction(
+        AssistInboundEmailContactExtractionRequest $request,
+        InboundEmailRoute $inboundEmailRoute,
+        InboundEmailContactExtractionAssistant $assistant,
+        InboundEmailRouteWorkspace $workspace,
+    ): View {
+        return $this->workspaceView(
+            workspace: $workspace,
+            sampleAssist: $assistant->assist(
+                route: $inboundEmailRoute,
+                raw: $request->contents(),
+            ),
+        );
     }
 
     public function testContactExtraction(
@@ -125,6 +140,19 @@ final class InboundEmailRouteController extends Controller
                     ? 'Inbound address enabled.'
                     : 'Inbound address disabled.',
             );
+    }
+
+    /**
+     * @param array<string, mixed>|null $sampleAssist
+     */
+    private function workspaceView(
+        InboundEmailRouteWorkspace $workspace,
+        ?array $sampleAssist = null,
+    ): View {
+        return view('crm.inbound-messaging.email-routes.index', [
+            'workspace' => $workspace->build(),
+            'sampleAssist' => $sampleAssist,
+        ]);
     }
 
     private function redirectTo(): RedirectResponse

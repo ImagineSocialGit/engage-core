@@ -720,6 +720,7 @@
 │   │   │   ├── Providers
 │   │   │   │   └── InboundMessagingModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   │   ├── AssistInboundEmailContactExtractionRequest.php
 │   │   │   │   ├── SaveInboundEmailContactExtractionRequest.php
 │   │   │   │   ├── SaveInboundEmailRouteRequest.php
 │   │   │   │   ├── SaveInboundReplyProfileRequest.php
@@ -732,9 +733,11 @@
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailWebhookHandlerResolver.php
 │   │   │   │   │   ├── EmailWebhookPayload.php
+│   │   │   │   │   ├── InboundEmailContactExtractionAssistant.php
 │   │   │   │   │   ├── InboundEmailContactExtractor.php
 │   │   │   │   │   ├── InboundEmailRouteResolver.php
 │   │   │   │   │   ├── InboundEmailRouteWorkspace.php
+│   │   │   │   │   ├── InboundEmailSampleParser.php
 │   │   │   │   │   └── RoutedInboundMessageConsumerRegistry.php
 │   │   │   │   ├── InboundMessageRouter.php
 │   │   │   │   ├── Inbox
@@ -1643,314 +1646,318 @@
 │   │   ├── Modules
 │   │   │   └── IntegrationsModuleServiceProvider.php
 │   │   └── PlatformMigrationServiceProvider.php
-│   └── Support
-│       ├── AnnualDates
-│       │   ├── Contracts
-│       │   └── Data
-│       ├── AutomationCapabilities
-│       │   ├── AutomationActionRegistry.php
-│       │   ├── AutomationCapabilityRegistry.php
-│       │   ├── AutomationPointAuthoringRegistry.php
-│       │   ├── AutomationPointDefinitionRegistry.php
-│       │   ├── Contracts
-│       │   │   ├── AutomationActionHandler.php
-│       │   │   ├── AutomationCapabilityContributor.php
-│       │   │   ├── AutomationPointAuthoringContributor.php
-│       │   │   └── AutomationPointDefinitionContributor.php
-│       │   └── Data
-│       │       ├── AutomationActionContext.php
-│       │       ├── AutomationActionResult.php
-│       │       ├── AutomationCapabilityDefinition.php
-│       │       ├── AutomationPointAuthoringContext.php
-│       │       ├── AutomationPointAuthoringDefinition.php
-│       │       ├── AutomationPointDefinition.php
-│       │       └── AutomationPointValidationContext.php
-│       ├── AutomationEvents
-│       │   ├── Data
-│       │   │   └── AutomationEventData.php
-│       │   ├── Events
-│       │   │   └── AutomationEventRecorded.php
-│       │   ├── Jobs
-│       │   │   └── PublishAutomationEventOutboxEventsJob.php
-│       │   ├── Models
-│       │   │   ├── AutomationEventConsumerReceipt.php
-│       │   │   └── AutomationEventOutboxEvent.php
-│       │   └── Services
-│       │       ├── AutomationEventConsumer.php
-│       │       └── AutomationEventOutbox.php
-│       ├── AutomationOpportunities
-│       │   ├── Actions
-│       │   │   ├── AutomationBehaviorAction.php
-│       │   │   ├── EvaluateAutomationOpportunityAction.php
-│       │   │   ├── RecordAutomationBehaviorOccurrenceAction.php
-│       │   │   └── RecordAutomationEventCorrelationEvidenceAction.php
-│       │   ├── Data
-│       │   │   └── AutomationBehaviorData.php
-│       │   ├── Models
-│       │   │   ├── AutomationBehaviorOccurrence.php
-│       │   │   └── AutomationOpportunity.php
-│       │   └── Services
-│       │       └── AutomationBehaviorFingerprintBuilder.php
-│       ├── AutomationTriggers
-│       │   ├── AutomationTriggerAuthoringRegistry.php
-│       │   ├── Contracts
-│       │   │   └── AutomationTriggerAuthoringContributor.php
-│       │   └── Data
-│       │       ├── AutomationTriggerAuthoringDefinition.php
-│       │       └── AutomationTriggerSelection.php
-│       ├── Caching
-│       │   └── CacheKey.php
-│       ├── Clients
-│       │   ├── ClientEnvironmentLoader.php
-│       │   └── ViewResolver.php
-│       ├── ConfigContracts
-│       │   ├── ConfigContractRegistry.php
-│       │   ├── ConfigContractTargetRegistry.php
-│       │   ├── Contracts
-│       │   │   ├── ConfigContract.php
-│       │   │   ├── ConfigContractTargetProvider.php
-│       │   │   ├── ModuleDefinitionConfigContract.php
-│       │   │   └── PresetPackageConfigContract.php
-│       │   ├── Data
-│       │   │   ├── ConfigContractTargetContext.php
-│       │   │   ├── ConfigContractTarget.php
-│       │   │   ├── ConfigContractViolation.php
-│       │   │   ├── ConfigField.php
-│       │   │   └── ConfigSchema.php
-│       │   └── TargetProviders
-│       │       ├── AppConfigContractTargetProvider.php
-│       │       └── ComposedPresetConfigContractTargetProvider.php
-│       ├── Dashboard
-│       │   ├── Contracts
-│       │   │   └── DashboardPanelProvider.php
-│       │   └── DashboardPanelRegistry.php
-│       ├── Deployment
-│       │   ├── Contracts
-│       │   │   └── DeploymentPlanContributor.php
-│       │   ├── Data
-│       │   │   ├── DeploymentPlan.php
-│       │   │   ├── EnvironmentRequirement.php
-│       │   │   └── ResolvedEnvironmentRequirement.php
-│       │   ├── DeploymentPlanResolver.php
-│       │   ├── EnvironmentFileRepository.php
-│       │   └── EnvironmentFileSynchronizer.php
-│       ├── DestinationVerification
-│       │   ├── Contracts
-│       │   │   └── DestinationVerificationTransport.php
-│       │   └── UnavailableDestinationVerificationTransport.php
-│       ├── Environment
-│       │   ├── Data
-│       │   │   └── EnvironmentVariableDefinition.php
-│       │   └── EnvironmentVariableCatalog.php
-│       ├── Guidance
-│       │   └── FirstUseGuidance.php
-│       ├── ModuleFacts
-│       │   ├── Contracts
-│       │   │   ├── ModuleFactProvider.php
-│       │   │   ├── ModuleFactQueryResolver.php
-│       │   │   └── ModuleFactValueResolver.php
-│       │   ├── Data
-│       │   │   ├── ModuleFactDefinition.php
-│       │   │   └── ModuleFactQuery.php
-│       │   ├── Enums
-│       │   │   ├── ModuleFactCapability.php
-│       │   │   ├── ModuleFactQueryOperator.php
-│       │   │   └── ModuleFactType.php
-│       │   ├── ModuleFactRegistry.php
-│       │   └── Validation
-│       │       └── ModuleFactsSetupValidationContributor.php
-│       ├── ModuleIntegrations
-│       │   ├── Forms
-│       │   │   ├── Contracts
-│       │   │   │   ├── FormSubmissionAutomationWorkspace.php
-│       │   │   │   └── FormSubmissionConsentHandler.php
-│       │   │   ├── FlowRoutes
-│       │   │   │   └── FlowRoutesFormSubmissionAutomationWorkspace.php
-│       │   │   ├── FormSubmissionConsentBridge.php
-│       │   │   ├── Messaging
-│       │   │   │   └── GrantFormSubmissionMessagingConsent.php
-│       │   │   └── UnavailableFormSubmissionAutomationWorkspace.php
-│       │   ├── InboundMessaging
-│       │   │   ├── Contracts
-│       │   │   │   └── InboundEmailRouteAutomationWorkspace.php
-│       │   │   ├── FlowRoutes
-│       │   │   │   └── FlowRoutesInboundEmailRouteAutomationWorkspace.php
-│       │   │   └── UnavailableInboundEmailRouteAutomationWorkspace.php
-│       │   ├── InternalNotifications
-│       │   │   ├── InboundMessaging
-│       │   │   │   ├── InboundMessageNotificationRecipientResolver.php
-│       │   │   │   └── ScheduleInboundMessageInternalNotification.php
-│       │   │   └── Tasks
-│       │   │       ├── InternalNotificationTaskScheduler.php
-│       │   │       ├── OnlyActiveTeamMemberTaskAssignmentStrategyResolver.php
-│       │   │       ├── TeamMemberTaskAssignedRecipientResolver.php
-│       │   │       └── TeamMemberTaskAssigneeOptionProvider.php
-│       │   ├── Messaging
-│       │   │   ├── Contracts
-│       │   │   │   └── MessageMediaLibrary.php
-│       │   │   ├── FlowRoutes
-│       │   │   │   └── FlowRouteReusableMessageTemplateAuthoringContributor.php
-│       │   │   ├── Media
-│       │   │   │   └── MediaMessageMediaLibrary.php
-│       │   │   └── UnavailableMessageMediaLibrary.php
-│       │   ├── RelationshipLocationAreaBridge.php
-│       │   ├── RelationshipLocationAreaImportHandler.php
-│       │   └── Scheduling
-│       │       ├── Automation
-│       │       │   ├── AppointmentHostNotificationAutomationCapabilityContributor.php
-│       │       │   ├── AppointmentHostNotificationAutomationPointAuthoringContributor.php
-│       │       │   ├── AppointmentHostNotificationAutomationPointDefinitionContributor.php
-│       │       │   ├── AppointmentHostNotificationScheduler.php
-│       │       │   ├── AppointmentTaskAutomationCapabilityContributor.php
-│       │       │   ├── AppointmentTaskAutomationPointAuthoringContributor.php
-│       │       │   ├── AppointmentTaskAutomationPointDefinitionContributor.php
-│       │       │   ├── CreateAppointmentTaskAutomationActionHandler.php
-│       │       │   ├── NotifyAppointmentHostAutomationActionHandler.php
-│       │       │   ├── ReconcileAppointmentHostNotifications.php
-│       │       │   └── ReconcileAppointmentTasks.php
-│       │       ├── Contracts
-│       │       │   ├── AppointmentAfterBookingWorkspace.php
-│       │       │   └── AppointmentCommunications.php
-│       │       ├── FlowRoutes
-│       │       │   └── FlowRoutesAppointmentAfterBookingWorkspace.php
-│       │       ├── Messaging
-│       │       │   ├── MessagingAppointmentCommunications.php
-│       │       │   ├── MessagingSchedulingDestinationVerificationTransport.php
-│       │       │   ├── SchedulingAppointmentComputedTokenValueProvider.php
-│       │       │   ├── SchedulingAppointmentMessageChainExecutionContextProvider.php
-│       │       │   ├── SchedulingAppointmentTemplatePublicationHook.php
-│       │       │   ├── SchedulingAppointmentTokenContextProvider.php
-│       │       │   ├── SchedulingAppointmentTokenSourceProvider.php
-│       │       │   └── SchedulingDestinationVerificationRecipientGate.php
-│       │       ├── Simple
-│       │       │   ├── ApplySimpleAppointmentAfterBookingActions.php
-│       │       │   └── SimpleAppointmentAfterBookingWorkspace.php
-│       │       ├── UnavailableAppointmentAfterBookingWorkspace.php
-│       │       └── UnavailableAppointmentCommunications.php
-│       ├── Modules
-│       │   ├── Migrations
-│       │   │   ├── MigrationScopeDefinition.php
-│       │   │   ├── ModuleInstallation.php
-│       │   │   ├── ModuleInstallationRepository.php
-│       │   │   ├── ModuleMigrationExecutionResult.php
-│       │   │   ├── ModuleMigrationExecutor.php
-│       │   │   ├── ModuleMigrationPathPolicy.php
-│       │   │   ├── ModuleMigrationPlanner.php
-│       │   │   ├── ModuleMigrationPlan.php
-│       │   │   ├── ModuleMigrationRegistry.php
-│       │   │   ├── ModuleMigrationStatusInspector.php
-│       │   │   └── ModuleMigrationStatus.php
-│       │   └── ModuleManager.php
-│       ├── Presets
-│       │   ├── ClientPresetContributor.php
-│       │   ├── Contracts
-│       │   │   └── PresetContributor.php
-│       │   ├── Data
-│       │   │   ├── PresetContribution.php
-│       │   │   └── ResolvedPresetDomain.php
-│       │   ├── Enums
-│       │   │   └── PresetDomain.php
-│       │   ├── PresetCompositionResolver.php
-│       │   ├── PresetContributionRegistry.php
-│       │   └── PresetPackageResolver.php
-│       ├── ProcessHighway
-│       │   ├── Contracts
-│       │   │   ├── ProcessHighwayContributor.php
-│       │   │   ├── ProcessHighwayEntryRampActionContributor.php
-│       │   │   └── ProcessHighwayEntryRampContributor.php
-│       │   ├── Data
-│       │   │   ├── ProcessHighwayAuthority.php
-│       │   │   ├── ProcessHighwayContribution.php
-│       │   │   ├── ProcessHighwayEdge.php
-│       │   │   ├── ProcessHighwayEditTarget.php
-│       │   │   ├── ProcessHighwayLane.php
-│       │   │   └── ProcessHighwayNode.php
-│       │   ├── ProcessHighwayEntryRampInspector.php
-│       │   ├── ProcessHighwayExitLinkBuilder.php
-│       │   ├── ProcessHighwayGraphComposer.php
-│       │   ├── ProcessHighwayMapBuilder.php
-│       │   ├── ProcessHighwayReadService.php
-│       │   └── ProcessHighwaySemanticKey.php
-│       ├── ProjectState
-│       │   ├── ProjectStateContractRegistry.php
-│       │   ├── ProjectStateDeferredReferenceApplier.php
-│       │   ├── ProjectStateDocumentCodec.php
-│       │   ├── ProjectStateDocumentValidator.php
-│       │   ├── ProjectStateExporter.php
-│       │   ├── ProjectStateImporter.php
-│       │   ├── ProjectStateImportIdMap.php
-│       │   ├── ProjectStateImportRowTransformer.php
-│       │   ├── ProjectStateImportValueMapper.php
-│       │   ├── ProjectStateManager.php
-│       │   ├── ProjectStateReferenceResolver.php
-│       │   ├── ProjectStateResumeItemRecorder.php
-│       │   ├── ProjectStateResumeManager.php
-│       │   └── ProjectStateSchemaGuard.php
-│       ├── Queues
-│       │   └── QueueContract.php
-│       ├── ReplyHandling
-│       │   ├── Contracts
-│       │   │   ├── ReplyProfileDependencyContributor.php
-│       │   │   └── ReplyProfilePresentationProvider.php
-│       │   ├── Data
-│       │   │   ├── ReplyProfileDependency.php
-│       │   │   └── ReplyProfilePresentation.php
-│       │   ├── ReplyProfileDependencyRegistry.php
-│       │   └── ReplyProfilePresentationRegistry.php
-│       ├── Reporting
-│       │   ├── Contracts
-│       │   │   ├── ReportingEventDefinitionContributor.php
-│       │   │   ├── ReportingObservationRecorder.php
-│       │   │   └── ReportingProjectionFactContributor.php
-│       │   ├── Data
-│       │   │   ├── ReportingEventDefinition.php
-│       │   │   ├── ReportingObservationData.php
-│       │   │   ├── ReportingObservationResult.php
-│       │   │   ├── ReportingProjectionFact.php
-│       │   │   └── ReportingProjectionWindow.php
-│       │   ├── PaidAdTrackingLinkGenerator.php
-│       │   ├── PaidAdTrackingSetupGenerator.php
-│       │   ├── ReportingEventDefinitionRegistry.php
-│       │   ├── ReportingProjectionFactRegistry.php
-│       │   └── Services
-│       │       └── NoopReportingObservationRecorder.php
-│       ├── SetupValidation
-│       │   ├── Contracts
-│       │   │   └── SetupValidationContributor.php
-│       │   ├── Contributors
-│       │   │   ├── ConfigContractsSetupValidationContributor.php
-│       │   │   ├── ModuleDependenciesSetupValidationContributor.php
-│       │   │   ├── ModuleMigrationsSetupValidationContributor.php
-│       │   │   ├── PresetCompositionSetupValidationContributor.php
-│       │   │   └── ReferenceRegistrySetupValidationContributor.php
-│       │   ├── Data
-│       │   │   ├── SetupValidationFinding.php
-│       │   │   └── SetupValidationResult.php
-│       │   └── SetupValidationManager.php
-│       ├── Testing
-│       │   ├── ArtisanTestDatabaseLock.php
-│       │   └── ArtisanTestEnvironmentBootstrap.php
-│       ├── TestingTools
-│       │   ├── TestingToolGuard.php
-│       │   └── TestingToolRuntime.php
-│       ├── TokenContracts
-│       │   ├── Contracts
-│       │   │   ├── ComputedTokenValueProvider.php
-│       │   │   ├── TokenContextProvider.php
-│       │   │   └── TokenSourceProvider.php
-│       │   ├── Data
-│       │   │   ├── TokenContextDefinition.php
-│       │   │   └── TokenSourceDefinition.php
-│       │   └── TokenContractRegistry.php
-│       ├── Urls
-│       │   └── AbsoluteUrl.php
-│       ├── Users
-│       │   └── CrmUserManager.php
-│       └── Webhooks
-│           ├── Models
-│           │   └── WebhookInboxReceipt.php
-│           └── Services
-│               └── WebhookInbox.php
+│   ├── Support
+│   │   ├── AnnualDates
+│   │   │   ├── Contracts
+│   │   │   └── Data
+│   │   ├── AutomationCapabilities
+│   │   │   ├── AutomationActionRegistry.php
+│   │   │   ├── AutomationCapabilityRegistry.php
+│   │   │   ├── AutomationPointAuthoringRegistry.php
+│   │   │   ├── AutomationPointDefinitionRegistry.php
+│   │   │   ├── Contracts
+│   │   │   │   ├── AutomationActionHandler.php
+│   │   │   │   ├── AutomationCapabilityContributor.php
+│   │   │   │   ├── AutomationPointAuthoringContributor.php
+│   │   │   │   └── AutomationPointDefinitionContributor.php
+│   │   │   └── Data
+│   │   │       ├── AutomationActionContext.php
+│   │   │       ├── AutomationActionResult.php
+│   │   │       ├── AutomationCapabilityDefinition.php
+│   │   │       ├── AutomationPointAuthoringContext.php
+│   │   │       ├── AutomationPointAuthoringDefinition.php
+│   │   │       ├── AutomationPointDefinition.php
+│   │   │       └── AutomationPointValidationContext.php
+│   │   ├── AutomationEvents
+│   │   │   ├── Data
+│   │   │   │   └── AutomationEventData.php
+│   │   │   ├── Events
+│   │   │   │   └── AutomationEventRecorded.php
+│   │   │   ├── Jobs
+│   │   │   │   └── PublishAutomationEventOutboxEventsJob.php
+│   │   │   ├── Models
+│   │   │   │   ├── AutomationEventConsumerReceipt.php
+│   │   │   │   └── AutomationEventOutboxEvent.php
+│   │   │   └── Services
+│   │   │       ├── AutomationEventConsumer.php
+│   │   │       └── AutomationEventOutbox.php
+│   │   ├── AutomationOpportunities
+│   │   │   ├── Actions
+│   │   │   │   ├── AutomationBehaviorAction.php
+│   │   │   │   ├── EvaluateAutomationOpportunityAction.php
+│   │   │   │   ├── RecordAutomationBehaviorOccurrenceAction.php
+│   │   │   │   └── RecordAutomationEventCorrelationEvidenceAction.php
+│   │   │   ├── Data
+│   │   │   │   └── AutomationBehaviorData.php
+│   │   │   ├── Models
+│   │   │   │   ├── AutomationBehaviorOccurrence.php
+│   │   │   │   └── AutomationOpportunity.php
+│   │   │   └── Services
+│   │   │       └── AutomationBehaviorFingerprintBuilder.php
+│   │   ├── AutomationTriggers
+│   │   │   ├── AutomationTriggerAuthoringRegistry.php
+│   │   │   ├── Contracts
+│   │   │   │   └── AutomationTriggerAuthoringContributor.php
+│   │   │   └── Data
+│   │   │       ├── AutomationTriggerAuthoringDefinition.php
+│   │   │       └── AutomationTriggerSelection.php
+│   │   ├── Caching
+│   │   │   └── CacheKey.php
+│   │   ├── Clients
+│   │   │   ├── ClientEnvironmentLoader.php
+│   │   │   └── ViewResolver.php
+│   │   ├── ConfigContracts
+│   │   │   ├── ConfigContractRegistry.php
+│   │   │   ├── ConfigContractTargetRegistry.php
+│   │   │   ├── Contracts
+│   │   │   │   ├── ConfigContract.php
+│   │   │   │   ├── ConfigContractTargetProvider.php
+│   │   │   │   ├── ModuleDefinitionConfigContract.php
+│   │   │   │   └── PresetPackageConfigContract.php
+│   │   │   ├── Data
+│   │   │   │   ├── ConfigContractTargetContext.php
+│   │   │   │   ├── ConfigContractTarget.php
+│   │   │   │   ├── ConfigContractViolation.php
+│   │   │   │   ├── ConfigField.php
+│   │   │   │   └── ConfigSchema.php
+│   │   │   └── TargetProviders
+│   │   │       ├── AppConfigContractTargetProvider.php
+│   │   │       └── ComposedPresetConfigContractTargetProvider.php
+│   │   ├── Dashboard
+│   │   │   ├── Contracts
+│   │   │   │   └── DashboardPanelProvider.php
+│   │   │   └── DashboardPanelRegistry.php
+│   │   ├── Deployment
+│   │   │   ├── Contracts
+│   │   │   │   └── DeploymentPlanContributor.php
+│   │   │   ├── Data
+│   │   │   │   ├── DeploymentPlan.php
+│   │   │   │   ├── EnvironmentRequirement.php
+│   │   │   │   └── ResolvedEnvironmentRequirement.php
+│   │   │   ├── DeploymentPlanResolver.php
+│   │   │   ├── EnvironmentFileRepository.php
+│   │   │   └── EnvironmentFileSynchronizer.php
+│   │   ├── DestinationVerification
+│   │   │   ├── Contracts
+│   │   │   │   └── DestinationVerificationTransport.php
+│   │   │   └── UnavailableDestinationVerificationTransport.php
+│   │   ├── Environment
+│   │   │   ├── Data
+│   │   │   │   └── EnvironmentVariableDefinition.php
+│   │   │   └── EnvironmentVariableCatalog.php
+│   │   ├── Guidance
+│   │   │   └── FirstUseGuidance.php
+│   │   ├── ModuleFacts
+│   │   │   ├── Contracts
+│   │   │   │   ├── ModuleFactProvider.php
+│   │   │   │   ├── ModuleFactQueryResolver.php
+│   │   │   │   └── ModuleFactValueResolver.php
+│   │   │   ├── Data
+│   │   │   │   ├── ModuleFactDefinition.php
+│   │   │   │   └── ModuleFactQuery.php
+│   │   │   ├── Enums
+│   │   │   │   ├── ModuleFactCapability.php
+│   │   │   │   ├── ModuleFactQueryOperator.php
+│   │   │   │   └── ModuleFactType.php
+│   │   │   ├── ModuleFactRegistry.php
+│   │   │   └── Validation
+│   │   │       └── ModuleFactsSetupValidationContributor.php
+│   │   ├── ModuleIntegrations
+│   │   │   ├── Forms
+│   │   │   │   ├── Contracts
+│   │   │   │   │   ├── FormSubmissionAutomationWorkspace.php
+│   │   │   │   │   └── FormSubmissionConsentHandler.php
+│   │   │   │   ├── FlowRoutes
+│   │   │   │   │   └── FlowRoutesFormSubmissionAutomationWorkspace.php
+│   │   │   │   ├── FormSubmissionConsentBridge.php
+│   │   │   │   ├── Messaging
+│   │   │   │   │   └── GrantFormSubmissionMessagingConsent.php
+│   │   │   │   └── UnavailableFormSubmissionAutomationWorkspace.php
+│   │   │   ├── InboundMessaging
+│   │   │   │   ├── Contracts
+│   │   │   │   │   └── InboundEmailRouteAutomationWorkspace.php
+│   │   │   │   ├── FlowRoutes
+│   │   │   │   │   └── FlowRoutesInboundEmailRouteAutomationWorkspace.php
+│   │   │   │   └── UnavailableInboundEmailRouteAutomationWorkspace.php
+│   │   │   ├── InternalNotifications
+│   │   │   │   ├── InboundMessaging
+│   │   │   │   │   ├── InboundMessageNotificationRecipientResolver.php
+│   │   │   │   │   └── ScheduleInboundMessageInternalNotification.php
+│   │   │   │   └── Tasks
+│   │   │   │       ├── InternalNotificationTaskScheduler.php
+│   │   │   │       ├── OnlyActiveTeamMemberTaskAssignmentStrategyResolver.php
+│   │   │   │       ├── TeamMemberTaskAssignedRecipientResolver.php
+│   │   │   │       └── TeamMemberTaskAssigneeOptionProvider.php
+│   │   │   ├── Messaging
+│   │   │   │   ├── Contracts
+│   │   │   │   │   └── MessageMediaLibrary.php
+│   │   │   │   ├── FlowRoutes
+│   │   │   │   │   └── FlowRouteReusableMessageTemplateAuthoringContributor.php
+│   │   │   │   ├── Media
+│   │   │   │   │   └── MediaMessageMediaLibrary.php
+│   │   │   │   └── UnavailableMessageMediaLibrary.php
+│   │   │   ├── RelationshipLocationAreaBridge.php
+│   │   │   ├── RelationshipLocationAreaImportHandler.php
+│   │   │   └── Scheduling
+│   │   │       ├── Automation
+│   │   │       │   ├── AppointmentHostNotificationAutomationCapabilityContributor.php
+│   │   │       │   ├── AppointmentHostNotificationAutomationPointAuthoringContributor.php
+│   │   │       │   ├── AppointmentHostNotificationAutomationPointDefinitionContributor.php
+│   │   │       │   ├── AppointmentHostNotificationScheduler.php
+│   │   │       │   ├── AppointmentTaskAutomationCapabilityContributor.php
+│   │   │       │   ├── AppointmentTaskAutomationPointAuthoringContributor.php
+│   │   │       │   ├── AppointmentTaskAutomationPointDefinitionContributor.php
+│   │   │       │   ├── CreateAppointmentTaskAutomationActionHandler.php
+│   │   │       │   ├── NotifyAppointmentHostAutomationActionHandler.php
+│   │   │       │   ├── ReconcileAppointmentHostNotifications.php
+│   │   │       │   └── ReconcileAppointmentTasks.php
+│   │   │       ├── Contracts
+│   │   │       │   ├── AppointmentAfterBookingWorkspace.php
+│   │   │       │   └── AppointmentCommunications.php
+│   │   │       ├── FlowRoutes
+│   │   │       │   └── FlowRoutesAppointmentAfterBookingWorkspace.php
+│   │   │       ├── Messaging
+│   │   │       │   ├── MessagingAppointmentCommunications.php
+│   │   │       │   ├── MessagingSchedulingDestinationVerificationTransport.php
+│   │   │       │   ├── SchedulingAppointmentComputedTokenValueProvider.php
+│   │   │       │   ├── SchedulingAppointmentMessageChainExecutionContextProvider.php
+│   │   │       │   ├── SchedulingAppointmentTemplatePublicationHook.php
+│   │   │       │   ├── SchedulingAppointmentTokenContextProvider.php
+│   │   │       │   ├── SchedulingAppointmentTokenSourceProvider.php
+│   │   │       │   └── SchedulingDestinationVerificationRecipientGate.php
+│   │   │       ├── Simple
+│   │   │       │   ├── ApplySimpleAppointmentAfterBookingActions.php
+│   │   │       │   └── SimpleAppointmentAfterBookingWorkspace.php
+│   │   │       ├── UnavailableAppointmentAfterBookingWorkspace.php
+│   │   │       └── UnavailableAppointmentCommunications.php
+│   │   ├── Modules
+│   │   │   ├── Migrations
+│   │   │   │   ├── MigrationScopeDefinition.php
+│   │   │   │   ├── ModuleInstallation.php
+│   │   │   │   ├── ModuleInstallationRepository.php
+│   │   │   │   ├── ModuleMigrationExecutionResult.php
+│   │   │   │   ├── ModuleMigrationExecutor.php
+│   │   │   │   ├── ModuleMigrationPathPolicy.php
+│   │   │   │   ├── ModuleMigrationPlanner.php
+│   │   │   │   ├── ModuleMigrationPlan.php
+│   │   │   │   ├── ModuleMigrationRegistry.php
+│   │   │   │   ├── ModuleMigrationStatusInspector.php
+│   │   │   │   └── ModuleMigrationStatus.php
+│   │   │   └── ModuleManager.php
+│   │   ├── Presets
+│   │   │   ├── ClientPresetContributor.php
+│   │   │   ├── Contracts
+│   │   │   │   └── PresetContributor.php
+│   │   │   ├── Data
+│   │   │   │   ├── PresetContribution.php
+│   │   │   │   └── ResolvedPresetDomain.php
+│   │   │   ├── Enums
+│   │   │   │   └── PresetDomain.php
+│   │   │   ├── PresetCompositionResolver.php
+│   │   │   ├── PresetContributionRegistry.php
+│   │   │   └── PresetPackageResolver.php
+│   │   ├── ProcessHighway
+│   │   │   ├── Contracts
+│   │   │   │   ├── ProcessHighwayContributor.php
+│   │   │   │   ├── ProcessHighwayEntryRampActionContributor.php
+│   │   │   │   └── ProcessHighwayEntryRampContributor.php
+│   │   │   ├── Data
+│   │   │   │   ├── ProcessHighwayAuthority.php
+│   │   │   │   ├── ProcessHighwayContribution.php
+│   │   │   │   ├── ProcessHighwayEdge.php
+│   │   │   │   ├── ProcessHighwayEditTarget.php
+│   │   │   │   ├── ProcessHighwayLane.php
+│   │   │   │   └── ProcessHighwayNode.php
+│   │   │   ├── ProcessHighwayEntryRampInspector.php
+│   │   │   ├── ProcessHighwayExitLinkBuilder.php
+│   │   │   ├── ProcessHighwayGraphComposer.php
+│   │   │   ├── ProcessHighwayMapBuilder.php
+│   │   │   ├── ProcessHighwayReadService.php
+│   │   │   └── ProcessHighwaySemanticKey.php
+│   │   ├── ProjectState
+│   │   │   ├── ProjectStateContractRegistry.php
+│   │   │   ├── ProjectStateDeferredReferenceApplier.php
+│   │   │   ├── ProjectStateDocumentCodec.php
+│   │   │   ├── ProjectStateDocumentValidator.php
+│   │   │   ├── ProjectStateExporter.php
+│   │   │   ├── ProjectStateImporter.php
+│   │   │   ├── ProjectStateImportIdMap.php
+│   │   │   ├── ProjectStateImportRowTransformer.php
+│   │   │   ├── ProjectStateImportValueMapper.php
+│   │   │   ├── ProjectStateManager.php
+│   │   │   ├── ProjectStateReferenceResolver.php
+│   │   │   ├── ProjectStateResumeItemRecorder.php
+│   │   │   ├── ProjectStateResumeManager.php
+│   │   │   └── ProjectStateSchemaGuard.php
+│   │   ├── Queues
+│   │   │   └── QueueContract.php
+│   │   ├── ReplyHandling
+│   │   │   ├── Contracts
+│   │   │   │   ├── ReplyProfileDependencyContributor.php
+│   │   │   │   └── ReplyProfilePresentationProvider.php
+│   │   │   ├── Data
+│   │   │   │   ├── ReplyProfileDependency.php
+│   │   │   │   └── ReplyProfilePresentation.php
+│   │   │   ├── ReplyProfileDependencyRegistry.php
+│   │   │   └── ReplyProfilePresentationRegistry.php
+│   │   ├── Reporting
+│   │   │   ├── Contracts
+│   │   │   │   ├── ReportingEventDefinitionContributor.php
+│   │   │   │   ├── ReportingObservationRecorder.php
+│   │   │   │   └── ReportingProjectionFactContributor.php
+│   │   │   ├── Data
+│   │   │   │   ├── ReportingEventDefinition.php
+│   │   │   │   ├── ReportingObservationData.php
+│   │   │   │   ├── ReportingObservationResult.php
+│   │   │   │   ├── ReportingProjectionFact.php
+│   │   │   │   └── ReportingProjectionWindow.php
+│   │   │   ├── PaidAdTrackingLinkGenerator.php
+│   │   │   ├── PaidAdTrackingSetupGenerator.php
+│   │   │   ├── ReportingEventDefinitionRegistry.php
+│   │   │   ├── ReportingProjectionFactRegistry.php
+│   │   │   └── Services
+│   │   │       └── NoopReportingObservationRecorder.php
+│   │   ├── SetupValidation
+│   │   │   ├── Contracts
+│   │   │   │   └── SetupValidationContributor.php
+│   │   │   ├── Contributors
+│   │   │   │   ├── ConfigContractsSetupValidationContributor.php
+│   │   │   │   ├── ModuleDependenciesSetupValidationContributor.php
+│   │   │   │   ├── ModuleMigrationsSetupValidationContributor.php
+│   │   │   │   ├── PresetCompositionSetupValidationContributor.php
+│   │   │   │   └── ReferenceRegistrySetupValidationContributor.php
+│   │   │   ├── Data
+│   │   │   │   ├── SetupValidationFinding.php
+│   │   │   │   └── SetupValidationResult.php
+│   │   │   └── SetupValidationManager.php
+│   │   ├── Testing
+│   │   │   ├── ArtisanTestDatabaseLock.php
+│   │   │   └── ArtisanTestEnvironmentBootstrap.php
+│   │   ├── TestingTools
+│   │   │   ├── TestingToolGuard.php
+│   │   │   └── TestingToolRuntime.php
+│   │   ├── TokenContracts
+│   │   │   ├── Contracts
+│   │   │   │   ├── ComputedTokenValueProvider.php
+│   │   │   │   ├── TokenContextProvider.php
+│   │   │   │   └── TokenSourceProvider.php
+│   │   │   ├── Data
+│   │   │   │   ├── TokenContextDefinition.php
+│   │   │   │   └── TokenSourceDefinition.php
+│   │   │   └── TokenContractRegistry.php
+│   │   ├── Urls
+│   │   │   └── AbsoluteUrl.php
+│   │   ├── Users
+│   │   │   └── CrmUserManager.php
+│   │   └── Webhooks
+│   │       ├── Models
+│   │       │   └── WebhookInboxReceipt.php
+│   │       └── Services
+│   │           └── WebhookInbox.php
+│   └── View
+│       └── Components
+│           └── Layouts
+│               └── Crm.php
 ├── artisan
 ├── BASH-AUDIT.md
 ├── bootstrap
@@ -2622,6 +2629,7 @@
 │       │   │       └── show.blade.php
 │       │   ├── inbound-messaging
 │       │   │   ├── email-routes
+│       │   │   │   ├── _contact-extraction-result.blade.php
 │       │   │   │   └── index.blade.php
 │       │   │   ├── inbox
 │       │   │   │   ├── index.blade.php
@@ -2992,6 +3000,7 @@
 │   │   │   ├── InboundEmailRouteResolutionTest.php
 │   │   │   ├── InboundEmailRouteSetupValidationTest.php
 │   │   │   ├── InboundEmailRouteWorkspaceTest.php
+│   │   │   ├── InboundEmailSampleAssistantTest.php
 │   │   │   ├── InboundInboxWorkspaceTest.php
 │   │   │   ├── InboundMessageAutomationOutboxTest.php
 │   │   │   ├── InboundMessagingDeploymentPlanContributorTest.php
@@ -3403,4 +3412,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-805 directories, 2599 files
+808 directories, 2605 files

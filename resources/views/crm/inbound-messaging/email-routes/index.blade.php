@@ -1,8 +1,3 @@
-@php
-    $domain = $workspace['domain'];
-    $routes = $workspace['routes'];
-@endphp
-
 <x-layouts.crm
     title="Inbound Addresses"
     heading="Inbound Addresses"
@@ -91,7 +86,7 @@
 
                 @if($workspace['domain_ready'])
                     <p class="mt-1 break-all text-sm font-semibold text-slate-900">
-                        {{ $domain }}
+                        {{ $workspace['domain'] }}
                     </p>
                     <p class="mt-2 text-xs leading-5 text-slate-500">
                         This is managed with the site's email/DNS setup and cannot be changed here.
@@ -172,7 +167,7 @@
                             class="min-w-0 flex-1 rounded-l-xl border-slate-300 text-sm"
                         >
                         <span class="inline-flex items-center rounded-r-xl border border-l-0 border-slate-300 bg-slate-50 px-3 text-sm text-slate-500">
-                            {{ $domain ? '@'.$domain : '@your-inbound-domain' }}
+                            {{ $workspace['domain'] ? '@'.$workspace['domain'] : '@your-inbound-domain' }}
                         </span>
                     </div>
                 </div>
@@ -189,8 +184,7 @@
         </section>
 
         <section class="space-y-4">
-            @forelse($routes as $row)
-                @php($route = $row['route'])
+            @forelse($workspace['routes'] as $row)
 
                 <article
                     class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"
@@ -200,10 +194,10 @@
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
                                 <h2 class="text-lg font-semibold text-slate-950">
-                                    {{ $route->label }}
+                                    {{ $row['route']->label }}
                                 </h2>
-                                <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $route->is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600' }}">
-                                    {{ $route->is_active ? 'Active' : 'Disabled' }}
+                                <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $row['route']->is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600' }}">
+                                    {{ $row['route']->is_active ? 'Active' : 'Disabled' }}
                                 </span>
                             </div>
 
@@ -228,7 +222,18 @@
                             <div
                                 class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-4"
                                 data-inbound-email-contact-extraction
-                                x-data="{ open: @js($row['contact_extraction']['enabled'] || old('form_mode') === 'contact_extraction:'.$route->getKey() || (int) data_get(session('contact_extraction_test'), 'route_id') === (int) $route->getKey()), testOpen: false }"
+                                x-data="{
+                                    open: @js(
+                                        $row['contact_extraction']['enabled']
+                                        || old('form_mode') === 'contact_extraction:'.$row['route']->getKey()
+                                        || old('form_mode') === 'contact_extraction_assist:'.$row['route']->getKey()
+                                        || (int) data_get(session('contact_extraction_test'), 'route_id') === (int) $row['route']->getKey()
+                                        || (int) data_get($sampleAssist, 'route_id') === (int) $row['route']->getKey()
+                                    ),
+                                    testOpen: @js(
+                                        (int) data_get($sampleAssist, 'route_id') === (int) $row['route']->getKey()
+                                    )
+                                }"
                             >
                                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                     <div>
@@ -259,7 +264,71 @@
                                 >
                                     <form
                                         method="POST"
-                                        action="{{ route('crm.inbound-messaging.email-routes.contact-extraction.update', $route) }}"
+                                        action="{{ route('crm.inbound-messaging.email-routes.contact-extraction.assist', $row['route']) }}"
+                                        enctype="multipart/form-data"
+                                        class="mb-4 rounded-xl border border-blue-200 bg-blue-50/50 p-4"
+                                    >
+                                        @csrf
+                                        <input
+                                            type="hidden"
+                                            name="form_mode"
+                                            value="contact_extraction_assist:{{ $row['route']->getKey() }}"
+                                        >
+
+                                        <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                                            <div class="min-w-0 flex-1">
+                                                <label class="block text-sm font-semibold text-slate-900">
+                                                    Start from a sample email
+                                                </label>
+                                                <p class="mt-1 text-xs leading-5 text-slate-600">
+                                                    Upload a saved <strong>.eml</strong> file and Engage will read its From, Reply-To, Subject, and message text, then suggest deterministic person-field mappings. Uploading a sample does not save the email, create a Contact, or turn on this extraction rule.
+                                                </p>
+                                                <input
+                                                    name="sample_eml"
+                                                    type="file"
+                                                    accept=".eml,message/rfc822"
+                                                    class="mt-3 block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-50"
+                                                >
+                                            </div>
+
+                                            <button
+                                                type="submit"
+                                                class="shrink-0 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600"
+                                            >
+                                                Analyze sample
+                                            </button>
+                                        </div>
+                                    </form>
+
+                                    @if((int) data_get($sampleAssist, 'route_id') === (int) $row['route']->getKey())
+                                        <div class="mb-4 rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                            <p class="font-semibold text-slate-950">
+                                                Suggested setup is prefilled below.
+                                            </p>
+                                            <p class="mt-1 text-xs leading-5 text-slate-600">
+                                                Review the suggested fields, then choose <strong>Save person extraction</strong> only if they are correct. Nothing from the uploaded sample has been stored.
+                                            </p>
+
+                                            @if(data_get($sampleAssist, 'suggestion_rows', []) !== [])
+                                                <dl class="mt-3 grid gap-2 sm:grid-cols-2">
+                                                    @foreach(data_get($sampleAssist, 'suggestion_rows', []) as $suggestion)
+                                                        <div class="rounded-lg bg-slate-50 px-3 py-2">
+                                                            <dt class="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                                                {{ $suggestion['field'] }}
+                                                            </dt>
+                                                            <dd class="mt-0.5 text-sm font-semibold text-slate-900">
+                                                                {{ $suggestion['source'] }}
+                                                            </dd>
+                                                        </div>
+                                                    @endforeach
+                                                </dl>
+                                            @endif
+                                        </div>
+                                    @endif
+
+                                    <form
+                                        method="POST"
+                                        action="{{ route('crm.inbound-messaging.email-routes.contact-extraction.update', $row['route']) }}"
                                         class="space-y-4"
                                     >
                                         @csrf
@@ -267,7 +336,7 @@
                                         <input
                                             type="hidden"
                                             name="form_mode"
-                                            value="contact_extraction:{{ $route->getKey() }}"
+                                            value="contact_extraction:{{ $row['route']->getKey() }}"
                                         >
                                         <input type="hidden" name="enabled" value="0">
 
@@ -278,7 +347,7 @@
                                                 value="1"
                                                 class="mt-0.5 rounded border-slate-300 text-blue-700"
                                                 @checked(
-                                                    old('form_mode') === 'contact_extraction:'.$route->getKey()
+                                                    old('form_mode') === 'contact_extraction:'.$row['route']->getKey()
                                                         ? old('enabled')
                                                         : $row['contact_extraction']['enabled']
                                                 )
@@ -319,9 +388,13 @@
                                                                             value="{{ $sourceValue }}"
                                                                             @selected(
                                                                                 (
-                                                                                    old('form_mode') === 'contact_extraction:'.$route->getKey()
+                                                                                    old('form_mode') === 'contact_extraction:'.$row['route']->getKey()
                                                                                         ? old('fields.'.$target['key'].'.source')
-                                                                                        : $target['source']
+                                                                                        : (
+                                                                                            (int) data_get($sampleAssist, 'route_id') === (int) $row['route']->getKey()
+                                                                                                ? data_get($sampleAssist, 'suggested_definition.fields.'.$target['key'].'.source', 'none')
+                                                                                                : $target['source']
+                                                                                        )
                                                                                 ) === $sourceValue
                                                                             )
                                                                         >
@@ -334,7 +407,14 @@
                                                                 <input
                                                                     name="fields[{{ $target['key'] }}][label]"
                                                                     type="text"
-                                                                    value="{{ old('form_mode') === 'contact_extraction:'.$route->getKey() ? old('fields.'.$target['key'].'.label') : $target['marker_label'] }}"
+                                                                    value="{{ old('form_mode') === 'contact_extraction:'.$row['route']->getKey()
+                                                                        ? old('fields.'.$target['key'].'.label')
+                                                                        : (
+                                                                            (int) data_get($sampleAssist, 'route_id') === (int) $row['route']->getKey()
+                                                                                ? data_get($sampleAssist, 'suggested_definition.fields.'.$target['key'].'.label', '')
+                                                                                : $target['marker_label']
+                                                                        )
+                                                                    }}"
                                                                     placeholder="{{ $target['label'] }}"
                                                                     class="block w-full rounded-lg border-slate-300 text-sm"
                                                                 >
@@ -350,9 +430,17 @@
                                                                         value="{{ $target['key'] }}"
                                                                         class="rounded border-slate-300 text-blue-700"
                                                                         @checked(
-                                                                            old('form_mode') === 'contact_extraction:'.$route->getKey()
+                                                                            old('form_mode') === 'contact_extraction:'.$row['route']->getKey()
                                                                                 ? in_array($target['key'], old('required_fields', []), true)
-                                                                                : $target['required']
+                                                                                : (
+                                                                                    (int) data_get($sampleAssist, 'route_id') === (int) $row['route']->getKey()
+                                                                                        ? in_array(
+                                                                                            $target['key'],
+                                                                                            data_get($sampleAssist, 'suggested_definition.required_fields', []),
+                                                                                            true,
+                                                                                        )
+                                                                                        : $target['required']
+                                                                                )
                                                                         )
                                                                     >
                                                                 @endif
@@ -389,7 +477,7 @@
                                         x-cloak
                                         x-show="testOpen"
                                         method="POST"
-                                        action="{{ route('crm.inbound-messaging.email-routes.contact-extraction.test', $route) }}"
+                                        action="{{ route('crm.inbound-messaging.email-routes.contact-extraction.test', $row['route']) }}"
                                         class="mt-4 grid gap-3 rounded-xl bg-slate-50 p-4 sm:grid-cols-2"
                                     >
                                         @csrf
@@ -399,6 +487,7 @@
                                             <input
                                                 name="from"
                                                 type="text"
+                                                value="{{ (int) data_get($sampleAssist, 'route_id') === (int) $row['route']->getKey() ? data_get($sampleAssist, 'sample.from') : '' }}"
                                                 placeholder="Vendor &lt;notifications@example.com&gt;"
                                                 class="mt-1 block w-full rounded-lg border-slate-300 text-sm"
                                             >
@@ -409,6 +498,7 @@
                                             <input
                                                 name="reply_to"
                                                 type="text"
+                                                value="{{ (int) data_get($sampleAssist, 'route_id') === (int) $row['route']->getKey() ? data_get($sampleAssist, 'sample.reply_to') : '' }}"
                                                 placeholder="lead@example.com"
                                                 class="mt-1 block w-full rounded-lg border-slate-300 text-sm"
                                             >
@@ -419,6 +509,7 @@
                                             <input
                                                 name="subject"
                                                 type="text"
+                                                value="{{ (int) data_get($sampleAssist, 'route_id') === (int) $row['route']->getKey() ? data_get($sampleAssist, 'sample.subject') : '' }}"
                                                 class="mt-1 block w-full rounded-lg border-slate-300 text-sm"
                                             >
                                         </div>
@@ -430,7 +521,7 @@
                                                 rows="8"
                                                 class="mt-1 block w-full rounded-lg border-slate-300 text-sm"
                                                 placeholder="First Name: Jane&#10;Last Name: Doe&#10;Email: jane@example.com&#10;Phone: 555-555-1212"
-                                            ></textarea>
+                                            >{{ (int) data_get($sampleAssist, 'route_id') === (int) $row['route']->getKey() ? data_get($sampleAssist, 'sample.body') : '' }}</textarea>
                                         </div>
 
                                         <div class="sm:col-span-2">
@@ -443,37 +534,18 @@
                                         </div>
                                     </form>
 
-                                    @if((int) data_get(session('contact_extraction_test'), 'route_id') === (int) $route->getKey())
-                                        <div @class([
-                                            'mt-4 rounded-xl border px-4 py-3 text-sm',
-                                            'border-emerald-200 bg-emerald-50 text-emerald-900' => data_get(session('contact_extraction_test'), 'ok'),
-                                            'border-amber-200 bg-amber-50 text-amber-900' => ! data_get(session('contact_extraction_test'), 'ok'),
-                                        ])>
-                                            <p class="font-semibold">
-                                                {{ data_get(session('contact_extraction_test'), 'ok') ? 'Example matched.' : 'Example needs attention.' }}
-                                            </p>
-
-                                            @if(data_get(session('contact_extraction_test'), 'values', []) !== [])
-                                                <dl class="mt-2 grid gap-2 sm:grid-cols-2">
-                                                    @foreach(data_get(session('contact_extraction_test'), 'values', []) as $field => $value)
-                                                        <div>
-                                                            <dt class="text-xs font-bold uppercase tracking-wide opacity-70">
-                                                                {{ \Illuminate\Support\Str::headline($field) }}
-                                                            </dt>
-                                                            <dd class="mt-0.5 break-words font-semibold">{{ $value }}</dd>
-                                                        </div>
-                                                    @endforeach
-                                                </dl>
-                                            @endif
-
-                                            @if(data_get(session('contact_extraction_test'), 'errors', []) !== [])
-                                                <ul class="mt-2 list-disc space-y-1 pl-5">
-                                                    @foreach(data_get(session('contact_extraction_test'), 'errors', []) as $error)
-                                                        <li>{{ $error }}</li>
-                                                    @endforeach
-                                                </ul>
-                                            @endif
-                                        </div>
+                                    @if((int) data_get($sampleAssist, 'route_id') === (int) $row['route']->getKey())
+                                        @include('crm.inbound-messaging.email-routes._contact-extraction-result', [
+                                            'result' => data_get($sampleAssist, 'test', []),
+                                            'matchedLabel' => 'Sample matched the suggested setup.',
+                                            'attentionLabel' => 'Sample needs attention before saving.',
+                                        ])
+                                    @elseif((int) data_get(session('contact_extraction_test'), 'route_id') === (int) $row['route']->getKey())
+                                        @include('crm.inbound-messaging.email-routes._contact-extraction-result', [
+                                            'result' => session('contact_extraction_test'),
+                                            'matchedLabel' => 'Example matched.',
+                                            'attentionLabel' => 'Example needs attention.',
+                                        ])
                                     @endif
                                 </div>
                             </div>
@@ -528,7 +600,7 @@
                                             </a>
                                         @endforeach
                                     </div>
-                                @elseif(! $route->is_active)
+                                @elseif(! $row['route']->is_active)
                                     <p class="mt-3 text-sm text-slate-600">
                                         Enable this inbound address before creating a new automation for it.
                                     </p>
@@ -542,7 +614,7 @@
 
                         <form
                             method="POST"
-                            action="{{ route('crm.inbound-messaging.email-routes.state', $route) }}"
+                            action="{{ route('crm.inbound-messaging.email-routes.state', $row['route']) }}"
                             class="shrink-0"
                         >
                             @csrf
@@ -550,21 +622,21 @@
                             <input
                                 type="hidden"
                                 name="is_active"
-                                value="{{ $route->is_active ? '0' : '1' }}"
+                                value="{{ $row['route']->is_active ? '0' : '1' }}"
                             >
 
                             <button
                                 type="submit"
                                 class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 hover:text-slate-950"
                             >
-                                {{ $route->is_active ? 'Disable' : 'Enable' }}
+                                {{ $row['route']->is_active ? 'Disable' : 'Enable' }}
                             </button>
                         </form>
                     </div>
 
                     <form
                         method="POST"
-                        action="{{ route('crm.inbound-messaging.email-routes.update', $route) }}"
+                        action="{{ route('crm.inbound-messaging.email-routes.update', $row['route']) }}"
                         class="mt-6 grid gap-5 border-t border-slate-200 pt-5 lg:grid-cols-2"
                     >
                         @csrf
@@ -572,38 +644,38 @@
 
                         <div>
                             <label
-                                for="route-label-{{ $route->id }}"
+                                for="route-label-{{ $row['route']->id }}"
                                 class="block text-sm font-semibold text-slate-800"
                             >
                                 Name
                             </label>
                             <input
-                                id="route-label-{{ $route->id }}"
+                                id="route-label-{{ $row['route']->id }}"
                                 name="label"
                                 type="text"
-                                value="{{ $route->label }}"
+                                value="{{ $row['route']->label }}"
                                 class="mt-2 block w-full rounded-xl border-slate-300 text-sm shadow-sm"
                             >
                         </div>
 
                         <div>
                             <label
-                                for="route-local-part-{{ $route->id }}"
+                                for="route-local-part-{{ $row['route']->id }}"
                                 class="block text-sm font-semibold text-slate-800"
                             >
                                 Email address
                             </label>
                             <div class="mt-2 flex rounded-xl shadow-sm">
                                 <input
-                                    id="route-local-part-{{ $route->id }}"
+                                    id="route-local-part-{{ $row['route']->id }}"
                                     name="local_part"
                                     type="text"
-                                    value="{{ $route->local_part }}"
+                                    value="{{ $row['route']->local_part }}"
                                     autocomplete="off"
                                     class="min-w-0 flex-1 rounded-l-xl border-slate-300 text-sm"
                                 >
                                 <span class="inline-flex items-center rounded-r-xl border border-l-0 border-slate-300 bg-slate-50 px-3 text-sm text-slate-500">
-                                    {{ $domain ? '@'.$domain : '@your-inbound-domain' }}
+                                    {{ $workspace['domain'] ? '@'.$workspace['domain'] : '@your-inbound-domain' }}
                                 </span>
                             </div>
                         </div>

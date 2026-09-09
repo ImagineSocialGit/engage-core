@@ -47,6 +47,8 @@ body value after a literal label
 
 Body extraction operates on the canonical normalized inbound body. The provider's plain text is preferred; when only HTML exists, common block boundaries are converted to line breaks before tags are removed. Operators author literal labels such as `First Name`, `Email`, or `Phone`; CRM users are not asked to write regular expressions.
 
+The CRM editor also supports `.eml`-assisted setup for these rules. A saved sample email may be uploaded to the selected Inbound Address; the setup assistant reads bounded RFC822/MIME headers and prefers the first non-attachment `text/plain` body, falling back to normalized `text/html` text. It then suggests the same literal extraction sources the runtime extractor already understands and pre-fills the manual tester. The uploaded `.eml`, its MIME envelope, and its attachments are not persisted, no Contact is created, and the route definition is unchanged until the operator explicitly saves it.
+
 The route stores:
 
 ```text
