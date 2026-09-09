@@ -2438,6 +2438,7 @@
 │   ├── module-ui-ux-review-playbook.md
 │   ├── operations
 │   │   ├── client-environment-reference.md
+│   │   ├── client-launch-orchestrated-runbook.md
 │   │   ├── client-staging-production-setup-checklist.md
 │   │   ├── client-third-party-services-checklist.md
 │   │   ├── crm-user-administration.md
@@ -2791,6 +2792,7 @@
 │   ├── dump-client-files.sh
 │   ├── dump-integration-files.sh
 │   ├── dump-migrations.sh
+│   ├── init-client-local-env.sh
 │   ├── load-investigation-audit.sh
 │   ├── make-automation-dependency-cone-dump.sh
 │   ├── make-crm-dependency-cone-dump.sh
@@ -2804,8 +2806,11 @@
 │   │   ├── install-observability.sh
 │   │   ├── launch-client-environment.sh
 │   │   ├── lib
+│   │   │   ├── launch_client_environment.py
 │   │   │   ├── patch_nginx_site.py
-│   │   │   └── patch_php_fpm_pool.py
+│   │   │   ├── patch_php_fpm_pool.py
+│   │   │   └── __pycache__
+│   │   │       └── launch_client_environment.cpython-312.pyc
 │   │   ├── rollback-observability.sh
 │   │   └── verify-observability.sh
 │   ├── process-images.sh
@@ -2954,7 +2959,8 @@
 │   │   │   ├── EnvironmentRequirementEmailDomainRuleTest.php
 │   │   │   ├── EnvironmentRequirementPositiveIntegerRuleTest.php
 │   │   │   ├── EnvironmentRequirementValueRuleTest.php
-│   │   │   └── EnvironmentVariableCatalogTest.php
+│   │   │   ├── EnvironmentVariableCatalogTest.php
+│   │   │   └── LaunchClientEnvironmentScriptTest.php
 │   │   ├── Documents
 │   │   │   └── DocumentsFoundationTest.php
 │   │   ├── Email
@@ -3454,4 +3460,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-817 directories, 2638 files
+818 directories, 2643 files
