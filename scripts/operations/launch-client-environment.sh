@@ -1264,19 +1264,19 @@ audit_git_repo() {
     fi
 
     head="$(git -C "$path" rev-parse HEAD 2>/dev/null || true)"
+
+    local remote_output remote_head remote_status
     set +e
-    remote_head="$(
-        GIT_TERMINAL_PROMPT=0 \
-        GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=8' \
-        git ls-remote "$origin" "refs/heads/$expected_branch" 2>/dev/null \
-            | awk 'NR == 1 {print $1}'
-    )"
-    local remote_status=$?
+    remote_output="$(git ls-remote "$origin" "refs/heads/$expected_branch" 2>&1)"
+    remote_status=$?
     set -e
 
+    remote_head="$(printf '%s\n' "$remote_output" | awk 'NR == 1 {print $1}')"
+
     if [[ "$remote_status" -ne 0 || -z "$remote_head" ]]; then
+        remote_output="$(printf '%s' "$remote_output" | tail -n 3 | tr '\n' ' ')"
         audit_result "MANUAL VERIFICATION REQUIRED" "$key_prefix.current" \
-            "Could not verify the remote [$expected_branch] revision without mutating local Git state. Confirm remote access and rerun audit."
+            "Could not verify the remote [$expected_branch] revision without mutating local Git state. Git reported: ${remote_output:-[no diagnostic output]}"
         AUDIT_SOURCE_CURRENT="false"
     elif [[ "$head" == "$remote_head" ]]; then
         audit_result PASS "$key_prefix.current" "Local HEAD matches origin/$expected_branch."

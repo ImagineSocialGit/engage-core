@@ -517,11 +517,19 @@ NGINX;
         );
 
         $this->assertStringContainsString(
+            'git ls-remote',
+            $launcher,
+        );
+        $this->assertStringNotContainsString(
             'GIT_TERMINAL_PROMPT=0',
             $launcher,
         );
+        $this->assertStringNotContainsString(
+            'BatchMode=yes',
+            $launcher,
+        );
         $this->assertStringContainsString(
-            'git ls-remote',
+            'Git reported:',
             $launcher,
         );
         $this->assertStringContainsString(
