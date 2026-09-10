@@ -3231,10 +3231,7 @@ fix_reaudit_after_failure() {
 
 run_fix() {
     echo "== Fix precondition audit =="
-    set +e
-    run_audit
-    local audit_status=$?
-    set -e
+    run_audit || true
 
     [[ "$AUDIT_SOURCE_CURRENT" == "true" ]] \
         || fail "Fix requires clean Core/client checkouts matching their configured remote branches. Source is never pulled automatically."

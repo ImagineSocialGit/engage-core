@@ -569,6 +569,14 @@ NGINX;
             $launcher,
         );
         $this->assertStringContainsString(
+            "run_fix() {\n    echo \"== Fix precondition audit ==\"\n    run_audit || true",
+            $launcher,
+        );
+        $this->assertStringNotContainsString(
+            "run_fix() {\n    echo \"== Fix precondition audit ==\"\n    set +e\n    run_audit",
+            $launcher,
+        );
+        $this->assertStringContainsString(
             '== Mandatory post-fix audit ==',
             $launcher,
         );
