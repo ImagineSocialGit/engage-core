@@ -2,181 +2,90 @@
 
 set -euo pipefail
 
-# Proven local development baseline: group-writable source, world-readable/traversable.
-umask 0002
-
-usage() {
-  cat <<'EOF'
-Usage:
-  ./scripts/create-client.sh client-key timezone [module ...] [options]
-
-Examples:
-  ./scripts/create-client.sh sample-client-core America/Chicago
-  ./scripts/create-client.sh sample-client-core America/Chicago tasks scheduling messaging
-  ./scripts/create-client.sh sample-client-core America/Chicago --name "Sample Client" --create-repo
-  ./scripts/create-client.sh sample-client-core America/Chicago --repo-url git@github.com:ImagineSocialGit/sample-client-core.git
-  ./scripts/create-client.sh sample-client-core America/Chicago --no-local-env
-
-Options:
-  --name NAME           Client display name. Defaults to a title-cased client key.
-  --preset KEY          Initial client preset. Defaults to basic.
-  --create-repo         Create a private GitHub repository, make the initial commit,
-                        add origin, and push the initial branch.
-  --github-owner OWNER  GitHub owner used by --create-repo. Defaults to ImagineSocialGit.
-  --repo-url URL        Add an already-existing repository URL as origin instead of
-                        creating a GitHub repository.
-  --branch NAME         Initial client repository branch. Defaults to main.
-  --local-env           Require local client .env initialization after scaffold creation.
-  --no-local-env        Skip local client .env initialization. By default it runs
-                        automatically when the root .env exists with APP_ENV=local.
-  --dry-run             Validate and print the planned scaffold without writing files.
-  -h, --help            Show this help.
-
-Notes:
-  - The client key is also the repository slug. Existing --repo-url basenames must
-    match the client key so deployment identity remains deterministic.
-  - --create-repo always creates a private repository.
-  - Core/always-on modules are never written to the client's enabled list.
-  - Optional modules may be supplied here or added later with add-client-modules.sh.
-  - On a configured local checkout, an ignored client .env is initialized with safe
-    local defaults so the new client can be smoke-tested immediately.
-  - This script creates development/source configuration only. Runtime environment,
-    database, provider, Nginx, TLS, Horizon, and Scheduler setup belongs to
-    scripts/operations/launch-client-environment.sh.
-EOF
-}
-
-fail() {
-  printf 'ERROR: %s\n' "$*" >&2
-  exit 1
-}
-
-repo_slug_from_url() {
-  local value="${1%/}"
-  local tail="${value##*/}"
-  tail="${tail%.git}"
-  printf '%s' "$tail"
-}
-
-CLIENT_KEY=""
-CLIENT_TIMEZONE=""
+CLIENT_KEY="${1:-}"
+CLIENT_TIMEZONE="${2:-}"
 CLIENT_NAME=""
-CLIENT_PRESET="basic"
-CREATE_REPO=false
-GITHUB_OWNER="ImagineSocialGit"
-REPO_URL=""
-GIT_BRANCH="main"
-LOCAL_ENV_MODE="auto"
-DRY_RUN=false
-REQUESTED_MODULES=()
+WEB_GROUP="${ENGAGE_CORE_WEB_GROUP:-www-data}"
+GITHUB_OWNER="${ENGAGE_CORE_GITHUB_OWNER:-ImagineSocialGit}"
+
+if [[ -n "$CLIENT_KEY" ]]; then
+  shift
+fi
+if [[ -n "$CLIENT_TIMEZONE" ]]; then
+  shift
+fi
 
 while (($#)); do
   case "$1" in
     --name)
-      (($# >= 2)) || fail "--name requires a value."
-      CLIENT_NAME="$2"
+      CLIENT_NAME="${2:?--name requires a value}"
       shift 2
-      ;;
-    --preset)
-      (($# >= 2)) || fail "--preset requires a value."
-      CLIENT_PRESET="$2"
-      shift 2
-      ;;
-    --create-repo)
-      CREATE_REPO=true
-      shift
-      ;;
-    --github-owner)
-      (($# >= 2)) || fail "--github-owner requires a value."
-      GITHUB_OWNER="$2"
-      shift 2
-      ;;
-    --repo-url)
-      (($# >= 2)) || fail "--repo-url requires a value."
-      REPO_URL="$2"
-      shift 2
-      ;;
-    --branch)
-      (($# >= 2)) || fail "--branch requires a value."
-      GIT_BRANCH="$2"
-      shift 2
-      ;;
-    --local-env)
-      LOCAL_ENV_MODE="required"
-      shift
-      ;;
-    --no-local-env)
-      LOCAL_ENV_MODE="disabled"
-      shift
-      ;;
-    --dry-run)
-      DRY_RUN=true
-      shift
       ;;
     -h|--help)
-      usage
+      cat <<'USAGE'
+Usage: ./scripts/create-client.sh client-key timezone [--name "Client Name"]
+
+Example:
+  ./scripts/create-client.sh example-client America/Chicago --name "Example Client"
+
+Environment overrides:
+  ENGAGE_CORE_WEB_GROUP=www-data
+  ENGAGE_CORE_GITHUB_OWNER=ImagineSocialGit
+
+The command creates the local client scaffold, initializes it as a Git repository,
+creates a private GitHub repository, and pushes the initial main branch.
+USAGE
       exit 0
       ;;
-    --*)
-      fail "Unknown option: $1"
-      ;;
     *)
-      if [[ -z "$CLIENT_KEY" ]]; then
-        CLIENT_KEY="$1"
-      elif [[ -z "$CLIENT_TIMEZONE" ]]; then
-        CLIENT_TIMEZONE="$1"
-      else
-        REQUESTED_MODULES+=("$1")
-      fi
-      shift
+      echo "Unknown argument: $1" >&2
+      exit 1
       ;;
   esac
 done
 
 if [[ -z "$CLIENT_KEY" || -z "$CLIENT_TIMEZONE" ]]; then
-  usage
-  exit 2
+  echo "Usage: ./scripts/create-client.sh client-key timezone [--name \"Client Name\"]"
+  echo "Example: ./scripts/create-client.sh example-client America/Chicago --name \"Example Client\""
+  echo
+  echo "Environment overrides:"
+  echo "  ENGAGE_CORE_WEB_GROUP=www-data"
+  echo "  ENGAGE_CORE_GITHUB_OWNER=ImagineSocialGit"
+  exit 1
 fi
 
 if [[ ! "$CLIENT_KEY" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
-  fail "Client key must start with a lowercase letter or number and contain only lowercase letters, numbers, hyphens, and underscores."
+  echo "Client key must start with a lowercase letter or number and contain only lowercase letters, numbers, hyphens, and underscores."
+  exit 1
 fi
 
-if [[ ! "$CLIENT_PRESET" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
-  fail "Preset key must start with a lowercase letter or number and contain only lowercase letters, numbers, hyphens, and underscores."
+if [[ -n "$CLIENT_NAME" && "$CLIENT_NAME" =~ [[:cntrl:]] ]]; then
+  echo "Client name must not contain control characters."
+  exit 1
 fi
 
-if [[ ! "$GIT_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-  fail "Git branch contains unsupported characters: $GIT_BRANCH"
+if [[ ! "$GITHUB_OWNER" =~ ^[A-Za-z0-9][A-Za-z0-9-]*$ ]]; then
+  echo "Invalid GitHub owner: $GITHUB_OWNER"
+  exit 1
 fi
 
-if [[ ! "$GITHUB_OWNER" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ ]]; then
-  fail "GitHub owner contains unsupported characters: $GITHUB_OWNER"
-fi
-
-if [[ "$CREATE_REPO" == true && -n "$REPO_URL" ]]; then
-  fail "Use either --create-repo or --repo-url, not both."
-fi
-
-if [[ -n "$REPO_URL" ]]; then
-  REPO_SLUG="$(repo_slug_from_url "$REPO_URL")"
-  [[ "$REPO_SLUG" == "$CLIENT_KEY" ]] \
-    || fail "Repository basename [$REPO_SLUG] must match client key [$CLIENT_KEY]."
-fi
-
-command -v php >/dev/null 2>&1 || fail "PHP is required."
-command -v git >/dev/null 2>&1 || fail "Git is required."
-
-if [[ "$CREATE_REPO" == true ]]; then
-  command -v gh >/dev/null 2>&1 \
-    || fail "GitHub CLI (gh) is required for --create-repo. Install/authenticate gh or use --repo-url with an existing repository."
-
-  gh auth status -h github.com >/dev/null 2>&1 \
-    || fail "GitHub CLI is not authenticated for github.com. Run: gh auth login"
-
-  if gh repo view "$GITHUB_OWNER/$CLIENT_KEY" >/dev/null 2>&1; then
-    fail "GitHub repository already exists: $GITHUB_OWNER/$CLIENT_KEY"
+for command in php git gh getent; do
+  if ! command -v "$command" >/dev/null 2>&1; then
+    echo "$command is required to create a client and its GitHub repository."
+    exit 1
   fi
+done
+
+if ! getent group "$WEB_GROUP" >/dev/null 2>&1; then
+  echo "Web server group does not exist: $WEB_GROUP"
+  echo "Set ENGAGE_CORE_WEB_GROUP when the PHP-FPM group is not www-data."
+  exit 1
+fi
+
+if ! gh auth status --hostname github.com >/dev/null 2>&1; then
+  echo "GitHub CLI is not authenticated for github.com."
+  echo "Run: gh auth login"
+  exit 1
 fi
 
 php -r '
@@ -191,15 +100,40 @@ if (! in_array($timezone, timezone_identifiers_list(), true)) {
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLIENTS_DIR="$ROOT_DIR/client"
 CLIENT_DIR="$CLIENTS_DIR/$CLIENT_KEY"
-ROOT_MODULES_FILE="$ROOT_DIR/config/modules.php"
-ENV_TEMPLATE="$ROOT_DIR/docs/config-templates/client-environment.example"
-LOCAL_ENV_SCRIPT="$ROOT_DIR/scripts/init-client-local-env.sh"
+TEMP_CLIENT_DIR=""
+GITHUB_REPOSITORY="$GITHUB_OWNER/$CLIENT_KEY"
+GITHUB_SSH_URL="git@github.com:${GITHUB_REPOSITORY}.git"
 
-[[ -f "$ROOT_DIR/artisan" ]] || fail "Run this script from an Engage Core checkout."
-[[ -f "$ROOT_MODULES_FILE" ]] || fail "Root module config is missing: $ROOT_MODULES_FILE"
-[[ -f "$ENV_TEMPLATE" ]] || fail "Canonical client environment reference is missing: $ENV_TEMPLATE"
-[[ -f "$LOCAL_ENV_SCRIPT" ]] || fail "Local client environment helper is missing: $LOCAL_ENV_SCRIPT"
-[[ ! -e "$CLIENT_DIR" ]] || fail "Client already exists: $CLIENT_DIR"
+if [[ -e "$CLIENT_DIR" ]]; then
+  echo "Client already exists: $CLIENT_DIR"
+  exit 1
+fi
+
+if gh repo view "$GITHUB_REPOSITORY" --json nameWithOwner >/dev/null 2>&1; then
+  echo "GitHub repository already exists: $GITHUB_REPOSITORY"
+  echo "Refusing to attach a new client scaffold to an existing remote repository."
+  exit 1
+fi
+
+GIT_AUTHOR_NAME="$(git -C "$ROOT_DIR" config user.name 2>/dev/null || true)"
+GIT_AUTHOR_EMAIL="$(git -C "$ROOT_DIR" config user.email 2>/dev/null || true)"
+
+if [[ -z "$GIT_AUTHOR_NAME" || -z "$GIT_AUTHOR_EMAIL" ]]; then
+  echo "Git author identity is required before creating a client repository."
+  echo "Configure user.name and user.email in this Core checkout or globally."
+  exit 1
+fi
+
+mkdir -p "$CLIENTS_DIR"
+TEMP_CLIENT_DIR="$(mktemp -d "$CLIENTS_DIR/.${CLIENT_KEY}.creating.XXXXXX")"
+
+cleanup() {
+  if [[ -n "$TEMP_CLIENT_DIR" && -d "$TEMP_CLIENT_DIR" ]]; then
+    rm -rf "$TEMP_CLIENT_DIR"
+  fi
+}
+
+trap cleanup EXIT
 
 if [[ -z "$CLIENT_NAME" ]]; then
   CLIENT_NAME="$(
@@ -213,259 +147,130 @@ if [[ -z "$CLIENT_NAME" ]]; then
   )"
 fi
 
-CLIENT_NAME="$(printf '%s' "$CLIENT_NAME" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-[[ -n "$CLIENT_NAME" ]] || fail "Client display name cannot be blank."
-
-LOCAL_ENV_PLANNED=false
-LOCAL_ENV_REASON="disabled by --no-local-env"
-
-if [[ "$LOCAL_ENV_MODE" != "disabled" ]]; then
-  if [[ -f "$ROOT_DIR/.env" ]]; then
-    ROOT_APP_ENV="$(
-      awk -F= '
-        $1 ~ /^[[:space:]]*APP_ENV[[:space:]]*$/ {
-          value = substr($0, index($0, "=") + 1)
-          gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
-          gsub(/^"|"$/, "", value)
-          gsub(/^\047|\047$/, "", value)
-          print value
-          exit
-        }
-      ' "$ROOT_DIR/.env"
-    )"
-
-    if [[ "$ROOT_APP_ENV" == "local" ]]; then
-      LOCAL_ENV_PLANNED=true
-      LOCAL_ENV_REASON="root APP_ENV=local"
-    elif [[ "$LOCAL_ENV_MODE" == "required" ]]; then
-      fail "--local-env requires root .env APP_ENV=local; resolved [$ROOT_APP_ENV]."
-    else
-      LOCAL_ENV_REASON="root APP_ENV is not local"
-    fi
-  elif [[ "$LOCAL_ENV_MODE" == "required" ]]; then
-    fail "--local-env requires an existing root .env with APP_ENV=local."
-  else
-    LOCAL_ENV_REASON="root .env is not present"
-  fi
-fi
-
-if [[ "$CREATE_REPO" == true ]]; then
-  DEPLOY_REPO_URL="git@github.com:$GITHUB_OWNER/$CLIENT_KEY.git"
-elif [[ -n "$REPO_URL" ]]; then
-  DEPLOY_REPO_URL="$REPO_URL"
-else
-  DEPLOY_REPO_URL="<client-repo-url>"
-fi
-
-MODULE_RESULT="$(mktemp)"
-TEMP_CLIENT_DIR=""
-
-cleanup() {
-  rm -f "$MODULE_RESULT"
-
-  if [[ -n "$TEMP_CLIENT_DIR" && -d "$TEMP_CLIENT_DIR" ]]; then
-    rm -rf "$TEMP_CLIENT_DIR"
-  fi
-}
-
-trap cleanup EXIT
-
-if ! php -r '
-array_shift($argv);
-$configFile = array_shift($argv);
-$requested = array_values(array_unique(array_filter(
-    $argv,
-    static fn (mixed $value): bool => is_string($value) && trim($value) !== ""
-)));
-
-$config = require $configFile;
-$definitions = $config["modules"] ?? null;
-
-if (! is_array($definitions) || $definitions === []) {
-    fwrite(STDERR, "Root module definitions are missing.\n");
-    exit(1);
-}
-
-$selectable = [];
-
-foreach ($definitions as $key => $definition) {
-    if (! is_string($key) || $key === "") {
-        continue;
-    }
-
-    if (is_array($definition) && ! empty($definition["always_on"])) {
-        continue;
-    }
-
-    $selectable[] = $key;
-}
-
-foreach ($requested as $key) {
-    if (! in_array($key, $selectable, true)) {
-        fwrite(STDERR, "Unknown or always-on module: {$key}\n");
-        fwrite(STDERR, "Available optional modules: ".implode(", ", $selectable)."\n");
-        exit(1);
-    }
-}
-
-$lookup = array_fill_keys($requested, true);
-
-foreach ($selectable as $key) {
-    if (isset($lookup[$key])) {
-        echo $key.PHP_EOL;
-    }
-}
-' "$ROOT_MODULES_FILE" "${REQUESTED_MODULES[@]}" > "$MODULE_RESULT"; then
-  exit 1
-fi
-
-mapfile -t INITIAL_MODULES < "$MODULE_RESULT"
-
-if [[ "$DRY_RUN" == true ]]; then
-  cat <<EOF
-Client scaffold dry run
-Client key: $CLIENT_KEY
-Name: $CLIENT_NAME
-Timezone: $CLIENT_TIMEZONE
-Preset: $CLIENT_PRESET
-Optional modules: $([[ ${#INITIAL_MODULES[@]} -eq 0 ]] && echo "(none; Core only)" || printf '%s' "${INITIAL_MODULES[*]}")
-Git branch: $GIT_BRANCH
-GitHub create: $CREATE_REPO
-GitHub owner: $GITHUB_OWNER
-Origin/deployment repo: $DEPLOY_REPO_URL
-Visibility: $([[ "$CREATE_REPO" == true ]] && echo "private" || echo "not changed by this script")
-Local env initialization: $LOCAL_ENV_PLANNED ($LOCAL_ENV_REASON)
-Target: $CLIENT_DIR
-EOF
-  exit 0
-fi
-
-mkdir -p "$CLIENTS_DIR"
-TEMP_CLIENT_DIR="$(mktemp -d "$CLIENTS_DIR/.${CLIENT_KEY}.creating.XXXXXX")"
-# mktemp creates the top-level directory as 0700 regardless of umask. The known-good
-# local client baseline uses a 0775 client root so PHP-FPM can traverse client source.
-chmod 0775 "$TEMP_CLIENT_DIR"
+CLIENT_NAME_PHP="$(php -r 'echo var_export($argv[1], true);' "$CLIENT_NAME")"
+CLIENT_KEY_PHP="$(php -r 'echo var_export($argv[1], true);' "$CLIENT_KEY")"
+CLIENT_TIMEZONE_PHP="$(php -r 'echo var_export($argv[1], true);' "$CLIENT_TIMEZONE")"
 
 mkdir -p "$TEMP_CLIENT_DIR/config"
 mkdir -p "$TEMP_CLIENT_DIR/resources/views"
 mkdir -p "$TEMP_CLIENT_DIR/resources/images/raw"
 
-php -r '
-[$path, $name, $key, $timezone, $preset] = array_slice($argv, 1);
+cat > "$TEMP_CLIENT_DIR/.gitignore" <<'EOF_GITIGNORE'
+.env
+.env.*
+!.env.example
+EOF_GITIGNORE
 
-$content = "<?php\n\nreturn [\n"
-    ."    '\''name'\'' => ".var_export($name, true).",\n"
-    ."    '\''key'\'' => ".var_export($key, true).",\n\n"
-    ."    '\''timezone'\'' => ".var_export($timezone, true).",\n\n"
-    ."    '\''preset'\'' => ".var_export($preset, true).",\n"
-    ."];\n";
+cat > "$TEMP_CLIENT_DIR/config/client.php" <<EOF_CLIENT
+<?php
 
-file_put_contents($path, $content);
-' \
-  "$TEMP_CLIENT_DIR/config/client.php" \
-  "$CLIENT_NAME" \
-  "$CLIENT_KEY" \
-  "$CLIENT_TIMEZONE" \
-  "$CLIENT_PRESET"
+return [
+    'name' => $CLIENT_NAME_PHP,
+    'key' => $CLIENT_KEY_PHP,
 
-{
-  printf '%s\n' '<?php'
-  printf '\n'
-  printf '%s\n' 'return ['
-  printf '%s\n' "    'enabled' => ["
+    'timezone' => $CLIENT_TIMEZONE_PHP,
 
-  for module in "${INITIAL_MODULES[@]}"; do
-    printf "        '%s',\n" "$module"
-  done
+    'preset' => 'basic',
+];
+EOF_CLIENT
 
-  printf '%s\n' '    ],'
-  printf '%s\n' '];'
-} > "$TEMP_CLIENT_DIR/config/modules.php"
+cat > "$TEMP_CLIENT_DIR/config/modules.php" <<'EOF_MODULES'
+<?php
+
+return [
+    'enabled' => [
+        'tasks',
+        'workflow',
+    ],
+];
+EOF_MODULES
 
 cat > "$TEMP_CLIENT_DIR/resources/images/manifest.json" <<'EOF_MANIFEST'
 {}
 EOF_MANIFEST
 
+ENV_TEMPLATE="$ROOT_DIR/docs/config-templates/client-environment.example"
+
+if [[ ! -f "$ENV_TEMPLATE" ]]; then
+  echo "Canonical client environment reference is missing: $ENV_TEMPLATE"
+  exit 1
+fi
+
 cp "$ENV_TEMPLATE" "$TEMP_CLIENT_DIR/.env.example"
 
-cat > "$TEMP_CLIENT_DIR/.gitignore" <<'EOF_GITIGNORE'
-.env
-.env.*
-!.env.example
-.DS_Store
-EOF_GITIGNORE
+cat > "$TEMP_CLIENT_DIR/README.md" <<EOF_README
+# $CLIENT_NAME
 
-{
-  printf '# %s\n\n' "$CLIENT_NAME"
-  cat <<EOF_README
-Client-owned configuration, content, views, and deployment-reference environment documentation.
+Engage Core client configuration, content, views, and deployment-reference environment documentation.
 
-## Identity
+Repository: \`$GITHUB_REPOSITORY\`
 
-- Client key: \`$CLIENT_KEY\`
-- Timezone: \`$CLIENT_TIMEZONE\`
-- Preset: \`$CLIENT_PRESET\`
-- Repository slug: \`$CLIENT_KEY\`
+This scaffold intentionally starts with the \`basic\` preset and the Tasks and Workflow modules. Add client-specific config contributions only when the client actually needs them.
 
-## Optional modules
+## Review before use
 
-The client starts with only the optional modules explicitly selected during creation. Core/always-on modules are resolved by the platform and do not belong in \`config/modules.php\`.
-
-From the Engage Core repository root:
-
-\`\`\`bash
-./scripts/add-client-modules.sh $CLIENT_KEY --list
-./scripts/add-client-modules.sh $CLIENT_KEY module [module ...]
-\`\`\`
-
-Module selection is source configuration. Provider credentials and deployment environment requirements are resolved later by the deployment plan and environment launcher.
+1. Review \`config/client.php\`:
+   - client name
+   - client key
+   - timezone
+   - selected preset
+2. Review \`config/modules.php\` and enable only the modules the client needs.
+3. Decide which provider-backed features are required before adding credentials.
 
 ## Environment model
 
-\`.env.example\` is the canonical selected-client environment reference. Do not commit a runtime \`.env\`.
+\`.env.example\` is an exhaustive selected-client reference. It is not a runtime template and must not be copied wholesale to \`.env\`.
 
-Stable client behavior belongs in \`config/**\`. Deployment-specific values and secrets belong in the selected-client runtime \`.env\`.
-
-## Local development
-
-When this client is created from a configured local Core checkout, \`create-client.sh\` initializes an ignored local \`.env\` automatically. For an existing client or a skipped initialization, run from the Core repository root:
+The committed client/module configuration determines the runtime requirement set. Select this client in the root runtime environment first. If root \`.env\` already contains another \`CLIENT_KEY\`, change that one runtime value deliberately before continuing. When root \`.env\` does not exist yet, an explicit process value can bootstrap the first sync:
 
 \`\`\`bash
-./scripts/init-client-local-env.sh $CLIENT_KEY
+CLIENT_KEY=$CLIENT_KEY php artisan engage:environment:sync --write-missing
 \`\`\`
 
-The local helper selects the client in the root \`.env\`, uses the standard local MySQL defaults (\`devUser\` / \`password\`), derives a client-specific database and runtime prefixes, and uses the Messaging development sink when Messaging is enabled. It never creates/drops a database or runs migrations.
+That command adds only missing required variable names to the correct root/client environment file. It never invents secret values or overwrites existing values. A persisted \`CLIENT_KEY\` that disagrees with the selected client is reported as a blocking mismatch instead of being silently changed.
 
-## Repository workflow
+Populate the reported blank values. If \`APP_KEY\` was added blank, generate it first:
 
-This directory is its own Git repository and is versioned independently from Engage Core.
+\`\`\`bash
+php artisan key:generate
+\`\`\`
 
-Repository identity must stay aligned with the client key:
+Then run:
+
+\`\`\`bash
+php artisan optimize:clear
+php artisan engage:deployment-plan
+php artisan engage:install
+php artisan modules:status
+\`\`\`
+
+\`engage:install\` already runs setup validation; a second standalone \`setup:validate\` is only needed when diagnosing setup state separately.
+
+## File permissions
+
+The client scaffold uses:
 
 \`\`\`text
-client key: $CLIENT_KEY
-repo slug:  $CLIENT_KEY
+directories: 2750
+files:       0640
+group:       $WEB_GROUP
 \`\`\`
 
-When the repository was not created/pushed by create-client.sh, review the scaffold, commit it, connect the private remote, and push the branch before staging deployment.
+The setgid directory bit keeps newly created files in the PHP-FPM group. Runtime \`.env\` files created by the environment synchronizer default to mode \`0640\`; deployment must also ensure the deploy user and PHP-FPM identity can read them without making secrets world-readable.
 
-## Staging / production
+## Configuration ownership
 
-Do not edit source/config directly on staging or production.
+\`config/**\`
+: Stable client product behavior and version-controlled overrides authored in development.
 
-After this client repository is committed and pushed, start the current Core deployment orchestrator from the Core checkout:
+Client \`.env\`
+: Deployment-specific client values and secrets required by the committed build. The generated \`.gitignore\` excludes runtime environment files while retaining \`.env.example\`.
 
-\`\`\`bash
-bash scripts/operations/launch-client-environment.sh new \\
-  --environment staging \\
-  --client-repo $DEPLOY_REPO_URL \\
-  --root-domain <staging-root-domain> \\
-  --topology core_services_only
-\`\`\`
+Root \`.env\`
+: Application/process infrastructure and the active \`CLIENT_KEY\`.
 
-Use \`--topology managed_main_site --main-site-type seo\` when the organization also owns the root website through the SEO platform.
+Staging and production are deployment targets. Do not edit source/config there; deploy committed development changes and reconcile only runtime environment/host state.
 EOF_README
-} > "$TEMP_CLIENT_DIR/README.md"
 
 php -l "$TEMP_CLIENT_DIR/config/client.php" >/dev/null
 php -l "$TEMP_CLIENT_DIR/config/modules.php" >/dev/null
@@ -475,116 +280,79 @@ $json = file_get_contents($argv[1]);
 json_decode($json, true, 512, JSON_THROW_ON_ERROR);
 ' "$TEMP_CLIENT_DIR/resources/images/manifest.json"
 
-if git init -q -b "$GIT_BRANCH" "$TEMP_CLIENT_DIR" 2>/dev/null; then
-  :
-else
-  git init -q "$TEMP_CLIENT_DIR"
-  git -C "$TEMP_CLIENT_DIR" checkout -q -b "$GIT_BRANCH"
+# mktemp creates the temporary client directory as 0700. Before publishing the
+# client, make it traversable/readable by the PHP-FPM group while keeping it
+# closed to all other users. The setgid bit preserves the web group on new files.
+if ! chgrp -R "$WEB_GROUP" "$TEMP_CLIENT_DIR" 2>/dev/null; then
+  if ! command -v sudo >/dev/null 2>&1; then
+    echo "Unable to assign the client directory to group '$WEB_GROUP'."
+    echo "Install sudo, run as root, or add the current user to that group."
+    exit 1
+  fi
+
+  sudo chgrp -R "$WEB_GROUP" "$TEMP_CLIENT_DIR"
 fi
 
-if [[ -n "$REPO_URL" ]]; then
-  git -C "$TEMP_CLIENT_DIR" remote add origin "$REPO_URL"
+find "$TEMP_CLIENT_DIR" -type d -exec chmod 2750 {} +
+find "$TEMP_CLIENT_DIR" -type f -exec chmod 0640 {} +
+
+# Initialize and commit while the scaffold is still in its temporary location.
+# This keeps a failed GitHub create from publishing a half-created client under client/.
+git -C "$TEMP_CLIENT_DIR" init -q
+git -C "$TEMP_CLIENT_DIR" config user.name "$GIT_AUTHOR_NAME"
+git -C "$TEMP_CLIENT_DIR" config user.email "$GIT_AUTHOR_EMAIL"
+git -C "$TEMP_CLIENT_DIR" add .
+git -C "$TEMP_CLIENT_DIR" commit -q -m "feat: initialize client"
+git -C "$TEMP_CLIENT_DIR" branch -M main
+
+echo
+echo "Creating private GitHub repository: $GITHUB_REPOSITORY"
+if ! gh repo create "$GITHUB_REPOSITORY" --private; then
+  echo "GitHub repository creation failed. No client directory was published."
+  exit 1
+fi
+
+git -C "$TEMP_CLIENT_DIR" remote add origin "$GITHUB_SSH_URL"
+
+if ! git -C "$TEMP_CLIENT_DIR" push -u origin main; then
+  echo
+  echo "GitHub repository was created, but the initial push failed."
+  echo "Preserving the client scaffold locally so the push can be repaired without recreating it."
+
+  mv "$TEMP_CLIENT_DIR" "$CLIENT_DIR"
+  TEMP_CLIENT_DIR=""
+  trap - EXIT
+
+  echo "Client: $CLIENT_DIR"
+  echo "Repository: $GITHUB_SSH_URL"
+  echo "Retry after fixing Git authentication:"
+  echo "  git -C client/$CLIENT_KEY push -u origin main"
+  exit 1
 fi
 
 mv "$TEMP_CLIENT_DIR" "$CLIENT_DIR"
-chmod 0775 "$CLIENT_DIR"
 TEMP_CLIENT_DIR=""
 trap - EXIT
-rm -f "$MODULE_RESULT"
-
-LOCAL_ENV_CREATED=false
-
-if [[ "$LOCAL_ENV_PLANNED" == true ]]; then
-  echo
-  echo "Initializing ignored local client environment..."
-
-  if ! bash "$LOCAL_ENV_SCRIPT" "$CLIENT_KEY"; then
-    cat >&2 <<EOF_LOCAL_ENV_FAIL
-
-The client source scaffold was preserved at:
-  $CLIENT_DIR
-
-Local environment initialization failed before any GitHub repository was created.
-Fix the reported local-environment issue, then run:
-  ./scripts/init-client-local-env.sh $CLIENT_KEY
-EOF_LOCAL_ENV_FAIL
-    exit 1
-  fi
-
-  LOCAL_ENV_CREATED=true
-fi
-
-if [[ "$CREATE_REPO" == true ]]; then
-  echo
-  echo "Creating initial client commit..."
-  git -C "$CLIENT_DIR" add .
-
-  if ! git -C "$CLIENT_DIR" commit -m "chore: initialize $CLIENT_KEY client"; then
-    cat >&2 <<EOF_COMMIT_FAIL
-
-The client scaffold was preserved at:
-  $CLIENT_DIR
-
-Git could not create the initial commit. Configure your Git author identity, then run:
-  git -C "$CLIENT_DIR" add .
-  git -C "$CLIENT_DIR" commit -m "chore: initialize $CLIENT_KEY client"
-
-No GitHub repository was created.
-EOF_COMMIT_FAIL
-    exit 1
-  fi
-
-  echo
-  echo "Creating private GitHub repository: $GITHUB_OWNER/$CLIENT_KEY"
-
-  if ! gh repo create "$GITHUB_OWNER/$CLIENT_KEY" \
-    --private \
-    --source "$CLIENT_DIR" \
-    --remote origin \
-    --push \
-    --description "$CLIENT_NAME Core client configuration"; then
-    cat >&2 <<EOF_GITHUB_FAIL
-
-The local client repository and initial commit were preserved at:
-  $CLIENT_DIR
-
-GitHub repository creation/push did not complete cleanly. Check whether the remote
-was created before retrying:
-  gh repo view "$GITHUB_OWNER/$CLIENT_KEY"
-  git -C "$CLIENT_DIR" remote -v
-
-If the remote exists, finish with:
-  git -C "$CLIENT_DIR" push -u origin "$GIT_BRANCH"
-EOF_GITHUB_FAIL
-    exit 1
-  fi
-fi
-
-ORIGIN="$(git -C "$CLIENT_DIR" remote get-url origin 2>/dev/null || true)"
 
 cat <<EOF_DONE
-Created client source repository: $CLIENT_DIR
+Created client: $CLIENT_DIR
 Name: $CLIENT_NAME
 Timezone: $CLIENT_TIMEZONE
-Preset: $CLIENT_PRESET
-Optional modules: $([[ ${#INITIAL_MODULES[@]} -eq 0 ]] && echo "(none; Core only)" || printf '%s' "${INITIAL_MODULES[*]}")
-Branch: $GIT_BRANCH
-Origin: ${ORIGIN:-"(not configured)"}
-GitHub private repo created/pushed: $CREATE_REPO
-Local .env initialized: $LOCAL_ENV_CREATED
+Preset: basic
+Modules: tasks, workflow
+Repository: $GITHUB_SSH_URL
+Branch: main
+Visibility: private
+Permissions: directories 2750; files 0640; group $WEB_GROUP
 
 Next:
-  ./scripts/add-client-modules.sh $CLIENT_KEY --list
-  ./scripts/add-client-modules.sh $CLIENT_KEY module [module ...]
-
-For local smoke testing (if the local .env was skipped or this client already existed):
-  ./scripts/init-client-local-env.sh $CLIENT_KEY
-
-After any module/config changes:
-  git -C "$CLIENT_DIR" status
-  git -C "$CLIENT_DIR" add .
-  git -C "$CLIENT_DIR" commit -m "chore: configure $CLIENT_KEY"
-  git -C "$CLIENT_DIR" push
-
-Then launch staging with scripts/operations/launch-client-environment.sh new.
+  # Review config/client.php and config/modules.php, then commit/push any client-specific changes.
+  # If root .env already selects another client, deliberately set CLIENT_KEY=$CLIENT_KEY there first.
+  CLIENT_KEY=$CLIENT_KEY php artisan engage:environment:sync --write-missing
+  # Populate the reported blank runtime values/secrets.
+  # If APP_KEY is blank: php artisan key:generate
+  php artisan optimize:clear
+  php artisan engage:deployment-plan
+  php artisan engage:install
+  php artisan modules:status
 EOF_DONE
