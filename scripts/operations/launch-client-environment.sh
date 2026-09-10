@@ -611,13 +611,15 @@ runtime_permission_setup() {
     sudo find storage bootstrap/cache -type d -exec chmod 2775 {} \;
     sudo find storage bootstrap/cache -type f -exec chmod 0664 {} \;
 
-    local one="storage/logs/.engage-permission-deploy-$$"
-    local two="storage/logs/.engage-permission-web-$$"
-    sudo -u "$DEPLOY_USER" sh -c "printf 'deploy-created\\n' > '$one'"
-    sudo -u "$WEB_USER" sh -c "printf 'web-updated\\n' >> '$one'"
-    sudo -u "$WEB_USER" sh -c "printf 'web-created\\n' > '$two'"
-    sudo -u "$DEPLOY_USER" sh -c "printf 'deploy-updated\\n' >> '$two'"
-    sudo rm -f "$one" "$two"
+    local log_dir="$APP_PATH/storage/logs"
+    local deploy_probe="$log_dir/.engage-permission-deploy-$$"
+    local web_probe="$log_dir/.engage-permission-web-$$"
+
+    sudo -u "$DEPLOY_USER" sh -c 'printf "deploy-created\\n" > "$1"' sh "$deploy_probe"
+    sudo -u "$WEB_USER" sh -c 'printf "web-updated\\n" >> "$1"' sh "$deploy_probe"
+    sudo -u "$WEB_USER" sh -c 'printf "web-created\\n" > "$1"' sh "$web_probe"
+
+    sudo rm -f "$deploy_probe" "$web_probe"
 }
 
 install_supervisor_program() {
