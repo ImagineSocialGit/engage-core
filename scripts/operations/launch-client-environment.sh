@@ -1082,6 +1082,10 @@ audit_reset() {
     AUDIT_WARNING=0
     AUDIT_BREAKING=0
     AUDIT_MANUAL=0
+    AUDIT_APP_COMMANDS_AVAILABLE="unknown"
+    AUDIT_APP_BOOTSTRAP_READY="unknown"
+    AUDIT_NGINX_DUMP_LOADED="false"
+    AUDIT_NGINX_DUMP=""
 }
 
 audit_result() {
@@ -1316,19 +1320,25 @@ audit_env_file_metadata() {
     fi
 }
 
-audit_prefix_collision() {
-    local env_key="$1"
-    local value="$2"
-    local result_key="$3"
+audit_prefix_collision_from_map() {
+    local collision_json="$1"
+    local env_key="$2"
+    local value="$3"
+    local result_key="$4"
 
     [[ -n "$value" ]] || return 0
 
     local collisions
-    collisions="$(python3 "$HELPER" env-collisions \
-        --search-root /var/www \
-        --key "$env_key" \
-        --value "$value" \
-        --exclude "$CLIENT_ENV" 2>/dev/null || true)"
+    collisions="$(printf '%s' "$collision_json" | python3 -c '
+import json, sys
+key = sys.argv[1]
+try:
+    payload = json.load(sys.stdin)
+except json.JSONDecodeError:
+    payload = {}
+for path in payload.get(key, []):
+    print(path)
+' "$env_key" 2>/dev/null || true)"
 
     if [[ -z "$collisions" ]]; then
         audit_result PASS "$result_key" "$env_key is not duplicated in another readable /var/www environment."
@@ -1373,32 +1383,81 @@ audit_canonical_drift() {
     fi
 }
 
+audit_load_nginx_dump() {
+    if [[ "$AUDIT_NGINX_DUMP_LOADED" == "true" ]]; then
+        [[ -n "$AUDIT_NGINX_DUMP" ]]
+        return
+    fi
+
+    AUDIT_NGINX_DUMP_LOADED="true"
+
+    local status
+    set +e
+    AUDIT_NGINX_DUMP="$(sudo nginx -T 2>/dev/null)"
+    status=$?
+    set -e
+
+    [[ "$status" -eq 0 && -n "$AUDIT_NGINX_DUMP" ]]
+}
+
+audit_nginx_owners_json() {
+    local host="$1"
+
+    if audit_load_nginx_dump; then
+        printf '%s' "$AUDIT_NGINX_DUMP" \
+            | python3 "$HELPER" nginx-host-owners-stdin --host "$host" 2>/dev/null \
+            || printf '[]'
+        return
+    fi
+
+    python3 "$HELPER" nginx-host-owners \
+        --directory /etc/nginx/sites-enabled \
+        --host "$host" 2>/dev/null || printf '[]'
+}
+
+audit_nginx_owner_summary() {
+    local owners_json="$1"
+
+    printf '%s' "$owners_json" | python3 -c '
+import json, sys
+try:
+    owners = json.load(sys.stdin)
+except json.JSONDecodeError:
+    owners = []
+for owner in owners:
+    root = owner.get("root") or "[no root]"
+    config = owner.get("config") or "[unknown config]"
+    fastcgi = owner.get("fastcgi_pass") or "[no fastcgi_pass]"
+    print(f"{root} via {config} ({fastcgi})")
+' 2>/dev/null || true
+}
+
 audit_detect_active_host_owner() {
     AUDIT_CHECKOUT_ACTIVE="unknown"
     AUDIT_ACTIVE_APP_PATH=""
 
-    local owners_json count root config
-    owners_json="$(python3 "$HELPER" nginx-host-owners \
-        --directory /etc/nginx/sites-enabled \
-        --host "$CRM_HOST" 2>/dev/null || printf '[]')"
+    local owners_json count root config owner_summary
+    owners_json="$(audit_nginx_owners_json "$CRM_HOST")"
     count="$(printf '%s' "$owners_json" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || printf '0')"
 
     if [[ "$count" -eq 0 ]]; then
         audit_result WARNING deployment.crm_host_owner \
-            "No enabled Nginx server block was discovered for CRM host [$CRM_HOST]. Runtime ownership will be evaluated from the audited checkout."
+            "No application-serving Nginx block was discovered for CRM host [$CRM_HOST]. Runtime ownership is not proven."
         return
     fi
 
     if [[ "$count" -gt 1 ]]; then
+        owner_summary="$(audit_nginx_owner_summary "$owners_json")"
+        owner_summary="${owner_summary//$'\n'/; }"
         audit_result BREAKING deployment.crm_host_owner \
-            "Multiple enabled Nginx server blocks claim CRM host [$CRM_HOST]. Host ownership is ambiguous and unsafe."
+            "Multiple distinct application-serving Nginx owners claim CRM host [$CRM_HOST]: ${owner_summary:-[details unavailable]}. Host ownership is genuinely ambiguous."
         return
     fi
 
     root="$(printf '%s' "$owners_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)[0].get("root", ""))')"
     config="$(printf '%s' "$owners_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)[0].get("config", ""))')"
 
-    if [[ "$root" == "$APP_PATH/public" ]]; then
+    if [[ "$root" == "${APP_PATH%/}/public" ]]; then
         AUDIT_CHECKOUT_ACTIVE="true"
         AUDIT_ACTIVE_APP_PATH="$APP_PATH"
         audit_result PASS deployment.crm_host_owner \
@@ -1431,6 +1490,7 @@ audit_composer_dependencies() {
     fi
 
     AUDIT_APP_COMMANDS_AVAILABLE="false"
+    AUDIT_APP_BOOTSTRAP_READY="false"
     if [[ "$AUDIT_CHECKOUT_ACTIVE" == "false" ]]; then
         audit_result INFO runtime.composer_dependencies \
             "vendor/autoload.php is absent in the inactive Engage Core checkout. Application-level checks are unavailable until a deliberate cutover is prepared."
@@ -1440,9 +1500,63 @@ audit_composer_dependencies() {
     fi
 }
 
+audit_client_environment_contract() {
+    if [[ "$AUDIT_APP_COMMANDS_AVAILABLE" != "true" ]]; then
+        return
+    fi
+
+    local output status
+    set +e
+    output="$(
+        cd "$APP_PATH" &&
+        "$PHP_BIN" -r '
+require __DIR__."/vendor/autoload.php";
+
+try {
+    Dotenv\Dotenv::createImmutable(__DIR__)->safeLoad();
+} catch (Throwable $e) {
+    fwrite(STDERR, "ROOT_ENV_PARSE_ERROR: ".get_class($e).PHP_EOL);
+    exit(2);
+}
+
+try {
+    (new App\Support\Clients\ClientEnvironmentLoader())->load(__DIR__);
+    echo "CLIENT ENV OK\n";
+} catch (Throwable $e) {
+    fwrite(STDERR, get_class($e).": ".$e->getMessage().PHP_EOL);
+    exit(1);
+}
+' 2>&1
+    )"
+    status=$?
+    set -e
+
+    if [[ "$status" -eq 0 ]]; then
+        AUDIT_APP_BOOTSTRAP_READY="true"
+        audit_result PASS env.client_contract "Root/client environment loading contract passed before Laravel bootstrap."
+        return
+    fi
+
+    AUDIT_APP_BOOTSTRAP_READY="false"
+    output="$(printf '%s' "$output" | tail -n 3 | tr '\n' ' ')"
+
+    if [[ "$status" -eq 2 ]]; then
+        audit_runtime_violation env.root_parse \
+            "Root .env could not be parsed safely. Error details are suppressed because environment values may be sensitive."
+    else
+        audit_runtime_violation env.client_contract \
+            "Selected-client environment violates the bootstrap-safe ownership contract: ${output:-[no diagnostic output]}"
+    fi
+}
+
 audit_app_command() {
     local result_key="$1"
     shift
+
+    if [[ "${AUDIT_APP_BOOTSTRAP_READY:-unknown}" == "false" ]]; then
+        audit_result INFO "$result_key"             "Not evaluated because the early environment/bootstrap contract is already failing."
+        return
+    fi
 
     local output status
     set +e
@@ -1462,6 +1576,12 @@ audit_app_command() {
 }
 
 audit_resolve_plan() {
+    if [[ "${AUDIT_APP_BOOTSTRAP_READY:-unknown}" == "false" ]]; then
+        audit_result INFO deployment_plan.unavailable             "Not evaluated because the early environment/bootstrap contract is already failing."
+        AUDIT_PLAN_JSON=""
+        return
+    fi
+
     local output status
     set +e
     output="$(
@@ -1524,168 +1644,241 @@ audit_core_hosts() {
     printf '%s\n' "${hosts[@]}" | awk 'NF && !seen[$0]++'
 }
 
+audit_nginx_host() {
+    local expected_host="$1"
+    local owners_json count owner_summary matching_roots
+
+    owners_json="$(audit_nginx_owners_json "$expected_host")"
+    count="$(printf '%s' "$owners_json" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || printf '0')"
+
+    if [[ "$count" -eq 0 ]]; then
+        audit_result BREAKING "nginx.host.$expected_host" \
+            "No application-serving Nginx block owns required Core host [$expected_host]."
+        return
+    fi
+
+    matching_roots="$(printf '%s' "$owners_json" | python3 -c '
+import json, sys
+target = sys.argv[1].rstrip("/")
+try:
+    owners = json.load(sys.stdin)
+except json.JSONDecodeError:
+    owners = []
+print(sum(1 for owner in owners if (owner.get("root") or "").rstrip("/") == target))
+' "$APP_PATH/public" 2>/dev/null || printf '0')"
+
+    if [[ "$count" -eq 1 && "$matching_roots" -eq 1 ]]; then
+        audit_result PASS "nginx.host.$expected_host" \
+            "Required Core host is served from $APP_PATH/public."
+        return
+    fi
+
+    owner_summary="$(audit_nginx_owner_summary "$owners_json")"
+    owner_summary="${owner_summary//$'\n'/; }"
+
+    if [[ "$matching_roots" -gt 0 ]]; then
+        audit_result BREAKING "nginx.host.$expected_host" \
+            "Core host [$expected_host] has multiple distinct application-serving owners: ${owner_summary:-[details unavailable]}."
+    else
+        audit_result BREAKING "nginx.host.$expected_host" \
+            "Core host [$expected_host] is served by a different application root: ${owner_summary:-[details unavailable]}."
+    fi
+}
+
+audit_live_tls_host() {
+    local host="$1"
+
+    if ! command -v curl >/dev/null 2>&1; then
+        audit_result "MANUAL VERIFICATION REQUIRED" "tls.host.$host" \
+            "curl is unavailable; verify the live certificate and hostname coverage for https://$host manually."
+        return
+    fi
+
+    local tls_error
+    set +e
+    tls_error="$(curl -sS \
+        --resolve "$host:443:127.0.0.1" \
+        --connect-timeout 5 \
+        --max-time 10 \
+        -o /dev/null \
+        "https://$host/" 2>&1)"
+    local curl_status=$?
+    set -e
+
+    if [[ "$curl_status" -eq 0 ]]; then
+        audit_result PASS "tls.host.$host" \
+            "The certificate served locally for [$host] passes CA and hostname validation."
+    else
+        tls_error="$(printf '%s' "$tls_error" | tail -n 2 | tr '\n' ' ')"
+        audit_result BREAKING "tls.host.$host" \
+            "TLS validation failed for the certificate actually served for [$host]: ${tls_error:-curl exit $curl_status}."
+        return
+    fi
+
+    if ! command -v openssl >/dev/null 2>&1; then
+        audit_result "MANUAL VERIFICATION REQUIRED" "tls.expiry.$host" \
+            "openssl is unavailable; verify certificate expiry for [$host] manually."
+        return
+    fi
+
+    local certificate
+    certificate="$(
+        printf '\n' \
+            | openssl s_client \
+                -connect 127.0.0.1:443 \
+                -servername "$host" \
+                -showcerts 2>/dev/null \
+            | awk '
+                /-----BEGIN CERTIFICATE-----/ {capture=1}
+                capture {print}
+                /-----END CERTIFICATE-----/ {exit}
+            '
+    )"
+
+    if [[ -z "$certificate" ]]; then
+        audit_result WARNING "tls.expiry.$host" \
+            "TLS hostname validation passed, but the leaf certificate could not be extracted for expiry inspection."
+        return
+    fi
+
+    if printf '%s\n' "$certificate" \
+        | openssl x509 -noout -checkend 2592000 >/dev/null 2>&1
+    then
+        audit_result PASS "tls.expiry.$host" \
+            "The certificate actually served for [$host] is valid for more than 30 days."
+    else
+        audit_result WARNING "tls.expiry.$host" \
+            "The certificate actually served for [$host] expires within 30 days or its expiry could not be validated."
+    fi
+}
+
 audit_nginx() {
     note "Nginx / TLS"
     local canonical="/etc/nginx/sites-available/$NGINX_SITE_NAME"
     local -a configs=()
     local path resolved existing
 
-    if [[ -f "$canonical" ]]; then
-        configs+=("$canonical")
-    else
-        for path in /etc/nginx/sites-enabled/*; do
-            [[ -e "$path" ]] || continue
-            if grep -Fq "root $APP_PATH/public;" "$path" 2>/dev/null; then
-                resolved="$(readlink -f "$path" 2>/dev/null || printf '%s' "$path")"
-                local duplicate=false
-                for existing in "${configs[@]:-}"; do
-                    [[ "$existing" == "$resolved" ]] && duplicate=true
-                done
-                [[ "$duplicate" == "true" ]] || configs+=("$resolved")
-            fi
-        done
-    fi
+    for path in /etc/nginx/sites-enabled/*; do
+        [[ -e "$path" ]] || continue
+        if grep -Fq "root $APP_PATH/public;" "$path" 2>/dev/null; then
+            resolved="$(readlink -f "$path" 2>/dev/null || printf '%s' "$path")"
+            local duplicate=false
+            for existing in "${configs[@]:-}"; do
+                [[ "$existing" == "$resolved" ]] && duplicate=true
+            done
+            [[ "$duplicate" == "true" ]] || configs+=("$resolved")
+        fi
+    done
 
     if [[ ${#configs[@]} -eq 0 ]]; then
-        audit_result BREAKING nginx.site "No enabled/available Nginx site was found for the active audited checkout $APP_PATH."
-        return
-    fi
-
-    if [[ ${#configs[@]} -eq 1 && "${configs[0]}" == "$canonical" ]]; then
-        audit_result PASS nginx.site "Canonical Core site exists at $canonical."
+        audit_result BREAKING nginx.site \
+            "No enabled Nginx configuration references the active Engage Core document root $APP_PATH/public."
+    elif [[ ${#configs[@]} -eq 1 && "$(readlink -f "${configs[0]}" 2>/dev/null || printf '%s' "${configs[0]}")" == "$(readlink -f "$canonical" 2>/dev/null || printf '%s' "$canonical")" ]]; then
+        audit_result PASS nginx.site "Canonical Core site exists at $canonical and is enabled."
     else
         audit_result INFO nginx.site \
             "Nginx site filename/layout differs from new-deployment convention [$canonical]; discovered: ${configs[*]}. Do not rename a healthy site for consistency."
     fi
 
-    local enabled=false
-    for path in /etc/nginx/sites-enabled/*; do
-        [[ -e "$path" ]] || continue
-        resolved="$(readlink -f "$path" 2>/dev/null || true)"
-        for existing in "${configs[@]}"; do
-            if [[ "$resolved" == "$(readlink -f "$existing" 2>/dev/null || printf '%s' "$existing")" ]]; then
-                enabled=true
-            fi
-        done
-    done
-    if [[ "$enabled" == "true" ]]; then
-        audit_result PASS nginx.enabled "At least one discovered Core site is enabled."
-    else
-        audit_result BREAKING nginx.enabled "Discovered Nginx site for the active audited checkout is not enabled."
-    fi
-
-    local expected_host found config
+    local expected_host
     while IFS= read -r expected_host; do
         [[ -n "$expected_host" ]] || continue
-        found=false
-        for config in "${configs[@]}"; do
-            if awk '$1 == "server_name" {for (i=2; i<=NF; i++) {gsub(/;/, "", $i); print $i}}' "$config" \
-                | grep -Fxq "$expected_host"
-            then
-                found=true
-                break
-            fi
-        done
-        if [[ "$found" == "true" ]]; then
-            audit_result PASS "nginx.host.$expected_host" "Core host is present in Nginx server_name."
-        else
-            audit_result BREAKING "nginx.host.$expected_host" "Required Core host is not present in the active Nginx configuration."
-        fi
+        audit_nginx_host "$expected_host"
     done < <(audit_core_hosts)
 
-    found=false
-    for config in "${configs[@]}"; do
-        if awk '$1 == "server_name" {for (i=2; i<=NF; i++) {gsub(/;/, "", $i); print $i}}' "$config" \
-            | grep -Fxq "$ROOT_DOMAIN"
-        then
-            found=true
-            break
-        fi
-    done
-    if [[ "$found" == "true" ]]; then
+    local root_owners root_core_count root_summary
+    root_owners="$(audit_nginx_owners_json "$ROOT_DOMAIN")"
+    root_core_count="$(printf '%s' "$root_owners" | python3 -c '
+import json, sys
+target = sys.argv[1].rstrip("/")
+try:
+    owners = json.load(sys.stdin)
+except json.JSONDecodeError:
+    owners = []
+print(sum(1 for owner in owners if (owner.get("root") or "").rstrip("/") == target))
+' "$APP_PATH/public" 2>/dev/null || printf '0')"
+
+    if [[ "$root_core_count" -gt 0 ]]; then
         audit_result BREAKING nginx.root_domain \
-            "Root domain $ROOT_DOMAIN appears in the Core Nginx site even though Core must not own the main-site root."
+            "Root domain [$ROOT_DOMAIN] is served from the Core document root [$APP_PATH/public]. Core must not take ownership of the main-site root."
     else
-        audit_result PASS nginx.root_domain "Root domain is not owned by the Core Nginx site."
-    fi
-
-    found=false
-    for config in "${configs[@]}"; do
-        grep -Fq "root $APP_PATH/public;" "$config" && found=true
-    done
-    if [[ "$found" == "true" ]]; then
-        audit_result PASS nginx.document_root "Core Nginx document root points to $APP_PATH/public."
-    else
-        audit_result BREAKING nginx.document_root "Active Nginx site does not point to $APP_PATH/public."
-    fi
-
-    found=false
-    for config in "${configs[@]}"; do
-        grep -Fq "fastcgi_pass unix:$PHP_FPM_SOCKET;" "$config" && found=true
-    done
-    if [[ "$found" == "true" ]]; then
-        audit_result PASS nginx.php_fpm "Nginx uses expected PHP-FPM socket $PHP_FPM_SOCKET."
-    else
-        audit_result INFO nginx.php_fpm "Nginx uses a PHP-FPM target different from new-deployment default [$PHP_FPM_SOCKET]. HTTP runtime verification is authoritative before remediation."
-    fi
-
-    local nginx_test
-    set +e
-    nginx_test="$(sudo nginx -t 2>&1)"
-    local nginx_status=$?
-    set -e
-    if [[ "$nginx_status" -eq 0 ]]; then
-        audit_result PASS nginx.syntax "nginx -t passed."
-    else
-        audit_result BREAKING nginx.syntax "$(printf '%s' "$nginx_test" | tail -n 3 | tr '\n' ' ')"
-    fi
-
-    local -a certs=()
-    local cert
-    for config in "${configs[@]}"; do
-        while IFS= read -r cert; do
-            [[ -n "$cert" ]] || continue
-            local seen=false
-            for existing in "${certs[@]:-}"; do
-                [[ "$existing" == "$cert" ]] && seen=true
-            done
-            [[ "$seen" == "true" ]] || certs+=("$cert")
-        done < <(awk '$1 == "ssl_certificate" {gsub(/;/, "", $2); print $2}' "$config")
-    done
-
-    if [[ ${#certs[@]} -eq 0 ]]; then
-        audit_result BREAKING tls.certificate "No TLS certificate was found in the active Core Nginx configuration."
-        return
-    fi
-
-    require_command openssl
-    for cert in "${certs[@]}"; do
-        if [[ ! -r "$cert" ]]; then
-            audit_result BREAKING "tls.file.$cert" "Configured certificate file is not readable."
-        elif openssl x509 -in "$cert" -noout -checkend 2592000 >/dev/null 2>&1; then
-            audit_result PASS "tls.expiry.$cert" "Certificate is valid for more than 30 days."
+        root_summary="$(audit_nginx_owner_summary "$root_owners")"
+        root_summary="${root_summary//$'\n'/; }"
+        if [[ -n "$root_summary" ]]; then
+            audit_result PASS nginx.root_domain \
+                "Root domain [$ROOT_DOMAIN] is served separately from Core: $root_summary."
         else
-            audit_result WARNING "tls.expiry.$cert" "Certificate expires within 30 days or could not be validated."
+            audit_result PASS nginx.root_domain \
+                "Root domain [$ROOT_DOMAIN] is not served from the Core document root."
         fi
-    done
+    fi
+
+    local crm_owners crm_root crm_fastcgi
+    crm_owners="$(audit_nginx_owners_json "$CRM_HOST")"
+    crm_root="$(printf '%s' "$crm_owners" | python3 -c '
+import json, sys
+target = sys.argv[1].rstrip("/")
+try:
+    owners = json.load(sys.stdin)
+except json.JSONDecodeError:
+    owners = []
+for owner in owners:
+    if (owner.get("root") or "").rstrip("/") == target:
+        print(owner.get("root") or "")
+        break
+' "$APP_PATH/public" 2>/dev/null || true)"
+    crm_fastcgi="$(printf '%s' "$crm_owners" | python3 -c '
+import json, sys
+target = sys.argv[1].rstrip("/")
+try:
+    owners = json.load(sys.stdin)
+except json.JSONDecodeError:
+    owners = []
+for owner in owners:
+    if (owner.get("root") or "").rstrip("/") == target:
+        print(owner.get("fastcgi_pass") or "")
+        break
+' "$APP_PATH/public" 2>/dev/null || true)"
+
+    if [[ "$crm_root" == "$APP_PATH/public" ]]; then
+        audit_result PASS nginx.document_root \
+            "CRM Nginx ownership resolves to $APP_PATH/public."
+    else
+        audit_result BREAKING nginx.document_root \
+            "CRM Nginx ownership does not resolve to $APP_PATH/public."
+    fi
+
+    if [[ "$crm_fastcgi" == "unix:$PHP_FPM_SOCKET" ]]; then
+        audit_result PASS nginx.php_fpm \
+            "The CRM application-serving block uses expected PHP-FPM socket $PHP_FPM_SOCKET."
+    elif [[ -n "$crm_fastcgi" ]]; then
+        audit_result INFO nginx.php_fpm \
+            "The CRM application-serving block uses [$crm_fastcgi] rather than new-deployment default [unix:$PHP_FPM_SOCKET]. HTTP runtime verification is authoritative before remediation."
+    else
+        audit_result WARNING nginx.php_fpm \
+            "No fastcgi_pass target was discovered in the CRM application-serving block."
+    fi
+
+    if audit_load_nginx_dump; then
+        audit_result PASS nginx.syntax "nginx -T passed and the active configuration was parsed."
+    else
+        local nginx_test
+        set +e
+        nginx_test="$(sudo nginx -t 2>&1)"
+        local nginx_status=$?
+        set -e
+        if [[ "$nginx_status" -eq 0 ]]; then
+            audit_result PASS nginx.syntax \
+                "nginx -t passed, but nginx -T output was unavailable for authoritative ownership parsing."
+        else
+            audit_result BREAKING nginx.syntax \
+                "$(printf '%s' "$nginx_test" | tail -n 3 | tr '\n' ' ')"
+        fi
+    fi
 
     while IFS= read -r expected_host; do
         [[ -n "$expected_host" ]] || continue
-        found=false
-        for cert in "${certs[@]}"; do
-            [[ -r "$cert" ]] || continue
-            if openssl x509 -in "$cert" -noout -ext subjectAltName 2>/dev/null \
-                | grep -Fq "DNS:$expected_host"
-            then
-                found=true
-                break
-            fi
-        done
-        if [[ "$found" == "true" ]]; then
-            audit_result PASS "tls.host.$expected_host" "A configured certificate covers this Core host."
-        else
-            audit_result BREAKING "tls.host.$expected_host" "No configured certificate SAN covers this required active Core host."
-        fi
+        audit_live_tls_host "$expected_host"
     done < <(audit_core_hosts)
 }
 
@@ -1929,9 +2122,21 @@ audit_database_and_namespaces() {
     cache_value="$(env_get "$CLIENT_ENV" CACHE_PREFIX)"
     redis_value="$(env_get "$CLIENT_ENV" REDIS_PREFIX)"
     horizon_value="$(env_get "$CLIENT_ENV" HORIZON_PREFIX)"
-    audit_prefix_collision CACHE_PREFIX "$cache_value" redis.cache_collision
-    audit_prefix_collision REDIS_PREFIX "$redis_value" redis.redis_collision
-    audit_prefix_collision HORIZON_PREFIX "$horizon_value" redis.horizon_collision
+
+    local -a collision_args=(
+        python3 "$HELPER" env-collision-map
+        --search-root /var/www
+        --exclude "$CLIENT_ENV"
+    )
+    [[ -n "$cache_value" ]] && collision_args+=(--query "CACHE_PREFIX=$cache_value")
+    [[ -n "$redis_value" ]] && collision_args+=(--query "REDIS_PREFIX=$redis_value")
+    [[ -n "$horizon_value" ]] && collision_args+=(--query "HORIZON_PREFIX=$horizon_value")
+
+    local collision_json
+    collision_json="$("${collision_args[@]}" 2>/dev/null || printf '{}')"
+    audit_prefix_collision_from_map "$collision_json" CACHE_PREFIX "$cache_value" redis.cache_collision
+    audit_prefix_collision_from_map "$collision_json" REDIS_PREFIX "$redis_value" redis.redis_collision
+    audit_prefix_collision_from_map "$collision_json" HORIZON_PREFIX "$horizon_value" redis.horizon_collision
 
     audit_env_defaulted "$ROOT_ENV" REDIS_HOST 127.0.0.1 redis.host
     audit_env_defaulted "$ROOT_ENV" REDIS_DB 0 redis.database
@@ -2103,24 +2308,33 @@ run_audit() {
     fi
 
     audit_resolve_public_hosts
+    audit_load_nginx_dump || true
     audit_detect_active_host_owner
     audit_environment_identity
     audit_composer_dependencies
+    audit_client_environment_contract
     audit_database_and_namespaces
 
     note "Application deployment contract"
     AUDIT_PLAN_JSON=""
-    if [[ "$AUDIT_APP_COMMANDS_AVAILABLE" == "true" ]]; then
+    if [[ "$AUDIT_APP_COMMANDS_AVAILABLE" == "true" && "$AUDIT_APP_BOOTSTRAP_READY" == "true" ]]; then
         audit_resolve_plan
         audit_app_command modules.status "$PHP_BIN" artisan modules:status
         audit_app_command setup.validate "$PHP_BIN" artisan setup:validate
-    else
+    elif [[ "$AUDIT_APP_COMMANDS_AVAILABLE" != "true" ]]; then
         audit_result INFO deployment_plan.unavailable \
             "Not evaluated because Composer runtime dependencies are unavailable in the audited checkout."
         audit_result INFO modules.status \
             "Not evaluated because Composer runtime dependencies are unavailable in the audited checkout."
         audit_result INFO setup.validate \
             "Not evaluated because Composer runtime dependencies are unavailable in the audited checkout."
+    else
+        audit_result INFO deployment_plan.unavailable \
+            "Not evaluated because the early environment/bootstrap contract is already failing."
+        audit_result INFO modules.status \
+            "Not evaluated because the early environment/bootstrap contract is already failing."
+        audit_result INFO setup.validate \
+            "Not evaluated because the early environment/bootstrap contract is already failing."
     fi
 
     audit_runtime_directories

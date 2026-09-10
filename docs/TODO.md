@@ -38,7 +38,7 @@ The Routes-specific suggestion experience belongs in `modules/flow-routes/TODO.m
 
 ## Operations tooling
 
-- [ ] After the read-only deployment auditor is exercised against Rob pre-cutover staging, an older active Engage Core staging deployment, Thompson Square staging, and Buddy's staging, add `fix --dry-run` / explicit `fix --apply` with a closed BREAKING-only safe-remediation registry and a mandatory post-fix re-audit. Never normalize functional legacy names/paths/prefixes merely to match new-deployment conventions.
+- [ ] After the read-only deployment auditor is exercised against an older active Engage Core staging deployment, Thompson Square staging, and Buddy's staging, add `fix --dry-run` / explicit `fix --apply` with a closed BREAKING-only safe-remediation registry and a mandatory post-fix re-audit. Never normalize functional legacy names/paths/prefixes merely to match new-deployment conventions.
 - [ ] Harden `scripts/operations/configure-client-logging.sh` so dry-run/apply output never prints unrelated environment values or secrets, and align the helper with root `.env` logging ownership before it is used against a secret-bearing production environment again.
 
 ## Documentation maintenance
@@ -51,15 +51,15 @@ The Routes-specific suggestion experience belongs in `modules/flow-routes/TODO.m
 
 ## Deployment audit/fix follow-up
 
-- Re-audit Rob staging to confirm the auditor identifies the active `leadflow-core`
-  host owner and reports the Engage Core checkout as pre-cutover without BREAKING
-  findings merely for canonical drift.
-- Exercise the hardened read-only audit against an older active Engage Core staging
-  deployment (Slam Dunk is the next useful case).
+- Re-audit Slam Dunk staging after active-Nginx server-block ownership, live TLS
+  verification, and bootstrap-safe client-environment diagnostics are hardened.
 - Exercise Thompson Square staging to verify its known `.env` metadata difference is
   informational when both required process identities can read the files, and BREAKING
   only if effective access actually fails.
 - Exercise Buddy's staging as the fresh canonical reference.
 - Build `fix --dry-run` / `fix --apply` only after those classifications hold. The fix
   registry may consume BREAKING findings only; INFO/WARNING/MANUAL findings are excluded.
-- Keep legacy-app-to-Engage-Core cutover and cosmetic normalization outside generic automatic fix.
+- Keep cosmetic normalization outside generic automatic fix.
+- Remove deprecated pre-Core server/repository naming residue during the Rob staging
+  clean rebuild after confirming no live Nginx, Supervisor, cron, or process dependency
+  still references the retired tree.

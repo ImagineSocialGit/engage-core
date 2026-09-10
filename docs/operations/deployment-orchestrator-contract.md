@@ -269,16 +269,16 @@ The auditor may inspect:
 - root/client environment-file metadata and non-secret identity values;
 - Core staging-local versus Core production-remote database topology;
 - canonical database/runtime namespace identities;
-- duplicate readable Redis/cache/Horizon prefixes across `/var/www`;
+- duplicate readable Redis/cache/Horizon prefixes across `/var/www`, using one pruned environment scan for all three namespace keys;
 - `engage:deployment-plan --json`;
 - `modules:status`;
 - `setup:validate`;
 - runtime-directory effective access without creating probe files;
 - Supervisor/Horizon config/process state;
 - exact Scheduler cron identity plus `schedule:list`;
-- Core-owned Nginx hosts/document root/PHP-FPM socket;
-- `nginx -t`;
-- configured TLS certificate expiry/SAN coverage;
+- Core-owned Nginx hosts/document root/PHP-FPM socket from the authoritative `nginx -T` active configuration;
+- `nginx -T` / `nginx -t`;
+- live TLS hostname validation and expiry against the certificate Nginx actually serves;
 - DNS resolution;
 - deployment-plan provider/setup steps that still require external verification.
 
@@ -294,6 +294,8 @@ MANUAL VERIFICATION REQUIRED
 
 `INFO` is harmless historical/canonical drift. `WARNING` is unproven risk, incomplete evidence, or a deliberate review item. `BREAKING` is reserved for a current active-runtime, security, or isolation contract that the auditor can actually prove is failing. Only `BREAKING` findings fail the normal audit result and only `BREAKING` findings may feed the automatic-fix registry.
 
+Nginx runtime ownership is determined from application-serving blocks with a document root. Redirect-only/Certbot companion blocks may repeat the same `server_name`, but they do not count as a second application owner. Multiple distinct application document roots claiming the same CRM hostname are `BREAKING`.
+
 The audit implementation must not call mutating launcher helpers or commands. In particular it must not write environment files/state, run `engage:environment:sync --write-missing`, change permissions, migrate/install schema, alter Nginx/Supervisor/cron, issue certificates, reload services, clear Redis, or change provider/DNS state.
 
 For staging `.env` files, the currently proven convention is deploy-user ownership, deploy-user primary group, and mode `0664`. Runtime-directory correctness is tested through effective deploy/web write access; metadata divergence from the launcher convention is `INFO` when access is still effective.
@@ -302,7 +304,7 @@ The staging-proven `.env` mode is not automatically declared the production secr
 
 ## Audit-driven fix contract
 
-Automated `fix` remains gated on real audit results from the Rob pre-cutover case, an older active Engage Core staging client, the Thompson Square metadata-drift case, and the fresh Buddy's deployment.
+Automated `fix` remains gated on real audit results from an older active Engage Core staging client, the Thompson Square metadata-drift case, and the fresh Buddy's deployment.
 
 The required future flow is:
 
@@ -361,10 +363,25 @@ specific finding is classified `BREAKING`. Legacy canonical drift is not normali
 all merely for consistency. A pre-cutover checkout owned by another live application
 requires a migration/cutover plan rather than a generic repair.
 
-The auditor discovers CRM host ownership from enabled Nginx server blocks. When a
-different document root owns the host, missing Core Supervisor/Scheduler/Nginx entries
-for the inactive checkout are not counted as live-service failures.
+The auditor discovers CRM host ownership from the active `nginx -T` configuration and
+reasons at the individual `server`-block level. Redirect-only blocks do not establish
+application ownership. A root/main-site block in the same Nginx file is valid when it
+points at a different application document root; the Core root-domain guard fails only
+when the root hostname itself is actually served from the Core document root. When a
+different document root owns the CRM host, missing Core Supervisor/Scheduler/Nginx
+entries for the inactive checkout are not counted as live-service failures.
+
+TLS correctness is judged from the certificate actually served for each Core hostname,
+not from whether the deploy user can directly read the configured certificate file.
+Nginx may legitimately rely on privileged master-process access to certificate material.
+
+Before ordinary Artisan checks, the auditor runs the bootstrap-safe selected-client
+environment ownership diagnostic. If that diagnostic proves an early bootstrap failure,
+the root cause is reported once and dependent application commands are marked
+unevaluated rather than emitting repeated secondary framework exceptions.
 
 Omitted root/process values with documented Core defaults, including Redis host/database
 defaults, are valid. A duplicate namespace found only by scanning another environment
-file is a warning until concurrent runtime use is independently established. An isolated, functioning legacy namespace remains valid even when its formatting differs from the current derivation rule.
+file is a warning until concurrent runtime use is independently established. An isolated,
+functioning legacy namespace remains valid even when its formatting differs from the
+current derivation rule.

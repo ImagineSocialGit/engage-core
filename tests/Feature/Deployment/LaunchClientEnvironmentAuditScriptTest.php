@@ -176,11 +176,17 @@ class LaunchClientEnvironmentAuditScriptTest extends TestCase
 server {
     listen 443 ssl;
     server_name crm.staging.example.com webhooks.staging.example.com;
-    root /var/www/staging/example/leadflow-core/public;
+    root /var/www/staging/example/legacy-core/public;
 
     location / {
         try_files $uri $uri/ /index.php?$query_string;
     }
+}
+
+server {
+    listen 80;
+    server_name crm.staging.example.com webhooks.staging.example.com;
+    return 301 https://$host$request_uri;
 }
 NGINX,
         );
@@ -200,9 +206,143 @@ NGINX,
 
         $this->assertCount(1, $owners);
         $this->assertSame(
-            '/var/www/staging/example/leadflow-core/public',
+            '/var/www/staging/example/legacy-core/public',
             $owners[0]['root'],
         );
+    }
+
+    public function test_nginx_dump_owner_helper_separates_main_site_from_core_and_ignores_redirect_blocks(): void
+    {
+        $configDump = <<<'NGINX'
+# configuration file /etc/nginx/sites-enabled/staging.example.com:
+server {
+    listen 443 ssl;
+    server_name staging.example.com;
+    root /var/www/staging/example-seo/public;
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+    }
+}
+
+server {
+    listen 80;
+    server_name staging.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name crm.staging.example.com webhooks.staging.example.com;
+    root /var/www/staging/staging.example.com/engage-core/public;
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+    }
+}
+
+server {
+    listen 80;
+    server_name crm.staging.example.com webhooks.staging.example.com;
+    return 301 https://$host$request_uri;
+}
+NGINX;
+
+        $crmProcess = new Process([
+            'python3',
+            base_path('scripts/operations/lib/launch_client_environment.py'),
+            'nginx-host-owners-stdin',
+            '--host',
+            'crm.staging.example.com',
+        ]);
+        $crmProcess->setInput($configDump);
+        $crmProcess->mustRun();
+
+        $crmOwners = json_decode(
+            $crmProcess->getOutput(),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        $this->assertCount(1, $crmOwners);
+        $this->assertSame(
+            '/var/www/staging/staging.example.com/engage-core/public',
+            $crmOwners[0]['root'],
+        );
+        $this->assertSame(
+            'unix:/run/php/php8.3-fpm.sock',
+            $crmOwners[0]['fastcgi_pass'],
+        );
+
+        $rootProcess = new Process([
+            'python3',
+            base_path('scripts/operations/lib/launch_client_environment.py'),
+            'nginx-host-owners-stdin',
+            '--host',
+            'staging.example.com',
+        ]);
+        $rootProcess->setInput($configDump);
+        $rootProcess->mustRun();
+
+        $rootOwners = json_decode(
+            $rootProcess->getOutput(),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        $this->assertCount(1, $rootOwners);
+        $this->assertSame(
+            '/var/www/staging/example-seo/public',
+            $rootOwners[0]['root'],
+        );
+    }
+
+    public function test_environment_collision_map_scans_multiple_prefixes_in_one_pass(): void
+    {
+        $directory = storage_path('framework/testing/deployment-audit-env-collisions');
+        $first = $directory.'/first';
+        $second = $directory.'/second';
+
+        if (! is_dir($first)) {
+            mkdir($first, 0777, true);
+        }
+        if (! is_dir($second)) {
+            mkdir($second, 0777, true);
+        }
+
+        file_put_contents(
+            $first.'/.env',
+            "CACHE_PREFIX=client_cache_\nREDIS_PREFIX=client_\nHORIZON_PREFIX=client_horizon:\n",
+        );
+        file_put_contents(
+            $second.'/.env',
+            "CACHE_PREFIX=client_cache_\nREDIS_PREFIX=other_\nHORIZON_PREFIX=client_horizon:\n",
+        );
+
+        $process = new Process([
+            'python3',
+            base_path('scripts/operations/lib/launch_client_environment.py'),
+            'env-collision-map',
+            '--search-root',
+            $directory,
+            '--query',
+            'CACHE_PREFIX=client_cache_',
+            '--query',
+            'REDIS_PREFIX=client_',
+            '--query',
+            'HORIZON_PREFIX=client_horizon:',
+            '--exclude',
+            $first.'/.env',
+        ]);
+        $process->mustRun();
+
+        $collisions = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertSame([$second.'/.env'], $collisions['CACHE_PREFIX']);
+        $this->assertSame([], $collisions['REDIS_PREFIX']);
+        $this->assertSame([$second.'/.env'], $collisions['HORIZON_PREFIX']);
     }
 
     public function test_audit_distinguishes_legacy_drift_from_breaking_runtime_failures(): void
@@ -228,6 +368,10 @@ NGINX,
             $launcher,
         );
         $this->assertStringContainsString(
+            'env-collision-map',
+            $launcher,
+        );
+        $this->assertStringContainsString(
             'uses the Core default',
             $launcher,
         );
@@ -237,6 +381,22 @@ NGINX,
         );
         $this->assertStringContainsString(
             'Application-level checks are unavailable until a deliberate cutover is prepared.',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'nginx-host-owners-stdin',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'Root/client environment loading contract passed before Laravel bootstrap.',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'The certificate served locally for',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'is served separately from Core',
             $launcher,
         );
 

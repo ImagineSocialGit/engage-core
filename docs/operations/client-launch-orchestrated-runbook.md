@@ -179,7 +179,7 @@ Useful optional comparisons include:
 - change DNS/provider configuration;
 - modify CRM/business data.
 
-It may read environment metadata and non-secret identity keys, inspect Git/Nginx/certificate/Supervisor/cron state, perform DNS lookups, and run application commands whose contracts are read-only (`engage:deployment-plan --json`, `modules:status`, `setup:validate`, `horizon:status`, and `schedule:list`).
+It may read environment metadata and non-secret identity keys, inspect Git/Nginx/live-TLS/Supervisor/cron state, perform DNS lookups, run the bootstrap-safe client-environment ownership diagnostic, and run application commands whose contracts are read-only (`engage:deployment-plan --json`, `modules:status`, `setup:validate`, `horizon:status`, and `schedule:list`).
 
 The report uses:
 
@@ -215,10 +215,9 @@ The deployment plan contributes provider setup steps to the report as `MANUAL VE
 
 Before adding automated repair, exercise the auditor against:
 
-1. Rob staging as the known pre-cutover/legacy-owner case;
-2. Slam Dunk staging as an older active Engage Core deployment;
-3. Thompson Square staging as the known environment-file-metadata drift case;
-4. Buddy's staging as the fresh launcher-created reference environment.
+1. Slam Dunk staging as an older active Engage Core deployment;
+2. Thompson Square staging as the known environment-file-metadata drift case;
+3. Buddy's staging as the fresh launcher-created reference environment.
 
 Do not manually normalize Thompson Square first. Its different but potentially functional metadata is useful evidence that the auditor reports legacy drift without treating it as repair work unless effective access is actually broken.
 
@@ -307,7 +306,12 @@ valid existing value. The audit does not require an older deployment to be renam
 merely to match today's launcher naming.
 
 Before evaluating Core runtime services, audit resolves the enabled Nginx owner of the
-CRM hostname. If that hostname points at another checkout, the selected Engage Core
+CRM hostname from the authoritative `nginx -T` configuration dump. It reasons about
+individual application-serving `server` blocks rather than treating an entire site file
+as one application. Redirect-only/Certbot companion blocks that repeat the same
+`server_name` do not count as a second application owner, and a managed main-site block
+may coexist in the same Nginx file while pointing at a different document root. If the
+application-serving CRM block points at another checkout, the selected Engage Core
 checkout is treated as an inactive/pre-cutover candidate. Runtime-directory gaps and
 missing dependencies are then cutover-readiness information/warnings, while missing
 Core Supervisor/Scheduler/Nginx state is not misreported as a defect in the currently
@@ -315,18 +319,28 @@ served application.
 
 If `vendor/autoload.php` is absent, audit reports Composer-runtime availability once and
 does not repeat the same root cause as independent deployment-plan, modules, setup, and
-schedule command failures.
+schedule command failures. When dependencies exist, audit runs the bootstrap-safe
+`ClientEnvironmentLoader` diagnostic before normal Artisan checks. A client `.env`
+ownership violation is reported directly and subsequent Laravel command failures are
+suppressed as consequences of that already-proved bootstrap failure.
 
 Redis database/host settings that are omitted and therefore use Core defaults are valid.
 Duplicate prefix values found in another `.env` remain warnings until active concurrent
 runtime use is proven; file duplication by itself is not proof of a live Redis collision.
-A noncanonical prefix that is isolated and functional is never fix-eligible.
+The auditor checks cache/Redis/Horizon duplicate values in one pruned `/var/www` environment
+scan so large dependency/runtime trees are not traversed three separate times. A
+noncanonical prefix that is isolated and functional is never fix-eligible.
 
 A CRM hostname actively served by a legacy application is `INFO` describing current
 runtime ownership and a future migration/cutover boundary. It is not a broken Engage
 Core deployment and is never eligible for generic `fix --apply`. Multiple enabled Nginx
 owners for the same CRM hostname, by contrast, are `BREAKING` because ownership is
 actually ambiguous and unsafe.
+
+TLS is validated against the certificate actually served locally by Nginx for each
+required Core hostname using SNI/hostname verification. Deploy-user readability of the
+certificate file is not treated as a runtime requirement because Nginx may legitimately
+read certificate material through its privileged master process.
 
 The auditor also performs an HTTPS CRM login smoke for the active Engage Core checkout.
 This lets harmless differences such as a noncanonical PHP-FPM socket remain

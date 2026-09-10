@@ -435,6 +435,30 @@ def command_derive_audit(args: argparse.Namespace) -> None:
     ))
 
 
+AUDIT_ENV_SCAN_PRUNE = {
+    '.git',
+    '.svn',
+    '__pycache__',
+    'node_modules',
+    'storage',
+    'vendor',
+}
+
+
+def audit_environment_files(search_root: Path) -> list[Path]:
+    paths: list[Path] = []
+
+    for current_root, directories, files in os.walk(search_root):
+        directories[:] = [
+            name for name in directories
+            if name not in AUDIT_ENV_SCAN_PRUNE
+        ]
+        if '.env' in files:
+            paths.append(Path(current_root) / '.env')
+
+    return sorted(paths)
+
+
 def command_env_collisions(args: argparse.Namespace) -> None:
     search_root = Path(args.search_root)
     exclude = Path(args.exclude).resolve() if args.exclude else None
@@ -442,7 +466,7 @@ def command_env_collisions(args: argparse.Namespace) -> None:
     if not search_root.exists():
         return
 
-    for path in sorted(search_root.rglob('.env')):
+    for path in audit_environment_files(search_root):
         try:
             resolved = path.resolve()
             if exclude is not None and resolved == exclude:
@@ -453,6 +477,40 @@ def command_env_collisions(args: argparse.Namespace) -> None:
 
         if values.get(args.key) == args.value:
             print(path)
+
+
+def command_env_collision_map(args: argparse.Namespace) -> None:
+    search_root = Path(args.search_root)
+    exclude = Path(args.exclude).resolve() if args.exclude else None
+    queries: dict[str, str] = {}
+
+    for raw_query in args.query:
+        key, separator, value = raw_query.partition('=')
+        key = key.strip()
+        if separator == '' or key == '':
+            fail(f'Invalid environment collision query [{raw_query}]. Expected KEY=VALUE.')
+        queries[key] = value
+
+    results: dict[str, list[str]] = {key: [] for key in queries}
+
+    if not search_root.exists() or not queries:
+        print(json.dumps(results, sort_keys=True))
+        return
+
+    for path in audit_environment_files(search_root):
+        try:
+            resolved = path.resolve()
+            if exclude is not None and resolved == exclude:
+                continue
+            values = env_values(path)
+        except (OSError, UnicodeError):
+            continue
+
+        for key, expected in queries.items():
+            if values.get(key) == expected:
+                results[key].append(str(path))
+
+    print(json.dumps(results, sort_keys=True))
 
 
 def command_plan_modules_stdin(args: argparse.Namespace) -> None:
@@ -707,10 +765,70 @@ def _nginx_server_blocks(text: str) -> list[str]:
     return blocks
 
 
+def _nginx_host_owners_from_sections(
+    sections: list[tuple[str, str]],
+    host: str,
+) -> list[dict[str, str]]:
+    owners: list[dict[str, str]] = []
+
+    for config_name, text in sections:
+        for block in _nginx_server_blocks(text):
+            server_names: list[str] = []
+            for match in re.finditer(r'(?m)^\s*server_name\s+([^;]+);', block):
+                server_names.extend(
+                    item.strip().lower().rstrip('.')
+                    for item in match.group(1).split()
+                    if item.strip()
+                )
+
+            if host not in server_names:
+                continue
+
+            root_match = re.search(r'(?m)^\s*root\s+([^;]+);', block)
+            if root_match is None:
+                # Redirect-only/Certbot companion blocks may repeat server_name but
+                # do not establish application checkout ownership. Only a block
+                # with an application document root can identify runtime ownership.
+                continue
+
+            fastcgi_match = re.search(r'(?m)^\s*fastcgi_pass\s+([^;]+);', block)
+
+            owners.append({
+                'config': config_name,
+                'root': root_match.group(1).strip().rstrip('/'),
+                'fastcgi_pass': fastcgi_match.group(1).strip() if fastcgi_match else '',
+            })
+
+    unique: list[dict[str, str]] = []
+    seen_roots: set[str] = set()
+    for item in owners:
+        root = item['root']
+        if root in seen_roots:
+            continue
+        seen_roots.add(root)
+        unique.append(item)
+
+    return unique
+
+
+def _nginx_dump_sections(text: str) -> list[tuple[str, str]]:
+    markers = list(re.finditer(r'(?m)^# configuration file (.+?):\n', text))
+    if not markers:
+        return [('<nginx-config>', text)]
+
+    sections: list[tuple[str, str]] = []
+    for index, marker in enumerate(markers):
+        start = marker.end()
+        end = markers[index + 1].start() if index + 1 < len(markers) else len(text)
+        sections.append((marker.group(1).strip(), text[start:end]))
+
+    return sections
+
+
 def command_nginx_host_owners(args: argparse.Namespace) -> None:
     directory = Path(args.directory)
     host = normalize_domain(args.host)
-    owners: list[dict[str, str]] = []
+    sections: list[tuple[str, str]] = []
 
     if not directory.exists():
         print('[]')
@@ -725,35 +843,22 @@ def command_nginx_host_owners(args: argparse.Namespace) -> None:
         except OSError:
             continue
 
-        for block in _nginx_server_blocks(text):
-            server_names: list[str] = []
-            for match in re.finditer(r'(?m)^\s*server_name\s+([^;]+);', block):
-                server_names.extend(
-                    item.strip().lower().rstrip('.')
-                    for item in match.group(1).split()
-                    if item.strip()
-                )
+        sections.append((str(path.resolve()), text))
 
-            if host not in server_names:
-                continue
+    print(json.dumps(
+        _nginx_host_owners_from_sections(sections, host),
+        sort_keys=True,
+    ))
 
-            root_match = re.search(r'(?m)^\s*root\s+([^;]+);', block)
-            root = root_match.group(1).strip() if root_match else ''
-            owners.append({
-                'config': str(path.resolve()),
-                'root': root,
-            })
 
-    unique: list[dict[str, str]] = []
-    seen: set[tuple[str, str]] = set()
-    for item in owners:
-        identity = (item['config'], item['root'])
-        if identity in seen:
-            continue
-        seen.add(identity)
-        unique.append(item)
+def command_nginx_host_owners_stdin(args: argparse.Namespace) -> None:
+    host = normalize_domain(args.host)
+    text = sys.stdin.read()
 
-    print(json.dumps(unique, sort_keys=True))
+    print(json.dumps(
+        _nginx_host_owners_from_sections(_nginx_dump_sections(text), host),
+        sort_keys=True,
+    ))
 
 
 def command_origin_host(args: argparse.Namespace) -> None:
@@ -866,10 +971,20 @@ def build_parser() -> argparse.ArgumentParser:
     collisions.add_argument('--exclude')
     collisions.set_defaults(func=command_env_collisions)
 
+    collision_map = sub.add_parser('env-collision-map')
+    collision_map.add_argument('--search-root', required=True)
+    collision_map.add_argument('--query', action='append', default=[])
+    collision_map.add_argument('--exclude')
+    collision_map.set_defaults(func=command_env_collision_map)
+
     nginx_host_owners = sub.add_parser('nginx-host-owners')
     nginx_host_owners.add_argument('--directory', required=True)
     nginx_host_owners.add_argument('--host', required=True)
     nginx_host_owners.set_defaults(func=command_nginx_host_owners)
+
+    nginx_host_owners_stdin = sub.add_parser('nginx-host-owners-stdin')
+    nginx_host_owners_stdin.add_argument('--host', required=True)
+    nginx_host_owners_stdin.set_defaults(func=command_nginx_host_owners_stdin)
 
     origin_host = sub.add_parser('origin-host')
     origin_host.add_argument('--origin', required=True)

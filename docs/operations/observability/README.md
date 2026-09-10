@@ -67,17 +67,18 @@ The installer defaults to a dry run. `--apply` requires root and performs timest
 
 ## Resolve the real application path first
 
-The supplied production evidence contains different historical Rob paths (`engage-core` and `leadflow-core`). Do not copy either value blindly.
+Do not infer an application path from an old server convention. Confirm the active
+Nginx document root for the deployment's CRM hostname and use that exact checkout.
 
-Confirm the active Nginx document root:
+Example:
 
 ```bash
 sudo nginx -T 2>/dev/null | \
-  sed -n '/server_name crm\.robthemortgagecoach\.com/,/^[[:space:]]*}/p' | \
-  grep -m1 'root '
+  grep -n -B8 -A20 'server_name .*crm\.example\.com'
 ```
 
-Remove `/public` from the resolved root and verify:
+Confirm the application-serving block has the intended document root, then remove
+`/public` from that root and verify:
 
 ```bash
 test -f /REAL/APP/PATH/artisan && echo OK
