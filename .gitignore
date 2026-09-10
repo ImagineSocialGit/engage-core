@@ -34,3 +34,5 @@ Homestead.yaml
 Thumbs.db
 /config/generated/images.php
 /file_dumps
+__pycache__/
+*.py[cod]
