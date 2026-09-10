@@ -38,7 +38,7 @@ The Routes-specific suggestion experience belongs in `modules/flow-routes/TODO.m
 
 ## Operations tooling
 
-- [ ] Exercise the implemented BREAKING-only `audit` / `fix --dry-run` / `fix --apply` flow against Slam Dunk staging, then Thompson Square staging, then Buddy's staging; tighten only classifications or safe-remediation prerequisites proven wrong by those real deployments.
+- [ ] Exercise the guided `fix` workflow plus non-interactive `--dry-run` / `--apply` modes against Slam Dunk staging, then Thompson Square staging, then Buddy's staging; tighten only prompts, classifications, or safe-remediation prerequisites proven wrong by those real deployments.
 - [ ] Add deployment-owned direct-upload request sizing for Media: ask whether direct video uploads are needed, suggest the current 256 MB Media ceiling by default, allow an explicit operator-selected ceiling, and keep application validation, Nginx `client_max_body_size`, PHP `upload_max_filesize`, and PHP `post_max_size` coordinated; request/post ceilings must include enough headroom for multipart overhead rather than merely equaling the file ceiling. Audit the effective limits and surface a BREAKING mismatch only when a configured valid application upload would be rejected by the host request limits.
 - [ ] Harden `scripts/operations/configure-client-logging.sh` so dry-run/apply output never prints unrelated environment values or secrets, and align the helper with root `.env` logging ownership before it is used against a secret-bearing production environment again.
 
@@ -52,8 +52,8 @@ The Routes-specific suggestion experience belongs in `modules/flow-routes/TODO.m
 
 ## Deployment audit/fix follow-up
 
-- Use Slam Dunk staging as the first real `fix --dry-run` / `fix --apply` proof for mixed pre-ledger schema, an unowned Messaging host/TLS pair, and deferred Horizon/Scheduler startup while provider requirements remain incomplete.
+- Use Slam Dunk staging as the first real guided `fix` proof: accept intentional legacy drift, collect the missing provider-owned environment values through operator prompts, repair the unowned Messaging host/TLS pair, then start Horizon/Scheduler only after readiness is green.
 - Exercise Thompson Square staging to verify its known `.env` metadata difference is informational when both required process identities can read the files, and BREAKING only if effective access actually fails.
 - Exercise Buddy's staging as the fresh canonical reference.
-- Keep the fix registry BREAKING-only and keep cosmetic normalization outside generic automatic fix.
+- Keep the automatic fix registry BREAKING-only. Guided review may acknowledge INFO/WARNING drift or collect operator-supplied blocking values, but must never silently normalize harmless legacy state or invent provider credentials.
 - Remove deprecated pre-Core server/repository naming residue during the Rob staging clean rebuild after confirming no live Nginx, Supervisor, cron, or process dependency still references the retired tree.

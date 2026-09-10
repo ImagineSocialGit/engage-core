@@ -194,6 +194,8 @@ A mixed pre-ledger deployment is different. If enabled scopes include any combin
 
 The audit/fix path automates that decision for existing deployments: it derives the enabled dependency closure from `ModuleManager`/`ModuleMigrationPlanner`, ignores disabled optional scopes that merely appear in the global `modules:status` table, and applies the existing module executor instead of writing ledger rows directly.
 
+For an operator-driven existing deployment, plain `launch-client-environment.sh fix ...` is the preferred reconciliation entry point. It first audits, then lets the operator accept harmless legacy drift, supply blocking deployment-plan values (with hidden input for secrets and application-owned setup guidance), and confirm each eligible deterministic repair. Environment changes trigger `optimize:clear` plus another audit before Horizon/Scheduler eligibility is evaluated. Use `--dry-run` for a plan only, or `--apply` when only the deterministic safe registry should run non-interactively.
+
 Bulk `modules:reconcile --force` remains appropriate only for a reviewed database whose selected scopes are all already current. Partial scopes block reconciliation.
 
 ## Controlled Project State clean rebuild

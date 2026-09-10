@@ -42,16 +42,24 @@ Audit classifications are PASS, INFO, WARNING, BREAKING, and MANUAL VERIFICATION
 Only BREAKING findings may enter the closed automatic fix registry.
 
 Fix options:
-  --apply                           Apply safe registered repairs. Default is dry-run.
-  --dry-run                         Print the exact safe repair plan without changing state.
-  --only CATEGORY[,CATEGORY...]     Limit to schema,runtime,nginx,horizon,scheduler.
-                                    Aliases: supervisor=horizon, cron=scheduler, tls=nginx.
-  --all-safe                        Select every registered safe repair category (default).
+  --interactive                     Guided reconciliation (default): review non-breaking drift,
+                                    collect missing/mismatched environment values, and confirm
+                                    each eligible deterministic repair before mutation.
+  --dry-run                         Print the reconciliation/repair plan without prompting or changing state.
+  --apply                           Non-interactively apply eligible deterministic safe repairs only.
+                                    Provider secrets/credentials are never invented or collected in this mode.
+  --only CATEGORY[,CATEGORY...]     Limit to environment,schema,runtime,nginx,horizon,scheduler.
+                                    Aliases: env/providers=environment, supervisor=horizon,
+                                    cron=scheduler, tls=nginx.
+  --all-safe                        Select only the deterministic safe registry:
+                                    schema,runtime,nginx,horizon,scheduler.
   plus all Audit/fix identity options above.
 
-Fix never pulls source, invents credentials, changes DNS, normalizes healthy legacy
-names/paths/prefixes, rewrites CRM data, or performs destructive schema operations.
-Production --apply requires an explicit confirmation.
+Plain fix is the operator-guided reconciliation workflow. It may write values explicitly
+supplied or approved by the operator, but it never invents credentials, changes DNS,
+normalizes healthy legacy names/paths/prefixes without review, rewrites CRM data, or
+performs destructive schema operations. Automatic repair remains BREAKING-only.
+Production mutation requires an explicit root-domain confirmation.
 
 New-environment options:
   --environment staging|production
@@ -1099,6 +1107,9 @@ audit_reset() {
     AUDIT_BREAKING=0
     AUDIT_MANUAL=0
     AUDIT_BREAKING_KEYS=()
+    AUDIT_RESULT_STATUSES=()
+    AUDIT_RESULT_KEYS=()
+    AUDIT_RESULT_MESSAGES=()
     AUDIT_SOURCE_CURRENT="true"
     AUDIT_APP_COMMANDS_AVAILABLE="unknown"
     AUDIT_APP_BOOTSTRAP_READY="unknown"
@@ -1115,6 +1126,10 @@ audit_result() {
     message="${message//$'\n'/ }"
 
     printf '%-28s %-38s %s\n' "$status" "$key" "$message"
+
+    AUDIT_RESULT_STATUSES+=("$status")
+    AUDIT_RESULT_KEYS+=("$key")
+    AUDIT_RESULT_MESSAGES+=("$message")
 
     case "$status" in
         PASS) ((AUDIT_PASS += 1)) ;;
@@ -1139,6 +1154,7 @@ audit_summary() {
     printf '  MANUAL VERIFICATION REQUIRED: %d\n' "$AUDIT_MANUAL"
     echo
     echo "Fix eligibility: only BREAKING findings are candidates for automatic remediation."
+    echo "Guided fix may review INFO/WARNING findings and collect operator-supplied required environment values."
     echo "INFO and WARNING findings are never normalized merely to match a new-deployment convention."
     echo "No deployment state was changed by audit."
 
@@ -2632,6 +2648,239 @@ audit_has_breaking_prefix() {
     return 1
 }
 
+fix_confirm_mutation_once() {
+    if [[ "$DEPLOY_ENV" != "production" ]]; then
+        return 0
+    fi
+
+    if [[ "${FIX_PRODUCTION_CONFIRMED:-false}" == "true" ]]; then
+        return 0
+    fi
+
+    local confirmation
+    read -r -p "Type [$ROOT_DOMAIN] to allow this guided/automatic production mutation: " confirmation
+    [[ "$confirmation" == "$ROOT_DOMAIN" ]] \
+        || fail "Production fix confirmation did not match the root domain."
+
+    FIX_PRODUCTION_CONFIRMED="true"
+}
+
+fix_review_nonbreaking_findings() {
+    local -a indexes=()
+    local i status key message
+
+    for i in "${!AUDIT_RESULT_STATUSES[@]}"; do
+        status="${AUDIT_RESULT_STATUSES[$i]}"
+        [[ "$status" == "INFO" || "$status" == "WARNING" ]] || continue
+
+        key="${AUDIT_RESULT_KEYS[$i]}"
+        case "$key" in
+            deployment.app_path|database.topology|database.name|database.user|redis.cache_prefix|redis.prefix|redis.horizon_prefix|redis.*_collision|deployment_plan.unused_environment|runtime.*.metadata|supervisor.config|supervisor.program|supervisor.running|nginx.site)
+                indexes+=("$i")
+                ;;
+        esac
+    done
+
+    [[ ${#indexes[@]} -gt 0 ]] || return 0
+
+    echo
+    echo "== Guided review: non-breaking drift/warnings =="
+    for i in "${indexes[@]}"; do
+        printf '  %-38s [%s] %s\n' \
+            "${AUDIT_RESULT_KEYS[$i]}" \
+            "${AUDIT_RESULT_STATUSES[$i]}" \
+            "${AUDIT_RESULT_MESSAGES[$i]}"
+    done
+
+    if prompt_yes_no "Keep these non-breaking findings as-is for this fix pass?" "yes"; then
+        return 0
+    fi
+
+    echo
+    echo "Reviewing individually. Choosing not to keep one stops fix without mutating that finding."
+    for i in "${indexes[@]}"; do
+        key="${AUDIT_RESULT_KEYS[$i]}"
+        status="${AUDIT_RESULT_STATUSES[$i]}"
+        message="${AUDIT_RESULT_MESSAGES[$i]}"
+        echo
+        echo "[$status] $key"
+        echo "  $message"
+        if ! prompt_yes_no "Keep the current state for [$key] and continue?" "yes"; then
+            fail "Fix stopped at [$key]. This non-breaking finding has no generic automatic normalization; reconcile it deliberately, then rerun fix."
+        fi
+    done
+}
+
+fix_plan_blocking_environment_count() {
+    [[ -n "$AUDIT_PLAN_JSON" ]] || {
+        printf '0\n'
+        return 0
+    }
+
+    printf '%s' "$AUDIT_PLAN_JSON" | python3 -c '
+import json, sys
+plan = json.load(sys.stdin)
+count = 0
+for item in plan.get("environment_requirements", []):
+    if not isinstance(item, dict):
+        continue
+    status = item.get("status")
+    requirement = item.get("requirement")
+    if status in {"mismatch", "invalid"}:
+        count += 1
+    elif requirement == "required" and status in {"missing", "unresolved"}:
+        count += 1
+print(count)
+'
+}
+
+fix_environment_plan() {
+    [[ -n "$AUDIT_PLAN_JSON" ]] || return 0
+
+    local count
+    count="$(fix_plan_blocking_environment_count)"
+    [[ "$count" -gt 0 ]] || return 0
+
+    echo "  [environment] $count blocking environment requirement(s) need operator reconciliation:"
+    printf '%s' "$AUDIT_PLAN_JSON" | python3 -c '
+import json, sys
+plan = json.load(sys.stdin)
+for item in plan.get("environment_requirements", []):
+    if not isinstance(item, dict):
+        continue
+    status = item.get("status")
+    requirement = item.get("requirement")
+    blocking = status in {"mismatch", "invalid"} or (
+        requirement == "required" and status in {"missing", "unresolved"}
+    )
+    if not blocking:
+        continue
+    key = str(item.get("key", "unknown"))
+    scope = str(item.get("scope", "unknown"))
+    secret = "secret; hidden input" if item.get("secret") else "non-secret"
+    expected = item.get("expected_value")
+    suffix = f"; expected={expected}" if expected is not None and not item.get("secret") else ""
+    print(f"                {key} ({scope}, {status}, {secret}{suffix})")
+'
+}
+
+fix_environment_guidance() {
+    [[ -n "$AUDIT_PLAN_JSON" ]] || return 0
+
+    printf '%s' "$AUDIT_PLAN_JSON" | python3 -c '
+import json, sys
+plan = json.load(sys.stdin)
+blocking = set()
+for item in plan.get("environment_requirements", []):
+    if not isinstance(item, dict):
+        continue
+    status = item.get("status")
+    requirement = item.get("requirement")
+    if status in {"mismatch", "invalid"} or (
+        requirement == "required" and status in {"missing", "unresolved"}
+    ):
+        key = item.get("key")
+        if isinstance(key, str):
+            blocking.add(key)
+
+shown = False
+for step in plan.get("setup_steps", []):
+    if not isinstance(step, dict):
+        continue
+    keys = {key for key in step.get("environment_keys", []) if isinstance(key, str)}
+    if not (keys & blocking):
+        continue
+    if not shown:
+        print("\nProvider/external guidance for the blocking values:")
+        shown = True
+    title = str(step.get("title", step.get("key", "Setup step"))).strip()
+    reason = str(step.get("reason", "")).strip()
+    print(f"\n  {title}")
+    if reason:
+        print(f"    {reason}")
+    for instruction in step.get("instructions", []):
+        if isinstance(instruction, str) and instruction.strip():
+            print(f"    - {instruction.strip()}")
+'
+}
+
+fix_reaudit_after_environment_change() {
+    echo
+    echo "Environment values changed. Clearing cached application configuration and re-auditing before any runtime repair."
+    (
+        cd "$APP_PATH" || exit 1
+        "$PHP_BIN" artisan optimize:clear
+    ) || return 1
+
+    run_audit || true
+
+    [[ "$AUDIT_SOURCE_CURRENT" == "true" ]] \
+        || fail "Fix requires clean Core/client checkouts matching their configured remote branches. Source is never pulled automatically."
+    [[ "${AUDIT_CHECKOUT_ACTIVE:-unknown}" == "true" ]] \
+        || fail "Fix requires the audited checkout to be the active CRM owner."
+}
+
+fix_interactive_environment_reconciliation() {
+    fix_category_selected environment || return 0
+    [[ -n "$AUDIT_PLAN_JSON" ]] || return 0
+
+    local count
+    count="$(fix_plan_blocking_environment_count)"
+    [[ "$count" -gt 0 ]] || return 0
+
+    echo
+    echo "== Guided reconciliation: environment/provider requirements =="
+    fix_environment_guidance
+    echo
+    echo "The launcher will now prompt only for currently blocking environment values."
+    echo "Secret input is hidden. Values are written only after you supply or approve them."
+    echo "Use Ctrl+C to stop safely if you need to leave and retrieve a provider value."
+
+    if ! prompt_yes_no "Reconcile these blocking environment values now?" "yes"; then
+        echo "Skipping environment reconciliation for this pass."
+        return 0
+    fi
+
+    fix_confirm_mutation_once
+
+    local plan_file result_file changed
+    plan_file="$(mktemp)" || return 1
+    result_file="$(mktemp)" || {
+        rm -f "$plan_file"
+        return 1
+    }
+
+    printf '%s\n' "$AUDIT_PLAN_JSON" > "$plan_file"
+
+    if ! python3 "$HELPER" resolve-requirements \
+        --plan "$plan_file" \
+        --root-env "$ROOT_ENV" \
+        --client-env "$CLIENT_ENV" \
+        --mode all \
+        --result-file "$result_file"
+    then
+        rm -f "$plan_file" "$result_file"
+        return 1
+    fi
+
+    changed="$(cat "$result_file" 2>/dev/null || printf '0')"
+    rm -f "$plan_file" "$result_file"
+
+    if [[ "$changed" =~ ^[0-9]+$ && "$changed" -gt 0 ]]; then
+        fix_reaudit_after_environment_change || return 1
+    else
+        echo "No environment values changed."
+    fi
+}
+
+fix_should_apply_interactively() {
+    local prompt="$1"
+    if [[ "$FIX_MODE" != "interactive" ]]; then
+        return 0
+    fi
+    prompt_yes_no "$prompt" "yes"
+}
+
 fix_category_selected() {
     local category="$1"
     [[ ",${FIX_CATEGORIES}," == *",${category},"* ]]
@@ -3164,8 +3413,15 @@ fix_manual_breaking_summary() {
                     echo "  [manual] setup.validate — no registered deterministic prerequisite repair explains this failure."
                 fi
                 ;;
-            deployment_plan.*|external_setup.*|dns.*)
-                echo "  [manual] $key — external/provider/DNS values or verification are never invented by fix."
+            deployment_plan.*)
+                if fix_category_selected environment && [[ "$FIX_MODE" != "apply" ]]; then
+                    echo "  [guided] $key — operator-supplied environment reconciliation is available; values are never invented."
+                else
+                    echo "  [manual] $key — non-interactive fix never invents or collects environment/provider values."
+                fi
+                ;;
+            external_setup.*|dns.*)
+                echo "  [manual] $key — provider-dashboard verification and DNS changes remain operator/external work."
                 ;;
             *)
                 echo "  [manual] $key — no closed safe-remediation handler is registered."
@@ -3177,9 +3433,14 @@ fix_manual_breaking_summary() {
 fix_print_plan() {
     echo
     echo "Fix plan (${FIX_MODE})"
-    echo "Selected safe categories: $FIX_CATEGORIES"
+    echo "Selected categories: $FIX_CATEGORIES"
 
     local planned=false
+
+    if fix_category_selected environment && [[ "$(fix_plan_blocking_environment_count)" -gt 0 ]]; then
+        fix_environment_plan
+        planned=true
+    fi
 
     if fix_category_selected schema && fix_schema_repairable; then
         fix_schema_plan
@@ -3213,7 +3474,7 @@ fix_print_plan() {
     fi
 
     if [[ "$planned" == "false" ]]; then
-        echo "  No registered safe repair is currently selected."
+        echo "  No guided reconciliation or registered safe repair is currently selected."
     fi
 
     echo
@@ -3243,21 +3504,32 @@ run_fix() {
 
     if [[ "$FIX_MODE" == "dry-run" ]]; then
         echo
-        echo "Dry-run only. No deployment state was changed by fix."
+        echo "Dry-run only. No prompts were opened and no deployment state was changed by fix."
         return 0
     fi
 
-    if [[ "$DEPLOY_ENV" == "production" ]]; then
-        local confirmation
-        read -r -p "Type [$ROOT_DOMAIN] to apply safe production repairs: " confirmation
-        [[ "$confirmation" == "$ROOT_DOMAIN" ]] \
-            || fail "Production fix confirmation did not match the root domain."
+    if [[ "$FIX_MODE" == "interactive" ]]; then
+        if fix_category_selected environment; then
+            fix_review_nonbreaking_findings
+        fi
+        if ! fix_interactive_environment_reconciliation; then
+            fix_reaudit_after_failure
+            return 1
+        fi
+        echo
+        echo "== Reconciled repair plan =="
+        fix_print_plan
     fi
 
     if fix_category_selected schema && fix_schema_repairable; then
-        if ! fix_apply_schema; then
-            fix_reaudit_after_failure
-            return 1
+        if fix_should_apply_interactively "Apply the enabled schema/ledger repair shown above?"; then
+            fix_confirm_mutation_once
+            if ! fix_apply_schema; then
+                fix_reaudit_after_failure
+                return 1
+            fi
+        else
+            echo "Skipped schema repair."
         fi
     fi
 
@@ -3266,9 +3538,14 @@ run_fix() {
         || audit_has_breaking runtime.storage/logs.write \
         || audit_has_breaking runtime.bootstrap/cache.write
     ); then
-        if ! fix_apply_runtime; then
-            fix_reaudit_after_failure
-            return 1
+        if fix_should_apply_interactively "Repair the proven runtime-directory write failure?"; then
+            fix_confirm_mutation_once
+            if ! fix_apply_runtime; then
+                fix_reaudit_after_failure
+                return 1
+            fi
+        else
+            echo "Skipped runtime-directory repair."
         fi
     fi
 
@@ -3277,9 +3554,14 @@ run_fix() {
         mapfile -t nginx_hosts < <(fix_safe_nginx_missing_hosts)
         local host
         for host in "${nginx_hosts[@]}"; do
-            if ! fix_apply_nginx_host "$host"; then
-                fix_reaudit_after_failure
-                return 1
+            if fix_should_apply_interactively "Create the supplemental Nginx/TLS host [$host]?"; then
+                fix_confirm_mutation_once
+                if ! fix_apply_nginx_host "$host"; then
+                    fix_reaudit_after_failure
+                    return 1
+                fi
+            else
+                echo "Skipped Nginx/TLS repair for [$host]."
             fi
         done
     fi
@@ -3293,16 +3575,26 @@ run_fix() {
         if fix_category_selected horizon && (
             audit_has_breaking horizon.process || audit_has_breaking horizon.status
         ); then
-            if ! fix_apply_horizon; then
-                fix_reaudit_after_failure
-                return 1
+            if fix_should_apply_interactively "Start/restart Horizon through the existing checkout-owned Supervisor program?"; then
+                fix_confirm_mutation_once
+                if ! fix_apply_horizon; then
+                    fix_reaudit_after_failure
+                    return 1
+                fi
+            else
+                echo "Skipped Horizon repair."
             fi
         fi
 
         if fix_category_selected scheduler && audit_has_breaking scheduler.cron; then
-            if ! fix_apply_scheduler; then
-                fix_reaudit_after_failure
-                return 1
+            if fix_should_apply_interactively "Install the missing Laravel Scheduler cron entry?"; then
+                fix_confirm_mutation_once
+                if ! fix_apply_scheduler; then
+                    fix_reaudit_after_failure
+                    return 1
+                fi
+            else
+                echo "Skipped Scheduler repair."
             fi
         fi
     else
@@ -3319,17 +3611,14 @@ run_fix() {
 
     echo
     echo "== Mandatory post-fix audit =="
-    set +e
-    run_audit
-    local final_status=$?
-    set -e
+    run_audit || true
 
-    if [[ "$final_status" -eq 0 ]]; then
-        echo "Safe repairs applied and re-audit is clean."
+    if [[ "$AUDIT_BREAKING" -eq 0 ]]; then
+        echo "Fix reconciliation completed and re-audit is clean."
         return 0
     fi
 
-    echo "Safe repairs applied. Re-audit still reports findings that require another selected safe pass or manual/external resolution."
+    echo "Fix reconciliation completed. Re-audit still reports findings that require another selected pass or operator/external resolution."
     return 1
 }
 
@@ -3338,6 +3627,10 @@ normalize_fix_categories() {
     python3 -c '
 import sys
 aliases = {
+    "environment": "environment",
+    "env": "environment",
+    "provider": "environment",
+    "providers": "environment",
     "schema": "schema",
     "runtime": "runtime",
     "nginx": "nginx",
@@ -3377,7 +3670,7 @@ parse_fix() {
     local web_group="www-data"
     local scheduler_user=""
     local server_ip=""
-    local mode="dry-run"
+    local mode="interactive"
     local only=""
     local all_safe=false
 
@@ -3396,6 +3689,7 @@ parse_fix() {
             --web-group) web_group=${2:?}; shift 2 ;;
             --scheduler-user) scheduler_user=${2:?}; shift 2 ;;
             --server-ip) server_ip=${2:?}; shift 2 ;;
+            --interactive) mode="interactive"; shift ;;
             --apply) mode="apply"; shift ;;
             --dry-run) mode="dry-run"; shift ;;
             --only) only=${2:?}; shift 2 ;;
@@ -3433,12 +3727,15 @@ parse_fix() {
     AUDIT_SERVER_IP="$server_ip"
 
     FIX_MODE="$mode"
+    FIX_PRODUCTION_CONFIRMED="false"
     if [[ -n "$only" ]]; then
         FIX_CATEGORIES="$(normalize_fix_categories "$only")" \
             || fail "Invalid --only category list [$only]."
         [[ -n "$FIX_CATEGORIES" ]] || fail "--only must select at least one fix category."
-    else
+    elif [[ "$all_safe" == "true" ]]; then
         FIX_CATEGORIES="schema,runtime,nginx,horizon,scheduler"
+    else
+        FIX_CATEGORIES="environment,schema,runtime,nginx,horizon,scheduler"
     fi
 
     run_fix

@@ -308,40 +308,60 @@ The staging-proven `.env` mode is not automatically declared the production secr
 
 ## Audit-driven fix contract
 
-`fix` is implemented as the state-file-independent mutation companion to `audit`.
+`fix` is the state-file-independent reconciliation companion to `audit`.
 
-The operator flow is:
+The normal operator flow is:
 
 ```text
 pull current Core + client source
 audit
-fix --dry-run
-review exact proposed safe changes
-fix --apply
+fix
+  -> review non-breaking drift
+  -> supply/approve blocking environment values
+  -> confirm eligible deterministic repairs
 mandatory re-audit
 ```
 
-`fix` reruns the full read-only audit before planning or applying anything. It refuses to operate when Core/client source is not clean and remote-current, or when the audited checkout is not the active CRM owner. It never pulls source itself.
+`fix` reruns the full read-only audit before planning or changing anything. It refuses to operate when Core/client source is not clean and remote-current, or when the audited checkout is not the active CRM owner. It never pulls source itself.
 
-Dry-run is the default. `--apply` is required for mutation. Production apply also requires typing the root domain. `--only` can restrict work to the closed safe categories `schema`, `runtime`, `nginx`, `horizon`, and `scheduler`; `supervisor`, `cron`, and `tls` are accepted as operator aliases. `--all-safe` selects the full registry.
+Plain `fix` defaults to **interactive reconciliation**. `--dry-run` is non-interactive and non-mutating. `--apply` is non-interactive and applies only the deterministic safe registry. Production mutation, whether triggered by guided environment entry or a deterministic repair, requires typing the root domain once before the first change.
 
-The current safe registry is deliberately narrow:
+`--only` can restrict the pass to `environment`, `schema`, `runtime`, `nginx`, `horizon`, and `scheduler`; `env`/`provider`/`providers`, `supervisor`, `cron`, and `tls` are accepted aliases. `--all-safe` selects only `schema,runtime,nginx,horizon,scheduler` and deliberately excludes operator-supplied environment/provider values.
 
-- **schema** — when the auditor proves enabled module schema/ledger breakage, run platform migrations first, then use the existing application-owned `modules:install` machinery for only the enabled schema scopes that are not fully current/tracked, followed by preset sync and validation. This supports older mixed pre-ledger databases where some enabled scopes are current, some partial, and some not migrated. It never writes migration-ledger rows directly and never installs disabled optional scopes merely because `modules:status` lists them.
+### Guided environment and review behavior
+
+The audit classification remains authoritative: `INFO` and `WARNING` do not become automatic mutations. Guided fix may nevertheless surface relevant non-breaking drift/warnings for an operator decision. The fast path is to keep them as-is for the current pass; if the operator rejects one, generic fix stops rather than normalizing it blindly.
+
+Blocking deployment-plan environment requirements are different from automatic repairs. Guided fix may:
+
+- show the application-owned setup-step reason/instructions associated with the blocking keys;
+- show non-secret expected values supplied by the deployment contract;
+- enforce allowed-value constraints through the existing environment requirement prompt logic;
+- accept required secrets through hidden input;
+- write only the operator-supplied/approved value to the deployment-plan-owned root or selected-client environment file;
+- clear cached configuration and immediately rerun audit before server/runtime repairs continue.
+
+This does **not** permit credential invention. Provider dashboards, credential issuance, DNS changes, account creation, and real-event verification remain external/operator actions. The launcher is allowed to wait for the operator to retrieve a value and enter it; it is not allowed to fabricate one.
+
+### Deterministic automatic repair registry
+
+Only `BREAKING` findings may enter this registry:
+
+- **schema** — when the auditor proves enabled module schema/ledger breakage, run platform migrations first, then use the existing application-owned `modules:install` machinery for only the enabled schema scopes that are not fully current/tracked, followed by preset sync and validation. It never writes migration-ledger rows directly and never installs disabled optional scopes merely because `modules:status` lists them.
 - **runtime** — restore effective deploy/web write access only when the active runtime directories are actually `BREAKING`.
 - **nginx** — when a required Core hostname has no application-serving owner, add a supplemental Core site and dedicated certificate without rewriting a functional shared/legacy site. DNS must already resolve directly to the server and Certbot must already be available. Ambiguous ownership, wrong-root ownership, DNS changes, and TLS-only cases without the safe missing-host prerequisite remain manual.
 - **horizon** — reuse the single existing Supervisor config that already points at the audited checkout; do not rename a healthy legacy program or silently replace process-manager ownership.
 - **scheduler** — install the exact marked scheduler entry only when none exists for the active checkout.
 
-Horizon and Scheduler repairs are deferred until both the deployment plan and `setup:validate` are green after preceding safe repairs. This prevents workers or scheduled side effects from starting while schema/provider readiness is still incomplete.
+Interactive mode asks before each eligible deterministic repair. `--apply` performs the same safe registry without those prompts. Horizon and Scheduler repairs remain deferred until both the deployment plan and `setup:validate` are green after preceding schema/environment repairs.
 
-Canonical Redis/cache/Horizon names, database names/users, checkout paths, Supervisor program names, cron markers, Nginx filenames, or equivalent identities are never fix candidates merely because they differ from a new deployment.
+Canonical Redis/cache/Horizon names, database names/users, checkout paths, Supervisor program names, cron markers, Nginx filenames, or equivalent identities are never automatic fix candidates merely because they differ from a new deployment.
 
-Hard exclusions from automatic fix behavior include:
+Hard exclusions from automatic mutation remain:
 
 - source pulling or branch changes;
 - remote database credentials or account provisioning;
-- provider credentials/secrets;
+- provider credential/secret generation;
 - provider dashboard configuration;
 - DNS changes;
 - CRM/business data;
@@ -349,9 +369,9 @@ Hard exclusions from automatic fix behavior include:
 - destructive production schema/state operations;
 - normalization of healthy legacy names/paths/prefixes.
 
-A finding is not automatically fixable merely because the auditor can detect it. The fix registry first requires `BREAKING`, then classifies ownership, safety, prerequisites, and restart/reload needs. `INFO`, `WARNING`, and `MANUAL VERIFICATION REQUIRED` are categorically excluded from automatic mutation.
+A finding is not automatically fixable merely because the auditor can detect it. The automatic registry first requires `BREAKING`, then classifies ownership, safety, prerequisites, and restart/reload needs. Guided review/value entry is a separate human-in-the-loop path and does not weaken those automatic-mutation rules.
 
-Every apply attempt ends with a fresh audit. If a safe repair step itself fails, the launcher re-audits the resulting state before stopping so the next decision is based on what actually changed.
+Every mutating fix attempt ends with a fresh audit. If environment values change, fix re-audits before proceeding to runtime services. If a deterministic repair step fails, the launcher re-audits the resulting state before stopping so the next decision is based on what actually changed.
 
 
 ## Remaining higher-level work

@@ -546,7 +546,7 @@ NGINX;
         );
     }
 
-    public function test_fix_is_a_separate_breaking_only_dry_run_first_path(): void
+    public function test_fix_defaults_to_guided_reconciliation_while_automatic_repairs_remain_breaking_only(): void
     {
         $launcher = (string) file_get_contents(
             base_path('scripts/operations/launch-client-environment.sh'),
@@ -561,7 +561,23 @@ NGINX;
             $launcher,
         );
         $this->assertStringContainsString(
-            'local mode="dry-run"',
+            'local mode="interactive"',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            '--interactive                     Guided reconciliation (default)',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            '--dry-run                         Print the reconciliation/repair plan without prompting or changing state.',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            '--apply                           Non-interactively apply eligible deterministic safe repairs only.',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'environment,schema,runtime,nginx,horizon,scheduler',
             $launcher,
         );
         $this->assertStringContainsString(
@@ -569,11 +585,27 @@ NGINX;
             $launcher,
         );
         $this->assertStringContainsString(
-            "run_fix() {\n    echo \"== Fix precondition audit ==\"\n    run_audit || true",
+            'Guided fix may review INFO/WARNING findings and collect operator-supplied required environment values.',
             $launcher,
         );
-        $this->assertStringNotContainsString(
-            "run_fix() {\n    echo \"== Fix precondition audit ==\"\n    set +e\n    run_audit",
+        $this->assertStringContainsString(
+            'fix_review_nonbreaking_findings',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'fix_interactive_environment_reconciliation',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'resolve-requirements',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'Secret input is hidden. Values are written only after you supply or approve them.',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'fix_confirm_mutation_once',
             $launcher,
         );
         $this->assertStringContainsString(
@@ -597,5 +629,42 @@ NGINX;
             $launcher,
         );
     }
+
+    public function test_guided_fix_reaudits_after_environment_changes_and_apply_mode_never_collects_provider_values(): void
+    {
+        $launcher = (string) file_get_contents(
+            base_path('scripts/operations/launch-client-environment.sh'),
+        );
+
+        $this->assertStringContainsString(
+            'Environment values changed. Clearing cached application configuration and re-auditing before any runtime repair.',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            '"$PHP_BIN" artisan optimize:clear',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'run_audit || true',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'if [[ "$FIX_MODE" == "interactive" ]]; then',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'Provider secrets/credentials are never invented or collected in this mode.',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'FIX_CATEGORIES="schema,runtime,nginx,horizon,scheduler"',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'Use Ctrl+C to stop safely if you need to leave and retrieve a provider value.',
+            $launcher,
+        );
+    }
+
 
 }

@@ -230,47 +230,75 @@ audit
   ↓
 findings
   ↓
-fix --dry-run
+fix
   ↓
-exact proposed safe changes
-  ↓
-fix --apply
+guided review + operator-supplied environment values + confirmed safe repairs
   ↓
 mandatory audit again
 ```
 
-`fix` accepts the same identity inputs as `audit`. Dry-run is the default:
+`fix` accepts the same identity inputs as `audit`. Plain `fix` is the default operator-guided workflow:
 
 ```bash
-bash scripts/operations/launch-client-environment.sh fix   --environment staging   --client-key slam-dunk-crm   --root-domain staging.slamdunkhomeloans.com
+bash scripts/operations/launch-client-environment.sh fix \
+  --environment staging \
+  --client-key slam-dunk-crm \
+  --root-domain staging.slamdunkhomeloans.com
 ```
 
-Apply only after reviewing the proposed actions:
+Guided mode first shows the audit and repair plan. It then:
+
+- summarizes relevant `INFO`/`WARNING` drift and lets the operator keep it as-is or stop for deliberate reconciliation;
+- walks currently blocking deployment-plan environment requirements, showing the application-owned provider/setup instructions that explain where the value comes from;
+- uses hidden input for secret values and writes only values the operator supplies or explicitly approves;
+- clears cached application configuration and re-audits after environment changes;
+- asks before each eligible deterministic schema/runtime/Nginx/Horizon/Scheduler repair;
+- ends with another full audit.
+
+Use `--dry-run` when no prompts or mutations are wanted:
 
 ```bash
-bash scripts/operations/launch-client-environment.sh fix   --environment staging   --client-key slam-dunk-crm   --root-domain staging.slamdunkhomeloans.com   --apply
+bash scripts/operations/launch-client-environment.sh fix \
+  --environment staging \
+  --client-key slam-dunk-crm \
+  --root-domain staging.slamdunkhomeloans.com \
+  --dry-run
+```
+
+Use `--apply` for non-interactive application of the deterministic safe repair registry only. This mode never collects provider credentials/secrets:
+
+```bash
+bash scripts/operations/launch-client-environment.sh fix \
+  --environment staging \
+  --client-key slam-dunk-crm \
+  --root-domain staging.slamdunkhomeloans.com \
+  --apply
 ```
 
 Limit a pass when useful:
 
 ```text
+--only environment
 --only schema
 --only nginx
+--only providers
 --only supervisor,cron
 --all-safe
 ```
 
-Canonical category names are `schema`, `runtime`, `nginx`, `horizon`, and `scheduler`; `supervisor`, `cron`, and `tls` are aliases.
+Canonical category names are `environment`, `schema`, `runtime`, `nginx`, `horizon`, and `scheduler`. `env`, `provider`, and `providers` alias `environment`; `supervisor`, `cron`, and `tls` retain their existing aliases. `--all-safe` intentionally excludes guided environment/provider entry and selects only the deterministic safe registry.
 
-The fix registry consumes `BREAKING` findings only. Current deterministic repairs are intentionally limited to enabled module schema/ledger repair, proven runtime-directory write failures, an unowned required Core Nginx/TLS host, the existing checkout-owned Supervisor/Horizon program, and a missing Scheduler entry.
+The automatic repair registry still consumes `BREAKING` findings only. Current deterministic repairs remain limited to enabled module schema/ledger repair, proven runtime-directory write failures, an unowned required Core Nginx/TLS host, the existing checkout-owned Supervisor/Horizon program, and a missing Scheduler entry.
 
 For an older pre-ledger database with mixed module state, schema repair runs platform migrations first and then uses `modules:install` only for the enabled schema scopes that need migration/adoption. Current-but-untracked scopes are adopted through the normal executor, partial/not-migrated scopes run only their registered pending migrations, and disabled optional module scopes are ignored. The fix path never edits installation-ledger rows itself.
 
-Provider requirements, provider dashboards, DNS changes, remote DB credentials, CRM/business data, Project State, ambiguous Nginx/process ownership, and healthy legacy naming remain outside automatic mutation. A missing provider value may therefore remain `BREAKING` after every safe host/schema repair until the operator supplies the real external value.
+Provider credentials, provider dashboards, DNS changes, remote DB account provisioning, CRM/business data, Project State, ambiguous Nginx/process ownership, and destructive schema operations remain outside automatic mutation. The important distinction is that a provider value can still participate in **guided fix**: the script can explain the requirement and accept the real operator-supplied value without inventing it.
+
+Healthy legacy naming/path/prefix drift remains non-breaking. Guided fix may ask whether to keep those differences. Choosing not to keep a non-breaking value stops the pass so the operator can perform the appropriate deliberate migration instead of letting the generic fixer normalize it blindly.
 
 Horizon and Scheduler are deliberately deferred until the deployment plan and `setup:validate` both pass after schema/config repairs. This keeps queues and scheduled work stopped while application readiness is incomplete.
 
-Every `--apply` ends with a fresh audit. If a safe repair step fails mid-pass, the launcher re-audits before stopping.
+Every mutating guided/apply pass ends with a fresh audit. If a safe repair step fails mid-pass, the launcher re-audits before stopping.
 
 
 ## Normal deployment after launch
