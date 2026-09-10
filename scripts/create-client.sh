@@ -2,55 +2,92 @@
 
 set -euo pipefail
 
-CLIENT_KEY="${1:-}"
-CLIENT_TIMEZONE="${2:-}"
-CLIENT_NAME=""
-WEB_GROUP="${ENGAGE_CORE_WEB_GROUP:-www-data}"
-GITHUB_OWNER="${ENGAGE_CORE_GITHUB_OWNER:-ImagineSocialGit}"
+usage() {
+  cat <<'USAGE'
+Usage:
+  ./scripts/create-client.sh client-key timezone [options]
 
-if [[ -n "$CLIENT_KEY" ]]; then
-  shift
-fi
-if [[ -n "$CLIENT_TIMEZONE" ]]; then
-  shift
-fi
+Options:
+  --name "Client Name"
+      Explicit human-readable client name.
 
-while (($#)); do
-  case "$1" in
-    --name)
-      CLIENT_NAME="${2:?--name requires a value}"
-      shift 2
-      ;;
-    -h|--help)
-      cat <<'USAGE'
-Usage: ./scripts/create-client.sh client-key timezone [--name "Client Name"]
+  --preset PRESET
+      Client product package. Supported presets:
+        basic   Tasks + Workflow. Default.
+        artist  Artist fan engagement: Messaging, Broadcasts, Campaigns,
+                Forms, Integrations, and Reporting.
 
-Example:
-  ./scripts/create-client.sh example-client America/Chicago --name "Example Client"
+  -h, --help
+      Show this help.
 
 Environment overrides:
   ENGAGE_CORE_WEB_GROUP=www-data
   ENGAGE_CORE_GITHUB_OWNER=ImagineSocialGit
 
-The command creates the local client scaffold, initializes it as a Git repository,
-creates a private GitHub repository, and pushes the initial main branch.
+The command builds the selected client package, initializes it as a Git
+repository, creates a private GitHub repository, and pushes the initial main
+branch.
+
+Examples:
+  ./scripts/create-client.sh example-client America/Chicago
+
+  ./scripts/create-client.sh stevie-woodward-crm America/Chicago \
+    --name "Stevie Woodward" \
+    --preset artist
 USAGE
+}
+
+CLIENT_KEY=""
+CLIENT_TIMEZONE=""
+CLIENT_NAME=""
+CLIENT_PRESET="basic"
+WEB_GROUP="${ENGAGE_CORE_WEB_GROUP:-www-data}"
+GITHUB_OWNER="${ENGAGE_CORE_GITHUB_OWNER:-ImagineSocialGit}"
+
+while (($#)); do
+  case "$1" in
+    --name)
+      [[ $# -ge 2 ]] || {
+        echo "--name requires a value." >&2
+        exit 1
+      }
+      CLIENT_NAME="$2"
+      shift 2
+      ;;
+    --preset)
+      [[ $# -ge 2 ]] || {
+        echo "--preset requires a value." >&2
+        exit 1
+      }
+      CLIENT_PRESET="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
       exit 0
       ;;
-    *)
-      echo "Unknown argument: $1" >&2
+    --*)
+      echo "Unknown option: $1" >&2
+      usage >&2
       exit 1
+      ;;
+    *)
+      if [[ -z "$CLIENT_KEY" ]]; then
+        CLIENT_KEY="$1"
+      elif [[ -z "$CLIENT_TIMEZONE" ]]; then
+        CLIENT_TIMEZONE="$1"
+      else
+        echo "Unexpected positional argument: $1" >&2
+        usage >&2
+        exit 1
+      fi
+      shift
       ;;
   esac
 done
 
 if [[ -z "$CLIENT_KEY" || -z "$CLIENT_TIMEZONE" ]]; then
-  echo "Usage: ./scripts/create-client.sh client-key timezone [--name \"Client Name\"]"
-  echo "Example: ./scripts/create-client.sh example-client America/Chicago --name \"Example Client\""
-  echo
-  echo "Environment overrides:"
-  echo "  ENGAGE_CORE_WEB_GROUP=www-data"
-  echo "  ENGAGE_CORE_GITHUB_OWNER=ImagineSocialGit"
+  usage >&2
   exit 1
 fi
 
@@ -61,6 +98,11 @@ fi
 
 if [[ -n "$CLIENT_NAME" && "$CLIENT_NAME" =~ [[:cntrl:]] ]]; then
   echo "Client name must not contain control characters."
+  exit 1
+fi
+
+if [[ ! "$CLIENT_PRESET" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+  echo "Invalid client preset: $CLIENT_PRESET"
   exit 1
 fi
 
@@ -103,6 +145,40 @@ CLIENT_DIR="$CLIENTS_DIR/$CLIENT_KEY"
 TEMP_CLIENT_DIR=""
 GITHUB_REPOSITORY="$GITHUB_OWNER/$CLIENT_KEY"
 GITHUB_SSH_URL="git@github.com:${GITHUB_REPOSITORY}.git"
+PRESET_TEMPLATES_DIR="$ROOT_DIR/docs/config-templates/client-presets"
+PRESET_TEMPLATE_DIR="$PRESET_TEMPLATES_DIR/$CLIENT_PRESET"
+
+if [[ ! -d "$PRESET_TEMPLATE_DIR" ]]; then
+  echo "Unsupported client preset: $CLIENT_PRESET"
+  echo
+  echo "Available presets:"
+  find "$PRESET_TEMPLATES_DIR" \
+    -mindepth 1 \
+    -maxdepth 1 \
+    -type d \
+    -printf '  %f\n' \
+    | sort
+  exit 1
+fi
+
+if [[ ! -f "$PRESET_TEMPLATE_DIR/config/modules.php" ]]; then
+  echo "Client preset is missing config/modules.php: $PRESET_TEMPLATE_DIR"
+  exit 1
+fi
+
+for reserved_path in \
+  config/client.php \
+  .env \
+  .env.example \
+  .gitignore \
+  README.md
+do
+  if [[ -e "$PRESET_TEMPLATE_DIR/$reserved_path" ]]; then
+    echo "Client preset must not own generated/reserved path: $reserved_path"
+    echo "Preset: $CLIENT_PRESET"
+    exit 1
+  fi
+done
 
 if [[ -e "$CLIENT_DIR" ]]; then
   echo "Client already exists: $CLIENT_DIR"
@@ -150,10 +226,13 @@ fi
 CLIENT_NAME_PHP="$(php -r 'echo var_export($argv[1], true);' "$CLIENT_NAME")"
 CLIENT_KEY_PHP="$(php -r 'echo var_export($argv[1], true);' "$CLIENT_KEY")"
 CLIENT_TIMEZONE_PHP="$(php -r 'echo var_export($argv[1], true);' "$CLIENT_TIMEZONE")"
+CLIENT_PRESET_PHP="$(php -r 'echo var_export($argv[1], true);' "$CLIENT_PRESET")"
 
 mkdir -p "$TEMP_CLIENT_DIR/config"
 mkdir -p "$TEMP_CLIENT_DIR/resources/views"
 mkdir -p "$TEMP_CLIENT_DIR/resources/images/raw"
+
+cp -R "$PRESET_TEMPLATE_DIR/." "$TEMP_CLIENT_DIR/"
 
 cat > "$TEMP_CLIENT_DIR/.gitignore" <<'EOF_GITIGNORE'
 .env
@@ -170,20 +249,9 @@ return [
 
     'timezone' => $CLIENT_TIMEZONE_PHP,
 
-    'preset' => 'basic',
+    'preset' => $CLIENT_PRESET_PHP,
 ];
 EOF_CLIENT
-
-cat > "$TEMP_CLIENT_DIR/config/modules.php" <<'EOF_MODULES'
-<?php
-
-return [
-    'enabled' => [
-        'tasks',
-        'workflow',
-    ],
-];
-EOF_MODULES
 
 cat > "$TEMP_CLIENT_DIR/resources/images/manifest.json" <<'EOF_MANIFEST'
 {}
@@ -198,6 +266,27 @@ fi
 
 cp "$ENV_TEMPLATE" "$TEMP_CLIENT_DIR/.env.example"
 
+CLIENT_MODULES="$(
+  php -r '
+$config = require $argv[1];
+$enabled = $config["enabled"] ?? null;
+
+if (! is_array($enabled) || $enabled === []) {
+    fwrite(STDERR, "Preset modules.php must contain a non-empty enabled array.\n");
+    exit(1);
+}
+
+foreach ($enabled as $module) {
+    if (! is_string($module) || trim($module) === "") {
+        fwrite(STDERR, "Preset modules.php contains an invalid enabled module.\n");
+        exit(1);
+    }
+}
+
+echo implode(", ", $enabled);
+' "$TEMP_CLIENT_DIR/config/modules.php"
+)"
+
 cat > "$TEMP_CLIENT_DIR/README.md" <<EOF_README
 # $CLIENT_NAME
 
@@ -205,31 +294,45 @@ Engage Core client configuration, content, views, and deployment-reference envir
 
 Repository: \`$GITHUB_REPOSITORY\`
 
-This scaffold intentionally starts with the \`basic\` preset and the Tasks and Workflow modules. Add client-specific config contributions only when the client actually needs them.
+## Client package
 
-## Review before use
+Client key: \`$CLIENT_KEY\`
 
-1. Review \`config/client.php\`:
-   - client name
-   - client key
-   - timezone
-   - selected preset
-2. Review \`config/modules.php\` and enable only the modules the client needs.
-3. Decide which provider-backed features are required before adding credentials.
+Timezone: \`$CLIENT_TIMEZONE\`
+
+Preset: \`$CLIENT_PRESET\`
+
+Explicit modules: \`$CLIENT_MODULES\`
+
+The selected preset was generated from the canonical template at:
+
+\`docs/config-templates/client-presets/$CLIENT_PRESET\`
+
+Review client-specific business behavior before deployment, but do not replace the
+selected starter package with another client's configuration.
 
 ## Environment model
 
-\`.env.example\` is an exhaustive selected-client reference. It is not a runtime template and must not be copied wholesale to \`.env\`.
+\`.env.example\` is an exhaustive selected-client reference. It is not a runtime
+template and must not be copied wholesale to \`.env\`.
 
-The committed client/module configuration determines the runtime requirement set. Select this client in the root runtime environment first. If root \`.env\` already contains another \`CLIENT_KEY\`, change that one runtime value deliberately before continuing. When root \`.env\` does not exist yet, an explicit process value can bootstrap the first sync:
+The committed client/module configuration determines the runtime requirement set.
+Select this client in the root runtime environment first. If root \`.env\` already
+contains another \`CLIENT_KEY\`, change that one runtime value deliberately before
+continuing. When root \`.env\` does not exist yet, an explicit process value can
+bootstrap the first sync:
 
 \`\`\`bash
 CLIENT_KEY=$CLIENT_KEY php artisan engage:environment:sync --write-missing
 \`\`\`
 
-That command adds only missing required variable names to the correct root/client environment file. It never invents secret values or overwrites existing values. A persisted \`CLIENT_KEY\` that disagrees with the selected client is reported as a blocking mismatch instead of being silently changed.
+That command adds only missing required variable names to the correct root/client
+environment file. It never invents secret values or overwrites existing values. A
+persisted \`CLIENT_KEY\` that disagrees with the selected client is reported as a
+blocking mismatch instead of being silently changed.
 
-Populate the reported blank values. If \`APP_KEY\` was added blank, generate it first:
+Populate the reported blank values. If \`APP_KEY\` was added blank, generate it
+first:
 
 \`\`\`bash
 php artisan key:generate
@@ -244,7 +347,8 @@ php artisan engage:install
 php artisan modules:status
 \`\`\`
 
-\`engage:install\` already runs setup validation; a second standalone \`setup:validate\` is only needed when diagnosing setup state separately.
+\`engage:install\` already runs setup validation; a second standalone
+\`setup:validate\` is only needed when diagnosing setup state separately.
 
 ## File permissions
 
@@ -256,7 +360,10 @@ files:       0640
 group:       $WEB_GROUP
 \`\`\`
 
-The setgid directory bit keeps newly created files in the PHP-FPM group. Runtime \`.env\` files created by the environment synchronizer default to mode \`0640\`; deployment must also ensure the deploy user and PHP-FPM identity can read them without making secrets world-readable.
+The setgid directory bit keeps newly created files in the PHP-FPM group. Runtime
+\`.env\` files created by the environment synchronizer default to mode \`0640\`;
+deployment must also ensure the deploy user and PHP-FPM identity can read them
+without making secrets world-readable.
 
 ## Configuration ownership
 
@@ -264,16 +371,29 @@ The setgid directory bit keeps newly created files in the PHP-FPM group. Runtime
 : Stable client product behavior and version-controlled overrides authored in development.
 
 Client \`.env\`
-: Deployment-specific client values and secrets required by the committed build. The generated \`.gitignore\` excludes runtime environment files while retaining \`.env.example\`.
+: Deployment-specific client values and secrets required by the committed build.
+The generated \`.gitignore\` excludes runtime environment files while retaining
+\`.env.example\`.
 
 Root \`.env\`
 : Application/process infrastructure and the active \`CLIENT_KEY\`.
 
-Staging and production are deployment targets. Do not edit source/config there; deploy committed development changes and reconcile only runtime environment/host state.
+Staging and production are deployment targets. Do not edit source/config there;
+deploy committed development changes and reconcile only runtime environment/host
+state.
 EOF_README
 
 php -l "$TEMP_CLIENT_DIR/config/client.php" >/dev/null
-php -l "$TEMP_CLIENT_DIR/config/modules.php" >/dev/null
+
+while IFS= read -r php_file; do
+  php -l "$php_file" >/dev/null
+done < <(
+  find "$TEMP_CLIENT_DIR/config" \
+    -type f \
+    -name '*.php' \
+    -print \
+    | sort
+)
 
 php -r '
 $json = file_get_contents($argv[1]);
@@ -296,8 +416,9 @@ fi
 find "$TEMP_CLIENT_DIR" -type d -exec chmod 2750 {} +
 find "$TEMP_CLIENT_DIR" -type f -exec chmod 0640 {} +
 
-# Initialize and commit while the scaffold is still in its temporary location.
-# This keeps a failed GitHub create from publishing a half-created client under client/.
+# Initialize and commit while the complete selected preset is still in the
+# temporary location. A failed GitHub repository create therefore does not
+# publish a partial client under client/.
 git -C "$TEMP_CLIENT_DIR" init -q
 git -C "$TEMP_CLIENT_DIR" config user.name "$GIT_AUTHOR_NAME"
 git -C "$TEMP_CLIENT_DIR" config user.email "$GIT_AUTHOR_EMAIL"
@@ -317,13 +438,14 @@ git -C "$TEMP_CLIENT_DIR" remote add origin "$GITHUB_SSH_URL"
 if ! git -C "$TEMP_CLIENT_DIR" push -u origin main; then
   echo
   echo "GitHub repository was created, but the initial push failed."
-  echo "Preserving the client scaffold locally so the push can be repaired without recreating it."
+  echo "Preserving the complete client package locally so the push can be repaired without recreating it."
 
   mv "$TEMP_CLIENT_DIR" "$CLIENT_DIR"
   TEMP_CLIENT_DIR=""
   trap - EXIT
 
   echo "Client: $CLIENT_DIR"
+  echo "Preset: $CLIENT_PRESET"
   echo "Repository: $GITHUB_SSH_URL"
   echo "Retry after fixing Git authentication:"
   echo "  git -C client/$CLIENT_KEY push -u origin main"
@@ -338,21 +460,14 @@ cat <<EOF_DONE
 Created client: $CLIENT_DIR
 Name: $CLIENT_NAME
 Timezone: $CLIENT_TIMEZONE
-Preset: basic
-Modules: tasks, workflow
+Preset: $CLIENT_PRESET
+Modules: $CLIENT_MODULES
 Repository: $GITHUB_SSH_URL
 Branch: main
 Visibility: private
 Permissions: directories 2750; files 0640; group $WEB_GROUP
 
 Next:
-  # Review config/client.php and config/modules.php, then commit/push any client-specific changes.
-  # If root .env already selects another client, deliberately set CLIENT_KEY=$CLIENT_KEY there first.
-  CLIENT_KEY=$CLIENT_KEY php artisan engage:environment:sync --write-missing
-  # Populate the reported blank runtime values/secrets.
-  # If APP_KEY is blank: php artisan key:generate
-  php artisan optimize:clear
-  php artisan engage:deployment-plan
-  php artisan engage:install
-  php artisan modules:status
+  # The complete selected preset has already been committed and pushed.
+  # Use the deployment launcher to create the first staging/production runtime.
 EOF_DONE
