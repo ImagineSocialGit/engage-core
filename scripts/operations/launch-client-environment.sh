@@ -14,9 +14,10 @@ Usage:
   launch-client-environment.sh add-modules <state-file> --module MODULE [--module MODULE ...]
   launch-client-environment.sh verify <state-file>
   launch-client-environment.sh audit --environment ENV --client-key KEY --root-domain DOMAIN [options]
+  launch-client-environment.sh fix --environment ENV --client-key KEY --root-domain DOMAIN [options]
   launch-client-environment.sh derive --environment ENV --client-repo URL --root-domain DOMAIN [--client-key KEY]
 
-Audit options:
+Audit/fix identity options:
   --environment staging|production
   --client-key KEY
   --root-domain DOMAIN
@@ -31,11 +32,26 @@ Audit options:
   --scheduler-user USER            Default: deploy user
   --server-ip IPV4                 Optional authoritative direct-DNS target for Core hosts.
 
-Audit is strictly non-mutating. It does not create a state file, write environment
-files, change permissions, migrate/install schema, alter Nginx/Supervisor/cron,
-issue certificates, reload services, or modify provider/DNS configuration.
+Audit is strictly non-mutating. It verifies that both Git checkouts match their
+configured remote branch before interpreting runtime state. It does not create a
+state file, write environment files, change permissions, migrate/install schema,
+alter Nginx/Supervisor/cron, issue certificates, reload services, or modify
+provider/DNS configuration.
+
 Audit classifications are PASS, INFO, WARNING, BREAKING, and MANUAL VERIFICATION REQUIRED.
-Only BREAKING findings are candidates for the future automatic fix path.
+Only BREAKING findings may enter the closed automatic fix registry.
+
+Fix options:
+  --apply                           Apply safe registered repairs. Default is dry-run.
+  --dry-run                         Print the exact safe repair plan without changing state.
+  --only CATEGORY[,CATEGORY...]     Limit to schema,runtime,nginx,horizon,scheduler.
+                                    Aliases: supervisor=horizon, cron=scheduler, tls=nginx.
+  --all-safe                        Select every registered safe repair category (default).
+  plus all Audit/fix identity options above.
+
+Fix never pulls source, invents credentials, changes DNS, normalizes healthy legacy
+names/paths/prefixes, rewrites CRM data, or performs destructive schema operations.
+Production --apply requires an explicit confirmation.
 
 New-environment options:
   --environment staging|production
@@ -1082,10 +1098,14 @@ audit_reset() {
     AUDIT_WARNING=0
     AUDIT_BREAKING=0
     AUDIT_MANUAL=0
+    AUDIT_BREAKING_KEYS=()
+    AUDIT_SOURCE_CURRENT="true"
     AUDIT_APP_COMMANDS_AVAILABLE="unknown"
     AUDIT_APP_BOOTSTRAP_READY="unknown"
     AUDIT_NGINX_DUMP_LOADED="false"
     AUDIT_NGINX_DUMP=""
+    AUDIT_PLAN_JSON=""
+    AUDIT_MODULE_STATUS_JSON=""
 }
 
 audit_result() {
@@ -1100,7 +1120,10 @@ audit_result() {
         PASS) ((AUDIT_PASS += 1)) ;;
         INFO) ((AUDIT_INFO += 1)) ;;
         WARNING) ((AUDIT_WARNING += 1)) ;;
-        BREAKING) ((AUDIT_BREAKING += 1)) ;;
+        BREAKING)
+            ((AUDIT_BREAKING += 1))
+            AUDIT_BREAKING_KEYS+=("$key")
+            ;;
         "MANUAL VERIFICATION REQUIRED") ((AUDIT_MANUAL += 1)) ;;
         *) fail "Unknown audit result status [$status]." ;;
     esac
@@ -1204,32 +1227,63 @@ audit_git_repo() {
     local expected_origin="${4:-}"
 
     if [[ ! -d "$path/.git" ]]; then
-        audit_result WARNING "$key_prefix.repository" "Git metadata is missing at $path; runtime may still function, but deployment provenance cannot be verified."
+        audit_result WARNING "$key_prefix.repository" "Git metadata is missing at $path; current-source provenance cannot be verified."
+        AUDIT_SOURCE_CURRENT="false"
         return
     fi
 
-    local branch dirty origin
+    local branch dirty origin head remote_head
     branch="$(git -C "$path" branch --show-current 2>/dev/null || true)"
     if [[ "$branch" == "$expected_branch" ]]; then
         audit_result PASS "$key_prefix.branch" "Branch is $branch."
     else
-        audit_result INFO "$key_prefix.branch" "Branch differs from the new-deployment default [$expected_branch]; found ${branch:-[detached/unknown]}. Branch naming alone is not a runtime defect."
+        audit_result WARNING "$key_prefix.branch" "Checkout is on [${branch:-detached/unknown}], expected [$expected_branch]. Pull/select the intended current branch before auditing runtime state."
+        AUDIT_SOURCE_CURRENT="false"
     fi
 
     dirty="$(git -C "$path" status --porcelain 2>/dev/null || true)"
     if [[ -z "$dirty" ]]; then
         audit_result PASS "$key_prefix.clean" "Checkout is clean."
     else
-        audit_result WARNING "$key_prefix.clean" "Checkout has uncommitted or untracked changes. This is deployment provenance drift, not automatic fix work."
+        audit_result WARNING "$key_prefix.clean" "Checkout has uncommitted or untracked changes. Resolve source drift before auditing runtime state."
+        AUDIT_SOURCE_CURRENT="false"
     fi
 
     origin="$(git -C "$path" remote get-url origin 2>/dev/null || true)"
     if [[ -z "$origin" ]]; then
-        audit_result WARNING "$key_prefix.origin" "Origin remote is not configured; runtime may still function, but deployment provenance cannot be verified."
-    elif [[ -n "$expected_origin" && "$origin" != "$expected_origin" ]]; then
-        audit_result WARNING "$key_prefix.origin" "Origin differs from expected [$expected_origin]; found [$origin]. Do not rewrite a functional checkout automatically."
+        audit_result WARNING "$key_prefix.origin" "Origin remote is not configured; current-source provenance cannot be verified."
+        AUDIT_SOURCE_CURRENT="false"
+        return
+    fi
+
+    if [[ -n "$expected_origin" && "$origin" != "$expected_origin" ]]; then
+        audit_result WARNING "$key_prefix.origin" "Origin differs from expected [$expected_origin]; found [$origin]. Resolve source identity before auditing runtime state."
+        AUDIT_SOURCE_CURRENT="false"
     else
         audit_result PASS "$key_prefix.origin" "Origin is [$origin]."
+    fi
+
+    head="$(git -C "$path" rev-parse HEAD 2>/dev/null || true)"
+    set +e
+    remote_head="$(
+        GIT_TERMINAL_PROMPT=0 \
+        GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=8' \
+        git ls-remote "$origin" "refs/heads/$expected_branch" 2>/dev/null \
+            | awk 'NR == 1 {print $1}'
+    )"
+    local remote_status=$?
+    set -e
+
+    if [[ "$remote_status" -ne 0 || -z "$remote_head" ]]; then
+        audit_result "MANUAL VERIFICATION REQUIRED" "$key_prefix.current" \
+            "Could not verify the remote [$expected_branch] revision without mutating local Git state. Confirm remote access and rerun audit."
+        AUDIT_SOURCE_CURRENT="false"
+    elif [[ "$head" == "$remote_head" ]]; then
+        audit_result PASS "$key_prefix.current" "Local HEAD matches origin/$expected_branch."
+    else
+        audit_result WARNING "$key_prefix.current" \
+            "Local HEAD does not match origin/$expected_branch. Pull the current repository state, then rerun audit."
+        AUDIT_SOURCE_CURRENT="false"
     fi
 }
 
@@ -1607,6 +1661,84 @@ audit_resolve_plan() {
             audit_result "$result_status" "$result_key" "$result_message"
         fi
     done < <(printf '%s' "$AUDIT_PLAN_JSON" | python3 "$HELPER" plan-audit)
+}
+
+audit_module_migrations() {
+    if [[ "${AUDIT_APP_BOOTSTRAP_READY:-unknown}" == "false" ]]; then
+        audit_result INFO module_migrations.unavailable \
+            "Not evaluated because the early environment/bootstrap contract is already failing."
+        AUDIT_MODULE_STATUS_JSON=""
+        return
+    fi
+
+    local output status payload
+    set +e
+    output="$(
+        cd "$APP_PATH" &&
+        "$PHP_BIN" -r '
+require "vendor/autoload.php";
+$app = require "bootstrap/app.php";
+$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+$modules = app(\App\Support\Modules\ModuleManager::class);
+$planner = app(\App\Support\Modules\Migrations\ModuleMigrationPlanner::class);
+$inspector = app(\App\Support\Modules\Migrations\ModuleMigrationStatusInspector::class);
+$migrator = app(\Illuminate\Database\Migrations\Migrator::class);
+
+$enabled = $modules->enabledKeysWithDependencies();
+$plan = $planner->forModules($enabled);
+$statuses = $inspector->inspectScopes($plan->migrationScopes);
+
+$payload = [
+    "platform" => [
+        "repository_exists" => $migrator->repositoryExists(),
+        "ledger_exists" => \Illuminate\Support\Facades\Schema::hasTable("module_installations"),
+    ],
+    "scopes" => array_map(
+        static fn (\App\Support\Modules\Migrations\ModuleMigrationStatus $status): array => [
+            "module_key" => (string) $status->scope->moduleKey,
+            "migration_state" => $status->migrationState,
+            "progress" => $status->progress(),
+            "pending_migrations" => $status->pendingMigrationFiles,
+            "ledger_status" => $status->ledgerStatus,
+            "contract_state" => $status->contractState,
+        ],
+        $statuses,
+    ),
+];
+
+echo "__ENGAGE_MODULE_STATUS_JSON__".json_encode($payload, JSON_THROW_ON_ERROR);
+' 2>&1
+    )"
+    status=$?
+    set -e
+
+    if [[ "$status" -ne 0 || "$output" != *"__ENGAGE_MODULE_STATUS_JSON__"* ]]; then
+        output="$(printf '%s' "$output" | tail -n 8 | tr '\n' ' ')"
+        audit_runtime_violation module_migrations.inspect \
+            "Unable to inspect enabled module migration state read-only: ${output:-[no output]}"
+        AUDIT_MODULE_STATUS_JSON=""
+        return
+    fi
+
+    payload="${output#*__ENGAGE_MODULE_STATUS_JSON__}"
+    if ! printf '%s' "$payload" | python3 -m json.tool >/dev/null 2>&1; then
+        audit_runtime_violation module_migrations.inspect \
+            "Enabled module migration inspection returned invalid JSON."
+        AUDIT_MODULE_STATUS_JSON=""
+        return
+    fi
+
+    AUDIT_MODULE_STATUS_JSON="$payload"
+    while IFS=$'\t' read -r result_status result_key result_message; do
+        [[ -n "$result_status" ]] || continue
+        if [[ "$result_status" == "BREAKING" && "${AUDIT_CHECKOUT_ACTIVE:-unknown}" != "true" ]]; then
+            audit_result WARNING "$result_key" \
+                "$result_message The audited checkout is not the live CRM owner, so this is cutover readiness rather than a current platform break."
+        else
+            audit_result "$result_status" "$result_key" "$result_message"
+        fi
+    done < <(printf '%s' "$AUDIT_MODULE_STATUS_JSON" | python3 "$HELPER" module-status-audit)
 }
 
 audit_plan_module_enabled() {
@@ -2301,6 +2433,13 @@ run_audit() {
     audit_git_repo "$APP_PATH" source.core "$AUDIT_CORE_BRANCH" "$expected_core_origin"
     audit_git_repo "$CLIENT_PATH" source.client "$AUDIT_CLIENT_BRANCH" "$AUDIT_CLIENT_REPO"
 
+    if [[ "$AUDIT_SOURCE_CURRENT" != "true" ]]; then
+        echo
+        echo "Authoritative runtime audit deferred: Core and client source must be clean and match their configured remote branches first."
+        audit_summary || true
+        return 1
+    fi
+
     if [[ ! -f "$ROOT_ENV" || ! -f "$CLIENT_ENV" ]]; then
         audit_environment_identity
         audit_summary
@@ -2320,11 +2459,14 @@ run_audit() {
     if [[ "$AUDIT_APP_COMMANDS_AVAILABLE" == "true" && "$AUDIT_APP_BOOTSTRAP_READY" == "true" ]]; then
         audit_resolve_plan
         audit_app_command modules.status "$PHP_BIN" artisan modules:status
+        audit_module_migrations
         audit_app_command setup.validate "$PHP_BIN" artisan setup:validate
     elif [[ "$AUDIT_APP_COMMANDS_AVAILABLE" != "true" ]]; then
         audit_result INFO deployment_plan.unavailable \
             "Not evaluated because Composer runtime dependencies are unavailable in the audited checkout."
         audit_result INFO modules.status \
+            "Not evaluated because Composer runtime dependencies are unavailable in the audited checkout."
+        audit_result INFO module_migrations.unavailable \
             "Not evaluated because Composer runtime dependencies are unavailable in the audited checkout."
         audit_result INFO setup.validate \
             "Not evaluated because Composer runtime dependencies are unavailable in the audited checkout."
@@ -2332,6 +2474,8 @@ run_audit() {
         audit_result INFO deployment_plan.unavailable \
             "Not evaluated because the early environment/bootstrap contract is already failing."
         audit_result INFO modules.status \
+            "Not evaluated because the early environment/bootstrap contract is already failing."
+        audit_result INFO module_migrations.unavailable \
             "Not evaluated because the early environment/bootstrap contract is already failing."
         audit_result INFO setup.validate \
             "Not evaluated because the early environment/bootstrap contract is already failing."
@@ -2468,6 +2612,839 @@ verify_runtime() {
     echo "Review the verification items shown during each deployment setup step."
     echo "State file: $STATE_FILE"
     echo "Deployment plan: $PLAN_FILE"
+}
+
+audit_has_breaking() {
+    local expected="$1"
+    local key
+    for key in "${AUDIT_BREAKING_KEYS[@]:-}"; do
+        [[ "$key" == "$expected" ]] && return 0
+    done
+    return 1
+}
+
+audit_has_breaking_prefix() {
+    local prefix="$1"
+    local key
+    for key in "${AUDIT_BREAKING_KEYS[@]:-}"; do
+        [[ "$key" == "$prefix"* ]] && return 0
+    done
+    return 1
+}
+
+fix_category_selected() {
+    local category="$1"
+    [[ ",${FIX_CATEGORIES}," == *",${category},"* ]]
+}
+
+fix_safe_nginx_missing_hosts() {
+    [[ "${AUDIT_NGINX_DUMP_LOADED:-false}" == "true" ]] || return 0
+    audit_has_breaking nginx.syntax && return 0
+
+    local key host owners_json count
+    for key in "${AUDIT_BREAKING_KEYS[@]:-}"; do
+        [[ "$key" == nginx.host.* ]] || continue
+        host="${key#nginx.host.}"
+        owners_json="$(audit_nginx_owners_json "$host")"
+        count="$(printf '%s' "$owners_json" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || printf '0')"
+        [[ "$count" -eq 0 ]] && printf '%s\n' "$host"
+    done | awk 'NF && !seen[$0]++'
+}
+
+fix_schema_modules() {
+    [[ -n "$AUDIT_MODULE_STATUS_JSON" ]] || return 0
+    printf '%s' "$AUDIT_MODULE_STATUS_JSON" | python3 "$HELPER" module-status-fix-modules
+}
+
+fix_schema_repairable() {
+    [[ -n "$AUDIT_MODULE_STATUS_JSON" ]]         && audit_has_breaking_prefix module_migrations.
+}
+
+fix_schema_plan() {
+    local -a modules=()
+    mapfile -t modules < <(fix_schema_modules)
+
+    echo "  [schema] cd $APP_PATH"
+    echo "           $PHP_BIN artisan migrate --force"
+    local module
+    for module in "${modules[@]}"; do
+        echo "           $PHP_BIN artisan modules:install $module --force"
+    done
+    echo "           $PHP_BIN artisan presets:sync"
+    echo "           $PHP_BIN artisan modules:status"
+    echo "           then re-evaluate setup:validate before runtime workers are eligible."
+}
+
+fix_apply_schema() {
+    if [[ -z "$AUDIT_MODULE_STATUS_JSON" ]]; then
+        echo "ERROR: Module migration audit data is unavailable; refusing automatic schema repair." >&2
+        return 1
+    fi
+
+    local modules_output
+    if ! modules_output="$(fix_schema_modules)"; then
+        echo "ERROR: Unable to derive the enabled schema repair list from audit data." >&2
+        return 1
+    fi
+
+    local -a modules=()
+    if [[ -n "$modules_output" ]]; then
+        mapfile -t modules <<<"$modules_output"
+    fi
+
+    note "Fix: platform and enabled module schema"
+
+    cd "$APP_PATH" || return 1
+    "$PHP_BIN" artisan migrate --force || return 1
+
+    local module
+    for module in "${modules[@]}"; do
+        "$PHP_BIN" artisan modules:install "$module" --force || return 1
+    done
+
+    "$PHP_BIN" artisan presets:sync || return 1
+    "$PHP_BIN" artisan modules:status || return 1
+}
+
+fix_runtime_plan() {
+    echo "  [runtime] chown $DEPLOY_USER:$WEB_GROUP under $APP_PATH/storage and $APP_PATH/bootstrap/cache"
+    echo "            directories -> 2775; files -> 0664; then verify deploy/web effective writes."
+}
+
+fix_apply_runtime() {
+    note "Fix: runtime directory permissions"
+
+    cd "$APP_PATH" || return 1
+    sudo chown -R "$DEPLOY_USER:$WEB_GROUP" storage bootstrap/cache || return 1
+    sudo find storage bootstrap/cache -type d -exec chmod 2775 {} \; || return 1
+    sudo find storage bootstrap/cache -type f -exec chmod 0664 {} \; || return 1
+
+    local log_dir="$APP_PATH/storage/logs"
+    local deploy_probe="$log_dir/.engage-permission-deploy-fix-$$"
+    local web_probe="$log_dir/.engage-permission-web-fix-$$"
+
+    if ! sudo -u "$DEPLOY_USER" sh -c 'printf "deploy-created\n" > "$1"' sh "$deploy_probe"; then
+        sudo rm -f "$deploy_probe" "$web_probe" || true
+        return 1
+    fi
+    if ! sudo -u "$WEB_USER" sh -c 'printf "web-updated\n" >> "$1"' sh "$deploy_probe"; then
+        sudo rm -f "$deploy_probe" "$web_probe" || true
+        return 1
+    fi
+    if ! sudo -u "$WEB_USER" sh -c 'printf "web-created\n" > "$1"' sh "$web_probe"; then
+        sudo rm -f "$deploy_probe" "$web_probe" || true
+        return 1
+    fi
+
+    sudo rm -f "$deploy_probe" "$web_probe" || return 1
+}
+
+fix_host_dns_ready() {
+    local host="$1"
+    local expected="$AUDIT_SERVER_IP"
+
+    if [[ -z "$expected" ]] && command -v curl >/dev/null 2>&1; then
+        expected="$(curl -fsS --max-time 4 https://api.ipify.org 2>/dev/null || true)"
+        [[ "$expected" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || expected=""
+    fi
+
+    [[ -n "$expected" ]] || return 1
+    dns_host_ready "$host" "$expected"
+}
+
+fix_supplemental_nginx_id() {
+    local host="$1"
+    printf 'engage-core-%s' "${host//./-}"
+}
+
+fix_render_supplemental_nginx() {
+    local host="$1"
+    local cert_name="$2"
+    local destination="$3"
+    local tls_enabled="$4"
+    local id access_log error_log
+    id="$(fix_supplemental_nginx_id "$host")"
+    access_log="/var/log/nginx/${id}-access.log"
+    error_log="/var/log/nginx/${id}-error.log"
+
+    local log_format_suffix=""
+    local request_header=""
+    local fastcgi_request_id=""
+    if [[ -f /etc/nginx/conf.d/00-engage-core-observability.conf ]]; then
+        log_format_suffix=" engage_core_json"
+    fi
+    if [[ -f /etc/nginx/snippets/engage-core-request-id-fastcgi.conf ]]; then
+        request_header='    add_header X-Request-ID $request_id always;'
+        fastcgi_request_id='        include /etc/nginx/snippets/engage-core-request-id-fastcgi.conf;'
+    fi
+
+    {
+        echo "# Managed by Engage Core deployment fix: supplemental Core host."
+        echo "server {"
+        echo "    listen 80;"
+        echo "    listen [::]:80;"
+        echo "    server_name ${host};"
+        echo "    root ${APP_PATH}/public;"
+        echo "    index index.php;"
+        echo "    charset utf-8;"
+        [[ -n "$request_header" ]] && echo "$request_header"
+        echo
+        echo "    access_log ${access_log}${log_format_suffix};"
+        echo "    error_log ${error_log};"
+        echo
+        echo "    location ^~ /.well-known/acme-challenge/ {"
+        echo '        try_files $uri =404;'
+        echo "    }"
+        echo
+
+        if [[ "$tls_enabled" == "true" ]]; then
+            echo "    location / {"
+            echo '        return 301 https://$host$request_uri;'
+            echo "    }"
+        else
+            echo "    location / {"
+            echo '        try_files $uri $uri/ /index.php?$query_string;'
+            echo "    }"
+            echo
+            echo '    location ~ \.php$ {'
+            echo "        include snippets/fastcgi-php.conf;"
+            [[ -n "$fastcgi_request_id" ]] && echo "$fastcgi_request_id"
+            echo "        fastcgi_pass unix:${PHP_FPM_SOCKET};"
+            echo "    }"
+            echo
+            echo '    location ~ /\.(?!well-known).* {'
+            echo "        deny all;"
+            echo "    }"
+        fi
+        echo "}"
+
+        if [[ "$tls_enabled" == "true" ]]; then
+            cat <<EOF
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${host};
+    root ${APP_PATH}/public;
+    index index.php;
+    charset utf-8;
+${request_header}
+
+    ssl_certificate /etc/letsencrypt/live/${cert_name}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${cert_name}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    access_log ${access_log}${log_format_suffix};
+    error_log ${error_log};
+
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    location ~ \.php\$ {
+        include snippets/fastcgi-php.conf;
+${fastcgi_request_id}
+        fastcgi_pass unix:${PHP_FPM_SOCKET};
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+EOF
+        fi
+    } > "$destination"
+}
+
+fix_nginx_plan() {
+    local -a hosts=()
+    mapfile -t hosts < <(fix_safe_nginx_missing_hosts)
+    local host id
+
+    for host in "${hosts[@]}"; do
+        id="$(fix_supplemental_nginx_id "$host")"
+        echo "  [nginx] Add missing Core host [$host] without rewriting the existing shared/legacy site."
+        echo "          Write/enable: /etc/nginx/sites-available/$id -> /etc/nginx/sites-enabled/$id"
+        echo "          Validate/reload Nginx, issue dedicated Certbot certificate [$id] for [$host], render HTTPS, validate/reload again."
+    done
+}
+
+fix_install_certbot_reload_hook() {
+    local hook='/etc/letsencrypt/renewal-hooks/deploy/engage-nginx-reload.sh'
+    local tmp
+    tmp="$(mktemp)" || return 1
+
+    if ! cat > "$tmp" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+nginx -t
+systemctl reload nginx
+EOF
+    then
+        rm -f "$tmp"
+        return 1
+    fi
+
+    if ! sudo install -d -o root -g root -m 0755 /etc/letsencrypt/renewal-hooks/deploy; then
+        rm -f "$tmp"
+        return 1
+    fi
+    if ! sudo install -o root -g root -m 0755 "$tmp" "$hook"; then
+        rm -f "$tmp"
+        return 1
+    fi
+    rm -f "$tmp"
+}
+
+fix_apply_nginx_host() {
+    local host="$1"
+    local id available enabled cert_name tmp
+    id="$(fix_supplemental_nginx_id "$host")"
+    available="/etc/nginx/sites-available/$id"
+    enabled="/etc/nginx/sites-enabled/$id"
+    cert_name="$id"
+
+    local owners_json count
+    owners_json="$(audit_nginx_owners_json "$host")"
+    count="$(printf '%s' "$owners_json" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || printf '0')"
+    if [[ "$count" -ne 0 ]]; then
+        echo "ERROR: Refusing Nginx auto-repair for [$host]: an application-serving owner now exists. Re-audit first." >&2
+        return 1
+    fi
+
+    if [[ -f "$available" ]] && ! grep -Fq '# Managed by Engage Core deployment fix: supplemental Core host.' "$available"; then
+        echo "ERROR: Refusing to overwrite unmanaged Nginx config [$available]." >&2
+        return 1
+    fi
+
+    if ! fix_host_dns_ready "$host"; then
+        echo "ERROR: Refusing TLS repair for [$host]: DNS is not proven to resolve directly to this server." >&2
+        return 1
+    fi
+
+    if ! command -v certbot >/dev/null 2>&1; then
+        echo "ERROR: Certbot is not installed; automatic TLS repair is unavailable." >&2
+        return 1
+    fi
+
+    note "Fix: Nginx/TLS supplemental host $host"
+
+    tmp="$(mktemp)" || return 1
+    if ! fix_render_supplemental_nginx "$host" "$cert_name" "$tmp" false; then
+        rm -f "$tmp"
+        return 1
+    fi
+    if ! sudo install -o root -g root -m 0644 "$tmp" "$available"; then
+        rm -f "$tmp"
+        return 1
+    fi
+    rm -f "$tmp"
+
+    sudo ln -sfn "$available" "$enabled" || return 1
+    sudo nginx -t || return 1
+    sudo systemctl reload nginx || return 1
+
+    fix_install_certbot_reload_hook || return 1
+    sudo certbot certonly --webroot \
+        -w "$APP_PATH/public" \
+        --non-interactive \
+        --agree-tos \
+        --keep-until-expiring \
+        --cert-name "$cert_name" \
+        -d "$host" || return 1
+
+    tmp="$(mktemp)" || return 1
+    if ! fix_render_supplemental_nginx "$host" "$cert_name" "$tmp" true; then
+        rm -f "$tmp"
+        return 1
+    fi
+    if ! sudo install -o root -g root -m 0644 "$tmp" "$available"; then
+        rm -f "$tmp"
+        return 1
+    fi
+    rm -f "$tmp"
+
+    sudo nginx -t || return 1
+    sudo systemctl reload nginx || return 1
+}
+
+fix_existing_supervisor_config() {
+    local canonical="/etc/supervisor/conf.d/${HORIZON_PROGRAM}.conf"
+    local -a candidates=()
+    local path
+
+    if [[ -f "$canonical" ]] && grep -Fq "$APP_PATH/artisan horizon" "$canonical" 2>/dev/null; then
+        printf '%s\n' "$canonical"
+        return 0
+    fi
+
+    for path in /etc/supervisor/conf.d/*.conf; do
+        [[ -f "$path" ]] || continue
+        if grep -Fq "$APP_PATH/artisan horizon" "$path" 2>/dev/null; then
+            candidates+=("$path")
+        fi
+    done
+
+    [[ ${#candidates[@]} -eq 1 ]] || return 1
+    printf '%s\n' "${candidates[0]}"
+}
+
+fix_horizon_plan() {
+    local config program
+    config="$(fix_existing_supervisor_config 2>/dev/null || true)"
+    if [[ -n "$config" ]]; then
+        program="$(sed -n 's/^\[program:\([^]]*\)\].*/\1/p' "$config" | head -n 1)"
+        echo "  [horizon] After application readiness is green: supervisorctl reread/update/restart [${program:-unknown}] using existing [$config]."
+    else
+        echo "  [horizon] No single existing Supervisor config can be safely selected; automatic Horizon repair is not currently eligible."
+    fi
+}
+
+fix_apply_horizon() {
+    local config program
+    config="$(fix_existing_supervisor_config 2>/dev/null || true)"
+    if [[ -z "$config" ]]; then
+        echo "ERROR: No single existing Supervisor config points at $APP_PATH; refusing to create/replace process-manager ownership automatically." >&2
+        return 1
+    fi
+
+    program="$(sed -n 's/^\[program:\([^]]*\)\].*/\1/p' "$config" | head -n 1)"
+    if [[ -z "$program" ]]; then
+        echo "ERROR: Supervisor config [$config] does not declare a program name." >&2
+        return 1
+    fi
+
+    note "Fix: Horizon via existing Supervisor program $program"
+    sudo supervisorctl reread || return 1
+    sudo supervisorctl update || return 1
+    sudo supervisorctl restart "$program" || return 1
+    sleep 1
+    sudo supervisorctl status "$program" || return 1
+    ps aux | grep '[a]rtisan horizon' | grep -F "$APP_PATH" >/dev/null \
+        || return 1
+}
+
+fix_scheduler_plan() {
+    echo "  [scheduler] After application readiness is green, install for [$SCHEDULER_USER]:"
+    echo "              * * * * * cd ${APP_PATH} && ${PHP_BIN} artisan schedule:run >> /dev/null 2>&1 # ${SCHEDULER_MARKER}"
+}
+
+fix_apply_scheduler() {
+    note "Fix: Laravel Scheduler"
+
+    local line="* * * * * cd ${APP_PATH} && ${PHP_BIN} artisan schedule:run >> /dev/null 2>&1 # ${SCHEDULER_MARKER}"
+    local tmp
+    tmp="$(mktemp)" || return 1
+
+    if ! sudo crontab -u "$SCHEDULER_USER" -l 2>/dev/null \
+        | grep -Fv "# ${SCHEDULER_MARKER}" > "$tmp"
+    then
+        : > "$tmp"
+    fi
+
+    printf '%s\n' "$line" >> "$tmp" || {
+        rm -f "$tmp"
+        return 1
+    }
+
+    if ! sudo crontab -u "$SCHEDULER_USER" "$tmp"; then
+        rm -f "$tmp"
+        return 1
+    fi
+    rm -f "$tmp"
+
+    sudo crontab -u "$SCHEDULER_USER" -l | grep -F "# ${SCHEDULER_MARKER}" || return 1
+    (
+        cd "$APP_PATH" || exit 1
+        "$PHP_BIN" artisan schedule:list
+    ) || return 1
+}
+
+fix_runtime_directories_ready() {
+    local relative path
+    for relative in storage storage/logs bootstrap/cache; do
+        path="$APP_PATH/$relative"
+        [[ -d "$path" ]] || return 1
+        sudo -u "$DEPLOY_USER" test -w "$path" || return 1
+        sudo -u "$WEB_USER" test -w "$path" || return 1
+    done
+}
+
+fix_application_ready() {
+    local plan output status
+
+    set +e
+    plan="$(
+        cd "$APP_PATH" &&
+        "$PHP_BIN" artisan engage:deployment-plan --json 2>/dev/null
+    )"
+    status=$?
+    set -e
+    [[ "$status" -eq 0 ]] || return 1
+    printf '%s' "$plan" | python3 -m json.tool >/dev/null 2>&1 || return 1
+
+    local blockers
+    blockers="$(printf '%s' "$plan" | python3 -c '
+import json, sys
+plan = json.load(sys.stdin)
+blocking = 0
+for item in plan.get("environment_requirements", []):
+    if not isinstance(item, dict):
+        continue
+    status = item.get("status")
+    requirement = item.get("requirement")
+    if status in {"mismatch", "invalid"}:
+        blocking += 1
+    elif requirement == "required" and status in {"missing", "unresolved"}:
+        blocking += 1
+print(blocking)
+')"
+    [[ "$blockers" == "0" ]] || return 1
+
+    set +e
+    output="$(
+        cd "$APP_PATH" &&
+        "$PHP_BIN" artisan setup:validate >/dev/null 2>&1
+    )"
+    status=$?
+    set -e
+
+    [[ "$status" -eq 0 ]]
+}
+
+fix_manual_breaking_summary() {
+    local key
+    for key in "${AUDIT_BREAKING_KEYS[@]:-}"; do
+        case "$key" in
+            module_migrations.*)
+                fix_category_selected schema || echo "  [not selected] $key"
+                ;;
+            runtime.storage.write|runtime.storage/logs.write|runtime.bootstrap/cache.write)
+                fix_category_selected runtime || echo "  [not selected] $key"
+                ;;
+            nginx.host.*)
+                if fix_category_selected nginx; then
+                    local host="${key#nginx.host.}"
+                    if ! fix_safe_nginx_missing_hosts | grep -Fxq "$host"; then
+                        echo "  [manual] $key — Nginx ownership is ambiguous or already claimed; automatic repair is refused."
+                    fi
+                else
+                    echo "  [not selected] $key"
+                fi
+                ;;
+            tls.host.*)
+                local tls_host="${key#tls.host.}"
+                if fix_category_selected nginx && fix_safe_nginx_missing_hosts | grep -Fxq "$tls_host"; then
+                    :
+                else
+                    echo "  [manual] $key — TLS-only or non-selected repair requires operator review."
+                fi
+                ;;
+            horizon.process|horizon.status)
+                if fix_category_selected horizon; then
+                    if [[ -z "$(fix_existing_supervisor_config 2>/dev/null || true)" ]]; then
+                        echo "  [manual] $key — no single existing Supervisor owner can be selected safely."
+                    fi
+                else
+                    echo "  [not selected] $key"
+                fi
+                ;;
+            scheduler.cron)
+                fix_category_selected scheduler || echo "  [not selected] $key"
+                ;;
+            setup.validate)
+                if fix_category_selected schema && fix_schema_repairable; then
+                    echo "  [recheck] setup.validate — re-evaluate after schema repair."
+                else
+                    echo "  [manual] setup.validate — no registered deterministic prerequisite repair explains this failure."
+                fi
+                ;;
+            deployment_plan.*|external_setup.*|dns.*)
+                echo "  [manual] $key — external/provider/DNS values or verification are never invented by fix."
+                ;;
+            *)
+                echo "  [manual] $key — no closed safe-remediation handler is registered."
+                ;;
+        esac
+    done
+}
+
+fix_print_plan() {
+    echo
+    echo "Fix plan (${FIX_MODE})"
+    echo "Selected safe categories: $FIX_CATEGORIES"
+
+    local planned=false
+
+    if fix_category_selected schema && fix_schema_repairable; then
+        fix_schema_plan
+        planned=true
+    fi
+
+    if fix_category_selected runtime && (
+        audit_has_breaking runtime.storage.write \
+        || audit_has_breaking runtime.storage/logs.write \
+        || audit_has_breaking runtime.bootstrap/cache.write
+    ); then
+        fix_runtime_plan
+        planned=true
+    fi
+
+    if fix_category_selected nginx && [[ -n "$(fix_safe_nginx_missing_hosts)" ]]; then
+        fix_nginx_plan
+        planned=true
+    fi
+
+    if fix_category_selected horizon && (
+        audit_has_breaking horizon.process || audit_has_breaking horizon.status
+    ); then
+        fix_horizon_plan
+        planned=true
+    fi
+
+    if fix_category_selected scheduler && audit_has_breaking scheduler.cron; then
+        fix_scheduler_plan
+        planned=true
+    fi
+
+    if [[ "$planned" == "false" ]]; then
+        echo "  No registered safe repair is currently selected."
+    fi
+
+    echo
+    echo "Breaking findings outside automatic application:"
+    fix_manual_breaking_summary
+}
+
+fix_reaudit_after_failure() {
+    echo
+    echo "A safe repair step failed. Re-auditing the resulting state before stopping."
+    set +e
+    run_audit
+    set -e
+}
+
+run_fix() {
+    echo "== Fix precondition audit =="
+    set +e
+    run_audit
+    local audit_status=$?
+    set -e
+
+    [[ "$AUDIT_SOURCE_CURRENT" == "true" ]] \
+        || fail "Fix requires clean Core/client checkouts matching their configured remote branches. Source is never pulled automatically."
+
+    [[ "${AUDIT_CHECKOUT_ACTIVE:-unknown}" == "true" ]] \
+        || fail "Fix requires the audited checkout to be the active CRM owner."
+
+    fix_print_plan
+
+    if [[ "$FIX_MODE" == "dry-run" ]]; then
+        echo
+        echo "Dry-run only. No deployment state was changed by fix."
+        return 0
+    fi
+
+    if [[ "$DEPLOY_ENV" == "production" ]]; then
+        local confirmation
+        read -r -p "Type [$ROOT_DOMAIN] to apply safe production repairs: " confirmation
+        [[ "$confirmation" == "$ROOT_DOMAIN" ]] \
+            || fail "Production fix confirmation did not match the root domain."
+    fi
+
+    if fix_category_selected schema && fix_schema_repairable; then
+        if ! fix_apply_schema; then
+            fix_reaudit_after_failure
+            return 1
+        fi
+    fi
+
+    if fix_category_selected runtime && (
+        audit_has_breaking runtime.storage.write \
+        || audit_has_breaking runtime.storage/logs.write \
+        || audit_has_breaking runtime.bootstrap/cache.write
+    ); then
+        if ! fix_apply_runtime; then
+            fix_reaudit_after_failure
+            return 1
+        fi
+    fi
+
+    if fix_category_selected nginx; then
+        local -a nginx_hosts=()
+        mapfile -t nginx_hosts < <(fix_safe_nginx_missing_hosts)
+        local host
+        for host in "${nginx_hosts[@]}"; do
+            if ! fix_apply_nginx_host "$host"; then
+                fix_reaudit_after_failure
+                return 1
+            fi
+        done
+    fi
+
+    local runtime_ready=false
+    if fix_application_ready && fix_runtime_directories_ready; then
+        runtime_ready=true
+    fi
+
+    if [[ "$runtime_ready" == "true" ]]; then
+        if fix_category_selected horizon && (
+            audit_has_breaking horizon.process || audit_has_breaking horizon.status
+        ); then
+            if ! fix_apply_horizon; then
+                fix_reaudit_after_failure
+                return 1
+            fi
+        fi
+
+        if fix_category_selected scheduler && audit_has_breaking scheduler.cron; then
+            if ! fix_apply_scheduler; then
+                fix_reaudit_after_failure
+                return 1
+            fi
+        fi
+    else
+        if fix_category_selected scheduler && audit_has_breaking scheduler.cron; then
+            echo
+            echo "Deferred Scheduler repair: deployment plan/setup validation or effective runtime-directory access is not green yet."
+        fi
+        if fix_category_selected horizon && (
+            audit_has_breaking horizon.process || audit_has_breaking horizon.status
+        ); then
+            echo "Deferred Horizon repair: deployment plan/setup validation or effective runtime-directory access is not green yet."
+        fi
+    fi
+
+    echo
+    echo "== Mandatory post-fix audit =="
+    set +e
+    run_audit
+    local final_status=$?
+    set -e
+
+    if [[ "$final_status" -eq 0 ]]; then
+        echo "Safe repairs applied and re-audit is clean."
+        return 0
+    fi
+
+    echo "Safe repairs applied. Re-audit still reports findings that require another selected safe pass or manual/external resolution."
+    return 1
+}
+
+normalize_fix_categories() {
+    local raw="$1"
+    python3 -c '
+import sys
+aliases = {
+    "schema": "schema",
+    "runtime": "runtime",
+    "nginx": "nginx",
+    "tls": "nginx",
+    "horizon": "horizon",
+    "supervisor": "horizon",
+    "scheduler": "scheduler",
+    "cron": "scheduler",
+}
+raw = sys.argv[1]
+selected = []
+for item in raw.split(","):
+    item = item.strip().lower()
+    if not item:
+        continue
+    if item not in aliases:
+        raise SystemExit(f"Unknown fix category [{item}].")
+    canonical = aliases[item]
+    if canonical not in selected:
+        selected.append(canonical)
+print(",".join(selected))
+' "$raw"
+}
+
+parse_fix() {
+    local environment=""
+    local client_key=""
+    local root_domain=""
+    local app_path=""
+    local client_repo=""
+    local crm_host=""
+    local core_branch="main"
+    local client_branch="main"
+    local deploy_user
+    deploy_user="$(id -un)"
+    local web_user="www-data"
+    local web_group="www-data"
+    local scheduler_user=""
+    local server_ip=""
+    local mode="dry-run"
+    local only=""
+    local all_safe=false
+
+    while (($#)); do
+        case "$1" in
+            --environment) environment=${2:?}; shift 2 ;;
+            --client-key) client_key=${2:?}; shift 2 ;;
+            --root-domain) root_domain=${2:?}; shift 2 ;;
+            --app-path) app_path=${2:?}; shift 2 ;;
+            --client-repo) client_repo=${2:?}; shift 2 ;;
+            --crm-host) crm_host=${2:?}; shift 2 ;;
+            --core-branch) core_branch=${2:?}; shift 2 ;;
+            --client-branch) client_branch=${2:?}; shift 2 ;;
+            --deploy-user) deploy_user=${2:?}; shift 2 ;;
+            --web-user) web_user=${2:?}; shift 2 ;;
+            --web-group) web_group=${2:?}; shift 2 ;;
+            --scheduler-user) scheduler_user=${2:?}; shift 2 ;;
+            --server-ip) server_ip=${2:?}; shift 2 ;;
+            --apply) mode="apply"; shift ;;
+            --dry-run) mode="dry-run"; shift ;;
+            --only) only=${2:?}; shift 2 ;;
+            --all-safe) all_safe=true; shift ;;
+            -h|--help) usage; return 0 ;;
+            *) fail "Unknown fix argument: $1" ;;
+        esac
+    done
+
+    [[ "$environment" == "staging" || "$environment" == "production" ]] \
+        || fail "fix requires --environment staging|production."
+    [[ -n "$client_key" ]] || fail "fix requires --client-key."
+    [[ -n "$root_domain" ]] || fail "fix requires --root-domain."
+    [[ "$client_key" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || fail "Invalid --client-key [$client_key]."
+    [[ -z "$only" || "$all_safe" == "false" ]] \
+        || fail "Use either --only or --all-safe, not both."
+
+    DEPLOY_ENV="$environment"
+    CLIENT_KEY="$client_key"
+    ROOT_DOMAIN="$(python3 "$HELPER" derive-audit \
+        --environment "$environment" \
+        --client-key "$client_key" \
+        --root-domain "$root_domain" \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin)["root_domain"])')"
+
+    AUDIT_APP_PATH="$app_path"
+    AUDIT_CLIENT_REPO="$client_repo"
+    AUDIT_CRM_HOST="$crm_host"
+    AUDIT_CORE_BRANCH="$core_branch"
+    AUDIT_CLIENT_BRANCH="$client_branch"
+    AUDIT_DEPLOY_USER="$deploy_user"
+    AUDIT_WEB_USER="$web_user"
+    AUDIT_WEB_GROUP="$web_group"
+    AUDIT_SCHEDULER_USER="${scheduler_user:-$deploy_user}"
+    AUDIT_SERVER_IP="$server_ip"
+
+    FIX_MODE="$mode"
+    if [[ -n "$only" ]]; then
+        FIX_CATEGORIES="$(normalize_fix_categories "$only")" \
+            || fail "Invalid --only category list [$only]."
+        [[ -n "$FIX_CATEGORIES" ]] || fail "--only must select at least one fix category."
+    else
+        FIX_CATEGORIES="schema,runtime,nginx,horizon,scheduler"
+    fi
+
+    run_fix
 }
 
 run_new_or_resume() {
@@ -2673,6 +3650,9 @@ main() {
             ;;
         audit)
             parse_audit "$@"
+            ;;
+        fix)
+            parse_fix "$@"
             ;;
         derive)
             parse_derive "$@"

@@ -527,6 +527,141 @@ def command_plan_modules_stdin(args: argparse.Namespace) -> None:
             print(module.strip())
 
 
+def _module_status_payload() -> dict:
+    try:
+        payload = json.load(sys.stdin)
+    except json.JSONDecodeError as exc:
+        fail(f'Invalid module-status JSON on stdin: {exc}')
+
+    if not isinstance(payload, dict):
+        fail('Module-status JSON must decode to an object.')
+
+    scopes = payload.get('scopes', [])
+    if not isinstance(scopes, list):
+        fail('Module-status JSON [scopes] must be an array.')
+
+    return payload
+
+
+def command_module_status_audit(args: argparse.Namespace) -> None:
+    payload = _module_status_payload()
+    platform = payload.get('platform', {})
+    scopes = payload.get('scopes', [])
+
+    repository_exists = bool(
+        isinstance(platform, dict) and platform.get('repository_exists') is True
+    )
+    ledger_exists = bool(
+        isinstance(platform, dict) and platform.get('ledger_exists') is True
+    )
+
+    if not repository_exists:
+        audit_line(
+            'BREAKING',
+            'module_migrations.platform_repository',
+            'Laravel migration repository is missing. Platform migrations must run before module schema can be managed.',
+        )
+    else:
+        audit_line(
+            'PASS',
+            'module_migrations.platform_repository',
+            'Laravel migration repository exists.',
+        )
+
+    if not ledger_exists:
+        audit_line(
+            'BREAKING',
+            'module_migrations.platform_ledger',
+            'The module installation ledger is missing. Run platform migrations before module installation/adoption.',
+        )
+    else:
+        audit_line(
+            'PASS',
+            'module_migrations.platform_ledger',
+            'The module installation ledger exists.',
+        )
+
+    for scope in scopes:
+        if not isinstance(scope, dict):
+            continue
+
+        module = audit_text(scope.get('module_key', 'unknown'))
+        migration_state = audit_text(scope.get('migration_state', 'unknown'))
+        progress = audit_text(scope.get('progress', 'unknown'))
+        pending = [
+            audit_text(item)
+            for item in scope.get('pending_migrations', [])
+            if isinstance(item, str) and item.strip()
+        ]
+
+        if migration_state == 'current':
+            audit_line(
+                'PASS',
+                f'module_migrations.{module}.schema',
+                f'Enabled schema scope [{module}] is current ({progress}).',
+            )
+        else:
+            pending_summary = ', '.join(pending[:3]) if pending else '[details unavailable]'
+            if len(pending) > 3:
+                pending_summary += f' (+{len(pending) - 3} more)'
+            audit_line(
+                'BREAKING',
+                f'module_migrations.{module}.schema',
+                f'Enabled schema scope [{module}] is {migration_state} ({progress}). Pending: {pending_summary}.',
+            )
+
+        if not ledger_exists:
+            continue
+
+        ledger_status = audit_text(scope.get('ledger_status', 'unknown'))
+        contract_state = audit_text(scope.get('contract_state', 'unknown'))
+
+        if ledger_status == 'installed' and contract_state == 'current':
+            audit_line(
+                'PASS',
+                f'module_migrations.{module}.ledger',
+                f'Enabled schema scope [{module}] has a current installation-ledger contract.',
+            )
+        elif ledger_status == 'untracked':
+            audit_line(
+                'BREAKING',
+                f'module_migrations.{module}.ledger',
+                f'Enabled schema scope [{module}] is not tracked in the module installation ledger.',
+            )
+        else:
+            audit_line(
+                'BREAKING',
+                f'module_migrations.{module}.ledger',
+                f'Enabled schema scope [{module}] ledger is [{ledger_status}] with contract [{contract_state}].',
+            )
+
+
+def command_module_status_fix_modules(args: argparse.Namespace) -> None:
+    payload = _module_status_payload()
+    scopes = payload.get('scopes', [])
+
+    for scope in scopes:
+        if not isinstance(scope, dict):
+            continue
+
+        module = scope.get('module_key')
+        if not isinstance(module, str) or not module.strip():
+            continue
+
+        migration_state = scope.get('migration_state')
+        ledger_status = scope.get('ledger_status')
+        contract_state = scope.get('contract_state')
+
+        if (
+            migration_state == 'current'
+            and ledger_status == 'installed'
+            and contract_state == 'current'
+        ):
+            continue
+
+        print(module.strip())
+
+
 def command_plan_audit(args: argparse.Namespace) -> None:
     try:
         plan = json.load(sys.stdin)
@@ -960,6 +1095,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     plan_modules_stdin = sub.add_parser('plan-modules-stdin')
     plan_modules_stdin.set_defaults(func=command_plan_modules_stdin)
+
+    module_status_audit = sub.add_parser('module-status-audit')
+    module_status_audit.set_defaults(func=command_module_status_audit)
+
+    module_status_fix_modules = sub.add_parser('module-status-fix-modules')
+    module_status_fix_modules.set_defaults(func=command_module_status_fix_modules)
 
     plan_audit = sub.add_parser('plan-audit')
     plan_audit.set_defaults(func=command_plan_audit)

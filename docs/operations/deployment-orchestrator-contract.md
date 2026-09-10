@@ -181,6 +181,7 @@ update
 add-modules
 verify
 audit
+fix
 derive
 ```
 
@@ -262,16 +263,19 @@ root domain
 
 The checkout path is discovered from the canonical location and readable `/var/www` client checkouts, with `--app-path` available when a legacy layout is ambiguous.
 
+Before any runtime interpretation, the auditor proves that both Core and client checkouts are clean and that local `HEAD` matches the configured remote branch through read-only `git ls-remote`. It never fetches or pulls. A branch/origin/cleanliness/current-revision mismatch stops the authoritative runtime audit so stale source cannot be mistaken for a deployment defect.
+
 The auditor may inspect:
 
 - canonical versus actual checkout path;
-- Core/client Git repository state, branch, origin, and cleanliness;
+- Core/client Git repository state, branch, origin, cleanliness, and remote-current revision;
 - root/client environment-file metadata and non-secret identity values;
 - Core staging-local versus Core production-remote database topology;
 - canonical database/runtime namespace identities;
 - duplicate readable Redis/cache/Horizon prefixes across `/var/www`, using one pruned environment scan for all three namespace keys;
 - `engage:deployment-plan --json`;
 - `modules:status`;
+- enabled-module migration state and installation-ledger state, using the application migration planner/status inspector read-only;
 - `setup:validate`;
 - runtime-directory effective access without creating probe files;
 - Supervisor/Horizon config/process state;
@@ -304,39 +308,50 @@ The staging-proven `.env` mode is not automatically declared the production secr
 
 ## Audit-driven fix contract
 
-Automated `fix` remains gated on real audit results from an older active Engage Core staging client, the Thompson Square metadata-drift case, and the fresh Buddy's deployment.
+`fix` is implemented as the state-file-independent mutation companion to `audit`.
 
-The required future flow is:
+The operator flow is:
 
 ```text
+pull current Core + client source
 audit
 fix --dry-run
+review exact proposed safe changes
 fix --apply
-audit
+mandatory re-audit
 ```
 
-`fix --dry-run` must describe every proposed mutation before application. `fix --apply` must require explicit operator intent.
+`fix` reruns the full read-only audit before planning or applying anything. It refuses to operate when Core/client source is not clean and remote-current, or when the audited checkout is not the active CRM owner. It never pulls source itself.
 
-Potential safe deterministic fix classes exist only when the corresponding audit finding is `BREAKING`, for example:
+Dry-run is the default. `--apply` is required for mutation. Production apply also requires typing the root domain. `--only` can restrict work to the closed safe categories `schema`, `runtime`, `nginx`, `horizon`, and `scheduler`; `supervisor`, `cron`, and `tls` are accepted as operator aliases. `--all-safe` selects the full registry.
 
-- restoring effective runtime-directory access required by the active process identities;
-- repairing Core-owned Nginx/TLS state that prevents a required active host from working;
-- restoring a missing/broken active Horizon runtime after process ownership is proven;
-- restoring a required Scheduler entry when scheduled work would otherwise not run.
+The current safe registry is deliberately narrow:
+
+- **schema** — when the auditor proves enabled module schema/ledger breakage, run platform migrations first, then use the existing application-owned `modules:install` machinery for only the enabled schema scopes that are not fully current/tracked, followed by preset sync and validation. This supports older mixed pre-ledger databases where some enabled scopes are current, some partial, and some not migrated. It never writes migration-ledger rows directly and never installs disabled optional scopes merely because `modules:status` lists them.
+- **runtime** — restore effective deploy/web write access only when the active runtime directories are actually `BREAKING`.
+- **nginx** — when a required Core hostname has no application-serving owner, add a supplemental Core site and dedicated certificate without rewriting a functional shared/legacy site. DNS must already resolve directly to the server and Certbot must already be available. Ambiguous ownership, wrong-root ownership, DNS changes, and TLS-only cases without the safe missing-host prerequisite remain manual.
+- **horizon** — reuse the single existing Supervisor config that already points at the audited checkout; do not rename a healthy legacy program or silently replace process-manager ownership.
+- **scheduler** — install the exact marked scheduler entry only when none exists for the active checkout.
+
+Horizon and Scheduler repairs are deferred until both the deployment plan and `setup:validate` are green after preceding safe repairs. This prevents workers or scheduled side effects from starting while schema/provider readiness is still incomplete.
 
 Canonical Redis/cache/Horizon names, database names/users, checkout paths, Supervisor program names, cron markers, Nginx filenames, or equivalent identities are never fix candidates merely because they differ from a new deployment.
 
-Hard exclusions from silent fix behavior include:
+Hard exclusions from automatic fix behavior include:
 
+- source pulling or branch changes;
 - remote database credentials or account provisioning;
 - provider credentials/secrets;
 - provider dashboard configuration;
 - DNS changes;
 - CRM/business data;
 - Project State;
-- destructive production schema/state operations.
+- destructive production schema/state operations;
+- normalization of healthy legacy names/paths/prefixes.
 
-A finding is not automatically fixable merely because the auditor can detect it. The fix registry first requires `BREAKING`, then must classify ownership, safety, prerequisites, and whether a restart/reload is required before exposing an apply action. `INFO`, `WARNING`, and `MANUAL VERIFICATION REQUIRED` are categorically excluded from automatic fix.
+A finding is not automatically fixable merely because the auditor can detect it. The fix registry first requires `BREAKING`, then classifies ownership, safety, prerequisites, and restart/reload needs. `INFO`, `WARNING`, and `MANUAL VERIFICATION REQUIRED` are categorically excluded from automatic mutation.
+
+Every apply attempt ends with a fresh audit. If a safe repair step itself fails, the launcher re-audits the resulting state before stopping so the next decision is based on what actually changed.
 
 
 ## Remaining higher-level work

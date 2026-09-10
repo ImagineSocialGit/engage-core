@@ -135,6 +135,8 @@ Provider verification that requires a real provider event remains a deliberate f
 
 Existing pre-orchestrator deployments do not need a launch state file before they can be inspected.
 
+First make sure the target server has the intended current Core and client commits. The auditor independently proves that both clean local checkouts match their configured remote branches before it interprets runtime state. It does not pull source itself; if either checkout is stale or unverifiable, the authoritative runtime audit stops there.
+
 Run:
 
 ```bash
@@ -179,7 +181,7 @@ Useful optional comparisons include:
 - change DNS/provider configuration;
 - modify CRM/business data.
 
-It may read environment metadata and non-secret identity keys, inspect Git/Nginx/live-TLS/Supervisor/cron state, perform DNS lookups, run the bootstrap-safe client-environment ownership diagnostic, and run application commands whose contracts are read-only (`engage:deployment-plan --json`, `modules:status`, `setup:validate`, `horizon:status`, and `schedule:list`).
+It may read environment metadata and non-secret identity keys, compare local Git revisions with the configured remote branch through `git ls-remote`, inspect Nginx/live-TLS/Supervisor/cron state, perform DNS lookups, run the bootstrap-safe client-environment ownership diagnostic, inspect the enabled module migration/ledger state through application services, and run application commands whose contracts are read-only (`engage:deployment-plan --json`, `modules:status`, `setup:validate`, `horizon:status`, and `schedule:list`).
 
 The report uses:
 
@@ -193,7 +195,7 @@ MANUAL VERIFICATION REQUIRED
 
 Only `BREAKING` means the auditor has proved a current runtime/security/isolation contract is actually failing on the active Engage Core deployment. `INFO` records harmless legacy/canonical drift. `WARNING` records something unusual, incomplete, or worth review that has not been proved to break the platform. `MANUAL VERIFICATION REQUIRED` is reserved for facts the host cannot safely prove by itself.
 
-Only `BREAKING` findings make the normal audit result fail and only `BREAKING` findings may enter the future automatic-fix registry. A different legacy name, path, prefix, process label, or metadata convention must never become fix work merely because `new` would derive a different value today.
+Only `BREAKING` findings make the normal audit result fail and only `BREAKING` findings may enter the automatic-fix registry. A different legacy name, path, prefix, process label, or metadata convention must never become fix work merely because `new` would derive a different value today.
 
 The audit uses canonical naming/topology as a **reference for new deployments**, not a normalization mandate for existing ones. Functional runtime contracts are authoritative. In particular, `CRM_APP_URL` remains authoritative unless `--crm-host` is supplied, because the CRM hostname is not required to use the literal `crm.` label.
 
@@ -211,23 +213,19 @@ For production environment-file mode/group, audit reports the current metadata f
 
 The deployment plan contributes provider setup steps to the report as `MANUAL VERIFICATION REQUIRED`, because provider dashboards and real provider events cannot be proven solely from local environment values.
 
-### Initial audit exercise order
+### Reference deployment validation
 
-Before adding automated repair, exercise the auditor against:
+Use older active clients such as Slam Dunk and Thompson Square to keep exercising drift classification, then use Buddy's as the fresh launcher-created reference. A metadata or naming difference remains `INFO`/`WARNING` unless effective runtime behavior is actually broken.
 
-1. Slam Dunk staging as an older active Engage Core deployment;
-2. Thompson Square staging as the known environment-file-metadata drift case;
-3. Buddy's staging as the fresh launcher-created reference environment.
-
-Do not manually normalize Thompson Square first. Its different but potentially functional metadata is useful evidence that the auditor reports legacy drift without treating it as repair work unless effective access is actually broken.
+Do not normalize a reference deployment before auditing it; the differences are useful evidence that the classifier separates harmless history from real failures.
 
 ## Audit-driven fix path
 
-`fix` is intentionally not enabled until the read-only auditor has been exercised against the reference deployments above.
-
-The planned operator flow is:
+The implemented operator flow is:
 
 ```text
+current Core + client source
+  ↓
 audit
   ↓
 findings
@@ -238,14 +236,41 @@ exact proposed safe changes
   ↓
 fix --apply
   ↓
-audit again
+mandatory audit again
 ```
 
-The future fix command may automate only explicitly safe deterministic remediation for a `BREAKING` finding, such as repairing proven runtime write access, restoring a required active Horizon process, restoring a required Scheduler entry, or repairing Core-owned Nginx/TLS state that is demonstrably preventing the active deployment from working.
+`fix` accepts the same identity inputs as `audit`. Dry-run is the default:
 
-It must not rename or rewrite a healthy legacy database identity, Redis/cache/Horizon prefix, checkout path, Supervisor program, cron marker, Nginx filename, process user, or other operational identity solely to match the convention used by `new`.
+```bash
+bash scripts/operations/launch-client-environment.sh fix   --environment staging   --client-key slam-dunk-crm   --root-domain staging.slamdunkhomeloans.com
+```
 
-It must never silently change remote database credentials, provider credentials/secrets, provider dashboards, DNS, CRM/business data, Project State, or destructive schema/runtime state.
+Apply only after reviewing the proposed actions:
+
+```bash
+bash scripts/operations/launch-client-environment.sh fix   --environment staging   --client-key slam-dunk-crm   --root-domain staging.slamdunkhomeloans.com   --apply
+```
+
+Limit a pass when useful:
+
+```text
+--only schema
+--only nginx
+--only supervisor,cron
+--all-safe
+```
+
+Canonical category names are `schema`, `runtime`, `nginx`, `horizon`, and `scheduler`; `supervisor`, `cron`, and `tls` are aliases.
+
+The fix registry consumes `BREAKING` findings only. Current deterministic repairs are intentionally limited to enabled module schema/ledger repair, proven runtime-directory write failures, an unowned required Core Nginx/TLS host, the existing checkout-owned Supervisor/Horizon program, and a missing Scheduler entry.
+
+For an older pre-ledger database with mixed module state, schema repair runs platform migrations first and then uses `modules:install` only for the enabled schema scopes that need migration/adoption. Current-but-untracked scopes are adopted through the normal executor, partial/not-migrated scopes run only their registered pending migrations, and disabled optional module scopes are ignored. The fix path never edits installation-ledger rows itself.
+
+Provider requirements, provider dashboards, DNS changes, remote DB credentials, CRM/business data, Project State, ambiguous Nginx/process ownership, and healthy legacy naming remain outside automatic mutation. A missing provider value may therefore remain `BREAKING` after every safe host/schema repair until the operator supplies the real external value.
+
+Horizon and Scheduler are deliberately deferred until the deployment plan and `setup:validate` both pass after schema/config repairs. This keeps queues and scheduled work stopped while application readiness is incomplete.
+
+Every `--apply` ends with a fresh audit. If a safe repair step fails mid-pass, the launcher re-audits before stopping.
 
 
 ## Normal deployment after launch

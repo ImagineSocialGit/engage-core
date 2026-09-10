@@ -181,6 +181,8 @@ The platform migration step remains separate because platform schema is not a mo
 
 Use reconciliation only when the database already contains the complete current migration history for the scope. Reconciliation does not repair or create schema.
 
+For a single known-current scope:
+
 ```bash
 php artisan modules:status [module]
 php artisan modules:reconcile [module] --force
@@ -188,7 +190,11 @@ php artisan modules:status [module]
 php artisan setup:validate
 ```
 
-Bulk `modules:reconcile --force` may be used for a known existing database only after status has been reviewed. Partial scopes block reconciliation.
+A mixed pre-ledger deployment is different. If enabled scopes include any combination of `current`, `partial`, and `not_migrated`, do **not** bulk-reconcile. Run platform migrations first so `module_installations` exists, then use `modules:install` for the enabled schema scopes. The executor adopts already-current scopes without replaying migrations and runs only registered pending migrations for partial/not-migrated scopes.
+
+The audit/fix path automates that decision for existing deployments: it derives the enabled dependency closure from `ModuleManager`/`ModuleMigrationPlanner`, ignores disabled optional scopes that merely appear in the global `modules:status` table, and applies the existing module executor instead of writing ledger rows directly.
+
+Bulk `modules:reconcile --force` remains appropriate only for a reviewed database whose selected scopes are all already current. Partial scopes block reconciliation.
 
 ## Controlled Project State clean rebuild
 

@@ -411,4 +411,175 @@ NGINX;
         $this->assertStringContainsString('audit_result BREAKING scheduler.cron', $auditRegion);
         $this->assertStringContainsString('audit_result BREAKING http.crm', $auditRegion);
     }
+
+    public function test_module_status_audit_reports_pre_ledger_enabled_schema_breaks_without_disabled_scope_noise(): void
+    {
+        $payload = [
+            'platform' => [
+                'repository_exists' => true,
+                'ledger_exists' => false,
+            ],
+            'scopes' => [
+                [
+                    'module_key' => 'core',
+                    'migration_state' => 'partial',
+                    'progress' => '6/12',
+                    'pending_migrations' => ['2026_08_19_161800_create_contact_import_occurrences_table.php'],
+                    'ledger_status' => 'ledger_missing',
+                    'contract_state' => 'unavailable',
+                ],
+                [
+                    'module_key' => 'tasks',
+                    'migration_state' => 'current',
+                    'progress' => '3/3',
+                    'pending_migrations' => [],
+                    'ledger_status' => 'ledger_missing',
+                    'contract_state' => 'unavailable',
+                ],
+            ],
+        ];
+
+        $process = new Process([
+            'python3',
+            base_path('scripts/operations/lib/launch_client_environment.py'),
+            'module-status-audit',
+        ]);
+        $process->setInput(json_encode($payload, JSON_THROW_ON_ERROR));
+        $process->mustRun();
+
+        $output = $process->getOutput();
+
+        $this->assertStringContainsString(
+            "BREAKING\tmodule_migrations.platform_ledger\t",
+            $output,
+        );
+        $this->assertStringContainsString(
+            "BREAKING\tmodule_migrations.core.schema\t",
+            $output,
+        );
+        $this->assertStringContainsString(
+            "PASS\tmodule_migrations.tasks.schema\t",
+            $output,
+        );
+        $this->assertStringNotContainsString('media', $output);
+        $this->assertStringNotContainsString('portal', $output);
+    }
+
+    public function test_module_status_fix_selection_includes_current_untracked_and_partial_enabled_scopes_only(): void
+    {
+        $payload = [
+            'platform' => [
+                'repository_exists' => true,
+                'ledger_exists' => true,
+            ],
+            'scopes' => [
+                [
+                    'module_key' => 'core',
+                    'migration_state' => 'partial',
+                    'ledger_status' => 'untracked',
+                    'contract_state' => 'untracked',
+                ],
+                [
+                    'module_key' => 'tasks',
+                    'migration_state' => 'current',
+                    'ledger_status' => 'untracked',
+                    'contract_state' => 'untracked',
+                ],
+                [
+                    'module_key' => 'workflow',
+                    'migration_state' => 'current',
+                    'ledger_status' => 'installed',
+                    'contract_state' => 'current',
+                ],
+            ],
+        ];
+
+        $process = new Process([
+            'python3',
+            base_path('scripts/operations/lib/launch_client_environment.py'),
+            'module-status-fix-modules',
+        ]);
+        $process->setInput(json_encode($payload, JSON_THROW_ON_ERROR));
+        $process->mustRun();
+
+        $this->assertSame(
+            ['core', 'tasks'],
+            array_values(array_filter(
+                preg_split('/\R/', trim($process->getOutput())) ?: [],
+            )),
+        );
+    }
+
+    public function test_audit_proves_remote_source_current_before_interpreting_runtime_state(): void
+    {
+        $launcher = (string) file_get_contents(
+            base_path('scripts/operations/launch-client-environment.sh'),
+        );
+
+        $this->assertStringContainsString(
+            'GIT_TERMINAL_PROMPT=0',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'git ls-remote',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'Local HEAD matches origin/$expected_branch.',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'Authoritative runtime audit deferred: Core and client source must be clean and match their configured remote branches first.',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'Source is never pulled automatically.',
+            $launcher,
+        );
+    }
+
+    public function test_fix_is_a_separate_breaking_only_dry_run_first_path(): void
+    {
+        $launcher = (string) file_get_contents(
+            base_path('scripts/operations/launch-client-environment.sh'),
+        );
+
+        $this->assertStringContainsString(
+            'launch-client-environment.sh fix --environment ENV --client-key KEY --root-domain DOMAIN [options]',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            "fix)\n            parse_fix \"\$@\"",
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'local mode="dry-run"',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'Only BREAKING findings may enter the closed automatic fix registry.',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            '== Mandatory post-fix audit ==',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'modules:install "$module" --force',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'supplemental Core host',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'Deferred Horizon repair: deployment plan/setup validation or effective runtime-directory access is not green yet.',
+            $launcher,
+        );
+        $this->assertStringContainsString(
+            'Deferred Scheduler repair: deployment plan/setup validation or effective runtime-directory access is not green yet.',
+            $launcher,
+        );
+    }
+
 }
