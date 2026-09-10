@@ -100,6 +100,17 @@ class ArtistUpdatesPresetTest extends TestCase
         ], collect(data_get($version->schema, 'sections.0.fields', []))
             ->pluck('key')
             ->all());
+        $emailMarketingConsent = collect(
+            data_get($version->schema, 'sections.0.fields', []),
+        )->firstWhere('key', 'email_marketing_consent');
+
+        $this->assertIsArray($emailMarketingConsent);
+        $this->assertSame('boolean', $emailMarketingConsent['type']);
+        $this->assertFalse($emailMarketingConsent['required']);
+        $this->assertSame(
+            ['nullable', 'boolean'],
+            data_get($version->rules, 'email_marketing_consent'),
+        );
         $this->assertEquals([
             'email' => 'email',
             'first_name' => 'first_name',
@@ -201,6 +212,32 @@ class ArtistUpdatesPresetTest extends TestCase
             $this->assertSame('forms', $consent->scope);
             $this->assertSame('forms_submission', $consent->source);
         }
+    }
+
+    public function test_artist_updates_submission_accepts_omitted_email_marketing_consent_without_granting_permission(): void
+    {
+        $this->selectArtistUpdatesPreset();
+        $this->syncArtistUpdates();
+
+        $result = app(CreateFormSubmissionAction::class)->handle(
+            $this->submissionInput(
+                externalId: '04f7bc12-953a-4eb4-bd3c-c845b0e2b6c1',
+                values: [
+                    'email' => 'no-consent@example.com',
+                ],
+            ),
+        );
+
+        $contact = Contact::query()->findOrFail($result->contactId);
+
+        $this->assertSame('no-consent@example.com', $contact->email);
+        $this->assertSame(0, MessageConsent::query()
+            ->where('contact_id', $contact->getKey())
+            ->count());
+        $this->assertSame(0, ContactTag::query()
+            ->where('contact_id', $contact->getKey())
+            ->where('tag', 'interest:general_updates')
+            ->count());
     }
 
     public function test_sms_marketing_acceptance_requires_a_phone_number(): void

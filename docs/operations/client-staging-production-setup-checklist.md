@@ -792,7 +792,7 @@ Core staging must first satisfy:
 [ ] external Forms intake enabled
 [ ] matching external client ID/secret configured
 [ ] allowed_forms includes artist_updates
-[ ] email_marketing_consent maps to email / marketing when Messaging consent is used
+[ ] email_marketing_consent is the optional boolean field mapped to email / marketing when Messaging consent is used
 [ ] sms_marketing_consent maps to sms / marketing when the selected form retains SMS consent
 [ ] setup:validate has no Forms runtime errors
 ```
@@ -807,7 +807,7 @@ php artisan site:probe-core-form artist_updates
 
 That read-only GET must prove the intended Core environment, HMAC client/secret pair, form allowlist, and current public schema before cutover.
 
-A successful probe is not a POST-readiness proof. Before changing `NEWSLETTER_DESTINATION=engage_core`, confirm the deployed Artist Sites sender submits the fields required by the current Core FormVersion. In particular, the reusable Core contract requires explicit accepted `email_marketing_consent`; a Sites build that still posts only `email` is not ready for cutover.
+A successful probe is not a POST-readiness proof. Before changing `NEWSLETTER_DESTINATION=engage_core`, confirm the deployed Artist Sites sender matches the current Core FormVersion. In the reusable artist-newsletter contract, `email_marketing_consent` is optional at the Forms validation layer but must be submitted as boolean `true` when the disclosed Subscribe action is being used to grant email marketing permission. A Sites build that posts only `email` would create the intake without granting that permission and is therefore not ready for the newsletter cutover.
 
 Once the Sites sender matches the published contract:
 
@@ -2298,7 +2298,7 @@ Core staging must first satisfy:
 [ ] external Forms intake enabled
 [ ] matching external client ID/secret configured
 [ ] allowed_forms includes artist_updates
-[ ] email_marketing_consent maps to email / marketing when Messaging consent is used
+[ ] email_marketing_consent is the optional boolean field mapped to email / marketing when Messaging consent is used
 [ ] sms_marketing_consent maps to sms / marketing when the selected form retains SMS consent
 [ ] setup:validate has no Forms runtime errors
 ```
@@ -2313,7 +2313,7 @@ php artisan site:probe-core-form artist_updates
 
 That read-only GET must prove the intended Core environment, HMAC client/secret pair, form allowlist, and current public schema before cutover.
 
-A successful probe is not a POST-readiness proof. Before changing `NEWSLETTER_DESTINATION=engage_core`, confirm the deployed Artist Sites sender submits the fields required by the current Core FormVersion. In particular, the reusable Core contract requires explicit accepted `email_marketing_consent`; a Sites build that still posts only `email` is not ready for cutover.
+A successful probe is not a POST-readiness proof. Before changing `NEWSLETTER_DESTINATION=engage_core`, confirm the deployed Artist Sites sender matches the current Core FormVersion. In the reusable artist-newsletter contract, `email_marketing_consent` is optional at the Forms validation layer but must be submitted as boolean `true` when the disclosed Subscribe action is being used to grant email marketing permission. A Sites build that posts only `email` would create the intake without granting that permission and is therefore not ready for the newsletter cutover.
 
 Once the Sites sender matches the published contract:
 

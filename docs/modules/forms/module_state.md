@@ -679,7 +679,7 @@ email                       required email
 phone                       optional tel
 postal_code                 optional text
 interests                   optional multi-select
-email_marketing_consent     required checkbox + accepted rule
+email_marketing_consent     optional boolean; true records disclosed-submit acceptance
 sms_marketing_consent       optional checkbox
 ```
 
@@ -723,6 +723,8 @@ The server-owned Messaging consent intents are channel + purpose only:
 email_marketing_consent=true -> email / marketing
 sms_marketing_consent=true   -> sms / marketing
 ```
+
+For the reusable artist-newsletter integration, `email_marketing_consent` is a server-owned boolean evidence field rather than a required rendered checkbox. The matching Artist Sites surface presents the email-marketing disclosure immediately before the Subscribe action and submits `email_marketing_consent=true` only as the result of that disclosed signup action. An omitted, false, or null value remains a valid form submission but does not grant email marketing permission.
 
 There is no Forms-authored permission scope. Operational message scopes continue to identify the message family. Messaging authorization uses exact channel + purpose, while the bridge stores `forms` as capture scope for provenance/context. Optional acknowledgement-domain configuration may still improve human-readable acknowledgement topic/copy, but it cannot broaden or narrow permission.
 

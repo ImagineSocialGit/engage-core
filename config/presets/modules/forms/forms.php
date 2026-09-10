@@ -66,8 +66,8 @@ return [
                         [
                             'key' => 'email_marketing_consent',
                             'label' => 'Email me artist updates',
-                            'type' => 'checkbox',
-                            'required' => true,
+                            'type' => 'boolean',
+                            'required' => false,
                         ],
                         [
                             'key' => 'sms_marketing_consent',
@@ -85,7 +85,7 @@ return [
                 'phone' => ['nullable', 'string', 'max:255', 'required_if:sms_marketing_consent,true'],
                 'postal_code' => ['nullable', 'string', 'max:20'],
                 'interests' => ['array', 'max:4'],
-                'email_marketing_consent' => ['accepted'],
+                'email_marketing_consent' => ['nullable', 'boolean'],
                 'sms_marketing_consent' => ['nullable', 'boolean'],
             ],
             'layout' => [],

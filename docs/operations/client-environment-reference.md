@@ -274,7 +274,7 @@ to set only:
 
 Then run `php artisan presets:sync` and `php artisan setup:validate`. The sync publishes a new immutable FormVersion; it does not mutate the previously published version.
 
-The Artist Sites read-only probe may be run before destination cutover. Do not treat a successful GET probe as permission to switch live POST traffic until the Sites sender also matches the required submission fields, especially `email_marketing_consent` and any enabled SMS-consent field.
+The Artist Sites read-only probe may be run before destination cutover. Do not treat a successful GET probe as permission to switch live POST traffic until the Sites sender also matches the published field contract. For the reusable artist-newsletter flow, `email_marketing_consent` is an optional boolean field: the matching disclosed Subscribe action must submit it as `true` when email marketing permission is being granted. Any enabled SMS-consent field remains independently explicit.
 
 ---
 
