@@ -130,6 +130,120 @@ The launcher verifies:
 
 Provider verification that requires a real provider event remains a deliberate final human smoke: for example sending a real staging-safe email/SMS, receiving a signed callback, or exercising a Zoom registration/ended-event path.
 
+
+## Auditing an existing deployment
+
+Existing pre-orchestrator deployments do not need a launch state file before they can be inspected.
+
+Run:
+
+```bash
+bash scripts/operations/launch-client-environment.sh audit \
+  --environment staging \
+  --client-key rob-the-mortgage-coach \
+  --root-domain staging.robthemortgagecoach.com
+```
+
+If the deployment lives outside the canonical derived path and automatic discovery is ambiguous, add:
+
+```bash
+--app-path /actual/path/to/engage-core
+```
+
+Useful optional comparisons include:
+
+```text
+--client-repo URL
+--crm-host HOST
+--core-branch BRANCH
+--client-branch BRANCH
+--deploy-user USER
+--web-user USER
+--web-group GROUP
+--scheduler-user USER
+--server-ip IPV4
+```
+
+`audit` is a hard read-only boundary. It does not create a launcher state file and does not:
+
+- write root/client `.env` files;
+- change ownership or modes;
+- run environment sync;
+- migrate/install/reconcile modules;
+- alter Redis;
+- write Nginx configuration;
+- issue certificates;
+- reload services;
+- write Supervisor configuration;
+- change cron;
+- change DNS/provider configuration;
+- modify CRM/business data.
+
+It may read environment metadata and non-secret identity keys, inspect Git/Nginx/certificate/Supervisor/cron state, perform DNS lookups, and run application commands whose contracts are read-only (`engage:deployment-plan --json`, `modules:status`, `setup:validate`, `horizon:status`, and `schedule:list`).
+
+The report uses:
+
+```text
+PASS
+WARNING
+MISMATCH
+MISSING
+MANUAL VERIFICATION REQUIRED
+```
+
+`MISMATCH` and `MISSING` produce a non-zero audit exit status. Warnings and manual-verification items do not by themselves make the audit fail.
+
+The audit compares the existing deployment to the canonical naming/topology rules while preserving important deployment-owned exceptions. In particular, `CRM_APP_URL` remains authoritative unless `--crm-host` is supplied, because the CRM hostname is not required to use the literal `crm.` label.
+
+For staging environment files, the current proven convention is:
+
+```text
+owner: deploy user
+group: deploy user's primary group
+mode: 0664
+```
+
+Runtime directories are a separate contract. Audit checks effective deploy-user and PHP-FPM-user write access without creating probe files. Canonical `deploy-user:web-group 2775` metadata differences are warnings when effective access is valid.
+
+For production environment-file mode/group, audit reports the current metadata for manual verification rather than silently extending the staging-proven `0664` convention to secret-bearing production files.
+
+The deployment plan contributes provider setup steps to the report as `MANUAL VERIFICATION REQUIRED`, because provider dashboards and real provider events cannot be proven solely from local environment values.
+
+### Initial audit exercise order
+
+Before adding automated repair, exercise the auditor against:
+
+1. Rob staging and/or Slam Dunk staging as established deployments;
+2. Thompson Square staging as the known environment-file-permission drift case;
+3. Buddy's staging as the fresh launcher-created reference environment.
+
+Do not manually normalize Thompson Square first; it is useful evidence that the auditor detects real legacy drift.
+
+## Audit-driven fix path
+
+`fix` is intentionally not enabled until the read-only auditor has been exercised against the reference deployments above.
+
+The planned operator flow is:
+
+```text
+audit
+  ↓
+findings
+  ↓
+fix --dry-run
+  ↓
+exact proposed safe changes
+  ↓
+fix --apply
+  ↓
+audit again
+```
+
+The future fix command may automate only explicitly safe deterministic server-owned drift such as approved runtime permissions, Core-owned Nginx configuration, Supervisor/Horizon configuration, Scheduler cron, and canonical runtime prefixes/namespaces.
+
+It must never silently change remote database credentials, provider credentials/secrets, provider dashboards, DNS, CRM/business data, Project State, or destructive schema/runtime state.
+
+
 ## Normal deployment after launch
 
 Use:

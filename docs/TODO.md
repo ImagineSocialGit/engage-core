@@ -38,6 +38,7 @@ The Routes-specific suggestion experience belongs in `modules/flow-routes/TODO.m
 
 ## Operations tooling
 
+- [ ] After the read-only deployment auditor is exercised against Rob/Slam Dunk staging, Thompson Square staging, and Buddy's staging, add `fix --dry-run` / explicit `fix --apply` with a closed safe-remediation registry and a mandatory post-fix re-audit.
 - [ ] Harden `scripts/operations/configure-client-logging.sh` so dry-run/apply output never prints unrelated environment values or secrets, and align the helper with root `.env` logging ownership before it is used against a secret-bearing production environment again.
 
 ## Documentation maintenance

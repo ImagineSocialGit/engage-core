@@ -2960,6 +2960,7 @@
 │   │   │   ├── EnvironmentRequirementPositiveIntegerRuleTest.php
 │   │   │   ├── EnvironmentRequirementValueRuleTest.php
 │   │   │   ├── EnvironmentVariableCatalogTest.php
+│   │   │   ├── LaunchClientEnvironmentAuditScriptTest.php
 │   │   │   └── LaunchClientEnvironmentScriptTest.php
 │   │   ├── Documents
 │   │   │   └── DocumentsFoundationTest.php
@@ -3460,4 +3461,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-818 directories, 2643 files
+818 directories, 2644 files

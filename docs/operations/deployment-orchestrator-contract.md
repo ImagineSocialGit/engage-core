@@ -180,6 +180,7 @@ resume
 update
 add-modules
 verify
+audit
 derive
 ```
 
@@ -245,6 +246,95 @@ bash scripts/operations/launch-client-environment.sh add-modules /path/to/state.
 The launcher refuses a requested module that is not enabled by the pulled client configuration. For each requested module it runs the application-owned `modules:install <module> --force` dependency closure, then preset sync/status/setup validation and runtime/host verification.
 
 This flow may activate new deployment-plan requirements or provider setup steps before schema installation.
+
+
+## Existing-deployment audit contract
+
+`audit` is state-file-independent and strictly non-mutating. It exists so deployments created before the orchestrator can be compared with the same canonical identity/runtime contract used by `new`.
+
+Required identity inputs are:
+
+```text
+environment
+client key
+root domain
+```
+
+The checkout path is discovered from the canonical location and readable `/var/www` client checkouts, with `--app-path` available when a legacy layout is ambiguous.
+
+The auditor may inspect:
+
+- canonical versus actual checkout path;
+- Core/client Git repository state, branch, origin, and cleanliness;
+- root/client environment-file metadata and non-secret identity values;
+- Core staging-local versus Core production-remote database topology;
+- canonical database/runtime namespace identities;
+- duplicate readable Redis/cache/Horizon prefixes across `/var/www`;
+- `engage:deployment-plan --json`;
+- `modules:status`;
+- `setup:validate`;
+- runtime-directory effective access without creating probe files;
+- Supervisor/Horizon config/process state;
+- exact Scheduler cron identity plus `schedule:list`;
+- Core-owned Nginx hosts/document root/PHP-FPM socket;
+- `nginx -t`;
+- configured TLS certificate expiry/SAN coverage;
+- DNS resolution;
+- deployment-plan provider/setup steps that still require external verification.
+
+The result vocabulary is:
+
+```text
+PASS
+WARNING
+MISMATCH
+MISSING
+MANUAL VERIFICATION REQUIRED
+```
+
+An audit returns non-zero when at least one `MISMATCH` or `MISSING` finding exists.
+
+The audit implementation must not call mutating launcher helpers or commands. In particular it must not write environment files/state, run `engage:environment:sync --write-missing`, change permissions, migrate/install schema, alter Nginx/Supervisor/cron, issue certificates, reload services, clear Redis, or change provider/DNS state.
+
+For staging `.env` files, the currently proven convention is deploy-user ownership, deploy-user primary group, and mode `0664`. Runtime-directory correctness is tested through effective deploy/web write access; metadata divergence from the launcher convention is a warning when access is still effective.
+
+The staging-proven `.env` mode is not automatically declared the production secret-file mode. Production mode/group remains an explicit review item until that contract is separately proven.
+
+## Audit-driven fix contract
+
+Automated `fix` remains gated on real audit results from established staging clients, the known Thompson Square drift case, and the fresh Buddy's deployment.
+
+The required future flow is:
+
+```text
+audit
+fix --dry-run
+fix --apply
+audit
+```
+
+`fix --dry-run` must describe every proposed mutation before application. `fix --apply` must require explicit operator intent.
+
+Potential safe deterministic fix classes include:
+
+- approved runtime-directory ownership/modes;
+- Core-owned Nginx site reconciliation;
+- Supervisor/Horizon program reconciliation;
+- exact Scheduler cron reconciliation;
+- canonical Redis/cache/Horizon namespaces when the migration is explicitly safe.
+
+Hard exclusions from silent fix behavior include:
+
+- remote database credentials or account provisioning;
+- provider credentials/secrets;
+- provider dashboard configuration;
+- DNS changes;
+- CRM/business data;
+- Project State;
+- destructive production schema/state operations.
+
+A finding is not automatically fixable merely because the auditor can detect it. The fix registry must classify ownership, safety, prerequisites, and whether a restart/reload is required before exposing an apply action.
+
 
 ## Remaining higher-level work
 

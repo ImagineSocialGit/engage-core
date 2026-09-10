@@ -13,7 +13,27 @@ Usage:
   launch-client-environment.sh update <state-file>
   launch-client-environment.sh add-modules <state-file> --module MODULE [--module MODULE ...]
   launch-client-environment.sh verify <state-file>
+  launch-client-environment.sh audit --environment ENV --client-key KEY --root-domain DOMAIN [options]
   launch-client-environment.sh derive --environment ENV --client-repo URL --root-domain DOMAIN [--client-key KEY]
+
+Audit options:
+  --environment staging|production
+  --client-key KEY
+  --root-domain DOMAIN
+  --app-path PATH                  Optional existing checkout override; otherwise discovered.
+  --client-repo URL                Optional expected client-repository origin.
+  --crm-host HOST                  Optional expected CRM host; otherwise discovered from CRM_APP_URL.
+  --core-branch BRANCH             Default: main
+  --client-branch BRANCH           Default: main
+  --deploy-user USER               Default: current user
+  --web-user USER                  Default: www-data
+  --web-group GROUP                Default: www-data
+  --scheduler-user USER            Default: deploy user
+  --server-ip IPV4                 Optional authoritative direct-DNS target for Core hosts.
+
+Audit is strictly non-mutating. It does not create a state file, write environment
+files, change permissions, migrate/install schema, alter Nginx/Supervisor/cron,
+issue certificates, reload services, or modify provider/DNS configuration.
 
 New-environment options:
   --environment staging|production
@@ -1054,6 +1074,939 @@ ensure_dns_and_tls() {
     mark_phase dns_tls
 }
 
+audit_reset() {
+    AUDIT_PASS=0
+    AUDIT_WARNING=0
+    AUDIT_MISMATCH=0
+    AUDIT_MISSING=0
+    AUDIT_MANUAL=0
+}
+
+audit_result() {
+    local status="$1"
+    local key="$2"
+    local message="$3"
+    message="${message//$'\n'/ }"
+
+    printf '%-28s %-38s %s\n' "$status" "$key" "$message"
+
+    case "$status" in
+        PASS) ((AUDIT_PASS += 1)) ;;
+        WARNING) ((AUDIT_WARNING += 1)) ;;
+        MISMATCH) ((AUDIT_MISMATCH += 1)) ;;
+        MISSING) ((AUDIT_MISSING += 1)) ;;
+        "MANUAL VERIFICATION REQUIRED") ((AUDIT_MANUAL += 1)) ;;
+        *) fail "Unknown audit result status [$status]." ;;
+    esac
+}
+
+audit_summary() {
+    echo
+    echo "Audit summary"
+    printf '  PASS:                         %d\n' "$AUDIT_PASS"
+    printf '  WARNING:                      %d\n' "$AUDIT_WARNING"
+    printf '  MISMATCH:                     %d\n' "$AUDIT_MISMATCH"
+    printf '  MISSING:                      %d\n' "$AUDIT_MISSING"
+    printf '  MANUAL VERIFICATION REQUIRED: %d\n' "$AUDIT_MANUAL"
+    echo
+    echo "No deployment state was changed by audit."
+
+    [[ "$AUDIT_MISMATCH" -eq 0 && "$AUDIT_MISSING" -eq 0 ]]
+}
+
+audit_identity_value() {
+    local key="$1"
+    printf '%s' "$AUDIT_IDENTITY_JSON" | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+value = data.get(sys.argv[1])
+if value is None:
+    raise SystemExit(1)
+print(value)
+' "$key"
+}
+
+audit_find_app_path() {
+    local requested="$1"
+    local canonical="$2"
+
+    if [[ -n "$requested" ]]; then
+        printf '%s\n' "$requested"
+        return 0
+    fi
+
+    if [[ -f "$canonical/artisan" && -d "$canonical/client/$CLIENT_KEY" ]]; then
+        printf '%s\n' "$canonical"
+        return 0
+    fi
+
+    local -a candidates=()
+    local modules_file candidate existing
+    while IFS= read -r modules_file; do
+        [[ -n "$modules_file" ]] || continue
+        candidate="${modules_file%/client/$CLIENT_KEY/config/modules.php}"
+        [[ -f "$candidate/artisan" ]] || continue
+
+        local duplicate=false
+        for existing in "${candidates[@]:-}"; do
+            if [[ "$existing" == "$candidate" ]]; then
+                duplicate=true
+                break
+            fi
+        done
+
+        [[ "$duplicate" == "true" ]] || candidates+=("$candidate")
+    done < <(find /var/www -maxdepth 9 -type f -path "*/client/$CLIENT_KEY/config/modules.php" -print 2>/dev/null || true)
+
+    if [[ ${#candidates[@]} -eq 1 ]]; then
+        printf '%s\n' "${candidates[0]}"
+        return 0
+    fi
+
+    if [[ ${#candidates[@]} -gt 1 ]]; then
+        printf 'Multiple candidate Core checkouts contain client [%s]:\n' "$CLIENT_KEY" >&2
+        printf '  - %s\n' "${candidates[@]}" >&2
+        return 2
+    fi
+
+    return 1
+}
+
+audit_git_repo() {
+    local path="$1"
+    local key_prefix="$2"
+    local expected_branch="$3"
+    local expected_origin="${4:-}"
+
+    if [[ ! -d "$path/.git" ]]; then
+        audit_result MISSING "$key_prefix.repository" "Git repository is missing at $path."
+        return
+    fi
+
+    local branch dirty origin
+    branch="$(git -C "$path" branch --show-current 2>/dev/null || true)"
+    if [[ "$branch" == "$expected_branch" ]]; then
+        audit_result PASS "$key_prefix.branch" "Branch is $branch."
+    else
+        audit_result MISMATCH "$key_prefix.branch" "Expected $expected_branch; found ${branch:-[detached/unknown]}."
+    fi
+
+    dirty="$(git -C "$path" status --porcelain 2>/dev/null || true)"
+    if [[ -z "$dirty" ]]; then
+        audit_result PASS "$key_prefix.clean" "Checkout is clean."
+    else
+        audit_result MISMATCH "$key_prefix.clean" "Checkout has uncommitted or untracked changes."
+    fi
+
+    origin="$(git -C "$path" remote get-url origin 2>/dev/null || true)"
+    if [[ -z "$origin" ]]; then
+        audit_result MISSING "$key_prefix.origin" "Origin remote is not configured."
+    elif [[ -n "$expected_origin" && "$origin" != "$expected_origin" ]]; then
+        audit_result MISMATCH "$key_prefix.origin" "Expected [$expected_origin]; found [$origin]."
+    else
+        audit_result PASS "$key_prefix.origin" "Origin is [$origin]."
+    fi
+}
+
+audit_env_equals() {
+    local file="$1"
+    local env_key="$2"
+    local expected="$3"
+    local result_key="$4"
+    local actual
+
+    actual="$(env_get "$file" "$env_key")"
+    if [[ -z "$actual" ]]; then
+        audit_result MISSING "$result_key" "$env_key is not populated in $file."
+    elif [[ "$actual" == "$expected" ]]; then
+        audit_result PASS "$result_key" "$env_key matches the canonical value."
+    else
+        audit_result MISMATCH "$result_key" "$env_key expected [$expected]; found [$actual]."
+    fi
+}
+
+audit_env_present_redacted() {
+    local file="$1"
+    local env_key="$2"
+    local result_key="$3"
+    local actual
+
+    actual="$(env_get "$file" "$env_key")"
+    if [[ -n "$actual" ]]; then
+        audit_result PASS "$result_key" "$env_key is populated; value not displayed."
+    else
+        audit_result MISSING "$result_key" "$env_key is blank or missing."
+    fi
+}
+
+audit_env_file_metadata() {
+    local path="$1"
+    local key_prefix="$2"
+
+    if [[ ! -f "$path" ]]; then
+        audit_result MISSING "$key_prefix.file" "Environment file is missing: $path"
+        return
+    fi
+
+    local owner group mode deploy_group
+    owner="$(stat -c '%U' "$path")"
+    group="$(stat -c '%G' "$path")"
+    mode="$(stat -c '%a' "$path")"
+    deploy_group="$(id -gn "$DEPLOY_USER" 2>/dev/null || true)"
+
+    if [[ "$DEPLOY_ENV" == "staging" ]]; then
+        if [[ -z "$deploy_group" ]]; then
+            audit_result MISSING "$key_prefix.metadata" \
+                "Cannot resolve the primary group for missing deploy user [$DEPLOY_USER]; found $owner:$group $mode."
+        elif [[ "$owner" == "$DEPLOY_USER" && "$group" == "$deploy_group" && "$mode" == "664" ]]; then
+            audit_result PASS "$key_prefix.metadata" "Staging convention is $owner:$group $mode."
+        else
+            audit_result MISMATCH "$key_prefix.metadata" \
+                "Staging convention expects $DEPLOY_USER:$deploy_group 664; found $owner:$group $mode."
+        fi
+    else
+        if [[ "$owner" == "$DEPLOY_USER" ]]; then
+            audit_result PASS "$key_prefix.owner" "Production environment file owner is $owner."
+        else
+            audit_result MISMATCH "$key_prefix.owner" "Expected owner $DEPLOY_USER; found $owner."
+        fi
+        audit_result "MANUAL VERIFICATION REQUIRED" "$key_prefix.mode" \
+            "Production secret-file mode/group policy is intentionally not auto-normalized by the staging-proven 0664 convention; found $owner:$group $mode."
+    fi
+
+    if id "$DEPLOY_USER" >/dev/null 2>&1; then
+        if sudo -u "$DEPLOY_USER" test -r "$path"; then
+            audit_result PASS "$key_prefix.deploy_read" "$DEPLOY_USER can read the environment file."
+        else
+            audit_result MISMATCH "$key_prefix.deploy_read" "$DEPLOY_USER cannot read the environment file."
+        fi
+    else
+        audit_result MISSING "$key_prefix.deploy_read" "Deploy user [$DEPLOY_USER] does not exist."
+    fi
+
+    if id "$WEB_USER" >/dev/null 2>&1; then
+        if sudo -u "$WEB_USER" test -r "$path"; then
+            audit_result PASS "$key_prefix.web_read" "$WEB_USER can read the environment file."
+        else
+            audit_result MISMATCH "$key_prefix.web_read" "$WEB_USER cannot read the environment file."
+        fi
+    else
+        audit_result MISSING "$key_prefix.web_read" "Web user [$WEB_USER] does not exist."
+    fi
+}
+
+audit_prefix_collision() {
+    local env_key="$1"
+    local value="$2"
+    local result_key="$3"
+
+    [[ -n "$value" ]] || return 0
+
+    local collisions
+    collisions="$(python3 "$HELPER" env-collisions \
+        --search-root /var/www \
+        --key "$env_key" \
+        --value "$value" \
+        --exclude "$CLIENT_ENV" 2>/dev/null || true)"
+
+    if [[ -z "$collisions" ]]; then
+        audit_result PASS "$result_key" "$env_key is not duplicated in another readable /var/www client environment."
+    else
+        collisions="${collisions//$'\n'/, }"
+        audit_result MISMATCH "$result_key" "$env_key collides with: $collisions"
+    fi
+}
+
+audit_app_command() {
+    local result_key="$1"
+    shift
+
+    local output status
+    set +e
+    output="$(
+        cd "$APP_PATH" &&
+        "$@" 2>&1
+    )"
+    status=$?
+    set -e
+
+    if [[ "$status" -eq 0 ]]; then
+        audit_result PASS "$result_key" "Read-only application command passed."
+    else
+        output="$(printf '%s' "$output" | tail -n 8 | tr '\n' ' ')"
+        audit_result MISMATCH "$result_key" "Read-only application command failed: ${output:-[no output]}"
+    fi
+}
+
+audit_resolve_plan() {
+    local output status
+    set +e
+    output="$(
+        cd "$APP_PATH" &&
+        "$PHP_BIN" artisan engage:deployment-plan --json 2>&1
+    )"
+    status=$?
+    set -e
+
+    if ! printf '%s' "$output" | python3 -m json.tool >/dev/null 2>&1; then
+        audit_result MISMATCH deployment_plan.json \
+            "engage:deployment-plan --json did not produce valid JSON (exit $status)."
+        AUDIT_PLAN_JSON=""
+        return
+    fi
+
+    AUDIT_PLAN_JSON="$output"
+    while IFS=$'\t' read -r result_status result_key result_message; do
+        [[ -n "$result_status" ]] || continue
+        audit_result "$result_status" "$result_key" "$result_message"
+    done < <(printf '%s' "$AUDIT_PLAN_JSON" | python3 "$HELPER" plan-audit)
+}
+
+audit_plan_module_enabled() {
+    local module="$1"
+    [[ -n "$AUDIT_PLAN_JSON" ]] || return 1
+    printf '%s' "$AUDIT_PLAN_JSON" \
+        | python3 "$HELPER" plan-modules-stdin \
+        | grep -Fxq "$module"
+}
+
+audit_core_hosts() {
+    local -a hosts=("$CRM_HOST")
+
+    if audit_plan_module_enabled messaging; then
+        hosts+=("$MESSAGING_HOST")
+    fi
+    if audit_plan_module_enabled webinars; then
+        hosts+=("$WEBINAR_HOST")
+    fi
+    if audit_plan_module_enabled messaging \
+        || audit_plan_module_enabled inbound_messaging \
+        || audit_plan_module_enabled webinars \
+        || audit_plan_module_enabled forms
+    then
+        hosts+=("$WEBHOOKS_HOST")
+    fi
+
+    local scheduling_url scheduling_host
+    scheduling_url="$(env_get "$CLIENT_ENV" SCHEDULING_APP_URL)"
+    if [[ -n "$scheduling_url" ]]; then
+        scheduling_host="$(python3 "$HELPER" origin-host --origin "$scheduling_url" 2>/dev/null || true)"
+        [[ -n "$scheduling_host" ]] && hosts+=("$scheduling_host")
+    fi
+
+    printf '%s\n' "${hosts[@]}" | awk 'NF && !seen[$0]++'
+}
+
+audit_nginx() {
+    note "Nginx / TLS"
+    local canonical="/etc/nginx/sites-available/$NGINX_SITE_NAME"
+    local -a configs=()
+    local path resolved existing
+
+    if [[ -f "$canonical" ]]; then
+        configs+=("$canonical")
+    else
+        for path in /etc/nginx/sites-enabled/*; do
+            [[ -e "$path" ]] || continue
+            if grep -Fq "root $APP_PATH/public;" "$path" 2>/dev/null; then
+                resolved="$(readlink -f "$path" 2>/dev/null || printf '%s' "$path")"
+                local duplicate=false
+                for existing in "${configs[@]:-}"; do
+                    [[ "$existing" == "$resolved" ]] && duplicate=true
+                done
+                [[ "$duplicate" == "true" ]] || configs+=("$resolved")
+            fi
+        done
+    fi
+
+    if [[ ${#configs[@]} -eq 0 ]]; then
+        audit_result MISSING nginx.site "No enabled/available Nginx Core site was found for $APP_PATH."
+        return
+    fi
+
+    if [[ ${#configs[@]} -eq 1 && "${configs[0]}" == "$canonical" ]]; then
+        audit_result PASS nginx.site "Canonical Core site exists at $canonical."
+    else
+        audit_result MISMATCH nginx.site \
+            "Canonical site is $canonical; discovered: ${configs[*]}"
+    fi
+
+    local enabled=false
+    for path in /etc/nginx/sites-enabled/*; do
+        [[ -e "$path" ]] || continue
+        resolved="$(readlink -f "$path" 2>/dev/null || true)"
+        for existing in "${configs[@]}"; do
+            if [[ "$resolved" == "$(readlink -f "$existing" 2>/dev/null || printf '%s' "$existing")" ]]; then
+                enabled=true
+            fi
+        done
+    done
+    if [[ "$enabled" == "true" ]]; then
+        audit_result PASS nginx.enabled "At least one discovered Core site is enabled."
+    else
+        audit_result MISSING nginx.enabled "Discovered Core site is not enabled."
+    fi
+
+    local expected_host found config
+    while IFS= read -r expected_host; do
+        [[ -n "$expected_host" ]] || continue
+        found=false
+        for config in "${configs[@]}"; do
+            if awk '$1 == "server_name" {for (i=2; i<=NF; i++) {gsub(/;/, "", $i); print $i}}' "$config" \
+                | grep -Fxq "$expected_host"
+            then
+                found=true
+                break
+            fi
+        done
+        if [[ "$found" == "true" ]]; then
+            audit_result PASS "nginx.host.$expected_host" "Core host is present in Nginx server_name."
+        else
+            audit_result MISSING "nginx.host.$expected_host" "Core host is not present in the discovered Nginx configuration."
+        fi
+    done < <(audit_core_hosts)
+
+    found=false
+    for config in "${configs[@]}"; do
+        if awk '$1 == "server_name" {for (i=2; i<=NF; i++) {gsub(/;/, "", $i); print $i}}' "$config" \
+            | grep -Fxq "$ROOT_DOMAIN"
+        then
+            found=true
+            break
+        fi
+    done
+    if [[ "$found" == "true" ]]; then
+        audit_result MISMATCH nginx.root_domain \
+            "Root domain $ROOT_DOMAIN appears in the Core Nginx site; Core must not take ownership of the main-site root."
+    else
+        audit_result PASS nginx.root_domain "Root domain is not owned by the Core Nginx site."
+    fi
+
+    found=false
+    for config in "${configs[@]}"; do
+        grep -Fq "root $APP_PATH/public;" "$config" && found=true
+    done
+    if [[ "$found" == "true" ]]; then
+        audit_result PASS nginx.document_root "Core Nginx document root points to $APP_PATH/public."
+    else
+        audit_result MISMATCH nginx.document_root "Discovered Nginx site does not point to $APP_PATH/public."
+    fi
+
+    found=false
+    for config in "${configs[@]}"; do
+        grep -Fq "fastcgi_pass unix:$PHP_FPM_SOCKET;" "$config" && found=true
+    done
+    if [[ "$found" == "true" ]]; then
+        audit_result PASS nginx.php_fpm "Nginx uses expected PHP-FPM socket $PHP_FPM_SOCKET."
+    else
+        audit_result MISMATCH nginx.php_fpm "Expected PHP-FPM socket $PHP_FPM_SOCKET was not found in the Core site."
+    fi
+
+    local nginx_test
+    set +e
+    nginx_test="$(sudo nginx -t 2>&1)"
+    local nginx_status=$?
+    set -e
+    if [[ "$nginx_status" -eq 0 ]]; then
+        audit_result PASS nginx.syntax "nginx -t passed."
+    else
+        audit_result MISMATCH nginx.syntax "$(printf '%s' "$nginx_test" | tail -n 3 | tr '\n' ' ')"
+    fi
+
+    local -a certs=()
+    local cert
+    for config in "${configs[@]}"; do
+        while IFS= read -r cert; do
+            [[ -n "$cert" ]] || continue
+            local seen=false
+            for existing in "${certs[@]:-}"; do
+                [[ "$existing" == "$cert" ]] && seen=true
+            done
+            [[ "$seen" == "true" ]] || certs+=("$cert")
+        done < <(awk '$1 == "ssl_certificate" {gsub(/;/, "", $2); print $2}' "$config")
+    done
+
+    if [[ ${#certs[@]} -eq 0 ]]; then
+        audit_result MISSING tls.certificate "No ssl_certificate was found in the Core Nginx configuration."
+        return
+    fi
+
+    require_command openssl
+    for cert in "${certs[@]}"; do
+        if [[ ! -r "$cert" ]]; then
+            audit_result MISSING "tls.file.$cert" "Certificate file is not readable."
+        elif openssl x509 -in "$cert" -noout -checkend 2592000 >/dev/null 2>&1; then
+            audit_result PASS "tls.expiry.$cert" "Certificate is valid for more than 30 days."
+        else
+            audit_result WARNING "tls.expiry.$cert" "Certificate expires within 30 days or could not be validated."
+        fi
+    done
+
+    while IFS= read -r expected_host; do
+        [[ -n "$expected_host" ]] || continue
+        found=false
+        for cert in "${certs[@]}"; do
+            [[ -r "$cert" ]] || continue
+            if openssl x509 -in "$cert" -noout -ext subjectAltName 2>/dev/null \
+                | grep -Fq "DNS:$expected_host"
+            then
+                found=true
+                break
+            fi
+        done
+        if [[ "$found" == "true" ]]; then
+            audit_result PASS "tls.host.$expected_host" "A configured certificate covers this Core host."
+        else
+            audit_result MISMATCH "tls.host.$expected_host" "No configured certificate SAN covers this Core host."
+        fi
+    done < <(audit_core_hosts)
+}
+
+audit_dns() {
+    note "DNS"
+    local server_ip="$AUDIT_SERVER_IP"
+    local source="explicit"
+
+    if [[ -z "$server_ip" ]] && command -v curl >/dev/null 2>&1; then
+        server_ip="$(curl -fsS --max-time 4 https://api.ipify.org 2>/dev/null || true)"
+        if [[ ! "$server_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            server_ip=""
+        else
+            source="observed public IPv4"
+        fi
+    fi
+
+    local host addresses
+    while IFS= read -r host; do
+        [[ -n "$host" ]] || continue
+        addresses="$(getent ahostsv4 "$host" 2>/dev/null | awk '{print $1}' | sort -u | paste -sd, -)"
+        if [[ -z "$addresses" ]]; then
+            audit_result MISSING "dns.$host" "No IPv4 address resolved."
+            continue
+        fi
+
+        if [[ -n "$AUDIT_SERVER_IP" ]]; then
+            if tr ',' '\n' <<<"$addresses" | grep -Fxq "$AUDIT_SERVER_IP"; then
+                audit_result PASS "dns.$host" "Resolves to authoritative server IPv4 $AUDIT_SERVER_IP."
+            else
+                audit_result MISMATCH "dns.$host" "Expected $AUDIT_SERVER_IP; resolved $addresses."
+            fi
+        elif [[ -n "$server_ip" ]]; then
+            if tr ',' '\n' <<<"$addresses" | grep -Fxq "$server_ip"; then
+                audit_result PASS "dns.$host" "Resolves to this server's $source $server_ip."
+            else
+                audit_result WARNING "dns.$host" \
+                    "Resolved $addresses, while this server reports $server_ip. Proxy/NAT may be intentional; use --server-ip for an authoritative direct-DNS comparison."
+            fi
+        else
+            audit_result "MANUAL VERIFICATION REQUIRED" "dns.$host" \
+                "Resolved IPv4: $addresses. Supply --server-ip to compare against an authoritative direct-DNS target."
+        fi
+    done < <(audit_core_hosts)
+}
+
+audit_runtime_directories() {
+    note "Runtime directory access"
+    local relative path owner group mode
+
+    for relative in storage storage/logs bootstrap/cache; do
+        path="$APP_PATH/$relative"
+        if [[ ! -d "$path" ]]; then
+            audit_result MISSING "runtime.$relative" "Directory is missing."
+            continue
+        fi
+
+        if sudo -u "$DEPLOY_USER" test -w "$path" && sudo -u "$WEB_USER" test -w "$path"; then
+            audit_result PASS "runtime.$relative.write" "$DEPLOY_USER and $WEB_USER both have effective write access."
+        else
+            audit_result MISMATCH "runtime.$relative.write" \
+                "Both $DEPLOY_USER and $WEB_USER must have effective write access."
+        fi
+
+        owner="$(stat -c '%U' "$path")"
+        group="$(stat -c '%G' "$path")"
+        mode="$(stat -c '%a' "$path")"
+        if [[ "$owner" == "$DEPLOY_USER" && "$group" == "$WEB_GROUP" && "$mode" == "2775" ]]; then
+            audit_result PASS "runtime.$relative.metadata" "Matches canonical $DEPLOY_USER:$WEB_GROUP 2775."
+        else
+            audit_result WARNING "runtime.$relative.metadata" \
+                "Effective access is authoritative for audit; canonical launcher metadata is $DEPLOY_USER:$WEB_GROUP 2775, found $owner:$group $mode."
+        fi
+    done
+}
+
+audit_supervisor() {
+    note "Supervisor / Horizon"
+    local canonical="/etc/supervisor/conf.d/${HORIZON_PROGRAM}.conf"
+    local config=""
+    local -a candidates=()
+
+    if [[ -f "$canonical" ]]; then
+        config="$canonical"
+    else
+        local path
+        for path in /etc/supervisor/conf.d/*.conf; do
+            [[ -f "$path" ]] || continue
+            if grep -Fq "$APP_PATH/artisan horizon" "$path" 2>/dev/null; then
+                candidates+=("$path")
+            fi
+        done
+        if [[ ${#candidates[@]} -eq 1 ]]; then
+            config="${candidates[0]}"
+        fi
+    fi
+
+    if [[ -z "$config" ]]; then
+        audit_result MISSING supervisor.config "No Supervisor Horizon config was found for $APP_PATH."
+        return
+    fi
+
+    if [[ "$config" == "$canonical" ]]; then
+        audit_result PASS supervisor.config "Canonical config exists at $canonical."
+    else
+        audit_result MISMATCH supervisor.config "Expected $canonical; found $config."
+    fi
+
+    local program directory user command
+    program="$(sed -n 's/^\[program:\([^]]*\)\].*/\1/p' "$config" | head -n 1)"
+    directory="$(sed -n 's/^directory=//p' "$config" | head -n 1)"
+    user="$(sed -n 's/^user=//p' "$config" | head -n 1)"
+    command="$(sed -n 's/^command=//p' "$config" | head -n 1)"
+
+    if [[ "$program" == "$HORIZON_PROGRAM" ]]; then
+        audit_result PASS supervisor.program "Program name is $program."
+    else
+        audit_result MISMATCH supervisor.program "Expected $HORIZON_PROGRAM; found ${program:-[missing]}."
+    fi
+
+    if [[ "$directory" == "$APP_PATH" && "$command" == *"$APP_PATH/artisan horizon"* ]]; then
+        audit_result PASS supervisor.path "Supervisor command/directory point at the audited checkout."
+    else
+        audit_result MISMATCH supervisor.path "Supervisor command/directory do not consistently point at $APP_PATH."
+    fi
+
+    if [[ "$user" == "$WEB_USER" ]]; then
+        audit_result PASS supervisor.user "Horizon runs as $WEB_USER."
+    else
+        audit_result MISMATCH supervisor.user "Expected $WEB_USER; found ${user:-[missing]}."
+    fi
+
+    local status_output status_code
+    set +e
+    status_output="$(sudo supervisorctl status "${program:-$HORIZON_PROGRAM}" 2>&1)"
+    status_code=$?
+    set -e
+    if [[ "$status_code" -eq 0 && "$status_output" == *"RUNNING"* ]]; then
+        audit_result PASS supervisor.running "$status_output"
+    else
+        audit_result MISMATCH supervisor.running "${status_output:-Supervisor program is not running.}"
+    fi
+
+    if ps aux | grep '[a]rtisan horizon' | grep -F "$APP_PATH" >/dev/null; then
+        audit_result PASS horizon.process "A Horizon process is running from $APP_PATH."
+    else
+        audit_result MISSING horizon.process "No Horizon process was found for $APP_PATH."
+    fi
+
+    audit_app_command horizon.status "$PHP_BIN" artisan horizon:status
+}
+
+audit_scheduler() {
+    note "Laravel Scheduler"
+    local cron expected
+    cron="$(sudo crontab -u "$SCHEDULER_USER" -l 2>/dev/null || true)"
+    expected="cd ${APP_PATH} && ${PHP_BIN} artisan schedule:run"
+
+    if printf '%s\n' "$cron" | grep -F "$expected" | grep -Fq "# ${SCHEDULER_MARKER}"; then
+        audit_result PASS scheduler.cron "Canonical Scheduler cron entry and marker are present for $SCHEDULER_USER."
+    elif printf '%s\n' "$cron" | grep -Fq "$APP_PATH" && printf '%s\n' "$cron" | grep -Fq "artisan schedule:run"; then
+        audit_result MISMATCH scheduler.cron \
+            "A Scheduler entry exists for this checkout but does not match canonical command/marker [${SCHEDULER_MARKER}]."
+    else
+        audit_result MISSING scheduler.cron "No Scheduler cron entry was found for $APP_PATH under $SCHEDULER_USER."
+    fi
+
+    audit_app_command scheduler.list "$PHP_BIN" artisan schedule:list
+}
+
+audit_database_and_namespaces() {
+    note "Database / Redis identity"
+    local db_host db_name db_user db_password
+    db_host="$(env_get "$ROOT_ENV" DB_HOST)"
+    db_name="$(env_get "$CLIENT_ENV" DB_DATABASE)"
+    db_user="$(env_get "$CLIENT_ENV" DB_USERNAME)"
+    db_password="$(env_get "$CLIENT_ENV" DB_PASSWORD)"
+
+    if [[ "$DEPLOY_ENV" == "staging" ]]; then
+        if [[ "$db_host" == "127.0.0.1" || "$db_host" == "localhost" ]]; then
+            audit_result PASS database.topology "Core staging uses a local database host [$db_host]."
+        else
+            audit_result MISMATCH database.topology "Core staging must use local MySQL; found DB_HOST [$db_host]."
+        fi
+    else
+        if [[ -n "$db_host" && "$db_host" != "127.0.0.1" && "$db_host" != "localhost" ]]; then
+            audit_result PASS database.topology "Core production uses remote database host [$db_host]."
+        else
+            audit_result MISMATCH database.topology "Core production must use a remote DB_HOST; found [${db_host:-blank}]."
+        fi
+    fi
+
+    if [[ "$db_name" == "$DB_DATABASE_DERIVED" ]]; then
+        audit_result PASS database.name "DB_DATABASE matches canonical [$DB_DATABASE_DERIVED]."
+    elif [[ -z "$db_name" ]]; then
+        audit_result MISSING database.name "DB_DATABASE is blank."
+    else
+        audit_result MISMATCH database.name "Expected [$DB_DATABASE_DERIVED]; found [$db_name]."
+    fi
+
+    if [[ "$db_user" == "$DB_USERNAME_DERIVED" ]]; then
+        audit_result PASS database.user "DB_USERNAME matches canonical [$DB_USERNAME_DERIVED]."
+    elif [[ -z "$db_user" ]]; then
+        audit_result MISSING database.user "DB_USERNAME is blank."
+    else
+        audit_result MISMATCH database.user "Expected [$DB_USERNAME_DERIVED]; found [$db_user]."
+    fi
+
+    if [[ -n "$db_password" ]]; then
+        audit_result PASS database.password "DB_PASSWORD is populated; value not displayed."
+    else
+        audit_result MISSING database.password "DB_PASSWORD is blank."
+    fi
+
+    audit_env_equals "$CLIENT_ENV" CACHE_PREFIX "$CACHE_PREFIX" redis.cache_prefix
+    audit_env_equals "$CLIENT_ENV" REDIS_PREFIX "$REDIS_PREFIX" redis.prefix
+    audit_env_equals "$CLIENT_ENV" HORIZON_PREFIX "$HORIZON_PREFIX" redis.horizon_prefix
+
+    local cache_value redis_value horizon_value
+    cache_value="$(env_get "$CLIENT_ENV" CACHE_PREFIX)"
+    redis_value="$(env_get "$CLIENT_ENV" REDIS_PREFIX)"
+    horizon_value="$(env_get "$CLIENT_ENV" HORIZON_PREFIX)"
+    audit_prefix_collision CACHE_PREFIX "$cache_value" redis.cache_collision
+    audit_prefix_collision REDIS_PREFIX "$redis_value" redis.redis_collision
+    audit_prefix_collision HORIZON_PREFIX "$horizon_value" redis.horizon_collision
+
+    audit_env_equals "$ROOT_ENV" REDIS_HOST 127.0.0.1 redis.host
+    audit_env_equals "$ROOT_ENV" REDIS_DB 0 redis.database
+    audit_env_equals "$ROOT_ENV" REDIS_CACHE_DB 1 redis.cache_database
+}
+
+audit_environment_identity() {
+    note "Environment / client identity"
+    audit_env_file_metadata "$ROOT_ENV" env.root
+    audit_env_file_metadata "$CLIENT_ENV" env.client
+
+    [[ -f "$ROOT_ENV" && -f "$CLIENT_ENV" ]] || return 0
+
+    audit_env_equals "$ROOT_ENV" APP_ENV "$DEPLOY_ENV" env.app_env
+    audit_env_equals "$ROOT_ENV" CLIENT_KEY "$CLIENT_KEY" env.client_key
+    audit_env_present_redacted "$ROOT_ENV" APP_KEY env.app_key
+    audit_env_equals "$CLIENT_ENV" ROOT_DOMAIN "$ROOT_DOMAIN" env.root_domain
+    audit_env_equals "$CLIENT_ENV" APP_URL "https://$ROOT_DOMAIN" env.app_url
+
+    local crm_url discovered_crm
+    crm_url="$(env_get "$CLIENT_ENV" CRM_APP_URL)"
+    if [[ -n "$AUDIT_CRM_HOST" ]]; then
+        CRM_HOST="$(python3 "$HELPER" origin-host --origin "https://$AUDIT_CRM_HOST" 2>/dev/null || true)"
+        if [[ -z "$CRM_HOST" ]]; then
+            audit_result MISMATCH env.crm_host "Provided --crm-host [$AUDIT_CRM_HOST] is invalid."
+            CRM_HOST="$(audit_identity_value crm_host)"
+        fi
+    elif [[ -n "$crm_url" ]]; then
+        discovered_crm="$(python3 "$HELPER" origin-host --origin "$crm_url" 2>/dev/null || true)"
+        CRM_HOST="${discovered_crm:-$(audit_identity_value crm_host)}"
+    else
+        CRM_HOST="$(audit_identity_value crm_host)"
+    fi
+    audit_env_equals "$CLIENT_ENV" CRM_APP_URL "https://$CRM_HOST" env.crm_app_url
+
+    WEBHOOKS_HOST="$(audit_identity_value webhooks_host)"
+    WEBINAR_HOST="$(audit_identity_value webinar_host)"
+    MESSAGING_HOST="$(audit_identity_value messaging_host)"
+}
+
+run_audit() {
+    audit_reset
+    require_command python3
+    require_command git
+    require_command stat
+    require_command find
+    require_command getent
+    require_command sudo
+    require_command awk
+    require_command grep
+
+    AUDIT_IDENTITY_JSON="$(python3 "$HELPER" derive-audit \
+        --environment "$DEPLOY_ENV" \
+        --client-key "$CLIENT_KEY" \
+        --root-domain "$ROOT_DOMAIN")"
+
+    CANONICAL_APP_PATH="$(audit_identity_value app_path)"
+    DB_DATABASE_DERIVED="$(audit_identity_value database_name)"
+    DB_USERNAME_DERIVED="$(audit_identity_value database_user)"
+    CACHE_PREFIX="$(audit_identity_value cache_prefix)"
+    REDIS_PREFIX="$(audit_identity_value redis_prefix)"
+    HORIZON_PREFIX="$(audit_identity_value horizon_prefix)"
+    HORIZON_PROGRAM="$(audit_identity_value horizon_program)"
+    NGINX_SITE_NAME="$(audit_identity_value nginx_site_name)"
+    SCHEDULER_MARKER="$(audit_identity_value scheduler_marker)"
+
+    local discovery_status=0
+    set +e
+    APP_PATH="$(audit_find_app_path "$AUDIT_APP_PATH" "$CANONICAL_APP_PATH")"
+    discovery_status=$?
+    set -e
+
+    if [[ "$discovery_status" -ne 0 || -z "$APP_PATH" ]]; then
+        if [[ "$discovery_status" -eq 2 ]]; then
+            audit_result MISMATCH deployment.app_path.discovery \
+                "Multiple matching checkouts exist. Rerun audit with --app-path."
+        else
+            audit_result MISSING deployment.app_path.discovery \
+                "No Core checkout containing client [$CLIENT_KEY] was found. Rerun with --app-path if it is outside /var/www."
+        fi
+        audit_summary
+        return 1
+    fi
+
+    if [[ "$APP_PATH" == "$CANONICAL_APP_PATH" ]]; then
+        audit_result PASS deployment.app_path "Checkout is at canonical path $CANONICAL_APP_PATH."
+    else
+        audit_result MISMATCH deployment.app_path \
+            "Canonical path is $CANONICAL_APP_PATH; existing deployment is at $APP_PATH."
+    fi
+
+    CLIENT_PATH="$APP_PATH/client/$CLIENT_KEY"
+    ROOT_ENV="$APP_PATH/.env"
+    CLIENT_ENV="$CLIENT_PATH/.env"
+    DEPLOY_USER="$AUDIT_DEPLOY_USER"
+    WEB_USER="$AUDIT_WEB_USER"
+    WEB_GROUP="$AUDIT_WEB_GROUP"
+    SCHEDULER_USER="$AUDIT_SCHEDULER_USER"
+
+    PHP_BIN="$(command -v php || true)"
+    if [[ -z "$PHP_BIN" ]]; then
+        audit_result MISSING runtime.php "PHP is not installed or not on PATH."
+        audit_summary
+        return 1
+    fi
+    PHP_VERSION="$("$PHP_BIN" -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
+    PHP_FPM_SOCKET="/run/php/php${PHP_VERSION}-fpm.sock"
+
+    if id "$DEPLOY_USER" >/dev/null 2>&1; then
+        audit_result PASS runtime.deploy_user "Deploy user [$DEPLOY_USER] exists."
+    else
+        audit_result MISSING runtime.deploy_user "Deploy user [$DEPLOY_USER] does not exist."
+    fi
+    if id "$WEB_USER" >/dev/null 2>&1; then
+        audit_result PASS runtime.web_user "Web user [$WEB_USER] exists."
+    else
+        audit_result MISSING runtime.web_user "Web user [$WEB_USER] does not exist."
+    fi
+    if getent group "$WEB_GROUP" >/dev/null 2>&1; then
+        audit_result PASS runtime.web_group "Web group [$WEB_GROUP] exists."
+    else
+        audit_result MISSING runtime.web_group "Web group [$WEB_GROUP] does not exist."
+    fi
+    if id "$SCHEDULER_USER" >/dev/null 2>&1; then
+        audit_result PASS runtime.scheduler_user "Scheduler user [$SCHEDULER_USER] exists."
+    else
+        audit_result MISSING runtime.scheduler_user "Scheduler user [$SCHEDULER_USER] does not exist."
+    fi
+
+    note "Repository state"
+    local expected_core_origin
+    expected_core_origin="$(git -C "$BUNDLE_ROOT" remote get-url origin 2>/dev/null || true)"
+    audit_git_repo "$APP_PATH" source.core "$AUDIT_CORE_BRANCH" "$expected_core_origin"
+    audit_git_repo "$CLIENT_PATH" source.client "$AUDIT_CLIENT_BRANCH" "$AUDIT_CLIENT_REPO"
+
+    audit_environment_identity
+    if [[ ! -f "$ROOT_ENV" || ! -f "$CLIENT_ENV" ]]; then
+        audit_summary
+        return 1
+    fi
+
+    audit_database_and_namespaces
+
+    note "Application deployment contract"
+    AUDIT_PLAN_JSON=""
+    audit_resolve_plan
+
+    audit_app_command modules.status "$PHP_BIN" artisan modules:status
+    audit_app_command setup.validate "$PHP_BIN" artisan setup:validate
+
+    audit_runtime_directories
+    audit_supervisor
+    audit_scheduler
+    audit_nginx
+    audit_dns
+
+    audit_summary
+}
+
+parse_audit() {
+    local environment=""
+    local client_key=""
+    local root_domain=""
+    local app_path=""
+    local client_repo=""
+    local crm_host=""
+    local core_branch="main"
+    local client_branch="main"
+    local deploy_user
+    deploy_user="$(id -un)"
+    local web_user="www-data"
+    local web_group="www-data"
+    local scheduler_user=""
+    local server_ip=""
+
+    while (($#)); do
+        case "$1" in
+            --environment) environment=${2:?}; shift 2 ;;
+            --client-key) client_key=${2:?}; shift 2 ;;
+            --root-domain) root_domain=${2:?}; shift 2 ;;
+            --app-path) app_path=${2:?}; shift 2 ;;
+            --client-repo) client_repo=${2:?}; shift 2 ;;
+            --crm-host) crm_host=${2:?}; shift 2 ;;
+            --core-branch) core_branch=${2:?}; shift 2 ;;
+            --client-branch) client_branch=${2:?}; shift 2 ;;
+            --deploy-user) deploy_user=${2:?}; shift 2 ;;
+            --web-user) web_user=${2:?}; shift 2 ;;
+            --web-group) web_group=${2:?}; shift 2 ;;
+            --scheduler-user) scheduler_user=${2:?}; shift 2 ;;
+            --server-ip) server_ip=${2:?}; shift 2 ;;
+            -h|--help) usage; return 0 ;;
+            *) fail "Unknown audit argument: $1" ;;
+        esac
+    done
+
+    [[ "$environment" == "staging" || "$environment" == "production" ]] \
+        || fail "audit requires --environment staging|production."
+    [[ -n "$client_key" ]] || fail "audit requires --client-key."
+    [[ -n "$root_domain" ]] || fail "audit requires --root-domain."
+    [[ "$client_key" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || fail "Invalid --client-key [$client_key]."
+
+    DEPLOY_ENV="$environment"
+    CLIENT_KEY="$client_key"
+    ROOT_DOMAIN="$(python3 "$HELPER" derive-audit \
+        --environment "$environment" \
+        --client-key "$client_key" \
+        --root-domain "$root_domain" \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin)["root_domain"])')"
+
+    AUDIT_APP_PATH="$app_path"
+    AUDIT_CLIENT_REPO="$client_repo"
+    AUDIT_CRM_HOST="$crm_host"
+    AUDIT_CORE_BRANCH="$core_branch"
+    AUDIT_CLIENT_BRANCH="$client_branch"
+    AUDIT_DEPLOY_USER="$deploy_user"
+    AUDIT_WEB_USER="$web_user"
+    AUDIT_WEB_GROUP="$web_group"
+    AUDIT_SCHEDULER_USER="${scheduler_user:-$deploy_user}"
+    AUDIT_SERVER_IP="$server_ip"
+
+    run_audit
+}
+
 http_status() {
     curl -sS -o /dev/null -w '%{http_code}' "$1"
 }
@@ -1297,6 +2250,9 @@ main() {
             load_state
             write_plan_json || true
             verify_runtime
+            ;;
+        audit)
+            parse_audit "$@"
             ;;
         derive)
             parse_derive "$@"

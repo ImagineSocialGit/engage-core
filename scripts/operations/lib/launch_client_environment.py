@@ -8,6 +8,7 @@ import json
 import os
 import re
 import stat
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -85,12 +86,12 @@ def bounded_identifier(value: str, maximum: int, separator: str = '_') -> str:
     return f'{prefix}{separator}{digest}'
 
 
-def derive_identity(environment: str, client_repo: str, root_domain: str, client_key_override: str | None, var_root: str) -> dict[str, Any]:
+def _derived_runtime_identity(environment: str, client_key: str, root_domain: str) -> dict[str, Any]:
     if environment not in {'staging', 'production'}:
         fail('Environment must be staging or production.')
 
     domain = normalize_domain(root_domain)
-    key = client_key_override.strip() if client_key_override else repo_slug(client_repo)
+    key = client_key.strip()
     if not re.fullmatch(r'[a-z0-9][a-z0-9_-]*', key):
         fail(f'Invalid client key [{key}]. Expected lowercase letters, numbers, hyphens, and underscores.')
 
@@ -98,13 +99,10 @@ def derive_identity(environment: str, client_repo: str, root_domain: str, client
     namespaced_stem = stem if environment == 'production' else f'{stem}_{environment}'
     database = bounded_identifier(namespaced_stem, 64)
     database_user = bounded_identifier(namespaced_stem, 32)
-    state_slug = bounded_identifier(f'{domain}-{environment}', 120, '-')
 
     return {
         'environment': environment,
-        'client_repo_url': client_repo,
         'client_key': key,
-        'repo_slug': repo_slug(client_repo),
         'root_domain': domain,
         'runtime_stem': stem,
         'runtime_prefix_stem': namespaced_stem,
@@ -123,9 +121,24 @@ def derive_identity(environment: str, client_repo: str, root_domain: str, client
         'horizon_program': f'{domain}-horizon',
         'nginx_site_name': f'{domain}-core',
         'scheduler_marker': f'engage-core:{domain}',
-        'state_file': str(Path(var_root).expanduser() / f'{state_slug}.json'),
     }
 
+
+def derive_identity(environment: str, client_repo: str, root_domain: str, client_key_override: str | None, var_root: str) -> dict[str, Any]:
+    key = client_key_override.strip() if client_key_override else repo_slug(client_repo)
+    identity = _derived_runtime_identity(environment, key, root_domain)
+    domain = identity['root_domain']
+    state_slug = bounded_identifier(f'{domain}-{environment}', 120, '-')
+    identity.update({
+        'client_repo_url': client_repo,
+        'repo_slug': repo_slug(client_repo),
+        'state_file': str(Path(var_root).expanduser() / f'{state_slug}.json'),
+    })
+    return identity
+
+
+def derive_audit_identity(environment: str, client_key: str, root_domain: str) -> dict[str, Any]:
+    return _derived_runtime_identity(environment, client_key, root_domain)
 
 def dotenv_serialize(value: str) -> str:
     if value != '' and re.fullmatch(r'[A-Za-z0-9_./:@%+,-]+', value):
@@ -402,6 +415,131 @@ def run_setup_steps(plan_path: Path, root_env: Path, client_env: Path, state_pat
     return completed_now
 
 
+def audit_text(value: Any) -> str:
+    return re.sub(r'\s+', ' ', str(value)).strip()
+
+
+def audit_line(status: str, key: str, message: str) -> None:
+    print('\t'.join([
+        audit_text(status),
+        audit_text(key),
+        audit_text(message),
+    ]))
+
+
+def command_derive_audit(args: argparse.Namespace) -> None:
+    print(json.dumps(
+        derive_audit_identity(args.environment, args.client_key, args.root_domain),
+        indent=2,
+        sort_keys=True,
+    ))
+
+
+def command_env_collisions(args: argparse.Namespace) -> None:
+    search_root = Path(args.search_root)
+    exclude = Path(args.exclude).resolve() if args.exclude else None
+
+    if not search_root.exists():
+        return
+
+    for path in sorted(search_root.rglob('.env')):
+        try:
+            resolved = path.resolve()
+            if exclude is not None and resolved == exclude:
+                continue
+            values = env_values(path)
+        except (OSError, UnicodeError):
+            continue
+
+        if values.get(args.key) == args.value:
+            print(path)
+
+
+def command_plan_modules_stdin(args: argparse.Namespace) -> None:
+    try:
+        plan = json.load(sys.stdin)
+    except json.JSONDecodeError as exc:
+        fail(f'Invalid deployment-plan JSON on stdin: {exc}')
+
+    if not isinstance(plan, dict):
+        fail('Deployment-plan JSON must decode to an object.')
+
+    for module in plan.get('enabled_modules', []):
+        if isinstance(module, str) and module.strip():
+            print(module.strip())
+
+
+def command_plan_audit(args: argparse.Namespace) -> None:
+    try:
+        plan = json.load(sys.stdin)
+    except json.JSONDecodeError as exc:
+        fail(f'Invalid deployment-plan JSON on stdin: {exc}')
+
+    if not isinstance(plan, dict):
+        fail('Deployment-plan JSON must decode to an object.')
+
+    blocking = [item for item in plan_requirements(plan) if blocks(item)]
+    if blocking:
+        for item in blocking:
+            key = audit_text(item.get('key', 'unknown'))
+            scope = audit_text(item.get('scope', 'unknown'))
+            owner = audit_text(item.get('owner', 'unknown'))
+            status = audit_text(item.get('status', 'unknown'))
+            reason = audit_text(item.get('reason', 'Deployment requirement is not ready.'))
+            audit_line(
+                'MISMATCH',
+                f'deployment_plan.{key}',
+                f'{scope}/{owner} requirement is {status}: {reason}',
+            )
+    else:
+        audit_line(
+            'PASS',
+            'deployment_plan.ready',
+            'No blocking environment requirements were reported.',
+        )
+
+    modules = [
+        module.strip()
+        for module in plan.get('enabled_modules', [])
+        if isinstance(module, str) and module.strip()
+    ]
+    audit_line(
+        'PASS',
+        'deployment_plan.modules',
+        'Enabled modules: ' + (', '.join(modules) if modules else '[none]'),
+    )
+
+    unused = [
+        audit_text(key)
+        for key in plan.get('unused_environment_keys', [])
+        if isinstance(key, str) and key.strip()
+    ]
+    if unused:
+        audit_line(
+            'WARNING',
+            'deployment_plan.unused_environment',
+            'Present but currently unused environment keys: ' + ', '.join(unused),
+        )
+
+    for step in plan.get('setup_steps', []):
+        if not isinstance(step, dict):
+            continue
+        key = audit_text(step.get('key', 'external_setup'))
+        title = audit_text(step.get('title', key))
+        verification = [
+            audit_text(item)
+            for item in step.get('verification', [])
+            if isinstance(item, str) and item.strip()
+        ]
+        suffix = ' Verification: ' + ' '.join(verification) if verification else ''
+        audit_line(
+            'MANUAL VERIFICATION REQUIRED',
+            f'external_setup.{key}',
+            f'{title} requires provider/dashboard or real-event verification.{suffix}',
+        )
+
+
+
 def command_derive(args: argparse.Namespace) -> None:
     print(json.dumps(derive_identity(
         args.environment,
@@ -555,6 +693,12 @@ def build_parser() -> argparse.ArgumentParser:
     derive.add_argument('--state-root', default='~/.local/state/engage/deployments')
     derive.set_defaults(func=command_derive)
 
+    derive_audit = sub.add_parser('derive-audit')
+    derive_audit.add_argument('--environment', required=True, choices=['staging', 'production'])
+    derive_audit.add_argument('--client-key', required=True)
+    derive_audit.add_argument('--root-domain', required=True)
+    derive_audit.set_defaults(func=command_derive_audit)
+
     env_set = sub.add_parser('env-set')
     env_set.add_argument('--file', required=True)
     env_set.add_argument('--key', required=True)
@@ -626,6 +770,19 @@ def build_parser() -> argparse.ArgumentParser:
     blocking = sub.add_parser('plan-blocking-count')
     blocking.add_argument('--plan', required=True)
     blocking.set_defaults(func=command_plan_blocking_count)
+
+    plan_modules_stdin = sub.add_parser('plan-modules-stdin')
+    plan_modules_stdin.set_defaults(func=command_plan_modules_stdin)
+
+    plan_audit = sub.add_parser('plan-audit')
+    plan_audit.set_defaults(func=command_plan_audit)
+
+    collisions = sub.add_parser('env-collisions')
+    collisions.add_argument('--search-root', required=True)
+    collisions.add_argument('--key', required=True)
+    collisions.add_argument('--value', required=True)
+    collisions.add_argument('--exclude')
+    collisions.set_defaults(func=command_env_collisions)
 
     origin_host = sub.add_parser('origin-host')
     origin_host.add_argument('--origin', required=True)
