@@ -286,23 +286,23 @@ The result vocabulary is:
 
 ```text
 PASS
+INFO
 WARNING
-MISMATCH
-MISSING
+BREAKING
 MANUAL VERIFICATION REQUIRED
 ```
 
-An audit returns non-zero when at least one `MISMATCH` or `MISSING` finding exists.
+`INFO` is harmless historical/canonical drift. `WARNING` is unproven risk, incomplete evidence, or a deliberate review item. `BREAKING` is reserved for a current active-runtime, security, or isolation contract that the auditor can actually prove is failing. Only `BREAKING` findings fail the normal audit result and only `BREAKING` findings may feed the automatic-fix registry.
 
 The audit implementation must not call mutating launcher helpers or commands. In particular it must not write environment files/state, run `engage:environment:sync --write-missing`, change permissions, migrate/install schema, alter Nginx/Supervisor/cron, issue certificates, reload services, clear Redis, or change provider/DNS state.
 
-For staging `.env` files, the currently proven convention is deploy-user ownership, deploy-user primary group, and mode `0664`. Runtime-directory correctness is tested through effective deploy/web write access; metadata divergence from the launcher convention is a warning when access is still effective.
+For staging `.env` files, the currently proven convention is deploy-user ownership, deploy-user primary group, and mode `0664`. Runtime-directory correctness is tested through effective deploy/web write access; metadata divergence from the launcher convention is `INFO` when access is still effective.
 
 The staging-proven `.env` mode is not automatically declared the production secret-file mode. Production mode/group remains an explicit review item until that contract is separately proven.
 
 ## Audit-driven fix contract
 
-Automated `fix` remains gated on real audit results from established staging clients, the known Thompson Square drift case, and the fresh Buddy's deployment.
+Automated `fix` remains gated on real audit results from the Rob pre-cutover case, an older active Engage Core staging client, the Thompson Square metadata-drift case, and the fresh Buddy's deployment.
 
 The required future flow is:
 
@@ -315,13 +315,14 @@ audit
 
 `fix --dry-run` must describe every proposed mutation before application. `fix --apply` must require explicit operator intent.
 
-Potential safe deterministic fix classes include:
+Potential safe deterministic fix classes exist only when the corresponding audit finding is `BREAKING`, for example:
 
-- approved runtime-directory ownership/modes;
-- Core-owned Nginx site reconciliation;
-- Supervisor/Horizon program reconciliation;
-- exact Scheduler cron reconciliation;
-- canonical Redis/cache/Horizon namespaces when the migration is explicitly safe.
+- restoring effective runtime-directory access required by the active process identities;
+- repairing Core-owned Nginx/TLS state that prevents a required active host from working;
+- restoring a missing/broken active Horizon runtime after process ownership is proven;
+- restoring a required Scheduler entry when scheduled work would otherwise not run.
+
+Canonical Redis/cache/Horizon names, database names/users, checkout paths, Supervisor program names, cron markers, Nginx filenames, or equivalent identities are never fix candidates merely because they differ from a new deployment.
 
 Hard exclusions from silent fix behavior include:
 
@@ -333,7 +334,7 @@ Hard exclusions from silent fix behavior include:
 - Project State;
 - destructive production schema/state operations.
 
-A finding is not automatically fixable merely because the auditor can detect it. The fix registry must classify ownership, safety, prerequisites, and whether a restart/reload is required before exposing an apply action.
+A finding is not automatically fixable merely because the auditor can detect it. The fix registry first requires `BREAKING`, then must classify ownership, safety, prerequisites, and whether a restart/reload is required before exposing an apply action. `INFO`, `WARNING`, and `MANUAL VERIFICATION REQUIRED` are categorically excluded from automatic fix.
 
 
 ## Remaining higher-level work
@@ -341,3 +342,29 @@ A finding is not automatically fixable merely because the auditor can detect it.
 The Core launcher deliberately does not yet deploy an SEO Site or Artist Site. A later host/client orchestrator can call compatible sub-deployment entry points for those platforms while retaining the topology/data-mode rules defined here.
 
 Shared-production-data SEO/Artist preview staging must remain protected from migrations, destructive resets, and production-side-effect workers even when that higher-level orchestrator is added.
+
+## Legacy deployment audit classification
+
+The read-only auditor must distinguish four different states:
+
+1. **live current Core defect** — the audited Engage Core checkout owns the CRM hostname
+   and a required runtime contract is actually broken;
+2. **legacy canonical drift** — a populated path/name/prefix differs from today's
+   deterministic naming but remains a potentially valid existing identity;
+3. **inactive/pre-cutover Engage Core checkout** — the checkout exists but the CRM
+   hostname is currently served by another application;
+4. **external/manual state** — provider-dashboard or infrastructure facts that cannot be
+   proven safely from the host.
+
+Only the first category can become an automatic-fix candidate, and only after the
+specific finding is classified `BREAKING`. Legacy canonical drift is not normalized at
+all merely for consistency. A pre-cutover checkout owned by another live application
+requires a migration/cutover plan rather than a generic repair.
+
+The auditor discovers CRM host ownership from enabled Nginx server blocks. When a
+different document root owns the host, missing Core Supervisor/Scheduler/Nginx entries
+for the inactive checkout are not counted as live-service failures.
+
+Omitted root/process values with documented Core defaults, including Redis host/database
+defaults, are valid. A duplicate namespace found only by scanning another environment
+file is a warning until concurrent runtime use is independently established. An isolated, functioning legacy namespace remains valid even when its formatting differs from the current derivation rule.

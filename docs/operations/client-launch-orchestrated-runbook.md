@@ -185,15 +185,17 @@ The report uses:
 
 ```text
 PASS
+INFO
 WARNING
-MISMATCH
-MISSING
+BREAKING
 MANUAL VERIFICATION REQUIRED
 ```
 
-`MISMATCH` and `MISSING` produce a non-zero audit exit status. Warnings and manual-verification items do not by themselves make the audit fail.
+Only `BREAKING` means the auditor has proved a current runtime/security/isolation contract is actually failing on the active Engage Core deployment. `INFO` records harmless legacy/canonical drift. `WARNING` records something unusual, incomplete, or worth review that has not been proved to break the platform. `MANUAL VERIFICATION REQUIRED` is reserved for facts the host cannot safely prove by itself.
 
-The audit compares the existing deployment to the canonical naming/topology rules while preserving important deployment-owned exceptions. In particular, `CRM_APP_URL` remains authoritative unless `--crm-host` is supplied, because the CRM hostname is not required to use the literal `crm.` label.
+Only `BREAKING` findings make the normal audit result fail and only `BREAKING` findings may enter the future automatic-fix registry. A different legacy name, path, prefix, process label, or metadata convention must never become fix work merely because `new` would derive a different value today.
+
+The audit uses canonical naming/topology as a **reference for new deployments**, not a normalization mandate for existing ones. Functional runtime contracts are authoritative. In particular, `CRM_APP_URL` remains authoritative unless `--crm-host` is supplied, because the CRM hostname is not required to use the literal `crm.` label.
 
 For staging environment files, the current proven convention is:
 
@@ -203,7 +205,7 @@ group: deploy user's primary group
 mode: 0664
 ```
 
-Runtime directories are a separate contract. Audit checks effective deploy-user and PHP-FPM-user write access without creating probe files. Canonical `deploy-user:web-group 2775` metadata differences are warnings when effective access is valid.
+Runtime directories are a separate contract. Audit checks effective deploy-user and PHP-FPM-user write access without creating probe files. Canonical `deploy-user:web-group 2775` metadata differences are informational when effective access is valid.
 
 For production environment-file mode/group, audit reports the current metadata for manual verification rather than silently extending the staging-proven `0664` convention to secret-bearing production files.
 
@@ -213,11 +215,12 @@ The deployment plan contributes provider setup steps to the report as `MANUAL VE
 
 Before adding automated repair, exercise the auditor against:
 
-1. Rob staging and/or Slam Dunk staging as established deployments;
-2. Thompson Square staging as the known environment-file-permission drift case;
-3. Buddy's staging as the fresh launcher-created reference environment.
+1. Rob staging as the known pre-cutover/legacy-owner case;
+2. Slam Dunk staging as an older active Engage Core deployment;
+3. Thompson Square staging as the known environment-file-metadata drift case;
+4. Buddy's staging as the fresh launcher-created reference environment.
 
-Do not manually normalize Thompson Square first; it is useful evidence that the auditor detects real legacy drift.
+Do not manually normalize Thompson Square first. Its different but potentially functional metadata is useful evidence that the auditor reports legacy drift without treating it as repair work unless effective access is actually broken.
 
 ## Audit-driven fix path
 
@@ -239,7 +242,9 @@ fix --apply
 audit again
 ```
 
-The future fix command may automate only explicitly safe deterministic server-owned drift such as approved runtime permissions, Core-owned Nginx configuration, Supervisor/Horizon configuration, Scheduler cron, and canonical runtime prefixes/namespaces.
+The future fix command may automate only explicitly safe deterministic remediation for a `BREAKING` finding, such as repairing proven runtime write access, restoring a required active Horizon process, restoring a required Scheduler entry, or repairing Core-owned Nginx/TLS state that is demonstrably preventing the active deployment from working.
+
+It must not rename or rewrite a healthy legacy database identity, Redis/cache/Horizon prefix, checkout path, Supervisor program, cron marker, Nginx filename, process user, or other operational identity solely to match the convention used by `new`.
 
 It must never silently change remote database credentials, provider credentials/secrets, provider dashboards, DNS, CRM/business data, Project State, or destructive schema/runtime state.
 
@@ -291,3 +296,38 @@ managed_main_site
 `core_services_only` means the root website is external. The launcher must not modify it.
 
 `managed_main_site` records that an SEO Site, Artist Site, or another managed application owns the root website. The current Core launcher still does not point that root domain at Core; the future higher-level site orchestrator will deploy the owning site application separately.
+
+## Audit classification for legacy and pre-cutover installs
+
+Existing-client audit distinguishes **canonical drift** from **live-service defects**.
+
+A noncanonical checkout path, database name/user, runtime prefix, Supervisor program
+name, Nginx filename, or equivalent operational identity is `INFO` when it remains a
+valid existing value. The audit does not require an older deployment to be renamed
+merely to match today's launcher naming.
+
+Before evaluating Core runtime services, audit resolves the enabled Nginx owner of the
+CRM hostname. If that hostname points at another checkout, the selected Engage Core
+checkout is treated as an inactive/pre-cutover candidate. Runtime-directory gaps and
+missing dependencies are then cutover-readiness information/warnings, while missing
+Core Supervisor/Scheduler/Nginx state is not misreported as a defect in the currently
+served application.
+
+If `vendor/autoload.php` is absent, audit reports Composer-runtime availability once and
+does not repeat the same root cause as independent deployment-plan, modules, setup, and
+schedule command failures.
+
+Redis database/host settings that are omitted and therefore use Core defaults are valid.
+Duplicate prefix values found in another `.env` remain warnings until active concurrent
+runtime use is proven; file duplication by itself is not proof of a live Redis collision.
+A noncanonical prefix that is isolated and functional is never fix-eligible.
+
+A CRM hostname actively served by a legacy application is `INFO` describing current
+runtime ownership and a future migration/cutover boundary. It is not a broken Engage
+Core deployment and is never eligible for generic `fix --apply`. Multiple enabled Nginx
+owners for the same CRM hostname, by contrast, are `BREAKING` because ownership is
+actually ambiguous and unsafe.
+
+The auditor also performs an HTTPS CRM login smoke for the active Engage Core checkout.
+This lets harmless differences such as a noncanonical PHP-FPM socket remain
+informational when the application is actually serving requests successfully.

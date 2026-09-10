@@ -487,7 +487,7 @@ def command_plan_audit(args: argparse.Namespace) -> None:
             status = audit_text(item.get('status', 'unknown'))
             reason = audit_text(item.get('reason', 'Deployment requirement is not ready.'))
             audit_line(
-                'MISMATCH',
+                'BREAKING',
                 f'deployment_plan.{key}',
                 f'{scope}/{owner} requirement is {status}: {reason}',
             )
@@ -674,6 +674,88 @@ def command_plan_blocking_count(args: argparse.Namespace) -> None:
 
 
 
+def _nginx_server_blocks(text: str) -> list[str]:
+    blocks: list[str] = []
+    pattern = re.compile(r'\bserver\s*\{')
+    position = 0
+
+    while True:
+        match = pattern.search(text, position)
+        if match is None:
+            break
+
+        start = match.start()
+        depth = 0
+        end = None
+
+        for index in range(match.end() - 1, len(text)):
+            char = text[index]
+            if char == '{':
+                depth += 1
+            elif char == '}':
+                depth -= 1
+                if depth == 0:
+                    end = index + 1
+                    break
+
+        if end is None:
+            break
+
+        blocks.append(text[start:end])
+        position = end
+
+    return blocks
+
+
+def command_nginx_host_owners(args: argparse.Namespace) -> None:
+    directory = Path(args.directory)
+    host = normalize_domain(args.host)
+    owners: list[dict[str, str]] = []
+
+    if not directory.exists():
+        print('[]')
+        return
+
+    for path in sorted(directory.iterdir()):
+        if not path.exists() or path.is_dir():
+            continue
+
+        try:
+            text = path.read_text(errors='replace')
+        except OSError:
+            continue
+
+        for block in _nginx_server_blocks(text):
+            server_names: list[str] = []
+            for match in re.finditer(r'(?m)^\s*server_name\s+([^;]+);', block):
+                server_names.extend(
+                    item.strip().lower().rstrip('.')
+                    for item in match.group(1).split()
+                    if item.strip()
+                )
+
+            if host not in server_names:
+                continue
+
+            root_match = re.search(r'(?m)^\s*root\s+([^;]+);', block)
+            root = root_match.group(1).strip() if root_match else ''
+            owners.append({
+                'config': str(path.resolve()),
+                'root': root,
+            })
+
+    unique: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for item in owners:
+        identity = (item['config'], item['root'])
+        if identity in seen:
+            continue
+        seen.add(identity)
+        unique.append(item)
+
+    print(json.dumps(unique, sort_keys=True))
+
+
 def command_origin_host(args: argparse.Namespace) -> None:
     parsed = urlparse(args.origin.strip())
     if parsed.scheme not in {'http', 'https'} or not parsed.hostname:
@@ -783,6 +865,11 @@ def build_parser() -> argparse.ArgumentParser:
     collisions.add_argument('--value', required=True)
     collisions.add_argument('--exclude')
     collisions.set_defaults(func=command_env_collisions)
+
+    nginx_host_owners = sub.add_parser('nginx-host-owners')
+    nginx_host_owners.add_argument('--directory', required=True)
+    nginx_host_owners.add_argument('--host', required=True)
+    nginx_host_owners.set_defaults(func=command_nginx_host_owners)
 
     origin_host = sub.add_parser('origin-host')
     origin_host.add_argument('--origin', required=True)
