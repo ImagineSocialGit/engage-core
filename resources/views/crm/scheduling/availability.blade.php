@@ -4,7 +4,12 @@
     subheading="Set when each appointment type can be booked, how often starts are offered, and how much time stays free around appointments."
 >
 
-    <div class="space-y-6" data-scheduling-availability-configuration>
+    <div
+        class="space-y-6"
+        data-scheduling-availability-configuration
+        x-data="{ scrollTarget: @js(session('availability_scroll_to')) }"
+        x-init="if (scrollTarget) $nextTick(() => document.getElementById(scrollTarget)?.scrollIntoView({ block: 'start' }))"
+    >
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <a
                 href="{{ route('crm.scheduling.configuration.index') }}"
@@ -150,34 +155,25 @@
             @endif
 
             @if ($selectedService)
-                <x-ui.card class="space-y-5" data-availability-regular-hours>
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                            <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                                Regular hours
-                            </div>
-                            <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
-                                When can people normally book {{ $selectedService->name }}?
-                            </h2>
-                            <p class="mt-1 text-sm text-slate-500">
-                                Add one or more time ranges to any day. Leave a day empty when the appointment type is normally unavailable.
-                            </p>
-                        </div>
-                    </div>
 
-                    <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                        Times below use <strong class="font-semibold text-slate-800">{{ $selectedService->timezone }}</strong>,
-                        the timezone configured for this appointment type.
-                    </div>
-
+                @if ($selectedService->getAttribute('crm_editable'))
                     <form
+                        id="availability-workspace"
                         method="POST"
-                        action="{{ route('crm.scheduling.configuration.availability.regular-hours', $selectedService) }}"
-                        class="space-y-4"
+                        action="{{ route('crm.scheduling.configuration.availability.workspace', $selectedService) }}"
+                        class="scroll-mt-6 space-y-6"
+                        data-availability-edit-workspace
                         x-data="{
+                            dirty: false,
+                            intervalChoice: @js($slotIntervalChoice),
                             days: @js($regularHoursState),
                             addRange(day) {
                                 day.ranges.push({ start: '09:00', end: '17:00' });
+                                this.dirty = true;
+                            },
+                            removeRange(day, rangeIndex) {
+                                day.ranges.splice(rangeIndex, 1);
+                                this.dirty = true;
                             },
                             useWeekdayPreset() {
                                 this.days = this.days.map((day) => ({
@@ -186,93 +182,166 @@
                                         ? [{ start: '09:00', end: '17:00' }]
                                         : []
                                 }));
+                                this.dirty = true;
                             }
                         }"
+                        x-on:input="dirty = true"
+                        x-on:change="dirty = true"
                     >
                         @csrf
                         @method('PUT')
+                        <input type="hidden" name="current_version" value="{{ $selectedService->updated_at?->toISOString() }}">
                         @if ($guided)
                             <input type="hidden" name="guided" value="1">
                         @endif
 
-                        <div class="flex flex-wrap gap-2">
-                            <button
-                                type="button"
-                                class="inline-flex rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                                x-on:click="useWeekdayPreset()"
-                            >
-                                Use Monday–Friday, 9–5
-                            </button>
-                        </div>
-
-                        <div class="divide-y divide-slate-200 rounded-xl border border-slate-200">
-                            <template x-for="day in days" :key="day.weekday">
-                                <div class="grid gap-3 p-4 lg:grid-cols-[10rem_1fr_auto] lg:items-start">
-                                    <div>
-                                        <p class="font-semibold text-slate-900" x-text="day.label"></p>
-                                        <p class="mt-1 text-xs text-slate-500" x-show="day.ranges.length === 0">Unavailable</p>
-                                        <input
-                                            type="hidden"
-                                            x-bind:name="`regular_hours[${day.weekday}][weekday]`"
-                                            x-bind:value="day.weekday"
-                                        >
-                                    </div>
-
-                                    <div class="space-y-2">
-                                        <template x-for="(range, rangeIndex) in day.ranges" :key="`${day.weekday}-${rangeIndex}`">
-                                            <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                                                <div class="grid flex-1 grid-cols-2 gap-2">
-                                                    <label>
-                                                        <span class="sr-only">Start time</span>
-                                                        <input
-                                                            class="{{ $inputClass }} mt-0"
-                                                            type="time"
-                                                            x-bind:name="`regular_hours[${day.weekday}][ranges][${rangeIndex}][start]`"
-                                                            x-model="range.start"
-                                                            required
-                                                        >
-                                                    </label>
-                                                    <label>
-                                                        <span class="sr-only">End time</span>
-                                                        <input
-                                                            class="{{ $inputClass }} mt-0"
-                                                            type="time"
-                                                            x-bind:name="`regular_hours[${day.weekday}][ranges][${rangeIndex}][end]`"
-                                                            x-model="range.end"
-                                                            required
-                                                        >
-                                                    </label>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    class="text-sm font-semibold text-rose-700 hover:text-rose-800"
-                                                    x-on:click="day.ranges.splice(rangeIndex, 1)"
-                                                >
-                                                    Remove
-                                                </button>
-                                            </div>
-                                        </template>
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        class="inline-flex justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                                        x-on:click="addRange(day)"
-                                    >
-                                        Add hours
-                                    </button>
+                        <x-ui.card id="regular-hours" class="scroll-mt-6 space-y-5" data-availability-regular-hours>
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                    <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">Regular hours</div>
+                                    <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">When can people normally book {{ $selectedService->name }}?</h2>
+                                    <p class="mt-1 text-sm text-slate-500">Add one or more time ranges to any day. Leave a day empty when the appointment type is normally unavailable.</p>
                                 </div>
-                            </template>
-                        </div>
+                            </div>
 
-                        <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
-                            Save regular hours
-                        </button>
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                                Times below use <strong class="font-semibold text-slate-800">{{ $selectedService->timezone }}</strong>, the timezone configured for this appointment type.
+                            </div>
+
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" class="inline-flex rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" x-on:click="useWeekdayPreset()">
+                                    Use Monday–Friday, 9–5
+                                </button>
+                            </div>
+
+                            <div class="divide-y divide-slate-200 rounded-xl border border-slate-200">
+                                <template x-for="day in days" :key="day.weekday">
+                                    <div class="grid gap-3 p-4 lg:grid-cols-[10rem_1fr_auto] lg:items-start">
+                                        <div>
+                                            <p class="font-semibold text-slate-900" x-text="day.label"></p>
+                                            <p class="mt-1 text-xs text-slate-500" x-show="day.ranges.length === 0">Unavailable</p>
+                                            <input type="hidden" x-bind:name="`regular_hours[${day.weekday}][weekday]`" x-bind:value="day.weekday">
+                                        </div>
+                                        <div class="space-y-2">
+                                            <template x-for="(range, rangeIndex) in day.ranges" :key="`${day.weekday}-${rangeIndex}`">
+                                                <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                                    <div class="grid flex-1 grid-cols-2 gap-2">
+                                                        <label>
+                                                            <span class="sr-only">Start time</span>
+                                                            <input class="{{ $inputClass }} mt-0" type="time" x-bind:name="`regular_hours[${day.weekday}][ranges][${rangeIndex}][start]`" x-model="range.start" required>
+                                                        </label>
+                                                        <label>
+                                                            <span class="sr-only">End time</span>
+                                                            <input class="{{ $inputClass }} mt-0" type="time" x-bind:name="`regular_hours[${day.weekday}][ranges][${rangeIndex}][end]`" x-model="range.end" required>
+                                                        </label>
+                                                    </div>
+                                                    <button type="button" class="text-sm font-semibold text-rose-700 hover:text-rose-800" x-on:click="removeRange(day, rangeIndex)">Remove</button>
+                                                </div>
+                                            </template>
+                                        </div>
+                                        <button type="button" class="inline-flex justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" x-on:click="addRange(day)">Add hours</button>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <div class="flex justify-end">
+                                <button
+                                    type="submit"
+                                    name="save_section"
+                                    value="regular_hours"
+                                    formaction="{{ route('crm.scheduling.configuration.availability.regular-hours', $selectedService) }}"
+                                    class="inline-flex w-full justify-center rounded-lg border border-teal-600 bg-white px-4 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50 sm:w-auto"
+                                >
+                                    Save regular hours
+                                </button>
+                            </div>
+                        </x-ui.card>
+
+                        <x-ui.card id="booking-timing" class="scroll-mt-6 space-y-5" data-availability-booking-timing>
+                            <div>
+                                <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">Booking timing</div>
+                                <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">How should available times be spaced?</h2>
+                                <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-500">These settings control possible start times and the time protected around an appointment. They do not change the appointment's actual length.</p>
+                            </div>
+
+                            <div class="grid gap-4 md:grid-cols-2">
+                                <label class="{{ $labelClass }}">
+                                    How often can appointments start?
+                                    <select class="{{ $inputClass }}" name="slot_interval_choice" x-model="intervalChoice" required>
+                                        <option value="15" @selected((string) old('slot_interval_choice', $slotIntervalChoice) === '15')>Every 15 minutes</option>
+                                        <option value="30" @selected((string) old('slot_interval_choice', $slotIntervalChoice) === '30')>Every 30 minutes</option>
+                                        <option value="60" @selected((string) old('slot_interval_choice', $slotIntervalChoice) === '60')>Every hour</option>
+                                        <option value="120" @selected((string) old('slot_interval_choice', $slotIntervalChoice) === '120')>Every 2 hours</option>
+                                        <option value="custom" @selected((string) old('slot_interval_choice', $slotIntervalChoice) === 'custom')>Custom interval</option>
+                                    </select>
+                                    <span class="mt-1 block text-xs font-normal text-slate-500">A 60-minute appointment can still start every 30 minutes. Length and start frequency are separate.</span>
+                                </label>
+
+                                <label class="{{ $labelClass }}" x-show="intervalChoice === 'custom'" x-cloak>
+                                    Custom start interval (minutes)
+                                    <input class="{{ $inputClass }}" type="number" min="1" max="1440" name="slot_interval_custom_minutes" value="{{ $slotIntervalCustomMinutes }}" x-bind:required="intervalChoice === 'custom'" x-bind:disabled="intervalChoice !== 'custom'">
+                                </label>
+
+                                <label class="{{ $labelClass }}">
+                                    Start the pattern at
+                                    <input class="{{ $inputClass }}" type="time" name="slot_start_anchor_time" value="{{ $slotStartAnchorTime }}" required>
+                                    <span class="mt-1 block text-xs font-normal text-slate-500">Example: every 2 hours starting at 9:00 AM offers 9:00, 11:00, 1:00, 3:00, and so on when those times fit your hours.</span>
+                                </label>
+
+                                <label class="{{ $labelClass }}">
+                                    How long do you need to prepare beforehand?
+                                    <div class="mt-1 flex items-center gap-2">
+                                        <input class="{{ $inputClass }} mt-0" type="number" min="0" max="10080" name="buffer_before_minutes" value="{{ old('buffer_before_minutes', $selectedService->buffer_before_minutes) }}" required>
+                                        <span class="shrink-0 text-sm text-slate-500">minutes</span>
+                                    </div>
+                                    <span class="mt-1 block text-xs font-normal text-slate-500">Useful for preparation, travel, setup, or reviewing notes before the appointment.</span>
+                                </label>
+
+                                <label class="{{ $labelClass }}">
+                                    How much time should stay free after an appointment?
+                                    <div class="mt-1 flex items-center gap-2">
+                                        <input class="{{ $inputClass }} mt-0" type="number" min="0" max="10080" name="buffer_after_minutes" value="{{ old('buffer_after_minutes', $selectedService->buffer_after_minutes) }}" required>
+                                        <span class="shrink-0 text-sm text-slate-500">minutes</span>
+                                    </div>
+                                    <span class="mt-1 block text-xs font-normal text-slate-500">Leave room for meetings that run over, cleanup, travel, notes, or resetting before the next appointment.</span>
+                                </label>
+                            </div>
+
+                            <div class="flex justify-end">
+                                <button
+                                    type="submit"
+                                    name="save_section"
+                                    value="booking_timing"
+                                    formaction="{{ route('crm.scheduling.configuration.availability.booking-timing', $selectedService) }}"
+                                    class="inline-flex w-full justify-center rounded-lg border border-teal-600 bg-white px-4 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50 sm:w-auto"
+                                >
+                                    Save booking timing
+                                </button>
+                            </div>
+                        </x-ui.card>
+
+                        <div class="sticky bottom-4 z-10 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur" data-availability-save-all>
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-900">Save multiple availability edits together</p>
+                                    <p class="mt-1 text-xs text-slate-500" x-text="dirty ? 'You have unsaved regular-hours or booking-timing changes.' : 'Regular hours and booking timing are saved.'"></p>
+                                </div>
+                                <button type="submit" name="save_section" value="all" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto" x-bind:disabled="!dirty">
+                                    Save all edits
+                                </button>
+                            </div>
+                        </div>
                     </form>
-                </x-ui.card>
+                @else
+                    <x-ui.card id="regular-hours" class="scroll-mt-6 space-y-4" data-availability-regular-hours>
+                        <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                            This appointment type is managed externally. Its regular hours and booking timing are shown through Scheduling, but editable policy fields must be changed by their owner.
+                        </div>
+                    </x-ui.card>
+                @endif
 
                 <div class="grid gap-6 xl:grid-cols-2">
-                    <x-ui.card class="space-y-4" data-availability-special-hours>
+                    <x-ui.card id="special-hours" class="scroll-mt-6 space-y-4" data-availability-special-hours>
                         <div>
                             <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
                                 Special hours
@@ -354,7 +423,7 @@
                         </form>
                     </x-ui.card>
 
-                    <x-ui.card class="space-y-4" data-availability-time-off>
+                    <x-ui.card id="time-off" class="scroll-mt-6 space-y-4" data-availability-time-off>
                         <div>
                             <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
                                 Time off
@@ -427,133 +496,6 @@
                         </form>
                     </x-ui.card>
                 </div>
-
-                <x-ui.card
-                class="space-y-5"
-                data-availability-booking-timing
-                x-data="{ intervalChoice: @js($slotIntervalChoice) }"
-            >
-                <div>
-                    <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                        Booking timing
-                    </div>
-                    <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">How should available times be spaced?</h2>
-                    <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-                        These settings control possible start times and the time protected around an appointment. They do not change the appointment's actual length.
-                    </p>
-                </div>
-
-                @if ($selectedService->getAttribute('crm_editable'))
-                    <form
-                        method="POST"
-                        action="{{ route('crm.scheduling.configuration.availability.booking-timing', $selectedService) }}"
-                        class="grid gap-4 md:grid-cols-2"
-                    >
-                        @csrf
-                        @method('PUT')
-                        <input type="hidden" name="current_version" value="{{ $selectedService->updated_at?->toISOString() }}">
-                        @if ($guided)
-                            <input type="hidden" name="guided" value="1">
-                        @endif
-
-                        <label class="{{ $labelClass }}">
-                            How often can appointments start?
-                            <select
-                                class="{{ $inputClass }}"
-                                name="slot_interval_choice"
-                                x-model="intervalChoice"
-                                required
-                            >
-                                <option value="15" @selected((string) old('slot_interval_choice', $slotIntervalChoice) === '15')>Every 15 minutes</option>
-                                <option value="30" @selected((string) old('slot_interval_choice', $slotIntervalChoice) === '30')>Every 30 minutes</option>
-                                <option value="60" @selected((string) old('slot_interval_choice', $slotIntervalChoice) === '60')>Every hour</option>
-                                <option value="120" @selected((string) old('slot_interval_choice', $slotIntervalChoice) === '120')>Every 2 hours</option>
-                                <option value="custom" @selected((string) old('slot_interval_choice', $slotIntervalChoice) === 'custom')>Custom interval</option>
-                            </select>
-                            <span class="mt-1 block text-xs font-normal text-slate-500">
-                                A 60-minute appointment can still start every 30 minutes. Length and start frequency are separate.
-                            </span>
-                        </label>
-
-                        <label class="{{ $labelClass }}" x-show="intervalChoice === 'custom'" x-cloak>
-                            Custom start interval (minutes)
-                            <input
-                                class="{{ $inputClass }}"
-                                type="number"
-                                min="1"
-                                max="1440"
-                                name="slot_interval_custom_minutes"
-                                value="{{ $slotIntervalCustomMinutes }}"
-                                x-bind:required="intervalChoice === 'custom'"
-                                x-bind:disabled="intervalChoice !== 'custom'"
-                            >
-                        </label>
-
-                        <label class="{{ $labelClass }}">
-                            Start the pattern at
-                            <input
-                                class="{{ $inputClass }}"
-                                type="time"
-                                name="slot_start_anchor_time"
-                                value="{{ $slotStartAnchorTime }}"
-                                required
-                            >
-                            <span class="mt-1 block text-xs font-normal text-slate-500">
-                                Example: every 2 hours starting at 9:00 AM offers 9:00, 11:00, 1:00, 3:00, and so on when those times fit your hours.
-                            </span>
-                        </label>
-
-                        <label class="{{ $labelClass }}">
-                            How long do you need to prepare beforehand?
-                            <div class="mt-1 flex items-center gap-2">
-                                <input
-                                    class="{{ $inputClass }} mt-0"
-                                    type="number"
-                                    min="0"
-                                    max="10080"
-                                    name="buffer_before_minutes"
-                                    value="{{ old('buffer_before_minutes', $selectedService->buffer_before_minutes) }}"
-                                    required
-                                >
-                                <span class="shrink-0 text-sm text-slate-500">minutes</span>
-                            </div>
-                            <span class="mt-1 block text-xs font-normal text-slate-500">
-                                Useful for preparation, travel, setup, or reviewing notes before the appointment.
-                            </span>
-                        </label>
-
-                        <label class="{{ $labelClass }}">
-                            How much time should stay free after an appointment?
-                            <div class="mt-1 flex items-center gap-2">
-                                <input
-                                    class="{{ $inputClass }} mt-0"
-                                    type="number"
-                                    min="0"
-                                    max="10080"
-                                    name="buffer_after_minutes"
-                                    value="{{ old('buffer_after_minutes', $selectedService->buffer_after_minutes) }}"
-                                    required
-                                >
-                                <span class="shrink-0 text-sm text-slate-500">minutes</span>
-                            </div>
-                            <span class="mt-1 block text-xs font-normal text-slate-500">
-                                Leave room for meetings that run over, cleanup, travel, notes, or resetting before the next appointment.
-                            </span>
-                        </label>
-
-                        <div class="md:col-span-2">
-                            <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 sm:w-auto">
-                                Save booking timing
-                            </button>
-                        </div>
-                    </form>
-                @else
-                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                        This appointment type is managed externally. Its start-time spacing and buffer rules are shown here but must be changed by its owner.
-                    </div>
-                @endif
-            </x-ui.card>
-
             @if ($guided && $setupProgress['next_action'])
                 <x-ui.card class="border-yellow-300 bg-yellow-50" data-availability-guided-next>
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -575,7 +517,7 @@
                 </x-ui.card>
             @endif
 
-            <section class="space-y-4" data-availability-date-changes>
+            <section id="date-changes" class="scroll-mt-6 space-y-4" data-availability-date-changes>
                     <div>
                         <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
                             One-off changes
@@ -775,7 +717,7 @@
                                 <p class="mt-1 text-xs text-teal-800">Continue to Scheduling to choose one of these times and finish a test or real appointment.</p>
                             </div>
                             <a
-                                href="{{ route('crm.scheduling.index', array_filter([
+                                href="{{ route('crm.scheduling.appointments.create', array_filter([
                                     'bookable_service_id' => $selectedService->id,
                                     'scheduling_host_id' => $previewHost?->id,
                                     'date' => $previewDate,

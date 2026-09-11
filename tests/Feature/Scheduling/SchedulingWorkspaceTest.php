@@ -61,13 +61,12 @@ class SchedulingWorkspaceTest extends TestCase
         $this->availability($service, null, $startsAt, $startsAt->addHour());
 
         $this->actingAs(User::factory()->create())
-            ->get(route('crm.scheduling.index', [
-                'bookable_service_id' => $service->id,
-                'date' => '2026-08-04',
-            ]))
+            ->get(route('crm.scheduling.index'))
             ->assertOk()
             ->assertDontSee('data-scheduling-setup-readiness', false)
-            ->assertSee('data-scheduling-routine-workspace', false);
+            ->assertSee('data-scheduling-routine-workspace', false)
+            ->assertSee('data-scheduling-create-appointment', false)
+            ->assertSee(route('crm.scheduling.appointments.create'), false);
     }
 
     public function test_scheduling_navigation_and_workspace_present_upcoming_operational_state(): void
@@ -127,7 +126,7 @@ class SchedulingWorkspaceTest extends TestCase
         $this->availability($service, $host, $startsAt, $startsAt->addHour());
 
         $this->actingAs($user)
-            ->get(route('crm.scheduling.index', [
+            ->get(route('crm.scheduling.appointments.create', [
                 'bookable_service_id' => $service->id,
                 'scheduling_host_id' => $host->id,
                 'date' => '2026-08-04',
@@ -140,7 +139,7 @@ class SchedulingWorkspaceTest extends TestCase
         $key = (string) Str::uuid();
 
         $response = $this->actingAs($user)
-            ->from(route('crm.scheduling.index', [
+            ->from(route('crm.scheduling.appointments.create', [
                 'bookable_service_id' => $service->id,
                 'scheduling_host_id' => $host->id,
                 'date' => '2026-08-04',
@@ -182,6 +181,9 @@ class SchedulingWorkspaceTest extends TestCase
         $contact = Contact::factory()->create(['name' => 'Home Visit Contact']);
         $service = $this->service([
             'name' => 'Home Visit',
+            'appointment_format' => BookableService::APPOINTMENT_FORMAT_IN_PERSON,
+            'in_person_arrangement' => BookableService::IN_PERSON_ARRANGEMENT_CUSTOMER_ADDRESS,
+            'remote_method' => null,
             'location_type' => BookableService::LOCATION_TYPE_CUSTOMER_SITE,
             'location_details' => [
                 'label' => 'Customer address',
@@ -190,7 +192,7 @@ class SchedulingWorkspaceTest extends TestCase
         ]);
         $startsAt = CarbonImmutable::parse('2026-08-04 15:00:00 UTC');
         $this->availability($service, null, $startsAt, $startsAt->addHour());
-        $workspace = route('crm.scheduling.index', [
+        $workspace = route('crm.scheduling.appointments.create', [
             'bookable_service_id' => $service->id,
             'date' => '2026-08-04',
         ]);
@@ -303,7 +305,7 @@ class SchedulingWorkspaceTest extends TestCase
             CarbonImmutable::parse('2026-08-10 11:00:00 UTC'),
         );
 
-        $workspace = route('crm.scheduling.index', [
+        $workspace = route('crm.scheduling.appointments.create', [
             'bookable_service_id' => $service->id,
         ]);
 
@@ -404,7 +406,7 @@ class SchedulingWorkspaceTest extends TestCase
         );
 
         $this->actingAs($user)
-            ->from(route('crm.scheduling.index'))
+            ->from(route('crm.scheduling.appointments.create'))
             ->post(route('crm.scheduling.appointments.store'), [
                 'attendee_mode' => 'contact',
                 'contact_id' => $contact->id,
@@ -413,13 +415,13 @@ class SchedulingWorkspaceTest extends TestCase
                 'starts_at' => $startsAt->toIso8601String(),
                 'idempotency_key' => (string) Str::uuid(),
             ])
-            ->assertRedirect(route('crm.scheduling.index'))
+            ->assertRedirect(route('crm.scheduling.appointments.create'))
             ->assertSessionHasErrors('starts_at');
 
         $this->assertSame(0, Appointment::query()->count());
 
         $this->actingAs($user)
-            ->from(route('crm.scheduling.index'))
+            ->from(route('crm.scheduling.appointments.create'))
             ->post(route('crm.scheduling.appointments.store'), [
                 'attendee_mode' => 'contact',
                 'contact_id' => $contact->id,
@@ -428,7 +430,7 @@ class SchedulingWorkspaceTest extends TestCase
                 'starts_at' => $startsAt->addHours(3)->toIso8601String(),
                 'idempotency_key' => (string) Str::uuid(),
             ])
-            ->assertRedirect(route('crm.scheduling.index'))
+            ->assertRedirect(route('crm.scheduling.appointments.create'))
             ->assertSessionHasErrors('starts_at');
 
         $this->assertSame(0, Appointment::query()->count());
@@ -479,7 +481,7 @@ class SchedulingWorkspaceTest extends TestCase
         $startsAt = CarbonImmutable::parse('2026-08-04 14:00:00 UTC');
         $this->availability($service, null, $startsAt, $startsAt->addHour());
 
-        $workspace = route('crm.scheduling.index', [
+        $workspace = route('crm.scheduling.appointments.create', [
             'bookable_service_id' => $service->id,
             'date' => '2026-08-04',
         ]);
@@ -617,6 +619,10 @@ class SchedulingWorkspaceTest extends TestCase
             'minimum_notice_minutes' => 0,
             'booking_horizon_days' => 30,
             'timezone' => 'UTC',
+            'appointment_format' => BookableService::APPOINTMENT_FORMAT_REMOTE,
+            'in_person_arrangement' => null,
+            'remote_method' => BookableService::REMOTE_METHOD_PHONE,
+            'location_type' => BookableService::LOCATION_TYPE_PHONE,
             'capacity' => 1,
             ...$attributes,
         ]);

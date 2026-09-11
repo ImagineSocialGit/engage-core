@@ -42,12 +42,17 @@ class SchedulingSetupReadinessTest extends TestCase
         $service = BookableService::factory()->create([
             'status' => BookableService::STATUS_ACTIVE,
             'is_public' => false,
+            'appointment_format' => BookableService::APPOINTMENT_FORMAT_REMOTE,
+            'remote_method' => BookableService::REMOTE_METHOD_PHONE,
+            'in_person_arrangement' => null,
+            'location_type' => BookableService::LOCATION_TYPE_PHONE,
         ]);
 
         $serviceOnly = $readiness->summary();
 
         $this->assertFalse($serviceOnly['empty']);
         $this->assertTrue($serviceOnly['has_service']);
+        $this->assertTrue($serviceOnly['has_complete_format']);
         $this->assertFalse($serviceOnly['has_active_host']);
         $this->assertFalse($serviceOnly['has_availability']);
         $this->assertFalse($serviceOnly['internal_ready']);
@@ -66,6 +71,7 @@ class SchedulingSetupReadinessTest extends TestCase
         $ready = $readiness->summary();
 
         $this->assertTrue($ready['has_service']);
+        $this->assertTrue($ready['has_complete_format']);
         $this->assertFalse($ready['has_active_host']);
         $this->assertTrue($ready['has_availability']);
         $this->assertTrue($ready['internal_ready']);
@@ -97,8 +103,9 @@ class SchedulingSetupReadinessTest extends TestCase
 
         $summary = app(SchedulingSetupReadiness::class)->summary();
 
-        $this->assertTrue($summary['internal_ready']);
-        $this->assertFalse($summary['has_public_service']);
+        $this->assertFalse($summary['has_complete_format']);
+        $this->assertFalse($summary['internal_ready']);
+        $this->assertTrue($summary['has_public_service']);
         $this->assertTrue($summary['has_incomplete_public_service']);
         $this->assertFalse($summary['public_ready']);
     }

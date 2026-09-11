@@ -27,10 +27,12 @@ class SchedulingServiceWorkspaceTest extends TestCase
 
         $this->get(route('crm.scheduling.configuration.services.index'))
             ->assertRedirect(route('login'));
-
         $this->get(route('crm.scheduling.configuration.services.edit', $service))
             ->assertRedirect(route('login'));
-
+        $this->get(route('crm.scheduling.configuration.services.details.edit', $service))
+            ->assertRedirect(route('login'));
+        $this->get(route('crm.scheduling.configuration.services.staff.edit', $service))
+            ->assertRedirect(route('login'));
         $this->get(route('crm.scheduling.configuration.staff.index'))
             ->assertRedirect(route('login'));
 
@@ -41,17 +43,21 @@ class SchedulingServiceWorkspaceTest extends TestCase
         $this->actingAs($user)
             ->get(route('crm.scheduling.configuration.services.index'))
             ->assertNotFound();
-
         $this->actingAs($user)
             ->get(route('crm.scheduling.configuration.services.edit', $service))
             ->assertNotFound();
-
+        $this->actingAs($user)
+            ->get(route('crm.scheduling.configuration.services.details.edit', $service))
+            ->assertNotFound();
+        $this->actingAs($user)
+            ->get(route('crm.scheduling.configuration.services.staff.edit', $service))
+            ->assertNotFound();
         $this->actingAs($user)
             ->get(route('crm.scheduling.configuration.staff.index'))
             ->assertNotFound();
     }
 
-    public function test_service_editor_exposes_service_owned_authoring_assignments_and_related_setup(): void
+    public function test_service_setup_is_split_into_readiness_details_and_staff_workspaces(): void
     {
         $user = User::factory()->create();
         $host = SchedulingHost::factory()->create([
@@ -81,16 +87,51 @@ class SchedulingServiceWorkspaceTest extends TestCase
             'sort_order' => 10,
         ]);
 
-        $response = $this->actingAs($user)
-            ->get(route('crm.scheduling.configuration.services.edit', $service));
-
-        $response
+        $this->actingAs($user)
+            ->get(route('crm.scheduling.configuration.services.edit', $service))
             ->assertOk()
             ->assertViewIs('crm.scheduling.services.edit')
             ->assertViewHas('service', fn (BookableService $viewService): bool =>
                 $viewService->is($service)
             )
             ->assertViewHas('serviceEditable', true)
+            ->assertSee('data-scheduling-service-hub', false)
+            ->assertSee('data-scheduling-service-readiness', false)
+            ->assertSee('data-scheduling-config-card="details"', false)
+            ->assertSee('data-scheduling-config-card="availability"', false)
+            ->assertSee('data-scheduling-config-card="staff"', false)
+            ->assertSee(
+                route('crm.scheduling.configuration.services.details.edit', $service),
+                false,
+            )
+            ->assertSee(
+                route('crm.scheduling.configuration.services.staff.edit', $service),
+                false,
+            );
+
+        $this->actingAs($user)
+            ->get(route('crm.scheduling.configuration.services.details.edit', $service))
+            ->assertOk()
+            ->assertViewIs('crm.scheduling.services.details')
+            ->assertViewHas('serviceEditable', true)
+            ->assertSee('data-scheduling-service-details="'.$service->getKey().'"', false)
+            ->assertSee(
+                'data-configuration-service-details-update="'.$service->getKey().'"',
+                false,
+            )
+            ->assertSee(
+                route('crm.scheduling.configuration.services.update', $service),
+                false,
+            )
+            ->assertSee('name="appointment_method"', false)
+            ->assertSee('name="duration_mode"', false)
+            ->assertSee('name="is_public"', false)
+            ->assertDontSee('name="location_type"', false);
+
+        $this->actingAs($user)
+            ->get(route('crm.scheduling.configuration.services.staff.edit', $service))
+            ->assertOk()
+            ->assertViewIs('crm.scheduling.services.staff')
             ->assertViewHas('assignmentRows', function (array $rows) use ($host): bool {
                 foreach ($rows as $row) {
                     if (($row['id'] ?? null) === $host->getKey()
@@ -103,50 +144,38 @@ class SchedulingServiceWorkspaceTest extends TestCase
 
                 return false;
             })
-            ->assertSee('data-scheduling-service-editor="'.$service->getKey().'"', false)
-            ->assertSee('data-scheduling-service-section="basics"', false)
-            ->assertSee('data-scheduling-service-section="appointment"', false)
-            ->assertSee('data-scheduling-service-section="advanced_booking_rules"', false)
+            ->assertSee('data-scheduling-service-staff-workspace="'.$service->getKey().'"', false)
             ->assertSee('data-service-assignment-form="'.$service->getKey().'"', false)
             ->assertSee('data-assignment-host-id="'.$host->getKey().'"', false)
             ->assertSee(
-                route('crm.scheduling.configuration.services.update', $service),
-                false,
-            )
-            ->assertSee(
                 route('crm.scheduling.configuration.services.hosts.update', $service),
                 false,
-            )
-            ->assertSee(
-                route('crm.scheduling.configuration.availability.index', [
-                    'service_id' => $service->getKey(),
-                ]),
-                false,
-            )
-            ->assertSee('name="appointment_format"', false)
-            ->assertSee('name="duration_mode"', false)
-            ->assertSee('name="slot_interval_minutes"', false)
-            ->assertSee('name="is_public"', false)
-            ->assertSee('data-service-business-location-name', false)
-            ->assertDontSee('value="Legacy phone display label"', false)
-            ->assertDontSee('name="location_type"', false);
+            );
     }
 
-    public function test_provider_owned_service_uses_the_same_editor_as_a_read_only_workspace(): void
+    public function test_provider_owned_service_uses_readiness_hub_and_read_only_details_workspace(): void
     {
         $service = BookableService::factory()->create([
             'source' => 'provider',
             'provider' => 'calendar_provider',
             'external_id' => 'service-123',
         ]);
+        $user = User::factory()->create();
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs($user)
             ->get(route('crm.scheduling.configuration.services.edit', $service))
             ->assertOk()
             ->assertViewHas('serviceEditable', false)
+            ->assertSee('Managed externally');
+
+        $this->actingAs($user)
+            ->get(route('crm.scheduling.configuration.services.details.edit', $service))
+            ->assertOk()
+            ->assertViewIs('crm.scheduling.services.details')
+            ->assertViewHas('serviceEditable', false)
             ->assertSee('data-configuration-read-only="service"', false)
             ->assertDontSee(
-                'data-configuration-service-update="'.$service->getKey().'"',
+                'data-configuration-service-details-update="'.$service->getKey().'"',
                 false,
             );
     }

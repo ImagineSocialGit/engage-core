@@ -1,22 +1,3 @@
-@php
-    $nextAppointment = $upcomingAppointments->first();
-    $otherUpcomingAppointments = $upcomingAppointments->skip(1)->values();
-    $clientTimezone = config('client.timezone', config('app.timezone', 'UTC'));
-    $statusClasses = fn (string $status): string => match($status) {
-        \App\Modules\Scheduling\Models\Appointment::STATUS_PENDING => 'bg-amber-100 text-amber-800',
-        \App\Modules\Scheduling\Models\Appointment::STATUS_CONFIRMED => 'bg-emerald-100 text-emerald-800',
-        \App\Modules\Scheduling\Models\Appointment::STATUS_COMPLETED => 'bg-emerald-100 text-emerald-800',
-        \App\Modules\Scheduling\Models\Appointment::STATUS_CANCELED => 'bg-slate-100 text-slate-700',
-        \App\Modules\Scheduling\Models\Appointment::STATUS_NO_SHOW => 'bg-rose-100 text-rose-800',
-        default => 'bg-sky-100 text-sky-800',
-    };
-    $displayTimezone = fn ($appointment): string => in_array(
-        $appointment->timezone,
-        timezone_identifiers_list(),
-        true,
-    ) ? $appointment->timezone : $clientTimezone;
-@endphp
-
 <x-ui.card
     class="space-y-5 {{ module_tone('scheduling', 'panel') }}"
     data-module-panel="scheduling"
@@ -34,7 +15,7 @@
         </div>
 
         <x-ui.button
-            href="{{ route('crm.scheduling.index', ['contact_id' => $contact->id]) }}"
+            href="{{ route('crm.scheduling.appointments.create', ['contact_id' => $contact->id]) }}"
             variant="secondary"
             class="w-full sm:w-auto"
             data-scheduling-panel-action="schedule"
@@ -55,11 +36,7 @@
         </div>
     @endif
 
-    @if($nextAppointment)
-        @php
-            $nextTimezone = $displayTimezone($nextAppointment);
-        @endphp
-
+    @if($nextAppointmentPresentation)
         <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0">
@@ -68,69 +45,65 @@
                     </p>
 
                     <a
-                        href="{{ route('crm.scheduling.appointments.show', $nextAppointment) }}"
+                        href="{{ $nextAppointmentPresentation['show_url'] }}"
                         class="mt-1 block font-semibold text-slate-950 hover:text-teal-700 hover:underline"
                         data-scheduling-appointment-kind="next"
-                        data-appointment-id="{{ $nextAppointment->id }}"
-                        data-appointment-status="{{ $nextAppointment->status }}"
+                        data-appointment-id="{{ $nextAppointmentPresentation['id'] }}"
+                        data-appointment-status="{{ $nextAppointmentPresentation['status'] }}"
                     >
-                        {{ $nextAppointment->title ?: $nextAppointment->bookableService?->name ?: 'Appointment' }}
+                        {{ $nextAppointmentPresentation['title'] }}
                     </a>
 
                     <p class="mt-2 text-sm font-medium text-slate-900">
-                        {{ $nextAppointment->starts_at->setTimezone($nextTimezone)->format('D, M j, Y \a\t g:i A') }}
+                        {{ $nextAppointmentPresentation['starts_at_label'] }}
                         –
-                        {{ $nextAppointment->ends_at->setTimezone($nextTimezone)->format('g:i A') }}
+                        {{ $nextAppointmentPresentation['ends_at_label'] }}
                     </p>
 
                     <p class="mt-1 text-xs text-slate-500">
-                        {{ $nextTimezone }}
-                        @if($nextAppointment->schedulingHost)
-                            · {{ $nextAppointment->schedulingHost->name }}
+                        {{ $nextAppointmentPresentation['timezone'] }}
+                        @if($nextAppointmentPresentation['host_name'])
+                            · {{ $nextAppointmentPresentation['host_name'] }}
                         @endif
                     </p>
                 </div>
 
-                <span class="inline-flex self-start rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClasses($nextAppointment->status) }}">
-                    {{ str($nextAppointment->status)->replace('_', ' ')->title() }}
+                <span class="inline-flex self-start rounded-full px-2.5 py-1 text-xs font-semibold {{ $nextAppointmentPresentation['status_classes'] }}">
+                    {{ $nextAppointmentPresentation['status_label'] }}
                 </span>
             </div>
         </div>
     @endif
 
-    @if($otherUpcomingAppointments->isNotEmpty())
+    @if($otherUpcomingAppointmentPresentations !== [])
         <div>
             <h4 class="text-sm font-semibold uppercase tracking-wide text-slate-500">
                 Other upcoming
             </h4>
 
             <div class="mt-2 divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
-                @foreach($otherUpcomingAppointments as $appointment)
-                    @php
-                        $appointmentTimezone = $displayTimezone($appointment);
-                    @endphp
-
+                @foreach($otherUpcomingAppointmentPresentations as $appointment)
                     <a
-                        href="{{ route('crm.scheduling.appointments.show', $appointment) }}"
+                        href="{{ $appointment['show_url'] }}"
                         class="flex flex-col gap-2 p-3 hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between"
                         data-scheduling-appointment-kind="upcoming"
-                        data-appointment-id="{{ $appointment->id }}"
-                        data-appointment-status="{{ $appointment->status }}"
+                        data-appointment-id="{{ $appointment['id'] }}"
+                        data-appointment-status="{{ $appointment['status'] }}"
                     >
                         <span class="min-w-0">
                             <span class="block truncate text-sm font-semibold text-slate-900">
-                                {{ $appointment->title ?: $appointment->bookableService?->name ?: 'Appointment' }}
+                                {{ $appointment['title'] }}
                             </span>
                             <span class="mt-1 block text-xs text-slate-500">
-                                {{ $appointment->starts_at->setTimezone($appointmentTimezone)->format('M j, Y g:i A') }}
-                                @if($appointment->schedulingHost)
-                                    · {{ $appointment->schedulingHost->name }}
+                                {{ $appointment['starts_at_label'] }}
+                                @if($appointment['host_name'])
+                                    · {{ $appointment['host_name'] }}
                                 @endif
                             </span>
                         </span>
 
-                        <span class="inline-flex self-start rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClasses($appointment->status) }}">
-                            {{ str($appointment->status)->replace('_', ' ')->title() }}
+                        <span class="inline-flex self-start rounded-full px-2.5 py-1 text-xs font-semibold {{ $appointment['status_classes'] }}">
+                            {{ $appointment['status_label'] }}
                         </span>
                     </a>
                 @endforeach
@@ -138,47 +111,38 @@
         </div>
     @endif
 
-    @if($recentAppointments->isNotEmpty())
+    @if($recentAppointmentPresentations !== [])
         <div>
             <h4 class="text-sm font-semibold uppercase tracking-wide text-slate-500">
                 Recent outcomes
             </h4>
 
             <div class="mt-2 divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
-                @foreach($recentAppointments as $appointment)
-                    @php
-                        $appointmentTimezone = $displayTimezone($appointment);
-                        $replacement = $appointment->rescheduledAppointments->first();
-                    @endphp
-
+                @foreach($recentAppointmentPresentations as $appointment)
                     <a
-                        href="{{ route('crm.scheduling.appointments.show', $appointment) }}"
+                        href="{{ $appointment['show_url'] }}"
                         class="flex flex-col gap-2 p-3 hover:bg-slate-50 sm:flex-row sm:items-start sm:justify-between"
                         data-scheduling-appointment-kind="recent"
-                        data-appointment-id="{{ $appointment->id }}"
-                        data-appointment-status="{{ $appointment->status }}"
+                        data-appointment-id="{{ $appointment['id'] }}"
+                        data-appointment-status="{{ $appointment['status'] }}"
                     >
                         <span class="min-w-0">
                             <span class="block truncate text-sm font-semibold text-slate-900">
-                                {{ $appointment->title ?: $appointment->bookableService?->name ?: 'Appointment' }}
+                                {{ $appointment['title'] }}
                             </span>
                             <span class="mt-1 block text-xs text-slate-500">
-                                {{ $appointment->starts_at->setTimezone($appointmentTimezone)->format('M j, Y g:i A') }}
+                                {{ $appointment['starts_at_label'] }}
                             </span>
 
-                            @if($appointment->rescheduledFrom)
+                            @if($appointment['reschedule_note'])
                                 <span class="mt-1 block text-xs font-medium text-slate-600">
-                                    Replacement for an earlier appointment.
-                                </span>
-                            @elseif($replacement)
-                                <span class="mt-1 block text-xs font-medium text-slate-600">
-                                    Rescheduled to {{ $replacement->starts_at->setTimezone($displayTimezone($replacement))->format('M j, Y g:i A') }}.
+                                    {{ $appointment['reschedule_note'] }}
                                 </span>
                             @endif
                         </span>
 
-                        <span class="inline-flex self-start rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClasses($appointment->status) }}">
-                            {{ str($appointment->status)->replace('_', ' ')->title() }}
+                        <span class="inline-flex self-start rounded-full px-2.5 py-1 text-xs font-semibold {{ $appointment['status_classes'] }}">
+                            {{ $appointment['status_label'] }}
                         </span>
                     </a>
                 @endforeach
@@ -186,7 +150,7 @@
         </div>
     @endif
 
-    @if(! $nextAppointment && $recentAppointments->isEmpty())
+    @if(! $hasAnyAppointment)
         <div
             class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center"
             data-scheduling-panel-state="empty"

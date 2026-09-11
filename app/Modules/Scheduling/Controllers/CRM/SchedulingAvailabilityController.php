@@ -16,6 +16,7 @@ use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -254,14 +255,17 @@ class SchedulingAvailabilityController extends Controller
         ]);
     }
 
-    public function saveBookingTiming(
+    public function saveWorkspace(
         Request $request,
         BookableService $bookableService,
-        SchedulingConfigurationWriter $writer,
+        SchedulingAvailabilityConfigurationWriter $availabilityWriter,
+        SchedulingConfigurationWriter $configurationWriter,
     ): RedirectResponse {
         $this->assertActiveService($bookableService);
         $this->assertAllowedFields($request, [
+            'save_section',
             'current_version',
+            'regular_hours',
             'slot_interval_choice',
             'slot_interval_custom_minutes',
             'slot_start_anchor_time',
@@ -269,38 +273,92 @@ class SchedulingAvailabilityController extends Controller
             'buffer_after_minutes',
             'guided',
         ]);
-        $validated = $request->validate([
-            'current_version' => ['required', 'string', 'max:80'],
-            'slot_interval_choice' => [
-                'required',
-                'string',
-                Rule::in(['15', '30', '60', '120', 'custom']),
-            ],
-            'slot_interval_custom_minutes' => [
-                'nullable',
-                'required_if:slot_interval_choice,custom',
-                'integer',
-                'min:1',
-                'max:1440',
-            ],
-            'slot_start_anchor_time' => ['required', 'date_format:H:i'],
-            'buffer_before_minutes' => ['required', 'integer', 'min:0', 'max:10080'],
-            'buffer_after_minutes' => ['required', 'integer', 'min:0', 'max:10080'],
+
+        $section = $request->validate([
+            'save_section' => ['required', 'string', Rule::in([
+                'regular_hours',
+                'booking_timing',
+                'all',
+            ])],
             'guided' => ['nullable', 'boolean'],
+        ])['save_section'];
+
+        $regularHours = in_array($section, ['regular_hours', 'all'], true)
+            ? $this->validateRegularHours($request)
+            : null;
+        $bookingTiming = in_array($section, ['booking_timing', 'all'], true)
+            ? $this->validateBookingTiming($request)
+            : null;
+
+        try {
+            DB::transaction(function () use (
+                $bookableService,
+                $availabilityWriter,
+                $configurationWriter,
+                $regularHours,
+                $bookingTiming,
+            ): void {
+                if (is_array($regularHours)) {
+                    $availabilityWriter->replaceRegularHours(
+                        $bookableService,
+                        $this->regularHourRanges($regularHours),
+                    );
+                }
+
+                if (is_array($bookingTiming)) {
+                    $configurationWriter->updateAvailabilityPolicy(
+                        service: $bookableService,
+                        attributes: $this->bookingTimingAttributes($bookingTiming),
+                        expectedUpdatedAt: $bookingTiming['current_version'],
+                    );
+                }
+            }, 3);
+        } catch (DomainException|InvalidArgumentException|LogicException $exception) {
+            throw $this->availabilityException($exception);
+        }
+
+        $message = match ($section) {
+            'regular_hours' => 'Regular hours updated.',
+            'booking_timing' => 'Booking timing updated.',
+            default => 'Availability changes saved.',
+        };
+        $scrollTarget = match ($section) {
+            'regular_hours' => 'regular-hours',
+            'booking_timing' => 'booking-timing',
+            default => 'availability-workspace',
+        };
+
+        return $this->businessRedirect(
+            service: $bookableService,
+            message: $message,
+            guided: $request->boolean('guided'),
+            scrollTarget: $scrollTarget,
+        );
+    }
+
+    public function saveBookingTiming(
+        Request $request,
+        BookableService $bookableService,
+        SchedulingConfigurationWriter $writer,
+    ): RedirectResponse {
+        $this->assertActiveService($bookableService);
+        $this->assertAllowedFields($request, [
+            'save_section',
+            'current_version',
+            'regular_hours',
+            'slot_interval_choice',
+            'slot_interval_custom_minutes',
+            'slot_start_anchor_time',
+            'buffer_before_minutes',
+            'buffer_after_minutes',
+            'guided',
         ]);
-        $slotIntervalMinutes = $validated['slot_interval_choice'] === 'custom'
-            ? (int) $validated['slot_interval_custom_minutes']
-            : (int) $validated['slot_interval_choice'];
+        $validated = $this->validateBookingTiming($request);
 
         try {
             $writer->updateAvailabilityPolicy(
                 service: $bookableService,
-                attributes: [
-                    'slot_interval_minutes' => $slotIntervalMinutes,
-                    'slot_start_anchor_time' => $validated['slot_start_anchor_time'],
-                    'buffer_before_minutes' => (int) $validated['buffer_before_minutes'],
-                    'buffer_after_minutes' => (int) $validated['buffer_after_minutes'],
-                ],
+                attributes: $this->bookingTimingAttributes($validated),
                 expectedUpdatedAt: $validated['current_version'],
             );
         } catch (DomainException|InvalidArgumentException|LogicException $exception) {
@@ -311,6 +369,7 @@ class SchedulingAvailabilityController extends Controller
             service: $bookableService,
             message: 'Booking timing updated.',
             guided: (bool) ($validated['guided'] ?? false),
+            scrollTarget: 'booking-timing',
         );
     }
 
@@ -320,41 +379,24 @@ class SchedulingAvailabilityController extends Controller
         SchedulingAvailabilityConfigurationWriter $writer,
     ): RedirectResponse {
         $this->assertActiveService($bookableService);
-        $this->assertAllowedFields($request, ['regular_hours', 'guided']);
-        $validated = $request->validate([
-            'guided' => ['nullable', 'boolean'],
-            'regular_hours' => ['required', 'array', 'size:7'],
-            'regular_hours.*.weekday' => [
-                'required',
-                'integer',
-                'between:0,6',
-                'distinct',
-            ],
-            'regular_hours.*.ranges' => ['nullable', 'array', 'max:8'],
-            'regular_hours.*.ranges.*.start' => [
-                'required',
-                'date_format:H:i',
-            ],
-            'regular_hours.*.ranges.*.end' => [
-                'required',
-                'date_format:H:i',
-            ],
+        $this->assertAllowedFields($request, [
+            'save_section',
+            'current_version',
+            'regular_hours',
+            'slot_interval_choice',
+            'slot_interval_custom_minutes',
+            'slot_start_anchor_time',
+            'buffer_before_minutes',
+            'buffer_after_minutes',
+            'guided',
         ]);
-
-        $ranges = [];
-
-        foreach ($validated['regular_hours'] as $day) {
-            foreach (($day['ranges'] ?? []) as $range) {
-                $ranges[] = [
-                    'weekday' => (int) $day['weekday'],
-                    'start_time' => $range['start'],
-                    'end_time' => $range['end'],
-                ];
-            }
-        }
+        $validated = $this->validateRegularHours($request);
 
         try {
-            $writer->replaceRegularHours($bookableService, $ranges);
+            $writer->replaceRegularHours(
+                $bookableService,
+                $this->regularHourRanges($validated),
+            );
         } catch (DomainException|InvalidArgumentException|LogicException $exception) {
             throw $this->availabilityException($exception);
         }
@@ -363,6 +405,7 @@ class SchedulingAvailabilityController extends Controller
             service: $bookableService,
             message: 'Regular hours updated.',
             guided: (bool) ($validated['guided'] ?? false),
+            scrollTarget: 'regular-hours',
         );
     }
 
@@ -403,6 +446,7 @@ class SchedulingAvailabilityController extends Controller
             service: $bookableService,
             message: 'Special hours saved for '.$validated['date'].'.',
             guided: (bool) ($validated['guided'] ?? false),
+            scrollTarget: 'special-hours',
         );
     }
 
@@ -456,6 +500,7 @@ class SchedulingAvailabilityController extends Controller
                 ? 'This appointment type is unavailable for the selected day.'
                 : 'Unavailable time added.',
             guided: (bool) ($validated['guided'] ?? false),
+            scrollTarget: 'time-off',
         );
     }
 
@@ -490,6 +535,7 @@ class SchedulingAvailabilityController extends Controller
             service: $bookableService,
             message: 'The one-off change was removed. Regular hours apply again.',
             guided: (bool) ($validated['guided'] ?? false),
+            scrollTarget: 'date-changes',
         );
     }
 
@@ -578,6 +624,89 @@ class SchedulingAvailabilityController extends Controller
         }
 
         return $this->availabilityRedirect('restored');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validateRegularHours(Request $request): array
+    {
+        return validator($request->all(), [
+            'guided' => ['nullable', 'boolean'],
+            'regular_hours' => ['required', 'array', 'size:7'],
+            'regular_hours.*.weekday' => [
+                'required',
+                'integer',
+                'between:0,6',
+                'distinct',
+            ],
+            'regular_hours.*.ranges' => ['nullable', 'array', 'max:8'],
+            'regular_hours.*.ranges.*.start' => ['required', 'date_format:H:i'],
+            'regular_hours.*.ranges.*.end' => ['required', 'date_format:H:i'],
+        ])->validate();
+    }
+
+    /**
+     * @param array<string, mixed> $validated
+     * @return array<int, array{weekday: int, start_time: string, end_time: string}>
+     */
+    private function regularHourRanges(array $validated): array
+    {
+        $ranges = [];
+
+        foreach ($validated['regular_hours'] as $day) {
+            foreach (($day['ranges'] ?? []) as $range) {
+                $ranges[] = [
+                    'weekday' => (int) $day['weekday'],
+                    'start_time' => $range['start'],
+                    'end_time' => $range['end'],
+                ];
+            }
+        }
+
+        return $ranges;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validateBookingTiming(Request $request): array
+    {
+        return validator($request->all(), [
+            'current_version' => ['required', 'string', 'max:80'],
+            'slot_interval_choice' => [
+                'required',
+                'string',
+                Rule::in(['15', '30', '60', '120', 'custom']),
+            ],
+            'slot_interval_custom_minutes' => [
+                'nullable',
+                'required_if:slot_interval_choice,custom',
+                'integer',
+                'min:1',
+                'max:1440',
+            ],
+            'slot_start_anchor_time' => ['required', 'date_format:H:i'],
+            'buffer_before_minutes' => ['required', 'integer', 'min:0', 'max:10080'],
+            'buffer_after_minutes' => ['required', 'integer', 'min:0', 'max:10080'],
+            'guided' => ['nullable', 'boolean'],
+        ])->validate();
+    }
+
+    /**
+     * @param array<string, mixed> $validated
+     * @return array{slot_interval_minutes: int, slot_start_anchor_time: string, buffer_before_minutes: int, buffer_after_minutes: int}
+     */
+    private function bookingTimingAttributes(array $validated): array
+    {
+        return [
+            'slot_interval_minutes' => $validated['slot_interval_choice'] === 'custom'
+                ? (int) $validated['slot_interval_custom_minutes']
+                : (int) $validated['slot_interval_choice'],
+            'slot_start_anchor_time' => $validated['slot_start_anchor_time'],
+            'buffer_before_minutes' => (int) $validated['buffer_before_minutes'],
+            'buffer_after_minutes' => (int) $validated['buffer_after_minutes'],
+        ];
     }
 
     /**
@@ -1066,13 +1195,15 @@ class SchedulingAvailabilityController extends Controller
         BookableService $service,
         string $message,
         bool $guided = false,
+        ?string $scrollTarget = null,
     ): RedirectResponse {
         return redirect()
             ->route('crm.scheduling.configuration.availability.index', array_filter([
                 'service_id' => $service->getKey(),
                 'guided' => $guided ? 1 : null,
             ], static fn (mixed $value): bool => $value !== null))
-            ->with('success', $message);
+            ->with('success', $message)
+            ->with('availability_scroll_to', $scrollTarget);
     }
 
     private function availabilityRedirect(string $event): RedirectResponse

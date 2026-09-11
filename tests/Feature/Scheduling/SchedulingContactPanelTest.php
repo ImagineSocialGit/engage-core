@@ -188,7 +188,7 @@ class SchedulingContactPanelTest extends TestCase
             ->assertSee(route('crm.scheduling.appointments.show', $next), false)
             ->assertSee(route('crm.scheduling.appointments.show', $recent), false)
             ->assertSee(
-                route('crm.scheduling.index', ['contact_id' => $contact->id]),
+                route('crm.scheduling.appointments.create', ['contact_id' => $contact->id]),
                 false,
             )
             ->assertDontSee('data-appointment-id="'.$otherAppointment->id.'"', false);
@@ -211,7 +211,7 @@ class SchedulingContactPanelTest extends TestCase
         $startsAt = CarbonImmutable::parse('2026-08-04 13:00:00 UTC');
         $this->availability($service, $startsAt, $startsAt->addHour());
 
-        $workspaceUrl = route('crm.scheduling.index', [
+        $workspaceUrl = route('crm.scheduling.appointments.create', [
             'contact_id' => $contact->id,
             'bookable_service_id' => $service->id,
             'date' => '2026-08-04',

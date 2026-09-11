@@ -28,6 +28,7 @@
                     'border-yellow-300 bg-yellow-50' => $step['state'] === 'current',
                     'border-red-300 bg-red-50' => $step['state'] === 'required',
                     'border-orange-300 bg-orange-50' => $step['state'] === 'recommended',
+                    'border-slate-200 bg-slate-50' => $step['state'] === 'optional',
                 ])
                 data-scheduling-progress-step="{{ $step['key'] }}"
                 data-scheduling-progress-state="{{ $step['state'] }}"
@@ -41,6 +42,7 @@
                                 'bg-yellow-400 text-yellow-950' => $step['state'] === 'current',
                                 'bg-red-700 text-white' => $step['state'] === 'required',
                                 'bg-orange-500 text-white' => $step['state'] === 'recommended',
+                                'bg-slate-300 text-slate-700' => $step['state'] === 'optional',
                             ])
                         >
                             {{ $step['state'] === 'complete' ? '✓' : $step['number'] }}
@@ -55,6 +57,7 @@
                             'bg-yellow-100 text-yellow-900' => $step['state'] === 'current',
                             'bg-red-100 text-red-800' => $step['state'] === 'required',
                             'bg-orange-100 text-orange-900' => $step['state'] === 'recommended',
+                            'bg-slate-200 text-slate-700' => $step['state'] === 'optional',
                         ])
                     >
                         {{ $step['state_label'] }}

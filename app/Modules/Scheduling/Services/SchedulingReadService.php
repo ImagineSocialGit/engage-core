@@ -32,6 +32,7 @@ class SchedulingReadService
         private readonly SchedulingResourceConfigurationWriter $resourceConfigurationWriter,
         private readonly SchedulingDurationResolver $durations,
         private readonly UserAccessService $access,
+        private readonly SchedulingServiceReadiness $serviceReadiness,
     ) {}
 
     /**
@@ -317,39 +318,14 @@ class SchedulingReadService
             $this->configurationAppointmentLabel($nextAppointmentAt),
         );
 
-        $publicBaseUrl = trim((string) config('scheduling.public.url', ''));
-        $publicBookingUrl = $publicBaseUrl !== ''
-            ? rtrim($publicBaseUrl, '/').'/services/'.rawurlencode((string) $service->key)
-            : null;
-        $publicEnabled = (bool) config('scheduling.public.enabled', false)
-            && $publicBookingUrl !== null;
-        $publicBookingReady = $publicEnabled
-            && $service->status === BookableService::STATUS_ACTIVE
-            && (bool) $service->is_public
-            && $service->hasCompleteAppointmentFormat();
+        $readiness = $this->serviceReadiness->forService($service);
 
-        $service->setAttribute(
-            'public_booking_url',
-            $publicBookingUrl,
-        );
-        $service->setAttribute(
-            'public_booking_ready',
-            $publicBookingReady,
-        );
-        $service->setAttribute(
-            'public_booking_issue',
-            match (true) {
-                ! $publicEnabled =>
-                    'Public booking is not configured for this environment.',
-                $service->status !== BookableService::STATUS_ACTIVE =>
-                    'Activate this appointment type before sharing it.',
-                ! $service->hasCompleteAppointmentFormat() =>
-                    'Choose how the appointment happens before sharing it.',
-                ! (bool) $service->is_public =>
-                    'Turn on customer self-booking to get a shareable link.',
-                default => null,
-            },
-        );
+        $service->setAttribute('scheduling_readiness', $readiness);
+        $service->setAttribute('internal_booking_ready', $readiness['internal_ready']);
+        $service->setAttribute('public_booking_url', $readiness['public_url']);
+        $service->setAttribute('public_booking_ready', $readiness['public_ready']);
+        $service->setAttribute('public_booking_issue', $readiness['public_issue']);
+        $service->setAttribute('public_booking_blockers', $readiness['public_blockers']);
 
         return $service;
     }

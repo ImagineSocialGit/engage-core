@@ -92,16 +92,35 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
             ->get(route('crm.scheduling.configuration.services.edit', $service))
             ->assertOk()
             ->assertSee('data-scheduling-service-editor="'.$service->id.'"', false)
+            ->assertSee('data-scheduling-service-hub', false)
+            ->assertSee('data-scheduling-config-card="details"', false)
+            ->assertSee('data-scheduling-config-card="staff"', false)
             ->assertSee(
-                'data-configuration-service-update="'.$service->id.'"',
+                route('crm.scheduling.configuration.services.details.edit', $service),
                 false,
             )
             ->assertSee(
-                'data-service-assignment-form="'.$service->id.'"',
+                route('crm.scheduling.configuration.services.staff.edit', $service),
+                false,
+            );
+
+        $this->actingAs($user)
+            ->get(route('crm.scheduling.configuration.services.details.edit', $service))
+            ->assertOk()
+            ->assertSee(
+                'data-configuration-service-details-update="'.$service->id.'"',
                 false,
             )
             ->assertSee(
                 route('crm.scheduling.configuration.services.update', $service),
+                false,
+            );
+
+        $this->actingAs($user)
+            ->get(route('crm.scheduling.configuration.services.staff.edit', $service))
+            ->assertOk()
+            ->assertSee(
+                'data-service-assignment-form="'.$service->id.'"',
                 false,
             )
             ->assertSee(
@@ -169,6 +188,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
             ->post(route('crm.scheduling.configuration.services.store'), [
                 'name' => 'Planning Call',
                 'duration_minutes' => 30,
+                'appointment_method' => BookableService::REMOTE_METHOD_PHONE,
             ]);
 
         $service = BookableService::query()->sole();
@@ -184,6 +204,8 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
         $this->assertSame(BookableService::STATUS_ACTIVE, $service->status);
         $this->assertSame(BookableService::DURATION_MODE_FIXED, $service->duration_mode);
         $this->assertSame(30, $service->duration_minutes);
+        $this->assertSame(BookableService::APPOINTMENT_FORMAT_REMOTE, $service->appointment_format);
+        $this->assertSame(BookableService::REMOTE_METHOD_PHONE, $service->remote_method);
         $this->assertSame(15, $service->slot_interval_minutes);
         $this->assertSame('09:00', $service->slotStartAnchorTime());
         $this->assertSame(1, $service->capacity);
@@ -386,7 +408,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
                     'location_url' => '',
                 ], includeKey: false),
             )
-            ->assertRedirect(route('crm.scheduling.configuration.services.edit', $service))
+            ->assertRedirect(route('crm.scheduling.configuration.services.details.edit', $service))
             ->assertSessionHasNoErrors();
 
         $service->refresh();
@@ -440,7 +462,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
                     'duration_minutes' => 90,
                 ], includeKey: false),
             )
-            ->assertRedirect(route('crm.scheduling.configuration.services.edit', $service))
+            ->assertRedirect(route('crm.scheduling.configuration.services.details.edit', $service))
             ->assertSessionHasNoErrors();
 
         $service->refresh();
@@ -647,7 +669,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
                     ]],
                 ],
             )
-            ->assertRedirect(route('crm.scheduling.configuration.services.edit', $service))
+            ->assertRedirect(route('crm.scheduling.configuration.services.staff.edit', $service))
             ->assertSessionHasNoErrors();
 
         $primaryAssignment = BookableServiceHost::query()

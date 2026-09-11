@@ -54,10 +54,29 @@ class SchedulingConfigurationController extends Controller
                     (bool) $service->getAttribute('public_booking_ready')
                 )
                 ->count(),
+            'publicSurfaceReady' => (bool) config('scheduling.public.enabled', false)
+                && trim((string) config('scheduling.public.url', '')) !== '',
         ]);
     }
 
     public function editService(
+        BookableService $bookableService,
+        SchedulingReadService $read,
+        SchedulingSetupProgress $progress,
+    ): View {
+        $service = $read->configurationService($bookableService);
+
+        return view('crm.scheduling.services.edit', [
+            'title' => 'Appointment Type',
+            'heading' => $service->name,
+            'service' => $service,
+            'serviceEditable' => (bool) $service->getAttribute('crm_editable'),
+            'setupProgress' => $progress->forService($service, 'overview'),
+            'readiness' => $service->getAttribute('scheduling_readiness'),
+        ]);
+    }
+
+    public function editServiceDetails(
         BookableService $bookableService,
         SchedulingReadService $read,
         SchedulingSetupProgress $progress,
@@ -69,9 +88,36 @@ class SchedulingConfigurationController extends Controller
         $locationAddress = is_array($locationDetails['address'] ?? null)
             ? $locationDetails['address']
             : [];
+
+        return view('crm.scheduling.services.details', [
+            'title' => 'Appointment Details',
+            'heading' => $service->name,
+            'service' => $service,
+            'serviceEditable' => (bool) $service->getAttribute('crm_editable'),
+            'serviceStatuses' => [
+                BookableService::STATUS_ACTIVE,
+                BookableService::STATUS_INACTIVE,
+                BookableService::STATUS_ARCHIVED,
+            ],
+            'timezones' => timezone_identifiers_list(),
+            'appointmentMethodKey' => $this->appointmentMethodKey($service),
+            'locationDetails' => $locationDetails,
+            'locationAddress' => $locationAddress,
+            'setupProgress' => $progress->forService($service, 'appointment_type'),
+            'maxRangeDurationMinutes' => BookableService::MAX_RANGE_DURATION_MINUTES,
+            'publicSurfaceReady' => (bool) config('scheduling.public.enabled', false)
+                && trim((string) config('scheduling.public.url', '')) !== '',
+        ]);
+    }
+
+    public function editServiceStaff(
+        BookableService $bookableService,
+        SchedulingReadService $read,
+        SchedulingSetupProgress $progress,
+    ): View {
+        $service = $read->configurationService($bookableService);
         $assignmentByHost = $service->hostAssignments
             ->keyBy('scheduling_host_id');
-
         $assignmentRows = $read->configurationHosts()
             ->map(function (SchedulingHost $host) use ($assignmentByHost): array {
                 $assignment = $assignmentByHost->get($host->getKey());
@@ -91,23 +137,13 @@ class SchedulingConfigurationController extends Controller
             ->values()
             ->all();
 
-        return view('crm.scheduling.services.edit', [
-            'title' => 'Edit Appointment Type',
+        return view('crm.scheduling.services.staff', [
+            'title' => 'Appointment Staff',
             'heading' => $service->name,
             'service' => $service,
             'serviceEditable' => (bool) $service->getAttribute('crm_editable'),
-            'serviceStatuses' => [
-                BookableService::STATUS_ACTIVE,
-                BookableService::STATUS_INACTIVE,
-                BookableService::STATUS_ARCHIVED,
-            ],
-            'timezones' => timezone_identifiers_list(),
-            'appointmentConfiguration' => $service->resolvedAppointmentConfiguration(),
-            'locationDetails' => $locationDetails,
-            'locationAddress' => $locationAddress,
             'assignmentRows' => $assignmentRows,
-            'setupProgress' => $progress->forService($service, 'appointment_type'),
-            'maxRangeDurationMinutes' => BookableService::MAX_RANGE_DURATION_MINUTES,
+            'setupProgress' => $progress->forService($service, 'staff'),
         ]);
     }
 
@@ -208,6 +244,7 @@ class SchedulingConfigurationController extends Controller
     ): RedirectResponse {
         $this->assertAllowedFields($request, [
             'key',
+            'appointment_method',
             ...$this->serviceFieldNames(),
         ]);
 
@@ -245,27 +282,31 @@ class SchedulingConfigurationController extends Controller
     ): RedirectResponse {
         $this->assertAllowedFields($request, [
             'current_version',
+            'appointment_method',
             ...$this->serviceFieldNames(),
         ]);
 
-        $validated = $request->validate([
+        $version = $request->validate([
             'current_version' => ['required', 'string', 'max:80'],
-            ...$this->serviceRules(includeKey: false),
-        ]);
+        ])['current_version'];
+        $validated = validator(
+            $this->serviceUpdatePayload($request, $bookableService),
+            $this->serviceRules(includeKey: false),
+        )->validate();
 
         try {
             $writer->updateService(
                 service: $bookableService,
                 attributes: $validated,
-                expectedUpdatedAt: $validated['current_version'],
+                expectedUpdatedAt: $version,
             );
         } catch (DomainException|InvalidArgumentException|LogicException $exception) {
             throw $this->configurationException($exception);
         }
 
         return redirect()
-            ->route('crm.scheduling.configuration.services.edit', $bookableService)
-            ->with('success', 'Appointment type updated.');
+            ->route('crm.scheduling.configuration.services.details.edit', $bookableService)
+            ->with('success', 'Appointment details updated.');
     }
 
     public function updateServiceHosts(
@@ -315,7 +356,7 @@ class SchedulingConfigurationController extends Controller
         }
 
         return redirect()
-            ->route('crm.scheduling.configuration.services.edit', $bookableService)
+            ->route('crm.scheduling.configuration.services.staff.edit', $bookableService)
             ->with('success', 'Appointment-type staff assignments updated.');
     }
 
@@ -345,7 +386,6 @@ class SchedulingConfigurationController extends Controller
             'cancellation_notice_minutes' => 0,
             'reschedule_notice_minutes' => 0,
             'timezone' => $this->defaultTimezone(),
-            'location_type' => null,
             'location_label' => null,
             'location_instructions' => null,
             'location_url' => null,
@@ -360,6 +400,140 @@ class SchedulingConfigurationController extends Controller
             'is_public' => false,
             'sort_order' => $this->nextServiceSortOrder(),
         ];
+
+        return $this->applyAppointmentMethod($payload);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serviceUpdatePayload(
+        Request $request,
+        BookableService $service,
+    ): array {
+        $locationDetails = is_array($service->location_details)
+            ? $service->location_details
+            : [];
+        $address = is_array($locationDetails['address'] ?? null)
+            ? $locationDetails['address']
+            : [];
+        $submitted = $request->except(['_token', '_method', 'current_version']);
+        $usesLegacyAppointmentBoundary = array_key_exists('location_type', $submitted)
+            && ! array_key_exists('appointment_method', $submitted)
+            && ! array_key_exists('appointment_format', $submitted)
+            && ! array_key_exists('in_person_arrangement', $submitted)
+            && ! array_key_exists('remote_method', $submitted);
+
+        $payload = [
+            'name' => $service->name,
+            'description' => $service->description,
+            'status' => $service->status,
+            'duration_mode' => $service->duration_mode,
+            'duration_minutes' => $service->duration_minutes,
+            'minimum_duration_minutes' => $service->minimum_duration_minutes,
+            'maximum_duration_minutes' => $service->maximum_duration_minutes,
+            'slot_interval_minutes' => $service->slot_interval_minutes,
+            'buffer_before_minutes' => $service->buffer_before_minutes,
+            'buffer_after_minutes' => $service->buffer_after_minutes,
+            'minimum_notice_minutes' => $service->minimum_notice_minutes,
+            'booking_horizon_days' => $service->booking_horizon_days,
+            'cancellation_notice_minutes' => $service->cancellation_notice_minutes,
+            'reschedule_notice_minutes' => $service->reschedule_notice_minutes,
+            'timezone' => $service->timezone,
+            'location_label' => $locationDetails['label'] ?? null,
+            'location_instructions' => $locationDetails['instructions'] ?? null,
+            'location_url' => $locationDetails['url'] ?? null,
+            'location_address_line_1' => $address['address_line_1'] ?? null,
+            'location_address_line_2' => $address['address_line_2'] ?? null,
+            'location_city' => $address['city'] ?? null,
+            'location_region' => $address['region'] ?? null,
+            'location_postal_code' => $address['postal_code'] ?? null,
+            'location_country' => $address['country'] ?? null,
+            'capacity' => $service->capacity,
+            'requires_confirmation' => $service->requires_confirmation,
+            'is_public' => $service->is_public,
+            'sort_order' => $service->sort_order,
+        ];
+
+        if ($usesLegacyAppointmentBoundary) {
+            $payload['location_type'] = $service->location_type;
+        } else {
+            $payload['appointment_format'] = $service->appointment_format;
+            $payload['in_person_arrangement'] = $service->in_person_arrangement;
+            $payload['remote_method'] = $service->remote_method;
+        }
+
+        $payload = [...$payload, ...$submitted];
+
+        if (($payload['duration_mode'] ?? null) === BookableService::DURATION_MODE_FIXED) {
+            if (! array_key_exists('minimum_duration_minutes', $submitted)) {
+                $payload['minimum_duration_minutes'] = null;
+            }
+
+            if (! array_key_exists('maximum_duration_minutes', $submitted)) {
+                $payload['maximum_duration_minutes'] = null;
+            }
+        }
+
+        return $this->applyAppointmentMethod($payload);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function applyAppointmentMethod(array $payload): array
+    {
+        if (! array_key_exists('appointment_method', $payload)) {
+            return $payload;
+        }
+
+        $method = is_string($payload['appointment_method'])
+            ? trim($payload['appointment_method'])
+            : '';
+        unset($payload['appointment_method']);
+
+        $configuration = match ($method) {
+            BookableService::REMOTE_METHOD_PHONE => [
+                'appointment_format' => BookableService::APPOINTMENT_FORMAT_REMOTE,
+                'in_person_arrangement' => null,
+                'remote_method' => BookableService::REMOTE_METHOD_PHONE,
+            ],
+            BookableService::REMOTE_METHOD_VIRTUAL_MEETING => [
+                'appointment_format' => BookableService::APPOINTMENT_FORMAT_REMOTE,
+                'in_person_arrangement' => null,
+                'remote_method' => BookableService::REMOTE_METHOD_VIRTUAL_MEETING,
+            ],
+            BookableService::IN_PERSON_ARRANGEMENT_BUSINESS_LOCATION => [
+                'appointment_format' => BookableService::APPOINTMENT_FORMAT_IN_PERSON,
+                'in_person_arrangement' => BookableService::IN_PERSON_ARRANGEMENT_BUSINESS_LOCATION,
+                'remote_method' => null,
+            ],
+            BookableService::IN_PERSON_ARRANGEMENT_CUSTOMER_ADDRESS => [
+                'appointment_format' => BookableService::APPOINTMENT_FORMAT_IN_PERSON,
+                'in_person_arrangement' => BookableService::IN_PERSON_ARRANGEMENT_CUSTOMER_ADDRESS,
+                'remote_method' => null,
+            ],
+            default => throw ValidationException::withMessages([
+                'appointment_method' => 'Choose how this appointment happens.',
+            ]),
+        };
+
+        $payload = [...$payload, ...$configuration];
+
+        if ($method !== BookableService::REMOTE_METHOD_VIRTUAL_MEETING) {
+            $payload['location_url'] = null;
+        }
+
+        if ($method !== BookableService::IN_PERSON_ARRANGEMENT_BUSINESS_LOCATION) {
+            $payload['location_label'] = null;
+            $payload['location_address_line_1'] = null;
+            $payload['location_address_line_2'] = null;
+            $payload['location_city'] = null;
+            $payload['location_region'] = null;
+            $payload['location_postal_code'] = null;
+            $payload['location_country'] = null;
+        }
 
         return $payload;
     }
@@ -649,8 +823,35 @@ class SchedulingConfigurationController extends Controller
         ];
     }
 
+    private function appointmentMethodKey(BookableService $service): ?string
+    {
+        $configuration = $service->resolvedAppointmentConfiguration();
+
+        return match (true) {
+            ($configuration['appointment_format'] ?? null) === BookableService::APPOINTMENT_FORMAT_REMOTE
+                && ($configuration['remote_method'] ?? null) === BookableService::REMOTE_METHOD_PHONE =>
+                    BookableService::REMOTE_METHOD_PHONE,
+            ($configuration['appointment_format'] ?? null) === BookableService::APPOINTMENT_FORMAT_REMOTE
+                && ($configuration['remote_method'] ?? null) === BookableService::REMOTE_METHOD_VIRTUAL_MEETING =>
+                    BookableService::REMOTE_METHOD_VIRTUAL_MEETING,
+            ($configuration['appointment_format'] ?? null) === BookableService::APPOINTMENT_FORMAT_IN_PERSON
+                && ($configuration['in_person_arrangement'] ?? null) === BookableService::IN_PERSON_ARRANGEMENT_BUSINESS_LOCATION =>
+                    BookableService::IN_PERSON_ARRANGEMENT_BUSINESS_LOCATION,
+            ($configuration['appointment_format'] ?? null) === BookableService::APPOINTMENT_FORMAT_IN_PERSON
+                && ($configuration['in_person_arrangement'] ?? null) === BookableService::IN_PERSON_ARRANGEMENT_CUSTOMER_ADDRESS =>
+                    BookableService::IN_PERSON_ARRANGEMENT_CUSTOMER_ADDRESS,
+            default => null,
+        };
+    }
+
     private function requestUsesVirtualMeeting(): bool
     {
+        $method = request()->input('appointment_method');
+
+        if (is_string($method) && trim($method) !== '') {
+            return $method === BookableService::REMOTE_METHOD_VIRTUAL_MEETING;
+        }
+
         $legacyLocationType = request()->input('location_type');
 
         if (is_string($legacyLocationType) && trim($legacyLocationType) !== '') {
@@ -663,6 +864,12 @@ class SchedulingConfigurationController extends Controller
 
     private function requestUsesBusinessLocation(): bool
     {
+        $method = request()->input('appointment_method');
+
+        if (is_string($method) && trim($method) !== '') {
+            return $method === BookableService::IN_PERSON_ARRANGEMENT_BUSINESS_LOCATION;
+        }
+
         $legacyLocationType = request()->input('location_type');
 
         if (is_string($legacyLocationType) && trim($legacyLocationType) !== '') {

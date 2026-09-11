@@ -2,92 +2,29 @@
 
 namespace App\Modules\Scheduling\Services;
 
-use App\Modules\Scheduling\Enums\SchedulingAvailabilityWindowType;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\BookableService;
-use App\Modules\Scheduling\Models\SchedulingAvailabilityWindow;
 use App\Modules\Scheduling\Models\SchedulingHost;
 
 final class SchedulingSetupReadiness
 {
+    public function __construct(
+        private readonly SchedulingServiceReadiness $serviceReadiness,
+    ) {}
+
     /**
-     * @return array{
-     *     empty: bool,
-     *     has_service: bool,
-     *     has_active_host: bool,
-     *     has_availability: bool,
-     *     internal_ready: bool,
-     *     public_ready: bool,
-     *     public_surface_enabled: bool,
-     *     has_public_service: bool,
-     *     has_incomplete_public_service: bool,
-     *     active_service_count: int,
-     *     active_host_count: int,
-     *     upcoming_appointment_count: int
-     * }
+     * @return array<string, mixed>
      */
     public function summary(): array
     {
         $activeServices = BookableService::query()
             ->where('status', BookableService::STATUS_ACTIVE)
-            ->get([
-                'id',
-                'is_public',
-                'appointment_format',
-                'in_person_arrangement',
-                'remote_method',
-                'location_type',
-            ]);
-        $activeHosts = SchedulingHost::query()
+            ->get();
+        $serviceStates = $activeServices
+            ->map(fn (BookableService $service): array => $this->serviceReadiness->forService($service));
+        $activeHostCount = SchedulingHost::query()
             ->where('status', SchedulingHost::STATUS_ACTIVE)
-            ->get(['id']);
-        $activeServiceIds = $activeServices->pluck('id')->all();
-        $activeHostIds = $activeHosts->pluck('id')->all();
-
-        $hasService = $activeServices->isNotEmpty();
-        $hasActiveHost = $activeHosts->isNotEmpty();
-        $hasAvailability = $hasService
-            && SchedulingAvailabilityWindow::query()
-                ->where('is_available', true)
-                ->where(function ($query): void {
-                    $query
-                        ->where(
-                            'window_type',
-                            SchedulingAvailabilityWindowType::Weekly->value,
-                        )
-                        ->orWhere(function ($query): void {
-                            $query
-                                ->where(
-                                    'window_type',
-                                    SchedulingAvailabilityWindowType::Absolute->value,
-                                )
-                                ->where('ends_at', '>', now('UTC'));
-                        });
-                })
-                ->where(function ($query) use ($activeServiceIds): void {
-                    $query
-                        ->whereNull('bookable_service_id')
-                        ->orWhereIn('bookable_service_id', $activeServiceIds);
-                })
-                ->where(function ($query) use ($activeHostIds): void {
-                    $query->whereNull('scheduling_host_id');
-
-                    if ($activeHostIds !== []) {
-                        $query->orWhereIn('scheduling_host_id', $activeHostIds);
-                    }
-                })
-                ->exists();
-        $internalReady = $hasService && $hasAvailability;
-        $publicSurfaceEnabled = (bool) config('scheduling.public.enabled', false);
-        $publicServices = $activeServices->filter(
-            fn (BookableService $service): bool => (bool) $service->is_public,
-        );
-        $completePublicServices = $publicServices->filter(
-            fn (BookableService $service): bool => $service->hasCompleteAppointmentFormat(),
-        );
-        $hasPublicService = $completePublicServices->isNotEmpty();
-        $hasIncompletePublicService = $publicServices->count()
-            !== $completePublicServices->count();
+            ->count();
         $upcomingAppointmentCount = Appointment::query()
             ->whereIn('status', [
                 Appointment::STATUS_PENDING,
@@ -96,22 +33,37 @@ final class SchedulingSetupReadiness
             ])
             ->where('starts_at', '>=', now('UTC'))
             ->count();
+        $internalReadyCount = $serviceStates
+            ->filter(fn (array $state): bool => (bool) $state['internal_ready'])
+            ->count();
+        $publicReadyCount = $serviceStates
+            ->filter(fn (array $state): bool => (bool) $state['public_ready'])
+            ->count();
+        $publicRequestedCount = $serviceStates
+            ->filter(fn (array $state): bool => (bool) $state['self_booking_enabled'])
+            ->count();
+        $hasAvailability = $serviceStates
+            ->contains(fn (array $state): bool => (bool) $state['has_availability']);
+        $hasCompleteFormat = $serviceStates
+            ->contains(fn (array $state): bool => (bool) $state['format_complete']);
+        $publicSurfaceReady = (bool) config('scheduling.public.enabled', false)
+            && trim((string) config('scheduling.public.url', '')) !== '';
 
         return [
-            'empty' => ! $hasService && $upcomingAppointmentCount === 0,
-            'has_service' => $hasService,
-            'has_active_host' => $hasActiveHost,
+            'empty' => $activeServices->isEmpty() && $upcomingAppointmentCount === 0,
+            'has_service' => $activeServices->isNotEmpty(),
+            'has_complete_format' => $hasCompleteFormat,
+            'has_active_host' => $activeHostCount > 0,
             'has_availability' => $hasAvailability,
-            'internal_ready' => $internalReady,
-            'public_ready' => $internalReady
-                && $publicSurfaceEnabled
-                && $hasPublicService
-                && ! $hasIncompletePublicService,
-            'public_surface_enabled' => $publicSurfaceEnabled,
-            'has_public_service' => $hasPublicService,
-            'has_incomplete_public_service' => $hasIncompletePublicService,
+            'internal_ready' => $internalReadyCount > 0,
+            'public_ready' => $publicReadyCount > 0,
+            'public_surface_enabled' => $publicSurfaceReady,
+            'has_public_service' => $publicRequestedCount > 0,
+            'has_incomplete_public_service' => $publicRequestedCount > $publicReadyCount,
             'active_service_count' => $activeServices->count(),
-            'active_host_count' => $activeHosts->count(),
+            'internally_ready_service_count' => $internalReadyCount,
+            'public_ready_service_count' => $publicReadyCount,
+            'active_host_count' => $activeHostCount,
             'upcoming_appointment_count' => $upcomingAppointmentCount,
         ];
     }

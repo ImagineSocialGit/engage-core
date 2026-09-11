@@ -16,6 +16,9 @@ Route::middleware('module:scheduling')
         Route::get('/', [SchedulingController::class, 'index'])
             ->name('index');
 
+        Route::get('/appointments/create', [SchedulingController::class, 'create'])
+            ->name('appointments.create');
+
         Route::post('/appointments', [SchedulingController::class, 'store'])
             ->name('appointments.store');
 
@@ -27,6 +30,12 @@ Route::middleware('module:scheduling')
 
         Route::get('/configuration/services/{bookableService}/edit', [SchedulingConfigurationController::class, 'editService'])
             ->name('configuration.services.edit');
+
+        Route::get('/configuration/services/{bookableService}/details', [SchedulingConfigurationController::class, 'editServiceDetails'])
+            ->name('configuration.services.details.edit');
+
+        Route::get('/configuration/services/{bookableService}/staff', [SchedulingConfigurationController::class, 'editServiceStaff'])
+            ->name('configuration.services.staff.edit');
 
         Route::get('/configuration/staff', [SchedulingConfigurationController::class, 'staff'])
             ->name('configuration.staff.index');
@@ -63,6 +72,9 @@ Route::middleware('module:scheduling')
 
         Route::get('/configuration/availability', [SchedulingAvailabilityController::class, 'index'])
             ->name('configuration.availability.index');
+
+        Route::put('/configuration/availability/services/{bookableService}/workspace', [SchedulingAvailabilityController::class, 'saveWorkspace'])
+            ->name('configuration.availability.workspace');
 
         Route::put('/configuration/availability/services/{bookableService}/regular-hours', [SchedulingAvailabilityController::class, 'saveRegularHours'])
             ->name('configuration.availability.regular-hours');

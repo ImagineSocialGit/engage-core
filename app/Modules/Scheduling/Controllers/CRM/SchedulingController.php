@@ -34,6 +34,45 @@ class SchedulingController extends Controller
         Request $request,
         SchedulingReadService $read,
         SchedulingSetupReadiness $setupReadiness,
+    ): View|RedirectResponse {
+        $legacyCreateQuery = array_filter([
+            'contact_id' => $request->query('contact_id'),
+            'bookable_service_id' => $request->query('bookable_service_id'),
+            'scheduling_host_id' => $request->query('scheduling_host_id'),
+            'date' => $request->query('date'),
+        ], static fn (mixed $value): bool => $value !== null && $value !== '');
+
+        if ($legacyCreateQuery !== []) {
+            return redirect()->route('crm.scheduling.appointments.create', $legacyCreateQuery);
+        }
+
+        $setupSummary = $setupReadiness->summary();
+
+        if (($setupSummary['has_service'] ?? false) !== true) {
+            return redirect()
+                ->route('crm.scheduling.configuration.services.index');
+        }
+
+        $services = $read->activeServices();
+        $upcomingAppointments = $read->upcomingAppointments();
+
+        return view('crm.scheduling.index', [
+            'title' => 'Scheduling',
+            'heading' => 'Scheduling',
+            'services' => $services,
+            'upcomingAppointments' => $upcomingAppointments,
+            'upcomingAppointmentRows' => $this->presentUpcomingAppointments($upcomingAppointments),
+            'pendingCount' => $upcomingAppointments
+                ->where('status', Appointment::STATUS_PENDING)
+                ->count(),
+            'setupReadiness' => $setupSummary,
+        ]);
+    }
+
+    public function create(
+        Request $request,
+        SchedulingReadService $read,
+        SchedulingSetupReadiness $setupReadiness,
         SchedulingAvailableStartRangeBuilder $startRanges,
     ): View|RedirectResponse {
         $query = $request->validate([
@@ -117,7 +156,7 @@ class SchedulingController extends Controller
                     intervalMinutes: max(1, (int) $selectedService->slot_interval_minutes),
                 )
                 : [];
-        $upcomingAppointments = $read->upcomingAppointments();
+        $availableStartRanges = $this->presentStartRanges($availableStartRanges);
         $requestedContactId = $this->oldOrQueryInteger(
             request: $request,
             oldKey: 'contact_id',
@@ -130,9 +169,9 @@ class SchedulingController extends Controller
             ? $this->contactLabel($selectedContact)
             : '';
 
-        return view('crm.scheduling.index', [
-            'title' => 'Scheduling',
-            'heading' => 'Scheduling',
+        return view('crm.scheduling.create', [
+            'title' => 'Schedule Appointment',
+            'heading' => 'Schedule Appointment',
             'services' => $services,
             'selectedService' => $selectedService,
             'hosts' => $hosts,
@@ -144,10 +183,6 @@ class SchedulingController extends Controller
             'dateInRange' => $dateInRange,
             'slots' => $slots,
             'availableStartRanges' => $availableStartRanges,
-            'upcomingAppointments' => $upcomingAppointments,
-            'pendingCount' => $upcomingAppointments
-                ->where('status', Appointment::STATUS_PENDING)
-                ->count(),
             'setupReadiness' => $setupSummary,
             'selectedContact' => $selectedContact,
             'selectedContactLabel' => $selectedContactLabel,
@@ -273,7 +308,7 @@ class SchedulingController extends Controller
         }
 
         return redirect()
-            ->route('crm.scheduling.index', array_filter([
+            ->route('crm.scheduling.appointments.create', array_filter([
                 'contact_id' => $appointment->contact_id,
                 'bookable_service_id' => $service->getKey(),
                 'scheduling_host_id' => $host?->getKey(),
@@ -358,6 +393,79 @@ class SchedulingController extends Controller
         return $contact->email
             ?: $contact->phone
             ?: 'Contact #'.$contact->getKey();
+    }
+
+
+    /**
+     * @param \Illuminate\Support\Collection<int, Appointment> $appointments
+     * @return array<int, array<string, mixed>>
+     */
+    private function presentUpcomingAppointments($appointments): array
+    {
+        return $appointments->map(function (Appointment $appointment): array {
+            $timezone = in_array($appointment->timezone, timezone_identifiers_list(), true)
+                ? $appointment->timezone
+                : config('client.timezone', 'UTC');
+            $timezone = in_array($timezone, timezone_identifiers_list(), true)
+                ? $timezone
+                : 'UTC';
+            $attendee = $appointment->attendees->first();
+
+            return [
+                'appointment' => $appointment,
+                'title' => $appointment->title
+                    ?: $appointment->bookableService?->name
+                    ?: 'Appointment',
+                'contact_label' => $appointment->contact?->name
+                    ?: $attendee?->name
+                    ?: $appointment->contact?->email
+                    ?: $attendee?->email
+                    ?: 'Unidentified attendee',
+                'time_label' => $appointment->starts_at
+                    ->copy()
+                    ->setTimezone($timezone)
+                    ->format('D, M j, Y \\a\\t g:i A'),
+                'host_label' => $appointment->schedulingHost?->name,
+                'status_label' => str($appointment->status)->replace('_', ' ')->title()->toString(),
+                'status_class' => match ($appointment->status) {
+                    Appointment::STATUS_PENDING => 'bg-amber-100 text-amber-800',
+                    Appointment::STATUS_CONFIRMED => 'bg-emerald-100 text-emerald-800',
+                    default => 'bg-sky-100 text-sky-800',
+                },
+            ];
+        })->values()->all();
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $ranges
+     * @return array<int, array<string, mixed>>
+     */
+    private function presentStartRanges(array $ranges): array
+    {
+        return array_map(function (array $range): array {
+            $start = $range['starts_at']->setTimezone($range['display_timezone']);
+            $end = $range['last_start_at']->setTimezone($range['display_timezone']);
+
+            return [
+                ...$range,
+                'first_iso' => $range['starts_at']->toIso8601String(),
+                'last_iso' => $range['last_start_at']->toIso8601String(),
+                'display_label' => $start->format('g:i A')
+                    .(($range['slot_count'] ?? 0) > 1 ? '–'.$end->format('g:i A') : ''),
+                'cadence_label' => ($range['slot_count'] ?? 0) > 1
+                    ? 'Start every '.$range['interval_minutes'].' minutes'
+                    : 'One available start',
+                'capacity_label' => $range['remaining_capacity'].' open '
+                    .($range['remaining_capacity'] === 1 ? 'spot' : 'spots').' per start',
+                'slot_options' => array_map(
+                    static fn ($slot): array => [
+                        'value' => $slot->startsAt->toIso8601String(),
+                        'label' => $slot->localStartsAt()->format('g:i A'),
+                    ],
+                    $range['slots'] ?? [],
+                ),
+            ];
+        }, $ranges);
     }
 
     /**

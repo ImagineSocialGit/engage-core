@@ -949,6 +949,7 @@
 │   │   │   ├── Deployment
 │   │   │   │   └── MessagingDeploymentPlanContributor.php
 │   │   │   ├── Enums
+│   │   │   │   ├── ContactDirectMessageReason.php
 │   │   │   │   ├── MessageChannel.php
 │   │   │   │   └── MessagePurpose.php
 │   │   │   ├── Events
@@ -959,7 +960,8 @@
 │   │   │   │   ├── ScheduledMessageSent.php
 │   │   │   │   └── ScheduledMessageSkipped.php
 │   │   │   ├── Import
-│   │   │   │   └── MarketingPermissionContactImportPostProcessor.php
+│   │   │   │   ├── MarketingPermissionContactImportPostProcessor.php
+│   │   │   │   └── ServiceRelationshipPermissionContactImportPostProcessor.php
 │   │   │   ├── Jobs
 │   │   │   │   ├── ProcessDueMessageChainEnrollmentsJob.php
 │   │   │   │   ├── ProcessMessageChainEnrollmentJob.php
@@ -1351,6 +1353,7 @@
 │   │   │   │   ├── SchedulingLocationSnapshotResolver.php
 │   │   │   │   ├── SchedulingReadService.php
 │   │   │   │   ├── SchedulingResourceConfigurationWriter.php
+│   │   │   │   ├── SchedulingServiceReadiness.php
 │   │   │   │   ├── SchedulingSetupProgress.php
 │   │   │   │   ├── SchedulingSetupReadiness.php
 │   │   │   │   └── SchedulingUserHostSynchronizer.php
@@ -2716,14 +2719,17 @@
 │       │   │   ├── communications.blade.php
 │       │   │   ├── configuration.blade.php
 │       │   │   ├── contact-panel.blade.php
+│       │   │   ├── create.blade.php
 │       │   │   ├── index.blade.php
 │       │   │   ├── partials
 │       │   │   │   └── setup-progress.blade.php
 │       │   │   ├── reschedule.blade.php
 │       │   │   ├── resources.blade.php
 │       │   │   ├── services
+│       │   │   │   ├── details.blade.php
 │       │   │   │   ├── edit.blade.php
-│       │   │   │   └── index.blade.php
+│       │   │   │   ├── index.blade.php
+│       │   │   │   └── staff.blade.php
 │       │   │   ├── show.blade.php
 │       │   │   └── staff
 │       │   │       └── index.blade.php
@@ -3214,6 +3220,7 @@
 │   │   │   ├── ScheduleMessageTimeNormalizationTest.php
 │   │   │   ├── SemanticCampaignVariantIdentityResolutionTest.php
 │   │   │   ├── SendScheduledMessageJobTest.php
+│   │   │   ├── ServiceRelationshipPermissionContactImportPostProcessorTest.php
 │   │   │   ├── SkipScheduledMessagesActionTest.php
 │   │   │   ├── SmsMessagingServiceTest.php
 │   │   │   ├── SmsPayloadTest.php
@@ -3334,6 +3341,7 @@
 │   │   │   ├── SchedulingAppointmentRescheduleWorkspaceTest.php
 │   │   │   ├── SchedulingAppointmentWorkspaceTest.php
 │   │   │   ├── SchedulingAvailabilityConfigurationWorkspaceTest.php
+│   │   │   ├── SchedulingAvailabilitySaveAllTest.php
 │   │   │   ├── SchedulingAvailabilityWindowFoundationTest.php
 │   │   │   ├── SchedulingAvailableStartRangeBuilderTest.php
 │   │   │   ├── SchedulingConfigurationWorkspaceTest.php
@@ -3351,6 +3359,7 @@
 │   │   │   ├── SchedulingServiceWorkspaceTest.php
 │   │   │   ├── SchedulingSetupReadinessTest.php
 │   │   │   ├── SchedulingUserHostIdentityBridgeTest.php
+│   │   │   ├── SchedulingUxV3Test.php
 │   │   │   ├── SchedulingWorkspaceTest.php
 │   │   │   └── TravelAwareAvailabilityTest.php
 │   │   ├── SetupValidation
@@ -3491,4 +3500,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-830 directories, 2662 files
+830 directories, 2671 files
