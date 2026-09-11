@@ -85,6 +85,7 @@ fi
 command -v php >/dev/null 2>&1 || fail "PHP is required."
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WEB_GROUP="${ENGAGE_CORE_WEB_GROUP:-www-data}"
 CLIENT_DIR="$ROOT_DIR/client/$CLIENT_KEY"
 CLIENT_CONFIG="$CLIENT_DIR/config/client.php"
 MODULES_FILE="$CLIENT_DIR/config/modules.php"
@@ -95,12 +96,39 @@ cleanup() {
   rm -f "$RESULT_FILE"
 }
 
+set_web_group() {
+  local path="$1"
+
+  if chgrp "$WEB_GROUP" "$path" 2>/dev/null; then
+    return
+  fi
+
+  command -v sudo >/dev/null 2>&1 \
+    || fail "Unable to assign [$path] to web group [$WEB_GROUP]; sudo is unavailable."
+
+  sudo chgrp "$WEB_GROUP" "$path"
+}
+
+normalize_modules_source_permissions() {
+  local config_dir
+  config_dir="$(dirname "$MODULES_FILE")"
+
+  set_web_group "$config_dir"
+  chmod 2750 "$config_dir"
+  set_web_group "$MODULES_FILE"
+  chmod 0640 "$MODULES_FILE"
+}
+
 trap cleanup EXIT
 
 [[ -d "$CLIENT_DIR" ]] || fail "Client does not exist: $CLIENT_DIR"
 [[ -f "$CLIENT_CONFIG" ]] || fail "Client config does not exist: $CLIENT_CONFIG"
 [[ -f "$MODULES_FILE" ]] || fail "Client modules config does not exist: $MODULES_FILE"
 [[ -f "$ROOT_MODULES_FILE" ]] || fail "Root module config does not exist: $ROOT_MODULES_FILE"
+
+if [[ "$LIST_ONLY" == false && "$DRY_RUN" == false ]]; then
+  normalize_modules_source_permissions
+fi
 
 if ! php -r '
 array_shift($argv);
@@ -293,6 +321,11 @@ if (! $changed) {
             exit(1);
         }
 
+        if (! chmod($temporaryFile, 0640)) {
+            fwrite(STDERR, "Unable to apply web-readable permissions to the temporary modules config file.\n");
+            exit(1);
+        }
+
         if (! rename($temporaryFile, $modulesFile)) {
             fwrite(STDERR, "Unable to replace the client modules config atomically.\n");
             exit(1);
@@ -337,6 +370,7 @@ if [[ "$CHANGED" != "1" ]]; then
   exit 0
 fi
 
+normalize_modules_source_permissions
 php -l "$MODULES_FILE" >/dev/null
 
 echo

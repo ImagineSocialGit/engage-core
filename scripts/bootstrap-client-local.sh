@@ -43,6 +43,7 @@ fail() {
 
 CLIENT_KEY=""
 WEB_USER="${ENGAGE_CORE_WEB_USER:-www-data}"
+WEB_GROUP="${ENGAGE_CORE_WEB_GROUP:-www-data}"
 
 while (($#)); do
   case "$1" in
@@ -91,7 +92,7 @@ LOCAL_CRM_APP_URL="http://crm.engagecore.test"
 [[ -f "$ROOT_ENV" ]] || fail "Root local environment file does not exist: $ROOT_ENV"
 [[ -f "$HELPER" ]] || fail "Deployment environment helper is missing: $HELPER"
 
-for command in php python3 openssl mysql sudo id awk sed rm stat; do
+for command in php python3 openssl mysql sudo id awk sed rm stat find chgrp chmod; do
   command -v "$command" >/dev/null 2>&1 \
     || fail "Required command not found: $command"
 done
@@ -180,6 +181,36 @@ invalidate_client_runtime_caches() {
   rm -f "$ROOT_DIR/bootstrap/cache/routes-"*.php
 }
 
+set_web_group() {
+  local path="$1"
+
+  if chgrp "$WEB_GROUP" "$path" 2>/dev/null; then
+    return
+  fi
+
+  sudo chgrp "$WEB_GROUP" "$path"
+}
+
+set_web_group_recursive() {
+  local path="$1"
+
+  if chgrp -R "$WEB_GROUP" "$path" 2>/dev/null; then
+    return
+  fi
+
+  sudo chgrp -R "$WEB_GROUP" "$path"
+}
+
+apply_client_config_permissions() {
+  local config_dir="$CLIENT_DIR/config"
+
+  set_web_group "$CLIENT_DIR"
+  chmod 2750 "$CLIENT_DIR"
+  set_web_group_recursive "$config_dir"
+  find "$config_dir" -type d -exec chmod 2750 {} +
+  find "$config_dir" -type f -exec chmod 0640 {} +
+}
+
 apply_local_env_permissions() {
   chmod 0664 "$ROOT_ENV" "$CLIENT_ENV"
 }
@@ -215,6 +246,12 @@ foreach ([
     fwrite(STDOUT, "__".$key."__=".$value.PHP_EOL);
 }
 '
+}
+
+assert_web_application_boot() {
+  if ! sudo -u "$WEB_USER" php "$ROOT_DIR/artisan" about --no-ansi >/dev/null 2>&1; then
+    fail "Local PHP-FPM/web user [$WEB_USER] cannot boot selected client [$CLIENT_KEY]. Verify client config ownership, group, and read/traverse permissions."
+  fi
 }
 
 APP_ENV_VALUE="$(env_get_optional "$ROOT_ENV" APP_ENV)"
@@ -255,6 +292,8 @@ RUNTIME_STEM="$(
 
 DERIVED_DB_DATABASE="$(bounded_identifier "${RUNTIME_STEM}_local" 64)"
 DERIVED_DB_USERNAME="$(bounded_identifier "${RUNTIME_STEM}_local" 32)"
+
+apply_client_config_permissions
 
 touch "$CLIENT_ENV"
 
@@ -361,6 +400,7 @@ invalidate_client_runtime_caches
 cd "$ROOT_DIR"
 
 php artisan optimize:clear >/dev/null
+assert_web_application_boot
 
 RESOLVED_APP_ENV="$(
   php artisan env --no-ansi 2>/dev/null \
@@ -446,9 +486,11 @@ assert_web_runtime
 php artisan engage:environment:sync --write-missing
 php artisan optimize:clear >/dev/null
 apply_local_env_permissions
+apply_client_config_permissions
 assert_local_env_readability
 assert_developer_runtime
 assert_web_runtime
+assert_web_application_boot
 
 echo
 echo "Validating local deployment requirements..."
@@ -463,9 +505,11 @@ echo "Final local validation..."
 php artisan engage:deployment-plan
 php artisan modules:status
 apply_local_env_permissions
+apply_client_config_permissions
 assert_local_env_readability
 assert_developer_runtime
 assert_web_runtime
+assert_web_application_boot
 
 BOOTSTRAP_COMPLETE=true
 trap - EXIT

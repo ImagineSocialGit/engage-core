@@ -100,8 +100,54 @@ class BootstrapClientLocalScriptTest extends TestCase
             $script,
         );
         $this->assertStringNotContainsString('chmod 0640 "$CLIENT_ENV"', $script);
-        $this->assertStringNotContainsString('chgrp "$WEB_GROUP"', $script);
-        $this->assertStringNotContainsString('ENGAGE_CORE_WEB_GROUP', $script);
+        $this->assertStringContainsString(
+            'WEB_GROUP="${ENGAGE_CORE_WEB_GROUP:-www-data}"',
+            $script,
+        );
+    }
+
+    public function test_local_bootstrap_normalizes_selected_client_config_for_the_web_runtime(): void
+    {
+        $script = (string) file_get_contents(
+            base_path('scripts/bootstrap-client-local.sh'),
+        );
+
+        $this->assertStringContainsString(
+            'apply_client_config_permissions()',
+            $script,
+        );
+        $this->assertStringContainsString(
+            'set_web_group_recursive "$config_dir"',
+            $script,
+        );
+        $this->assertStringContainsString(
+            'find "$config_dir" -type d -exec chmod 2750 {} +',
+            $script,
+        );
+        $this->assertStringContainsString(
+            'find "$config_dir" -type f -exec chmod 0640 {} +',
+            $script,
+        );
+    }
+
+    public function test_local_bootstrap_requires_a_full_selected_client_boot_under_the_web_user_before_install(): void
+    {
+        $script = (string) file_get_contents(
+            base_path('scripts/bootstrap-client-local.sh'),
+        );
+
+        $selection = strpos($script, 'env_set "$ROOT_ENV" CLIENT_KEY "$CLIENT_KEY"');
+        $webBoot = strpos($script, 'assert_web_application_boot', $selection ?: 0);
+        $install = strpos($script, 'php artisan engage:install', $selection ?: 0);
+
+        $this->assertStringContainsString(
+            'sudo -u "$WEB_USER" php "$ROOT_DIR/artisan" about --no-ansi',
+            $script,
+        );
+        $this->assertNotFalse($selection);
+        $this->assertNotFalse($webBoot);
+        $this->assertNotFalse($install);
+        $this->assertLessThan($install, $webBoot);
     }
 
     public function test_local_bootstrap_provisions_client_scoped_runtime_state(): void
