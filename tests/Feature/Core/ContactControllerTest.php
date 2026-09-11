@@ -122,9 +122,9 @@ class ContactControllerTest extends TestCase
         $this->assertSame('crm_manual_create', data_get($profile->meta, 'last_status_change.reason'));
     }
 
-    public function test_it_applies_default_workflow_status_when_creating_contact_without_selected_status(): void
+    public function test_it_applies_default_contact_status_when_creating_contact_without_selected_status(): void
     {
-        config()->set('contacts.default_workflow_status_key', 'new');
+        config()->set('contacts.default_contact_status_key', 'new');
 
         $user = User::factory()->create();
 

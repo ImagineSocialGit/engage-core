@@ -2,12 +2,19 @@
 
 namespace App\Modules\Core\Actions\Contacts;
 
+use App\Modules\Core\Contracts\Contacts\UpdatesContactStatus;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Models\ContactStatus;
 use Illuminate\Database\QueryException;
 use InvalidArgumentException;
 
 class ResolveContactByEmailAction
 {
+    public function __construct(
+        private readonly ResolveContactStatusAction $resolveContactStatus,
+        private readonly UpdateContactStatusAction $updateContactStatus,
+    ) {}
+
     /**
      * @param array<string, mixed> $meta
      */
@@ -32,7 +39,7 @@ class ResolveContactByEmailAction
         }
 
         try {
-            return Contact::query()->create([
+            $contact = Contact::query()->create([
                 'name' => $name ?? $email,
                 'email' => $email,
                 'phone' => $phone,
@@ -40,6 +47,8 @@ class ResolveContactByEmailAction
                 'subsource' => $subsource,
                 'meta' => $meta !== [] ? $meta : null,
             ]);
+
+            return $this->applyDefaultStatus($contact);
         } catch (QueryException $exception) {
             if (! $this->isUniqueConstraintViolation($exception)) {
                 throw $exception;
@@ -53,6 +62,25 @@ class ResolveContactByEmailAction
 
             throw $exception;
         }
+    }
+
+    private function applyDefaultStatus(Contact $contact): Contact
+    {
+        if (! app()->bound(UpdatesContactStatus::class)) {
+            return $contact;
+        }
+
+        $status = $this->resolveContactStatus->handle();
+
+        if (! $status instanceof ContactStatus) {
+            return $contact;
+        }
+
+        return $this->updateContactStatus->handle(
+            contact: $contact,
+            status: $status,
+            reason: 'contact_email_resolution_create',
+        );
     }
 
     private function existingContact(string $email): ?Contact

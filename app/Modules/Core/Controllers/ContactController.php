@@ -143,7 +143,7 @@ class ContactController extends Controller
                 ...$validated,
                 'source' => $validated['source'] ?? 'crm',
             ],
-            statusKey: module_enabled('workflow') ? config('contacts.default_workflow_status_key') : null,
+            statusKey: module_enabled('workflow') ? config('contacts.default_contact_status_key') : null,
             existingRelationshipConfirmed: $request->boolean('existing_relationship_confirmed'),
             actorUserId: $request->user()?->getKey(),
             ipAddress: $request->ip(),

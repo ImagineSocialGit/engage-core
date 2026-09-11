@@ -1,3 +1,4 @@
+
 # Core Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable module backlog in this directory's `TODO.md` when one exists.
@@ -164,6 +165,26 @@ meta
 Do not duplicate first-class values inside `meta`.
 
 Default status resolution should use the configured canonical contact status key rather than hard-coding `prospect` or another vertical/client-specific label.
+
+Contact creation follows that canonical default without giving Core ownership of Workflow state:
+
+```text
+manual CRM creation with Workflow enabled
+    -> use the explicitly selected status when supplied
+    -> otherwise resolve contacts.default_contact_status_key
+
+Core ResolveContactByEmailAction creates a new Contact
+    -> when a Contact-status updater is available, resolve contacts.default_contact_status_key
+    -> apply that active status through the shared UpdatesContactStatus contract
+
+Core ResolveContactByEmailAction reuses an existing Contact
+    -> preserve the existing Contact and its lifecycle status unchanged
+
+configured default is missing/inactive, or no status updater is available
+    -> create/reuse the Contact without fabricating Workflow state
+```
+
+This keeps Forms, Scheduling, inbound resolution, and other callers that use the shared email resolver consistent with the same client-owned default while preserving existing-contact state and the Core → Workflow contract boundary.
 
 ## Current generic Core ContactStatus contribution
 
