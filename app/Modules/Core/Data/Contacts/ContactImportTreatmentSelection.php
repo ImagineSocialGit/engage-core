@@ -6,6 +6,7 @@ final readonly class ContactImportTreatmentSelection
 {
     public const MODE_FIXED = 'fixed';
     public const MODE_COLUMN = 'column';
+    public const SOURCE_VALUE = '__source_value__';
 
     /**
      * @param array<int, string> $fixedValues

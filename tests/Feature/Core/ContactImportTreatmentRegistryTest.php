@@ -51,6 +51,30 @@ class ContactImportTreatmentRegistryTest extends TestCase
         $this->assertSame('unmapped', $unmapped->targets['test_field']['state']);
     }
 
+    public function test_column_treatment_with_no_destination_values_is_ignored(): void
+    {
+        $registry = $this->registry();
+
+        $normalized = $registry->normalizeSubmitted([
+            'test_field' => [
+                'mode' => 'column',
+                'source_column' => 'Source',
+                'value_map' => [
+                    'one' => [
+                        'source' => 'Legacy One',
+                        'values' => [''],
+                    ],
+                    'two' => [
+                        'source' => 'Legacy Two',
+                        'values' => [''],
+                    ],
+                ],
+            ],
+        ], ['Source']);
+
+        $this->assertSame([], $normalized);
+    }
+
     public function test_unknown_treatment_and_invalid_source_column_fail_closed(): void
     {
         $registry = $this->registry();
@@ -120,6 +144,10 @@ final class TestFieldTreatmentTarget implements ContactImportTreatmentTarget
     public function normalizeValues(array $values): array
     {
         $value = $values[0] ?? null;
+
+        if ($value === null || (is_string($value) && trim($value) === '')) {
+            return [];
+        }
 
         if (! is_string($value) || ! in_array($value, ['one', 'two'], true)) {
             throw ValidationException::withMessages([

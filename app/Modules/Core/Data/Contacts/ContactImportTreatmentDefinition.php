@@ -16,5 +16,10 @@ final readonly class ContactImportTreatmentDefinition
         public bool $allowCustom = false,
         public array $options = [],
         public int $sort = 0,
+        public ?string $suggestedSourceFieldKey = null,
+        public ?string $sourceValueOptionLabel = null,
+        public ?string $sourceValueOptionDescription = null,
+        public bool $defaultSourceValue = false,
+        public ?string $unmappedOptionLabel = null,
     ) {}
 }

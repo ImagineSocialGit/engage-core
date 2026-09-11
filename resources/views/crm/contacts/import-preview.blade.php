@@ -32,13 +32,27 @@
         }"
     >
         <x-ui.card class="space-y-6">
+            @if ($errors->any())
+                <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3" role="alert">
+                    <p class="text-sm font-semibold text-red-900">
+                        Review the import choices below.
+                    </p>
+
+                    <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-red-800">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             <div>
                 <h2 class="text-lg font-semibold tracking-tight">
                     Import Fields
                 </h2>
 
                 <p class="mt-1 text-sm text-slate-500">
-                    Select the CSV column for each field. Required fields are marked.
+                    Clear CSV header matches are preselected automatically. Review them below; required fields are marked.
                 </p>
 
                 @if ($importProfile)
@@ -54,7 +68,7 @@
                         @endif
 
                         <p class="mt-1 text-xs text-slate-500">
-                            Known columns were preselected where recognized. Review the mappings below before importing.
+                            Profile mappings take priority, and other clear header matches are preselected automatically. Review them below before importing.
                         </p>
                     </div>
                 @endif
@@ -121,7 +135,7 @@
                             </p>
 
                             <p class="mt-1 text-xs text-slate-500">
-                                Required and recognized fields are shown first. Additional module fields remain available when needed.
+                                Required and automatically matched fields are shown first. Additional fields remain available when needed.
                             </p>
                         </div>
 
@@ -224,8 +238,26 @@
                                             class="rounded-xl border border-slate-200 p-4"
                                             x-data="{
                                                 targetKey: @js($treatment->key),
-                                                mode: @js(old("treatments.{$treatment->key}.mode", 'none')),
-                                                sourceColumn: @js(old("treatments.{$treatment->key}.source_column", '')),
+                                                mode: @js(old("treatments.{$treatment->key}.mode", $treatmentDefaults[$treatment->key]['mode'] ?? 'none')),
+                                                sourceColumn: @js(old("treatments.{$treatment->key}.source_column", $treatmentDefaults[$treatment->key]['source_column'] ?? '')),
+                                                previousValueMap: @js(old("treatments.{$treatment->key}.value_map", [])),
+                                                defaultUseSourceValue: @js($treatment->defaultSourceValue),
+                                                previousEntry(item) {
+                                                    const entry = this.previousValueMap?.[item.token];
+                                                    return entry && typeof entry === 'object' ? entry : null;
+                                                },
+                                                initialUseSourceValue(item) {
+                                                    const entry = this.previousEntry(item);
+                                                    if (entry !== null) {
+                                                        return Boolean(entry.use_source_value);
+                                                    }
+                                                    return this.defaultUseSourceValue;
+                                                },
+                                                previousSelectedValue(item) {
+                                                    const entry = this.previousEntry(item);
+                                                    const values = entry?.values;
+                                                    return Array.isArray(values) && values.length > 0 ? String(values[0]) : '';
+                                                },
                                             }"
                                         >
                                             <div>
@@ -251,10 +283,16 @@
                                                     x-model="mode"
                                                     class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                                 >
-                                                    <option value="none">Leave unchanged</option>
+                                                    <option value="none">{{ $treatment->unmappedOptionLabel ?? 'Leave unchanged' }}</option>
                                                     <option value="fixed">Apply fixed value(s) to all rows</option>
                                                     <option value="column">Apply based on a CSV field</option>
                                                 </select>
+
+                                                @error("treatments.{$treatment->key}.mode")
+                                                    <p class="mt-1 text-sm text-red-600">
+                                                        {{ $message }}
+                                                    </p>
+                                                @enderror
                                             </div>
 
                                             <div x-show="mode === 'fixed'" x-cloak class="mt-4">
@@ -284,7 +322,10 @@
                                                         class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                                     >
                                                         @foreach ($treatment->options as $option)
-                                                            <option value="{{ $option['value'] }}">
+                                                            <option
+                                                                value="{{ $option['value'] }}"
+                                                                @selected(in_array($option['value'], (array) old("treatments.{$treatment->key}.fixed_values", []), true))
+                                                            >
                                                                 {{ $option['label'] }}
                                                             </option>
                                                         @endforeach
@@ -297,12 +338,21 @@
                                                         <option value="">Choose value</option>
 
                                                         @foreach ($treatment->options as $option)
-                                                            <option value="{{ $option['value'] }}">
+                                                            <option
+                                                                value="{{ $option['value'] }}"
+                                                                @selected(in_array($option['value'], (array) old("treatments.{$treatment->key}.fixed_values", []), true))
+                                                            >
                                                                 {{ $option['label'] }}
                                                             </option>
                                                         @endforeach
                                                     </select>
                                                 @endif
+
+                                                @error("treatments.{$treatment->key}.fixed_values")
+                                                    <p class="mt-1 text-sm text-red-600">
+                                                        {{ $message }}
+                                                    </p>
+                                                @enderror
                                             </div>
 
                                             <div x-show="mode === 'column'" x-cloak class="mt-4 space-y-4">
@@ -324,6 +374,12 @@
                                                             </option>
                                                         @endforeach
                                                     </select>
+
+                                                    @error("treatments.{$treatment->key}.source_column")
+                                                        <p class="mt-1 text-sm text-red-600">
+                                                            {{ $message }}
+                                                        </p>
+                                                    @enderror
                                                 </div>
 
                                                 <div x-show="sourceColumn && valuesFor(sourceColumn).length > 0" class="space-y-2">
@@ -337,7 +393,7 @@
                                                             blank rows
                                                         </span>
                                                         <span x-show="isTruncated(sourceColumn)" class="text-amber-700">
-                                                            More than 100 distinct values; additional values remain unchanged.
+                                                            More than 100 distinct values; additional values are not explicitly mapped.
                                                         </span>
                                                     </div>
 
@@ -359,7 +415,7 @@
 
                                                             <tbody class="divide-y divide-slate-200 bg-white">
                                                                 <template x-for="item in valuesFor(sourceColumn)" :key="item.token">
-                                                                    <tr>
+                                                                    <tr x-data="{ useSourceValue: initialUseSourceValue(item) }">
                                                                         <td class="px-3 py-2 font-medium text-slate-900">
                                                                             <span x-text="item.value"></span>
                                                                             <input
@@ -390,18 +446,63 @@
                                                                                     @endforeach
                                                                                 </select>
                                                                             @else
-                                                                                <select
-                                                                                    x-bind:name="`treatments[${targetKey}][value_map][${item.token}][values][]`"
-                                                                                    class="block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                                                                >
-                                                                                    <option value="">Leave unchanged</option>
+                                                                                @if ($treatment->sourceValueOptionLabel)
+                                                                                    <div class="space-y-2">
+                                                                                        <label class="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                                                                            <input
+                                                                                                type="checkbox"
+                                                                                                value="1"
+                                                                                                x-model="useSourceValue"
+                                                                                                x-bind:name="`treatments[${targetKey}][value_map][${item.token}][use_source_value]`"
+                                                                                                class="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                                                            >
+                                                                                            <span>
+                                                                                                <span class="block text-xs font-semibold text-slate-800">
+                                                                                                    {{ $treatment->sourceValueOptionLabel }}
+                                                                                                </span>
+                                                                                                @if ($treatment->sourceValueOptionDescription)
+                                                                                                    <span class="mt-0.5 block text-[11px] leading-4 text-slate-500">
+                                                                                                        {{ $treatment->sourceValueOptionDescription }}
+                                                                                                    </span>
+                                                                                                @endif
+                                                                                            </span>
+                                                                                        </label>
 
-                                                                                    @foreach ($treatment->options as $option)
-                                                                                        <option value="{{ $option['value'] }}">
-                                                                                            {{ $option['label'] }}
-                                                                                        </option>
-                                                                                    @endforeach
-                                                                                </select>
+                                                                                        <select
+                                                                                            x-show="! useSourceValue"
+                                                                                            x-bind:disabled="useSourceValue"
+                                                                                            x-bind:name="`treatments[${targetKey}][value_map][${item.token}][values][]`"
+                                                                                            class="block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                                                                        >
+                                                                                            <option value="">{{ $treatment->unmappedOptionLabel ?? 'Leave unchanged' }}</option>
+
+                                                                                            @foreach ($treatment->options as $option)
+                                                                                                <option
+                                                                                                    value="{{ $option['value'] }}"
+                                                                                                    x-bind:selected="previousSelectedValue(item) === @js($option['value'])"
+                                                                                                >
+                                                                                                    Map to {{ $option['label'] }}
+                                                                                                </option>
+                                                                                            @endforeach
+                                                                                        </select>
+                                                                                    </div>
+                                                                                @else
+                                                                                    <select
+                                                                                        x-bind:name="`treatments[${targetKey}][value_map][${item.token}][values][]`"
+                                                                                        class="block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                                                                    >
+                                                                                        <option value="">{{ $treatment->unmappedOptionLabel ?? 'Leave unchanged' }}</option>
+
+                                                                                        @foreach ($treatment->options as $option)
+                                                                                            <option
+                                                                                                value="{{ $option['value'] }}"
+                                                                                                x-bind:selected="previousSelectedValue(item) === @js($option['value'])"
+                                                                                            >
+                                                                                                {{ $option['label'] }}
+                                                                                            </option>
+                                                                                        @endforeach
+                                                                                    </select>
+                                                                                @endif
                                                                             @endif
                                                                         </td>
                                                                     </tr>
@@ -409,6 +510,22 @@
                                                             </tbody>
                                                         </table>
                                                     </div>
+
+                                                    @if ($treatment->sourceValueOptionLabel)
+                                                        <p class="text-xs leading-5 text-slate-500">
+                                                            Legacy status names are preserved by default. Existing Contacts keep their current status when a value is left unmapped; newly created Contacts use the configured default status.
+                                                        </p>
+                                                    @else
+                                                        <p class="text-xs text-slate-500">
+                                                            Leaving every source value unchanged skips this treatment and continues the import.
+                                                        </p>
+                                                    @endif
+
+                                                    @error("treatments.{$treatment->key}.value_map")
+                                                        <p class="text-sm text-red-600">
+                                                            {{ $message }}
+                                                        </p>
+                                                    @enderror
                                                 </div>
 
                                                 <p

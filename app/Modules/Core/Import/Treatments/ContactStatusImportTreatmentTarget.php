@@ -4,16 +4,20 @@ namespace App\Modules\Core\Import\Treatments;
 
 use App\Modules\Core\Actions\Contacts\UpdateContactStatusAction;
 use App\Modules\Core\Contracts\Contacts\ContactImportTreatmentTarget;
+use App\Modules\Core\Contracts\Contacts\MaterializesContactImportTreatmentSelection;
 use App\Modules\Core\Contracts\Contacts\UpdatesContactStatus;
 use App\Modules\Core\Data\Contacts\ContactImportTreatmentApplication;
 use App\Modules\Core\Data\Contacts\ContactImportTreatmentDefinition;
+use App\Modules\Core\Data\Contacts\ContactImportTreatmentSelection;
 use App\Modules\Core\Models\ContactStatus;
+use App\Modules\Core\Services\Contacts\ContactImportStatusMapper;
 use Illuminate\Validation\ValidationException;
 
-final class ContactStatusImportTreatmentTarget implements ContactImportTreatmentTarget
+final class ContactStatusImportTreatmentTarget implements ContactImportTreatmentTarget, MaterializesContactImportTreatmentSelection
 {
     public function __construct(
         private readonly UpdateContactStatusAction $updateStatus,
+        private readonly ContactImportStatusMapper $statusMapper,
     ) {}
 
     public function available(): bool
@@ -27,7 +31,7 @@ final class ContactStatusImportTreatmentTarget implements ContactImportTreatment
             key: 'contact_status',
             label: 'Contact Status',
             section: 'Contact',
-            description: 'Apply one active CRM status to every imported row, or map values from a CSV column to active CRM statuses.',
+            description: 'Preserve legacy statuses automatically, map them to existing statuses, or apply one status to every imported Contact.',
             options: ContactStatus::query()
                 ->active()
                 ->ordered()
@@ -38,6 +42,11 @@ final class ContactStatusImportTreatmentTarget implements ContactImportTreatment
                 ])
                 ->all(),
             sort: 10,
+            suggestedSourceFieldKey: 'import_status',
+            sourceValueOptionLabel: 'Use legacy status',
+            sourceValueOptionDescription: 'Reuse an active status with this name. If none exists, create a new status with the legacy name.',
+            defaultSourceValue: true,
+            unmappedOptionLabel: 'Keep existing / use default',
         );
     }
 
@@ -74,6 +83,12 @@ final class ContactStatusImportTreatmentTarget implements ContactImportTreatment
         }
 
         return [$id];
+    }
+
+    public function materializeSelection(
+        ContactImportTreatmentSelection $selection,
+    ): ContactImportTreatmentSelection {
+        return $this->statusMapper->materializeSelection($selection);
     }
 
     public function fieldOverrides(array $values): array

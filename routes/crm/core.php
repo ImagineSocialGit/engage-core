@@ -83,6 +83,10 @@ Route::prefix(config('contacts.routes.plural'))
             ->middleware('capability:contacts.import')
             ->name('import');
 
+        Route::get('/import/preview', [ContactController::class, 'reviewImport'])
+            ->middleware('capability:contacts.import')
+            ->name('import.review');
+
         Route::post('/import/preview', [ContactController::class, 'previewImport'])
             ->middleware('capability:contacts.import')
             ->name('import.preview');

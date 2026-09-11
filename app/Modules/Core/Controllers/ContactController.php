@@ -16,6 +16,7 @@ use App\Modules\Core\Models\ContactImportRun;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Core\Requests\StoreContactRequest;
 use App\Modules\Core\Requests\UpdateContactRequest;
+use App\Modules\Core\Services\Contacts\ContactImportHeaderMapper;
 use App\Modules\Core\Services\Contacts\ContactImportProfileRegistry;
 use App\Modules\Core\Services\Contacts\ContactIndexFilterService;
 use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
@@ -265,6 +266,7 @@ class ContactController extends Controller
     public function previewImport(
         Request $request,
         ContactImportRegistry $contactImportRegistry,
+        ContactImportHeaderMapper $contactImportHeaderMapper,
         ContactImportProfileRegistry $contactImportProfileRegistry,
         ContactImportTreatmentRegistry $treatmentRegistry,
         ContactImportPostProcessorRegistry $postProcessorRegistry,
@@ -291,12 +293,87 @@ class ContactController extends Controller
             $importMode,
         );
 
+        return $this->renderImportPreview(
+            request: $request,
+            storedPath: $storedPath,
+            contactImportRegistry: $contactImportRegistry,
+            contactImportHeaderMapper: $contactImportHeaderMapper,
+            contactImportProfileRegistry: $contactImportProfileRegistry,
+            treatmentRegistry: $treatmentRegistry,
+            postProcessorRegistry: $postProcessorRegistry,
+        );
+    }
+
+    public function reviewImport(
+        Request $request,
+        ContactImportRegistry $contactImportRegistry,
+        ContactImportHeaderMapper $contactImportHeaderMapper,
+        ContactImportProfileRegistry $contactImportProfileRegistry,
+        ContactImportTreatmentRegistry $treatmentRegistry,
+        ContactImportPostProcessorRegistry $postProcessorRegistry,
+    ): View|RedirectResponse {
+        $storedPath = $this->nonEmptyString($request->query('csv_path'));
+
+        if ($storedPath === null
+            || ! $this->stagedImportBelongsToSession($request, $storedPath)
+        ) {
+            return redirect()
+                ->route('crm.contacts.import')
+                ->withErrors([
+                    'csv' => 'That import preview is no longer available. Upload the CSV again.',
+                ]);
+        }
+
+        return $this->renderImportPreview(
+            request: $request,
+            storedPath: $storedPath,
+            contactImportRegistry: $contactImportRegistry,
+            contactImportHeaderMapper: $contactImportHeaderMapper,
+            contactImportProfileRegistry: $contactImportProfileRegistry,
+            treatmentRegistry: $treatmentRegistry,
+            postProcessorRegistry: $postProcessorRegistry,
+        );
+    }
+
+    private function renderImportPreview(
+        Request $request,
+        string $storedPath,
+        ContactImportRegistry $contactImportRegistry,
+        ContactImportHeaderMapper $contactImportHeaderMapper,
+        ContactImportProfileRegistry $contactImportProfileRegistry,
+        ContactImportTreatmentRegistry $treatmentRegistry,
+        ContactImportPostProcessorRegistry $postProcessorRegistry,
+    ): View|RedirectResponse {
+        if (! Storage::disk('local')->exists($storedPath)) {
+            return redirect()
+                ->route('crm.contacts.import')
+                ->withErrors([
+                    'csv' => 'The staged CSV file could not be found. Upload the CSV again.',
+                ]);
+        }
+
+        $originalFilename = $request->session()->get(
+            $this->importOriginalFilenameSessionKey($storedPath),
+        );
+
+        if (! is_string($originalFilename) || trim($originalFilename) === '') {
+            return redirect()
+                ->route('crm.contacts.import')
+                ->withErrors([
+                    'csv' => 'The staged CSV no longer has its import context. Upload the CSV again.',
+                ]);
+        }
+
+        $importMode = $this->normalizeImportMode(
+            $request->session()->get($this->importModeSessionKey($storedPath)),
+        );
+
         $handle = fopen(Storage::disk('local')->path($storedPath), 'r');
 
         if ($handle === false) {
-            return back()
-                ->withErrors(['csv' => 'Unable to read the uploaded CSV file.'])
-                ->withInput();
+            return redirect()
+                ->route('crm.contacts.import')
+                ->withErrors(['csv' => 'Unable to read the staged CSV file.']);
         }
 
         $headers = fgetcsv($handle);
@@ -304,9 +381,9 @@ class ContactController extends Controller
         if (! is_array($headers) || $headers === []) {
             fclose($handle);
 
-            return back()
-                ->withErrors(['csv' => 'The uploaded CSV does not contain a valid header row.'])
-                ->withInput();
+            return redirect()
+                ->route('crm.contacts.import')
+                ->withErrors(['csv' => 'The uploaded CSV does not contain a valid header row.']);
         }
 
         $headers = collect($this->normalizeCsvHeaders($headers));
@@ -314,15 +391,34 @@ class ContactController extends Controller
         if ($headers->isEmpty()) {
             fclose($handle);
 
-            return back()
-                ->withErrors(['csv' => 'The uploaded CSV header row is empty.'])
-                ->withInput();
+            return redirect()
+                ->route('crm.contacts.import')
+                ->withErrors(['csv' => 'The uploaded CSV header row is empty.']);
         }
 
-        $importProfile = $contactImportProfileRegistry->findByFilename($originalFilename);
-        $suggestedMapping = $importProfile !== null
+        $profileKey = $request->session()->get(
+            $this->importProfileKeySessionKey($storedPath),
+        );
+        $importProfile = is_string($profileKey) && trim($profileKey) !== ''
+            ? $contactImportProfileRegistry->get($profileKey)
+            : $contactImportProfileRegistry->findByFilename($originalFilename);
+
+        if ($importProfile !== null) {
+            $request->session()->put(
+                $this->importProfileKeySessionKey($storedPath),
+                $importProfile->key,
+            );
+        } else {
+            $request->session()->forget($this->importProfileKeySessionKey($storedPath));
+        }
+
+        $profileSuggestedMapping = $importProfile !== null
             ? $contactImportProfileRegistry->suggestedMapping($importProfile, $headers->all())
             : [];
+        $suggestedMapping = $contactImportHeaderMapper->suggest(
+            headers: $headers->all(),
+            preferred: $profileSuggestedMapping,
+        );
         $operatorPostImportConfig = $importMode === self::IMPORT_MODE_ADD
             ? $postProcessorRegistry->operatorInputConfig(
                 $importProfile?->postImport ?? [],
@@ -337,19 +433,27 @@ class ContactController extends Controller
 
         $primaryImportFieldKeys = array_values(array_unique([
             ...$contactImportRegistry->requiredFieldKeys(),
-            ...($importProfile !== null
-                ? array_keys($suggestedMapping)
-                : $contactImportRegistry->contactAttributeFields()->pluck('key')->all()),
+            ...array_keys($suggestedMapping),
         ]));
         $hasAdvancedImportFields = count($primaryImportFieldKeys) < count($contactImportRegistry->fieldKeys());
+        $treatmentDefinitions = $treatmentRegistry->definitions(
+            allowedTargetKeys: $importProfile?->treatmentTargets,
+        );
+        $treatmentDefaults = [];
 
-        if ($importProfile !== null) {
-            $request->session()->put(
-                $this->importProfileKeySessionKey($storedPath),
-                $importProfile->key,
-            );
-        } else {
-            $request->session()->forget($this->importProfileKeySessionKey($storedPath));
+        foreach ($treatmentDefinitions as $definition) {
+            $sourceColumn = $definition->suggestedSourceFieldKey !== null
+                ? ($suggestedMapping[$definition->suggestedSourceFieldKey] ?? null)
+                : null;
+
+            $treatmentDefaults[$definition->key] = [
+                'mode' => is_string($sourceColumn) && $sourceColumn !== ''
+                    ? 'column'
+                    : 'none',
+                'source_column' => is_string($sourceColumn)
+                    ? $sourceColumn
+                    : '',
+            ];
         }
 
         $rows = [];
@@ -440,9 +544,8 @@ class ContactController extends Controller
             'columnProfiles' => $columnProfiles,
             'csvPath' => $storedPath,
             'importSections' => $contactImportRegistry->sections(),
-            'treatmentDefinitions' => $treatmentRegistry->definitions(
-                allowedTargetKeys: $importProfile?->treatmentTargets,
-            ),
+            'treatmentDefinitions' => $treatmentDefinitions,
+            'treatmentDefaults' => $treatmentDefaults,
             'importProfile' => $importProfile,
             'suggestedMapping' => $suggestedMapping,
             'postImportSummaries' => $postImportSummaries,
@@ -454,6 +557,38 @@ class ContactController extends Controller
     }
 
     public function processImport(
+        Request $request,
+        ContactImportRegistry $contactImportRegistry,
+        ContactImportProfileRegistry $contactImportProfileRegistry,
+        ContactImportTreatmentRegistry $treatmentRegistry,
+        ContactImportPostProcessorRegistry $postProcessorRegistry,
+    ): RedirectResponse {
+        try {
+            return $this->processImportRequest(
+                request: $request,
+                contactImportRegistry: $contactImportRegistry,
+                contactImportProfileRegistry: $contactImportProfileRegistry,
+                treatmentRegistry: $treatmentRegistry,
+                postProcessorRegistry: $postProcessorRegistry,
+            );
+        } catch (ValidationException $exception) {
+            $csvPath = $this->nonEmptyString($request->input('csv_path'));
+
+            $redirect = $csvPath !== null
+                && $this->stagedImportBelongsToSession($request, $csvPath)
+                && Storage::disk('local')->exists($csvPath)
+                    ? redirect()->route('crm.contacts.import.review', [
+                        'csv_path' => $csvPath,
+                    ])
+                    : redirect()->route('crm.contacts.import');
+
+            return $redirect
+                ->withErrors($exception->errors())
+                ->withInput();
+        }
+    }
+
+    private function processImportRequest(
         Request $request,
         ContactImportRegistry $contactImportRegistry,
         ContactImportProfileRegistry $contactImportProfileRegistry,
@@ -567,9 +702,6 @@ class ContactController extends Controller
             headers: $headers,
             allowedTargetKeys: $importProfile?->treatmentTargets,
         );
-        $treatmentStats = $this->initializeTreatmentStats(
-            $treatmentSelections,
-        );
         $postImportStats = $this->initializePostImportStats(
             $postImportConfig,
         );
@@ -589,7 +721,6 @@ class ContactController extends Controller
             $profileDefaults,
             $treatmentRegistry,
             $treatmentSelections,
-            $treatmentStats,
             $postImportConfig,
             $postImportSummaries,
             $postImportStats,
@@ -598,6 +729,13 @@ class ContactController extends Controller
             $totalRows,
             $firstDataOffset,
         ): ContactImportBatch {
+            $treatmentSelections = $treatmentRegistry->materializeSelections(
+                $treatmentSelections,
+            );
+            $treatmentStats = $this->initializeTreatmentStats(
+                $treatmentSelections,
+            );
+
             $importBatch = ContactImportBatch::query()->create([
                 'name' => (
                     $importMode === self::IMPORT_MODE_UPDATE
@@ -820,6 +958,17 @@ class ContactController extends Controller
     private function postImportReviewRequired(array $postImportMeta): bool
     {
         return ($postImportMeta['review_required'] ?? false) === true;
+    }
+
+    private function stagedImportBelongsToSession(
+        Request $request,
+        string $csvPath,
+    ): bool {
+        return $request->session()->has(
+            $this->importOriginalFilenameSessionKey($csvPath),
+        ) && $request->session()->has(
+            $this->importModeSessionKey($csvPath),
+        );
     }
 
     private function nonEmptyString(mixed $value): ?string

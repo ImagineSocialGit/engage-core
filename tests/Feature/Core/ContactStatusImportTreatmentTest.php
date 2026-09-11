@@ -9,6 +9,7 @@ use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -58,8 +59,10 @@ class ContactStatusImportTreatmentTest extends TestCase
         Storage::fake('local');
 
         $user = User::factory()->create();
+        $default = $this->contactStatus('new_contact', 'New Contact');
         $new = $this->contactStatus('new', 'New');
         $working = $this->contactStatus('working', 'Working');
+        Config::set('contacts.default_contact_status_key', $default->key);
         $csvPath = $this->preview($user, implode("\n", [
             'Email,Legacy Status',
             'jane@example.test,Fresh Lead',
@@ -105,8 +108,9 @@ class ContactStatusImportTreatmentTest extends TestCase
             'contact_id' => $robert->id,
             'contact_status_id' => $working->id,
         ]);
-        $this->assertDatabaseMissing('contact_workflow_profiles', [
+        $this->assertDatabaseHas('contact_workflow_profiles', [
             'contact_id' => $sam->id,
+            'contact_status_id' => $default->id,
         ]);
 
         $this->assertSame('Needs Review', data_get($sam->meta, 'import.original_status'));
@@ -116,6 +120,184 @@ class ContactStatusImportTreatmentTest extends TestCase
         $this->assertSame(2, data_get($batch->meta, 'treatments.contact_status.applied_count'));
         $this->assertSame(1, data_get($batch->meta, 'treatments.contact_status.unmapped_count'));
         $this->assertTrue(data_get($batch->meta, 'treatments.contact_status.review_required'));
+    }
+
+    public function test_column_status_treatment_with_every_source_value_left_unchanged_skips_the_treatment(): void
+    {
+        Storage::fake('local');
+
+        $user = User::factory()->create();
+        $default = $this->contactStatus('new_contact', 'New Contact');
+        Config::set('contacts.default_contact_status_key', $default->key);
+        $csvPath = $this->preview($user, implode("\n", [
+            'Email,Legacy Status',
+            'jane@example.test,New Inquiry',
+            'robert@example.test,Past Client',
+        ]));
+
+        $response = $this->actingAs($user)->post(route('crm.contacts.import.process'), [
+            'csv_path' => $csvPath,
+            'mapping' => [
+                'email' => 'Email',
+                'import_status' => 'Legacy Status',
+            ],
+            'treatments' => [
+                'contact_status' => [
+                    'mode' => 'column',
+                    'source_column' => 'Legacy Status',
+                    'value_map' => [
+                        'new' => [
+                            'source' => 'New Inquiry',
+                            'values' => [''],
+                        ],
+                        'past' => [
+                            'source' => 'Past Client',
+                            'values' => [''],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect(route('crm.contacts.index'));
+        $this->assertSame(2, Contact::query()->count());
+        $this->assertSame(2, ContactWorkflowProfile::query()
+            ->where('contact_status_id', $default->id)
+            ->count());
+
+        $batch = ContactImportBatch::query()->sole();
+        $this->assertNull(
+            data_get($batch->meta, 'treatment_selections.contact_status'),
+        );
+    }
+
+    public function test_use_legacy_status_reuses_matching_status_and_creates_missing_status(): void
+    {
+        Storage::fake('local');
+
+        $user = User::factory()->create();
+        $existing = $this->contactStatus('past_contact', 'Past Client');
+        $csvPath = $this->preview($user, implode("\n", [
+            'Email,Legacy Status',
+            'jane@example.test,Past Client',
+            'robert@example.test,Qualified Prospect',
+        ]));
+
+        $response = $this->actingAs($user)->post(route('crm.contacts.import.process'), [
+            'csv_path' => $csvPath,
+            'mapping' => [
+                'email' => 'Email',
+                'import_status' => 'Legacy Status',
+            ],
+            'treatments' => [
+                'contact_status' => [
+                    'mode' => 'column',
+                    'source_column' => 'Legacy Status',
+                    'value_map' => [
+                        'past' => [
+                            'source' => 'Past Client',
+                            'use_source_value' => '1',
+                        ],
+                        'qualified' => [
+                            'source' => 'Qualified Prospect',
+                            'use_source_value' => '1',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect(route('crm.contacts.index'));
+
+        $created = ContactStatus::query()
+            ->where('name', 'Qualified Prospect')
+            ->sole();
+
+        $this->assertFalse($created->is_core);
+        $this->assertTrue($created->is_active);
+        $this->assertTrue($created->is_customized);
+        $this->assertNotNull($created->customized_at);
+        $this->assertTrue((bool) data_get($created->meta, 'created_from_contact_import'));
+        $this->assertStringStartsWith('imported_status_', $created->key);
+        $this->assertSame(1, ContactStatus::query()->where('name', 'Past Client')->count());
+
+        $jane = Contact::query()->where('email', 'jane@example.test')->sole();
+        $robert = Contact::query()->where('email', 'robert@example.test')->sole();
+
+        $this->assertDatabaseHas('contact_workflow_profiles', [
+            'contact_id' => $jane->id,
+            'contact_status_id' => $existing->id,
+        ]);
+        $this->assertDatabaseHas('contact_workflow_profiles', [
+            'contact_id' => $robert->id,
+            'contact_status_id' => $created->id,
+        ]);
+
+        $batch = ContactImportBatch::query()->sole();
+        $this->assertSame(
+            [(string) $existing->id],
+            data_get($batch->meta, 'treatment_selections.contact_status.value_map.Past Client'),
+        );
+        $this->assertSame(
+            [(string) $created->id],
+            data_get($batch->meta, 'treatment_selections.contact_status.value_map.Qualified Prospect'),
+        );
+    }
+
+    public function test_existing_contact_keeps_its_status_when_import_status_is_not_applied(): void
+    {
+        Storage::fake('local');
+
+        $user = User::factory()->create();
+        $default = $this->contactStatus('new_contact', 'New Contact');
+        $existingStatus = $this->contactStatus('active_contact', 'Active Client');
+        Config::set('contacts.default_contact_status_key', $default->key);
+
+        $contact = Contact::factory()->create([
+            'email' => 'existing@example.test',
+        ]);
+        ContactWorkflowProfile::query()->create([
+            'contact_id' => $contact->id,
+            'contact_status_id' => $existingStatus->id,
+            'last_status_changed_at' => now(),
+            'meta' => [],
+        ]);
+
+        $csvPath = $this->preview($user, implode("\n", [
+            'Email,Legacy Status',
+            'existing@example.test,Unmapped Legacy Status',
+        ]));
+
+        $response = $this->actingAs($user)->post(route('crm.contacts.import.process'), [
+            'csv_path' => $csvPath,
+            'mapping' => [
+                'email' => 'Email',
+                'import_status' => 'Legacy Status',
+            ],
+            'treatments' => [
+                'contact_status' => [
+                    'mode' => 'column',
+                    'source_column' => 'Legacy Status',
+                    'value_map' => [
+                        'unmapped' => [
+                            'source' => 'Unmapped Legacy Status',
+                            'values' => [''],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect(route('crm.contacts.index'));
+
+        $this->assertDatabaseHas('contact_workflow_profiles', [
+            'contact_id' => $contact->id,
+            'contact_status_id' => $existingStatus->id,
+        ]);
+        $this->assertDatabaseMissing('contact_workflow_profiles', [
+            'contact_id' => $contact->id,
+            'contact_status_id' => $default->id,
+        ]);
     }
 
     public function test_status_treatment_rejects_inactive_destination_status(): void
@@ -147,7 +329,17 @@ class ContactStatusImportTreatmentTest extends TestCase
             ],
         ]);
 
-        $response->assertSessionHasErrors('treatments.contact_status');
+        $response->assertRedirect(route('crm.contacts.import.review', [
+            'csv_path' => $csvPath,
+        ]));
+        $response->assertSessionHasErrors([
+            'treatments.contact_status' => 'The selected Contact Status is missing or inactive.',
+        ]);
+
+        $this->actingAs($user)
+            ->get($response->headers->get('Location'))
+            ->assertOk();
+
         $this->assertSame(0, Contact::query()->count());
         $this->assertSame(0, ContactImportBatch::query()->count());
     }

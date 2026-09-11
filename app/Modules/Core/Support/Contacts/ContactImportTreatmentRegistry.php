@@ -3,6 +3,7 @@
 namespace App\Modules\Core\Support\Contacts;
 
 use App\Modules\Core\Contracts\Contacts\ContactImportTreatmentTarget;
+use App\Modules\Core\Contracts\Contacts\MaterializesContactImportTreatmentSelection;
 use App\Modules\Core\Data\Contacts\ContactImportTreatmentApplication;
 use App\Modules\Core\Data\Contacts\ContactImportTreatmentDefinition;
 use App\Modules\Core\Data\Contacts\ContactImportTreatmentResolution;
@@ -162,6 +163,25 @@ final class ContactImportTreatmentRegistry
                     continue;
                 }
 
+                $useSourceValue = filter_var(
+                    $entry['use_source_value'] ?? false,
+                    FILTER_VALIDATE_BOOL,
+                );
+
+                if ($useSourceValue) {
+                    if ($definition->sourceValueOptionLabel === null) {
+                        throw ValidationException::withMessages([
+                            "treatments.{$targetKey}.value_map" => 'This import treatment does not support using the source value directly.',
+                        ]);
+                    }
+
+                    $valueMap[$sourceValue] = [
+                        ContactImportTreatmentSelection::SOURCE_VALUE,
+                    ];
+
+                    continue;
+                }
+
                 $values = $this->submittedValues(
                     values: $entry['values'] ?? [],
                     custom: $entry['custom'] ?? null,
@@ -175,9 +195,10 @@ final class ContactImportTreatmentRegistry
             }
 
             if ($valueMap === []) {
-                throw ValidationException::withMessages([
-                    "treatments.{$targetKey}.value_map" => 'Map at least one source value for a column-based treatment.',
-                ]);
+                // Every visible source value was explicitly left unchanged.
+                // Treat that as no treatment rather than rejecting an otherwise
+                // valid import configuration.
+                continue;
             }
 
             $normalized[$targetKey] = new ContactImportTreatmentSelection(
@@ -190,6 +211,44 @@ final class ContactImportTreatmentRegistry
         }
 
         return $normalized;
+    }
+
+    /**
+     * Resolve any operator intent that must become durable before queued work begins.
+     *
+     * @param array<string, ContactImportTreatmentSelection> $selections
+     * @return array<string, ContactImportTreatmentSelection>
+     */
+    public function materializeSelections(array $selections): array
+    {
+        $available = $this->availableTargets();
+        $materialized = [];
+
+        foreach ($selections as $targetKey => $selection) {
+            $target = $available[$targetKey] ?? null;
+
+            if (! $target instanceof ContactImportTreatmentTarget) {
+                throw new LogicException(
+                    "Import treatment [{$targetKey}] became unavailable before import creation.",
+                );
+            }
+
+            if ($target instanceof MaterializesContactImportTreatmentSelection) {
+                $selection = $target->materializeSelection($selection);
+            }
+
+            foreach ($selection->valueMap as $values) {
+                if (in_array(ContactImportTreatmentSelection::SOURCE_VALUE, $values, true)) {
+                    throw new LogicException(
+                        "Import treatment [{$targetKey}] did not materialize its source-value mapping.",
+                    );
+                }
+            }
+
+            $materialized[$targetKey] = $selection;
+        }
+
+        return $materialized;
     }
 
     /**

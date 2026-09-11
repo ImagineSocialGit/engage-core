@@ -4,6 +4,7 @@ namespace App\Modules\Core\Services\Contacts;
 
 use App\Models\User;
 use App\Modules\Core\Actions\Contacts\CreateOrUpdateContactAction;
+use App\Modules\Core\Contracts\Contacts\UpdatesContactStatus;
 use App\Modules\Core\Data\Contacts\ContactImportContext;
 use App\Modules\Core\Data\Contacts\ContactImportPostProcessResult;
 use App\Modules\Core\Data\Contacts\ContactImportTreatmentResolution;
@@ -458,6 +459,26 @@ final class ContactImportBatchProcessor
         }
 
         $wasExisting = $existingContact !== null;
+        $defaultStatusKey = null;
+        $statusTreatmentState = data_get(
+            $treatmentResolution->targets,
+            'contact_status.state',
+        );
+
+        if (! $wasExisting
+            && $importMode === 'add'
+            && $statusTreatmentState !== 'applied'
+            && app()->bound(UpdatesContactStatus::class)
+        ) {
+            $configuredDefaultStatusKey = config('contacts.default_contact_status_key');
+
+            if (is_string($configuredDefaultStatusKey)
+                && trim($configuredDefaultStatusKey) !== ''
+            ) {
+                $defaultStatusKey = trim($configuredDefaultStatusKey);
+            }
+        }
+
         $existingImportedAt = is_array($existingContact?->meta)
             ? data_get($existingContact->meta, 'imported_at')
             : null;
@@ -513,8 +534,8 @@ final class ContactImportBatchProcessor
                     ],
                 ),
             ], static fn (mixed $value): bool => $value !== null),
-            statusKey: null,
-            statusChangeReason: 'crm_import',
+            statusKey: $defaultStatusKey,
+            statusChangeReason: 'crm_import_default_status',
         );
 
         $contact->forceFill([
