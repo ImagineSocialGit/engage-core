@@ -14,6 +14,8 @@ use App\Modules\Core\Jobs\ProcessContactImportBatchChunkJob;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Core\Models\ContactImportRun;
 use App\Modules\Core\Models\ContactStatus;
+use App\Modules\Core\Data\Contacts\ContactPanel;
+use App\Modules\Core\Data\Contacts\ContactResultAction;
 use App\Modules\Core\Requests\StoreContactRequest;
 use App\Modules\Core\Requests\UpdateContactRequest;
 use App\Modules\Core\Services\Contacts\ContactImportHeaderMapper;
@@ -111,6 +113,7 @@ class ContactController extends Controller
 
         $contactResultPayload = $contactIndexFilters->resultPayload($contactFilters);
         $contactResultActions = $contactResultActions->actionsFor($request->user());
+        $contactResultActionGroups = $this->contactResultActionGroups($contactResultActions);
         $contactResultCount = $contacts->total();
         $leadSingular = (string) config('contacts.labels.singular');
         $leadPlural = (string) config('contacts.labels.plural');
@@ -124,10 +127,49 @@ class ContactController extends Controller
             'contactRows',
             'contactResultPayload',
             'contactResultActions',
+            'contactResultActionGroups',
             'contactResultCount',
             'leadSingular',
             'leadPlural',
         ));
+    }
+
+    /**
+     * @param array<int, ContactResultAction> $actions
+     * @return array<int, array{key: string, label: string, description: string, sort: int, actions: array<int, ContactResultAction>}>
+     */
+    private function contactResultActionGroups(array $actions): array
+    {
+        return collect($actions)
+            ->groupBy(fn (ContactResultAction $action): string => $action->groupKey)
+            ->map(function ($group): array {
+                /** @var ContactResultAction $first */
+                $first = $group->first();
+
+                return [
+                    'key' => $first->groupKey,
+                    'label' => $first->groupLabel,
+                    'description' => $first->groupDescription,
+                    'sort' => $first->groupSort,
+                    'actions' => $group
+                        ->sortBy(fn (ContactResultAction $action): string => sprintf(
+                            '%010d-%s-%s',
+                            $action->sort,
+                            $action->label,
+                            $action->key,
+                        ))
+                        ->values()
+                        ->all(),
+                ];
+            })
+            ->sortBy(fn (array $group): string => sprintf(
+                '%010d-%s-%s',
+                $group['sort'],
+                $group['label'],
+                $group['key'],
+            ))
+            ->values()
+            ->all();
     }
 
     public function store(
@@ -197,10 +239,27 @@ class ContactController extends Controller
         $contact->load($relations);
 
         $contactPanels = $contactPanelRegistry->panelsFor($contact);
+        $configuredRailPanelKeys = collect(config('contacts.show.rail_panels', []))
+            ->filter(fn (mixed $key): bool => is_string($key) && trim($key) !== '')
+            ->map(fn (string $key): string => trim($key))
+            ->values();
+        $contactRailPanels = $contactPanels
+            ->filter(fn (ContactPanel $panel): bool => $panel->placement === ContactPanel::PLACEMENT_RAIL
+                || $configuredRailPanelKeys->contains($panel->key))
+            ->values();
+        $contactMainPanels = $contactPanels
+            ->reject(fn (ContactPanel $panel): bool => $contactRailPanels->contains(
+                fn (ContactPanel $railPanel): bool => $railPanel->key === $panel->key,
+            ))
+            ->values();
+        $contactHasRail = module_enabled('inbound_messaging') || $contactRailPanels->isNotEmpty();
 
-        return view('crm.contacts.show', array_replace_recursive([
+        $viewData = array_replace_recursive([
             'contact' => $contact,
             'contactPanels' => $contactPanels,
+            'contactMainPanels' => $contactMainPanels,
+            'contactRailPanels' => $contactRailPanels,
+            'contactHasRail' => $contactHasRail,
 
             'contactVisibilitySections' => [],
 
@@ -216,7 +275,137 @@ class ContactController extends Controller
             'contactStatuses' => module_enabled('workflow')
                 ? ContactStatus::query()->active()->ordered()->get(['id', 'name'])
                 : collect(),
-        ], $contactShowDataRegistry->dataFor($contact)));
+        ], $contactShowDataRegistry->dataFor($contact));
+
+        return view(
+            'crm.contacts.show',
+            $this->contactShowViewData($contact, $viewData),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private function contactShowViewData(Contact $contact, array $data): array
+    {
+        $contactSingular = (string) config('contacts.labels.singular', 'contact');
+        $contactName = $contact->name
+            ?: trim($contact->first_name.' '.$contact->last_name)
+            ?: $contact->email
+            ?: str($contactSingular)->title().' #'.$contact->id;
+        $currentStatus = module_enabled('workflow')
+            ? $contact->workflowProfile?->contactStatus
+            : null;
+
+        $businessContext = is_array($data['contactBusinessContext'] ?? null)
+            ? $data['contactBusinessContext']
+            : ['primary' => null, 'relationships' => []];
+        $primaryBusinessContext = is_array($businessContext['primary'] ?? null)
+            ? $businessContext['primary']
+            : null;
+        $businessRelationships = collect($businessContext['relationships'] ?? [])
+            ->filter(fn (mixed $relationship): bool => is_array($relationship))
+            ->values();
+        $businessLabel = filled($primaryBusinessContext['label'] ?? null)
+            ? $primaryBusinessContext['label']
+            : str($contactSingular)->title()->toString();
+        $usesRelationshipStage = ($primaryBusinessContext['progression_mode'] ?? null) === 'relationship_stage';
+        $showContactStatusProgression = module_enabled('workflow') && ! $usesRelationshipStage;
+        $hasProgression = $usesRelationshipStage || module_enabled('workflow');
+        $progressionType = $usesRelationshipStage ? 'Stage' : 'Status';
+        $progressionLabel = $usesRelationshipStage
+            ? ($primaryBusinessContext['stage_label'] ?? 'No stage')
+            : ($currentStatus?->name ?? 'No status');
+        $businessSource = filled($primaryBusinessContext['source'] ?? null)
+            ? $primaryBusinessContext['source']
+            : $contact->source;
+        $businessSubsource = filled($primaryBusinessContext['subsource'] ?? null)
+            ? $primaryBusinessContext['subsource']
+            : $contact->subsource;
+
+        $conversationItems = collect($data['conversationItems'] ?? [])
+            ->filter(fn (mixed $item): bool => is_array($item))
+            ->values();
+        $latestInboundReply = is_array($data['latestInboundReply'] ?? null)
+            ? $data['latestInboundReply']
+            : null;
+        $latestAutomatedResponse = is_array($data['latestAutomatedResponse'] ?? null)
+            ? $data['latestAutomatedResponse']
+            : null;
+        $conversationReply = is_array($data['conversationReply'] ?? null)
+            ? $data['conversationReply']
+            : null;
+        $primaryConversationItemIds = array_values(array_filter([
+            $latestInboundReply['id'] ?? null,
+            $latestAutomatedResponse['id'] ?? null,
+        ]));
+        $conversationTimeline = $conversationItems
+            ->reject(fn (array $item): bool => in_array(
+                $item['id'] ?? null,
+                $primaryConversationItemIds,
+                true,
+            ))
+            ->take($primaryConversationItemIds === [] ? 8 : 6)
+            ->values();
+
+        $contactTags = $contact->tags
+            ->pluck('tag')
+            ->filter(fn (mixed $tag): bool => filled($tag))
+            ->values();
+        $clientTimezone = (string) config('client.timezone', config('app.timezone', 'UTC'));
+        $defaultContactTaskDueAt = now($clientTimezone)
+            ->addDay()
+            ->setTime(9, 0)
+            ->format('Y-m-d\TH:i');
+        $openTasks = collect($data['tasks'] ?? [])
+            ->filter(fn ($task): bool => $task->status === 'open' && ! $task->archived_at)
+            ->sortBy(fn ($task): string => sprintf(
+                '%d-%012d-%012d-%012d',
+                $task->due_at ? 0 : 1,
+                $task->due_at?->timestamp ?? 999999999999,
+                $task->created_at?->timestamp ?? 0,
+                $task->id ?? 0,
+            ))
+            ->values();
+        $hasGenericImportTreatments = is_array(data_get($contact->meta, 'import.treatments'));
+        $importStatusTreatmentState = $hasGenericImportTreatments
+            ? data_get($contact->meta, 'import.treatments.contact_status.state')
+            : data_get($contact->meta, 'import.status_mapping.state');
+
+        return [
+            ...$data,
+            'contactSingular' => $contactSingular,
+            'contactName' => $contactName,
+            'currentStatus' => $currentStatus,
+            'primaryBusinessContext' => $primaryBusinessContext,
+            'businessRelationships' => $businessRelationships,
+            'businessLabel' => $businessLabel,
+            'usesRelationshipStage' => $usesRelationshipStage,
+            'showContactStatusProgression' => $showContactStatusProgression,
+            'hasProgression' => $hasProgression,
+            'progressionType' => $progressionType,
+            'progressionLabel' => $progressionLabel,
+            'businessSource' => $businessSource,
+            'businessSubsource' => $businessSubsource,
+            'conversationItems' => $conversationItems,
+            'latestInboundReply' => $latestInboundReply,
+            'latestAutomatedResponse' => $latestAutomatedResponse,
+            'conversationReply' => $conversationReply,
+            'conversationTimeline' => $conversationTimeline,
+            'contactTags' => $contactTags,
+            'clientTimezone' => $clientTimezone,
+            'defaultContactTaskDueAt' => $defaultContactTaskDueAt,
+            'openTasks' => $openTasks,
+            'nextTask' => $openTasks->first(),
+            'upNextTask' => $openTasks->skip(1)->first(),
+            'defaultActivityTab' => $openTasks->isNotEmpty() && module_enabled('tasks') ? 'tasks' : 'notes',
+            'contactPanelClass' => 'space-y-6 '.module_tone('core', 'panel'),
+            'nextStepTone' => module_enabled('tasks') ? module_tone('tasks', 'item') : 'bg-slate-50 border-slate-200',
+            'activityPanelClass' => 'space-y-4 '.(module_enabled('tasks') ? module_tone('tasks', 'panel') : module_tone('core', 'panel')),
+            'messagesPanelClass' => 'space-y-4 '.module_tone('messaging', 'panel'),
+            'importStatusTreatmentState' => $importStatusTreatmentState,
+        ];
     }
 
     public function updateStatus(

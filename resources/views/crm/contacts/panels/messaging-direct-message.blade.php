@@ -39,10 +39,10 @@
             this.mediaTitle = template.media_title || '';
         },
     }"
-    class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+    class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
     data-contact-direct-message-panel
 >
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex flex-col gap-4">
         <div>
             <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Messaging</p>
             <h2 class="mt-1 text-lg font-black text-slate-950">Send a message</h2>
@@ -55,13 +55,13 @@
             <button
                 type="button"
                 x-on:click="open = true"
-                class="inline-flex shrink-0 items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-extrabold text-white shadow-sm hover:bg-slate-800"
+                class="inline-flex w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-extrabold text-white shadow-sm hover:bg-slate-800"
                 data-contact-direct-message-open
             >
                 Send message
             </button>
         @else
-            <span class="inline-flex shrink-0 items-center rounded-xl bg-slate-100 px-3 py-2 text-xs font-extrabold text-slate-500">
+            <span class="inline-flex w-full items-center justify-center rounded-xl bg-slate-100 px-3 py-2 text-xs font-extrabold text-slate-500">
                 No sendable channel
             </span>
         @endif

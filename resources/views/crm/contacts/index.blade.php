@@ -183,7 +183,7 @@
                         </p>
 
                         <p class="mt-1 text-sm text-amber-800">
-                            Engage is not intended for unsolicited marketing. Do not add someone for the purpose of sending marketing email or text unless they have previously contacted you, requested information, done business with you, or otherwise expressed interest.
+                            Do not add someone solely for unsolicited marketing. Only add people who previously contacted you, requested information, did business with you, or otherwise expressed interest.
                         </p>
 
                         <label class="mt-4 flex items-start gap-3 text-sm text-amber-950">
@@ -361,27 +361,47 @@
                 </div>
             </div>
 
-            @if($contactResultCount > 0 && $contactResultActions !== [])
-                <div class="border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-6">
-                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                        <div>
-                            <p class="text-sm font-semibold text-slate-950">
-                                Actions for this result set
-                            </p>
-                            <p class="mt-1 text-xs leading-5 text-slate-500">
-                                These actions use all {{ number_format($contactResultCount) }} matching Contacts you can see, not just the current page.
-                            </p>
-                        </div>
+            @if($contactResultCount > 0 && $contactResultActionGroups !== [])
+                <div class="border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-6" data-contact-result-actions>
+                    <div>
+                        <p class="text-sm font-semibold text-slate-950">
+                            Actions for this set
+                        </p>
+                        <p class="mt-1 text-xs leading-5 text-slate-500">
+                            Actions use all {{ number_format($contactResultCount) }} matching {{ $leadPlural }} you can see, not just the current page.
+                        </p>
+                    </div>
 
-                        <div class="flex flex-wrap items-center gap-2">
-                            @foreach($contactResultActions as $contactResultAction)
-                                @include($contactResultAction->view, [
-                                    'contactResultAction' => $contactResultAction,
-                                    'contactResultPayload' => $contactResultPayload,
-                                    'contactResultCount' => $contactResultCount,
-                                ])
-                            @endforeach
-                        </div>
+                    <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
+                        @foreach($contactResultActionGroups as $contactResultActionGroup)
+                            <details
+                                class="group rounded-xl border border-slate-200 bg-white shadow-sm sm:min-w-48"
+                                data-contact-result-action-group="{{ $contactResultActionGroup['key'] }}"
+                            >
+                                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+                                    <span>{{ $contactResultActionGroup['label'] }}</span>
+                                    <span class="text-xs text-slate-400 transition group-open:rotate-180" aria-hidden="true">⌄</span>
+                                </summary>
+
+                                <div class="border-t border-slate-200 p-4 sm:w-96">
+                                    <p class="text-xs leading-5 text-slate-500">
+                                        {{ $contactResultActionGroup['description'] }}
+                                    </p>
+
+                                    <div class="mt-4 divide-y divide-slate-200">
+                                        @foreach($contactResultActionGroup['actions'] as $contactResultAction)
+                                            <div class="py-4 first:pt-0 last:pb-0">
+                                                @include($contactResultAction->view, [
+                                                    'contactResultAction' => $contactResultAction,
+                                                    'contactResultPayload' => $contactResultPayload,
+                                                    'contactResultCount' => $contactResultCount,
+                                                ])
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </details>
+                        @endforeach
                     </div>
                 </div>
             @endif

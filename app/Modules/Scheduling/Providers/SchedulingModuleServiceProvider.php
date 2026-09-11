@@ -12,6 +12,7 @@ use App\Modules\Scheduling\EventDefinitions\SchedulingPublicBookingEventDefiniti
 use App\Modules\Scheduling\Jobs\ExpireBookingHoldsJob;
 use App\Modules\Scheduling\ReadModels\SchedulingBookingFunnelFactContributor;
 use App\Modules\Scheduling\Services\ContactShow\SchedulingContactPanelProvider;
+use App\Modules\Scheduling\Services\Contacts\Filters\AppointmentStateContactFilterCriterion;
 use App\Modules\Scheduling\Services\Dashboard\TodayAppointmentsDashboardPanelProvider;
 use App\Modules\Scheduling\Services\Dashboard\TomorrowAppointmentsDashboardPanelProvider;
 use App\Modules\Scheduling\Services\SchedulingUserHostSynchronizer;
@@ -53,6 +54,10 @@ class SchedulingModuleServiceProvider extends ServiceProvider
             TodayAppointmentsDashboardPanelProvider::class,
             TomorrowAppointmentsDashboardPanelProvider::class,
         ], DashboardPanelRegistry::providerTag());
+
+        $this->app->tag([
+            AppointmentStateContactFilterCriterion::class,
+        ], 'core.contact_filter_criteria');
     }
 
     public function boot(): void

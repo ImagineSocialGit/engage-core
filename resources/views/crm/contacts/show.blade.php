@@ -1,91 +1,10 @@
-@php
-    $contactSingular = config('contacts.labels.singular');
-    $contactName = $contact->name ?: trim($contact->first_name.' '.$contact->last_name) ?: $contact->email ?: str($contactSingular)->title().' #'.$contact->id;
-    $currentStatus = module_enabled('workflow') ? $contact->workflowProfile?->contactStatus : null;
-
-    $businessContext = is_array($contactBusinessContext ?? null)
-        ? $contactBusinessContext
-        : ['primary' => null, 'relationships' => []];
-    $primaryBusinessContext = is_array($businessContext['primary'] ?? null)
-        ? $businessContext['primary']
-        : null;
-    $businessRelationships = collect($businessContext['relationships'] ?? [])
-        ->filter(fn ($relationship) => is_array($relationship))
-        ->values();
-    $businessLabel = filled($primaryBusinessContext['label'] ?? null)
-        ? $primaryBusinessContext['label']
-        : str($contactSingular)->title()->toString();
-    $usesRelationshipStage = ($primaryBusinessContext['progression_mode'] ?? null) === 'relationship_stage';
-    $showContactStatusProgression = module_enabled('workflow') && ! $usesRelationshipStage;
-    $hasProgression = $usesRelationshipStage || module_enabled('workflow');
-    $progressionType = $usesRelationshipStage ? 'Stage' : 'Status';
-    $progressionLabel = $usesRelationshipStage
-        ? ($primaryBusinessContext['stage_label'] ?? 'No stage')
-        : ($currentStatus?->name ?? 'No status');
-    $businessSource = filled($primaryBusinessContext['source'] ?? null)
-        ? $primaryBusinessContext['source']
-        : $contact->source;
-    $businessSubsource = filled($primaryBusinessContext['subsource'] ?? null)
-        ? $primaryBusinessContext['subsource']
-        : $contact->subsource;
-
-    $conversationItems = collect($conversationItems ?? [])
-        ->filter(fn ($item) => is_array($item))
-        ->values();
-    $latestInboundReply = is_array($latestInboundReply ?? null)
-        ? $latestInboundReply
-        : null;
-    $latestAutomatedResponse = is_array($latestAutomatedResponse ?? null)
-        ? $latestAutomatedResponse
-        : null;
-    $conversationReply = is_array($conversationReply ?? null)
-        ? $conversationReply
-        : null;
-    $primaryConversationItemIds = array_values(array_filter([
-        $latestInboundReply['id'] ?? null,
-        $latestAutomatedResponse['id'] ?? null,
-    ]));
-    $conversationTimeline = $conversationItems
-        ->reject(fn (array $item) => in_array(
-            $item['id'] ?? null,
-            $primaryConversationItemIds,
-            true,
-        ))
-        ->take($primaryConversationItemIds === [] ? 8 : 6)
-        ->values();
-    $contactTags = $contact->tags
-        ->pluck('tag')
-        ->filter(fn ($tag) => filled($tag))
-        ->values();
-    $clientTimezone = config('client.timezone', config('app.timezone', 'UTC'));
-
-    $defaultContactTaskDueAt = now($clientTimezone)->addDay()->setTime(9, 0)->format('Y-m-d\TH:i');
-    $openTasks = collect($tasks ?? [])
-        ->filter(fn ($task) => $task->status === 'open' && ! $task->archived_at)
-        ->sortBy(fn ($task) => sprintf(
-            '%d-%012d-%012d-%012d',
-            $task->due_at ? 0 : 1,
-            $task->due_at?->timestamp ?? 999999999999,
-            $task->created_at?->timestamp ?? 0,
-            $task->id ?? 0,
-        ))
-        ->values();
-    $nextTask = $openTasks->first();
-    $upNextTask = $openTasks->skip(1)->first();
-    $defaultActivityTab = $openTasks->isNotEmpty() && module_enabled('tasks') ? 'tasks' : 'notes';
-    $contactPanelClass = 'space-y-6 '.module_tone('core', 'panel');
-    $nextStepTone = module_enabled('tasks') ? module_tone('tasks', 'item') : 'bg-slate-50 border-slate-200';
-    $activityPanelClass = 'space-y-4 '.(module_enabled('tasks') ? module_tone('tasks', 'panel') : module_tone('core', 'panel'));
-    $messagesPanelClass = 'space-y-4 '.module_tone('messaging', 'panel');
-@endphp
-
 <x-layouts.crm
     :title="$contactName"
     :heading="$contactName"
     subheading="Who they are, what they said, and what needs to happen next"
 >
     <div
-        class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start"
+        class="grid gap-6 {{ $contactHasRail ? 'xl:grid-cols-[minmax(0,1fr)_24rem]' : 'xl:grid-cols-1' }} xl:items-start"
         x-data="{
             activityTab: new URLSearchParams(window.location.search).get('activity_tab') || @js($defaultActivityTab),
             messageTab: new URLSearchParams(window.location.search).get('messages_tab') || 'messages',
@@ -543,13 +462,6 @@
                 @endif
 
                 @if($showContactStatusProgression)
-                    @php
-                        $hasGenericImportTreatments = is_array(data_get($contact->meta, 'import.treatments'));
-                        $importStatusTreatmentState = $hasGenericImportTreatments
-                            ? data_get($contact->meta, 'import.treatments.contact_status.state')
-                            : data_get($contact->meta, 'import.status_mapping.state');
-                    @endphp
-
                     @if ($importStatusTreatmentState === 'unmapped')
                         <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4" data-contact-status-import-evidence>
                             <p class="text-sm font-semibold text-amber-900">Imported status needs review</p>
@@ -568,25 +480,29 @@
                 @endif
             </x-ui.card>
 
-            @if($contactPanels->isNotEmpty())
-                <div class="space-y-6">
-                    @foreach($contactPanels as $contactPanel)
-                        @include($contactPanel->view, $contactPanel->data + [
-                            'contact' => $contact,
-                            'contactPanel' => $contactPanel,
-                        ])
+            @if($contactMainPanels->isNotEmpty())
+                <div class="space-y-6" data-contact-main-panels>
+                    @foreach($contactMainPanels as $contactPanel)
+                        <div data-contact-main-panel="{{ $contactPanel->key }}">
+                            @include($contactPanel->view, $contactPanel->data + [
+                                'contact' => $contact,
+                                'contactPanel' => $contactPanel,
+                            ])
+                        </div>
                     @endforeach
                 </div>
             @endif
         </div>
 
-        @if(module_enabled('inbound_messaging'))
+        @if($contactHasRail)
             <aside
-                id="contact-conversation"
-                class="self-start xl:sticky xl:top-6 xl:col-start-2 xl:row-start-1 xl:row-span-3"
-                data-contact-conversation-rail
+                id="contact-right-rail"
+                class="space-y-6 self-start xl:sticky xl:top-6 xl:col-start-2 xl:row-start-1 xl:row-span-3"
+                data-contact-right-rail
             >
-                <x-ui.card class="space-y-5" data-module-panel="inbound_messaging">
+                @if(module_enabled('inbound_messaging'))
+                    <div id="contact-conversation" data-contact-conversation-rail>
+                        <x-ui.card class="space-y-5" data-module-panel="inbound_messaging">
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Conversation</p>
@@ -831,7 +747,22 @@
                             </div>
                         </div>
                     @endif
-                </x-ui.card>
+                        </x-ui.card>
+                    </div>
+                @endif
+
+                @if($contactRailPanels->isNotEmpty())
+                    <div class="space-y-6" data-contact-rail-panels>
+                        @foreach($contactRailPanels as $contactPanel)
+                            <div data-contact-rail-panel="{{ $contactPanel->key }}">
+                                @include($contactPanel->view, $contactPanel->data + [
+                                    'contact' => $contact,
+                                    'contactPanel' => $contactPanel,
+                                ])
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             </aside>
         @endif
 
@@ -1058,17 +989,13 @@
 
                 <div x-show="messageTab === 'messages'" class="space-y-3">
                     @forelse ($scheduledMessages as $message)
-                        @php
-                            $channel = str($message->channel)->replace('_', ' ')->title();
-                            $scope = str($message->scope)->replace('_', ' ')->title();
-                            $messageType = str($message->message_type)->replace('_', ' ')->title();
-                        @endphp
-
                         <div class="rounded-xl border border-slate-200 p-4">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                     <p class="font-medium text-slate-900">
-                                        {{ $scope }} {{ $messageType }} {{ $channel }}
+                                        {{ str($message->scope)->replace('_', ' ')->title() }}
+                                        {{ str($message->message_type)->replace('_', ' ')->title() }}
+                                        {{ str($message->channel)->replace('_', ' ')->title() }}
                                     </p>
 
                                     <p class="mt-1 text-sm text-slate-500">
@@ -1113,17 +1040,13 @@
                 <div x-show="messageTab === 'consents'" class="space-y-4">
                     <div class="space-y-3">
                         @forelse ($messageConsents as $consent)
-                            @php
-                                $channel = str($consent->channel->value)->replace('_', ' ')->title();
-                                $purpose = str($consent->purpose->value)->replace('_', ' ')->title();
-                                $scope = str($consent->scope)->replace('_', ' ')->title();
-                            @endphp
-
                             <div class="rounded-xl border border-slate-200 p-4">
                                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                     <div>
                                         <p class="font-medium text-slate-900">
-                                            Can receive {{ strtolower($scope) }} {{ strtolower($purpose) }} by {{ strtolower($channel) }}
+                                            Can receive {{ str($consent->scope)->replace('_', ' ')->lower() }}
+                                            {{ str($consent->purpose->value)->replace('_', ' ')->lower() }}
+                                            by {{ str($consent->channel->value)->replace('_', ' ')->lower() }}
                                         </p>
 
                                         <p class="mt-1 text-sm text-slate-500">

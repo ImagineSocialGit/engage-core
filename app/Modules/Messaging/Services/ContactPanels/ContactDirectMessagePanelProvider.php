@@ -25,6 +25,7 @@ final class ContactDirectMessagePanelProvider implements ContactPanelProvider
                 ],
                 sort: 5,
                 module: 'messaging',
+                placement: ContactPanel::PLACEMENT_RAIL,
             ),
         ];
     }

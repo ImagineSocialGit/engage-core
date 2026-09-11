@@ -12,6 +12,10 @@ final class CampaignContactResultActionContributor implements ContactResultActio
 {
     public function actions(): iterable
     {
+        $plural = str((string) config('contacts.labels.plural', 'contacts'))
+            ->lower()
+            ->toString();
+
         $campaigns = Schema::hasTable('campaigns')
             ? Campaign::query()
                 ->where('status', Campaign::STATUS_ACTIVE)
@@ -27,14 +31,18 @@ final class CampaignContactResultActionContributor implements ContactResultActio
 
         yield new ContactResultAction(
             key: 'campaigns.enroll',
-            label: 'Enroll in Campaign',
-            description: 'Choose an active Campaign and enroll this visible Contact result set.',
+            label: 'Enroll in campaign',
+            description: 'Choose an active Campaign and enroll this visible '.$plural.' result set.',
             view: 'crm.campaigns.partials.contact-result-action',
             capability: CampaignsAccessCapabilityContributor::ENROLL_CONTACT_RESULTS,
-            sort: 30,
+            sort: 20,
             data: [
                 'campaigns' => $campaigns,
             ],
+            groupKey: 'messaging',
+            groupLabel: 'Messaging',
+            groupDescription: 'Send or enroll this result set using the messaging tools available to this client.',
+            groupSort: 20,
         );
     }
 }

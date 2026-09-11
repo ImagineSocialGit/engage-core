@@ -12,5 +12,9 @@ final readonly class ContactResultAction
         public string $capability,
         public int $sort = 100,
         public array $data = [],
+        public string $groupKey = 'more',
+        public string $groupLabel = 'More actions',
+        public string $groupDescription = 'Additional actions available for this result set.',
+        public int $groupSort = 100,
     ) {}
 }

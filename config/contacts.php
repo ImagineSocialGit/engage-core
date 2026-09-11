@@ -1,4 +1,3 @@
-
 <?php
 
 return [
@@ -12,6 +11,12 @@ return [
 
     'routes' => [
         'plural' => 'contacts',
+    ],
+
+    'show' => [
+        // Optional client override for panel keys that should stay visible in the
+        // Contact right rail. Module-owned panel defaults still apply.
+        'rail_panels' => [],
     ],
 
     'sources' => [

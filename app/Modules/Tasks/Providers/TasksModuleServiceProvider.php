@@ -13,6 +13,7 @@ use App\Modules\Tasks\Events\TaskCompleted;
 use App\Modules\Tasks\Listeners\EmitTaskCompletedAutomationEvent;
 use App\Modules\Tasks\Services\ContactShow\ContactTasksShowDataProvider;
 use App\Modules\Tasks\Services\ContactShow\ContactTaskVisibilityDataProvider;
+use App\Modules\Tasks\Services\Contacts\Filters\TaskStateContactFilterCriterion;
 use App\Modules\Tasks\Services\Dashboard\TodayTasksDashboardPanelProvider;
 use App\Modules\Tasks\Services\LinkPresenters\ContactTaskLinkPresenter;
 use App\Modules\Tasks\Services\TaskAssignedRecipientsResolver;
@@ -85,6 +86,10 @@ class TasksModuleServiceProvider extends ServiceProvider
             ContactTasksShowDataProvider::class,
             ContactTaskVisibilityDataProvider::class,
         ], 'core.contact_show_data_providers');
+
+        $this->app->tag([
+            TaskStateContactFilterCriterion::class,
+        ], 'core.contact_filter_criteria');
 
         $this->app->tag([
             TodayTasksDashboardPanelProvider::class,

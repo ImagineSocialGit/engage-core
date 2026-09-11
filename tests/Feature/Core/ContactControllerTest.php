@@ -43,7 +43,6 @@ class ContactControllerTest extends TestCase
         $response->assertSee('Create '.str(config('contacts.labels.singular'))->title());
         $response->assertSee('name="email"', false);
         $response->assertSee('name="contact_status_id"', false);
-        $response->assertSee('Engage is not intended for unsolicited marketing.');
         $response->assertSee('name="existing_relationship_confirmed"', false);
 
         $this->assertSame($contact->id, Contact::query()->firstWhere('email', 'jane@example.test')->id);

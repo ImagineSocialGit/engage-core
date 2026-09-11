@@ -33,10 +33,36 @@ class ContactResultActionTest extends TestCase
 
         $this->assertContains('core.add_tag', $managerKeys);
         $this->assertContains('core.export', $managerKeys);
+
+        $managerActions = collect($registry->actionsFor($manager))->keyBy('key');
+
+        $this->assertSame('edit', $managerActions['core.add_tag']->groupKey);
+        $this->assertSame('Edit contacts', $managerActions['core.add_tag']->groupLabel);
+        $this->assertSame('export', $managerActions['core.export']->groupKey);
+        $this->assertSame('Export', $managerActions['core.export']->groupLabel);
         $this->assertContains('core.add_tag', $memberKeys);
         $this->assertNotContains('core.export', $memberKeys);
         $this->assertNotContains('core.add_tag', $viewerKeys);
         $this->assertNotContains('core.export', $viewerKeys);
+    }
+
+    public function test_contacts_index_groups_result_actions_by_business_category(): void
+    {
+        $manager = User::factory()->create();
+        $this->profile($manager, 'manager');
+        Contact::factory()->create([
+            'assigned_user_id' => $manager->getKey(),
+        ]);
+
+        $this
+            ->actingAs($manager)
+            ->get(route('crm.contacts.index'))
+            ->assertOk()
+            ->assertSee('Actions for this set')
+            ->assertSee('data-contact-result-action-group="edit"', false)
+            ->assertSee('Edit contacts')
+            ->assertSee('data-contact-result-action-group="export"', false)
+            ->assertSee('Export');
     }
 
     public function test_bulk_tag_action_freezes_only_current_visible_contact_ids(): void
