@@ -43,6 +43,13 @@ final class ClientEnvironmentLoader
             return;
         }
 
+        if (! is_readable($environmentPath)) {
+            throw new RuntimeException(sprintf(
+                'Selected client environment [%s] is not readable by the current process.',
+                $environmentPath,
+            ));
+        }
+
         $values = Dotenv::createArrayBacked(
             $clientDirectory,
             '.env',

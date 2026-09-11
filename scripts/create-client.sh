@@ -25,8 +25,8 @@ Environment overrides:
   ENGAGE_CORE_GITHUB_OWNER=ImagineSocialGit
 
 The command builds the selected client package, initializes it as a Git
-repository, creates a private GitHub repository, and pushes the initial main
-branch.
+repository, creates a private GitHub repository, pushes the initial main branch,
+then bootstraps the new client as the active local development runtime.
 
 Examples:
   ./scripts/create-client.sh example-client America/Chicago
@@ -456,6 +456,27 @@ mv "$TEMP_CLIENT_DIR" "$CLIENT_DIR"
 TEMP_CLIENT_DIR=""
 trap - EXIT
 
+LOCAL_BOOTSTRAP="$ROOT_DIR/scripts/bootstrap-client-local.sh"
+
+if [[ ! -x "$LOCAL_BOOTSTRAP" ]]; then
+  echo
+  echo "Client source and GitHub repository were created successfully, but the local bootstrap script is missing or not executable:"
+  echo "  $LOCAL_BOOTSTRAP"
+  echo "Repair the Core checkout, then run:"
+  echo "  ./scripts/bootstrap-client-local.sh $CLIENT_KEY"
+  exit 1
+fi
+
+echo
+echo "Bootstrapping local runtime for $CLIENT_KEY..."
+if ! "$LOCAL_BOOTSTRAP" "$CLIENT_KEY"; then
+  echo
+  echo "Client source and GitHub repository remain intact."
+  echo "After fixing the reported local-runtime issue, retry:"
+  echo "  ./scripts/bootstrap-client-local.sh $CLIENT_KEY"
+  exit 1
+fi
+
 cat <<EOF_DONE
 Created client: $CLIENT_DIR
 Name: $CLIENT_NAME
@@ -466,8 +487,9 @@ Repository: $GITHUB_SSH_URL
 Branch: main
 Visibility: private
 Permissions: directories 2750; files 0640; group $WEB_GROUP
+Local runtime: ready and selected
 
 Next:
-  # The complete selected preset has already been committed and pushed.
-  # Use the deployment launcher to create the first staging/production runtime.
+  # Review the client locally.
+  # Then use the deployment launcher to create the first staging/production runtime.
 EOF_DONE

@@ -2331,6 +2331,18 @@
 │   ├── config-templates
 │   │   ├── campaign-presets-template.php
 │   │   ├── client-environment.example
+│   │   ├── client-presets
+│   │   │   ├── artist
+│   │   │   │   └── config
+│   │   │   │       ├── messaging.php
+│   │   │   │       ├── modules.php
+│   │   │   │       ├── presets
+│   │   │   │       │   └── modules
+│   │   │   │       │       └── forms
+│   │   │   │       └── presets.php
+│   │   │   └── basic
+│   │   │       └── config
+│   │   │           └── modules.php
 │   │   ├── client-request-intake-template.md
 │   │   ├── contact-status-presets-template.php
 │   │   ├── flow-routes-template.php
@@ -2785,6 +2797,7 @@
 ├── scripts
 │   ├── add-client-modules.sh
 │   ├── audit-db-bloat.sh
+│   ├── bootstrap-client-local.sh
 │   ├── build-image-manifest.php
 │   ├── create-client.sh
 │   ├── dev-reset-test-client-database.sh
@@ -2882,10 +2895,13 @@
 │   │   │   └── ScheduleCampaignImportBatchInitialMessagesActionTest.php
 │   │   ├── Clients
 │   │   │   ├── ArtisanTestEnvironmentBootstrapTest.php
+│   │   │   ├── BootstrapClientLocalScriptTest.php
 │   │   │   ├── ClientConfigFallbackTest.php
 │   │   │   ├── ClientDashboardLayoutConfigTest.php
 │   │   │   ├── ClientEnvironmentLoaderTest.php
+│   │   │   ├── ClientEnvironmentUnreadableFileTest.php
 │   │   │   ├── ClientViewOverrideTest.php
+│   │   │   ├── CreateClientScriptTest.php
 │   │   │   ├── ExternalFormsClientEnvironmentContractTest.php
 │   │   │   └── ProjectStateClientEnvironmentContractTest.php
 │   │   ├── Commerce
@@ -3461,4 +3477,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-818 directories, 2644 files
+826 directories, 2652 files
