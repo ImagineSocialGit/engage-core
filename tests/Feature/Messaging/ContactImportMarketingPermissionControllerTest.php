@@ -24,7 +24,7 @@ class ContactImportMarketingPermissionControllerTest extends TestCase
         Queue::fake();
     }
 
-    public function test_add_import_exposes_marketing_permission_choice_without_a_detected_profile(): void
+    public function test_add_import_exposes_service_relationship_and_marketing_choices_without_a_detected_profile(): void
     {
         $user = User::factory()->create();
 
@@ -41,10 +41,15 @@ class ContactImportMarketingPermissionControllerTest extends TestCase
 
         $preview->assertOk();
         $preview->assertViewHas('postImportInputs', function (array $inputs): bool {
-            $permission = collect($inputs)->firstWhere('key', 'marketing_permission');
+            $servicePermission = collect($inputs)->firstWhere('key', 'service_relationship_permission');
+            $marketingPermission = collect($inputs)->firstWhere('key', 'marketing_permission');
 
-            return is_array($permission)
-                && collect($permission['inputs'] ?? [])->contains(
+            return is_array($servicePermission)
+                && collect($servicePermission['inputs'] ?? [])->contains(
+                    fn (array $input): bool => ($input['key'] ?? null) === 'relationship_status',
+                )
+                && is_array($marketingPermission)
+                && collect($marketingPermission['inputs'] ?? [])->contains(
                     fn (array $input): bool => ($input['key'] ?? null) === 'permission_status',
                 );
         });
@@ -100,6 +105,47 @@ class ContactImportMarketingPermissionControllerTest extends TestCase
             data_get($batch->meta, 'post_import_config', []),
         );
         Queue::assertPushed(ProcessContactImportBatchChunkJob::class);
+    }
+
+    public function test_confirmed_existing_relationship_is_stored_separately_from_marketing_permission(): void
+    {
+        $user = User::factory()->create();
+        $preview = $this->preview($user);
+
+        $response = $this->actingAs($user)->post(
+            route('crm.contacts.import.process'),
+            [
+                'csv_path' => $preview->viewData('csvPath'),
+                'mapping' => ['email' => 'Email'],
+                'treatments' => [],
+                'post_import_inputs' => [
+                    'service_relationship_permission' => [
+                        'relationship_status' => 'confirmed',
+                        'channels' => ['email'],
+                        'attestation' => '1',
+                    ],
+                    'marketing_permission' => [
+                        'permission_status' => 'not_confirmed',
+                    ],
+                ],
+            ],
+        );
+
+        $batch = ContactImportBatch::query()->latest('id')->firstOrFail();
+        $servicePermission = data_get(
+            $batch->meta,
+            'post_import_config.service_relationship_permission',
+        );
+
+        $response->assertRedirect(route('crm.contacts.import-batches.show', $batch));
+        $this->assertEquals(['email'], $servicePermission['channels'] ?? []);
+        $this->assertSame('contact_import', $servicePermission['scope'] ?? null);
+        $this->assertSame('confirmed', $servicePermission['operator_decision'] ?? null);
+        $this->assertTrue((bool) ($servicePermission['attested'] ?? false));
+        $this->assertArrayNotHasKey(
+            'marketing_permission',
+            data_get($batch->meta, 'post_import_config', []),
+        );
     }
 
     public function test_confirmed_permission_keeps_only_attested_selected_channels(): void

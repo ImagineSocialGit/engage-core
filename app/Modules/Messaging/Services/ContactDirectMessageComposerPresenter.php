@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Services;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Enums\ContactDirectMessageReason;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\MessageTemplate;
@@ -27,37 +28,44 @@ final class ContactDirectMessageComposerPresenter
     /** @return array<string, mixed> */
     public function forContact(Contact $contact): array
     {
-        $purposeOptionsByChannel = [];
+        $reasonOptionsByChannel = [];
 
         foreach ($this->providerReadyChannels($contact) as $channel) {
-            $purposeOptions = [];
+            $reasonOptions = [];
+            $eligiblePurposes = [];
 
             foreach (MessagePurpose::cases() as $purpose) {
-                if (! $this->messageEligibilityGate->allows(
+                $eligiblePurposes[$purpose->value] = $this->messageEligibilityGate->allows(
                     contact: $contact,
                     channel: $channel,
                     purpose: $purpose->value,
                     scope: self::SCOPE,
                     messageKey: self::MESSAGE_TYPE,
-                )) {
+                );
+            }
+
+            foreach (ContactDirectMessageReason::cases() as $reason) {
+                $purpose = $reason->purpose()->value;
+
+                if (($eligiblePurposes[$purpose] ?? false) !== true) {
                     continue;
                 }
 
-                $purposeOptions[] = [
-                    'value' => $purpose->value,
-                    'label' => $purpose === MessagePurpose::Transactional
-                        ? 'Personal / service'
-                        : 'Marketing',
+                $reasonOptions[] = [
+                    'value' => $reason->value,
+                    'label' => $reason->label(),
+                    'description' => $reason->description(),
+                    'purpose' => $purpose,
                 ];
             }
 
-            if ($purposeOptions !== []) {
-                $purposeOptionsByChannel[$channel] = $purposeOptions;
+            if ($reasonOptions !== []) {
+                $reasonOptionsByChannel[$channel] = $reasonOptions;
             }
         }
 
-        $channels = array_keys($purposeOptionsByChannel);
-        $templates = $this->templateOptions($channels, $purposeOptionsByChannel);
+        $channels = array_keys($reasonOptionsByChannel);
+        $templates = $this->templateOptions($channels, $reasonOptionsByChannel);
         $currentSnapshots = array_values(array_filter(array_map(
             static fn (array $template): array => is_array($template['media'] ?? null)
                 ? $template['media']
@@ -68,8 +76,8 @@ final class ContactDirectMessageComposerPresenter
         $defaultChannel = in_array(MessageChannel::Email->value, $channels, true)
             ? MessageChannel::Email->value
             : ($channels[0] ?? null);
-        $defaultPurpose = $defaultChannel !== null
-            ? ($purposeOptionsByChannel[$defaultChannel][0]['value'] ?? null)
+        $defaultReason = $defaultChannel !== null
+            ? ($reasonOptionsByChannel[$defaultChannel][0]['value'] ?? null)
             : null;
 
         return [
@@ -81,9 +89,9 @@ final class ContactDirectMessageComposerPresenter
                 ],
                 $channels,
             ),
-            'purposes_by_channel' => $purposeOptionsByChannel,
+            'reasons_by_channel' => $reasonOptionsByChannel,
             'default_channel' => $defaultChannel,
-            'default_purpose' => $defaultPurpose,
+            'default_reason' => $defaultReason,
             'templates' => $templates,
             'media' => $this->mediaAuthoring->presentation($currentSnapshots),
             'request_key' => (string) Str::uuid(),
@@ -114,12 +122,12 @@ final class ContactDirectMessageComposerPresenter
 
     /**
      * @param array<int, string> $channels
-     * @param array<string, array<int, array{value: string, label: string}>> $purposeOptionsByChannel
+     * @param array<string, array<int, array{value: string, label: string, description: string, purpose: string}>> $reasonOptionsByChannel
      * @return array<int, array<string, mixed>>
      */
     private function templateOptions(
         array $channels,
-        array $purposeOptionsByChannel,
+        array $reasonOptionsByChannel,
     ): array {
         if ($channels === []) {
             return [];
@@ -127,11 +135,11 @@ final class ContactDirectMessageComposerPresenter
 
         return $this->templateCatalog
             ->presets($channels)
-            ->filter(function (MessageTemplatePreset $preset) use ($purposeOptionsByChannel): bool {
-                $allowedPurposes = array_column(
-                    $purposeOptionsByChannel[(string) $preset->channel] ?? [],
-                    'value',
-                );
+            ->filter(function (MessageTemplatePreset $preset) use ($reasonOptionsByChannel): bool {
+                $allowedPurposes = array_values(array_unique(array_column(
+                    $reasonOptionsByChannel[(string) $preset->channel] ?? [],
+                    'purpose',
+                )));
 
                 return in_array((string) $preset->purpose, $allowedPurposes, true);
             })
@@ -146,12 +154,14 @@ final class ContactDirectMessageComposerPresenter
                 $media = is_array($payload['media'] ?? null)
                     ? $payload['media']
                     : [];
+                $reason = ContactDirectMessageReason::defaultForPurpose((string) $preset->purpose);
 
                 return [
                     'id' => (int) $preset->getKey(),
                     'name' => (string) $preset->name,
                     'channel' => (string) $preset->channel,
                     'purpose' => (string) $preset->purpose,
+                    'reason' => $reason->value,
                     'subject' => is_string($payload['subject'] ?? null) ? $payload['subject'] : '',
                     'body' => is_string($payload['body'] ?? null) ? $payload['body'] : '',
                     'message' => is_string($payload['message'] ?? null) ? $payload['message'] : '',
@@ -169,9 +179,9 @@ final class ContactDirectMessageComposerPresenter
                         '%s · %s · %s',
                         (string) $preset->name,
                         ucfirst((string) $preset->channel),
-                        (string) $preset->purpose === MessagePurpose::Transactional->value
-                            ? 'Personal / service'
-                            : 'Marketing',
+                        $reason->purpose() === MessagePurpose::Transactional
+                            ? 'Service / follow-up'
+                            : 'Marketing / promotional',
                     ),
                 ];
             })

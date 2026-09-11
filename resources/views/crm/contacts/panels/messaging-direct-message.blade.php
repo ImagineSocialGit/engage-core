@@ -2,10 +2,10 @@
     x-data="{
         open: @js($errors->has('direct_message.*')),
         channels: @js($directMessageComposer['channels'] ?? []),
-        purposesByChannel: @js($directMessageComposer['purposes_by_channel'] ?? []),
+        reasonsByChannel: @js($directMessageComposer['reasons_by_channel'] ?? []),
         templates: @js($directMessageComposer['templates'] ?? []),
         channel: @js(old('direct_message.channel', $directMessageComposer['default_channel'] ?? 'email')),
-        purpose: @js(old('direct_message.purpose', $directMessageComposer['default_purpose'] ?? 'transactional')),
+        reason: @js(old('direct_message.reason', $directMessageComposer['default_reason'] ?? 'service_follow_up')),
         templateId: @js((string) old('direct_message.template_preset_id', '')),
         subject: @js(old('direct_message.subject', '')),
         body: @js(old('direct_message.body', '')),
@@ -13,24 +13,33 @@
         mediaAssetUuid: @js(old('direct_message.media_asset_uuid', '')),
         mediaPosterAssetUuid: @js(old('direct_message.media_poster_asset_uuid', '')),
         mediaTitle: @js(old('direct_message.media_title', '')),
-        purposeOptions() {
-            return this.purposesByChannel[this.channel] || [];
+        reasonOptions() {
+            return this.reasonsByChannel[this.channel] || [];
+        },
+        selectedReason() {
+            return this.reasonOptions().find((option) => option.value === this.reason) || null;
+        },
+        selectedReasonDescription() {
+            return this.selectedReason()?.description || '';
+        },
+        selectedReasonPurpose() {
+            return this.selectedReason()?.purpose || '';
         },
         channelChanged() {
-            const options = this.purposeOptions();
-            if (! options.some((option) => option.value === this.purpose)) {
-                this.purpose = options[0]?.value || '';
+            const options = this.reasonOptions();
+            if (! options.some((option) => option.value === this.reason)) {
+                this.reason = options[0]?.value || '';
             }
             this.templateId = '';
         },
-        purposeChanged() {
+        reasonChanged() {
             this.templateId = '';
         },
         applyTemplate() {
             const template = this.templates.find((item) => String(item.id) === String(this.templateId));
             if (! template) return;
             this.channel = template.channel;
-            this.purpose = template.purpose;
+            this.reason = template.reason;
             this.subject = template.subject || '';
             this.body = template.body || '';
             this.message = template.message || '';
@@ -139,20 +148,27 @@
                         </div>
 
                         <div>
-                            <label for="contact-direct-message-purpose" class="mb-1.5 block text-sm font-extrabold text-slate-800">Message type</label>
+                            <label for="contact-direct-message-reason" class="mb-1.5 block text-sm font-extrabold text-slate-800">What is this message about?</label>
                             <select
-                                id="contact-direct-message-purpose"
-                                name="direct_message[purpose]"
-                                x-model="purpose"
-                                x-on:change="purposeChanged()"
+                                id="contact-direct-message-reason"
+                                name="direct_message[reason]"
+                                x-model="reason"
+                                x-on:change="reasonChanged()"
                                 class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900"
                             >
-                                <template x-for="option in purposeOptions()" :key="option.value">
+                                <template x-for="option in reasonOptions()" :key="option.value">
                                     <option x-bind:value="option.value" x-text="option.label"></option>
                                 </template>
                             </select>
-                            <p class="mt-2 text-xs leading-5 text-slate-500">Personal/service and marketing messages use their normal consent and suppression rules.</p>
-                            @error('direct_message.purpose')
+                            <p class="mt-2 text-xs leading-5 text-slate-500" x-text="selectedReasonDescription()"></p>
+                            <p
+                                x-show="selectedReasonPurpose() === 'marketing'"
+                                x-cloak
+                                class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-900"
+                            >
+                                Promotional outreach uses marketing permission. Ordinary inquiry, scheduling, requested-information, and existing-client follow-up use service-message permission instead.
+                            </p>
+                            @error('direct_message.reason')
                                 <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
                             @enderror
                         </div>

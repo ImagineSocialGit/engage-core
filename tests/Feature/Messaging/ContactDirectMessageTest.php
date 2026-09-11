@@ -40,10 +40,13 @@ class ContactDirectMessageTest extends TestCase
             ->assertOk()
             ->assertSee('data-contact-direct-message-panel', false)
             ->assertSee('data-contact-direct-message-open', false)
-            ->assertSee('data-contact-direct-message-modal', false);
+            ->assertSee('data-contact-direct-message-modal', false)
+            ->assertSee('Follow up on an inquiry')
+            ->assertSee('Appointment or scheduling')
+            ->assertDontSee('Marketing or promotional outreach');
     }
 
-    public function test_one_off_email_creates_scheduled_message_without_creating_reusable_template_rows(): void
+    public function test_business_reason_resolves_to_transactional_purpose_without_accepting_browser_authored_purpose(): void
     {
         config()->set('modules.enabled', ['messaging']);
         config()->set('messaging.channel_availability.email.surfaces.contact_direct_messages', true);
@@ -60,7 +63,8 @@ class ContactDirectMessageTest extends TestCase
                 'direct_message' => [
                     'request_key' => (string) Str::uuid(),
                     'channel' => 'email',
-                    'purpose' => 'transactional',
+                    'reason' => 'appointment_scheduling',
+                    'purpose' => 'marketing',
                     'subject' => 'Checking in',
                     'body' => 'Hi {first_name}, checking in about tomorrow.',
                 ],
@@ -101,7 +105,7 @@ class ContactDirectMessageTest extends TestCase
                 'direct_message' => [
                     'request_key' => (string) Str::uuid(),
                     'channel' => 'email',
-                    'purpose' => 'marketing',
+                    'reason' => 'marketing_outreach',
                     'subject' => 'An offer',
                     'body' => 'Marketing copy.',
                 ],
@@ -209,7 +213,7 @@ class ContactDirectMessageTest extends TestCase
                 'direct_message' => [
                     'request_key' => (string) Str::uuid(),
                     'channel' => 'email',
-                    'purpose' => 'transactional',
+                    'reason' => 'service_follow_up',
                     'template_preset_id' => $preset->getKey(),
                     'subject' => 'Customized subject',
                     'body' => 'Customized body',
@@ -229,7 +233,7 @@ class ContactDirectMessageTest extends TestCase
                 'direct_message' => [
                     'request_key' => (string) Str::uuid(),
                     'channel' => 'email',
-                    'purpose' => 'transactional',
+                    'reason' => 'service_follow_up',
                     'template_preset_id' => $preset->getKey(),
                     'subject' => 'No media',
                     'body' => 'This instance removes the template media.',

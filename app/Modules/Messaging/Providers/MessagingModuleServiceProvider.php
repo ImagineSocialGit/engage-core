@@ -4,6 +4,7 @@ namespace App\Modules\Messaging\Providers;
 
 use App\Modules\Core\Events\ManualContactCreated;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Messaging\Automation\MessagingAutomationPointAuthoringContributor;
 use App\Modules\Messaging\Automation\MessagingAutomationPointDefinitionContributor;
@@ -23,6 +24,7 @@ use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Jobs\ProcessDueMessageChainEnrollmentsJob;
 use App\Modules\Messaging\Jobs\PruneScheduledMessageCtaEngagementsJob;
 use App\Modules\Messaging\Jobs\PublishScheduledMessageOutboxEventsJob;
+use App\Modules\Messaging\Import\ServiceRelationshipPermissionContactImportPostProcessor;
 use App\Modules\Messaging\Jobs\RecoverStaleScheduledMessageClaimsJob;
 use App\Modules\Messaging\Listeners\AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal;
 use App\Modules\Messaging\Listeners\GrantManualContactCreatedConsents;
@@ -170,6 +172,9 @@ class MessagingModuleServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Blade::component('messaging.message-media-authoring', MessageMediaAuthoring::class);
+
+        $this->app->make(ContactImportPostProcessorRegistry::class)
+            ->registerProcessor(ServiceRelationshipPermissionContactImportPostProcessor::class);
 
         $this->app->make(ContactPanelRegistry::class)
             ->register(ContactDirectMessagePanelProvider::class, 'messaging')
