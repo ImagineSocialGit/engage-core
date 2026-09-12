@@ -4,6 +4,7 @@ namespace App\Modules\Core\Access\Services\ContactPanels;
 
 use App\Models\User;
 use App\Modules\Core\Access\Models\Team;
+use App\Modules\Core\Access\Services\AssignmentDirectory;
 use App\Modules\Core\Access\Services\UserAccessService;
 use App\Modules\Core\Contracts\Contacts\ContactPanelProvider;
 use App\Modules\Core\Data\Contacts\ContactPanel;
@@ -14,6 +15,7 @@ final class CoreContactAssignmentPanelProvider implements ContactPanelProvider
 {
     public function __construct(
         private readonly UserAccessService $access,
+        private readonly AssignmentDirectory $directory,
     ) {}
 
     public function panels(Contact $contact): array
@@ -31,21 +33,14 @@ final class CoreContactAssignmentPanelProvider implements ContactPanelProvider
         $assignableTeams = collect();
 
         if ($canAssign) {
-            $assignableUsers = User::query()
-                ->orderBy('name')
-                ->orderBy('email')
-                ->get()
-                ->filter(fn (User $user): bool => $this->access->isActive($user))
+            $assignableUsers = $this->directory->activeUsers()
                 ->map(fn (User $user): array => [
                     'id' => (int) $user->getKey(),
                     'label' => trim($user->name) !== '' ? $user->name : $user->email,
                 ])
                 ->values();
 
-            $assignableTeams = Team::query()
-                ->active()
-                ->orderBy('name')
-                ->get()
+            $assignableTeams = $this->directory->activeTeams()
                 ->map(fn (Team $team): array => [
                     'id' => (int) $team->getKey(),
                     'label' => $team->name,

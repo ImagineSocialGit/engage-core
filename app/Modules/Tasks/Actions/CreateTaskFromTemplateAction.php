@@ -9,11 +9,13 @@ use App\Modules\Tasks\Models\TaskTemplate;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use InvalidArgumentException;
+use App\Modules\Tasks\Services\TaskTemplateTimingResolver;
 
 class CreateTaskFromTemplateAction
 {
     public function __construct(
         private readonly CreateTaskAction $createTask,
+        private readonly TaskTemplateTimingResolver $timing,
     ) {}
 
     /**
@@ -103,15 +105,8 @@ class CreateTaskFromTemplateAction
                 'description',
                 $template->task_description ?? $template->description,
             ),
-            'due_at' => $this->value($data, $defaults, 'due_at'),
-            'due_offset_minutes' => $this->nullableInt(
-                $this->value(
-                    $data,
-                    $defaults,
-                    'due_offset_minutes',
-                    $template->due_offset_minutes,
-                ),
-            ),
+            'due_at' => $this->dueAt($data, $defaults, $template),
+            'due_offset_minutes' => $this->explicitDueOffsetMinutes($data, $defaults),
             'status' => $this->value(
                 $data,
                 $defaults,
@@ -299,5 +294,37 @@ class CreateTaskFromTemplateAction
     private function nullableInt(mixed $value): ?int
     {
         return is_numeric($value) ? (int) $value : null;
+    }
+
+    /** @param array<string, mixed> $data @param array<string, mixed> $defaults */
+    private function dueAt(array $data, array $defaults, TaskTemplate $template): mixed
+    {
+        if (array_key_exists('due_at', $data)) {
+            return $data['due_at'];
+        }
+
+        if (array_key_exists('due_at', $defaults)) {
+            return $defaults['due_at'];
+        }
+
+        if (array_key_exists('due_offset_minutes', $data)
+            || array_key_exists('due_offset_minutes', $defaults)
+        ) {
+            return null;
+        }
+
+        return $this->timing->dueAt($template);
+    }
+
+    /** @param array<string, mixed> $data @param array<string, mixed> $defaults */
+    private function explicitDueOffsetMinutes(array $data, array $defaults): ?int
+    {
+        if (array_key_exists('due_offset_minutes', $data)) {
+            return $this->nullableInt($data['due_offset_minutes']);
+        }
+
+        return array_key_exists('due_offset_minutes', $defaults)
+            ? $this->nullableInt($defaults['due_offset_minutes'])
+            : null;
     }
 }

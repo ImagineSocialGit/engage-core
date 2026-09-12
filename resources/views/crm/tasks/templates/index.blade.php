@@ -13,9 +13,14 @@
                 Back to Tasks
             </a>
 
-            <p class="text-sm text-slate-600">
-                {{ $templates->count() }} {{ \Illuminate\Support\Str::plural('template', $templates->count()) }}
-            </p>
+            <div class="flex items-center gap-3">
+                <p class="text-sm text-slate-600">
+                    {{ $templates->count() }} {{ \Illuminate\Support\Str::plural('template', $templates->count()) }}
+                </p>
+                <a href="{{ $createUrl }}" class="inline-flex items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
+                    Create template
+                </a>
+            </div>
         </div>
 
         <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">

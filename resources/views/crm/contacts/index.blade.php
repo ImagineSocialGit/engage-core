@@ -22,9 +22,9 @@
             </x-ui.feedback.alert>
         @endif
 
-        @if($errors->has('contact_result') || $errors->has('tag') || $errors->has('campaign_key'))
+        @if($errors->has('contact_result') || $errors->has('tag') || $errors->has('campaign_key') || $errors->has('assigned_user_id') || $errors->has('assigned_team_id') || $errors->has('task_template_id'))
             <x-ui.feedback.alert type="error">
-                {{ $errors->first('contact_result') ?: ($errors->first('tag') ?: $errors->first('campaign_key')) }}
+                {{ $errors->first('contact_result') ?: ($errors->first('tag') ?: ($errors->first('campaign_key') ?: ($errors->first('assigned_user_id') ?: ($errors->first('assigned_team_id') ?: $errors->first('task_template_id'))))) }}
             </x-ui.feedback.alert>
         @endif
 

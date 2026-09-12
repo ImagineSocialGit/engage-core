@@ -9,6 +9,7 @@ use App\Modules\Tasks\Automation\TasksAutomationPointDefinitionContributor;
 use App\Modules\Tasks\Capabilities\TasksAutomationCapabilityContributor;
 use App\Modules\Tasks\ConfigContracts\TaskPresetConfigContractTargetProvider;
 use App\Modules\Tasks\ConfigContracts\TaskPresetDefinitionConfigContract;
+use App\Modules\Tasks\Contacts\TasksContactResultActionContributor;
 use App\Modules\Tasks\Events\TaskCompleted;
 use App\Modules\Tasks\Listeners\EmitTaskCompletedAutomationEvent;
 use App\Modules\Tasks\Services\ContactShow\ContactTasksShowDataProvider;
@@ -21,7 +22,10 @@ use App\Modules\Tasks\Services\TaskAssigneeOptionsResolver;
 use App\Modules\Tasks\Services\TaskAssignmentStrategyResolver;
 use App\Modules\Tasks\Services\TaskLinkPresentationResolver;
 use App\Modules\Tasks\Services\TaskNotificationScheduler;
+use App\Modules\Tasks\Services\CoreTaskAssigneeOptionProvider;
+use App\Modules\Tasks\Services\CoreTeamRoundRobinTaskAssignmentStrategyResolver;
 use App\Modules\Tasks\Validation\TasksSetupValidationContributor;
+use App\Modules\Core\Support\Contacts\ContactResultActionRegistry;
 use App\Support\Dashboard\DashboardPanelRegistry;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -30,6 +34,16 @@ class TasksModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->tag(
+            CoreTaskAssigneeOptionProvider::class,
+            'tasks.assignee_option_providers',
+        );
+
+        $this->app->tag(
+            CoreTeamRoundRobinTaskAssignmentStrategyResolver::class,
+            'tasks.assignment_strategy_resolvers',
+        );
+
         $this->app->tag([
             TasksAutomationCapabilityContributor::class,
         ], 'automation.capability_contributors');
@@ -49,6 +63,11 @@ class TasksModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             TasksSetupValidationContributor::class,
         ], 'setup.validation_contributors');
+
+        $this->app->tag(
+            TasksContactResultActionContributor::class,
+            ContactResultActionRegistry::CONTRIBUTOR_TAG,
+        );
 
         $this->app->tag([
             TaskPresetDefinitionConfigContract::class,

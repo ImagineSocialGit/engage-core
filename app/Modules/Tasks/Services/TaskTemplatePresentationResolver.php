@@ -6,6 +6,7 @@ use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Models\TaskTemplate;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use App\Modules\Core\Access\Models\Team;
 
 class TaskTemplatePresentationResolver
 {
@@ -22,7 +23,7 @@ class TaskTemplatePresentationResolver
             'description' => (string) ($template->description ?? ''),
             'task_description' => (string) ($template->task_description ?? ''),
             'priority' => $template->priority ? Str::headline((string) $template->priority) : 'Normal',
-            'due' => $this->dueLabel($template->due_offset_minutes),
+            'due' => $this->dueLabel($template),
             'assignment' => $this->assignmentLabel($template),
             'responsible_party' => match ($template->responsible_party) {
                 Task::RESPONSIBLE_PARTY_CONTACT => config('contacts.labels.singular', 'Contact'),
@@ -49,13 +50,47 @@ class TaskTemplatePresentationResolver
 
         $strategy = trim((string) ($template->assigned_to_strategy ?? ''));
 
+        if (str_starts_with($strategy, CoreTeamRoundRobinTaskAssignmentStrategyResolver::PREFIX)) {
+            $teamId = (int) substr($strategy, strlen(CoreTeamRoundRobinTaskAssignmentStrategyResolver::PREFIX));
+            $team = Team::query()->find($teamId);
+
+            return $team ? 'Round-robin: '.$team->name : 'Round-robin Team unavailable';
+        }
+
         return $strategy === '' || $strategy === TaskTemplate::ASSIGNED_TO_STRATEGY_UNASSIGNED
             ? 'Unassigned'
             : Str::headline($strategy);
     }
 
-    private function dueLabel(?int $minutes): string
+    private function dueLabel(TaskTemplate $template): string
     {
+        $timing = data_get($template->meta, 'timing');
+
+        if (is_array($timing)) {
+            if (($timing['mode'] ?? null) === 'none') {
+                return 'No automatic due date';
+            }
+
+            if (($timing['mode'] ?? null) === 'immediately') {
+                return 'Immediately';
+            }
+
+            if (($timing['mode'] ?? null) === 'after'
+                && is_numeric($timing['value'] ?? null)
+                && in_array($timing['unit'] ?? null, TaskTemplateTimingResolver::UNITS, true)
+            ) {
+                $value = (int) $timing['value'];
+                $unit = match ($timing['unit']) {
+                    'business_days' => 'business day',
+                    default => rtrim(str_replace('_', ' ', $timing['unit']), 's'),
+                };
+
+                return $value.' '.Str::plural($unit, $value).' after creation';
+            }
+        }
+
+        $minutes = $template->due_offset_minutes;
+
         if ($minutes === null) {
             return 'No automatic due date';
         }

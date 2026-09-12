@@ -111,6 +111,10 @@ Route::prefix(config('contacts.routes.plural'))
             ->middleware('capability:contacts.export')
             ->name('results.export');
 
+        Route::post('/results/assignment', [ContactResultActionController::class, 'assignment'])
+            ->middleware('capability:contacts.assign')
+            ->name('results.assignment');
+
         Route::get('/{contact}', [ContactController::class, 'show'])
             ->name('show');
 

@@ -13,6 +13,8 @@ final class AssignContactOwnershipAction
         ?User $assignedUser,
         ?Team $assignedTeam,
         ?User $actor = null,
+        string $source = 'manual',
+        array $context = [],
     ): Contact {
         $meta = is_array($contact->meta) ? $contact->meta : [];
         $meta['assignment'] = [
@@ -20,6 +22,8 @@ final class AssignContactOwnershipAction
             'assigned_team_id' => $assignedTeam?->getKey(),
             'actor_user_id' => $actor?->getKey(),
             'assigned_at' => now()->toIso8601String(),
+            'source' => $source,
+            'operation_id' => $context['operation_id'] ?? null,
         ];
 
         $contact->forceFill([

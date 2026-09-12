@@ -21,6 +21,9 @@ use App\Modules\Core\Data\Contacts\ContactImportField;
 use App\Modules\Core\Deployment\CoreDeploymentPlanContributor;
 use App\Modules\Core\Import\Treatments\ContactStatusImportTreatmentTarget;
 use App\Modules\Core\Import\Treatments\ContactTagsImportTreatmentTarget;
+use App\Modules\Core\Import\Treatments\ContactAssignedTeamImportTreatmentTarget;
+use App\Modules\Core\Import\Treatments\ContactAssignedUserImportTreatmentTarget;
+use App\Modules\Core\Import\PostProcessors\ContactImportAssignmentPostProcessor;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactTag;
 use App\Modules\Core\Events\ManualContactCreated;
@@ -249,6 +252,7 @@ class CoreModuleServiceProvider extends ServiceProvider
 
     public function boot(
         ContactImportTreatmentRegistry $treatments,
+        ContactImportPostProcessorRegistry $postProcessors,
         ContactPanelRegistry $contactPanels,
         AccessCapabilityRegistry $capabilities,
     ): void {
@@ -272,7 +276,11 @@ class CoreModuleServiceProvider extends ServiceProvider
 
         $treatments
             ->registerTarget(ContactStatusImportTreatmentTarget::class)
-            ->registerTarget(ContactTagsImportTreatmentTarget::class);
+            ->registerTarget(ContactTagsImportTreatmentTarget::class)
+            ->registerTarget(ContactAssignedUserImportTreatmentTarget::class)
+            ->registerTarget(ContactAssignedTeamImportTreatmentTarget::class);
+
+        $postProcessors->registerProcessor(ContactImportAssignmentPostProcessor::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([

@@ -4,18 +4,6 @@
     subheading="Understand why this task exists, what needs doing, and finish it without hunting for context."
     module="tasks"
 >
-    @php
-        $responsiblePartyLabels = [
-            'internal' => 'Internal team',
-            'contact' => str(config('contacts.labels.singular', 'Contact'))->title()->toString(),
-            'third_party' => 'Third party',
-            'unknown' => 'Unknown',
-        ];
-
-        $localDueAt = $task->due_at?->timezone(config('client.timezone', config('app.timezone', 'UTC')));
-        $taskTone = module_tone('tasks');
-    @endphp
-
     <div class="space-y-6">
         @if(session('success'))
             <x-ui.feedback.alert type="success">
@@ -179,6 +167,26 @@
                     </div>
 
                     <div>
+                        <dt class="text-slate-500">Change assignment</dt>
+                        <dd class="mt-1">
+                            <form method="POST" action="{{ route('crm.tasks.assignment.update', $task) }}" class="space-y-2">
+                                @csrf
+                                @method('PATCH')
+                                <select name="assignee_key" class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm">
+                                    <option value="">Unassigned</option>
+                                    @foreach($taskAssigneeOptions as $option)
+                                        <option value="{{ $option->key() }}" @selected(old('assignee_key', $currentTaskAssigneeKey) === $option->key())>
+                                            {{ $option->label }}{{ $option->description ? ' — '.$option->description : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('assignee_key')<p class="text-xs text-red-700">{{ $message }}</p>@enderror
+                                <x-ui.button type="submit" variant="secondary">Update assignment</x-ui.button>
+                            </form>
+                        </dd>
+                    </div>
+
+                    <div>
                         <dt class="text-slate-500">Who needs to act</dt>
                         <dd class="mt-1 font-medium text-slate-950">
                             {{ $responsiblePartyLabels[$task->responsible_party] ?? str($task->responsible_party)->headline() }}
@@ -216,7 +224,6 @@
                                             <a
                                                 href="{{ $link['url'] }}"
                                                 class="mt-1 inline-block font-semibold text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900"
-                                            >
                                                 {{ $link['name'] }}
                                             </a>
                                         @else

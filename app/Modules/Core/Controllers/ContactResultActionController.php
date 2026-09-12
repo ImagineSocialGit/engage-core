@@ -5,10 +5,13 @@ namespace App\Modules\Core\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Modules\Core\Jobs\AddTagToContactResultChunkJob;
+use App\Modules\Core\Jobs\AssignContactResultChunkJob;
+use App\Modules\Core\Access\Services\AssignmentDirectory;
 use App\Modules\Core\Services\Contacts\ContactResultSetResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Str;
 
 final class ContactResultActionController extends Controller
 {
@@ -117,6 +120,65 @@ final class ContactResultActionController extends Controller
                 'Cache-Control' => 'no-store, private',
             ],
         );
+    }
+
+    public function assignment(
+        Request $request,
+        ContactResultSetResolver $resultSets,
+        AssignmentDirectory $directory,
+    ): RedirectResponse {
+        $validated = $request->validate(array_merge($resultSets->validationRules(), [
+            'assignment_mode' => ['required', 'in:user,team,team_round_robin,unassign'],
+            'assigned_user_id' => ['nullable', 'integer'],
+            'assigned_team_id' => ['nullable', 'integer'],
+            'only_unassigned' => ['sometimes', 'boolean'],
+        ]));
+        $user = $request->user();
+
+        if (! $user instanceof User) { abort(403); }
+
+        $mode = $validated['assignment_mode'];
+        $assignedUser = $mode === 'user' ? $directory->activeUser((int) ($validated['assigned_user_id'] ?? 0)) : null;
+        $assignedTeam = in_array($mode, ['team', 'team_round_robin'], true)
+            ? $directory->activeTeam((int) ($validated['assigned_team_id'] ?? 0))
+            : null;
+
+        if ($mode === 'user' && ! $assignedUser) {
+            return back()->withErrors(['assigned_user_id' => 'Choose an active person.']);
+        }
+
+        if (in_array($mode, ['team', 'team_round_robin'], true) && ! $assignedTeam) {
+            return back()->withErrors(['assigned_team_id' => 'Choose an active Team.']);
+        }
+
+        if ($mode === 'team_round_robin' && ! $assignedTeam->users()->exists()) {
+            return back()->withErrors(['assigned_team_id' => 'Round-robin requires a Team with at least one member.']);
+        }
+
+        $payload = $resultSets->normalizeForInput($validated['contact_result']);
+        $ids = $resultSets->visibleIds($payload, $user);
+        $returnQuery = $resultSets->contactIndexQuery($payload);
+
+        if ($ids === []) {
+            return redirect()->route('crm.contacts.index', $returnQuery)->with('error', 'No visible Contacts matched this result set.');
+        }
+
+        $operationId = (string) Str::uuid();
+
+        foreach (array_chunk($ids, self::CHUNK_SIZE) as $chunk) {
+            AssignContactResultChunkJob::dispatch(
+                contactIds: $chunk,
+                mode: $mode,
+                assignedUserId: $assignedUser?->getKey(),
+                assignedTeamId: $assignedTeam?->getKey(),
+                onlyUnassigned: $request->boolean('only_unassigned'),
+                actorUserId: (int) $user->getKey(),
+                operationId: $operationId,
+            );
+        }
+
+        return redirect()->route('crm.contacts.index', $returnQuery)
+            ->with('success', 'Assignment update queued for '.number_format(count($ids)).' Contact(s).');
     }
 
     private function safeCsv(mixed $value): string

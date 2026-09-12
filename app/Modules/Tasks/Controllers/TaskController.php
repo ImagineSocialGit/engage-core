@@ -9,6 +9,8 @@ use App\Modules\Tasks\Actions\NotifyAssignedTaskRecipientsAction;
 use App\Modules\Tasks\Actions\RecordManualTaskAutomationBehaviorAction;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Requests\StoreTaskRequest;
+use App\Modules\Tasks\Requests\UpdateTaskAssignmentRequest;
+use Illuminate\Validation\ValidationException;
 use App\Modules\Tasks\Services\TaskAssigneeOptionsResolver;
 use App\Modules\Tasks\Services\TaskContactLinkResolver;
 use App\Modules\Tasks\Services\TaskLinkPresentationResolver;
@@ -100,8 +102,10 @@ class TaskController extends Controller
     }
 
     public function show(
+        Request $request,
         Task $task,
         TaskLinkPresentationResolver $linkPresentation,
+        TaskAssigneeOptionsResolver $assigneeOptions,
     ): View {
         $task->load([
             'assignedTo',
@@ -110,12 +114,63 @@ class TaskController extends Controller
             'links.linkable',
         ]);
 
+        $options = $assigneeOptions->options($request->user());
+
         return view('crm.tasks.show', [
             'title' => $task->title,
             'heading' => $task->title,
             'task' => $task,
             'presentedLinks' => $linkPresentation->forTask($task),
+            'taskAssigneeOptions' => $options,
+            'currentTaskAssigneeKey' => $options->first(fn ($option): bool =>
+                $task->assignedTo
+                && $option->assignee->getMorphClass() === $task->assignedTo->getMorphClass()
+                && (string) $option->assignee->getKey() === (string) $task->assignedTo->getKey()
+            )?->key(),
+            'responsiblePartyLabels' => [
+                Task::RESPONSIBLE_PARTY_INTERNAL => 'Internal team',
+                Task::RESPONSIBLE_PARTY_CONTACT => str(config('contacts.labels.singular', 'Contact'))->title()->toString(),
+                Task::RESPONSIBLE_PARTY_THIRD_PARTY => 'Third party',
+                Task::RESPONSIBLE_PARTY_UNKNOWN => 'Unknown',
+            ],
+            'localDueAt' => $task->due_at?->timezone(config('client.timezone', config('app.timezone', 'UTC'))),
+            'taskTone' => module_tone('tasks'),
         ]);
+    }
+
+    public function updateAssignment(
+        UpdateTaskAssignmentRequest $request,
+        Task $task,
+        TaskAssigneeOptionsResolver $assigneeOptions,
+        TaskContactLinkResolver $contactLinks,
+    ): RedirectResponse {
+        $key = $request->validated('assignee_key');
+        $assignee = $key === null
+            ? null
+            : $assigneeOptions->options($request->user())->first(fn ($option): bool => $option->key() === $key)?->assignee;
+
+        if ($key !== null && ! $assignee) {
+            throw ValidationException::withMessages(['assignee_key' => 'The selected assignee is no longer available.']);
+        }
+
+        $meta = is_array($task->meta) ? $task->meta : [];
+        $meta['assignment'] = [
+            'assigned_to_type' => $assignee?->getMorphClass(),
+            'assigned_to_id' => $assignee?->getKey(),
+            'actor_user_id' => $request->user()?->getKey(),
+            'assigned_at' => now()->toIso8601String(),
+            'source' => 'crm_task_show',
+        ];
+
+        $task->forceFill([
+            'assigned_to_type' => $assignee?->getMorphClass(),
+            'assigned_to_id' => $assignee?->getKey(),
+            'meta' => $meta,
+        ])->save();
+
+        $this->touchLinkedContact($task, $contactLinks);
+
+        return back()->with('success', 'Task assignment updated.');
     }
 
     public function store(

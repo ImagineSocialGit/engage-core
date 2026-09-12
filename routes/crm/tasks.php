@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CRM\DashboardController;
+use App\Modules\Tasks\Controllers\ContactResultTaskActionController;
 use App\Modules\Tasks\Controllers\TaskController;
 use App\Modules\Tasks\Controllers\TaskTemplateController;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +25,16 @@ Route::middleware('module:tasks')
         Route::get('/templates', [TaskTemplateController::class, 'index'])
             ->name('templates.index');
 
+        Route::get('/templates/create', [TaskTemplateController::class, 'create'])
+            ->name('templates.create');
+
+        Route::post('/templates', [TaskTemplateController::class, 'store'])
+            ->name('templates.store');
+
+        Route::post('/contact-results', ContactResultTaskActionController::class)
+            ->middleware('capability:contacts.manage')
+            ->name('contact-results.store');
+
         Route::get('/templates/{taskTemplate}/edit', [TaskTemplateController::class, 'edit'])
             ->name('templates.edit');
 
@@ -32,6 +43,9 @@ Route::middleware('module:tasks')
 
         Route::get('/{task}', [TaskController::class, 'show'])
             ->name('show');
+
+        Route::patch('/{task}/assignment', [TaskController::class, 'updateAssignment'])
+            ->name('assignment.update');
 
         Route::patch('/{task}/complete', [TaskController::class, 'complete'])
             ->name('complete');
