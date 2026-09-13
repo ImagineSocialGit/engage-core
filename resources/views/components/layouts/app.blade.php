@@ -22,6 +22,10 @@
 
     <x-layouts.favicons />
 
+    @isset($head)
+        {{ $head }}
+    @endisset
+
     <style>
     :root {
         --brand-primary: {{ config('theme.colors.primary', '#FF1ECE') }};

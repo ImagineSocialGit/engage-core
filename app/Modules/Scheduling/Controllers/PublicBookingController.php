@@ -440,6 +440,7 @@ class PublicBookingController extends Controller
     ): RedirectResponse {
         $hold = $this->publicHold($holdId);
         $contactPrefill = $this->holdContactPrefill($request, $hold);
+        $trackCompletedBooking = $hold->status === BookingHold::STATUS_ACTIVE;
 
         if ($contactPrefill['verified_channel'] === 'email'
             && (! is_string($contactPrefill['email'])
@@ -482,6 +483,13 @@ class PublicBookingController extends Controller
             throw ValidationException::withMessages([
                 'booking' => 'This reservation can no longer be completed. Choose another appointment time.',
             ]);
+        }
+
+        if ($trackCompletedBooking) {
+            $request->session()->flash(
+                'public_surfaces.tracking.event',
+                'scheduling_booking_completed',
+            );
         }
 
         $request->session()->forget($this->holdContactPrefillSessionKey($hold));

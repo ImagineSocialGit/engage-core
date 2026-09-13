@@ -162,6 +162,13 @@ class WebinarRegistrationController extends Controller
             $webinar,
         );
 
+        if ($result->wasCreated()) {
+            $request->session()->flash(
+                'public_surfaces.tracking.event',
+                'webinar_registration_completed',
+            );
+        }
+
         $content = $config->content(
             page: 'register',
             seriesSlug: $series->slug,

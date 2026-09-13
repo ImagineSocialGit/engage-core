@@ -65,4 +65,12 @@ return [
             ],
         ],
     ],
+
+    'tracking' => [
+        'meta_pixel' => [
+            'enabled' => false,
+            'pixel_id' => null,
+            'events' => [],
+        ],
+    ],
 ];

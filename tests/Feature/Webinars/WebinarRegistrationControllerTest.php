@@ -461,6 +461,7 @@ class WebinarRegistrationControllerTest extends TestCase
 
         $this->assertRegistrationThankYouRedirect($response, $series);
         $response->assertSessionDoesntHaveErrors('email');
+        $response->assertSessionMissing('public_surfaces.tracking.event');
         $this->assertDatabaseCount('webinar_registrations', 1);
     }
 
@@ -608,6 +609,10 @@ class WebinarRegistrationControllerTest extends TestCase
             );
 
         $this->assertRegistrationThankYouRedirect($response, $series);
+        $response->assertSessionHas(
+            'public_surfaces.tracking.event',
+            'webinar_registration_completed',
+        );
 
         $registration = WebinarRegistration::query()->firstOrFail();
 

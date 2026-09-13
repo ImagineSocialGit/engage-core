@@ -17,6 +17,14 @@
     :meta-description="$metaDescription"
     :robots="$robots"
 >
+    <x-slot:head>
+        <x-public-surface.meta-pixel
+            :enabled="(bool) config('public_surfaces.tracking.meta_pixel.enabled', false)"
+            :pixel-id="config('public_surfaces.tracking.meta_pixel.pixel_id')"
+            :event-key="session('public_surfaces.tracking.event')"
+        />
+    </x-slot:head>
+
     <div
         data-public-surface
         class="flex min-h-screen flex-col {{ $bodyClass ?: config('public_surfaces.theme.layout.body', 'bg-slate-50 text-slate-950 font-sans') }}"

@@ -55,7 +55,12 @@ class PublicBookingCompletionTest extends TestCase
             'public_submission_attempt_id' => '2bc92de0-55fe-4dbd-9287-58c77d684a2f',
         ]);
 
-        $response->assertRedirect($holdUrl);
+        $response
+            ->assertRedirect($holdUrl)
+            ->assertSessionHas(
+                'public_surfaces.tracking.event',
+                'scheduling_booking_completed',
+            );
 
         $contact = Contact::query()->sole();
         $appointment = Appointment::query()->sole();
@@ -211,14 +216,20 @@ class PublicBookingCompletionTest extends TestCase
             'email' => 'first@example.test',
         ])->assertRedirect($holdUrl);
 
+        $this->get($holdUrl)->assertOk();
+
         $firstAppointmentId = Appointment::query()->sole()->id;
 
-        $this->post($holdUrl, [
+        $replayResponse = $this->post($holdUrl, [
             'first_name' => 'Replay',
             'last_name' => 'Visitor',
             'email' => 'second@example.test',
             'phone' => '+15555558888',
-        ])->assertRedirect($holdUrl);
+        ]);
+
+        $replayResponse
+            ->assertRedirect($holdUrl)
+            ->assertSessionMissing('public_surfaces.tracking.event');
 
         $this->assertDatabaseCount('contacts', 1);
         $this->assertDatabaseCount('appointments', 1);
