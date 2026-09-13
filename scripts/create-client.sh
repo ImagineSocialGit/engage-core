@@ -12,10 +12,20 @@ Options:
       Explicit human-readable client name.
 
   --preset PRESET
-      Client product package. Supported presets:
+      Client product family. Supported presets:
         basic   Tasks + Workflow. Default.
-        artist  Artist fan engagement: Messaging, Broadcasts, Campaigns,
-                Forms, Integrations, and Reporting.
+        artist  Artist client family.
+
+  --starter-package PACKAGE
+      Creation-time starter package for presets that define package choices.
+      Artist packages:
+        audience    Fan engagement, inbound replies, media, and reporting. Default.
+        management  Tasks, workflow, relationships, and automation.
+        full        Artist Audience + Artist Management.
+
+      Starter packages choose the initial explicit module list and runtime preset
+      package. They do not change runtime module ownership: config/modules.php
+      remains authoritative after creation, and modules may be added later.
 
   -h, --help
       Show this help.
@@ -33,7 +43,13 @@ Examples:
 
   ./scripts/create-client.sh stevie-woodward-crm America/Chicago \
     --name "Stevie Woodward" \
-    --preset artist
+    --preset artist \
+    --starter-package audience
+
+  ./scripts/create-client.sh thompson-square-engage America/Chicago \
+    --name "Thompson Square" \
+    --preset artist \
+    --starter-package full
 USAGE
 }
 
@@ -41,6 +57,7 @@ CLIENT_KEY=""
 CLIENT_TIMEZONE=""
 CLIENT_NAME=""
 CLIENT_PRESET="basic"
+CLIENT_STARTER_PACKAGE=""
 WEB_GROUP="${ENGAGE_CORE_WEB_GROUP:-www-data}"
 GITHUB_OWNER="${ENGAGE_CORE_GITHUB_OWNER:-ImagineSocialGit}"
 
@@ -60,6 +77,14 @@ while (($#)); do
         exit 1
       }
       CLIENT_PRESET="$2"
+      shift 2
+      ;;
+    --starter-package)
+      [[ $# -ge 2 ]] || {
+        echo "--starter-package requires a value." >&2
+        exit 1
+      }
+      CLIENT_STARTER_PACKAGE="$2"
       shift 2
       ;;
     -h|--help)
@@ -106,6 +131,11 @@ if [[ ! "$CLIENT_PRESET" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
   exit 1
 fi
 
+if [[ -n "$CLIENT_STARTER_PACKAGE" && ! "$CLIENT_STARTER_PACKAGE" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+  echo "Invalid starter package: $CLIENT_STARTER_PACKAGE"
+  exit 1
+fi
+
 if [[ ! "$GITHUB_OWNER" =~ ^[A-Za-z0-9][A-Za-z0-9-]*$ ]]; then
   echo "Invalid GitHub owner: $GITHUB_OWNER"
   exit 1
@@ -147,6 +177,8 @@ GITHUB_REPOSITORY="$GITHUB_OWNER/$CLIENT_KEY"
 GITHUB_SSH_URL="git@github.com:${GITHUB_REPOSITORY}.git"
 PRESET_TEMPLATES_DIR="$ROOT_DIR/docs/config-templates/client-presets"
 PRESET_TEMPLATE_DIR="$PRESET_TEMPLATES_DIR/$CLIENT_PRESET"
+STARTER_PACKAGE_RESOLVER="$ROOT_DIR/scripts/resolve-client-starter-package.php"
+STARTER_PACKAGES_FILE="$ROOT_DIR/docs/config-templates/client-starter-packages/$CLIENT_PRESET.php"
 
 if [[ ! -d "$PRESET_TEMPLATE_DIR" ]]; then
   echo "Unsupported client preset: $CLIENT_PRESET"
@@ -163,6 +195,11 @@ fi
 
 if [[ ! -f "$PRESET_TEMPLATE_DIR/config/modules.php" ]]; then
   echo "Client preset is missing config/modules.php: $PRESET_TEMPLATE_DIR"
+  exit 1
+fi
+
+if [[ ! -f "$STARTER_PACKAGE_RESOLVER" ]]; then
+  echo "Starter-package resolver is missing: $STARTER_PACKAGE_RESOLVER"
   exit 1
 fi
 
@@ -226,13 +263,48 @@ fi
 CLIENT_NAME_PHP="$(php -r 'echo var_export($argv[1], true);' "$CLIENT_NAME")"
 CLIENT_KEY_PHP="$(php -r 'echo var_export($argv[1], true);' "$CLIENT_KEY")"
 CLIENT_TIMEZONE_PHP="$(php -r 'echo var_export($argv[1], true);' "$CLIENT_TIMEZONE")"
-CLIENT_PRESET_PHP="$(php -r 'echo var_export($argv[1], true);' "$CLIENT_PRESET")"
 
 mkdir -p "$TEMP_CLIENT_DIR/config"
 mkdir -p "$TEMP_CLIENT_DIR/resources/views"
 mkdir -p "$TEMP_CLIENT_DIR/resources/images/raw"
 
 cp -R "$PRESET_TEMPLATE_DIR/." "$TEMP_CLIENT_DIR/"
+
+STARTER_PACKAGE_RESOLUTION_JSON="$(
+  php "$STARTER_PACKAGE_RESOLVER" \
+    "$PRESET_TEMPLATE_DIR" \
+    "$STARTER_PACKAGES_FILE" \
+    "$CLIENT_STARTER_PACKAGE" \
+    "$TEMP_CLIENT_DIR/config/modules.php"
+)"
+
+mapfile -t STARTER_PACKAGE_RESOLUTION < <(
+  php -r '
+$data = json_decode($argv[1], true, 512, JSON_THROW_ON_ERROR);
+
+foreach (["starter_package", "starter_package_name", "runtime_preset"] as $key) {
+    $value = $data[$key] ?? "";
+
+    if ($value !== null && ! is_string($value)) {
+        fwrite(STDERR, "Invalid starter-package resolver output for {$key}.\n");
+        exit(1);
+    }
+
+    echo ($value ?? "")."\n";
+}
+' "$STARTER_PACKAGE_RESOLUTION_JSON"
+)
+
+CLIENT_STARTER_PACKAGE="${STARTER_PACKAGE_RESOLUTION[0]:-}"
+CLIENT_STARTER_PACKAGE_NAME="${STARTER_PACKAGE_RESOLUTION[1]:-}"
+CLIENT_RUNTIME_PRESET="${STARTER_PACKAGE_RESOLUTION[2]:-}"
+
+if [[ -z "$CLIENT_RUNTIME_PRESET" ]]; then
+  echo "Starter-package resolver did not return a runtime preset."
+  exit 1
+fi
+
+CLIENT_RUNTIME_PRESET_PHP="$(php -r 'echo var_export($argv[1], true);' "$CLIENT_RUNTIME_PRESET")"
 
 cat > "$TEMP_CLIENT_DIR/.gitignore" <<'EOF_GITIGNORE'
 .env
@@ -249,7 +321,7 @@ return [
 
     'timezone' => $CLIENT_TIMEZONE_PHP,
 
-    'preset' => $CLIENT_PRESET_PHP,
+    'preset' => $CLIENT_RUNTIME_PRESET_PHP,
 ];
 EOF_CLIENT
 
@@ -300,16 +372,30 @@ Client key: \`$CLIENT_KEY\`
 
 Timezone: \`$CLIENT_TIMEZONE\`
 
-Preset: \`$CLIENT_PRESET\`
+Preset family: \`$CLIENT_PRESET\`
+
+Runtime preset package: \`$CLIENT_RUNTIME_PRESET\`
 
 Explicit modules: \`$CLIENT_MODULES\`
 
-The selected preset was generated from the canonical template at:
+The client was generated from the canonical preset-family template at:
 
 \`docs/config-templates/client-presets/$CLIENT_PRESET\`
 
+$(if [[ -n "$CLIENT_STARTER_PACKAGE" ]]; then
+  cat <<EOF_STARTER_PACKAGE
+Starter package: \`$CLIENT_STARTER_PACKAGE\` ($CLIENT_STARTER_PACKAGE_NAME)
+
+The starter package is creation-time composition only. Runtime module authority
+remains \`config/modules.php\`, and the runtime preset package remains the
+\`preset\` value in \`config/client.php\`. Add later capabilities through the
+normal client-module workflow rather than changing the original starter-package
+label.
+EOF_STARTER_PACKAGE
+fi)
+
 Review client-specific business behavior before deployment, but do not replace the
-selected starter package with another client's configuration.
+selected client package with another client's configuration.
 
 ## Environment model
 
@@ -445,7 +531,11 @@ if ! git -C "$TEMP_CLIENT_DIR" push -u origin main; then
   trap - EXIT
 
   echo "Client: $CLIENT_DIR"
-  echo "Preset: $CLIENT_PRESET"
+  echo "Preset family: $CLIENT_PRESET"
+  if [[ -n "$CLIENT_STARTER_PACKAGE" ]]; then
+    echo "Starter package: $CLIENT_STARTER_PACKAGE ($CLIENT_STARTER_PACKAGE_NAME)"
+  fi
+  echo "Runtime preset package: $CLIENT_RUNTIME_PRESET"
   echo "Repository: $GITHUB_SSH_URL"
   echo "Retry after fixing Git authentication:"
   echo "  git -C client/$CLIENT_KEY push -u origin main"
@@ -481,7 +571,9 @@ cat <<EOF_DONE
 Created client: $CLIENT_DIR
 Name: $CLIENT_NAME
 Timezone: $CLIENT_TIMEZONE
-Preset: $CLIENT_PRESET
+Preset family: $CLIENT_PRESET
+$(if [[ -n "$CLIENT_STARTER_PACKAGE" ]]; then echo "Starter package: $CLIENT_STARTER_PACKAGE ($CLIENT_STARTER_PACKAGE_NAME)"; fi)
+Runtime preset package: $CLIENT_RUNTIME_PRESET
 Modules: $CLIENT_MODULES
 Repository: $GITHUB_SSH_URL
 Branch: main
