@@ -8,6 +8,7 @@ final class MessageDefinitionModuleAvailability
 {
     public function __construct(
         private readonly ModuleManager $moduleManager,
+        private readonly MessageTemplateDefinitionRegistry $definitionRegistry,
     ) {}
 
     public function standardDefinitionsAvailable(string $scope): bool
@@ -53,6 +54,10 @@ final class MessageDefinitionModuleAvailability
         $moduleKey = $this->normalizeNullable($moduleKey);
 
         if ($moduleKey !== null) {
+            if ($moduleKey === 'campaigns') {
+                return $this->moduleAvailable($moduleKey);
+            }
+
             return $this->moduleAvailable($moduleKey);
         }
 
@@ -61,11 +66,7 @@ final class MessageDefinitionModuleAvailability
 
     public function standardOwnerModule(string $scope): string
     {
-        $scope = $this->normalize($scope);
-
-        return str_starts_with($scope, 'webinar')
-            ? 'webinars'
-            : 'messaging';
+        return $this->definitionRegistry->ownerModuleForScope($scope);
     }
 
     public function moduleAvailable(string $moduleKey): bool

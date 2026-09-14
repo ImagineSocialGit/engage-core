@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Broadcasts\Providers\BroadcastsModuleServiceProvider;
+use App\Modules\Campaigns\MessageTemplates\CampaignMessageTemplateDefinitionContributor;
 use App\Modules\Campaigns\Providers\CampaignsModuleServiceProvider;
 use App\Modules\Core\Presets\CorePresetContributor;
 use App\Support\Presets\ClientPresetContributor;
@@ -21,8 +22,10 @@ use App\Modules\Portal\Providers\PortalModuleServiceProvider;
 use App\Modules\Relationships\Providers\RelationshipsModuleServiceProvider;
 use App\Modules\Reporting\Providers\ReportingModuleServiceProvider;
 use App\Modules\Scheduling\Providers\SchedulingModuleServiceProvider;
+use App\Support\ModuleIntegrations\Scheduling\Messaging\SchedulingMessageTemplateDefinitionContributor;
 use App\Modules\Tasks\Presets\TasksPresetContributor;
 use App\Modules\Tasks\Providers\TasksModuleServiceProvider;
+use App\Modules\Webinars\MessageTemplates\WebinarMessageTemplateDefinitionContributor;
 use App\Modules\Webinars\Presets\WebinarsPresetContributor;
 use App\Modules\Webinars\Providers\WebinarsModuleServiceProvider;
 use App\Modules\Workflow\Providers\WorkflowModuleServiceProvider;
@@ -625,6 +628,9 @@ return [
                 'priority' => 30,
             ],
             'depends_on' => ['core'],
+            'message_template_definition_contributors' => [
+                SchedulingMessageTemplateDefinitionContributor::class,
+            ],
             'providers' => [
                 SchedulingModuleServiceProvider::class,
             ],
@@ -791,6 +797,9 @@ return [
                 'priority' => 70,
             ],
             'depends_on' => ['core', 'messaging'],
+            'message_template_definition_contributors' => [
+                CampaignMessageTemplateDefinitionContributor::class,
+            ],
             'providers' => [
                 CampaignsModuleServiceProvider::class,
             ],
@@ -835,6 +844,9 @@ return [
             'depends_on' => ['core', 'messaging'],
             'preset_contributors' => [
                 WebinarsPresetContributor::class,
+            ],
+            'message_template_definition_contributors' => [
+                WebinarMessageTemplateDefinitionContributor::class,
             ],
             'providers' => [
                 WebinarsModuleServiceProvider::class,

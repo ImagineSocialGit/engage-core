@@ -108,6 +108,36 @@ return [
         'chain_key' => 'scheduling_appointment_communications',
         'default_subject' => 'Appointment reminder',
         'default_message' => "Hello {first_name}! You have an appointment on:\n\n{appointment_date} at {appointment_time_with_timezone}.\n\n{appointment_location_or_method}\n\nThank you!",
+        'default_steps' => [
+            [
+                'key' => 'confirmation',
+                'name' => 'Appointment confirmation',
+                'timing' => 'immediate',
+                'offset_value' => null,
+                'offset_unit' => null,
+            ],
+            [
+                'key' => 'reminder_3_days',
+                'name' => '3-day reminder',
+                'timing' => 'before',
+                'offset_value' => 3,
+                'offset_unit' => 'days',
+            ],
+            [
+                'key' => 'reminder_24_hours',
+                'name' => '24-hour reminder',
+                'timing' => 'before',
+                'offset_value' => 24,
+                'offset_unit' => 'hours',
+            ],
+            [
+                'key' => 'reminder_1_hour',
+                'name' => '1-hour reminder',
+                'timing' => 'before',
+                'offset_value' => 1,
+                'offset_unit' => 'hours',
+            ],
+        ],
     ],
 
     'public' => [

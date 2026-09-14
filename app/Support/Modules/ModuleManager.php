@@ -134,6 +134,34 @@ class ModuleManager
     }
 
     /**
+     * Message-template definition contributors are discovered from every installed
+     * module so Messaging can know scope ownership even when a module is disabled.
+     * Runtime materialization still uses enabledKeysWithDependencies().
+     *
+     * @return array<class-string>
+     */
+    public function messageTemplateDefinitionContributorClasses(): array
+    {
+        $contributors = [];
+
+        foreach ($this->definitions() as $definition) {
+            if (! is_array($definition)) {
+                continue;
+            }
+
+            foreach (Arr::wrap($definition['message_template_definition_contributors'] ?? []) as $contributor) {
+                if (! is_string($contributor) || trim($contributor) === '') {
+                    continue;
+                }
+
+                $contributors[] = trim($contributor);
+            }
+        }
+
+        return array_values(array_unique($contributors));
+    }
+
+    /**
      * @return array<int, array{module: string, label: string, description: string, route: string, href: string, priority: int, class: string}>
      */
     public function navigationItems(): array

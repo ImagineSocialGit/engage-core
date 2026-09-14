@@ -66,6 +66,10 @@ class ModuleDefinitionConfigContract implements ConfigContract
                 ConfigSchema::listOf(ConfigSchema::string()),
                 [],
             ),
+            'message_template_definition_contributors' => ConfigField::defaulted(
+                ConfigSchema::listOf(ConfigSchema::string()),
+                [],
+            ),
             'providers' => ConfigField::defaulted(
                 ConfigSchema::listOf(ConfigSchema::string()),
                 [],

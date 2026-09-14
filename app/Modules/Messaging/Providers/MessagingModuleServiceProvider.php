@@ -9,6 +9,7 @@ use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Messaging\Automation\MessagingAutomationPointAuthoringContributor;
 use App\Modules\Messaging\Automation\MessagingAutomationPointDefinitionContributor;
 use App\Modules\Messaging\Automation\SendMessageAutomationActionHandler;
+use App\Modules\Messaging\Contracts\MessageTemplateDefinitionContributor;
 use App\Modules\Messaging\Contracts\ReusableMessageTemplateAuthoringOptionContributor;
 use App\Modules\Messaging\Capabilities\MessagingAutomationCapabilityContributor;
 use App\Modules\Messaging\ConfigContracts\EmailMessageDefinitionConfigContract;
@@ -44,6 +45,7 @@ use App\Modules\Messaging\Services\MessageChainExecutionContextResolver;
 use App\Modules\Messaging\Services\MessageMediaAuthoringService;
 use App\Modules\Messaging\Services\MessageRecipientGateRegistry;
 use App\Modules\Messaging\Services\MessageRecipientPayloadProviderRegistry;
+use App\Modules\Messaging\Services\MessageTemplateDefinitionRegistry;
 use App\Modules\Messaging\Services\MessageTemplatePublicationHookRegistry;
 use App\Modules\Messaging\Services\ReplyProfiles\MessagingReplyProfileDependencyContributor;
 use App\Modules\Messaging\Services\ReusableMessageTemplateAuthoringGuide;
@@ -52,12 +54,14 @@ use App\Modules\Messaging\TokenContracts\MessagingTokenContextProvider;
 use App\Modules\Messaging\Validation\MessagingSetupValidationContributor;
 use App\Modules\Messaging\View\Components\MessageMediaAuthoring;
 use App\Support\Dashboard\DashboardPanelRegistry;
+use App\Support\Modules\ModuleManager;
 use App\Support\ReplyHandling\ReplyProfileDependencyRegistry;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use InvalidArgumentException;
 use Twilio\Rest\Client;
 
 class MessagingModuleServiceProvider extends ServiceProvider
@@ -148,6 +152,36 @@ class MessagingModuleServiceProvider extends ServiceProvider
                 providers: $app->tagged(
                     'messaging.message_chain_execution_context_providers',
                 ),
+            );
+        });
+
+        $this->app->singleton(MessageTemplateDefinitionRegistry::class, function ($app) {
+            $moduleManager = $app->make(ModuleManager::class);
+            $contributors = [];
+
+            foreach ($moduleManager->messageTemplateDefinitionContributorClasses() as $contributorClass) {
+                if (! class_exists($contributorClass)) {
+                    throw new InvalidArgumentException(
+                        "Configured message template definition contributor class [{$contributorClass}] does not exist."
+                    );
+                }
+
+                $contributor = $app->make($contributorClass);
+
+                if (! $contributor instanceof MessageTemplateDefinitionContributor) {
+                    throw new InvalidArgumentException(sprintf(
+                        'Configured message template definition contributor [%s] must implement [%s].',
+                        $contributorClass,
+                        MessageTemplateDefinitionContributor::class,
+                    ));
+                }
+
+                $contributors[] = $contributor;
+            }
+
+            return new MessageTemplateDefinitionRegistry(
+                contributors: $contributors,
+                moduleManager: $moduleManager,
             );
         });
 

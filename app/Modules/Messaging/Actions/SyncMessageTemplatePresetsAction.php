@@ -10,6 +10,7 @@ use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Services\MessageDefinitionConfigSetResolver;
 use App\Modules\Messaging\Services\MessageDefinitionModuleAvailability;
 use App\Modules\Messaging\Services\MessageTemplateCompositionIdentityResolver;
+use App\Modules\Messaging\Services\MessageTemplateDefinitionRegistry;
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,7 @@ class SyncMessageTemplatePresetsAction
         private readonly PublishMessageTemplateVersionAction $publishMessageTemplateVersion,
         private readonly MessageDefinitionConfigSetResolver $configSetResolver,
         private readonly MessageDefinitionModuleAvailability $moduleAvailability,
+        private readonly MessageTemplateDefinitionRegistry $definitionRegistry,
         private readonly MessageTemplateCompositionIdentityResolver $compositionIdentity,
         private readonly SyncMessageTemplateCompositionLayersAction $syncCompositionLayers,
     ) {}
@@ -431,14 +433,41 @@ class SyncMessageTemplatePresetsAction
                         continue;
                     }
 
+                    if ($this->definitionRegistry->ownerModuleForScope($scope) !== 'messaging') {
+                        continue;
+                    }
+
                     yield from $this->definitionsFromScope(
                         channel: $channel,
                         purpose: $purpose,
                         scope: $scope,
                         scopeConfig: $scopeConfig,
+                        scopeConfigPath: MessageDefinitionConfigPath::scope(
+                            $channel,
+                            $purpose,
+                            $scope,
+                        ),
+                        moduleKey: 'messaging',
+                        moduleLabel: 'Messaging',
+                        surface: null,
                     );
                 }
             }
+        }
+
+        foreach ($this->definitionRegistry->activeContributions() as $registered) {
+            $contribution = $registered['contribution'];
+
+            yield from $this->definitionsFromScope(
+                channel: $contribution->channel,
+                purpose: $contribution->purpose,
+                scope: $contribution->scope,
+                scopeConfig: $contribution->definitions,
+                scopeConfigPath: $contribution->sourceConfigPath,
+                moduleKey: $registered['module_key'],
+                moduleLabel: $registered['module_label'],
+                surface: $contribution->surface,
+            );
         }
     }
 
@@ -451,6 +480,10 @@ class SyncMessageTemplatePresetsAction
         string $purpose,
         string $scope,
         array $scopeConfig,
+        string $scopeConfigPath,
+        string $moduleKey,
+        string $moduleLabel,
+        ?string $surface,
     ): iterable {
         $channel = $this->normalizeSegment($channel);
         $purpose = $this->normalizeSegment($purpose);
@@ -460,23 +493,14 @@ class SyncMessageTemplatePresetsAction
             $templateSetKey = $set['key'];
             $templateSetSourceKey = $set['source_key'];
             $definitions = $set['definitions'];
-            $scopeConfigPath = $templateSetKey === null
+            $templateSetConfigPath = $templateSetKey === null
                 || $templateSetKey === MessageDefinitionConfigSetResolver::DEFAULT_TEMPLATE_SET_KEY
                     && ! array_key_exists(
                         MessageDefinitionConfigSetResolver::DEFAULT_TEMPLATE_SET_KEY,
                         $scopeConfig,
                     )
-                ? MessageDefinitionConfigPath::scope(
-                    $channel,
-                    $purpose,
-                    $scope,
-                )
-                : MessageDefinitionConfigPath::templateSet(
-                    $channel,
-                    $purpose,
-                    $scope,
-                    $templateSetSourceKey ?? $templateSetKey,
-                );
+                ? $scopeConfigPath
+                : $scopeConfigPath.'.'.($templateSetSourceKey ?? $templateSetKey);
 
             yield from $this->definitionsFromTemplateSet(
                 channel: $channel,
@@ -484,7 +508,10 @@ class SyncMessageTemplatePresetsAction
                 scope: $scope,
                 templateSetKey: $templateSetKey,
                 definitions: $definitions,
-                scopeConfigPath: $scopeConfigPath,
+                scopeConfigPath: $templateSetConfigPath,
+                moduleKey: $moduleKey,
+                moduleLabel: $moduleLabel,
+                surface: $surface,
             );
         }
     }
@@ -500,6 +527,9 @@ class SyncMessageTemplatePresetsAction
         ?string $templateSetKey,
         array $definitions,
         string $scopeConfigPath,
+        string $moduleKey,
+        string $moduleLabel,
+        ?string $surface,
     ): iterable {
         foreach ($definitions as $messageType => $definition) {
             if ($messageType === 'campaigns') {
@@ -559,7 +589,9 @@ class SyncMessageTemplatePresetsAction
                     campaignKey: null,
                     campaignStep: null,
                     campaignStepVariantKey: null,
-                    surface: $this->surfaceForScope($scope),
+                    surface: $surface,
+                    moduleKey: $moduleKey,
+                    moduleLabel: $moduleLabel,
                     campaignTemplate: false,
                     listIndex: $isList ? (int) $index : null,
                     definitionKey: $assignmentDefinitionKey,
@@ -641,6 +673,8 @@ class SyncMessageTemplatePresetsAction
                         campaignStep: $stepNumber,
                         campaignStepVariantKey: $normalizedVariantKey,
                         surface: 'campaigns',
+                        moduleKey: 'campaigns',
+                        moduleLabel: 'Campaigns',
                         campaignTemplate: true,
                         listIndex: null,
                         definitionKey: null,
@@ -667,6 +701,8 @@ class SyncMessageTemplatePresetsAction
         ?int $campaignStep,
         ?string $campaignStepVariantKey,
         ?string $surface,
+        string $moduleKey,
+        string $moduleLabel,
         bool $campaignTemplate,
         ?int $listIndex,
         ?string $definitionKey,
@@ -694,7 +730,11 @@ class SyncMessageTemplatePresetsAction
             throw new InvalidArgumentException("Message template preset source [{$configPath}] has invalid [payload].");
         }
 
-        $key = $this->presetKey(
+        $explicitPresetKey = is_string($definition['preset_key'] ?? null)
+            && trim($definition['preset_key']) !== ''
+                ? trim($definition['preset_key'])
+                : null;
+        $key = $explicitPresetKey ?? $this->presetKey(
             channel: $channel,
             purpose: $purpose,
             scope: $scope,
@@ -719,6 +759,8 @@ class SyncMessageTemplatePresetsAction
             campaignStep: $campaignStep,
             campaignStepVariantKey: $campaignStepVariantKey,
             surface: $surface,
+            moduleKey: $moduleKey,
+            moduleLabel: $moduleLabel,
             campaignTemplate: $campaignTemplate,
             listIndex: $listIndex,
             presetKey: $key,
@@ -841,6 +883,8 @@ class SyncMessageTemplatePresetsAction
         ?int $campaignStep,
         ?string $campaignStepVariantKey,
         ?string $surface,
+        string $moduleKey,
+        string $moduleLabel,
         bool $campaignTemplate,
         ?int $listIndex,
         string $presetKey,
@@ -856,8 +900,6 @@ class SyncMessageTemplatePresetsAction
             $itemOrder = $campaignStep;
             $usageType = 'campaign_step';
         } else {
-            $moduleKey = $this->moduleKeyForScope($scope);
-            $moduleLabel = $this->moduleLabel($moduleKey);
             $businessFamilyKey = $this->compositionIdentity->familyKey(
                 scope: $scope,
                 sourceMessageType: $sourceMessageType,
@@ -890,6 +932,29 @@ class SyncMessageTemplatePresetsAction
             $itemOrder = $this->itemOrderForMessage($definition, $listIndex);
             $usageType = $this->usageTypeForMessage($scope, $sourceMessageType);
         }
+
+        $catalogOverrides = is_array($definition['catalog'] ?? null)
+            ? $definition['catalog']
+            : [];
+        $groupKey = is_string($catalogOverrides['group_key'] ?? null)
+            && trim($catalogOverrides['group_key']) !== ''
+                ? trim($catalogOverrides['group_key'])
+                : $groupKey;
+        $groupLabel = is_string($catalogOverrides['group_label'] ?? null)
+            && trim($catalogOverrides['group_label']) !== ''
+                ? trim($catalogOverrides['group_label'])
+                : $groupLabel;
+        $itemLabel = is_string($catalogOverrides['item_label'] ?? null)
+            && trim($catalogOverrides['item_label']) !== ''
+                ? trim($catalogOverrides['item_label'])
+                : $itemLabel;
+        $itemOrder = is_numeric($catalogOverrides['item_order'] ?? null)
+            ? (int) $catalogOverrides['item_order']
+            : $itemOrder;
+        $usageType = is_string($catalogOverrides['usage_type'] ?? null)
+            && trim($catalogOverrides['usage_type']) !== ''
+                ? $this->normalizeSegment($catalogOverrides['usage_type'])
+                : $usageType;
 
         $itemKey = $presetKey;
         $displayName = $groupLabel.' — '.$itemLabel;
@@ -1001,29 +1066,6 @@ class SyncMessageTemplatePresetsAction
         throw new InvalidArgumentException(
             "Message template preset source [{$configPath}] failed token validation at [{$path}]: {$message}"
         );
-    }
-
-    private function surfaceForScope(string $scope): ?string
-    {
-        return match ($scope) {
-            'webinar' => 'webinar_registrations',
-            'webinar_waitlist' => 'webinar_waitlists',
-            default => null,
-        };
-    }
-
-    private function moduleKeyForScope(string $scope): string
-    {
-        return str_starts_with($scope, 'webinar') ? 'webinars' : 'messaging';
-    }
-
-    private function moduleLabel(string $moduleKey): string
-    {
-        return match ($moduleKey) {
-            'campaigns' => 'Campaigns',
-            'webinars' => 'Webinars',
-            default => 'Messaging',
-        };
     }
 
     private function groupLabelForMessageType(string $scope, string $sourceMessageType): string

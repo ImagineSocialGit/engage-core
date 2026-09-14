@@ -198,6 +198,8 @@
 │   │   │   ├── Listeners
 │   │   │   │   ├── ReconcileCampaignEligibilityFromAutomationEvent.php
 │   │   │   │   └── ReconcileCampaignEligibilityFromContactFilterFactsChanged.php
+│   │   │   ├── MessageTemplates
+│   │   │   │   └── CampaignMessageTemplateDefinitionContributor.php
 │   │   │   ├── Messaging
 │   │   │   │   └── AnnualTouchReusableMessageTemplateAuthoringContributor.php
 │   │   │   ├── Models
@@ -923,6 +925,7 @@
 │   │   │   │   ├── MessageChainExecutionContextProvider.php
 │   │   │   │   ├── MessageRecipientGate.php
 │   │   │   │   ├── MessageRecipientPayloadProvider.php
+│   │   │   │   ├── MessageTemplateDefinitionContributor.php
 │   │   │   │   ├── MessageTemplatePublicationHook.php
 │   │   │   │   ├── ReusableMessageTemplateAuthoringOptionContributor.php
 │   │   │   │   └── Sms
@@ -955,6 +958,7 @@
 │   │   │   │   ├── Email
 │   │   │   │   │   └── EmailHygieneResult.php
 │   │   │   │   ├── MessageData.php
+│   │   │   │   ├── MessageTemplateDefinitionContribution.php
 │   │   │   │   ├── MessageTemplatePresetPublicationResult.php
 │   │   │   │   ├── ResolvedMessageDispatch.php
 │   │   │   │   ├── ReusableMessageTemplateAuthoringContext.php
@@ -1089,6 +1093,7 @@
 │   │   │   │   ├── MessageTemplateCompositionImpactResolver.php
 │   │   │   │   ├── MessageTemplateCompositionResolver.php
 │   │   │   │   ├── MessageTemplateCompositionSchema.php
+│   │   │   │   ├── MessageTemplateDefinitionRegistry.php
 │   │   │   │   ├── MessageTemplateDisplayLabelResolver.php
 │   │   │   │   ├── MessageTemplatePresetAssignmentResolver.php
 │   │   │   │   ├── MessageTemplatePublicationHookRegistry.php
@@ -1580,6 +1585,8 @@
 │   │   │   │   │   └── RetryWebinarRegistrationFollowUpJob.php
 │   │   │   │   ├── RecoverWebinarRegistrationFinalizationsJob.php
 │   │   │   │   └── SyncWebinarRegistrationToProviderJob.php
+│   │   │   ├── MessageTemplates
+│   │   │   │   └── WebinarMessageTemplateDefinitionContributor.php
 │   │   │   ├── Models
 │   │   │   │   ├── WebinarOccurrenceSuppression.php
 │   │   │   │   ├── Webinar.php
@@ -1882,7 +1889,8 @@
 │   │   │       │   ├── SchedulingAppointmentTemplatePublicationHook.php
 │   │   │       │   ├── SchedulingAppointmentTokenContextProvider.php
 │   │   │       │   ├── SchedulingAppointmentTokenSourceProvider.php
-│   │   │       │   └── SchedulingDestinationVerificationRecipientGate.php
+│   │   │       │   ├── SchedulingDestinationVerificationRecipientGate.php
+│   │   │       │   └── SchedulingMessageTemplateDefinitionContributor.php
 │   │   │       ├── Simple
 │   │   │       │   ├── ApplySimpleAppointmentAfterBookingActions.php
 │   │   │       │   └── SimpleAppointmentAfterBookingWorkspace.php
@@ -2933,6 +2941,7 @@
 │   │   │   ├── CampaignMessageChainRuntimeOwnershipTest.php
 │   │   │   ├── CampaignMessageReplyHandlingTest.php
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
+│   │   │   ├── CampaignMessageTemplateDefinitionContributorTest.php
 │   │   │   ├── CampaignProcessHighwayContributorTest.php
 │   │   │   ├── CampaignSetupActionabilityTest.php
 │   │   │   ├── CampaignSimulatorTest.php
@@ -3239,6 +3248,7 @@
 │   │   │   ├── MessagingDeploymentPlanContributorTest.php
 │   │   │   ├── MessagingIndexShapeTest.php
 │   │   │   ├── MessagingSetupValidationContributorTest.php
+│   │   │   ├── ModuleOwnedMessageTemplateSyncTest.php
 │   │   │   ├── ProviderSubmissionLimiterTest.php
 │   │   │   ├── PublishMessageTemplatePresetOverrideActionTest.php
 │   │   │   ├── QueueContractTest.php
@@ -3542,4 +3552,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-839 directories, 2704 files
+841 directories, 2712 files

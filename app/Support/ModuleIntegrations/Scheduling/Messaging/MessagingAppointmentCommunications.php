@@ -421,49 +421,49 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
             'scheduling.communications.default_subject',
             'Appointment reminder',
         );
+        $configuredSteps = config('scheduling.communications.default_steps', []);
 
-        return [
-            [
-                'key' => 'confirmation',
-                'name' => 'Appointment confirmation',
-                'timing' => 'immediate',
-                'offset_value' => null,
-                'offset_unit' => null,
-                'channels' => $channels,
-                'subject' => $subject,
-                'message' => $message,
-            ],
-            [
-                'key' => 'reminder_3_days',
-                'name' => '3-day reminder',
-                'timing' => 'before',
-                'offset_value' => 3,
-                'offset_unit' => 'days',
-                'channels' => $channels,
-                'subject' => $subject,
-                'message' => $message,
-            ],
-            [
-                'key' => 'reminder_24_hours',
-                'name' => '24-hour reminder',
-                'timing' => 'before',
-                'offset_value' => 24,
-                'offset_unit' => 'hours',
-                'channels' => $channels,
-                'subject' => $subject,
-                'message' => $message,
-            ],
-            [
-                'key' => 'reminder_1_hour',
-                'name' => '1-hour reminder',
-                'timing' => 'before',
-                'offset_value' => 1,
-                'offset_unit' => 'hours',
-                'channels' => $channels,
-                'subject' => $subject,
-                'message' => $message,
-            ],
-        ];
+        if (! is_array($configuredSteps)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            static function (mixed $step) use ($channels, $subject, $message): ?array {
+                if (! is_array($step)) {
+                    return null;
+                }
+
+                $key = is_string($step['key'] ?? null) ? trim($step['key']) : '';
+                $name = is_string($step['name'] ?? null) ? trim($step['name']) : '';
+                $timing = is_string($step['timing'] ?? null)
+                    ? strtolower(trim($step['timing']))
+                    : '';
+
+                if ($key === '' || $name === '' || ! in_array($timing, ['immediate', 'before', 'after'], true)) {
+                    return null;
+                }
+
+                return [
+                    'key' => $key,
+                    'name' => $name,
+                    'timing' => $timing,
+                    'offset_value' => is_numeric($step['offset_value'] ?? null)
+                        ? (int) $step['offset_value']
+                        : null,
+                    'offset_unit' => is_string($step['offset_unit'] ?? null)
+                        ? trim($step['offset_unit'])
+                        : null,
+                    'channels' => $channels,
+                    'subject' => is_string($step['subject'] ?? null)
+                        && trim($step['subject']) !== ''
+                            ? trim($step['subject'])
+                            : $subject,
+                    'message' => is_string($step['message'] ?? null)
+                        && trim($step['message']) !== ''
+                            ? $step['message']
+                            : $message,
+                ];
+            }, $configuredSteps)));
     }
 
     /** @return array<int, string> */
