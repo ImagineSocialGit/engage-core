@@ -40,6 +40,11 @@ final class FormDefinitionConfigContract implements ConfigContract
             )),
             'required' => ConfigField::defaulted(ConfigSchema::boolean(), false),
             'options' => ConfigField::optional(ConfigSchema::listOf($option)),
+            'exclusive_options' => ConfigField::optional(
+                ConfigSchema::listOf(ConfigSchema::string()),
+            ),
+            'placeholder' => ConfigField::optional(ConfigSchema::string(nullable: true)),
+            'help' => ConfigField::optional(ConfigSchema::string(nullable: true)),
         ], allowUnknown: true);
 
         $section = ConfigSchema::object([

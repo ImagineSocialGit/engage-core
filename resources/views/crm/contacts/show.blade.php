@@ -1019,7 +1019,7 @@
                                 <p>
                                     Channel:
                                     <span class="font-medium text-slate-700">
-                                        {{ $channel }}
+                                        {{ str($message->channel)->replace('_', ' ')->title() }}
                                     </span>
                                 </p>
                             </div>

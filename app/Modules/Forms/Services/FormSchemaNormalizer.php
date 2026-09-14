@@ -148,6 +148,23 @@ final class FormSchemaNormalizer
                     );
                 }
 
+                if (array_key_exists('exclusive_options', $field)) {
+                    if ($fieldType !== 'checkboxes') {
+                        throw new InvalidArgumentException(
+                            "{$context} field [{$fieldKey}] exclusive_options is supported only for checkboxes fields.",
+                        );
+                    }
+
+                    $normalizedField['exclusive_options'] = $this->normalizeExclusiveOptions(
+                        value: $field['exclusive_options'],
+                        allowedOptions: array_values(array_map(
+                            static fn (array $option): string => (string) $option['value'],
+                            $normalizedField['options'] ?? [],
+                        )),
+                        context: "{$context} field [{$fieldKey}] exclusive_options",
+                    );
+                }
+
                 if (in_array($fieldType, self::OPTION_FIELD_TYPES, true)
                     && ($normalizedField['options'] ?? []) === []
                 ) {
@@ -231,6 +248,50 @@ final class FormSchemaNormalizer
         }
 
         return $options;
+    }
+
+    /**
+     * @param array<int, string> $allowedOptions
+     * @return array<int, string>
+     */
+    private function normalizeExclusiveOptions(
+        mixed $value,
+        array $allowedOptions,
+        string $context,
+    ): array {
+        if (! is_array($value) || ! array_is_list($value)) {
+            throw new InvalidArgumentException("{$context} must be a list.");
+        }
+
+        $normalized = [];
+
+        foreach ($value as $index => $option) {
+            if (! is_string($option)) {
+                throw new InvalidArgumentException(
+                    "{$context}.{$index} must be a string.",
+                );
+            }
+
+            $option = trim($option);
+
+            if ($option === '' || ! in_array($option, $allowedOptions, true)) {
+                throw new InvalidArgumentException(
+                    "{$context}.{$index} must reference an existing option value.",
+                );
+            }
+
+            if (! in_array($option, $normalized, true)) {
+                $normalized[] = $option;
+            }
+        }
+
+        if ($normalized === []) {
+            throw new InvalidArgumentException(
+                "{$context} must contain at least one option value.",
+            );
+        }
+
+        return $normalized;
     }
 
     private function normalizeKey(mixed $value, string $label): string

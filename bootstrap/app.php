@@ -45,6 +45,12 @@ $app = Application::configure(basePath: dirname(__DIR__))
                     require base_path('routes/messaging.php');
                 });
 
+            Route::middleware(['web'])
+                ->domain('forms.'.$domain)
+                ->group(function () {
+                    require base_path('routes/forms.php');
+                });
+
             $crmHost = parse_url(
                 (string) config('app.crm_url'),
                 PHP_URL_HOST,

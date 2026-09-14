@@ -25,6 +25,10 @@ $clients = $clientId === '' ? [] : [
 ];
 
 return [
+    'public' => [
+        'submission_rate_limit_per_minute' => 20,
+    ],
+
     'external_intake' => [
         'enabled' => (bool) env('FORMS_EXTERNAL_INTAKE_ENABLED', false),
         'max_body_bytes' => (int) env('FORMS_EXTERNAL_INTAKE_MAX_BODY_BYTES', 262144),

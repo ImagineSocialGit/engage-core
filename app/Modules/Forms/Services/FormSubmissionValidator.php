@@ -17,6 +17,7 @@ final class FormSubmissionValidator
 {
     public function __construct(
         private readonly ValidationFactory $validation,
+        private readonly FormVisibilityEvaluator $visibility,
     ) {}
 
     public function validateConfiguration(PublishedForm $form): void
@@ -30,7 +31,14 @@ final class FormSubmissionValidator
     public function validate(PublishedForm $form, array $input): NormalizedFormSubmission
     {
         $errors = [];
-        $rules = $this->authoredRules($form);
+        $visibleFieldKeys = array_fill_keys(
+            $this->visibility->visibleFieldKeys($form, $input),
+            true,
+        );
+        $rules = $this->visibleRules(
+            $this->authoredRules($form),
+            $visibleFieldKeys,
+        );
         $knownKeys = array_fill_keys($form->fieldKeys(), true);
         $unknownKeys = [];
 
@@ -53,6 +61,11 @@ final class FormSubmissionValidator
 
         foreach ($form->fields as $field) {
             $key = (string) $field['key'];
+
+            if (! isset($visibleFieldKeys[$key])) {
+                continue;
+            }
+
             $required = (bool) ($field['required'] ?? false);
 
             if (! array_key_exists($key, $input)) {
@@ -283,6 +296,18 @@ final class FormSubmissionValidator
             );
         }
 
+        $exclusive = $field['exclusive_options'] ?? [];
+
+        if (is_array($exclusive) && $exclusive !== []) {
+            $selectedExclusive = array_values(array_intersect($normalized, $exclusive));
+
+            if ($selectedExclusive !== [] && count($normalized) > 1) {
+                throw new InvalidArgumentException(
+                    'The exclusive option cannot be selected with another option.',
+                );
+            }
+        }
+
         return $normalized;
     }
 
@@ -379,6 +404,24 @@ final class FormSubmissionValidator
             static fn (array $option): string => (string) $option['value'],
             $field['options'] ?? [],
         ));
+    }
+
+    /**
+     * @param array<string, string|array<int, string>> $rules
+     * @param array<string, bool> $visibleFieldKeys
+     * @return array<string, string|array<int, string>>
+     */
+    private function visibleRules(array $rules, array $visibleFieldKeys): array
+    {
+        return array_filter(
+            $rules,
+            static function (mixed $rule, string $key) use ($visibleFieldKeys): bool {
+                $fieldKey = str_ends_with($key, '.*') ? substr($key, 0, -2) : $key;
+
+                return isset($visibleFieldKeys[$fieldKey]);
+            },
+            ARRAY_FILTER_USE_BOTH,
+        );
     }
 
     /**

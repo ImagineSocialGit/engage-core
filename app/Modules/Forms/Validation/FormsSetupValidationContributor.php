@@ -10,6 +10,7 @@ use App\Modules\Forms\Services\FormSubmissionContactMapper;
 use App\Modules\Forms\Services\FormSubmissionValidator;
 use App\Modules\Forms\Services\FormSubmissionVerificationPolicy;
 use App\Modules\Forms\Services\FormSchemaNormalizer;
+use App\Modules\Forms\Services\HostedFormLayoutResolver;
 use App\Modules\Forms\Services\PublishedFormResolver;
 use App\Support\ModuleIntegrations\Forms\FormSubmissionConsentBridge;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
@@ -31,6 +32,7 @@ final class FormsSetupValidationContributor implements SetupValidationContributo
         private readonly FormSubmissionConsentIntentResolver $consentIntents,
         private readonly FormSubmissionConsentBridge $consentBridge,
         private readonly FormSubmissionVerificationPolicy $verifications,
+        private readonly HostedFormLayoutResolver $hostedLayouts,
         private readonly ExternalFormIntakeClientResolver $externalClients,
     ) {}
 
@@ -132,6 +134,17 @@ final class FormsSetupValidationContributor implements SetupValidationContributo
                 );
 
                 continue;
+            }
+
+            try {
+                $this->hostedLayouts->validate($published);
+            } catch (DomainException $exception) {
+                yield $this->error(
+                    code: 'forms.runtime.hosted_layout_invalid',
+                    message: $exception->getMessage(),
+                    path: "form_versions.{$version->getKey()}.layout",
+                    context: $versionContext,
+                );
             }
 
             try {
