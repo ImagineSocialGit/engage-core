@@ -27,7 +27,7 @@ The root version is derived and must never be incremented manually. Exact compat
 
 The fingerprint/vector cutover is itself a current-format boundary. Exports created before this change that contain only the old manually maintained root version must be re-exported from current code or transformed externally before import.
 
-The current contract includes dependency-ordered Core/universal sections plus optional Reporting, Mortgage, and Scheduling sections. Reporting is included only when its activation schema is installed. Mortgage is included only when the complete Mortgage vertical schema is installed. Scheduling is included only when the complete Scheduling schema is installed. A document containing an optional section is rejected when the target does not have that section's activation schema.
+The current contract includes dependency-ordered Core/universal sections plus optional Forms, Reporting, Mortgage, and Scheduling sections. Forms is included only when its complete Forms schema is installed. Reporting is included only when its activation schema is installed. Mortgage is included only when the complete Mortgage vertical schema is installed. Scheduling is included only when the complete Scheduling schema is installed. A document containing an optional section is rejected when the target does not have that section's activation schema.
 
 The CRM surface is owner-only:
 
@@ -65,7 +65,7 @@ Project State does not transfer:
 - Redis queue contents, Horizon metadata, cache, or locks;
 - failed-job history;
 - Reporting sessions, raw observations, and projection checkpoints reset; retained Reporting daily metrics and imported external measurements transfer only when the Reporting schema is installed;
-- unsupported Location, Portal, Forms, Documents, or Commerce durable state; Mortgage and Scheduling durable state transfer when their complete optional schemas are installed;
+- unsupported Location, Portal, Documents, or Commerce durable state; Forms, Mortgage, and Scheduling durable state transfer when their complete optional schemas are installed;
 - active Scheduling booking holds or slot offers, or destination-verification challenge/proof state;
 - external provider state.
 
@@ -114,7 +114,7 @@ Proceed only when all are true:
 
 Stop and extend the contract when:
 
-- an installed Mortgage schema is partial/outside the current Mortgage section contract, or unsupported Scheduling durable rows must survive;
+- an installed Forms, Mortgage, or Scheduling schema is partial/outside its current section contract, or unsupported durable rows in one of those modules must survive;
 - an unsupported module table contains required data;
 - a new table or column is unclassified;
 - a polymorphic relation points to an unexported target that must survive;

@@ -1,4 +1,3 @@
-
 # Engage Core — Project State Extension Guide
 
 ## Purpose
@@ -27,14 +26,15 @@ The application accepts only the current derived root version, exact current sec
 Current scope:
 
 ```text
-Core/universal sections plus optional Reporting, Mortgage, and Scheduling sections.
+Core/universal sections plus optional Forms, Reporting, Mortgage, and Scheduling sections.
+Forms activates only when its complete Forms schema is installed.
 Reporting activates only when its complete Reporting schema is installed.
 Mortgage activates only when its complete Mortgage vertical schema is installed.
 Scheduling activates only when its complete Scheduling schema is installed.
 All remaining application tables stay explicitly classified by Project State policy.
 ```
 
-Reporting retains normalized daily metrics and imported external measurements while its raw observations/session/projection coordination remains resettable. Mortgage transfers its current durable vertical state when installed. Scheduling transfers durable configuration, availability, Appointments, attendees, lifecycle history, and Appointment-owned resource occupancy when installed. Ephemeral Scheduling slot offers and booking holds remain `must_be_empty` export blockers, and destination-verification challenge/proof state remains cache/session owned and outside Project State.
+Forms transfers durable form definitions, immutable versions, submissions, and typed submission values when installed. Preset-backed definitions and versions upsert by stable identity so a clean target may run preset sync before Project State import; submission history remains insert-empty durable state. Current Forms Project State preserves Contact-backed subject links and clears environment-local review actor identity while retaining review status and timestamps. Reporting retains normalized daily metrics and imported external measurements while its raw observations/session/projection coordination remains resettable. Mortgage transfers its current durable vertical state when installed. Scheduling transfers durable configuration, availability, Appointments, attendees, lifecycle history, and Appointment-owned resource occupancy when installed. Ephemeral Scheduling slot offers and booking holds remain `must_be_empty` export blockers, and destination-verification challenge/proof state remains cache/session owned and outside Project State.
 
 ## Authority
 
@@ -142,7 +142,7 @@ An optional section may be absent from a current-version document when the sourc
 
 The inverse is strict: an export containing a known optional section cannot be imported into a target where that section is inactive; validation fails instead of silently discarding transferred state.
 
-Do not use optional sections to make ordinary required state best-effort. They exist for genuinely optional installed schema such as Reporting. A transferred table from an optional section must still not appear in `table_policies`; non-transferred tables from that module still need explicit policies.
+Do not use optional sections to make ordinary required state best-effort. They exist for genuinely optional installed schema such as Forms or Reporting. A transferred table from an optional section must still not appear in `table_policies`; non-transferred tables from that module still need explicit policies.
 
 ### Transfer the table when
 

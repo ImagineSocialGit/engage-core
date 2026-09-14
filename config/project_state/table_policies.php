@@ -140,23 +140,6 @@ return [
         'reason' => 'Portal transfer support has not been added yet.',
     ],
 
-    'form_definitions' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Forms transfer support has not been added yet.',
-    ],
-    'form_versions' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Forms transfer support has not been added yet.',
-    ],
-    'form_submissions' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Forms transfer support has not been added yet.',
-    ],
-    'form_submission_values' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Forms transfer support has not been added yet.',
-    ],
-
     'document_requirement_definitions' => [
         'mode' => 'must_be_empty',
         'reason' => 'Documents transfer support has not been added yet.',

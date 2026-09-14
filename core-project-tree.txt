@@ -611,9 +611,11 @@
 │   │   │   │   ├── CRM
 │   │   │   │   │   ├── FormsController.php
 │   │   │   │   │   └── FormSubmissionController.php
-│   │   │   │   └── External
-│   │   │   │       ├── ExternalFormIntakeController.php
-│   │   │   │       └── ExternalPublishedFormController.php
+│   │   │   │   ├── External
+│   │   │   │   │   ├── ExternalFormIntakeController.php
+│   │   │   │   │   └── ExternalPublishedFormController.php
+│   │   │   │   └── Public
+│   │   │   │       └── HostedFormController.php
 │   │   │   ├── Data
 │   │   │   │   ├── ExternalFormIntakeClient.php
 │   │   │   │   ├── ExternalPublishedForm.php
@@ -654,6 +656,10 @@
 │   │   │   │   ├── FormSubmissionReadService.php
 │   │   │   │   ├── FormSubmissionValidator.php
 │   │   │   │   ├── FormSubmissionVerificationPolicy.php
+│   │   │   │   ├── FormVisibilityEvaluator.php
+│   │   │   │   ├── HostedFormLayoutResolver.php
+│   │   │   │   ├── HostedFormPresenter.php
+│   │   │   │   ├── HostedFormRuntimeValidator.php
 │   │   │   │   └── PublishedFormResolver.php
 │   │   │   ├── Support
 │   │   │   └── Validation
@@ -2089,6 +2095,7 @@
 │   │   ├── campaigns.php
 │   │   ├── core.php
 │   │   ├── flow_routes.php
+│   │   ├── forms.php
 │   │   ├── inbound_messaging.php
 │   │   ├── internal_notifications.php
 │   │   ├── location.php
@@ -2374,6 +2381,8 @@
 │   │   │       └── config
 │   │   │           └── modules.php
 │   │   ├── client-request-intake-template.md
+│   │   ├── client-starter-packages
+│   │   │   └── artist.php
 │   │   ├── contact-status-presets-template.php
 │   │   ├── flow-routes-template.php
 │   │   ├── messaging-composition-template.php
@@ -2601,7 +2610,8 @@
 │       │   │   ├── button.blade.php
 │       │   │   ├── card.blade.php
 │       │   │   ├── header.blade.php
-│       │   │   └── human-verification.blade.php
+│       │   │   ├── human-verification.blade.php
+│       │   │   └── meta-pixel.blade.php
 │       │   ├── section.blade.php
 │       │   ├── tasks
 │       │   ├── ui
@@ -2778,6 +2788,8 @@
 │       ├── email.blade.php
 │       ├── email-media-card.blade.php
 │       ├── email-text.blade.php
+│       ├── forms
+│       │   └── show.blade.php
 │       ├── messaging
 │       │   ├── permission-invitations
 │       │   │   ├── accepted.blade.php
@@ -2827,6 +2839,7 @@
 │   │   ├── tasks.php
 │   │   └── webinars.php
 │   ├── crm.php
+│   ├── forms.php
 │   ├── messaging.php
 │   ├── scheduling.php
 │   ├── staging.php
@@ -2866,6 +2879,7 @@
 │   │   ├── rollback-observability.sh
 │   │   └── verify-observability.sh
 │   ├── process-images.sh
+│   ├── resolve-client-starter-package.php
 │   ├── run-tests-to-dump.sh
 │   └── upload-images.sh
 ├── tests
@@ -3088,6 +3102,7 @@
 │   │   │   ├── FormSubmissionMessagingConsentBridgeTest.php
 │   │   │   ├── FormSubmissionVerificationTest.php
 │   │   │   ├── FormSubmissionWorkspaceTest.php
+│   │   │   ├── HostedFormRuntimeTest.php
 │   │   │   ├── IssueExternalFormIntakeSecretCommandTest.php
 │   │   │   └── PublishedFormRuntimeTest.php
 │   │   ├── HumanVerification
@@ -3292,6 +3307,7 @@
 │   │   │   ├── CoreAccessProjectStateContractTest.php
 │   │   │   ├── CoreContactImportProvenanceProjectStateTest.php
 │   │   │   ├── FlowRoutesProjectStateRoundTripTest.php
+│   │   │   ├── FormsProjectStateRoundTripTest.php
 │   │   │   ├── InboundEmailRouteProjectStateRoundTripTest.php
 │   │   │   ├── InboundInboxProjectStateContractTest.php
 │   │   │   ├── InboundMessagingProjectStateRoundTripTest.php
@@ -3314,6 +3330,8 @@
 │   │   │   ├── TasksProjectStateRoundTripTest.php
 │   │   │   ├── WebinarProjectStateRoundTripTest.php
 │   │   │   └── WorkflowProjectStateRoundTripTest.php
+│   │   ├── PublicSurfaces
+│   │   │   └── MetaPixelTrackingTest.php
 │   │   ├── Relationships
 │   │   │   ├── ContactRelationshipImportHandlerTest.php
 │   │   │   ├── ContactRelationshipWorkspaceTest.php
@@ -3524,4 +3542,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-835 directories, 2690 files
+839 directories, 2704 files

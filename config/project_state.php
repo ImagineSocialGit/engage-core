@@ -2,6 +2,7 @@
 
 $sections = [
     'core' => require __DIR__.'/project_state/core.php',
+    'forms' => require __DIR__.'/project_state/forms.php',
     'scheduling' => require __DIR__.'/project_state/scheduling.php',
     'relationships' => require __DIR__.'/project_state/relationships.php',
     'location' => require __DIR__.'/project_state/location.php',
