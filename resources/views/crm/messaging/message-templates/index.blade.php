@@ -12,7 +12,7 @@
 
         @if($errors->any())
             <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
-                <p class="font-bold">The message could not be published.</p>
+                <p class="font-bold">The message template action could not be completed.</p>
                 <ul class="mt-2 list-disc space-y-1 pl-5">
                     @foreach($errors->all() as $error)
                         <li>{{ $error }}</li>
@@ -119,28 +119,24 @@
 
                     <div class="max-h-[44rem] divide-y divide-slate-100 overflow-y-auto">
                         @forelse($catalogGroups as $group)
-                            @php
-                                $firstEntry = $group['entries']->first();
-                                $firstPreset = $firstEntry?->messageTemplatePreset;
-                                $groupUrl = route('crm.messaging.message-templates.index', array_filter([
+                            <a
+                                href="{{ route('crm.messaging.message-templates.index', array_filter([
                                     'q' => $filters['q'],
                                     'channel' => $filters['channel'],
                                     'purpose' => $filters['purpose'],
                                     'module' => $filters['module'],
                                     'group' => $group['key'],
-                                    'preset' => $firstPreset?->getKey(),
-                                ]));
-                                $selected = ($selectedGroup['key'] ?? null) === $group['key'];
-                            @endphp
-
-                            <a href="{{ $groupUrl }}" class="block px-4 py-4 transition hover:bg-slate-50 sm:px-5 {{ $selected ? 'bg-indigo-50/70' : '' }}">
+                                    'preset' => $group['entries']->first()?->messageTemplatePreset?->getKey(),
+                                ])) }}"
+                                class="block px-4 py-4 transition hover:bg-slate-50 sm:px-5 {{ ($selectedGroup['key'] ?? null) === $group['key'] ? 'bg-indigo-50/70' : '' }}"
+                            >
                                 <div class="flex items-start justify-between gap-3">
                                     <div class="min-w-0">
                                         <div class="text-xs font-extrabold uppercase tracking-wide text-slate-500">{{ $group['module_label'] }} · {{ strtoupper($group['channel']) }}</div>
                                         <div class="mt-1 break-words text-sm font-extrabold text-slate-950">{{ $group['label'] }}</div>
                                         <div class="mt-1 text-xs text-slate-500">{{ $group['entries']->count() }} {{ \Illuminate\Support\Str::plural('message', $group['entries']->count()) }}</div>
                                     </div>
-                                    @if($selected)
+                                    @if(($selectedGroup['key'] ?? null) === $group['key'])
                                         <span class="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-bold text-indigo-800">Open</span>
                                     @endif
                                 </div>
@@ -198,11 +194,6 @@
                                         </div>
 
                                         @foreach($sharedCompositionLayers as $shared)
-                                            @php
-                                                $layer = $shared['layer'];
-                                                $layerPayload = is_array($layer->payload) ? $layer->payload : [];
-                                            @endphp
-
                                             <details class="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4" @if($loop->count === 1) open @endif>
                                                 <summary class="cursor-pointer list-none">
                                                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -214,11 +205,11 @@
                                                     </div>
                                                 </summary>
 
-                                                <form method="POST" action="{{ route('crm.messaging.message-templates.composition-layers.update', $layer) }}" class="mt-5 space-y-4">
+                                                <form method="POST" action="{{ route('crm.messaging.message-templates.composition-layers.update', $shared['layer']) }}" class="mt-5 space-y-4">
                                                     @csrf
                                                     @method('PATCH')
 
-                                                    @foreach($layerPayload as $field => $value)
+                                                    @foreach(is_array($shared['layer']->payload) ? $shared['layer']->payload : [] as $field => $value)
                                                         @if(in_array($field, ['subject', 'footer']))
                                                             <div>
                                                                 <label class="mb-1.5 block text-sm font-extrabold text-slate-800">{{ \Illuminate\Support\Str::headline($field) }}</label>
@@ -303,6 +294,43 @@
                                             <div><dt class="font-bold text-slate-900">Source</dt><dd>{{ $selectedPreset->source_config_path ?: 'Database template' }}</dd></div>
                                             <div><dt class="font-bold text-slate-900">Message override</dt><dd>{{ $messageOverrideLayer ? 'Active' : 'Inherits shared/source content' }}</dd></div>
                                         </dl>
+
+                                        <div class="mt-5 border-t border-slate-200 pt-4" x-data="{ confirmingDelete: false }">
+                                            <p class="text-xs leading-5 text-slate-500">
+                                                Delete removes this template from the library while preserving immutable published and scheduled history. If a Campaign, Flow Route, Broadcast, or active module selection still needs it, deletion is blocked.
+                                            </p>
+
+                                            <button
+                                                type="button"
+                                                x-show="! confirmingDelete"
+                                                x-on:click="confirmingDelete = true"
+                                                class="mt-3 inline-flex min-h-10 items-center justify-center rounded-full border border-red-300 bg-white px-4 text-xs font-extrabold text-red-700 transition hover:bg-red-50"
+                                            >
+                                                Delete template
+                                            </button>
+
+                                            <div x-show="confirmingDelete" x-cloak class="mt-3 rounded-xl border border-red-200 bg-red-50 p-3">
+                                                <p class="text-xs font-semibold leading-5 text-red-900">
+                                                    Delete this template from the message library?
+                                                </p>
+                                                <div class="mt-3 flex flex-wrap gap-2">
+                                                    <form method="POST" action="{{ route('crm.messaging.message-templates.destroy', $selectedPreset) }}">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="inline-flex min-h-9 items-center justify-center rounded-full bg-red-700 px-4 text-xs font-extrabold text-white transition hover:bg-red-800">
+                                                            Yes, delete template
+                                                        </button>
+                                                    </form>
+                                                    <button
+                                                        type="button"
+                                                        x-on:click="confirmingDelete = false"
+                                                        class="inline-flex min-h-9 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-xs font-extrabold text-slate-700"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </section>
                             </div>

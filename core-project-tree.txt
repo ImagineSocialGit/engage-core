@@ -875,6 +875,7 @@
 │   │   │   │   ├── CancelMessageChainEnrollmentAction.php
 │   │   │   │   ├── ClaimScheduledMessageForSendingAction.php
 │   │   │   │   ├── CreateReusableMessageTemplateAction.php
+│   │   │   │   ├── DeleteMessageTemplatePresetAction.php
 │   │   │   │   ├── DispatchConsentOptInMessageAction.php
 │   │   │   │   ├── DispatchMessageAction.php
 │   │   │   │   ├── DispatchMessageIntentsAction.php
@@ -926,6 +927,7 @@
 │   │   │   │   ├── MessageRecipientGate.php
 │   │   │   │   ├── MessageRecipientPayloadProvider.php
 │   │   │   │   ├── MessageTemplateDefinitionContributor.php
+│   │   │   │   ├── MessageTemplateDeletionReferenceContributor.php
 │   │   │   │   ├── MessageTemplatePublicationHook.php
 │   │   │   │   ├── ReusableMessageTemplateAuthoringOptionContributor.php
 │   │   │   │   └── Sms
@@ -936,6 +938,7 @@
 │   │   │   │   │   ├── ContactDirectMessageController.php
 │   │   │   │   │   ├── CreateFlowRouteMessageTemplateController.php
 │   │   │   │   │   ├── CreateReusableMessageTemplateController.php
+│   │   │   │   │   ├── DeleteMessageTemplatePresetController.php
 │   │   │   │   │   ├── MessageDeliveryIssueController.php
 │   │   │   │   │   └── MessageTemplatePresetController.php
 │   │   │   │   ├── Public
@@ -959,6 +962,7 @@
 │   │   │   │   │   └── EmailHygieneResult.php
 │   │   │   │   ├── MessageData.php
 │   │   │   │   ├── MessageTemplateDefinitionContribution.php
+│   │   │   │   ├── MessageTemplateDeletionReference.php
 │   │   │   │   ├── MessageTemplatePresetPublicationResult.php
 │   │   │   │   ├── ResolvedMessageDispatch.php
 │   │   │   │   ├── ReusableMessageTemplateAuthoringContext.php
@@ -1094,6 +1098,7 @@
 │   │   │   │   ├── MessageTemplateCompositionResolver.php
 │   │   │   │   ├── MessageTemplateCompositionSchema.php
 │   │   │   │   ├── MessageTemplateDefinitionRegistry.php
+│   │   │   │   ├── MessageTemplateDeletionReferenceRegistry.php
 │   │   │   │   ├── MessageTemplateDisplayLabelResolver.php
 │   │   │   │   ├── MessageTemplatePresetAssignmentResolver.php
 │   │   │   │   ├── MessageTemplatePublicationHookRegistry.php
@@ -1854,9 +1859,14 @@
 │   │   │   │   │   └── TeamMemberTaskAssigneeOptionProvider.php
 │   │   │   │   └── UserTeamMemberBridge.php
 │   │   │   ├── Messaging
+│   │   │   │   ├── Broadcasts
+│   │   │   │   │   └── BroadcastMessageTemplateDeletionReferenceContributor.php
+│   │   │   │   ├── Campaigns
+│   │   │   │   │   └── CampaignTouchMessageTemplateDeletionReferenceContributor.php
 │   │   │   │   ├── Contracts
 │   │   │   │   │   └── MessageMediaLibrary.php
 │   │   │   │   ├── FlowRoutes
+│   │   │   │   │   ├── FlowRouteMessageTemplateDeletionReferenceContributor.php
 │   │   │   │   │   └── FlowRouteReusableMessageTemplateAuthoringContributor.php
 │   │   │   │   ├── Media
 │   │   │   │   │   └── MediaMessageMediaLibrary.php
@@ -3232,6 +3242,7 @@
 │   │   │   ├── MessageTemplateCompositionSyncTest.php
 │   │   │   ├── MessageTemplateCompositionTest.php
 │   │   │   ├── MessageTemplateCompositionValidationTest.php
+│   │   │   ├── MessageTemplateDeletionTest.php
 │   │   │   ├── MessageTemplateEditorVersionCutoverTest.php
 │   │   │   ├── MessageTemplateMediaVersioningTest.php
 │   │   │   ├── MessageTemplatePresetAssignmentResolverTest.php
@@ -3552,4 +3563,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-841 directories, 2712 files
+843 directories, 2721 files

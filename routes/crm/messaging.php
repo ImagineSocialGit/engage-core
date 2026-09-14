@@ -2,6 +2,7 @@
 
 use App\Modules\Messaging\Controllers\CRM\CreateFlowRouteMessageTemplateController;
 use App\Modules\Messaging\Controllers\CRM\CreateReusableMessageTemplateController;
+use App\Modules\Messaging\Controllers\CRM\DeleteMessageTemplatePresetController;
 use App\Modules\Messaging\Controllers\CRM\ContactDirectMessageController;
 use App\Modules\Messaging\Controllers\CRM\MessageDeliveryIssueController;
 use App\Modules\Messaging\Controllers\CRM\MessageTemplatePresetController;
@@ -51,4 +52,7 @@ Route::middleware('module:messaging')
 
         Route::patch('/{messageTemplatePreset}', [MessageTemplatePresetController::class, 'update'])
             ->name('update');
+
+        Route::delete('/{messageTemplatePreset}', DeleteMessageTemplatePresetController::class)
+            ->name('destroy');
     });

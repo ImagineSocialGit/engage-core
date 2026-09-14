@@ -3,7 +3,11 @@
 namespace App\Providers\Modules;
 
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
+use App\Modules\Messaging\Contracts\MessageTemplateDeletionReferenceContributor;
 use App\Modules\Messaging\Contracts\ReusableMessageTemplateAuthoringOptionContributor;
+use App\Support\ModuleIntegrations\Messaging\Broadcasts\BroadcastMessageTemplateDeletionReferenceContributor;
+use App\Support\ModuleIntegrations\Messaging\Campaigns\CampaignTouchMessageTemplateDeletionReferenceContributor;
+use App\Support\ModuleIntegrations\Messaging\FlowRoutes\FlowRouteMessageTemplateDeletionReferenceContributor;
 use App\Support\ModuleIntegrations\Messaging\FlowRoutes\FlowRouteReusableMessageTemplateAuthoringContributor;
 use App\Support\ModuleIntegrations\Scheduling\Automation\AppointmentHostNotificationAutomationCapabilityContributor;
 use App\Support\ModuleIntegrations\Scheduling\Automation\AppointmentHostNotificationAutomationPointAuthoringContributor;
@@ -25,6 +29,12 @@ class IntegrationsModuleServiceProvider extends ServiceProvider
     public function register(): void
     {
         $enabled = $this->app->make(ModuleManager::class)->enabledKeysWithDependencies();
+
+        $this->app->tag([
+            BroadcastMessageTemplateDeletionReferenceContributor::class,
+            CampaignTouchMessageTemplateDeletionReferenceContributor::class,
+            FlowRouteMessageTemplateDeletionReferenceContributor::class,
+        ], MessageTemplateDeletionReferenceContributor::TAG);
 
         if ($this->has($enabled, ['flow_routes', 'messaging'])) {
             $this->app->tag(
