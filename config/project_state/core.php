@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 5,
+    'version' => 6,
     'tables' => [
         'business_calendars' => [
             'mode' => 'upsert',
@@ -109,6 +109,7 @@ return [
                 'meta',
                 'created_at',
                 'updated_at',
+                'deleted_at',
             ],
             'json_columns' => ['meta'],
             'null_on_import' => [

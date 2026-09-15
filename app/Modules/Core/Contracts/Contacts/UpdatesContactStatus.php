@@ -20,4 +20,18 @@ interface UpdatesContactStatus
         array $meta = [],
         bool $force = false,
     ): Contact;
+
+    /**
+     * Remove the current generic Contact status while preserving the Workflow
+     * profile and any unrelated Workflow assignment context.
+     *
+     * @param array<string, mixed> $meta
+     */
+    public function clear(
+        Contact $contact,
+        ?string $reason = null,
+        ?string $source = null,
+        ?Model $actor = null,
+        array $meta = [],
+    ): Contact;
 }

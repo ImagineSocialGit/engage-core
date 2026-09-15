@@ -6,6 +6,7 @@ use App\Modules\Core\Events\ManualContactCreated;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
+use App\Modules\Messaging\Actions\CancelContactMessagingRuntimeAction;
 use App\Modules\Messaging\Automation\MessagingAutomationPointAuthoringContributor;
 use App\Modules\Messaging\Automation\MessagingAutomationPointDefinitionContributor;
 use App\Modules\Messaging\Automation\SendMessageAutomationActionHandler;
@@ -277,6 +278,10 @@ class MessagingModuleServiceProvider extends ServiceProvider
                 SyncMessageTemplatePresetsCommand::class,
             ]);
         }
+
+        Contact::deleting(function (Contact $contact): void {
+            app(CancelContactMessagingRuntimeAction::class)->handle($contact);
+        });
 
         Contact::resolveRelationUsing('messageConsents', function (Contact $contact): HasMany {
             return $contact->hasMany(MessageConsent::class);

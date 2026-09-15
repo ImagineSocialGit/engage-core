@@ -14,6 +14,7 @@ final class HandleEmailProviderEventAction
     public function __construct(
         private readonly MessageSuppressionService $suppressions,
         private readonly RevokeMessageConsentAction $revokeMessageConsent,
+        private readonly SkipScheduledMessagesAction $skipScheduledMessages,
     ) {}
 
     /**
@@ -68,6 +69,17 @@ final class HandleEmailProviderEventAction
                 sourceEventId: $sourceEventId,
                 meta: $this->suppressionMeta($event, $eventType),
             );
+
+            Contact::query()
+                ->whereRaw('LOWER(email) = ?', [strtolower($email)])
+                ->get()
+                ->each(function (Contact $contact) use ($reason): void {
+                    $this->skipScheduledMessages->forRecipientChannel(
+                        recipient: $contact,
+                        channel: MessageChannel::Email->value,
+                        reason: 'destination_suppressed_'.$reason,
+                    );
+                });
         }
     }
 

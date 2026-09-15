@@ -11,6 +11,9 @@
             taskModalOpen: @js($errors->has('assigned_to_id') || $errors->has('assigned_to_type') || $errors->has('links') || $errors->has('title') || $errors->has('description') || $errors->has('due_at')),
             contactEditField: @js(old('contact_edit_context')),
             contactDetailsModalOpen: @js(old('contact_edit_context') === 'details'),
+            contactTagAddOpen: @js(old('contact_tag_context') === 'add'),
+            contactTagEditId: @js(old('contact_tag_context') === 'edit' ? (string) old('contact_tag_id') : null),
+            contactDeleteOpen: false,
         }"
     >
         @if(session('success'))
@@ -345,18 +348,172 @@
                     </div>
                 </div>
 
-                @if($contactTags->isNotEmpty())
-                    <div data-contact-tags>
-                        <p class="text-sm text-slate-500">Tags</p>
-                        <div class="mt-2 flex flex-wrap gap-2">
-                            @foreach($contactTags as $tag)
-                                <span class="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-100">
-                                    {{ $tag }}
-                                </span>
+                <div data-contact-tags>
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <p class="text-sm font-medium text-slate-700">Tags</p>
+                            <p class="text-xs text-slate-500">
+                                Add lightweight facts you can use for filtering and automation.
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="text-xs font-semibold text-indigo-600 underline decoration-indigo-200 underline-offset-4 hover:text-indigo-800"
+                            x-on:click="contactTagAddOpen = ! contactTagAddOpen; contactTagEditId = null"
+                            data-contact-tag-add-toggle
+                        >
+                            Add tag
+                        </button>
+                    </div>
+
+                    @if($contactTags->isEmpty())
+                        <p class="mt-2 text-sm text-slate-500" data-contact-tags-empty>
+                            No tags yet.
+                        </p>
+                    @else
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            @foreach($contactTags as $contactTag)
+                                <div
+                                    class="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2"
+                                    data-contact-tag="{{ $contactTag->id }}"
+                                >
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-semibold text-indigo-700">
+                                            {{ $contactTag->tag }}
+                                        </span>
+
+                                        <button
+                                            type="button"
+                                            class="text-[11px] font-semibold text-slate-500 hover:text-slate-900"
+                                            x-on:click="contactTagEditId = contactTagEditId === @js((string) $contactTag->id) ? null : @js((string) $contactTag->id); contactTagAddOpen = false"
+                                            aria-label="Edit tag {{ $contactTag->tag }}"
+                                            data-contact-tag-edit-toggle
+                                        >
+                                            Edit
+                                        </button>
+
+                                        <form
+                                            method="POST"
+                                            action="{{ route('crm.contacts.tags.destroy', [$contact, $contactTag]) }}"
+                                            x-on:submit="if (! window.confirm('Remove this tag?')) $event.preventDefault()"
+                                            data-contact-tag-remove-form
+                                        >
+                                            @csrf
+                                            @method('DELETE')
+
+                                            <button
+                                                type="submit"
+                                                class="text-[11px] font-semibold text-red-600 hover:text-red-800"
+                                                aria-label="Remove tag {{ $contactTag->tag }}"
+                                            >
+                                                Remove
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    <form
+                                        x-show="contactTagEditId === @js((string) $contactTag->id)"
+                                        x-cloak
+                                        method="POST"
+                                        action="{{ route('crm.contacts.tags.update', [$contact, $contactTag]) }}"
+                                        class="mt-2 min-w-64"
+                                        data-contact-tag-edit-form
+                                    >
+                                        @csrf
+                                        @method('PATCH')
+                                        <input type="hidden" name="contact_tag_context" value="edit">
+                                        <input type="hidden" name="contact_tag_id" value="{{ $contactTag->id }}">
+
+                                        <div class="flex flex-col gap-2 sm:flex-row">
+                                            <div class="min-w-0 flex-1">
+                                                <x-ui.form.input
+                                                    name="tag"
+                                                    value="{{ old('contact_tag_context') === 'edit' && (int) old('contact_tag_id') === (int) $contactTag->id ? old('tag') : $contactTag->tag }}"
+                                                    list="contact-tag-suggestions"
+                                                    maxlength="255"
+                                                    aria-label="Tag"
+                                                />
+
+                                                @if(old('contact_tag_context') === 'edit' && (int) old('contact_tag_id') === (int) $contactTag->id)
+                                                    <x-ui.form.error name="tag" />
+                                                @endif
+                                            </div>
+
+                                            <div class="flex gap-2">
+                                                <x-ui.button type="submit" class="w-full sm:w-auto">
+                                                    Save
+                                                </x-ui.button>
+                                                <x-ui.button
+                                                    type="button"
+                                                    variant="outline"
+                                                    class="w-full sm:w-auto"
+                                                    x-on:click="contactTagEditId = null"
+                                                >
+                                                    Cancel
+                                                </x-ui.button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
                             @endforeach
                         </div>
-                    </div>
-                @endif
+                    @endif
+
+                    <form
+                        x-show="contactTagAddOpen"
+                        x-cloak
+                        method="POST"
+                        action="{{ route('crm.contacts.tags.store', $contact) }}"
+                        class="mt-3 max-w-xl rounded-xl border border-slate-200 bg-slate-50 p-3"
+                        data-contact-tag-add-form
+                    >
+                        @csrf
+                        <input type="hidden" name="contact_tag_context" value="add">
+
+                        <x-ui.form.label for="contact_tag_new">
+                            Add tag
+                        </x-ui.form.label>
+
+                        <div class="mt-1 flex flex-col gap-2 sm:flex-row">
+                            <div class="min-w-0 flex-1">
+                                <x-ui.form.input
+                                    id="contact_tag_new"
+                                    name="tag"
+                                    value="{{ old('contact_tag_context') === 'add' ? old('tag') : '' }}"
+                                    list="contact-tag-suggestions"
+                                    maxlength="255"
+                                    autocomplete="off"
+                                    placeholder="Start typing or enter a new tag"
+                                />
+
+                                @if(old('contact_tag_context') === 'add')
+                                    <x-ui.form.error name="tag" />
+                                @endif
+                            </div>
+
+                            <div class="flex gap-2">
+                                <x-ui.button type="submit" class="w-full sm:w-auto">
+                                    Add
+                                </x-ui.button>
+                                <x-ui.button
+                                    type="button"
+                                    variant="outline"
+                                    class="w-full sm:w-auto"
+                                    x-on:click="contactTagAddOpen = false"
+                                >
+                                    Cancel
+                                </x-ui.button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <datalist id="contact-tag-suggestions">
+                        @foreach($contactTagSuggestions as $tagSuggestion)
+                            <option value="{{ $tagSuggestion }}"></option>
+                        @endforeach
+                    </datalist>
+                </div>
 
                 <div class="flex flex-wrap gap-2">
                     @if(module_enabled('tasks'))
@@ -400,6 +557,10 @@
                                 </x-ui.form.label>
 
                                 <x-ui.form.select id="contact_status_id" name="contact_status_id">
+                                    <option value="" @selected(old('contact_status_id', $contact->workflowProfile?->contact_status_id) === null)>
+                                        No status
+                                    </option>
+
                                     @foreach($contactStatuses as $contactStatus)
                                         <option
                                             value="{{ $contactStatus->id }}"
@@ -420,7 +581,7 @@
                             </div>
 
                             <x-ui.button type="submit" class="w-full sm:w-auto">
-                                Update Status
+                                Save Status
                             </x-ui.button>
                         </div>
                     </form>
@@ -492,6 +653,76 @@
                     @endforeach
                 </div>
             @endif
+        </div>
+
+        <div class="space-y-6 xl:col-start-1">
+            <x-ui.card class="border-red-200" data-contact-delete-zone>
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-red-600">
+                            Delete Contact
+                        </p>
+                        <p class="mt-1 text-sm text-slate-600">
+                            Removes this Contact from active CRM surfaces and stops future Contact messaging.
+                            Historical records and delivery suppression evidence are retained.
+                        </p>
+                    </div>
+
+                    <x-ui.button
+                        type="button"
+                        variant="outline"
+                        class="border-red-300 text-red-700 hover:bg-red-50"
+                        x-on:click="contactDeleteOpen = true"
+                        data-contact-delete-open
+                    >
+                        Delete Contact
+                    </x-ui.button>
+                </div>
+            </x-ui.card>
+        </div>
+
+        <div
+            x-show="contactDeleteOpen"
+            x-cloak
+            class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="contact-delete-title"
+            data-contact-delete-modal
+        >
+            <div
+                class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+                x-on:click.outside="contactDeleteOpen = false"
+            >
+                <h2 id="contact-delete-title" class="text-lg font-semibold text-slate-950">
+                    Delete {{ $contactName }}?
+                </h2>
+
+                <p class="mt-2 text-sm leading-6 text-slate-600">
+                    The Contact will disappear from active CRM surfaces and pending Contact messaging
+                    will be stopped. Historical records, sent-message history, and suppression evidence
+                    remain retained system history.
+                </p>
+
+                <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <x-ui.button type="button" variant="outline" x-on:click="contactDeleteOpen = false">
+                        Keep Contact
+                    </x-ui.button>
+
+                    <form method="POST" action="{{ route('crm.contacts.destroy', $contact) }}">
+                        @csrf
+                        @method('DELETE')
+
+                        <x-ui.button
+                            type="submit"
+                            class="w-full bg-red-700 hover:bg-red-800 sm:w-auto"
+                            data-contact-delete-confirm
+                        >
+                            Delete Contact
+                        </x-ui.button>
+                    </form>
+                </div>
+            </div>
         </div>
 
         @if($contactHasRail)
@@ -1012,7 +1243,7 @@
                                 <p>
                                     Send time:
                                     <span class="font-medium text-slate-700">
-                                        {{ $message->send_at?->format('M j, Y g:i A') ?? '—' }}
+                                        {{ $message->send_at?->setTimezone($clientTimezone)->format('M j, Y g:i A') ?? '—' }}
                                     </span>
                                 </p>
 

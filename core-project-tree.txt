@@ -344,6 +344,7 @@
 │   │   │   │   ├── ContactLookupController.php
 │   │   │   │   ├── ContactNoteController.php
 │   │   │   │   ├── ContactResultActionController.php
+│   │   │   │   ├── ContactTagController.php
 │   │   │   │   └── SettingsController.php
 │   │   │   ├── Data
 │   │   │   │   └── Contacts
@@ -872,6 +873,7 @@
 │   │   │   │   ├── AssignMessageTemplatePresetAction.php
 │   │   │   │   ├── AttachScheduledMessageComponentsAction.php
 │   │   │   │   ├── BuildConsentOptInMessageIntentAction.php
+│   │   │   │   ├── CancelContactMessagingRuntimeAction.php
 │   │   │   │   ├── CancelMessageChainEnrollmentAction.php
 │   │   │   │   ├── ClaimScheduledMessageForSendingAction.php
 │   │   │   │   ├── CreateReusableMessageTemplateAction.php
@@ -2266,7 +2268,8 @@
 │   │   │   │   ├── 2026_08_26_145500_create_business_calendars_table.php
 │   │   │   │   ├── 2026_08_28_214500_create_contact_import_runs_table.php
 │   │   │   │   ├── 2026_08_29_191700_add_batch_contact_index_to_contact_import_occurrences_table.php
-│   │   │   │   └── 2026_09_04_210000_add_team_access_foundation.php
+│   │   │   │   ├── 2026_09_04_210000_add_team_access_foundation.php
+│   │   │   │   └── 2026_09_15_202000_add_soft_deletes_to_contacts_table.php
 │   │   │   ├── documents
 │   │   │   │   ├── 2026_07_02_000001_create_document_requirement_definitions_table.php
 │   │   │   │   ├── 2026_07_02_000002_create_document_requests_table.php
@@ -2385,6 +2388,12 @@
 │       ├── DatabaseSeeder.php
 │       └── WebinarSeeder.php
 ├── docs
+│   ├── architecture
+│   │   └── deployment
+│   │       ├── command-ownership.md
+│   │       ├── deployment-orchestrator-contract.md
+│   │       ├── deployment-plan-and-environment.md
+│   │       └── README.md
 │   ├── automation-opportunities.md
 │   ├── config-templates
 │   │   ├── campaign-presets-template.php
@@ -2510,13 +2519,9 @@
 │   ├── module-ui-ux-review-playbook.md
 │   ├── operations
 │   │   ├── client-environment-reference.md
-│   │   ├── client-launch-orchestrated-runbook.md
-│   │   ├── client-staging-production-setup-checklist.md
 │   │   ├── client-third-party-services-checklist.md
 │   │   ├── crm-user-administration.md
-│   │   ├── deployment-command-workflow.md
-│   │   ├── deployment-orchestrator-contract.md
-│   │   ├── deployment-plan-and-environment.md
+│   │   ├── deployment-runbook.md
 │   │   ├── deployment-safety-and-troubleshooting.md
 │   │   ├── launch-client-environment.example.conf
 │   │   ├── observability
@@ -3000,6 +3005,7 @@
 │   │   │   ├── ContactAudienceExclusionTest.php
 │   │   │   ├── ContactBirthdayFoundationTest.php
 │   │   │   ├── ContactControllerTest.php
+│   │   │   ├── ContactDeletionTest.php
 │   │   │   ├── ContactFilterCriteriaTest.php
 │   │   │   ├── ContactFilterFactsChangedOutboxTest.php
 │   │   │   ├── ContactFilterResolverTest.php
@@ -3024,6 +3030,7 @@
 │   │   │   ├── ContactQuickEditTest.php
 │   │   │   ├── ContactResultActionTest.php
 │   │   │   ├── ContactShowLayoutTest.php
+│   │   │   ├── ContactStatusAndTagManagementTest.php
 │   │   │   ├── ContactStatusImportTreatmentTest.php
 │   │   │   ├── ContactTagAutomationTest.php
 │   │   │   ├── CoreSetupValidationContributorTest.php
@@ -3187,6 +3194,7 @@
 │   │   │   ├── ConsentDomainRegistryTest.php
 │   │   │   ├── ConsentOptInDefinitionResolverTest.php
 │   │   │   ├── ConsentRevocationControllerTest.php
+│   │   │   ├── ContactDeletionMessagingSafetyTest.php
 │   │   │   ├── ContactDirectMessageTest.php
 │   │   │   ├── ContactImportMarketingPermissionControllerTest.php
 │   │   │   ├── ContactPermissionInvitationControllerTest.php
@@ -3264,6 +3272,7 @@
 │   │   │   ├── MessagingSetupValidationContributorTest.php
 │   │   │   ├── ModuleOwnedMessageTemplateSyncTest.php
 │   │   │   ├── ProviderSubmissionLimiterTest.php
+│   │   │   ├── ProviderSuppressionRuntimeSafetyTest.php
 │   │   │   ├── PublishMessageTemplatePresetOverrideActionTest.php
 │   │   │   ├── QueueContractTest.php
 │   │   │   ├── ReplyProfileSetupValidationTest.php
@@ -3567,4 +3576,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-843 directories, 2725 files
+845 directories, 2732 files

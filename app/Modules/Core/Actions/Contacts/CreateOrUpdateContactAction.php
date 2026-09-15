@@ -25,9 +25,13 @@ class CreateOrUpdateContactAction
             $targetStatusId = $this->resolveContactStatus->handle($statusKey)?->id;
         }
 
-        $contact = Contact::query()->firstOrNew([
+        $contact = Contact::withTrashed()->firstOrNew([
             'email' => $email,
         ]);
+
+        if ($contact->exists && $contact->trashed()) {
+            $contact->restore();
+        }
 
         $source = $data['source'] ?? (
             $contact->exists

@@ -51,43 +51,81 @@
                     </p>
                 @endif
 
-                @if($issue['can_release'])
-                    <form
-                        method="POST"
-                        action="{{ route('crm.messaging.delivery-issues.release', $suppression) }}"
-                        class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
-                    >
-                        @csrf
-                        <input type="hidden" name="return_to" value="{{ request()->getRequestUri() }}">
+                <div class="mt-4 grid gap-3 lg:grid-cols-2" data-delivery-issue-resolution-options>
+                    @if($issue['can_release'])
+                        <div class="rounded-xl border border-slate-200 bg-white p-3">
+                            <p class="text-xs font-semibold text-slate-950">Keep this Contact</p>
+                            <p class="mt-1 text-xs leading-5 text-slate-500">
+                                Release only when this destination is genuinely correct and safe to retry.
+                            </p>
 
-                        <div>
-                            <x-ui.form.label :for="$fieldId">
-                                Release only after verification
-                            </x-ui.form.label>
-                            <x-ui.form.select :id="$fieldId" name="resolution_reason" required>
-                                <option value="">Choose a reason</option>
-                                <option value="destination_verified">Verified destination is correct</option>
-                                <option value="provider_issue_resolved">Provider issue resolved</option>
-                                <option value="manual_review_resolved">Reviewed and safe to retry</option>
-                            </x-ui.form.select>
+                            <form
+                                method="POST"
+                                action="{{ route('crm.messaging.delivery-issues.release', $suppression) }}"
+                                class="mt-3 space-y-2"
+                            >
+                                @csrf
+                                <input type="hidden" name="return_to" value="{{ request()->getRequestUri() }}">
+
+                                <div>
+                                    <x-ui.form.label :for="$fieldId">
+                                        Release reason
+                                    </x-ui.form.label>
+                                    <x-ui.form.select :id="$fieldId" name="resolution_reason" required>
+                                        <option value="">Choose a reason</option>
+                                        <option value="destination_verified">Verified destination is correct</option>
+                                        <option value="provider_issue_resolved">Provider issue resolved</option>
+                                        <option value="manual_review_resolved">Reviewed and safe to retry</option>
+                                    </x-ui.form.select>
+                                </div>
+
+                                <x-ui.button type="submit" variant="secondary" class="w-full justify-center">
+                                    Release suppression
+                                </x-ui.button>
+                            </form>
                         </div>
+                    @else
+                        <div class="rounded-xl border border-slate-200 bg-white p-3">
+                            <p class="text-xs font-semibold text-slate-950">Keep this Contact</p>
+                            <p class="mt-1 text-xs leading-5 text-slate-500">
+                                Complaint suppressions are intentionally not releasable from this screen.
+                            </p>
+                        </div>
+                    @endif
 
-                        <x-ui.button type="submit" variant="secondary">
-                            Release suppression
-                        </x-ui.button>
-                    </form>
-                @else
-                    <p class="mt-4 text-sm font-medium text-amber-950">
-                        Complaint suppressions are intentionally not releasable from this screen.
-                    </p>
-                @endif
+                    <div class="rounded-xl border border-red-200 bg-red-50 p-3">
+                        <p class="text-xs font-semibold text-red-900">Delete this Contact</p>
+                        <p class="mt-1 text-xs leading-5 text-red-800/80">
+                            Use this when the Contact itself is invalid or should no longer exist in the active CRM.
+                            The suppression remains historical delivery evidence.
+                        </p>
+
+                        <form
+                            method="POST"
+                            action="{{ route('crm.contacts.destroy', $contact) }}"
+                            class="mt-3"
+                            x-on:submit="if (! window.confirm('Delete this Contact? Historical delivery and suppression evidence will be retained.')) $event.preventDefault()"
+                            data-delivery-issue-delete-contact
+                        >
+                            @csrf
+                            @method('DELETE')
+
+                            <button
+                                type="submit"
+                                class="w-full rounded-xl border border-red-300 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.14em] text-red-700 hover:bg-red-100"
+                            >
+                                Delete Contact
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </div>
         @endforeach
     </div>
 
     <p class="text-xs leading-5 text-slate-500">
-        If the Contact information is wrong, correct the Contact instead of releasing the suppression.
-        The old destination remains suppressed as historical delivery evidence and automatically stops
-        appearing here once it is no longer current for this Contact.
+        If only the destination is wrong, correct the Contact instead of releasing the suppression.
+        If the Contact itself is invalid, delete the Contact. In either case, the old destination remains
+        suppressed as historical delivery evidence unless an operator explicitly releases it.
     </p>
 </x-ui.card>

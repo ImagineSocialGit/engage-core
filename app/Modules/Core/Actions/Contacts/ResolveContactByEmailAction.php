@@ -85,17 +85,29 @@ class ResolveContactByEmailAction
 
     private function existingContact(string $email): ?Contact
     {
-        return Contact::query()
+        $contact = Contact::withTrashed()
             ->where('email', $email)
             ->first();
+
+        if ($contact instanceof Contact && $contact->trashed()) {
+            $contact->restore();
+        }
+
+        return $contact;
     }
 
     private function winningContact(string $email): ?Contact
     {
-        return Contact::query()
+        $contact = Contact::withTrashed()
             ->where('email', $email)
             ->lockForUpdate()
             ->first();
+
+        if ($contact instanceof Contact && $contact->trashed()) {
+            $contact->restore();
+        }
+
+        return $contact;
     }
 
     private function normalizedEmail(string $email): string

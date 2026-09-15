@@ -14,6 +14,7 @@ use App\Modules\Core\Jobs\ProcessContactImportBatchChunkJob;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Core\Models\ContactImportRun;
 use App\Modules\Core\Models\ContactStatus;
+use App\Modules\Core\Models\ContactTag;
 use App\Modules\Core\Data\Contacts\ContactPanel;
 use App\Modules\Core\Data\Contacts\ContactResultAction;
 use App\Modules\Core\Requests\StoreContactRequest;
@@ -222,6 +223,15 @@ class ContactController extends Controller
             ->with('success', config('contacts.labels.singular').' updated.');
     }
 
+    public function destroy(Contact $contact): RedirectResponse
+    {
+        $contact->delete();
+
+        return redirect()
+            ->route('crm.contacts.index')
+            ->with('success', config('contacts.labels.singular').' deleted.');
+    }
+
     public function show(
         Contact $contact,
         ContactPanelRegistry $contactPanelRegistry,
@@ -275,6 +285,18 @@ class ContactController extends Controller
             'contactStatuses' => module_enabled('workflow')
                 ? ContactStatus::query()->active()->ordered()->get(['id', 'name'])
                 : collect(),
+            'contactTagSuggestions' => ContactTag::query()
+                ->select('tag')
+                ->distinct()
+                ->orderBy('tag')
+                ->limit(100)
+                ->pluck('tag')
+                ->filter(fn (mixed $tag): bool => filled($tag))
+                ->values(),
+            'clientTimezone' => config(
+                'client.timezone',
+                config('app.timezone', 'UTC'),
+            ),
         ], $contactShowDataRegistry->dataFor($contact));
 
         return view(
@@ -350,8 +372,7 @@ class ContactController extends Controller
             ->values();
 
         $contactTags = $contact->tags
-            ->pluck('tag')
-            ->filter(fn (mixed $tag): bool => filled($tag))
+            ->filter(fn (ContactTag $contactTag): bool => filled($contactTag->tag))
             ->values();
         $clientTimezone = (string) config('client.timezone', config('app.timezone', 'UTC'));
         $defaultContactTaskDueAt = now($clientTimezone)
@@ -419,16 +440,34 @@ class ContactController extends Controller
 
         $validated = $request->validate([
             'contact_status_id' => [
-                'required',
+                'nullable',
                 'integer',
                 Rule::exists('contact_statuses', 'id')
                     ->where(fn ($query) => $query->where('is_active', true)),
             ],
         ]);
 
+        $statusId = $validated['contact_status_id'] ?? null;
+
+        if ($statusId === null) {
+            $updatesContactStatus->clear(
+                contact: $contact,
+                reason: 'crm_manual_status_clear',
+                source: 'crm',
+                actor: $request->user(),
+                meta: [
+                    'source' => 'contact_show_status_form',
+                ],
+            );
+
+            return redirect()
+                ->route('crm.contacts.show', $contact)
+                ->with('success', config('contacts.labels.singular').' status removed.');
+        }
+
         $status = ContactStatus::query()
             ->active()
-            ->findOrFail($validated['contact_status_id']);
+            ->findOrFail($statusId);
 
         $updatesContactStatus->handle(
             contact: $contact,

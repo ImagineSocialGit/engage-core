@@ -1,4 +1,3 @@
-
 # Core Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable module backlog in this directory's `TODO.md` when one exists.
@@ -446,3 +445,11 @@ Export CSV -> contacts.export
 ```
 
 The result-action registry is an integration seam, not a generic ACL or workflow engine.
+
+## Contact deletion
+
+CRM Contact deletion is a soft-deletion boundary, not a hard-delete cascade.
+
+Deleting a Contact sets `contacts.deleted_at`, removes the Contact from ordinary CRM queries, and preserves the Contact row so historical module records and foreign-key relationships remain intact. Enabled modules may stop their own pending runtime through module-owned deletion hooks.
+
+A later legitimate interaction using the same unique email restores the existing Contact identity rather than creating a duplicate row. Historical records remain attached to that stable Contact identity.

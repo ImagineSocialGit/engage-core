@@ -30,6 +30,30 @@ class SkipScheduledMessagesAction
         );
     }
 
+    public function forRecipient(Model $recipient, ?string $reason = null): int
+    {
+        return $this->skip(
+            query: ScheduledMessage::query()
+                ->where('recipient_type', $recipient->getMorphClass())
+                ->where('recipient_id', $recipient->getKey()),
+            reason: $reason,
+        );
+    }
+
+    public function forRecipientChannel(
+        Model $recipient,
+        string $channel,
+        ?string $reason = null,
+    ): int {
+        return $this->skip(
+            query: ScheduledMessage::query()
+                ->where('recipient_type', $recipient->getMorphClass())
+                ->where('recipient_id', $recipient->getKey())
+                ->where('channel', strtolower(trim($channel))),
+            reason: $reason,
+        );
+    }
+
     public function forContext(Model $context, ?string $reason = null): int
     {
         return $this->skip(

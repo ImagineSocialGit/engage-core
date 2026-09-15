@@ -11,6 +11,7 @@ use App\Modules\Core\Controllers\ContactImportBatchController;
 use App\Modules\Core\Controllers\ContactLookupController;
 use App\Modules\Core\Controllers\ContactNoteController;
 use App\Modules\Core\Controllers\ContactResultActionController;
+use App\Modules\Core\Controllers\ContactTagController;
 use App\Modules\Core\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -122,6 +123,10 @@ Route::prefix(config('contacts.routes.plural'))
             ->middleware('capability:contacts.manage')
             ->name('update');
 
+        Route::delete('/{contact}', [ContactController::class, 'destroy'])
+            ->middleware('capability:contacts.manage')
+            ->name('destroy');
+
         Route::patch('/{contact}/assignment', ContactAssignmentController::class)
             ->middleware('capability:contacts.assign')
             ->name('assignment.update');
@@ -129,6 +134,18 @@ Route::prefix(config('contacts.routes.plural'))
         Route::patch('/{contact}/status', [ContactController::class, 'updateStatus'])
             ->middleware(['module:workflow', 'capability:contacts.manage'])
             ->name('status.update');
+
+        Route::post('/{contact}/tags', [ContactTagController::class, 'store'])
+            ->middleware('capability:contacts.manage')
+            ->name('tags.store');
+
+        Route::patch('/{contact}/tags/{contactTag}', [ContactTagController::class, 'update'])
+            ->middleware('capability:contacts.manage')
+            ->name('tags.update');
+
+        Route::delete('/{contact}/tags/{contactTag}', [ContactTagController::class, 'destroy'])
+            ->middleware('capability:contacts.manage')
+            ->name('tags.destroy');
 
         Route::post('/{contact}/notes', [ContactNoteController::class, 'store'])
             ->middleware('capability:contacts.manage')

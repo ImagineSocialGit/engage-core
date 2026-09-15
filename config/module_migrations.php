@@ -38,7 +38,7 @@ return [
     'modules' => [
         'core' => [
             'path' => 'database/migrations/modules/core',
-            'schema_version' => 7,
+            'schema_version' => 8,
             'migrations' => [
                 '2026_04_15_195800_create_contact_statuses_table.php',
                 '2026_04_15_195849_create_contact_import_batches_table.php',
@@ -52,6 +52,7 @@ return [
                 '2026_08_28_214500_create_contact_import_runs_table.php',
                 '2026_08_29_191700_add_batch_contact_index_to_contact_import_occurrences_table.php',
                 '2026_09_04_210000_add_team_access_foundation.php',
+                '2026_09_15_202000_add_soft_deletes_to_contacts_table.php',
             ],
         ],
 
