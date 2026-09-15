@@ -4,7 +4,7 @@
 
 This checklist contains only external-provider work required to support a client environment.
 
-Use it alongside `client-staging-production-setup-checklist.md`.
+Use it alongside `deployment-runbook.md`. Environment-variable ownership remains authoritative in `client-environment-reference.md`.
 
 Do not mix provider-dashboard work with local repository configuration or server provisioning. Record who owns each external account and whether staging and production intentionally share or isolate each resource.
 

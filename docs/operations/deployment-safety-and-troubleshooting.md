@@ -18,7 +18,7 @@ duplicate registrations
 join-link scanner/prefetch safety
 ```
 
-The canonical command-level install and deployment sequence is [`operations/deployment-command-workflow.md`](deployment-command-workflow.md). After the modular migration cutover, plain `php artisan migrate` and `migrate:fresh` operate on the platform path only; module schema is handled by the explicit module commands or `engage:install`.
+The canonical operator deployment sequence is [`operations/deployment-runbook.md`](deployment-runbook.md). Command ownership is documented for maintainers in [`architecture/deployment/command-ownership.md`](../architecture/deployment/command-ownership.md). After the modular migration cutover, plain `php artisan migrate` and `migrate:fresh` operate on the platform path only; module schema is handled by the explicit module commands or `engage:install`.
 
 ---
 
@@ -847,7 +847,7 @@ php artisan presets:sync
 php artisan setup:validate
 ```
 
-For the exact new-client, existing-client, module-addition, and controlled-rebuild command sequences, use `docs/operations/deployment-command-workflow.md`.
+For operator-facing new-client, existing-client, audit/fix, module-addition, and controlled-rebuild entry points, use `docs/operations/deployment-runbook.md`. For command ownership semantics, use `docs/architecture/deployment/command-ownership.md`.
 
 ---
 
