@@ -52,7 +52,7 @@ class ContactDirectMessageProjectStateContractTest extends TestCase
         $this->assertSame($sourceContactId, (int) $exportedMessage['context_id']);
 
         $message->delete();
-        $contact->delete();
+        $contact->forceDelete();
 
         $report = $projectState->validate($document);
         $this->assertTrue($report['valid'], implode(PHP_EOL, $report['errors']));
