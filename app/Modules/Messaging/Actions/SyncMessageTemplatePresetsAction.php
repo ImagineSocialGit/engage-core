@@ -533,7 +533,10 @@ class SyncMessageTemplatePresetsAction
     ): iterable {
         foreach ($definitions as $messageType => $definition) {
             if ($messageType === 'campaigns') {
-                if ($this->moduleAvailability->campaignDefinitionsAvailable()) {
+                if (
+                    $moduleKey === 'campaigns'
+                    && $this->moduleAvailability->campaignDefinitionsAvailable()
+                ) {
                     yield from $this->campaignDefinitionsFromConfig(
                         channel: $channel,
                         purpose: $purpose,

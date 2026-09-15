@@ -48,6 +48,62 @@ class CampaignMessageTemplateDefinitionContributorTest extends TestCase
         ]);
     }
 
+    public function test_campaigns_owns_campaign_steps_inside_messaging_owned_scope_without_duplicate_materialization(): void
+    {
+        Config::set('modules.enabled', [
+            'messaging',
+            'campaigns',
+        ]);
+        Config::set('messaging.email.definitions', [
+            'marketing' => [
+                'mortgage_homebuyer_nurture' => [
+                    'campaigns' => [
+                        'cold_lead_nurture' => [
+                            'steps' => [
+                                1 => [
+                                    'variants' => [
+                                        'email' => [
+                                            'dispatch_key' => 'campaign_step_due',
+                                            'payload_class' => EmailPayload::class,
+                                            'queue' => 'marketing',
+                                            'payload' => [
+                                                'subject' => 'Mortgage nurture subject',
+                                                'body' => 'Hi {first_name}.',
+                                            ],
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        app(SyncMessageTemplatePresetsAction::class)->handle();
+
+        $preset = MessageTemplatePreset::query()
+            ->where('key', 'email.marketing.mortgage_homebuyer_nurture.campaigns.cold_lead_nurture.steps.1.variants.email')
+            ->firstOrFail();
+
+        $this->assertSame(
+            'Mortgage nurture subject',
+            data_get($preset->payload, 'subject'),
+        );
+        $this->assertSame(
+            1,
+            MessageTemplatePreset::query()
+                ->where('key', $preset->key)
+                ->count(),
+        );
+        $this->assertDatabaseHas('message_template_catalog_entries', [
+            'message_template_preset_id' => $preset->getKey(),
+            'module_key' => 'campaigns',
+            'surface' => 'campaigns',
+            'usage_type' => 'campaign_step',
+        ]);
+    }
+
     public function test_enabling_webinars_alongside_campaigns_does_not_duplicate_campaign_templates(): void
     {
         Config::set('modules.enabled', [
