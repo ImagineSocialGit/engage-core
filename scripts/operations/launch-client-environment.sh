@@ -2069,7 +2069,7 @@ audit_dns() {
     local host addresses
     while IFS= read -r host; do
         [[ -n "$host" ]] || continue
-        addresses="$(getent ahostsv4 "$host" 2>/dev/null | awk '{print $1}' | sort -u | paste -sd, -)"
+        addresses="$(getent ahostsv4 "$host" 2>/dev/null | awk '{print $1}' | sort -u | paste -sd, - || true)"
         if [[ -z "$addresses" ]]; then
             audit_runtime_violation "dns.$host" "No IPv4 address resolved for required host [$host]."
             continue

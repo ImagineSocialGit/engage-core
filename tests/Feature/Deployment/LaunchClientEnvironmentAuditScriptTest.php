@@ -667,4 +667,82 @@ NGINX;
     }
 
 
+    public function test_dns_audit_records_unresolved_host_and_continues_to_later_hosts(): void
+    {
+        $launcher = (string) file_get_contents(
+            base_path('scripts/operations/launch-client-environment.sh'),
+        );
+
+        $start = strpos($launcher, 'audit_dns() {');
+        $end = strpos($launcher, "\naudit_runtime_directories() {", $start);
+
+        $this->assertNotFalse($start);
+        $this->assertNotFalse($end);
+
+        $auditDns = substr($launcher, $start, $end - $start);
+
+        $harness = <<<'BASH'
+set -Eeuo pipefail
+
+AUDIT_SERVER_IP="203.0.113.10"
+AUDIT_CHECKOUT_ACTIVE="true"
+
+note() {
+    printf '== %s ==\n' "$*"
+}
+
+audit_result() {
+    printf '%s\t%s\t%s\n' "$1" "$2" "$3"
+}
+
+audit_runtime_violation() {
+    audit_result BREAKING "$1" "$2"
+}
+
+audit_core_hosts() {
+    printf '%s\n' \
+        "missing.example.test" \
+        "healthy.example.test"
+}
+
+getent() {
+    if [[ "$1" == "ahostsv4" && "$2" == "missing.example.test" ]]; then
+        return 2
+    fi
+
+    if [[ "$1" == "ahostsv4" && "$2" == "healthy.example.test" ]]; then
+        printf '203.0.113.10 STREAM healthy.example.test\n'
+        return 0
+    fi
+
+    return 2
+}
+
+curl() {
+    printf '203.0.113.10'
+}
+BASH;
+
+        $harness .= "\n".$auditDns."\n";
+        $harness .= <<<'BASH'
+
+audit_dns
+printf '__AFTER_DNS__\n'
+BASH;
+
+        $process = new Process(['bash', '-c', $harness]);
+        $process->mustRun();
+
+        $output = $process->getOutput();
+
+        $this->assertStringContainsString(
+            "BREAKING\tdns.missing.example.test\tNo IPv4 address resolved for required host [missing.example.test].",
+            $output,
+        );
+        $this->assertStringContainsString(
+            "PASS\tdns.healthy.example.test\tResolves to authoritative server IPv4 203.0.113.10.",
+            $output,
+        );
+        $this->assertStringContainsString('__AFTER_DNS__', $output);
+    }
 }
