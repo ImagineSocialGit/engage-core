@@ -76,6 +76,48 @@ class WebinarRegistration extends Model
         return $this->morphMany(ScheduledMessage::class, 'context');
     }
 
+    public function hasDeterministicProviderRegistrationFailure(): bool
+    {
+        return data_get($this->meta, 'registration_finalization.status') === 'failed'
+            && data_get($this->meta, 'provider_sync.status') === 'permanent_failure';
+    }
+
+    public function registrationRecoveryFailureMessage(): string
+    {
+        $providerMessage = data_get(
+            $this->meta,
+            'provider_sync.provider_error_message',
+        );
+        $providerCode = data_get(
+            $this->meta,
+            'provider_sync.provider_error_code',
+        );
+        $provider = data_get($this->meta, 'provider_sync.provider');
+
+        if (is_string($providerMessage) && trim($providerMessage) !== '') {
+            $message = trim($providerMessage);
+
+            if (is_scalar($providerCode) && trim((string) $providerCode) !== '') {
+                $providerLabel = is_string($provider) && trim($provider) !== ''
+                    ? Str::title(trim($provider))
+                    : 'Provider';
+
+                return $message.' ('.$providerLabel.' '.trim((string) $providerCode).')';
+            }
+
+            return $message;
+        }
+
+        $reason = data_get(
+            $this->meta,
+            'registration_finalization.failure_reason',
+        ) ?? data_get($this->meta, 'provider_sync.failure_reason');
+
+        return is_string($reason) && trim($reason) !== ''
+            ? Str::headline(trim($reason))
+            : 'Unknown registration failure';
+    }
+
     protected static function booted(): void
     {
         static::creating(function (self $registration): void {

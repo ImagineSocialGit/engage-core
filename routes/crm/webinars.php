@@ -50,6 +50,9 @@ Route::middleware('module:webinars')->group(function () {
     Route::post('/webinar-registrations/{registration}/finalization/reconcile', [WebinarRegistrationFinalizationController::class, 'reconcile'])
         ->name('crm.webinar-registrations.finalization.reconcile');
 
+    Route::post('/webinar-registrations/{registration}/finalization/remove', [WebinarRegistrationFinalizationController::class, 'remove'])
+        ->name('crm.webinar-registrations.finalization.remove');
+
     Route::post('/webinar-series', [WebinarController::class, 'storeSeries'])
         ->name('crm.webinar-series.store');
 

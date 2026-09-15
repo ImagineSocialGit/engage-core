@@ -154,19 +154,33 @@
                                                     {{ $attentionRegistration->contact?->name ?: $attentionRegistration->contact?->email ?: 'Registration #'.$attentionRegistration->id }}
                                                 </span>
                                                 <span class="text-red-800">
-                                                    — {{ \Illuminate\Support\Str::headline((string) data_get($attentionRegistration->meta, 'registration_finalization.failure_reason', 'unknown_failure')) }}
+                                                    — {{ $attentionRegistration->registrationRecoveryFailureMessage() }}
                                                 </span>
                                             </div>
 
-                                            <form method="POST" action="{{ route('crm.webinar-registrations.finalization.retry', $attentionRegistration) }}">
-                                                @csrf
-                                                <button
-                                                    type="submit"
-                                                    class="inline-flex items-center justify-center rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-600"
-                                                >
-                                                    Retry registration
-                                                </button>
-                                            </form>
+                                            <div class="flex flex-wrap gap-2">
+                                                <form method="POST" action="{{ route('crm.webinar-registrations.finalization.retry', $attentionRegistration) }}">
+                                                    @csrf
+                                                    <button
+                                                        type="submit"
+                                                        class="inline-flex items-center justify-center rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-600"
+                                                    >
+                                                        Re-attempt
+                                                    </button>
+                                                </form>
+
+                                                @if($attentionRegistration->hasDeterministicProviderRegistrationFailure())
+                                                    <form method="POST" action="{{ route('crm.webinar-registrations.finalization.remove', $attentionRegistration) }}">
+                                                        @csrf
+                                                        <button
+                                                            type="submit"
+                                                            class="inline-flex items-center justify-center rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-100"
+                                                        >
+                                                            Remove registration
+                                                        </button>
+                                                    </form>
+                                                @endif
+                                            </div>
                                         </div>
                                     @elseif(
                                         data_get($attentionRegistration->meta, 'registration_finalization.status') === 'reconciliation_required'

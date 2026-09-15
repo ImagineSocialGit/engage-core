@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 3,
+    'version' => 4,
     'tables' => [
         'webinar_schedule_profiles' => [
             'mode' => 'upsert',

@@ -8,6 +8,7 @@ use App\Modules\Webinars\Actions\GetActiveWebinarSeriesAction;
 use App\Modules\Webinars\Actions\ResolveRegisterableWebinarAction;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Services\WebinarRegistrationEligibilityService;
 use App\Modules\Webinars\Services\WebinarRegistrationQuestionResolver;
 use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
 use Closure;
@@ -161,6 +162,10 @@ class StoreWebinarRegistrationRequest extends FormRequest
                         $this->transactionalConsentValidationMessage(),
                     );
                 }
+
+                if ($validator->errors()->isEmpty()) {
+                    $this->rejectProviderRegistrationConflict($validator);
+                }
             },
         ];
     }
@@ -235,6 +240,23 @@ class StoreWebinarRegistrationRequest extends FormRequest
         );
 
         return true;
+    }
+
+    private function rejectProviderRegistrationConflict(Validator $validator): void
+    {
+        $webinar = $this->registerableWebinar();
+        $email = $this->input('email');
+
+        if (! $webinar instanceof Webinar || ! is_string($email) || trim($email) === '') {
+            return;
+        }
+
+        $reason = app(WebinarRegistrationEligibilityService::class)
+            ->blockReason($webinar, $email);
+
+        if ($reason !== null) {
+            $validator->errors()->add('email', $reason);
+        }
     }
 
     private function requiresPhoneNumber(): bool

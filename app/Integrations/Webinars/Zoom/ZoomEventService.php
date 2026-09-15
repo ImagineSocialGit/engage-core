@@ -11,11 +11,14 @@ use App\Modules\Webinars\Enums\WebinarProviderEventType;
 use App\Modules\Webinars\Exceptions\ProviderRegistrationPreparationConnectionException;
 use App\Modules\Webinars\Services\WebinarProviderSchedulePolicy;
 use App\Modules\Webinars\Services\WebinarTimezoneResolver;
+use App\Support\Caching\CacheKey;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use InvalidArgumentException;
+use Throwable;
 
 class ZoomEventService
 {
@@ -56,6 +59,59 @@ class ZoomEventService
         $response->throw();
 
         return $response->json();
+    }
+
+    public function registrationBlockReason(
+        WebinarProviderEventType $eventType,
+        string $eventId,
+        string $email,
+    ): ?string {
+        $email = mb_strtolower(trim($email));
+
+        if ($email === '') {
+            return null;
+        }
+
+        try {
+            $hostEmail = Cache::remember(
+                CacheKey::externalApiResponse(
+                    'zoom',
+                    $eventType->value.'-host-email',
+                    $eventId,
+                ),
+                now()->addMinutes(15),
+                function () use ($eventType, $eventId): string {
+                    $response = $this->client()->get(
+                        sprintf(
+                            '/%s/%s',
+                            $this->plural($eventType),
+                            rawurlencode($eventId),
+                        ),
+                    );
+
+                    $response->throw();
+                    $payload = $response->json();
+                    $hostEmail = is_array($payload)
+                        ? ($payload['host_email'] ?? null)
+                        : null;
+
+                    return is_string($hostEmail)
+                        ? mb_strtolower(trim($hostEmail))
+                        : '';
+                },
+            );
+        } catch (Throwable) {
+            // This is an advisory preflight only. If Zoom cannot be reached,
+            // allow the durable registration finalization path to classify the
+            // real provider submission outcome.
+            return null;
+        }
+
+        if ($hostEmail === '' || ! hash_equals($hostEmail, $email)) {
+            return null;
+        }
+
+        return 'The Zoom host/owner cannot register for this session. Use a different email address.';
     }
 
     public function cancelRegistrant(

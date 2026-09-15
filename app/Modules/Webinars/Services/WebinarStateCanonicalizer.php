@@ -241,6 +241,12 @@ final class WebinarStateCanonicalizer
             'last_error_code' => $this->stringValue(
                 $state['last_error_code'] ?? null,
             ),
+            'provider_error_code' => $this->stringValue(
+                $state['provider_error_code'] ?? null,
+            ),
+            'provider_error_message' => $this->stringValue(
+                $state['provider_error_message'] ?? null,
+            ),
             'operator_retry_authorized_at' => $this->stringValue(
                 $state['operator_retry_authorized_at'] ?? null,
             ),

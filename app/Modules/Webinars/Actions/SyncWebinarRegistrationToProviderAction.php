@@ -91,6 +91,8 @@ class SyncWebinarRegistrationToProviderAction
                     'failure_reason' => null,
                     'last_error_class' => null,
                     'last_error_code' => null,
+                    'provider_error_code' => null,
+                    'provider_error_message' => null,
                 ]),
             );
 
@@ -162,6 +164,8 @@ class SyncWebinarRegistrationToProviderAction
                         'failure_reason' => 'stale_provider_submission_outcome_unknown',
                         'last_error_class' => null,
                         'last_error_code' => null,
+                        'provider_error_code' => null,
+                        'provider_error_message' => null,
                     ]),
                 );
                 $locked->forceFill(['meta' => $meta])->save();
@@ -200,6 +204,8 @@ class SyncWebinarRegistrationToProviderAction
                     'failure_reason' => null,
                     'last_error_class' => null,
                     'last_error_code' => null,
+                    'provider_error_code' => null,
+                    'provider_error_message' => null,
                 ]),
             );
 
@@ -316,6 +322,7 @@ class SyncWebinarRegistrationToProviderAction
                 ? $meta['provider_sync']
                 : [];
             $failedAt = now()->toISOString();
+            $providerError = $this->providerErrorDetails($exception);
 
             $meta['provider_sync'] = $this->canonicalizer()->providerSync(
                 array_replace($sync, [
@@ -327,11 +334,43 @@ class SyncWebinarRegistrationToProviderAction
                     'failure_reason' => $reason,
                     'last_error_class' => $exception::class,
                     'last_error_code' => (string) $exception->getCode(),
+                    'provider_error_code' => $providerError['code'],
+                    'provider_error_message' => $providerError['message'],
                 ]),
             );
 
             $locked->forceFill(['meta' => $meta])->save();
         });
+    }
+
+    /** @return array{code: ?string, message: ?string} */
+    private function providerErrorDetails(Throwable $exception): array
+    {
+        if (! $exception instanceof RequestException) {
+            return ['code' => null, 'message' => null];
+        }
+
+        try {
+            $payload = $exception->response->json();
+        } catch (Throwable) {
+            return ['code' => null, 'message' => null];
+        }
+
+        if (! is_array($payload)) {
+            return ['code' => null, 'message' => null];
+        }
+
+        $code = $payload['code'] ?? null;
+        $message = $payload['message'] ?? null;
+
+        return [
+            'code' => is_scalar($code) && trim((string) $code) !== ''
+                ? trim((string) $code)
+                : null,
+            'message' => is_string($message) && trim($message) !== ''
+                ? mb_substr(trim($message), 0, 1000)
+                : null,
+        ];
     }
 
     /** @param array<string, mixed> $sync */

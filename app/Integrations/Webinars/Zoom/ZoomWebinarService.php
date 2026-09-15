@@ -31,6 +31,17 @@ class ZoomWebinarService
         );
     }
 
+    public function registrationBlockReason(
+        string $webinarId,
+        string $email,
+    ): ?string {
+        return $this->events->registrationBlockReason(
+            WebinarProviderEventType::Webinar,
+            $webinarId,
+            $email,
+        );
+    }
+
     public function cancelRegistrant(
         string $webinarId,
         string $registrantId,

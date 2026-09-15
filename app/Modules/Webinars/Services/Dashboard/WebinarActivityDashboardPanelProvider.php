@@ -55,6 +55,7 @@ class WebinarActivityDashboardPanelProvider implements DashboardPanelProvider
 
         $attentionQuery = WebinarRegistration::query()
             ->with(['contact', 'webinar.webinarSeries'])
+            ->whereNull('cancelled_at')
             ->where(function (Builder $query): void {
                 $query
                     ->whereIn('meta->registration_finalization->status', [
@@ -76,6 +77,7 @@ class WebinarActivityDashboardPanelProvider implements DashboardPanelProvider
 
         $recentQuery = WebinarRegistration::query()
             ->with(['contact', 'webinar.webinarSeries'])
+            ->whereNull('cancelled_at')
             ->where('registered_at', '>=', now()->subDays(7))
             ->where(function (Builder $query): void {
                 $query
@@ -121,6 +123,11 @@ class WebinarActivityDashboardPanelProvider implements DashboardPanelProvider
             ->values();
 
         $attentionCount = $reviewCount + $registrationAttentionCount;
+        $summaryCount = $reviewCount > 0
+            ? $reviewCount
+            : ($registrationAttentionCount > 0
+                ? $registrationAttentionCount
+                : $recentCount);
 
         return [
             'key' => $this->key(),
@@ -146,7 +153,7 @@ class WebinarActivityDashboardPanelProvider implements DashboardPanelProvider
                 : ($registrationAttentionCount > 0
                     ? 'webinar registration failures'
                     : 'webinar updates'),
-            'count' => $attentionCount + $recentCount,
+            'count' => $summaryCount,
             'attention_count' => $attentionCount,
             'hide_when_empty' => true,
             'items' => $items,
@@ -211,12 +218,6 @@ class WebinarActivityDashboardPanelProvider implements DashboardPanelProvider
                 'registration_finalization.status',
                 'failed',
             );
-        $reason = (string) data_get(
-            $registration->meta,
-            'registration_finalization.failure_reason',
-            'unknown_failure',
-        );
-
         return [
             'key' => (string) $registration->id,
             'type' => 'webinar_registration_finalization',
@@ -230,7 +231,7 @@ class WebinarActivityDashboardPanelProvider implements DashboardPanelProvider
                 $webinar?->title,
                 Str::headline($status),
             ]))),
-            'description' => Str::headline($reason),
+            'description' => $registration->registrationRecoveryFailureMessage(),
             'href' => route('crm.webinar-series.index', ['attention' => 1]),
             'action_label' => 'Review recovery',
         ];

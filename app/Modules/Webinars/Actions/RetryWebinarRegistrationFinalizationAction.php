@@ -98,6 +98,8 @@ class RetryWebinarRegistrationFinalizationAction
                     'failure_reason' => null,
                     'last_error_class' => null,
                     'last_error_code' => null,
+                    'provider_error_code' => null,
+                    'provider_error_message' => null,
                     'operator_retry_authorized_at' => $retriedAt,
                     'operator_retry_authorized_by' => $operatorId,
                 ]);

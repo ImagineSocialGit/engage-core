@@ -1498,6 +1498,7 @@
 │   │   │   │   │   └── ReviewWebinarPostEventAction.php
 │   │   │   │   ├── QueueWebinarProviderCancellationAction.php
 │   │   │   │   ├── QueueWebinarRegistrationFinalizationAction.php
+│   │   │   │   ├── RemoveRejectedWebinarRegistrationAction.php
 │   │   │   │   ├── RemoveWebinarOccurrenceAction.php
 │   │   │   │   ├── RemoveWebinarSeriesAction.php
 │   │   │   │   ├── ReplaceWebinarOccurrenceAction.php
@@ -1531,7 +1532,8 @@
 │   │   │   │       ├── ReconcileWebinarScheduleOutliersCommand.php
 │   │   │   │       └── SyncWebinarScheduleProfilesCommand.php
 │   │   │   ├── Contracts
-│   │   │   │   └── WebinarProvider.php
+│   │   │   │   ├── WebinarProvider.php
+│   │   │   │   └── WebinarRegistrationEligibilityProvider.php
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
 │   │   │   │   │   ├── WebinarController.php
@@ -1642,6 +1644,7 @@
 │   │   │   │   ├── WebinarRegisterPageDefinitionValidator.php
 │   │   │   │   ├── WebinarRegistrationCancellationPolicy.php
 │   │   │   │   ├── WebinarRegistrationCsvReader.php
+│   │   │   │   ├── WebinarRegistrationEligibilityService.php
 │   │   │   │   ├── WebinarRegistrationQuestionResolver.php
 │   │   │   │   ├── WebinarScheduleProfileChainDefinitionBuilder.php
 │   │   │   │   ├── WebinarScheduleProfileDefinitionResolver.php
@@ -3530,6 +3533,7 @@
 │   │   │   ├── WebinarRegistrationQuestionConfigTest.php
 │   │   │   ├── WebinarRegistrationQuestionPlacementTest.php
 │   │   │   ├── WebinarRegistrationQuestionTest.php
+│   │   │   ├── WebinarRegistrationRecoveryTest.php
 │   │   │   ├── WebinarRegistrationSubmissionGrantTest.php
 │   │   │   ├── WebinarRegistrationThankYouTest.php
 │   │   │   ├── WebinarRegistrationTrustVariantTest.php
@@ -3563,4 +3567,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-843 directories, 2721 files
+843 directories, 2725 files

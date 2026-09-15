@@ -111,6 +111,8 @@ class ResolveWebinarRegistrationReconciliationAction
                         'failure_reason' => null,
                         'last_error_class' => null,
                         'last_error_code' => null,
+                        'provider_error_code' => null,
+                        'provider_error_message' => null,
                         'reconciliation_resolution' => $resolution,
                     ]));
             } elseif ($decision === self::DECISION_PROVIDER_ABSENT) {
@@ -127,6 +129,8 @@ class ResolveWebinarRegistrationReconciliationAction
                         'failure_reason' => null,
                         'last_error_class' => null,
                         'last_error_code' => null,
+                        'provider_error_code' => null,
+                        'provider_error_message' => null,
                         'resubmission_authorized_at' => $resolvedAt,
                         'resubmission_authorized_by' => $operatorId,
                         'reconciliation_resolution' => $resolution,

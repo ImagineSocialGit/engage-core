@@ -3,6 +3,7 @@
 namespace App\Integrations\Webinars\Zoom;
 
 use App\Modules\Webinars\Contracts\WebinarProvider;
+use App\Modules\Webinars\Contracts\WebinarRegistrationEligibilityProvider;
 use App\Modules\Webinars\Data\ProviderAttendanceSnapshot;
 use App\Modules\Webinars\Data\ProviderRecordingData;
 use App\Modules\Webinars\Data\ProviderRegistrationData;
@@ -12,7 +13,7 @@ use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use Illuminate\Http\Request;
 
-class ZoomMeetingProvider implements WebinarProvider
+class ZoomMeetingProvider implements WebinarProvider, WebinarRegistrationEligibilityProvider
 {
     public function __construct(
         private readonly ZoomEventService $events,
@@ -52,6 +53,15 @@ class ZoomMeetingProvider implements WebinarProvider
             registrantId: $response['registrant_id'] ?? $response['id'] ?? null,
             joinUrl: $response['join_url'] ?? null,
             raw: $response,
+        );
+    }
+
+    public function registrationBlockReason(Webinar $webinar, string $email): ?string
+    {
+        return $this->events->registrationBlockReason(
+            WebinarProviderEventType::Meeting,
+            (string) $webinar->external_id,
+            $email,
         );
     }
 

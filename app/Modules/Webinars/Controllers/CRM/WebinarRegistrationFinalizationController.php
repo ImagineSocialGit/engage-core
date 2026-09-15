@@ -3,6 +3,7 @@
 namespace App\Modules\Webinars\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Webinars\Actions\RemoveRejectedWebinarRegistrationAction;
 use App\Modules\Webinars\Actions\ResolveWebinarRegistrationReconciliationAction;
 use App\Modules\Webinars\Actions\RetryWebinarRegistrationFinalizationAction;
 use App\Modules\Webinars\Data\WebinarRegistrationFinalizationResult;
@@ -60,6 +61,29 @@ class WebinarRegistrationFinalizationController extends Controller
         return back()->with(
             'success',
             'The registration finalization retry has been queued.',
+        );
+    }
+
+    public function remove(
+        Request $request,
+        WebinarRegistration $registration,
+        RemoveRejectedWebinarRegistrationAction $removeRegistration,
+    ): RedirectResponse {
+        $removed = $removeRegistration->handle(
+            registration: $registration,
+            operatorId: $request->user()?->getKey(),
+        );
+
+        if (! $removed) {
+            return back()->with(
+                'error',
+                'This registration cannot be removed from recovery because the provider outcome is not a confirmed rejection.',
+            );
+        }
+
+        return back()->with(
+            'success',
+            'The failed webinar registration was removed. The contact and failure history were kept.',
         );
     }
 

@@ -32,7 +32,7 @@ class WebinarProjectStateRoundTripTest extends TestCase
         $document = $projectState->export();
 
         $this->assertSame((int) config('project_state.version'), $document['version']);
-        $this->assertSame(3, $document['sections']['webinars']['version']);
+        $this->assertSame(4, $document['sections']['webinars']['version']);
         $this->assertCount(
             1,
             $document['sections']['webinars']['tables']['webinar_schedule_profiles'],
@@ -131,6 +131,7 @@ class WebinarProjectStateRoundTripTest extends TestCase
             'webinar_id' => 321,
             'replacement_of_registration_id' => 330,
             'join_token' => 'production-replacement-token',
+            'status' => 'cancelled',
         ]);
         $this->assertDatabaseHas('webinar_registration_responses', [
             'id' => 340,
@@ -164,6 +165,26 @@ class WebinarProjectStateRoundTripTest extends TestCase
         $this->assertSame(
             'submitting',
             data_get($registrationMeta, 'provider_sync.status'),
+        );
+
+        $removedRegistrationMeta = json_decode(
+            (string) DB::table('webinar_registrations')
+                ->where('id', 331)
+                ->value('meta'),
+            true,
+        );
+
+        $this->assertSame(
+            '3027',
+            data_get($removedRegistrationMeta, 'provider_sync.provider_error_code'),
+        );
+        $this->assertSame(
+            'Host can not register',
+            data_get($removedRegistrationMeta, 'provider_sync.provider_error_message'),
+        );
+        $this->assertSame(
+            'remove_registration',
+            data_get($removedRegistrationMeta, 'registration_recovery.decision'),
         );
 
         $this->assertDatabaseHas('message_chain_enrollments', [
@@ -348,17 +369,32 @@ class WebinarProjectStateRoundTripTest extends TestCase
                 'replacement_of_registration_id' => 330,
                 'join_token' => 'production-replacement-token',
                 'webinar_slug' => 'production-webinar-replacement',
-                'status' => 'registered',
+                'status' => 'cancelled',
                 'source' => 'occurrence_replacement',
                 'meta' => json_encode([
                     'registration_finalization' => [
                         'status' => 'completed',
                         'mode' => 'replacement_reprovisioning',
+                        'completion_reason' => 'operator_removed_registration',
+                    ],
+                    'provider_sync' => [
+                        'status' => 'permanent_failure',
+                        'provider' => 'zoom',
+                        'failure_reason' => 'provider_rejected_registration',
+                        'provider_error_code' => '3027',
+                        'provider_error_message' => 'Host can not register',
+                    ],
+                    'registration_recovery' => [
+                        'status' => 'removed',
+                        'decision' => 'remove_registration',
+                        'removed_at' => $now->toISOString(),
+                        'removed_by' => 1,
+                        'prior_finalization_failure_reason' => 'provider_rejected_registration',
                     ],
                 ]),
                 'registered_at' => $now,
                 'attended_at' => null,
-                'cancelled_at' => null,
+                'cancelled_at' => $now,
                 'created_at' => $now,
                 'updated_at' => $now,
             ],
