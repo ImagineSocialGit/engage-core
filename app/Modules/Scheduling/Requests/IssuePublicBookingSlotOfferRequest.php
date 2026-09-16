@@ -3,6 +3,7 @@
 namespace App\Modules\Scheduling\Requests;
 
 use App\Modules\Scheduling\Models\BookableService;
+use App\Modules\Scheduling\Models\SchedulingBookingOffer;
 use App\Modules\Scheduling\Services\SchedulingLocalDateTimeResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Http\FormRequest;
@@ -50,6 +51,12 @@ class IssuePublicBookingSlotOfferRequest extends FormRequest
                 'max:16',
                 'regex:/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/',
             ],
+            'offer_code' => [
+                'nullable',
+                'string',
+                'max:40',
+                'regex:/\A[A-Za-z0-9][A-Za-z0-9_-]{2,39}\z/',
+            ],
             'idempotency_key' => ['prohibited'],
             'bookable_service_id' => ['prohibited'],
             'scheduling_host_id' => ['prohibited'],
@@ -57,6 +64,7 @@ class IssuePublicBookingSlotOfferRequest extends FormRequest
             'capacity' => ['prohibited'],
             'remaining_capacity' => ['prohibited'],
             'offer_id' => ['prohibited'],
+            'booking_offer_id' => ['prohibited'],
             'hold_id' => ['prohibited'],
             'source_window_ids' => ['prohibited'],
             'location_type' => ['prohibited'],
@@ -106,6 +114,17 @@ class IssuePublicBookingSlotOfferRequest extends FormRequest
             $this->serviceTimezone(),
             'check-out time',
         );
+    }
+
+    public function offerCode(): ?string
+    {
+        $value = $this->validated('offer_code');
+
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return SchedulingBookingOffer::normalizeCode($value);
     }
 
     private function usesRangeDuration(): bool

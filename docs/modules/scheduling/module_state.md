@@ -227,6 +227,11 @@ scheduling_availability_windows
 appointments
 appointment_attendees
 appointment_lifecycle_events
+scheduling_booking_offers
+scheduling_booking_offer_conditions
+scheduling_booking_offer_rewards
+scheduling_booking_offer_reward_actions
+scheduling_booking_offer_claims
 bookable_slot_offers
 booking_holds
 ```
@@ -243,6 +248,8 @@ availability and blackout rule evaluation
 read-only bookable-slot calculation
 appointment lifecycle and reschedule lineage
 appointment-related source context
+code-based optional booking offers selected explicitly by the visitor rather than applied automatically to every booking
+provider-neutral offer eligibility conditions, scoped first-N claims, and provider-neutral reward actions
 opaque expiring slot offers and short-lived booking holds
 hold-aware availability, explicit hold release, and atomic hold-to-Appointment conversion
 transaction-time slot, occupancy, capacity, and idempotency revalidation
@@ -773,7 +780,7 @@ The required gap is the resolved travel duration after the existing Appointment/
 
 Scheduling owns the provider-neutral `TravelTimeResolver` extension contract. `SchedulingTravelTimeResolver` uses an explicitly bound provider when an app-level integration supplies one and otherwise falls back to `ConservativeTravelTimeResolver`. The built-in fallback returns zero minutes for the same normalized address and otherwise uses `scheduling.travel.conservative_minutes`, currently 45 minutes, bounded by `scheduling.travel.maximum_minutes`, currently 240 minutes. The maximum also bounds the neighboring commitment query required to evaluate candidate slots safely.
 
-A richer routing or geographic integration may bind `TravelTimeResolver` without changing Scheduling's dependency graph. Optional Location enrichment may help that app-level integration obtain coordinates or other provider-neutral geographic facts, but Scheduling does not import or dependency-load Location and remains authoritative for whether the candidate fits.
+A richer routing or geographic integration may bind `TravelTimeResolver` without changing Scheduling's dependency graph. When `SCHEDULING_TRAVEL_PROVIDER=google_routes`, the app-level Google Routes adapter supplies traffic-aware drive-time estimates and `SchedulingTravelTimeResolver` falls back to the conservative resolver if the provider request fails. Optional Location enrichment may still help an app-level integration obtain coordinates or other provider-neutral geographic facts, but Scheduling does not import or dependency-load Location and remains authoritative for whether the candidate fits.
 
 `FindBookableAvailabilityAction` attaches resolved travel minutes before/after to server-side `BookableSlot` objects for internal ranking while keeping the existing public slot serialization contract compact. `CreateBookingHoldAction` and `CreateAppointmentAction` rerun travel-aware exact-slot availability inside their existing lock-backed transactions, so an offer or earlier availability result cannot bypass a newly created adjacent Appointment or active hold.
 
@@ -813,6 +820,30 @@ ReleaseBookingHoldAction
 ConvertBookingHoldToAppointmentAction
 ExpireBookingHoldsJob
 ```
+
+### code-based booking offers
+
+A `SchedulingBookingOffer` belongs to one `BookableService` and is selected by an explicit visitor-entered code. Multiple offers may belong to one appointment type. Codes are normalized to uppercase and unique within that appointment type. An active offer is never applied merely because it exists; a normal booking with no code follows the ordinary booking path.
+
+Offer state is Scheduling-owned and generic:
+
+```text
+scheduling_booking_offers
+scheduling_booking_offer_conditions
+scheduling_booking_offer_rewards
+scheduling_booking_offer_reward_actions
+scheduling_booking_offer_claims
+```
+
+Conditions store a provider key plus provider-owned opaque criteria. Scheduling does not import the optional module that interprets those criteria. App-level integration providers register through `BookingEligibilityProviderRegistry`. The first provider resolves webinar registration against the most recent occurrence in the configured series whose start time has passed, but that adapter lives outside both module boundaries and Webinars requires no schema or runtime change.
+
+Eligibility resolution returns a Contact identity plus a qualification scope key. The scope key controls first-N reset behavior. For example, an evergreen webinar code may resolve one occurrence to `webinar:123` and the next occurrence to `webinar:124`; each occurrence therefore receives its own claim sequence without Scheduling understanding webinar semantics.
+
+Rewards are threshold rows with provider-neutral actions. The initial `contact_tag` action is supplied by an app-level Core bridge. Future billing, certificates, credits, or other effects may add handlers without changing Scheduling's reward-tier schema.
+
+The selected offer identity is copied only through server-owned `BookableSlotOffer.meta` and `BookingHold.meta`. The visitor cannot submit an offer database ID, qualification result, scope key, claim number, or reward authority. Eligibility is resolved again when the held booking becomes an Appointment. Claim allocation locks the offer, assigns the next number within the resolved qualification scope, applies all matching reward tiers, and records one durable claim in the same conversion transaction. Abandoned slot offers and holds do not consume a claim. A completed claim is retained if the Appointment is later canceled.
+
+Public offer windows are checked when the code is applied to the slot offer. A hold created while the offer is open may finish after the time window closes, while explicitly disabling the offer stops later completion. Offers with no eligibility conditions use a global scope and can support ordinary referral or promotion codes.
 
 ### bookable_slot_offers
 
@@ -1413,7 +1444,8 @@ Phase 4B.2D1 — COMPLETE: add first-class fixed/range service-duration policy, 
 Phase 4B.2D2 — COMPLETE: expose closed CRM range-service authoring plus public/internal check-in/check-out input, strict service-timezone wall-time resolution, and range-specific reschedule presentation; fixed-location PetServices stays do not require Location, and PetServices continues to own pet/compliance/feeding/medication meaning
 Phase 4B.3 — COMPLETE: restructure public booking around appointment-type-first progressive prerequisites, require canonical customer-site location before travel-aware fixed-slot availability, issue a short-lived non-blocking location-bound offer before the real hold, and preserve fixed/range server authority without exposing host/capacity/provenance state
 Phase 4B.4 — COMPLETE: add optional Messaging-backed email/SMS destination verification after non-blocking offer selection and before the capacity hold, with server-owned challenge/proof state, single-use offer/session-bound proof enforcement, no marketing-consent side effects, and a graceful no-Messaging path
-Scheduling Project State transfer support — COMPLETE: optional schema-activated durable transfer with transient offer/hold/verification exclusion and reference-safe restore semantics
+Phase 4B.5A — COMPLETE: add explicit code-based booking offers with optional provider-neutral eligibility, qualification-scoped first-N claims, generic reward actions, app-level webinar-registration and contact-tag bridges, and optional Google Routes travel estimates with conservative fallback
+Scheduling Project State transfer support — COMPLETE: optional schema-activated durable transfer with transient slot-offer/hold/verification exclusion and reference-safe restore semantics
 calendar views
 provider connection and synchronization persistence
 external free/busy adapters

@@ -6,6 +6,7 @@ use App\Modules\Scheduling\Contracts\TravelTimeResolver;
 use App\Modules\Scheduling\Data\SchedulingLocationSnapshot;
 use App\Modules\Scheduling\Data\TravelTimeEstimate;
 use Illuminate\Contracts\Container\Container;
+use Throwable;
 
 final class SchedulingTravelTimeResolver
 {
@@ -27,12 +28,16 @@ final class SchedulingTravelTimeResolver
             return $this->estimates[$key];
         }
 
-        $estimate = $this->container->bound(TravelTimeResolver::class)
-            ? $this->container->make(TravelTimeResolver::class)->estimate(
-                $origin,
-                $destination,
-            )
-            : $this->fallback->estimate($origin, $destination);
+        try {
+            $estimate = $this->container->bound(TravelTimeResolver::class)
+                ? $this->container->make(TravelTimeResolver::class)->estimate(
+                    $origin,
+                    $destination,
+                )
+                : $this->fallback->estimate($origin, $destination);
+        } catch (Throwable) {
+            $estimate = $this->fallback->estimate($origin, $destination);
+        }
 
         return $this->estimates[$key] = $estimate;
     }

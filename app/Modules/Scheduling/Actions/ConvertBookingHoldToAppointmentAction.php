@@ -23,6 +23,7 @@ class ConvertBookingHoldToAppointmentAction
     public function __construct(
         private readonly TransitionAppointmentStatusAction $lifecycle,
         private readonly ResourceOccupancyResolver $resourceOccupancy,
+        private readonly ClaimSchedulingBookingOfferAction $claimBookingOffer,
     ) {}
 
     public function handle(
@@ -189,6 +190,13 @@ class ConvertBookingHoldToAppointmentAction
                     ],
                 ),
             ]);
+
+            $this->claimBookingOffer->handle(
+                appointment: $appointment,
+                service: $service,
+                hold: $hold,
+                booking: $booking,
+            );
 
             $this->lifecycle->recordInitial(
                 appointment: $appointment,

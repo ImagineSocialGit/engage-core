@@ -16,9 +16,10 @@ class SchedulingDeploymentPlanContributorTest extends TestCase
             false,
         );
 
-        $this->assertCount(1, $requirements);
+        $requirement = collect($requirements)
+            ->firstWhere('key', 'SCHEDULING_APP_URL');
 
-        $requirement = $requirements[0];
+        $this->assertNotNull($requirement);
 
         $this->assertSame('SCHEDULING_APP_URL', $requirement->key);
         $this->assertSame(EnvironmentRequirement::OPTIONAL, $requirement->requirement);

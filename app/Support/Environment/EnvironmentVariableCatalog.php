@@ -231,6 +231,8 @@ final class EnvironmentVariableCatalog
             ['WEBINAR_APP_URL', $client, 'webinars', false],
             ['CRM_APP_URL', $client, 'core', false],
             ['SCHEDULING_APP_URL', $client, 'scheduling', false],
+            ['SCHEDULING_TRAVEL_PROVIDER', $client, 'scheduling', false],
+            ['GOOGLE_ROUTES_API_KEY', $client, 'scheduling', true],
             ['DB_DATABASE', $client, 'core', false],
             ['DB_USERNAME', $client, 'core', false],
             ['DB_PASSWORD', $client, 'core', true],

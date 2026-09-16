@@ -5,6 +5,9 @@
     data-booking-address-form
 >
     @csrf
+    @if($bookingOfferCode)
+        <input type="hidden" name="offer_code" value="{{ $bookingOfferCode }}">
+    @endif
     <div class="grid gap-4 sm:grid-cols-2">
         <label class="{{ $publicPresentation['style']['field_label'] }} sm:col-span-2" for="address_line_1">
             Street address

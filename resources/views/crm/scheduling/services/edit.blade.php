@@ -190,6 +190,11 @@
                     <p class="mt-2 text-sm text-slate-500">Choose which people can handle this appointment type when person-specific assignment matters.</p>
                 </a>
 
+                <a href="{{ route('crm.scheduling.configuration.services.offers.index', $service) }}" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-teal-300" data-scheduling-config-card="offers">
+                    <div class="font-semibold text-slate-900">Offers</div>
+                    <p class="mt-2 text-sm text-slate-500">Add optional offer codes, eligibility rules, and limited rewards.</p>
+                </a>
+
                 <a href="{{ route('crm.scheduling.configuration.communications.index') }}" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-teal-300" data-scheduling-config-card="communications">
                     <div class="font-semibold text-slate-900">Confirmation & reminders</div>
                     <p class="mt-2 text-sm text-slate-500">Manage the shared appointment confirmation and reminder schedule.</p>

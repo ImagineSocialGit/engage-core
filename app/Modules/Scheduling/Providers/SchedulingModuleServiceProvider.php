@@ -2,9 +2,11 @@
 
 namespace App\Modules\Scheduling\Providers;
 
+use App\Integrations\Scheduling\GoogleRoutesTravelTimeResolver;
 use App\Models\User;
 use App\Modules\Core\Access\Models\UserAccessProfile;
 use App\Modules\Scheduling\Automation\AppointmentAutomationTriggerAuthoringContributor;
+use App\Modules\Scheduling\Contracts\TravelTimeResolver;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Scheduling\Console\Commands\SyncAppointmentCommunicationsCatalogCommand;
 use App\Modules\Scheduling\Deployment\SchedulingDeploymentPlanContributor;
@@ -26,6 +28,13 @@ class SchedulingModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        if ((string) config('scheduling.travel.provider') === 'google_routes') {
+            $this->app->bind(
+                TravelTimeResolver::class,
+                GoogleRoutesTravelTimeResolver::class,
+            );
+        }
+
         $this->app->tag([
             AppointmentAutomationTriggerAuthoringContributor::class,
         ], 'automation.trigger_authoring_contributors');

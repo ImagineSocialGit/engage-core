@@ -19,7 +19,11 @@ use App\Support\ModuleIntegrations\Scheduling\Automation\CreateAppointmentTaskAu
 use App\Support\ModuleIntegrations\Scheduling\Automation\NotifyAppointmentHostAutomationActionHandler;
 use App\Support\ModuleIntegrations\Scheduling\Automation\ReconcileAppointmentHostNotifications;
 use App\Support\ModuleIntegrations\Scheduling\Automation\ReconcileAppointmentTasks;
+use App\Support\ModuleIntegrations\Scheduling\Core\ContactTagBookingOfferRewardActionHandler;
 use App\Support\ModuleIntegrations\Scheduling\Simple\ApplySimpleAppointmentAfterBookingActions;
+use App\Support\ModuleIntegrations\Scheduling\Webinars\WebinarRegistrantBookingEligibilityProvider;
+use App\Modules\Scheduling\Services\BookingEligibilityProviderRegistry;
+use App\Modules\Scheduling\Services\BookingOfferRewardActionHandlerRegistry;
 use App\Support\Modules\ModuleManager;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -40,6 +44,20 @@ class IntegrationsModuleServiceProvider extends ServiceProvider
             $this->app->tag(
                 FlowRouteReusableMessageTemplateAuthoringContributor::class,
                 ReusableMessageTemplateAuthoringOptionContributor::TAG,
+            );
+        }
+
+        if ($this->has($enabled, ['scheduling', 'core'])) {
+            $this->app->tag(
+                ContactTagBookingOfferRewardActionHandler::class,
+                BookingOfferRewardActionHandlerRegistry::TAG,
+            );
+        }
+
+        if ($this->has($enabled, ['scheduling', 'webinars'])) {
+            $this->app->tag(
+                WebinarRegistrantBookingEligibilityProvider::class,
+                BookingEligibilityProviderRegistry::TAG,
             );
         }
 

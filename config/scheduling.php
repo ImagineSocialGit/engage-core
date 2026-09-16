@@ -200,8 +200,16 @@ return [
 
 
     'travel' => [
+        'provider' => strtolower(trim((string) env('SCHEDULING_TRAVEL_PROVIDER', 'conservative'))),
         'maximum_minutes' => 240,
         'conservative_minutes' => 45,
+        'google_routes' => [
+            'api_key' => env('GOOGLE_ROUTES_API_KEY'),
+            'endpoint' => 'https://routes.googleapis.com/directions/v2:computeRoutes',
+            'routing_preference' => 'TRAFFIC_AWARE',
+            'connect_timeout_seconds' => 3,
+            'timeout_seconds' => 5,
+        ],
     ],
 
     'reschedule_suggestions' => [

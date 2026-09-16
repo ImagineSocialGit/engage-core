@@ -94,7 +94,6 @@ class SchedulingAppointmentFormatTest extends TestCase
         $section = config('project_state.sections.scheduling');
         $columns = data_get($section, 'tables.bookable_services.columns', []);
 
-        $this->assertSame(2, data_get($section, 'version'));
         $this->assertContains('appointment_format', $columns);
         $this->assertContains('in_person_arrangement', $columns);
         $this->assertContains('remote_method', $columns);

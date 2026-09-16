@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 2,
+    'version' => 3,
     'optional' => true,
     'activation_tables' => [
         'scheduling_hosts',
@@ -17,6 +17,11 @@ return [
         'scheduling_host_resources',
         'bookable_service_resource_requirements',
         'scheduling_resource_occupancies',
+        'scheduling_booking_offers',
+        'scheduling_booking_offer_conditions',
+        'scheduling_booking_offer_rewards',
+        'scheduling_booking_offer_reward_actions',
+        'scheduling_booking_offer_claims',
     ],
     'tables' => [
         'scheduling_hosts' => [
@@ -204,6 +209,91 @@ return [
             ],
         ],
 
+        'scheduling_booking_offers' => [
+            'mode' => 'upsert',
+            'identity' => ['bookable_service_id', 'code'],
+            'preserve_id' => false,
+            'order_by' => ['bookable_service_id', 'code'],
+            'columns' => [
+                'id',
+                'bookable_service_id',
+                'code',
+                'name',
+                'status',
+                'starts_at',
+                'ends_at',
+                'claim_limit',
+                'ineligible_message',
+                'exhausted_message',
+                'meta',
+                'created_at',
+                'updated_at',
+            ],
+            'json_columns' => ['meta'],
+            'references' => [
+                'bookable_service_id' => 'bookable_services',
+            ],
+        ],
+
+        'scheduling_booking_offer_conditions' => [
+            'mode' => 'upsert',
+            'identity' => ['scheduling_booking_offer_id', 'sort_order'],
+            'preserve_id' => false,
+            'order_by' => ['scheduling_booking_offer_id', 'sort_order', 'id'],
+            'columns' => [
+                'id',
+                'scheduling_booking_offer_id',
+                'provider',
+                'criteria',
+                'sort_order',
+                'created_at',
+                'updated_at',
+            ],
+            'json_columns' => ['criteria'],
+            'references' => [
+                'scheduling_booking_offer_id' => 'scheduling_booking_offers',
+            ],
+        ],
+
+        'scheduling_booking_offer_rewards' => [
+            'mode' => 'upsert',
+            'identity' => ['scheduling_booking_offer_id', 'sort_order'],
+            'preserve_id' => false,
+            'order_by' => ['scheduling_booking_offer_id', 'sort_order', 'id'],
+            'columns' => [
+                'id',
+                'scheduling_booking_offer_id',
+                'name',
+                'max_claim_number',
+                'sort_order',
+                'created_at',
+                'updated_at',
+            ],
+            'references' => [
+                'scheduling_booking_offer_id' => 'scheduling_booking_offers',
+            ],
+        ],
+
+        'scheduling_booking_offer_reward_actions' => [
+            'mode' => 'upsert',
+            'identity' => ['scheduling_booking_offer_reward_id', 'sort_order'],
+            'preserve_id' => false,
+            'order_by' => ['scheduling_booking_offer_reward_id', 'sort_order', 'id'],
+            'columns' => [
+                'id',
+                'scheduling_booking_offer_reward_id',
+                'provider',
+                'payload',
+                'sort_order',
+                'created_at',
+                'updated_at',
+            ],
+            'json_columns' => ['payload'],
+            'references' => [
+                'scheduling_booking_offer_reward_id' => 'scheduling_booking_offer_rewards',
+            ],
+        ],
+
         'scheduling_availability_windows' => [
             'mode' => 'insert_empty',
             'preserve_id' => true,
@@ -377,6 +467,30 @@ return [
             'null_on_import' => [
                 'actor_type',
                 'actor_id',
+            ],
+        ],
+
+        'scheduling_booking_offer_claims' => [
+            'mode' => 'insert_empty',
+            'preserve_id' => true,
+            'order_by' => ['id'],
+            'columns' => [
+                'id',
+                'scheduling_booking_offer_id',
+                'appointment_id',
+                'contact_id',
+                'qualification_scope_key',
+                'claim_number',
+                'qualification_meta',
+                'claimed_at',
+                'created_at',
+                'updated_at',
+            ],
+            'json_columns' => ['qualification_meta'],
+            'references' => [
+                'scheduling_booking_offer_id' => 'scheduling_booking_offers',
+                'appointment_id' => 'appointments',
+                'contact_id' => 'contacts',
             ],
         ],
 

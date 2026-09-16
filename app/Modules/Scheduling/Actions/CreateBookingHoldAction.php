@@ -173,10 +173,15 @@ class CreateBookingHoldAction
                     'location_details' => $locationSnapshot?->details,
                     'held_at' => $now,
                     'expires_at' => $now->addSeconds($ttlSeconds),
-                    'meta' => [
-                        'source_scopes' => $currentSlot->sourceScopes,
-                        'source_window_ids' => $currentSlot->sourceWindowIds,
-                    ],
+                    'meta' => array_replace_recursive(
+                        [
+                            'source_scopes' => $currentSlot->sourceScopes,
+                            'source_window_ids' => $currentSlot->sourceWindowIds,
+                        ],
+                        is_array(data_get($offer->meta, 'booking_offer'))
+                            ? ['booking_offer' => data_get($offer->meta, 'booking_offer')]
+                            : [],
+                    ),
                 ]);
 
                 if ($resourceSnapshot !== [] && $host instanceof SchedulingHost) {

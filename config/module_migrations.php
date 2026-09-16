@@ -122,7 +122,7 @@ return [
 
         'scheduling' => [
             'path' => 'database/migrations/modules/scheduling',
-            'schema_version' => 3,
+            'schema_version' => 4,
             'migrations' => [
                 '2026_04_15_195859_create_scheduling_hosts_table.php',
                 '2026_04_15_195860_create_bookable_services_table.php',
@@ -135,6 +135,7 @@ return [
                 '2026_07_21_180101_create_booking_holds_table.php',
                 '2026_08_03_190000_create_scheduling_resource_occupancy_tables.php',
                 '2026_08_27_161500_add_appointment_format_to_bookable_services_table.php',
+                '2026_09_16_140000_create_scheduling_booking_offers_tables.php',
             ],
         ],
 

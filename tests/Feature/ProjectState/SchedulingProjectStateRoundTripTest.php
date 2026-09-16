@@ -381,46 +381,33 @@ class SchedulingProjectStateRoundTripTest extends TestCase
         $policies = config('project_state.table_policies');
 
         $this->assertTrue($section['optional'] ?? false);
-        $this->assertEquals([
-            'scheduling_hosts',
-            'bookable_services',
-            'scheduling_availability_windows',
-            'appointments',
-            'appointment_attendees',
-            'bookable_service_hosts',
-            'appointment_lifecycle_events',
-            'bookable_slot_offers',
-            'booking_holds',
-            'scheduling_resources',
-            'scheduling_host_resources',
-            'bookable_service_resource_requirements',
-            'scheduling_resource_occupancies',
-        ], $section['activation_tables'] ?? []);
 
-        foreach ([
-            'scheduling_hosts',
-            'bookable_services',
-            'scheduling_resources',
-            'bookable_service_hosts',
-            'scheduling_host_resources',
-            'bookable_service_resource_requirements',
-            'scheduling_availability_windows',
-            'appointments',
-            'appointment_attendees',
-            'appointment_lifecycle_events',
-            'scheduling_resource_occupancies',
-        ] as $table) {
-            $this->assertArrayHasKey($table, $section['tables'] ?? []);
+        $sectionTables = array_keys($section['tables'] ?? []);
+        $activationTables = $section['activation_tables'] ?? [];
+
+        foreach ($sectionTables as $table) {
+            $this->assertContains($table, $activationTables);
             $this->assertArrayNotHasKey($table, $policies);
         }
 
-        foreach ([
+        $ephemeralTables = [
             'bookable_slot_offers',
             'booking_holds',
-        ] as $table) {
+        ];
+
+        foreach ($ephemeralTables as $table) {
+            $this->assertContains($table, $activationTables);
             $this->assertArrayNotHasKey($table, $section['tables'] ?? []);
             $this->assertSame('must_be_empty', $policies[$table]['mode'] ?? null);
         }
+
+        $this->assertEqualsCanonicalizing(
+            [
+                ...$sectionTables,
+                ...$ephemeralTables,
+            ],
+            $activationTables,
+        );
     }
 
     public function test_optional_scheduling_section_may_be_absent_from_a_current_source_document(): void

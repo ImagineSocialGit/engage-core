@@ -55,6 +55,8 @@
 │   │   │       └── Twilio
 │   │   │           ├── TwilioSmsProvider.php
 │   │   │           └── TwilioWebhookHandler.php
+│   │   ├── Scheduling
+│   │   │   └── GoogleRoutesTravelTimeResolver.php
 │   │   └── Webinars
 │   │       └── Zoom
 │   │           ├── Mappers
@@ -1269,6 +1271,7 @@
 │   │   ├── Scheduling
 │   │   │   ├── Actions
 │   │   │   │   ├── CancelAppointmentAction.php
+│   │   │   │   ├── ClaimSchedulingBookingOfferAction.php
 │   │   │   │   ├── CompleteAppointmentAction.php
 │   │   │   │   ├── CompletePublicBookingAction.php
 │   │   │   │   ├── ConfirmAppointmentAction.php
@@ -1290,6 +1293,8 @@
 │   │   │   │   └── Commands
 │   │   │   │       └── SyncAppointmentCommunicationsCatalogCommand.php
 │   │   │   ├── Contracts
+│   │   │   │   ├── BookingEligibilityProvider.php
+│   │   │   │   ├── BookingOfferRewardActionHandler.php
 │   │   │   │   └── TravelTimeResolver.php
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
@@ -1297,6 +1302,7 @@
 │   │   │   │   │   ├── AppointmentController.php
 │   │   │   │   │   ├── SchedulingAfterBookingController.php
 │   │   │   │   │   ├── SchedulingAvailabilityController.php
+│   │   │   │   │   ├── SchedulingBookingOfferController.php
 │   │   │   │   │   ├── SchedulingConfigurationController.php
 │   │   │   │   │   ├── SchedulingController.php
 │   │   │   │   │   └── SchedulingResourceController.php
@@ -1309,6 +1315,7 @@
 │   │   │   │   ├── AvailabilityInterval.php
 │   │   │   │   ├── AvailabilitySearch.php
 │   │   │   │   ├── BookableSlot.php
+│   │   │   │   ├── BookingEligibilityIdentity.php
 │   │   │   │   ├── DestinationVerificationChallenge.php
 │   │   │   │   ├── DestinationVerificationProof.php
 │   │   │   │   ├── SchedulingLocationSnapshot.php
@@ -1320,6 +1327,9 @@
 │   │   │   │   └── SchedulingAvailabilityWindowType.php
 │   │   │   ├── EventDefinitions
 │   │   │   │   └── SchedulingPublicBookingEventDefinitionContributor.php
+│   │   │   ├── Exceptions
+│   │   │   │   ├── BookingOfferEligibilityException.php
+│   │   │   │   └── SchedulingBookingOfferExhaustedException.php
 │   │   │   ├── Jobs
 │   │   │   │   └── ExpireBookingHoldsJob.php
 │   │   │   ├── Models
@@ -1332,6 +1342,11 @@
 │   │   │   │   ├── BookableSlotOffer.php
 │   │   │   │   ├── BookingHold.php
 │   │   │   │   ├── SchedulingAvailabilityWindow.php
+│   │   │   │   ├── SchedulingBookingOfferClaim.php
+│   │   │   │   ├── SchedulingBookingOfferCondition.php
+│   │   │   │   ├── SchedulingBookingOffer.php
+│   │   │   │   ├── SchedulingBookingOfferRewardAction.php
+│   │   │   │   ├── SchedulingBookingOfferReward.php
 │   │   │   │   ├── SchedulingHost.php
 │   │   │   │   ├── SchedulingHostResource.php
 │   │   │   │   ├── SchedulingResourceOccupancy.php
@@ -1360,6 +1375,8 @@
 │   │   │   │   │   ├── ResourceOccupancyResolver.php
 │   │   │   │   │   ├── SchedulingTravelTimeResolver.php
 │   │   │   │   │   └── TravelFeasibilityResolver.php
+│   │   │   │   ├── BookingEligibilityProviderRegistry.php
+│   │   │   │   ├── BookingOfferRewardActionHandlerRegistry.php
 │   │   │   │   ├── Contacts
 │   │   │   │   │   └── Filters
 │   │   │   │   │       └── AppointmentStateContactFilterCriterion.php
@@ -1372,6 +1389,7 @@
 │   │   │   │   ├── PublicBookingDestinationVerificationService.php
 │   │   │   │   ├── SchedulingAvailabilityConfigurationWriter.php
 │   │   │   │   ├── SchedulingAvailableStartRangeBuilder.php
+│   │   │   │   ├── SchedulingBookingOfferReadService.php
 │   │   │   │   ├── SchedulingConfigurationWriter.php
 │   │   │   │   ├── SchedulingDurationResolver.php
 │   │   │   │   ├── SchedulingLocalDateTimeResolver.php
@@ -1894,6 +1912,8 @@
 │   │   │       ├── Contracts
 │   │   │       │   ├── AppointmentAfterBookingWorkspace.php
 │   │   │       │   └── AppointmentCommunications.php
+│   │   │       ├── Core
+│   │   │       │   └── ContactTagBookingOfferRewardActionHandler.php
 │   │   │       ├── FlowRoutes
 │   │   │       │   └── FlowRoutesAppointmentAfterBookingWorkspace.php
 │   │   │       ├── Messaging
@@ -1910,7 +1930,9 @@
 │   │   │       │   ├── ApplySimpleAppointmentAfterBookingActions.php
 │   │   │       │   └── SimpleAppointmentAfterBookingWorkspace.php
 │   │   │       ├── UnavailableAppointmentAfterBookingWorkspace.php
-│   │   │       └── UnavailableAppointmentCommunications.php
+│   │   │       ├── UnavailableAppointmentCommunications.php
+│   │   │       └── Webinars
+│   │   │           └── WebinarRegistrantBookingEligibilityProvider.php
 │   │   ├── Modules
 │   │   │   ├── Migrations
 │   │   │   │   ├── MigrationScopeDefinition.php
@@ -2348,7 +2370,8 @@
 │   │   │   │   ├── 2026_07_21_180100_create_bookable_slot_offers_table.php
 │   │   │   │   ├── 2026_07_21_180101_create_booking_holds_table.php
 │   │   │   │   ├── 2026_08_03_190000_create_scheduling_resource_occupancy_tables.php
-│   │   │   │   └── 2026_08_27_161500_add_appointment_format_to_bookable_services_table.php
+│   │   │   │   ├── 2026_08_27_161500_add_appointment_format_to_bookable_services_table.php
+│   │   │   │   └── 2026_09_16_140000_create_scheduling_booking_offers_tables.php
 │   │   │   ├── tasks
 │   │   │   │   ├── 2026_04_15_203543_create_task_templates_table.php
 │   │   │   │   ├── 2026_04_15_203544_create_tasks_table.php
@@ -2781,6 +2804,7 @@
 │       │   │   ├── reschedule.blade.php
 │       │   │   ├── resources.blade.php
 │       │   │   ├── services
+│       │   │   │   ├── booking-offers.blade.php
 │       │   │   │   ├── details.blade.php
 │       │   │   │   ├── edit.blade.php
 │       │   │   │   ├── index.blade.php
@@ -3398,6 +3422,7 @@
 │   │   │   ├── BookingHoldConversionAndReleaseActionTest.php
 │   │   │   ├── CreateAppointmentActionTest.php
 │   │   │   ├── FindBookableAvailabilityActionTest.php
+│   │   │   ├── GoogleRoutesTravelTimeResolverTest.php
 │   │   │   ├── PublicAppointmentSummaryPresentationTest.php
 │   │   │   ├── PublicBookingAppointmentCommunicationsConsentTest.php
 │   │   │   ├── PublicBookingCompletionTest.php
@@ -3419,6 +3444,7 @@
 │   │   │   ├── SchedulingAvailabilitySaveAllTest.php
 │   │   │   ├── SchedulingAvailabilityWindowFoundationTest.php
 │   │   │   ├── SchedulingAvailableStartRangeBuilderTest.php
+│   │   │   ├── SchedulingBookingOfferRuntimeTest.php
 │   │   │   ├── SchedulingConfigurationWorkspaceTest.php
 │   │   │   ├── SchedulingContactPanelTest.php
 │   │   │   ├── SchedulingDashboardPanelTest.php
@@ -3434,7 +3460,8 @@
 │   │   │   ├── SchedulingSetupReadinessTest.php
 │   │   │   ├── SchedulingUserHostIdentityBridgeTest.php
 │   │   │   ├── SchedulingWorkspaceTest.php
-│   │   │   └── TravelAwareAvailabilityTest.php
+│   │   │   ├── TravelAwareAvailabilityTest.php
+│   │   │   └── WebinarRegistrantBookingEligibilityProviderTest.php
 │   │   ├── SetupValidation
 │   │   │   ├── ConfigContractsSetupValidationContributorTest.php
 │   │   │   ├── MediaSetupValidationContributorTest.php
@@ -3576,4 +3603,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-845 directories, 2732 files
+849 directories, 2755 files

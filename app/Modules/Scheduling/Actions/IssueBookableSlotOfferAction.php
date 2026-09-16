@@ -36,6 +36,7 @@ class IssueBookableSlotOfferAction
         ?CarbonInterface $issuedAt = null,
         ?Appointment $rescheduleAppointment = null,
         ?SchedulingLocationSnapshot $location = null,
+        array $meta = [],
     ): BookableSlotOffer {
         $issuedAt = $issuedAt !== null
             ? CarbonImmutable::instance($issuedAt)->utc()
@@ -46,6 +47,7 @@ class IssueBookableSlotOfferAction
             $issuedAt,
             $rescheduleAppointment,
             $location,
+            $meta,
         ): BookableSlotOffer {
             $service = BookableService::withTrashed()
                 ->whereKey($slot->bookableServiceId)
@@ -113,6 +115,7 @@ class IssueBookableSlotOfferAction
                 'source_window_ids' => $currentSlot->sourceWindowIds,
                 'issued_at' => $issuedAt,
                 'expires_at' => $issuedAt->addSeconds($ttlSeconds),
+                'meta' => $meta !== [] ? $meta : null,
             ]);
         });
     }

@@ -4,6 +4,7 @@ use App\Modules\Scheduling\Controllers\CRM\AppointmentCommunicationsController;
 use App\Modules\Scheduling\Controllers\CRM\AppointmentController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingAfterBookingController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingAvailabilityController;
+use App\Modules\Scheduling\Controllers\CRM\SchedulingBookingOfferController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingConfigurationController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingResourceController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingController;
@@ -36,6 +37,18 @@ Route::middleware('module:scheduling')
 
         Route::get('/configuration/services/{bookableService}/staff', [SchedulingConfigurationController::class, 'editServiceStaff'])
             ->name('configuration.services.staff.edit');
+
+        Route::get('/configuration/services/{bookableService}/offers', [SchedulingBookingOfferController::class, 'index'])
+            ->name('configuration.services.offers.index');
+
+        Route::post('/configuration/services/{bookableService}/offers', [SchedulingBookingOfferController::class, 'store'])
+            ->name('configuration.services.offers.store');
+
+        Route::put('/configuration/services/{bookableService}/offers/{bookingOffer}', [SchedulingBookingOfferController::class, 'update'])
+            ->name('configuration.services.offers.update');
+
+        Route::delete('/configuration/services/{bookableService}/offers/{bookingOffer}', [SchedulingBookingOfferController::class, 'destroy'])
+            ->name('configuration.services.offers.destroy');
 
         Route::get('/configuration/staff', [SchedulingConfigurationController::class, 'staff'])
             ->name('configuration.staff.index');

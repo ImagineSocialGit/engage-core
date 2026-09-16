@@ -2,6 +2,7 @@
 
 namespace App\Modules\Scheduling\Requests;
 
+use App\Modules\Scheduling\Models\SchedulingBookingOffer;
 use Illuminate\Foundation\Http\FormRequest;
 
 class PreparePublicBookingRequest extends FormRequest
@@ -20,6 +21,12 @@ class PreparePublicBookingRequest extends FormRequest
             'region' => ['required', 'string', 'max:255'],
             'postal_code' => ['required', 'string', 'max:255'],
             'country' => ['required', 'string', 'size:2', 'regex:/^[A-Za-z]{2}$/'],
+            'offer_code' => [
+                'nullable',
+                'string',
+                'max:40',
+                'regex:/\A[A-Za-z0-9][A-Za-z0-9_-]{2,39}\z/',
+            ],
             'bookable_service_id' => ['prohibited'],
             'scheduling_host_id' => ['prohibited'],
             'starts_at' => ['prohibited'],
@@ -30,6 +37,7 @@ class PreparePublicBookingRequest extends FormRequest
             'capacity' => ['prohibited'],
             'remaining_capacity' => ['prohibited'],
             'offer_id' => ['prohibited'],
+            'booking_offer_id' => ['prohibited'],
             'hold_id' => ['prohibited'],
             'source_window_ids' => ['prohibited'],
             'location_type' => ['prohibited'],
@@ -46,9 +54,7 @@ class PreparePublicBookingRequest extends FormRequest
         ];
     }
 
-    /**
-     * @return array<string, string|null>
-     */
+    /** @return array<string, string|null> */
     public function customerSiteAddress(): array
     {
         return [
@@ -59,6 +65,17 @@ class PreparePublicBookingRequest extends FormRequest
             'postal_code' => (string) $this->validated('postal_code'),
             'country' => (string) $this->validated('country'),
         ];
+    }
+
+    public function offerCode(): ?string
+    {
+        $value = $this->validated('offer_code');
+
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return SchedulingBookingOffer::normalizeCode($value);
     }
 
     private function nullableValidatedString(string $field): ?string
