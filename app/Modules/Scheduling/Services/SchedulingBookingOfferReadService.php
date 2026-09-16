@@ -16,6 +16,7 @@ final class SchedulingBookingOfferReadService
     {
         return SchedulingBookingOffer::query()
             ->with(['conditions', 'rewards.actions'])
+            ->withCount('claims')
             ->where('bookable_service_id', $service->getKey())
             ->orderBy('code')
             ->orderBy('id')

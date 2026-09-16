@@ -99,6 +99,8 @@ class SchedulingAvailabilityController extends Controller
 
         $timezone = $selectedService?->timezone
             ?? config('client.timezone', config('app.timezone', 'UTC'));
+        $previewRequested = array_key_exists('preview_date', $validated)
+            || array_key_exists('preview_host_id', $validated);
         $previewDate = $validated['preview_date']
             ?? CarbonImmutable::now($timezone)->toDateString();
         $previewSlots = [];
@@ -228,6 +230,7 @@ class SchedulingAvailabilityController extends Controller
             'previewRequiresHost' => $previewRequiresHost,
             'previewHost' => $previewHost,
             'previewDate' => $previewDate,
+            'previewRequested' => $previewRequested,
             'previewSlots' => $previewSlots,
             'previewStartRanges' => array_map(
                 fn (array $range): array => [

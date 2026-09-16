@@ -5,6 +5,7 @@ namespace App\Modules\Scheduling\Services;
 use App\Models\User;
 use App\Modules\Core\Access\Services\UserAccessService;
 use App\Modules\Scheduling\Models\BookableService;
+use App\Modules\Scheduling\Models\SchedulingBookingOffer;
 
 final class SchedulingSetupProgress
 {
@@ -30,6 +31,10 @@ final class SchedulingSetupProgress
             : null;
         $staffGuidance = $this->staffGuidance();
         $staffRequired = (bool) ($serviceReadiness['staff_required'] ?? false);
+        $hasOffers = $service instanceof BookableService
+            && SchedulingBookingOffer::query()
+                ->where('bookable_service_id', $service->getKey())
+                ->exists();
 
         $definitions = [
             [
@@ -74,8 +79,20 @@ final class SchedulingSetupProgress
                     : route('crm.scheduling.configuration.staff.index'),
             ],
             [
-                'key' => 'ready',
+                'key' => 'offers',
                 'number' => 4,
+                'label' => 'Offers',
+                'description' => 'Optionally add offer codes, eligibility rules, and limited rewards for this appointment type.',
+                'required' => false,
+                'recommended' => false,
+                'complete' => $hasOffers,
+                'url' => $service instanceof BookableService
+                    ? route('crm.scheduling.configuration.services.offers.index', $service)
+                    : null,
+            ],
+            [
+                'key' => 'ready',
+                'number' => 5,
                 'label' => 'Ready to test',
                 'description' => 'Create a test or real appointment using the same availability and assignment rules the CRM will use day to day.',
                 'required' => true,
@@ -102,7 +119,18 @@ final class SchedulingSetupProgress
             fn (array $step): bool => ! $step['complete'] && $step['required'],
         );
 
-        if (! is_array($next) && (bool) ($serviceReadiness['internal_ready'] ?? false)) {
+        if ($currentStep === 'availability'
+            && ! $staffRequired
+            && $staffGuidance['recommended']
+        ) {
+            $staffStep = collect($steps)->firstWhere('key', 'staff');
+
+            if (is_array($staffStep) && filled($staffStep['url'] ?? null)) {
+                $next = $staffStep;
+            }
+        } elseif (! is_array($next)
+            && (bool) ($serviceReadiness['internal_ready'] ?? false)
+        ) {
             $next = collect($steps)->firstWhere('key', 'ready');
         }
 
@@ -121,9 +149,11 @@ final class SchedulingSetupProgress
             'steps' => $steps,
             'next_action' => is_array($next) && filled($next['url'] ?? null)
                 ? [
-                    'label' => $next['key'] === 'ready'
-                        ? 'Book a test appointment'
-                        : 'Continue to '.$next['label'],
+                    'label' => match ($next['key']) {
+                        'ready' => 'Book a test appointment',
+                        'staff' => 'Set up staff next',
+                        default => 'Continue to '.$next['label'],
+                    },
                     'url' => $next['url'],
                 ]
                 : null,
@@ -166,7 +196,7 @@ final class SchedulingSetupProgress
     {
         if ($step['key'] === $currentStep) {
             return [
-                'state' => 'current',
+                'state' => $step['complete'] ? 'current_complete' : 'current',
                 'state_label' => 'Current',
             ];
         }

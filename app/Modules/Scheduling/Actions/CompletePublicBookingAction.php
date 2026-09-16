@@ -25,6 +25,7 @@ class CompletePublicBookingAction
         string $lastName,
         string $email,
         ?string $phone = null,
+        ?string $bookingOfferCode = null,
         ?string $publicSubmissionAttemptId = null,
         array $disclosure = [],
         ?string $sourceIp = null,
@@ -36,6 +37,7 @@ class CompletePublicBookingAction
         $name = $firstName.' '.$lastName;
         $email = $this->normalizedEmail($email);
         $phone = $this->nullableString($phone, 'attendee phone', 255);
+        $bookingOfferCode = $this->nullableString($bookingOfferCode, 'booking offer code', 40);
         $publicSubmissionAttemptId = $this->attemptId($publicSubmissionAttemptId);
         $disclosure = $this->disclosure($disclosure);
 
@@ -47,6 +49,7 @@ class CompletePublicBookingAction
                 $name,
                 $email,
                 $phone,
+                $bookingOfferCode,
                 $publicSubmissionAttemptId,
                 $disclosure,
             ): AppointmentBookingData {
@@ -70,6 +73,7 @@ class CompletePublicBookingAction
                     name: $name,
                     email: $email,
                     phone: $phone,
+                    bookingOfferCode: $bookingOfferCode,
                     source: 'public_booking',
                     appointmentMeta: [
                         'reporting' => array_filter([

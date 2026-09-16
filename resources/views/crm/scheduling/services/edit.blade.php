@@ -191,8 +191,8 @@
                 </a>
 
                 <a href="{{ route('crm.scheduling.configuration.services.offers.index', $service) }}" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-teal-300" data-scheduling-config-card="offers">
-                    <div class="font-semibold text-slate-900">Offers</div>
-                    <p class="mt-2 text-sm text-slate-500">Add optional offer codes, eligibility rules, and limited rewards.</p>
+                    <div class="flex items-center justify-between gap-3"><span class="font-semibold text-slate-900">Offers</span><span class="text-xs font-semibold text-slate-500">Optional</span></div>
+                    <p class="mt-2 text-sm text-slate-500">Add offer codes, eligibility rules, and limited rewards when this appointment type needs them.</p>
                 </a>
 
                 <a href="{{ route('crm.scheduling.configuration.communications.index') }}" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-teal-300" data-scheduling-config-card="communications">

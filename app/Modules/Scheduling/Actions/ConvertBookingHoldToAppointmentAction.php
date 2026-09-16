@@ -194,7 +194,6 @@ class ConvertBookingHoldToAppointmentAction
             $this->claimBookingOffer->handle(
                 appointment: $appointment,
                 service: $service,
-                hold: $hold,
                 booking: $booking,
             );
 

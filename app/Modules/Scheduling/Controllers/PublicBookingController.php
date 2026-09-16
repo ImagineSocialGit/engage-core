@@ -25,7 +25,6 @@ use App\Modules\Scheduling\Requests\PreparePublicBookingRequest;
 use App\Modules\Scheduling\Requests\ResendPublicBookingDestinationVerificationRequest;
 use App\Modules\Scheduling\Services\PublicBookingDestinationVerificationService;
 use App\Modules\Scheduling\Services\SchedulingLocationSnapshotResolver;
-use App\Modules\Scheduling\Services\SchedulingBookingOfferReadService;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
@@ -50,14 +49,9 @@ class PublicBookingController extends Controller
         string $serviceKey,
         FindBookableAvailabilityAction $findAvailability,
         SchedulingLocationSnapshotResolver $locationSnapshots,
-        SchedulingBookingOfferReadService $bookingOffers,
     ): View {
         $service = $this->publicService($serviceKey);
-        $offerSelection = $this->publicOfferCodeSelection(
-            request: $request,
-            service: $service,
-            bookingOffers: $bookingOffers,
-        );
+        $offerCodePrefill = $this->publicOfferCodePrefill($request);
         $displayTimezone = $this->serviceTimezone($service);
         $today = CarbonImmutable::now($displayTimezone)->startOfDay();
         $maximumDate = $this->maximumPublicDate($service, $today);
@@ -76,7 +70,7 @@ class PublicBookingController extends Controller
                 'displayTimezone' => $displayTimezone,
                 'maximumDate' => $maximumDate,
                 'requiresCustomerSitePreparation' => true,
-                ...$offerSelection,
+                'offerCodePrefill' => $offerCodePrefill,
             ]));
         }
 
@@ -86,7 +80,7 @@ class PublicBookingController extends Controller
                 'displayTimezone' => $displayTimezone,
                 'maximumDate' => $maximumDate,
                 'preparedLocation' => $this->locationPresentation($location),
-                ...$offerSelection,
+                'offerCodePrefill' => $offerCodePrefill,
             ]));
         }
 
@@ -113,7 +107,7 @@ class PublicBookingController extends Controller
             'availableTimes' => $this->publicTimes($slots, $displayTimezone),
             'maximumDate' => $maximumDate,
             'preparedLocation' => $this->locationPresentation($location),
-            ...$offerSelection,
+            'offerCodePrefill' => $offerCodePrefill,
         ]));
     }
 
@@ -199,7 +193,7 @@ class PublicBookingController extends Controller
                 startsAt: $startsAt,
                 endsAt: $endsAt,
                 location: $location,
-                bookingOfferCode: $request->offerCode(),
+                offerCodePrefill: $request->offerCode(),
             );
         } catch (DomainException) {
             throw ValidationException::withMessages([
@@ -490,6 +484,7 @@ class PublicBookingController extends Controller
                 lastName: $request->attendeeLastName(),
                 email: $request->attendeeEmail(),
                 phone: $request->attendeePhone(),
+                bookingOfferCode: $request->offerCode(),
                 publicSubmissionAttemptId: $request->publicSubmissionAttemptId(),
                 disclosure: $this->publicBookingDisclosure(),
                 sourceIp: $request->ip(),
@@ -497,11 +492,11 @@ class PublicBookingController extends Controller
             );
         } catch (BookingOfferEligibilityException $exception) {
             throw ValidationException::withMessages([
-                'email' => $exception->getMessage(),
+                'offer_code' => $exception->getMessage(),
             ]);
         } catch (SchedulingBookingOfferExhaustedException $exception) {
             throw ValidationException::withMessages([
-                'booking' => $exception->getMessage(),
+                'offer_code' => $exception->getMessage(),
             ]);
         } catch (DomainException) {
             throw ValidationException::withMessages([
@@ -563,10 +558,7 @@ class PublicBookingController extends Controller
             ],
             'verificationCompletedChannel' => null,
             'holdIdempotencyKey' => (string) Str::uuid(),
-            'bookingOffer' => null,
-            'bookingOfferCode' => null,
-            'bookingOfferCodeInput' => '',
-            'bookingOfferError' => null,
+            'offerCodePrefill' => null,
         ], $overrides);
 
         $data['availableTimePeriods'] = $this->publicTimePeriods(
@@ -594,72 +586,23 @@ class PublicBookingController extends Controller
         return $data;
     }
 
-    /**
-     * @return array{
-     *     bookingOffer:array<string,mixed>|null,
-     *     bookingOfferCode:string|null,
-     *     bookingOfferCodeInput:string,
-     *     bookingOfferError:string|null
-     * }
-     */
-    private function publicOfferCodeSelection(
-        Request $request,
-        BookableService $service,
-        SchedulingBookingOfferReadService $bookingOffers,
-    ): array {
+    private function publicOfferCodePrefill(Request $request): ?string
+    {
         $raw = $request->query('offer');
 
         if (! is_string($raw) || trim($raw) === '') {
-            return [
-                'bookingOffer' => null,
-                'bookingOfferCode' => null,
-                'bookingOfferCodeInput' => '',
-                'bookingOfferError' => null,
-            ];
+            return null;
         }
 
-        $input = strtoupper(trim($raw));
+        $value = strtoupper(trim($raw));
 
-        if (mb_strlen($input) > 40
-            || preg_match('/\A[A-Z0-9][A-Z0-9_-]{2,39}\z/', $input) !== 1
+        if (mb_strlen($value) > 40
+            || preg_match('/\A[A-Z0-9][A-Z0-9_-]{2,39}\z/', $value) !== 1
         ) {
-            return [
-                'bookingOffer' => null,
-                'bookingOfferCode' => null,
-                'bookingOfferCodeInput' => $input,
-                'bookingOfferError' => 'That offer code is not valid.',
-            ];
+            return null;
         }
 
-        $summary = $bookingOffers->publicCodeSummary(
-            service: $service,
-            code: $input,
-        );
-
-        if (! is_array($summary)) {
-            return [
-                'bookingOffer' => null,
-                'bookingOfferCode' => null,
-                'bookingOfferCodeInput' => $input,
-                'bookingOfferError' => 'That offer code was not recognized for this appointment type.',
-            ];
-        }
-
-        if (! (bool) ($summary['open'] ?? false)) {
-            return [
-                'bookingOffer' => $summary,
-                'bookingOfferCode' => null,
-                'bookingOfferCodeInput' => $input,
-                'bookingOfferError' => (string) ($summary['status_message'] ?? 'That offer code is not currently available.'),
-            ];
-        }
-
-        return [
-            'bookingOffer' => $summary,
-            'bookingOfferCode' => (string) $summary['code'],
-            'bookingOfferCodeInput' => (string) $summary['code'],
-            'bookingOfferError' => null,
-        ];
+        return $value;
     }
 
     /** @param array<string, mixed> $data */
@@ -1341,8 +1284,8 @@ class PublicBookingController extends Controller
             'expires_at' => $offer->expires_at?->toISOString(),
             'service_key' => $service->key,
             'service_name' => $service->name,
-            'booking_offer_code' => is_string(data_get($offer->meta, 'booking_offer.code'))
-                ? data_get($offer->meta, 'booking_offer.code')
+            'booking_offer_prefill' => is_string(data_get($offer->meta, 'booking_offer_prefill'))
+                ? data_get($offer->meta, 'booking_offer_prefill')
                 : null,
             'is_range' => $service->usesRangeDuration(),
             'date' => $startsAt->format('Y-m-d'),
@@ -1431,6 +1374,9 @@ class PublicBookingController extends Controller
                 type: $hold->location_type,
                 details: $locationDetails,
             ),
+            'booking_offer_prefill' => is_string(data_get($hold->meta, 'booking_offer_prefill'))
+                ? data_get($hold->meta, 'booking_offer_prefill')
+                : null,
             'appointment_status' => $appointmentStatus,
             'confirmation_pending' => $appointmentStatus === Appointment::STATUS_PENDING,
             'public_submission_attempt_id' => $appointment instanceof Appointment

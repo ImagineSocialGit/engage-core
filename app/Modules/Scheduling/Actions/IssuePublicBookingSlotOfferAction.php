@@ -7,7 +7,6 @@ use App\Modules\Scheduling\Data\BookableSlot;
 use App\Modules\Scheduling\Data\SchedulingLocationSnapshot;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookableSlotOffer;
-use App\Modules\Scheduling\Services\SchedulingBookingOfferReadService;
 use App\Modules\Scheduling\Services\SchedulingDurationResolver;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -21,7 +20,6 @@ class IssuePublicBookingSlotOfferAction
         private readonly FindBookableAvailabilityAction $findAvailability,
         private readonly IssueBookableSlotOfferAction $issueSlotOffer,
         private readonly SchedulingDurationResolver $durations,
-        private readonly SchedulingBookingOfferReadService $bookingOffers,
     ) {}
 
     public function handle(
@@ -29,7 +27,7 @@ class IssuePublicBookingSlotOfferAction
         CarbonInterface $startsAt,
         ?CarbonInterface $endsAt = null,
         ?SchedulingLocationSnapshot $location = null,
-        ?string $bookingOfferCode = null,
+        ?string $offerCodePrefill = null,
     ): BookableSlotOffer {
         if (! $service->exists || $service->getKey() === null) {
             throw new InvalidArgumentException(
@@ -47,7 +45,7 @@ class IssuePublicBookingSlotOfferAction
             $startsAt,
             $requestedEndsAt,
             $location,
-            $bookingOfferCode,
+            $offerCodePrefill,
         ): BookableSlotOffer {
             $lockedService = BookableService::withTrashed()
                 ->whereKey($service->getKey())
@@ -99,24 +97,8 @@ class IssuePublicBookingSlotOfferAction
 
             $meta = [];
 
-            if (is_string($bookingOfferCode) && trim($bookingOfferCode) !== '') {
-                $bookingOffer = $this->bookingOffers->activeByCode(
-                    service: $lockedService,
-                    code: $bookingOfferCode,
-                    at: $now,
-                );
-
-                if ($bookingOffer === null) {
-                    throw new DomainException(
-                        'That offer code is invalid or is not currently active.',
-                    );
-                }
-
-                $meta['booking_offer'] = [
-                    'id' => (int) $bookingOffer->getKey(),
-                    'code' => $bookingOffer->code,
-                    'applied_at' => $now->toISOString(),
-                ];
+            if (is_string($offerCodePrefill) && trim($offerCodePrefill) !== '') {
+                $meta['booking_offer_prefill'] = strtoupper(trim($offerCodePrefill));
             }
 
             return $this->issueSlotOffer->handle(

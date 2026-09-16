@@ -7,6 +7,7 @@ use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\SchedulingBookingOffer;
 use App\Modules\Scheduling\Services\BookingEligibilityProviderRegistry;
 use App\Modules\Scheduling\Services\SchedulingBookingOfferReadService;
+use App\Modules\Scheduling\Services\SchedulingSetupProgress;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
@@ -22,6 +23,7 @@ final class SchedulingBookingOfferController extends Controller
         BookableService $bookableService,
         SchedulingBookingOfferReadService $offers,
         BookingEligibilityProviderRegistry $eligibilityProviders,
+        SchedulingSetupProgress $progress,
     ): View {
         $providerDefinitions = $eligibilityProviders->authoringDefinitions();
 
@@ -29,6 +31,7 @@ final class SchedulingBookingOfferController extends Controller
             'title' => 'Offers · '.$bookableService->name,
             'heading' => 'Booking offers',
             'service' => $bookableService,
+            'setupProgress' => $progress->forService($bookableService, 'offers'),
             'offers' => $offers->forService($bookableService)
                 ->map(fn (SchedulingBookingOffer $offer): array => $this->offerRow(
                     $offer,

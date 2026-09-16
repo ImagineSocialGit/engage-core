@@ -3,16 +3,20 @@
 namespace Tests\Feature\Scheduling;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Models\ContactTag;
 use App\Modules\Scheduling\Actions\CreatePublicBookingHoldAction;
 use App\Modules\Scheduling\Actions\IssuePublicBookingSlotOfferAction;
 use App\Modules\Scheduling\Actions\ReleaseBookingHoldAction;
+use App\Modules\Scheduling\Contracts\BookingOfferRewardActionHandler;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\AppointmentAttendee;
 use App\Modules\Scheduling\Models\AppointmentLifecycleEvent;
 use App\Modules\Scheduling\Models\BookableService;
+use App\Modules\Scheduling\Models\SchedulingBookingOffer;
 use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingAvailabilityWindow;
 use App\Modules\Scheduling\Providers\SchedulingModuleServiceProvider;
+use App\Modules\Scheduling\Services\BookingOfferRewardActionHandlerRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
@@ -118,6 +122,65 @@ class PublicBookingCompletionTest extends TestCase
             ->assertDontSee('appointment_id')
             ->assertDontSee('scheduling_host_id')
             ->assertDontSee('remaining_capacity');
+    }
+
+
+    public function test_public_offer_code_claims_reward_and_applies_tag_on_completion(): void
+    {
+        CarbonImmutable::setTestNow('2026-09-16 12:00:00 UTC');
+        $this->registerPublicSurface('https://schedule.test');
+        $this->app->tag(
+            [PublicBookingOfferTagRewardHandler::class],
+            BookingOfferRewardActionHandlerRegistry::TAG,
+        );
+
+        $service = $this->publicService('offer-reward');
+        $offer = SchedulingBookingOffer::query()->create([
+            'bookable_service_id' => $service->getKey(),
+            'code' => 'FREEVA',
+            'name' => 'Free consultation',
+            'status' => SchedulingBookingOffer::STATUS_ACTIVE,
+            'claim_limit' => 30,
+        ]);
+        $reward = $offer->rewards()->create([
+            'name' => 'Free consultation',
+            'max_claim_number' => 30,
+            'sort_order' => 0,
+        ]);
+        $reward->actions()->create([
+            'provider' => PublicBookingOfferTagRewardHandler::KEY,
+            'payload' => ['tag' => 'free-consultation'],
+            'sort_order' => 0,
+        ]);
+
+        $hold = $this->activeHold($service, '2026-09-17 09:00:00 UTC');
+        $holdUrl = 'https://schedule.test/book/'.$hold->hold_id;
+
+        $this->post($holdUrl, [
+            'first_name' => 'Offer',
+            'last_name' => 'Visitor',
+            'email' => 'offer@example.test',
+            'offer_code' => 'freeva',
+        ])
+            ->assertRedirect($holdUrl)
+            ->assertSessionHasNoErrors();
+
+        $contact = Contact::query()->sole();
+        $appointment = Appointment::query()->sole();
+
+        $this->assertDatabaseHas('scheduling_booking_offer_claims', [
+            'scheduling_booking_offer_id' => $offer->getKey(),
+            'appointment_id' => $appointment->getKey(),
+            'contact_id' => $contact->getKey(),
+            'qualification_scope_key' => 'global',
+            'claim_number' => 1,
+        ]);
+        $this->assertDatabaseHas('contact_tags', [
+            'contact_id' => $contact->getKey(),
+            'tag' => 'free-consultation',
+        ]);
+        $this->assertSame('FREEVA', data_get($appointment->meta, 'booking_offer.offer_code'));
+        $this->assertSame(1, data_get($appointment->meta, 'booking_offer.claim_number'));
     }
 
     public function test_services_requiring_confirmation_create_a_pending_public_appointment(): void
@@ -490,5 +553,28 @@ class PublicBookingCompletionTest extends TestCase
         );
 
         Route::getRoutes()->refreshNameLookups();
+    }
+}
+
+final class PublicBookingOfferTagRewardHandler implements BookingOfferRewardActionHandler
+{
+    public const KEY = 'public_booking_test_contact_tag';
+
+    public function key(): string
+    {
+        return self::KEY;
+    }
+
+    public function apply(
+        Contact $contact,
+        Appointment $appointment,
+        array $payload,
+    ): void {
+        $tag = trim((string) ($payload['tag'] ?? ''));
+
+        ContactTag::query()->firstOrCreate([
+            'contact_id' => $contact->getKey(),
+            'tag' => $tag,
+        ]);
     }
 }

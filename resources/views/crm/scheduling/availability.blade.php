@@ -7,7 +7,7 @@
     <div
         class="space-y-6"
         data-scheduling-availability-configuration
-        x-data="{ scrollTarget: @js(session('availability_scroll_to')) }"
+        x-data="{ scrollTarget: @js(session('availability_scroll_to')), testAvailabilityOpen: @js($previewRequested) }"
         x-init="if (scrollTarget) $nextTick(() => document.getElementById(scrollTarget)?.scrollIntoView({ block: 'start' }))"
     >
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -18,6 +18,17 @@
             >
                 Back to configuration
             </a>
+
+            @if ($selectedService)
+                <button
+                    type="button"
+                    class="inline-flex w-full items-center justify-center rounded-lg border border-teal-600 bg-white px-3 py-2 text-sm font-semibold text-teal-700 shadow-sm hover:bg-teal-50 sm:w-auto"
+                    x-on:click="testAvailabilityOpen = true"
+                    data-availability-test-trigger
+                >
+                    Test availability
+                </button>
+            @endif
         </div>
 
         @if (session('success'))
@@ -340,6 +351,41 @@
                     </x-ui.card>
                 @endif
 
+                @if ($guided && $setupProgress['next_action'])
+                    <x-ui.card class="border-emerald-200 bg-emerald-50" data-availability-guided-next>
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                            <div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <div class="text-sm font-semibold text-emerald-950">Availability is ready.</div>
+                                    @if ($setupProgress['staff_guidance']['recommended'])
+                                        <span class="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-emerald-800">Recommended next</span>
+                                    @endif
+                                </div>
+                                <div class="mt-1 text-sm text-emerald-900">
+                                    {{ $setupProgress['staff_guidance']['recommended']
+                                        ? 'Set up staff & providers next so appointments, tasks, and enabled team notifications can reach the right person.'
+                                        : 'Continue to the next useful setup step, or test the booking rules before moving on.' }}
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-2 sm:flex-row">
+                                <button
+                                    type="button"
+                                    class="inline-flex w-full shrink-0 justify-center rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 sm:w-auto"
+                                    x-on:click="testAvailabilityOpen = true"
+                                >
+                                    Test availability
+                                </button>
+                                <a
+                                    href="{{ $setupProgress['next_action']['url'] }}"
+                                    class="inline-flex w-full shrink-0 justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
+                                >
+                                    {{ $setupProgress['next_action']['label'] }}
+                                </a>
+                            </div>
+                        </div>
+                    </x-ui.card>
+                @endif
+
                 <div class="grid gap-6 xl:grid-cols-2">
                     <x-ui.card id="special-hours" class="scroll-mt-6 space-y-4" data-availability-special-hours>
                         <div>
@@ -496,27 +542,6 @@
                         </form>
                     </x-ui.card>
                 </div>
-            @if ($guided && $setupProgress['next_action'])
-                <x-ui.card class="border-yellow-300 bg-yellow-50" data-availability-guided-next>
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <div class="text-sm font-semibold text-yellow-950">Required availability is in place.</div>
-                            <div class="mt-1 text-sm text-yellow-900">
-                                {{ $setupProgress['staff_guidance']['recommended']
-                                    ? 'Staff is recommended next so appointments, tasks, and enabled team notifications can reach the right person.'
-                                    : 'Continue to the next useful setup step, or test booking now.' }}
-                            </div>
-                        </div>
-                        <a
-                            href="{{ $setupProgress['next_action']['url'] }}"
-                            class="inline-flex w-full shrink-0 justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
-                        >
-                            {{ $setupProgress['next_action']['label'] }}
-                        </a>
-                    </div>
-                </x-ui.card>
-            @endif
-
             <section id="date-changes" class="scroll-mt-6 space-y-4" data-availability-date-changes>
                     <div>
                         <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
@@ -588,20 +613,25 @@
                     </div>
                 </section>
 
-                <x-ui.card id="availability-preview" class="space-y-4 scroll-mt-6" data-availability-preview>
-                    <div>
-                        <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">
-                            Test availability
-                        </div>
-                        <h2 class="mt-3 text-xl font-semibold tracking-tight text-slate-900">
-                            Check what can actually be booked
-                        </h2>
-                        <p class="mt-1 text-sm text-slate-500">
-                            This checks the same availability used when booking, including regular hours, one-off changes, staff assignments, how many appointments can happen at once, existing appointments, and other active limits.
-                        </p>
-                    </div>
-
-                    <form method="GET" action="{{ route('crm.scheduling.configuration.availability.index').'#availability-preview' }}" class="grid gap-4 md:grid-cols-2">
+                <div
+                    x-show="testAvailabilityOpen"
+                    x-cloak
+                    x-on:keydown.escape.window="testAvailabilityOpen = false"
+                    class="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4 sm:p-8"
+                    data-availability-test-modal
+                    role="presentation"
+                >
+                    <div class="mx-auto flex min-h-full max-w-4xl items-start justify-center" x-on:click.self="testAvailabilityOpen = false">
+                        <div class="w-full rounded-2xl bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="availability-test-title">
+                            <div class="sticky top-0 z-10 flex items-start justify-between gap-4 rounded-t-2xl border-b border-slate-200 bg-white px-6 py-4">
+                                <div>
+                                    <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">Test availability</div>
+                                    <h2 id="availability-test-title" class="mt-2 text-xl font-semibold tracking-tight text-slate-900">Check the times customers can actually book</h2>
+                                </div>
+                                <button type="button" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" x-on:click="testAvailabilityOpen = false">Close</button>
+                            </div>
+                            <div id="availability-preview" class="space-y-4 p-6">
+                    <form method="GET" action="{{ route('crm.scheduling.configuration.availability.index') }}" class="grid gap-4 md:grid-cols-2">
                         <input type="hidden" name="service_id" value="{{ $selectedService->id }}">
                         @if ($guided)
                             <input type="hidden" name="guided" value="1">
@@ -728,7 +758,10 @@
                             </a>
                         </div>
                     @endif
-                </x-ui.card>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <details class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-availability-advanced>
                     <summary class="cursor-pointer text-sm font-semibold text-slate-800">

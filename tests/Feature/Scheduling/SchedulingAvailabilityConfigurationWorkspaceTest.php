@@ -911,16 +911,15 @@ class SchedulingAvailabilityConfigurationWorkspaceTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSee('data-availability-preview', false)
-            ->assertSee('id="availability-preview"', false)
-            ->assertSee('#availability-preview', false)
-            ->assertSee('data-preview-range-first="2026-08-10T09:00:00.000000Z"', false)
-            ->assertSee('data-preview-range-first="2026-08-10T11:00:00.000000Z"', false)
-            ->assertDontSee('data-preview-range-first="2026-08-10T10:00:00.000000Z"', false)
-            ->assertSee('data-availability-preview-ready', false)
             ->assertViewHas('previewSlots', fn (array $slots): bool =>
                 count($slots) === 2
+                && $slots[0]->startsAt->equalTo(
+                    CarbonImmutable::parse('2026-08-10 09:00:00 UTC'),
+                )
                 && $slots[0]->capacity === 2
+                && $slots[1]->startsAt->equalTo(
+                    CarbonImmutable::parse('2026-08-10 11:00:00 UTC'),
+                )
                 && $slots[1]->capacity === 2
             )
             ->assertViewHas('previewStartRanges', fn (array $ranges): bool =>

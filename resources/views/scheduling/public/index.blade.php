@@ -169,6 +169,26 @@
                                 </label>
                             </div>
 
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4" data-scheduling-offer-code>
+                                <label class="{{ $publicPresentation['style']['field_label'] }}" for="offer_code">
+                                    Have an offer code? <span class="font-medium text-slate-500">(optional)</span>
+                                    <input
+                                        class="{{ $publicPresentation['style']['input'] }} uppercase"
+                                        id="offer_code"
+                                        name="offer_code"
+                                        type="text"
+                                        maxlength="40"
+                                        value="{{ old('offer_code', $holdSummary['booking_offer_prefill'] ?? '') }}"
+                                        placeholder="FREEVA"
+                                        autocomplete="off"
+                                    >
+                                    <span class="mt-1 block text-xs font-normal text-slate-500">Offer eligibility and availability are checked when you complete the booking.</span>
+                                    @error('offer_code')
+                                        <span class="text-sm font-semibold text-red-700">{{ $message }}</span>
+                                    @enderror
+                                </label>
+                            </div>
+
                             <div class="flex justify-end">
                                 <x-public-surface.button type="submit">Complete booking</x-public-surface.button>
                             </div>
@@ -189,7 +209,7 @@
             <div class="{{ $publicPresentation['style']['state_width'] }}">
                 <a
                     class="{{ $publicPresentation['style']['back_link'] }}"
-                    href="{{ route('scheduling.public.services.show', array_filter(['serviceKey' => $offerSummary['service_key'], 'date' => $offerSummary['is_range'] ? null : $offerSummary['date'], 'offer' => $offerSummary['booking_offer_code']]), false) }}"
+                    href="{{ route('scheduling.public.services.show', array_filter(['serviceKey' => $offerSummary['service_key'], 'date' => $offerSummary['is_range'] ? null : $offerSummary['date'], 'offer' => $offerSummary['booking_offer_prefill']]), false) }}"
                 >
                     <span aria-hidden="true">←</span> Change time
                 </a>
@@ -289,7 +309,7 @@
                     @else
                         <div class="mt-6">
                             <x-public-surface.button
-                                :href="route('scheduling.public.services.show', array_filter(['serviceKey' => $offerSummary['service_key'], 'date' => $offerSummary['is_range'] ? null : $offerSummary['date'], 'offer' => $offerSummary['booking_offer_code']]), false)"
+                                :href="route('scheduling.public.services.show', array_filter(['serviceKey' => $offerSummary['service_key'], 'date' => $offerSummary['is_range'] ? null : $offerSummary['date'], 'offer' => $offerSummary['booking_offer_prefill']]), false)"
                             >
                                 View available times
                             </x-public-surface.button>
@@ -349,47 +369,6 @@
 
                     </div>
 
-                    <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4" data-scheduling-offer-code>
-                        <form
-                            class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
-                            method="GET"
-                            action="{{ route('scheduling.public.services.show', ['serviceKey' => $selectedService->key], false) }}"
-                        >
-                            @if($selectedDate)
-                                <input type="hidden" name="date" value="{{ $selectedDate->format('Y-m-d') }}">
-                            @endif
-                            <label class="{{ $publicPresentation['style']['field_label'] }}" for="offer">
-                                Have an offer code?
-                                <input
-                                    class="{{ $publicPresentation['style']['input'] }} uppercase"
-                                    id="offer"
-                                    name="offer"
-                                    type="text"
-                                    maxlength="40"
-                                    value="{{ $bookingOfferCodeInput }}"
-                                    placeholder="FREEVA"
-                                >
-                            </label>
-                            <x-public-surface.button type="submit" variant="secondary">Apply code</x-public-surface.button>
-                        </form>
-
-                        @if($bookingOfferError)
-                            <p class="mt-3 text-sm font-semibold text-red-700">{{ $bookingOfferError }}</p>
-                        @elseif($bookingOffer)
-                            <div class="mt-3 rounded-xl border border-teal-200 bg-teal-50 p-3" data-scheduling-booking-offer>
-                                <div class="text-sm font-extrabold text-teal-950">{{ $bookingOffer['code'] }} · {{ $bookingOffer['name'] }}</div>
-                                <p class="mt-1 text-sm leading-6 text-teal-900">{{ $bookingOffer['status_message'] }}</p>
-                                @if($bookingOffer['rewards'] !== [])
-                                    <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-teal-900">
-                                        @foreach($bookingOffer['rewards'] as $reward)
-                                            <li>First {{ $reward['max_claim_number'] }}: {{ $reward['name'] }}</li>
-                                        @endforeach
-                                    </ul>
-                                @endif
-                            </div>
-                        @endif
-                    </div>
-
                     @if($requiresCustomerSitePreparation)
                         <div class="{{ $publicPresentation['style']['section'] }}">
                             <h2 class="{{ $publicPresentation['style']['section_title'] }}">Where should we meet?</h2>
@@ -417,8 +396,8 @@
                                 action="{{ route('scheduling.public.services.offers.store', ['serviceKey' => $selectedService->key], false) }}"
                             >
                                 @csrf
-                                @if($bookingOfferCode)
-                                    <input type="hidden" name="offer_code" value="{{ $bookingOfferCode }}">
+                                @if($offerCodePrefill)
+                                    <input type="hidden" name="offer_code" value="{{ $offerCodePrefill }}">
                                 @endif
                                 <div class="grid gap-4 sm:grid-cols-2">
                                     <label class="{{ $publicPresentation['style']['field_label'] }}" for="range_starts_at">
@@ -461,8 +440,8 @@
                                     method="GET"
                                     action="{{ route('scheduling.public.services.show', ['serviceKey' => $selectedService->key], false) }}"
                                 >
-                                    @if($bookingOfferCode)
-                                        <input type="hidden" name="offer" value="{{ $bookingOfferCode }}">
+                                    @if($offerCodePrefill)
+                                        <input type="hidden" name="offer" value="{{ $offerCodePrefill }}">
                                     @endif
                                     <label class="{{ $publicPresentation['style']['field_label'] }}" for="date">
                                         Date
@@ -492,8 +471,8 @@
                                         data-time-selector
                                     >
                                         @csrf
-                                        @if($bookingOfferCode)
-                                            <input type="hidden" name="offer_code" value="{{ $bookingOfferCode }}">
+                                        @if($offerCodePrefill)
+                                            <input type="hidden" name="offer_code" value="{{ $offerCodePrefill }}">
                                         @endif
 
                                         <div

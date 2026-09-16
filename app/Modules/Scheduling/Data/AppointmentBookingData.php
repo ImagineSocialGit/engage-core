@@ -20,6 +20,7 @@ final readonly class AppointmentBookingData
         ?string $phone = null,
         ?string $title = null,
         ?string $description = null,
+        ?string $bookingOfferCode = null,
         public ?SchedulingLocationSnapshot $location = null,
         public ?Model $sourceContext = null,
         public ?Model $createdBy = null,
@@ -37,6 +38,7 @@ final readonly class AppointmentBookingData
         $this->phone = $this->nullableString($phone, 'phone', 255);
         $this->title = $this->nullableString($title, 'title', 255);
         $this->description = $this->nullableString($description, 'description', 10000);
+        $this->bookingOfferCode = $this->bookingOfferCode($bookingOfferCode);
         $this->source = $this->requiredString($source, 'source', 100);
 
         if ($this->email !== null && filter_var($this->email, FILTER_VALIDATE_EMAIL) === false) {
@@ -61,6 +63,7 @@ final readonly class AppointmentBookingData
     public ?string $phone;
     public ?string $title;
     public ?string $description;
+    public ?string $bookingOfferCode;
     public string $source;
 
     public function primaryAttendee(): ?Model
@@ -120,6 +123,23 @@ final readonly class AppointmentBookingData
         }
 
         return null;
+    }
+
+    private function bookingOfferCode(?string $value): ?string
+    {
+        if ($value === null || trim($value) === '') {
+            return null;
+        }
+
+        $value = strtoupper(trim($value));
+
+        if (preg_match('/\A[A-Z0-9][A-Z0-9_-]{2,39}\z/', $value) !== 1) {
+            throw new InvalidArgumentException(
+                'Appointment booking offer codes must be 3-40 characters using letters, numbers, dashes, or underscores.',
+            );
+        }
+
+        return $value;
     }
 
     private function requiredString(

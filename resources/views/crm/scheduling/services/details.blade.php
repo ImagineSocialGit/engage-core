@@ -254,5 +254,56 @@
                 <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">This appointment type is managed by a provider or system integration. Its business settings are visible here but cannot be edited from this CRM surface.</div>
             </x-ui.card>
         @endif
+
+        <x-ui.card id="offers" class="scroll-mt-6 space-y-4" data-scheduling-service-offers-panel>
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ module_tone('scheduling', 'badge') }}">Offers</div>
+                        <span class="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">Optional</span>
+                    </div>
+                    <h2 class="mt-3 text-lg font-semibold text-slate-900">Offer codes</h2>
+                    <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-500">Add codes customers can enter with their contact details. Offers can apply tags, enforce eligibility, and limit how many qualifying bookings receive each reward.</p>
+                </div>
+                <a
+                    href="{{ route('crm.scheduling.configuration.services.offers.index', $service) }}#add-offer"
+                    class="inline-flex w-full shrink-0 justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
+                >
+                    Add offer
+                </a>
+            </div>
+
+            @if ($bookingOffers->isEmpty())
+                <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                    No offers are configured. Normal public booking works without one.
+                </div>
+            @else
+                <div class="divide-y divide-slate-200 rounded-xl border border-slate-200" data-scheduling-service-offer-list>
+                    @foreach ($bookingOffers as $bookingOffer)
+                        <div class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between" data-scheduling-service-offer="{{ $bookingOffer->id }}">
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="font-mono text-sm font-bold text-slate-900">{{ $bookingOffer->code }}</span>
+                                    <span @class([
+                                        'rounded-full px-2 py-1 text-[11px] font-semibold',
+                                        'bg-emerald-100 text-emerald-800' => $bookingOffer->isActive(),
+                                        'bg-slate-200 text-slate-700' => ! $bookingOffer->isActive(),
+                                    ])>{{ $bookingOffer->isActive() ? 'Active' : 'Inactive' }}</span>
+                                    @if ($bookingOffer->conditions->isNotEmpty())
+                                        <span class="rounded-full bg-sky-100 px-2 py-1 text-[11px] font-semibold text-sky-800">Eligibility required</span>
+                                    @endif
+                                </div>
+                                <div class="mt-1 text-sm font-semibold text-slate-800">{{ $bookingOffer->name }}</div>
+                                <div class="mt-1 text-xs text-slate-500">{{ $bookingOffer->claims_count }} {{ $bookingOffer->claims_count === 1 ? 'claim' : 'claims' }} recorded</div>
+                            </div>
+                            <a href="{{ route('crm.scheduling.configuration.services.offers.index', $service) }}#offer-{{ $bookingOffer->id }}" class="text-sm font-semibold text-teal-700 hover:text-teal-800">Edit offer</a>
+                        </div>
+                    @endforeach
+                </div>
+                <div class="flex justify-end">
+                    <a href="{{ route('crm.scheduling.configuration.services.offers.index', $service) }}" class="text-sm font-semibold text-teal-700 hover:text-teal-800">Manage all offers</a>
+                </div>
+            @endif
+        </x-ui.card>
     </div>
 </x-layouts.crm>

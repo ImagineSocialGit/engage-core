@@ -4,6 +4,7 @@ namespace App\Modules\Scheduling\Requests;
 
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookingHold;
+use App\Modules\Scheduling\Models\SchedulingBookingOffer;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CompletePublicBookingRequest extends FormRequest
@@ -20,6 +21,7 @@ class CompletePublicBookingRequest extends FormRequest
             'public_submission_attempt_id' => $this->nullableTrimmed(
                 'public_submission_attempt_id',
             ),
+            'offer_code' => $this->nullableTrimmed('offer_code'),
         ]);
     }
 
@@ -41,6 +43,13 @@ class CompletePublicBookingRequest extends FormRequest
                 'regex:/^\+[1-9]\d{6,14}$/D',
             ],
             'public_submission_attempt_id' => ['bail', 'nullable', 'uuid'],
+            'offer_code' => [
+                'bail',
+                'nullable',
+                'string',
+                'max:40',
+                'regex:/\A[A-Za-z0-9][A-Za-z0-9_-]{2,39}\z/',
+            ],
             'name' => ['prohibited'],
             'contact_id' => ['prohibited'],
             'appointment_id' => ['prohibited'],
@@ -96,6 +105,17 @@ class CompletePublicBookingRequest extends FormRequest
         return is_string($phone) && trim($phone) !== ''
             ? trim($phone)
             : null;
+    }
+
+    public function offerCode(): ?string
+    {
+        $value = $this->validated('offer_code');
+
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return SchedulingBookingOffer::normalizeCode($value);
     }
 
     public function publicSubmissionAttemptId(): ?string

@@ -3430,6 +3430,7 @@
 │   │   │   ├── PublicBookingDestinationVerificationServiceTest.php
 │   │   │   ├── PublicBookingHoldTest.php
 │   │   │   ├── PublicSchedulingHumanVerificationTest.php
+│   │   │   ├── PublicSchedulingOfferCodeUxTest.php
 │   │   │   ├── PublicSchedulingSurfaceTest.php
 │   │   │   ├── RangeDurationBookingFoundationTest.php
 │   │   │   ├── RescheduleAppointmentActionTest.php
@@ -3451,6 +3452,7 @@
 │   │   │   ├── SchedulingDeploymentPlanContributorTest.php
 │   │   │   ├── SchedulingDestinationVerificationMessagingBridgeTest.php
 │   │   │   ├── SchedulingFoundationTest.php
+│   │   │   ├── SchedulingGuidedSetupUxTest.php
 │   │   │   ├── SchedulingHostAndServiceFoundationTest.php
 │   │   │   ├── SchedulingLocalDateTimeResolverTest.php
 │   │   │   ├── SchedulingLocationSnapshotRuntimeTest.php
@@ -3603,4 +3605,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-849 directories, 2755 files
+849 directories, 2757 files

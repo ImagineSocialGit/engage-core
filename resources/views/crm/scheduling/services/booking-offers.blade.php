@@ -4,7 +4,7 @@
     subheading="Add optional codes that can qualify a booking for limited rewards or other future booking benefits."
 >
     <div class="space-y-6" data-scheduling-booking-offers-workspace="{{ $service->id }}">
-        <a href="{{ route('crm.scheduling.configuration.services.edit', $service) }}" class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Back to {{ $service->name }}</a>
+        <a href="{{ route('crm.scheduling.configuration.services.details.edit', $service) }}#offers" class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Back to {{ $service->name }}</a>
 
         @if (session('success'))
             <x-ui.feedback.alert type="success">{{ session('success') }}</x-ui.feedback.alert>
@@ -20,13 +20,15 @@
             </x-ui.feedback.alert>
         @endif
 
+        @include('crm.scheduling.partials.setup-progress', ['setupProgress' => $setupProgress])
+
         <x-ui.card class="space-y-2">
             <h2 class="text-lg font-semibold text-slate-900">How offer codes work</h2>
-            <p class="text-sm leading-6 text-slate-600">Normal bookings do not use an offer unless the visitor enters a valid code. Eligibility is checked when the appointment is completed, and limited claim numbers are allocated transactionally.</p>
+            <p class="text-sm leading-6 text-slate-600">Customers enter an offer code with their contact details near the end of public booking. Eligibility is checked only when the appointment is completed, and limited claim numbers are allocated transactionally.</p>
         </x-ui.card>
 
         @foreach ($offers as $offerRow)
-            <form method="POST" action="{{ route('crm.scheduling.configuration.services.offers.update', ['bookableService' => $service, 'bookingOffer' => $offerRow['model']]) }}" class="space-y-5">
+            <form id="offer-{{ $offerRow['model']->id }}" method="POST" action="{{ route('crm.scheduling.configuration.services.offers.update', ['bookableService' => $service, 'bookingOffer' => $offerRow['model']]) }}" class="scroll-mt-6 space-y-5">
                 @csrf
                 @method('PUT')
 
@@ -143,7 +145,7 @@
             </form>
         @endforeach
 
-        <form method="POST" action="{{ route('crm.scheduling.configuration.services.offers.store', $service) }}" class="space-y-5">
+        <form id="add-offer" method="POST" action="{{ route('crm.scheduling.configuration.services.offers.store', $service) }}" class="scroll-mt-6 space-y-5">
             @csrf
 
             <x-ui.card class="space-y-5 border-dashed">

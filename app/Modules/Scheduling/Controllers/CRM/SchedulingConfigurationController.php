@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\SchedulingHost;
+use App\Modules\Scheduling\Services\SchedulingBookingOfferReadService;
 use App\Modules\Scheduling\Services\SchedulingConfigurationWriter;
 use App\Modules\Scheduling\Services\SchedulingReadService;
 use App\Modules\Scheduling\Services\SchedulingSetupReadiness;
@@ -80,6 +81,7 @@ class SchedulingConfigurationController extends Controller
         BookableService $bookableService,
         SchedulingReadService $read,
         SchedulingSetupProgress $progress,
+        SchedulingBookingOfferReadService $bookingOffers,
     ): View {
         $service = $read->configurationService($bookableService);
         $locationDetails = is_array($service->location_details)
@@ -103,6 +105,7 @@ class SchedulingConfigurationController extends Controller
             'appointmentMethodKey' => $this->appointmentMethodKey($service),
             'locationDetails' => $locationDetails,
             'locationAddress' => $locationAddress,
+            'bookingOffers' => $bookingOffers->forService($service),
             'setupProgress' => $progress->forService($service, 'appointment_type'),
             'maxRangeDurationMinutes' => BookableService::MAX_RANGE_DURATION_MINUTES,
             'publicSurfaceReady' => (bool) config('scheduling.public.enabled', false)

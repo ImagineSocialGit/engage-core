@@ -8,7 +8,6 @@ use App\Modules\Scheduling\Exceptions\BookingOfferEligibilityException;
 use App\Modules\Scheduling\Exceptions\SchedulingBookingOfferExhaustedException;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\BookableService;
-use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingBookingOffer;
 use App\Modules\Scheduling\Models\SchedulingBookingOfferClaim;
 use App\Modules\Scheduling\Services\BookingEligibilityProviderRegistry;
@@ -29,13 +28,11 @@ final class ClaimSchedulingBookingOfferAction
     public function handle(
         Appointment $appointment,
         BookableService $service,
-        BookingHold $hold,
         AppointmentBookingData $booking,
     ): ?SchedulingBookingOfferClaim {
         return DB::transaction(fn (): ?SchedulingBookingOfferClaim => $this->claim(
             appointment: $appointment,
             service: $service,
-            hold: $hold,
             booking: $booking,
         ));
     }
@@ -43,44 +40,31 @@ final class ClaimSchedulingBookingOfferAction
     private function claim(
         Appointment $appointment,
         BookableService $service,
-        BookingHold $hold,
         AppointmentBookingData $booking,
     ): ?SchedulingBookingOfferClaim {
-        $selection = data_get($hold->meta, 'booking_offer');
+        $code = $booking->bookingOfferCode;
 
-        if (! is_array($selection)) {
+        if ($code === null) {
             return null;
         }
 
-        $offerId = filter_var($selection['id'] ?? null, FILTER_VALIDATE_INT);
-        $code = is_string($selection['code'] ?? null)
-            ? SchedulingBookingOffer::normalizeCode($selection['code'])
-            : '';
-
-        if (! is_int($offerId) || $offerId < 1 || $code === '') {
-            throw new LogicException(
-                'The booking hold contains an invalid booking-offer selection.',
-            );
-        }
-
+        $evaluatedAt = CarbonImmutable::now('UTC');
         $offer = SchedulingBookingOffer::query()
             ->with(['conditions', 'rewards.actions'])
-            ->whereKey($offerId)
+            ->where('bookable_service_id', $service->getKey())
+            ->where('code', $code)
             ->lockForUpdate()
             ->first();
 
-        if (! $offer instanceof SchedulingBookingOffer
-            || (int) $offer->bookable_service_id !== (int) $service->getKey()
-            || ! hash_equals($offer->code, $code)
-        ) {
+        if (! $offer instanceof SchedulingBookingOffer) {
             throw new BookingOfferEligibilityException(
-                'This booking offer is no longer available for this appointment type.',
+                'That offer code is not available for this appointment type.',
             );
         }
 
-        if (! $offer->isActive()) {
+        if (! $offer->isOpenAt($evaluatedAt)) {
             throw new BookingOfferEligibilityException(
-                'This booking offer is no longer active.',
+                'That offer code is not currently available.',
             );
         }
 
@@ -93,7 +77,6 @@ final class ClaimSchedulingBookingOfferAction
             );
         }
 
-        $evaluatedAt = $this->offerAppliedAt($selection);
         $qualification = $this->qualification(
             offer: $offer,
             contactId: (int) $contact->getKey(),
@@ -268,22 +251,6 @@ final class ClaimSchedulingBookingOfferAction
         }
 
         return 'combined:'.hash('sha256', $encoded);
-    }
-
-    /** @param array<string, mixed> $selection */
-    private function offerAppliedAt(array $selection): CarbonImmutable
-    {
-        $value = $selection['applied_at'] ?? null;
-
-        if (is_string($value) && trim($value) !== '') {
-            try {
-                return CarbonImmutable::parse($value)->utc();
-            } catch (Throwable) {
-                // Fall through to current time for older or malformed transient state.
-            }
-        }
-
-        return CarbonImmutable::now('UTC');
     }
 
     private function ineligibleMessage(SchedulingBookingOffer $offer): string

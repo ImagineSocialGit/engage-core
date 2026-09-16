@@ -178,8 +178,8 @@ class CreateBookingHoldAction
                             'source_scopes' => $currentSlot->sourceScopes,
                             'source_window_ids' => $currentSlot->sourceWindowIds,
                         ],
-                        is_array(data_get($offer->meta, 'booking_offer'))
-                            ? ['booking_offer' => data_get($offer->meta, 'booking_offer')]
+                        is_string(data_get($offer->meta, 'booking_offer_prefill'))
+                            ? ['booking_offer_prefill' => data_get($offer->meta, 'booking_offer_prefill')]
                             : [],
                     ),
                 ]);

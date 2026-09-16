@@ -19,16 +19,17 @@
         </div>
     </div>
 
-    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         @foreach ($setupProgress['steps'] as $step)
             <div
                 @class([
-                    'rounded-xl border p-4',
-                    'border-emerald-300 bg-emerald-50' => $step['state'] === 'complete',
+                    'rounded-xl border p-4 transition',
+                    'border-emerald-300 bg-emerald-50' => in_array($step['state'], ['complete', 'current_complete'], true),
                     'border-yellow-300 bg-yellow-50' => $step['state'] === 'current',
                     'border-red-300 bg-red-50' => $step['state'] === 'required',
                     'border-orange-300 bg-orange-50' => $step['state'] === 'recommended',
                     'border-slate-200 bg-slate-50' => $step['state'] === 'optional',
+                    '-translate-y-1 shadow-md' => in_array($step['state'], ['current', 'current_complete'], true),
                 ])
                 data-scheduling-progress-step="{{ $step['key'] }}"
                 data-scheduling-progress-state="{{ $step['state'] }}"
@@ -38,7 +39,7 @@
                         <span
                             @class([
                                 'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold',
-                                'bg-emerald-700 text-white' => $step['state'] === 'complete',
+                                'bg-emerald-700 text-white' => in_array($step['state'], ['complete', 'current_complete'], true),
                                 'bg-yellow-400 text-yellow-950' => $step['state'] === 'current',
                                 'bg-red-700 text-white' => $step['state'] === 'required',
                                 'bg-orange-500 text-white' => $step['state'] === 'recommended',
@@ -53,7 +54,7 @@
                     <span
                         @class([
                             'rounded-full px-2 py-1 text-[11px] font-semibold',
-                            'bg-emerald-100 text-emerald-800' => $step['state'] === 'complete',
+                            'bg-emerald-100 text-emerald-800' => in_array($step['state'], ['complete', 'current_complete'], true),
                             'bg-yellow-100 text-yellow-900' => $step['state'] === 'current',
                             'bg-red-100 text-red-800' => $step['state'] === 'required',
                             'bg-orange-100 text-orange-900' => $step['state'] === 'recommended',

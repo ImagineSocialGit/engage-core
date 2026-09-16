@@ -16,7 +16,6 @@ use App\Modules\Scheduling\Exceptions\BookingOfferEligibilityException;
 use App\Modules\Scheduling\Exceptions\SchedulingBookingOfferExhaustedException;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\BookableService;
-use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingBookingOffer;
 use App\Modules\Scheduling\Models\SchedulingBookingOfferClaim;
 use App\Modules\Scheduling\Models\SchedulingAvailabilityWindow;
@@ -174,7 +173,7 @@ class SchedulingBookingOfferRuntimeTest extends TestCase
         );
     }
 
-    public function test_public_booking_snapshots_only_an_explicit_offer_code_into_the_hold(): void
+    public function test_public_booking_carries_offer_code_prefill_without_applying_it_before_details(): void
     {
         CarbonImmutable::setTestNow('2026-09-16 12:00:00 UTC');
         $service = BookableService::factory()->create([
@@ -201,49 +200,37 @@ class SchedulingBookingOfferRuntimeTest extends TestCase
                 'timezone' => 'UTC',
                 'capacity' => 1,
             ]);
-        $bookingOffer = SchedulingBookingOffer::query()->create([
-            'bookable_service_id' => $service->getKey(),
-            'code' => 'FREEVA',
-            'name' => 'Webinar consultation',
-            'status' => SchedulingBookingOffer::STATUS_ACTIVE,
-            'claim_limit' => 30,
-        ]);
 
         $ordinarySlotOffer = app(IssuePublicBookingSlotOfferAction::class)->handle(
             service: $service,
             startsAt: CarbonImmutable::parse('2026-09-17 09:00:00 UTC'),
         );
 
+        $this->assertNull(data_get($ordinarySlotOffer->meta, 'booking_offer_prefill'));
         $this->assertNull(data_get($ordinarySlotOffer->meta, 'booking_offer'));
 
         $codedSlotOffer = app(IssuePublicBookingSlotOfferAction::class)->handle(
             service: $service,
             startsAt: CarbonImmutable::parse('2026-09-17 09:00:00 UTC'),
-            bookingOfferCode: 'freeva',
+            offerCodePrefill: 'freeva',
         );
 
         $this->assertSame(
-            (int) $bookingOffer->getKey(),
-            (int) data_get($codedSlotOffer->meta, 'booking_offer.id'),
-        );
-        $this->assertSame(
             'FREEVA',
-            data_get($codedSlotOffer->meta, 'booking_offer.code'),
+            data_get($codedSlotOffer->meta, 'booking_offer_prefill'),
         );
+        $this->assertNull(data_get($codedSlotOffer->meta, 'booking_offer'));
 
         $hold = app(CreateBookingHoldAction::class)->handle(
             offerId: $codedSlotOffer->offer_id,
             idempotencyKey: (string) Str::uuid(),
         );
 
-        $this->assertSame(
-            (int) $bookingOffer->getKey(),
-            (int) data_get($hold->meta, 'booking_offer.id'),
-        );
-        $this->assertSame('FREEVA', data_get($hold->meta, 'booking_offer.code'));
+        $this->assertSame('FREEVA', data_get($hold->meta, 'booking_offer_prefill'));
+        $this->assertNull(data_get($hold->meta, 'booking_offer'));
     }
 
-    public function test_active_offers_do_not_apply_when_the_booking_hold_has_no_offer_code_selection(): void
+    public function test_active_offers_do_not_apply_when_booking_details_have_no_offer_code(): void
     {
         $this->registerEligibilityProvider();
         $this->registerRewardHandler();
@@ -254,12 +241,10 @@ class SchedulingBookingOfferRuntimeTest extends TestCase
             'bookable_service_id' => $service->getKey(),
             'contact_id' => $contact->getKey(),
         ]);
-        $hold = new BookingHold(['meta' => []]);
 
         $claim = app(ClaimSchedulingBookingOfferAction::class)->handle(
             appointment: $appointment,
             service: $service,
-            hold: $hold,
             booking: new AppointmentBookingData(
                 contact: $contact,
                 email: $contact->email,
@@ -339,23 +324,14 @@ class SchedulingBookingOfferRuntimeTest extends TestCase
             'bookable_service_id' => $service->getKey(),
             'contact_id' => $contact->getKey(),
         ]);
-        $hold = new BookingHold([
-            'meta' => [
-                'booking_offer' => [
-                    'id' => $offer->getKey(),
-                    'code' => $offer->code,
-                    'applied_at' => CarbonImmutable::parse('2026-09-16 12:00:00 UTC')->toISOString(),
-                ],
-            ],
-        ]);
 
         return app(ClaimSchedulingBookingOfferAction::class)->handle(
             appointment: $appointment,
             service: $service,
-            hold: $hold,
             booking: new AppointmentBookingData(
                 contact: $contact,
                 email: $contact->email,
+                bookingOfferCode: $offer->code,
             ),
         );
     }
