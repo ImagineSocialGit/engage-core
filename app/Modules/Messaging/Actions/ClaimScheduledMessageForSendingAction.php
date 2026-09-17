@@ -30,6 +30,7 @@ class ClaimScheduledMessageForSendingAction
 
             if (! $message instanceof ScheduledMessage
                 || $message->status !== ScheduledMessage::STATUS_PENDING
+                || ($message->send_at !== null && $message->send_at->isFuture())
             ) {
                 return null;
             }

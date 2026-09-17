@@ -698,6 +698,22 @@ class WebinarController extends Controller
                 .' outside the configured schedule grid ignored.';
         }
 
+        $movedEnrollments = (int) data_get($result, 'message_schedule.enrollments', 0);
+        $movedMessages = (int) data_get($result, 'message_schedule.messages', 0);
+        $reviewRequired = (int) data_get($result, 'message_schedule.review_required', 0);
+
+        if ($movedEnrollments + $movedMessages > 0) {
+            $syncSummary .= ' Reminder times updated: '
+                .number_format($movedEnrollments).' waiting, '
+                .number_format($movedMessages).' pending.';
+        }
+
+        if ($reviewRequired > 0) {
+            $syncSummary .= ' '.number_format($reviewRequired).' reminder '
+                .Str::plural('schedule', $reviewRequired)
+                .' could not be changed safely and require review.';
+        }
+
         $redirect = redirect()
             ->route('crm.webinar-series.index')
             ->with('success', $syncSummary)

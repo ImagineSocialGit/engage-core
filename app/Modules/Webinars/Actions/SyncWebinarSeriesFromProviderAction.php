@@ -14,6 +14,8 @@ use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use App\Modules\Webinars\Services\WebinarProviderManager;
 use App\Modules\Webinars\Services\WebinarProviderSchedulePolicy;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class SyncWebinarSeriesFromProviderAction
@@ -23,6 +25,7 @@ class SyncWebinarSeriesFromProviderAction
         private readonly GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction,
         private readonly WebinarProviderManager $webinarProviderManager,
         private readonly WebinarProviderSchedulePolicy $providerSchedulePolicy,
+        private readonly ReconcileWebinarMessageScheduleAction $reconcileMessageSchedule,
     ) {}
 
     public function execute(WebinarSeries $series): array
@@ -76,6 +79,13 @@ class SyncWebinarSeriesFromProviderAction
         $updated = 0;
         $createdWebinarIds = [];
         $missing = [];
+        $messageSchedule = [
+            'enrollments' => 0,
+            'messages' => 0,
+            'review_required' => 0,
+            'review_enrollment_ids' => [],
+            'review_message_ids' => [],
+        ];
 
         $fetchedWebinars->each(function (ProviderWebinarData $fetchedWebinar) use (
             $series,
@@ -84,57 +94,101 @@ class SyncWebinarSeriesFromProviderAction
             &$created,
             &$updated,
             &$createdWebinarIds,
+            &$messageSchedule,
         ): void {
-            $webinar = Webinar::query()->firstOrNew([
-                'platform' => $provider,
-                'provider_event_type' => $providerEventType,
-                'external_id' => $fetchedWebinar->externalId,
-                'webinar_series_id' => $series->id,
-            ]);
+            $outcome = DB::transaction(function () use (
+                $fetchedWebinar,
+                $series,
+                $provider,
+                $providerEventType,
+            ): array {
+                $webinar = Webinar::query()->lockForUpdate()->firstOrNew([
+                    'platform' => $provider,
+                    'provider_event_type' => $providerEventType,
+                    'external_id' => $fetchedWebinar->externalId,
+                    'webinar_series_id' => $series->id,
+                ]);
 
-            $attributes = [
-                'platform' => $provider,
-                'provider_event_type' => $providerEventType,
-                'title' => $fetchedWebinar->title,
-                'join_url' => $fetchedWebinar->joinUrl,
-                'registration_url' => $fetchedWebinar->registrationUrl ?? $webinar->registration_url,
-                'starts_at' => $fetchedWebinar->startsAt,
-                'ends_at' => $fetchedWebinar->endsAt,
-                'timezone' => $fetchedWebinar->timezone,
-                'description' => $fetchedWebinar->description,
-                'provider_lifecycle_status' => WebinarProviderLifecycleStatus::Active->value,
-                'provider_missing_at' => null,
-                'provider_archived_at' => null,
-                'meta' => $this->mergeProviderMeta(
-                    webinar: $webinar,
-                    provider: $provider,
-                    providerMeta: $fetchedWebinar->meta,
-                ),
-            ];
+                $attributes = [
+                    'platform' => $provider,
+                    'provider_event_type' => $providerEventType,
+                    'title' => $fetchedWebinar->title,
+                    'join_url' => $fetchedWebinar->joinUrl,
+                    'registration_url' => $fetchedWebinar->registrationUrl ?? $webinar->registration_url,
+                    'starts_at' => $fetchedWebinar->startsAt,
+                    'ends_at' => $fetchedWebinar->endsAt,
+                    'timezone' => $fetchedWebinar->timezone,
+                    'description' => $fetchedWebinar->description,
+                    'provider_lifecycle_status' => WebinarProviderLifecycleStatus::Active->value,
+                    'provider_missing_at' => null,
+                    'provider_archived_at' => null,
+                    'meta' => $this->mergeProviderMeta(
+                        webinar: $webinar,
+                        provider: $provider,
+                        providerMeta: $fetchedWebinar->meta,
+                    ),
+                ];
 
-            if (! $webinar->exists) {
-                $attributes['slug'] = $this->makeSlug(
-                    title: $fetchedWebinar->title,
-                    provider: $provider,
-                    providerEventType: $providerEventType,
-                    externalId: $fetchedWebinar->externalId,
-                );
+                if (! $webinar->exists) {
+                    $attributes['slug'] = $this->makeSlug(
+                        title: $fetchedWebinar->title,
+                        provider: $provider,
+                        providerEventType: $providerEventType,
+                        externalId: $fetchedWebinar->externalId,
+                    );
 
-                $webinar->provider_settings = null;
-            }
+                    $webinar->provider_settings = null;
+                }
 
-            $webinar->fill($attributes);
-            $webinar->save();
+                $previousStart = $webinar->exists ? $webinar->starts_at?->copy() : null;
+                $webinar->fill($attributes);
+                $webinar->save();
 
-            if ($webinar->wasRecentlyCreated) {
+                $impact = null;
+
+                if ($previousStart !== null && $webinar->starts_at !== null
+                    && ! $previousStart->equalTo($webinar->starts_at)
+                ) {
+                    $impact = $this->reconcileMessageSchedule->handle(
+                        $webinar,
+                        $previousStart,
+                        $webinar->starts_at,
+                    );
+                }
+
+                return [
+                    'created' => $webinar->wasRecentlyCreated,
+                    'webinar_id' => (int) $webinar->getKey(),
+                    'impact' => $impact,
+                ];
+            }, 3);
+
+            if ($outcome['created']) {
                 $created++;
-                $createdWebinarIds[] = (int) $webinar->getKey();
-
-                return;
+                $createdWebinarIds[] = $outcome['webinar_id'];
+            } else {
+                $updated++;
             }
 
-            $updated++;
+            if (is_array($outcome['impact'])) {
+                foreach ($outcome['impact'] as $key => $count) {
+                    if (is_array($count)) {
+                        $messageSchedule[$key] = array_merge($messageSchedule[$key], $count);
+                    } else {
+                        $messageSchedule[$key] += $count;
+                    }
+                }
+            }
         });
+
+        if ($messageSchedule['review_required'] > 0) {
+            Log::warning('Webinar reminder schedules require review after provider resync.', [
+                'series_id' => $series->getKey(),
+                'review_required' => $messageSchedule['review_required'],
+                'review_enrollment_ids' => $messageSchedule['review_enrollment_ids'],
+                'review_message_ids' => $messageSchedule['review_message_ids'],
+            ]);
+        }
 
         if ($snapshot->authoritative) {
             foreach ($this->missingWebinars(
@@ -199,6 +253,7 @@ class SyncWebinarSeriesFromProviderAction
             'ignored_schedule_outliers' => $ignoredScheduleOutliers,
             'conflicts' => [],
             'missing' => $missing,
+            'message_schedule' => $messageSchedule,
             'reconciliation' => [
                 'authoritative' => $snapshot->authoritative,
                 'reason' => $snapshot->reason,

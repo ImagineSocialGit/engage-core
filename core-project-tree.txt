@@ -1518,6 +1518,7 @@
 │   │   │   │   │   └── ReviewWebinarPostEventAction.php
 │   │   │   │   ├── QueueWebinarProviderCancellationAction.php
 │   │   │   │   ├── QueueWebinarRegistrationFinalizationAction.php
+│   │   │   │   ├── ReconcileWebinarMessageScheduleAction.php
 │   │   │   │   ├── RemoveRejectedWebinarRegistrationAction.php
 │   │   │   │   ├── RemoveWebinarOccurrenceAction.php
 │   │   │   │   ├── RemoveWebinarSeriesAction.php
@@ -3579,6 +3580,7 @@
 │   │   │   ├── WebinarReportingEngagementContractTest.php
 │   │   │   ├── WebinarReportingFunnelContractTest.php
 │   │   │   ├── WebinarResolvedMessageDispatchOwnershipTest.php
+│   │   │   ├── WebinarResyncReminderTimingTest.php
 │   │   │   ├── WebinarScheduleProfileDefinitionResolverMessageAreaTest.php
 │   │   │   ├── WebinarScheduleProfileMessageChainSyncTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
@@ -3605,4 +3607,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-849 directories, 2757 files
+849 directories, 2759 files
