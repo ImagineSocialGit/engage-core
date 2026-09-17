@@ -204,6 +204,14 @@
             @endif
         </section>
 
+        @if(function_exists('module_enabled') && module_enabled('messaging') && $canNotifyScheduleChanges)
+            <section class="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm sm:p-7">
+                <h2 class="text-lg font-semibold text-amber-950">Webinar time changes</h2>
+                <p class="mt-1 text-sm text-amber-900">Review changes from provider resync and notify eligible registrants of the old and new time.</p>
+                <a href="{{ route('crm.webinars.schedule-changes.show', $webinar) }}" class="mt-3 inline-block text-sm font-semibold text-amber-950 underline">Review time changes{{ $pendingScheduleChangeCount ? ' ('.$pendingScheduleChangeCount.' to review)' : '' }}</a>
+            </section>
+        @endif
+
         @if((int) ($messageReview['message_count'] ?? 0) > 0)
             <section
                 class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"

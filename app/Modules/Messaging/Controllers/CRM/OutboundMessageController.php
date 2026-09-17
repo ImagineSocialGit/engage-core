@@ -7,6 +7,7 @@ use App\Modules\Core\Access\Services\UserAccessService;
 use App\Modules\Core\Services\Contacts\ContactIndexFilterService;
 use App\Modules\Core\Services\Contacts\ContactResultSetResolver;
 use App\Modules\Messaging\Actions\ControlScheduledMessageAction;
+use App\Modules\Messaging\Actions\EditScheduledMessageContentAction;
 use App\Modules\Messaging\Services\OutboundMessageIndex;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -103,6 +104,9 @@ final class OutboundMessageController extends Controller
             'timezone' => $timezone,
             'canControl' => $access->allows($request->user(), 'contacts.manage'),
             'embedded' => $request->boolean('embedded'),
+            'canBulk' => $access->allows($request->user(), 'contacts.manage')
+                && $access->allows($request->user(), 'contacts.view_all')
+                && isset($filters['scope'], $filters['scope_id']),
         ]);
     }
 
@@ -156,6 +160,42 @@ final class OutboundMessageController extends Controller
 
         return redirect()->route('crm.messaging.outbound.index', $request->query())
             ->with('success', 'Outbound message updated.');
+    }
+
+    public function editContent(
+        Request $request,
+        int $scheduledMessage,
+        OutboundMessageIndex $messages,
+        EditScheduledMessageContentAction $edits,
+    ): RedirectResponse {
+        $message = $messages->visibleMessage($request->user(), $scheduledMessage);
+        $rules = [
+            'action' => ['required', 'string', Rule::in(['save', 'restore'])],
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ];
+
+        if ($request->input('action') === 'save') {
+            $rules += $message->channel === 'email'
+                ? [
+                    'subject' => ['required', 'string', 'max:998'],
+                    'body' => ['required', 'string', 'max:32768'],
+                ]
+                : ['message' => ['required', 'string', 'max:4096']];
+        }
+
+        $data = $request->validate($rules);
+
+        if ($data['action'] === 'restore') {
+            $edits->restore($message, $request->user(), $data['reason'] ?? null);
+        } else {
+            $fields = $message->channel === 'email'
+                ? ['subject' => $data['subject'], 'body' => $data['body']]
+                : ['message' => $data['message']];
+            $edits->save($message, $request->user(), $fields, $data['reason'] ?? null);
+        }
+
+        return redirect()->route('crm.messaging.outbound.index', $request->query())
+            ->with('success', 'Message content updated.');
     }
 
     private function sendAt(string $value): Carbon

@@ -8,6 +8,8 @@ use App\Modules\Webinars\Controllers\CRM\WebinarProviderCancellationController;
 use App\Modules\Webinars\Controllers\CRM\WebinarRegistrationFinalizationController;
 use App\Modules\Webinars\Controllers\CRM\WebinarRegistrationFollowUpController;
 use App\Modules\Webinars\Controllers\CRM\WebinarSeriesMessageChainController;
+use App\Modules\Webinars\Controllers\CRM\WebinarScheduleChangeController;
+use App\Modules\Webinars\Controllers\CRM\WebinarTimeChangeSettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('module:webinars')->group(function () {
@@ -26,6 +28,20 @@ Route::middleware('module:webinars')->group(function () {
     Route::get('/webinars/{webinar}', [WebinarController::class, 'showWebinar'])
         ->whereNumber('webinar')
         ->name('crm.webinars.show');
+
+    Route::middleware('module:messaging')->group(function () {
+        Route::get('/webinar-series/{series}/time-change-messages', [WebinarTimeChangeSettingsController::class, 'show'])
+            ->name('crm.webinar-series.time-change-settings.show');
+        Route::post('/webinar-series/{series}/time-change-messages/template', [WebinarTimeChangeSettingsController::class, 'saveTemplate'])
+            ->name('crm.webinar-series.time-change-settings.template');
+        Route::patch('/webinar-series/{series}/time-change-messages/policy', [WebinarTimeChangeSettingsController::class, 'savePolicy'])
+            ->name('crm.webinar-series.time-change-settings.policy');
+
+        Route::get('/webinars/{webinar}/schedule-changes', [WebinarScheduleChangeController::class, 'show'])
+            ->name('crm.webinars.schedule-changes.show');
+        Route::post('/webinars/{webinar}/schedule-changes/{change}/notify', [WebinarScheduleChangeController::class, 'store'])
+            ->name('crm.webinars.schedule-changes.store');
+    });
 
     Route::middleware('module:messaging')
         ->prefix('webinars/message-templates')

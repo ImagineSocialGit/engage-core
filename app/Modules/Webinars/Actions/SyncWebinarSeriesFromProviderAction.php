@@ -7,12 +7,16 @@ use App\Modules\Webinars\Data\ProviderWebinarData;
 use App\Modules\Webinars\Data\ProviderWebinarSnapshot;
 use App\Modules\Webinars\Enums\WebinarProviderLifecycleStatus;
 use App\Modules\Webinars\Jobs\NotifyWebinarWaitlistJob;
+use App\Modules\Webinars\Jobs\ProcessWebinarScheduleChangeJob;
+use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Models\WebinarScheduleChange;
 use App\Modules\Webinars\Models\WebinarOccurrenceSuppression;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use App\Modules\Webinars\Services\WebinarProviderManager;
 use App\Modules\Webinars\Services\WebinarProviderSchedulePolicy;
+use App\Modules\Webinars\Services\WebinarTimeChangeTemplates;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -26,6 +30,7 @@ class SyncWebinarSeriesFromProviderAction
         private readonly WebinarProviderManager $webinarProviderManager,
         private readonly WebinarProviderSchedulePolicy $providerSchedulePolicy,
         private readonly ReconcileWebinarMessageScheduleAction $reconcileMessageSchedule,
+        private readonly WebinarTimeChangeTemplates $timeChangeTemplates,
     ) {}
 
     public function execute(WebinarSeries $series): array
@@ -141,6 +146,7 @@ class SyncWebinarSeriesFromProviderAction
                 }
 
                 $previousStart = $webinar->exists ? $webinar->starts_at?->copy() : null;
+                $previousTimezone = $webinar->exists ? $webinar->timezone : null;
                 $webinar->fill($attributes);
                 $webinar->save();
 
@@ -154,6 +160,87 @@ class SyncWebinarSeriesFromProviderAction
                         $previousStart,
                         $webinar->starts_at,
                     );
+                }
+
+                if ($previousStart !== null && $webinar->starts_at !== null
+                    && (! $previousStart->equalTo($webinar->starts_at)
+                        || $previousTimezone !== $webinar->timezone)
+                ) {
+                    // Keep the old display zone: provider resync has already
+                    // replaced the occurrence's timezone at this point.
+                    $older = WebinarScheduleChange::query()
+                        ->where('webinar_id', $webinar->getKey())
+                        ->whereIn('status', [
+                            WebinarScheduleChange::STATUS_PENDING,
+                            WebinarScheduleChange::STATUS_DISPATCHING,
+                        ])->pluck('id');
+
+                    if ($older->isNotEmpty()) {
+                        WebinarScheduleChange::query()->whereIn('id', $older)
+                            ->update(['status' => WebinarScheduleChange::STATUS_SUPERSEDED]);
+
+                        ScheduledMessage::query()
+                            ->where('behavior_owner_type', (new WebinarScheduleChange)->getMorphClass())
+                            ->whereIn('behavior_owner_id', $older)
+                            ->where('message_type', 'webinar_schedule_change')
+                            ->where('status', ScheduledMessage::STATUS_PENDING)
+                            ->orderBy('id')->chunkById(100, function ($messages): void {
+                                foreach ($messages as $message) {
+                                    $message->forceFill([
+                                        'status' => ScheduledMessage::STATUS_CANCELLED,
+                                        'operational_state' => ScheduledMessage::OPERATIONAL_CANCELLED,
+                                    ])->save();
+                                    WebinarScheduleChange::query()
+                                        ->whereKey($message->behavior_owner_id)
+                                        ->increment('messages_cancelled');
+                                }
+                            });
+                    }
+
+                    $change = WebinarScheduleChange::query()->create([
+                        'webinar_id' => $webinar->getKey(),
+                        'previous_starts_at' => $previousStart,
+                        'current_starts_at' => $webinar->starts_at,
+                        'previous_timezone' => $previousTimezone ?? $webinar->timezone,
+                        'current_timezone' => $webinar->timezone,
+                        'status' => $webinar->starts_at->isFuture()
+                            ? WebinarScheduleChange::STATUS_PENDING
+                            : WebinarScheduleChange::STATUS_SUPERSEDED,
+                    ]);
+
+                    if ($change->status === WebinarScheduleChange::STATUS_PENDING
+                        && $series->status === 'active'
+                        && function_exists('module_enabled')
+                        && module_enabled('messaging')
+                    ) {
+                        $currentSeries = $series->fresh();
+
+                        if ($currentSeries && $this->timeChangeTemplates->autoSend($currentSeries)) {
+                            $channels = $this->timeChangeTemplates->configuredChannels($currentSeries);
+                            $versions = $this->timeChangeTemplates->versionsFor($currentSeries, $channels);
+
+                            if ($channels !== []
+                                && ! array_diff($channels, $this->timeChangeTemplates->availableChannels())
+                                && count($versions) === count($channels)
+                            ) {
+                                $change->update([
+                                    'status' => WebinarScheduleChange::STATUS_DISPATCHING,
+                                    'notification_mode' => 'automatic',
+                                    'channels' => $channels,
+                                    'template_version_ids' => $versions,
+                                    'queued_at' => now(),
+                                ]);
+                                ProcessWebinarScheduleChangeJob::dispatch((int) $change->getKey())
+                                    ->afterCommit();
+                            } else {
+                                Log::warning('Webinar time-change auto-send needs operator review.', [
+                                    'webinar_id' => $webinar->getKey(),
+                                    'change_id' => $change->getKey(),
+                                    'reason' => 'Selected channel or published template unavailable.',
+                                ]);
+                            }
+                        }
+                    }
                 }
 
                 return [

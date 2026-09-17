@@ -20,6 +20,7 @@ class ScheduledMessagePayloadResolver
         private readonly MessageChainExecutionContextResolver $chainExecutionContextResolver,
         private readonly ScheduledMessageComponentComposer $componentComposer,
         private readonly MessageTokenFallbackResolver $tokenFallbackResolver,
+        private readonly ScheduledMessageContentEditor $contentEditor,
     ) {}
 
     /**
@@ -57,6 +58,10 @@ class ScheduledMessagePayloadResolver
         $runtimePayload = array_replace_recursive(
             $persistedRuntimePayload,
             $runtimePayloadOverlay,
+        );
+        $runtimePayload = array_replace(
+            $runtimePayload,
+            $this->contentEditor->override($scheduledMessage),
         );
         $renderContext = $this->renderContext($scheduledMessage);
 
@@ -209,6 +214,11 @@ class ScheduledMessagePayloadResolver
                 ? $scheduledMessage->payload
                 : [],
             $runtimePayloadOverlay,
+        );
+
+        $payload = array_replace(
+            $payload,
+            $this->contentEditor->override($scheduledMessage),
         );
 
         return $this->withProviderIdempotencyKey(

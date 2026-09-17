@@ -87,6 +87,15 @@
         </div>
     </form>
 
+    @if($canBulk)
+        <a href="{{ route('crm.messaging.outbound.bulk.index', [
+            'scope' => $filters['scope'], 'scope_id' => $filters['scope_id'],
+            'embedded' => $embedded ? 1 : null,
+        ]) }}" class="inline-flex rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">
+            Bulk edit messages for this source
+        </a>
+    @endif
+
     <div class="flex flex-wrap items-center justify-between gap-3">
         <p class="text-sm text-slate-600">{{ number_format($messages->total()) }} messages · Times shown in {{ $timezone }}</p>
         <p class="text-xs text-slate-500">Template excerpts may contain tokens; final content is resolved at send time.</p>
@@ -130,6 +139,36 @@
                         </label>
                         <button class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">Save time</button>
                     </form>
+                    @if($row['can_edit'])
+                        <details class="w-full rounded-xl border border-slate-200 p-3">
+                            <summary class="cursor-pointer text-sm font-semibold text-slate-800">Edit this message</summary>
+                            <form method="POST" action="{{ route('crm.messaging.outbound.content', ['scheduledMessage' => $row['id']] + $returnFilters) }}" class="mt-3 space-y-3">
+                                @csrf
+                                <input type="hidden" name="action" value="save">
+                                @if($row['channel'] === 'EMAIL')
+                                    <label class="block text-sm font-medium text-slate-700">Subject
+                                        <input name="subject" value="{{ $row['edit_fields']['subject'] ?? '' }}" maxlength="998" required class="mt-1 block w-full rounded-lg border-slate-300">
+                                    </label>
+                                    <label class="block text-sm font-medium text-slate-700">Body
+                                        <textarea name="body" rows="8" maxlength="32768" required class="mt-1 block w-full rounded-lg border-slate-300">{{ $row['edit_fields']['body'] ?? '' }}</textarea>
+                                    </label>
+                                @else
+                                    <label class="block text-sm font-medium text-slate-700">Text
+                                        <textarea name="message" rows="5" maxlength="4096" required class="mt-1 block w-full rounded-lg border-slate-300">{{ $row['edit_fields']['message'] ?? '' }}</textarea>
+                                    </label>
+                                @endif
+                                <button class="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white">Save content</button>
+                            </form>
+                            @if($row['edited'])
+                                <form method="POST" action="{{ route('crm.messaging.outbound.content', ['scheduledMessage' => $row['id']] + $returnFilters) }}" class="mt-3">
+                                    @csrf
+                                    <input type="hidden" name="action" value="restore">
+                                    <button class="text-sm font-semibold text-slate-600 underline">Restore original content</button>
+                                </form>
+                            @endif
+                            <p class="mt-2 text-xs text-slate-500">Changes apply only to this message. Tokens already used in the original can be retained or removed.</p>
+                        </details>
+                    @endif
                     <form method="POST" action="{{ route('crm.messaging.outbound.control', ['scheduledMessage' => $row['id']] + $returnFilters) }}" onsubmit="return confirm('Cancel this unsent message?')">
                         @csrf
                         <input type="hidden" name="action" value="cancel">

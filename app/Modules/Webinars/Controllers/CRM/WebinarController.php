@@ -13,7 +13,10 @@ use App\Modules\Webinars\Actions\ReplaceWebinarOccurrenceAction;
 use App\Modules\Webinars\Actions\SyncWebinarSeriesFromProviderAction;
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
 use App\Modules\Webinars\Enums\WebinarProviderLifecycleStatus;
+use App\Modules\Core\Access\Services\UserAccessService;
 use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Models\WebinarScheduleChange;
+use App\Modules\Webinars\Services\WebinarTimeChangeTemplates;
 use App\Modules\Webinars\Models\WebinarOccurrenceSuppression;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Models\WebinarRegistration;
@@ -469,6 +472,7 @@ class WebinarController extends Controller
                 ];
 
         $messageProfile = $scheduleProfileResolver->resolveForSeries($series);
+        $timeChangeTemplates = app(WebinarTimeChangeTemplates::class);
 
         $paidAdTrackingPlatforms = function_exists('module_enabled')
             && module_enabled('reporting')
@@ -486,6 +490,12 @@ class WebinarController extends Controller
             'suppressedOccurrences' => $series->occurrenceSuppressions,
             'messageReview' => $messageReview,
             'messageProfile' => $messageProfile,
+            'canManageTimeChanges' => app(UserAccessService::class)->allows(request()->user(), 'contacts.view_all')
+                && app(UserAccessService::class)->allows(request()->user(), 'contacts.manage'),
+            'timeChangeAutoSend' => $timeChangeTemplates->autoSend($series),
+            'timeChangeChannelLabel' => collect($timeChangeTemplates->configuredChannels($series))
+                ->map(fn (string $channel): string => strtoupper($channel))
+                ->implode(', '),
             'registrationUrl' => route('webinar.show', [
                 'seriesSlug' => $series->slug,
             ]),
@@ -605,6 +615,11 @@ class WebinarController extends Controller
                 ->orderBy('name')
                 ->get(),
             'replacementCandidates' => $replacementCandidates,
+            'canNotifyScheduleChanges' => app(UserAccessService::class)->allows(request()->user(), 'contacts.view_all')
+                && app(UserAccessService::class)->allows(request()->user(), 'contacts.manage'),
+            'pendingScheduleChangeCount' => WebinarScheduleChange::query()
+                ->where('webinar_id', $webinar->getKey())
+                ->where('status', WebinarScheduleChange::STATUS_PENDING)->count(),
             'webinarDevEnabled' => $this->devTestingAllowed(),
         ]);
     }

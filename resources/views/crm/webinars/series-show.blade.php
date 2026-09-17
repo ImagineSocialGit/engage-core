@@ -443,6 +443,16 @@
             </section>
         @endif
 
+        @if(function_exists('module_enabled') && module_enabled('messaging') && $canManageTimeChanges)
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7" data-webinar-time-change-plan>
+                <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Event-triggered messages</p>
+                <h2 class="mt-2 text-xl font-semibold text-slate-950">Time-change notices</h2>
+                <p class="mt-2 text-sm text-slate-600">Sent when a resync changes a webinar time. This is separate from reminders scheduled before a webinar starts.</p>
+                <p class="mt-2 text-sm font-semibold text-slate-700">{{ $timeChangeAutoSend ? 'Automatic sending: On' : 'Automatic sending: Off · Review each change' }}@if($timeChangeAutoSend) · {{ $timeChangeChannelLabel }}@endif</p>
+                <a href="{{ route('crm.webinar-series.time-change-settings.show', $series) }}" class="mt-3 inline-block text-sm font-semibold text-slate-800 underline">Edit time-change messages and delivery</a>
+            </section>
+        @endif
+
         @if(function_exists('module_enabled') && module_enabled('messaging') && (int) ($messageReview['message_count'] ?? 0) > 0)
             <div
                 x-show="messageReviewOpen"

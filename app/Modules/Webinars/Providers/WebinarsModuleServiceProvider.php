@@ -21,6 +21,7 @@ use App\Modules\Webinars\Services\ContactPanels\WebinarContactPanelProvider;
 use App\Modules\Webinars\Services\Dashboard\WebinarActivityDashboardPanelProvider;
 use App\Modules\Webinars\Services\WebinarMessageChainExecutionContextProvider;
 use App\Modules\Webinars\Services\WebinarPostEventMessageRecipientGate;
+use App\Modules\Webinars\Services\WebinarScheduleChangeMessageGate;
 use App\Modules\Webinars\TokenContracts\WebinarTokenContextProvider;
 use App\Modules\Webinars\TokenContracts\WebinarTokenSourceProvider;
 use App\Modules\Webinars\Validation\WebinarMessageChainSetupValidationContributor;
@@ -65,10 +66,10 @@ class WebinarsModuleServiceProvider extends ServiceProvider
             'messaging.message_chain_execution_context_providers',
         );
 
-        $this->app->tag(
+        $this->app->tag([
             WebinarPostEventMessageRecipientGate::class,
-            'messaging.message_recipient_gates',
-        );
+            WebinarScheduleChangeMessageGate::class,
+        ], 'messaging.message_recipient_gates');
 
         $this->app->tag([
             WebinarActivityDashboardPanelProvider::class,

@@ -21,6 +21,7 @@ final class OutboundMessageIndex
         private readonly ContactVisibility $contactVisibility,
         private readonly ContactIndexFilterService $contactFilters,
         private readonly ContactResultSetResolver $resultSets,
+        private readonly ScheduledMessageContentEditor $contentEditor,
         private readonly UserAccessService $access,
     ) {}
 
@@ -32,6 +33,8 @@ final class OutboundMessageIndex
             'context',
             'messageTemplateVersion',
             'messageChainEnrollment',
+            'components.messageTemplateVersion',
+            'latestContentEdit',
         ]);
 
         $period = $filters['period'] ?? 'upcoming';
@@ -184,6 +187,10 @@ final class OutboundMessageIndex
         return $messages->getCollection()->map(function (ScheduledMessage $message) use ($timezone): array {
             $payload = is_array($message->payload) ? $message->payload : [];
             $template = $message->messageTemplateVersion?->payload() ?? [];
+            $content = $this->contentEditor->supported($message)
+                ? $this->contentEditor->fields($message)
+                : [];
+            $payload = array_replace($payload, $content);
             $recipient = $message->recipient;
             $name = $recipient?->name
                 ?: (trim(($recipient?->first_name ?? '').' '.($recipient?->last_name ?? ''))
@@ -209,6 +216,15 @@ final class OutboundMessageIndex
                 'status' => Str::headline((string) $status),
                 'send_at' => $message->send_at?->timezone($timezone)->format('M j, Y g:i A'),
                 'send_at_input' => $message->send_at?->timezone($timezone)->format('Y-m-d\\TH:i'),
+                'can_edit' => $this->contentEditor->supported($message)
+                    && $message->status === ScheduledMessage::STATUS_PENDING
+                    && in_array($message->operational_state, [
+                        ScheduledMessage::OPERATIONAL_ACTIVE,
+                        ScheduledMessage::OPERATIONAL_HELD,
+                    ], true),
+                'edited' => $message->latestContentEdit !== null
+                    && $message->latestContentEdit->override_payload !== [],
+                'edit_fields' => $content,
                 'can_hold' => $message->status === ScheduledMessage::STATUS_PENDING
                     && $message->operational_state === ScheduledMessage::OPERATIONAL_ACTIVE,
                 'can_resume' => $message->status === ScheduledMessage::STATUS_PENDING

@@ -7,6 +7,7 @@ use App\Modules\Messaging\Controllers\CRM\ContactDirectMessageController;
 use App\Modules\Messaging\Controllers\CRM\MessageDeliveryIssueController;
 use App\Modules\Messaging\Controllers\CRM\MessageTemplatePresetController;
 use App\Modules\Messaging\Controllers\CRM\OutboundMessageController;
+use App\Modules\Messaging\Controllers\CRM\BulkOutboundMessageController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -15,8 +16,17 @@ Route::middleware('module:messaging')
     ->name('crm.messaging.outbound.')
     ->group(function () {
         Route::get('/', [OutboundMessageController::class, 'index'])->name('index');
+        Route::get('/bulk', [BulkOutboundMessageController::class, 'index'])
+            ->middleware(['capability:contacts.manage', 'capability:contacts.view_all'])
+            ->name('bulk.index');
+        Route::post('/bulk', [BulkOutboundMessageController::class, 'save'])
+            ->middleware(['capability:contacts.manage', 'capability:contacts.view_all'])
+            ->name('bulk.save');
         Route::post('/contact-group', [OutboundMessageController::class, 'contactGroup'])
             ->name('contact-group');
+        Route::post('/{scheduledMessage}/content', [OutboundMessageController::class, 'editContent'])
+            ->middleware('capability:contacts.manage')
+            ->name('content');
         Route::post('/{scheduledMessage}', [OutboundMessageController::class, 'control'])
             ->middleware('capability:contacts.manage')
             ->name('control');

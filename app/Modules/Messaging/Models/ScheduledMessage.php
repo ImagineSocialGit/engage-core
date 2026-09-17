@@ -92,6 +92,16 @@ class ScheduledMessage extends Model
         return $this->morphTo('behavior_owner');
     }
 
+    public function contentEdits(): HasMany
+    {
+        return $this->hasMany(ScheduledMessageEdit::class);
+    }
+
+    public function latestContentEdit(): HasOne
+    {
+        return $this->hasOne(ScheduledMessageEdit::class)->ofMany('id', 'max');
+    }
+
     public function messageTemplateVersion(): BelongsTo
     {
         return $this->belongsTo(MessageTemplateVersion::class);

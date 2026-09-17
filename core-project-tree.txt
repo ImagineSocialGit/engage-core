@@ -885,6 +885,8 @@
 │   │   │   │   ├── DispatchMessageAction.php
 │   │   │   │   ├── DispatchMessageIntentsAction.php
 │   │   │   │   ├── DuplicateMessageChainAction.php
+│   │   │   │   ├── EditScheduledMessageBulkContentAction.php
+│   │   │   │   ├── EditScheduledMessageContentAction.php
 │   │   │   │   ├── EnsureConsentOptInMessageTemplateVersionAction.php
 │   │   │   │   ├── GrantMessageConsentAction.php
 │   │   │   │   ├── GrantMessageConsentsAction.php
@@ -942,6 +944,7 @@
 │   │   │   │       └── SmsProvider.php
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
+│   │   │   │   │   ├── BulkOutboundMessageController.php
 │   │   │   │   │   ├── ContactDirectMessageController.php
 │   │   │   │   │   ├── CreateFlowRouteMessageTemplateController.php
 │   │   │   │   │   ├── CreateReusableMessageTemplateController.php
@@ -1021,9 +1024,11 @@
 │   │   │   │   ├── MessageTemplatePresetAssignment.php
 │   │   │   │   ├── MessageTemplatePreset.php
 │   │   │   │   ├── MessageTemplateVersion.php
+│   │   │   │   ├── ScheduledMessageBulkEdit.php
 │   │   │   │   ├── ScheduledMessageComponent.php
 │   │   │   │   ├── ScheduledMessageCtaEngagement.php
 │   │   │   │   ├── ScheduledMessageDeliveryAttempt.php
+│   │   │   │   ├── ScheduledMessageEdit.php
 │   │   │   │   ├── ScheduledMessageOperationalEvent.php
 │   │   │   │   ├── ScheduledMessageOutboxEvent.php
 │   │   │   │   ├── ScheduledMessage.php
@@ -1124,7 +1129,9 @@
 │   │   │   │   ├── ReusableMessageTemplateAuthoringGuide.php
 │   │   │   │   ├── ReusableMessageTemplateCatalog.php
 │   │   │   │   ├── RouteAuthoringMessageTemplateEligibilityResolver.php
+│   │   │   │   ├── ScheduledMessageBulkContentRules.php
 │   │   │   │   ├── ScheduledMessageComponentComposer.php
+│   │   │   │   ├── ScheduledMessageContentEditor.php
 │   │   │   │   ├── ScheduledMessageDeliveryLeaseManager.php
 │   │   │   │   ├── ScheduledMessageDeliveryPolicy.php
 │   │   │   │   ├── ScheduledMessageEventOutbox.php
@@ -1523,6 +1530,7 @@
 │   │   │   │   │   ├── ResolveWebinarPlaybackAction.php
 │   │   │   │   │   ├── ResolveWebinarProviderEventTargetAction.php
 │   │   │   │   │   └── ReviewWebinarPostEventAction.php
+│   │   │   │   ├── ProcessWebinarScheduleChangeAction.php
 │   │   │   │   ├── QueueWebinarProviderCancellationAction.php
 │   │   │   │   ├── QueueWebinarRegistrationFinalizationAction.php
 │   │   │   │   ├── ReconcileWebinarMessageScheduleAction.php
@@ -1571,7 +1579,9 @@
 │   │   │   │   │   ├── WebinarProviderCancellationController.php
 │   │   │   │   │   ├── WebinarRegistrationFinalizationController.php
 │   │   │   │   │   ├── WebinarRegistrationFollowUpController.php
-│   │   │   │   │   └── WebinarSeriesMessageChainController.php
+│   │   │   │   │   ├── WebinarScheduleChangeController.php
+│   │   │   │   │   ├── WebinarSeriesMessageChainController.php
+│   │   │   │   │   └── WebinarTimeChangeSettingsController.php
 │   │   │   │   ├── Public
 │   │   │   │   │   ├── WebinarJoinRedirectController.php
 │   │   │   │   │   ├── WebinarPlaybackRedirectController.php
@@ -1618,6 +1628,7 @@
 │   │   │   │   │   ├── ProcessPostWebinarEventJob.php
 │   │   │   │   │   ├── ProcessWebinarProviderEventJob.php
 │   │   │   │   │   └── RetryWebinarRegistrationFollowUpJob.php
+│   │   │   │   ├── ProcessWebinarScheduleChangeJob.php
 │   │   │   │   ├── RecoverWebinarRegistrationFinalizationsJob.php
 │   │   │   │   └── SyncWebinarRegistrationToProviderJob.php
 │   │   │   ├── MessageTemplates
@@ -1627,6 +1638,7 @@
 │   │   │   │   ├── Webinar.php
 │   │   │   │   ├── WebinarRegistration.php
 │   │   │   │   ├── WebinarRegistrationResponse.php
+│   │   │   │   ├── WebinarScheduleChange.php
 │   │   │   │   ├── WebinarScheduleProfileChainBinding.php
 │   │   │   │   ├── WebinarScheduleProfileItem.php
 │   │   │   │   ├── WebinarScheduleProfile.php
@@ -1674,11 +1686,14 @@
 │   │   │   │   ├── WebinarRegistrationCsvReader.php
 │   │   │   │   ├── WebinarRegistrationEligibilityService.php
 │   │   │   │   ├── WebinarRegistrationQuestionResolver.php
+│   │   │   │   ├── WebinarScheduleChangeCopy.php
+│   │   │   │   ├── WebinarScheduleChangeMessageGate.php
 │   │   │   │   ├── WebinarScheduleProfileChainDefinitionBuilder.php
 │   │   │   │   ├── WebinarScheduleProfileDefinitionResolver.php
 │   │   │   │   ├── WebinarScheduleProfileResolver.php
 │   │   │   │   ├── WebinarSeriesHistoryResolver.php
 │   │   │   │   ├── WebinarStateCanonicalizer.php
+│   │   │   │   ├── WebinarTimeChangeTemplates.php
 │   │   │   │   ├── WebinarTimezoneResolver.php
 │   │   │   │   └── WebinarWaitlistNotificationStartResolver.php
 │   │   │   ├── Support
@@ -2358,7 +2373,9 @@
 │   │   │   │   ├── 2026_07_30_224001_create_message_chain_runtime_support_tables.php
 │   │   │   │   ├── 2026_08_20_203000_create_scheduled_message_cta_engagements_table.php
 │   │   │   │   ├── 2026_08_29_053500_prune_redundant_messaging_indexes.php
-│   │   │   │   └── 2026_09_17_140000_add_scheduled_message_operations.php
+│   │   │   │   ├── 2026_09_17_140000_add_scheduled_message_operations.php
+│   │   │   │   ├── 2026_09_17_140100_create_scheduled_message_edits_table.php
+│   │   │   │   └── 2026_09_17_140200_create_scheduled_message_bulk_edits_table.php
 │   │   │   ├── portal
 │   │   │   │   ├── 2026_04_15_195870_create_portal_users_table.php
 │   │   │   │   ├── 2026_04_15_195871_create_portal_contact_links_table.php
@@ -2395,7 +2412,9 @@
 │   │   │   │   ├── 2026_07_31_210000_create_webinar_schedule_profile_chain_bindings_table.php
 │   │   │   │   ├── 2026_08_01_023600_create_webinar_series_message_chain_bindings_table.php
 │   │   │   │   ├── 2026_08_27_120000_add_provider_lifecycle_to_webinars_table.php
-│   │   │   │   └── 2026_08_27_194500_add_occurrence_visibility_and_suppressions.php
+│   │   │   │   ├── 2026_08_27_194500_add_occurrence_visibility_and_suppressions.php
+│   │   │   │   ├── 2026_09_17_140300_create_webinar_schedule_changes_table.php
+│   │   │   │   └── 2026_09_17_140400_add_notification_templates_to_webinar_schedule_changes.php
 │   │   │   └── workflow
 │   │   │       └── 2026_04_15_195900_create_contact_workflow_profiles_table.php
 │   │   ├── platform
@@ -2786,6 +2805,8 @@
 │       │   │   │   ├── create.blade.php
 │       │   │   │   └── index.blade.php
 │       │   │   └── outbound
+│       │   │       ├── bulk.blade.php
+│       │   │       ├── bulk-form.blade.php
 │       │   │       ├── contact-result-action.blade.php
 │       │   │       ├── index.blade.php
 │       │   │       └── workspace.blade.php
@@ -2847,8 +2868,10 @@
 │       │       ├── message-templates
 │       │       │   └── index.blade.php
 │       │       ├── post-event-review.blade.php
+│       │       ├── schedule-changes.blade.php
 │       │       ├── series-show.blade.php
-│       │       └── show.blade.php
+│       │       ├── show.blade.php
+│       │       └── time-change-settings.blade.php
 │       ├── email.blade.php
 │       ├── email-media-card.blade.php
 │       ├── email-text.blade.php
@@ -3320,7 +3343,9 @@
 │   │   │   ├── ResolvedMessageDispatchIntegrationTest.php
 │   │   │   ├── ResolvedMessageDispatchSchemaTest.php
 │   │   │   ├── RouteAuthoringMessageTemplateEligibilityResolverTest.php
+│   │   │   ├── ScheduledMessageBulkContentTest.php
 │   │   │   ├── ScheduledMessageContactRecipientGateTest.php
+│   │   │   ├── ScheduledMessageContentEditTest.php
 │   │   │   ├── ScheduledMessageDeliveryLeaseTest.php
 │   │   │   ├── ScheduledMessageEventOutboxTest.php
 │   │   │   ├── ScheduledMessageFlowRoutesBoundaryTest.php
@@ -3597,6 +3622,7 @@
 │   │   │   ├── WebinarReportingFunnelContractTest.php
 │   │   │   ├── WebinarResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── WebinarResyncReminderTimingTest.php
+│   │   │   ├── WebinarScheduleChangeNoticeTest.php
 │   │   │   ├── WebinarScheduleProfileDefinitionResolverMessageAreaTest.php
 │   │   │   ├── WebinarScheduleProfileMessageChainSyncTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
@@ -3605,6 +3631,7 @@
 │   │   │   ├── WebinarSeriesMessageChainOwnershipTest.php
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
 │   │   │   ├── WebinarStateCanonicalizerTest.php
+│   │   │   ├── WebinarTimeChangeAutoSendTest.php
 │   │   │   ├── WebinarTokenReferenceContractTest.php
 │   │   │   ├── WebinarWaitlistNotificationStartResolverTest.php
 │   │   │   ├── WebinarWaitlistSignupControllerTest.php
@@ -3623,4 +3650,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-851 directories, 2773 files
+851 directories, 2800 files
