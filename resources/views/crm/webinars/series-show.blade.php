@@ -77,6 +77,12 @@
                 </div>
 
                 <div class="flex flex-wrap gap-2">
+                    @if(function_exists('module_enabled') && module_enabled('messaging'))
+                        <x-messaging.outbound-launcher
+                            :url="route('crm.messaging.outbound.index', ['scope' => 'webinar_series', 'scope_id' => $series->getKey(), 'module' => 'webinars', 'period' => 'upcoming', 'embedded' => 1])"
+                            label="Upcoming messages for this series"
+                        />
+                    @endif
                     @if($series->status === 'active')
                         @if(function_exists('module_enabled') && module_enabled('messaging'))
                             <button

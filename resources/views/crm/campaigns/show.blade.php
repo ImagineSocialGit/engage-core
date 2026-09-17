@@ -57,6 +57,13 @@
                     @endif
                 </div>
 
+                @if(function_exists('module_enabled') && module_enabled('messaging'))
+                    <x-messaging.outbound-launcher
+                        :url="route('crm.messaging.outbound.index', ['scope' => 'campaign', 'scope_id' => $campaign->getKey(), 'module' => 'campaigns', 'period' => 'upcoming', 'embedded' => 1])"
+                        label="Upcoming messages"
+                    />
+                @endif
+
                 <div class="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">
                     <a
                         href="{{ route('crm.campaigns.edit', $campaign) }}"

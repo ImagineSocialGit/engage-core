@@ -6,6 +6,8 @@ use App\Modules\Core\Events\ManualContactCreated;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
+use App\Modules\Core\Support\Contacts\ContactResultActionRegistry;
+use App\Modules\Messaging\Contacts\OutboundContactResultActionContributor;
 use App\Modules\Messaging\Actions\CancelContactMessagingRuntimeAction;
 use App\Modules\Messaging\Automation\MessagingAutomationPointAuthoringContributor;
 use App\Modules\Messaging\Automation\MessagingAutomationPointDefinitionContributor;
@@ -20,7 +22,6 @@ use App\Modules\Messaging\ConfigContracts\SmsMessageDefinitionConfigContract;
 use App\Modules\Messaging\Console\Commands\AuditEmailHygieneCommand;
 use App\Modules\Messaging\Console\Commands\SyncMessageTemplatePresetsCommand;
 use App\Modules\Messaging\Deployment\MessagingDeploymentPlanContributor;
-use App\Modules\Messaging\Events\ScheduledMessageCancelled;
 use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
@@ -71,6 +72,10 @@ class MessagingModuleServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->scoped(MessageMediaAuthoringService::class);
+        $this->app->tag(
+            OutboundContactResultActionContributor::class,
+            ContactResultActionRegistry::CONTRIBUTOR_TAG,
+        );
 
         $this->mergeConfigFrom(config_path('messaging/sms.php'), 'messaging.sms');
         $this->mergeConfigFrom(config_path('messaging/email.php'), 'messaging.email');
@@ -261,15 +266,6 @@ class MessagingModuleServiceProvider extends ServiceProvider
         );
         Event::listen(
             ScheduledMessageSkipped::class,
-            AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal::class,
-        );
-
-        Event::listen(
-            ScheduledMessageCancelled::class,
-            MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped::class,
-        );
-        Event::listen(
-            ScheduledMessageCancelled::class,
             AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal::class,
         );
 

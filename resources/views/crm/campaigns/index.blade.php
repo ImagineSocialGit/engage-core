@@ -17,6 +17,13 @@
             </div>
         @endif
 
+        @if(function_exists('module_enabled') && module_enabled('messaging'))
+            <x-messaging.outbound-launcher
+                :url="route('crm.messaging.outbound.index', ['module' => 'campaigns', 'period' => 'upcoming', 'embedded' => 1])"
+                label="Upcoming campaign messages"
+            />
+        @endif
+
         <section class="min-w-0 rounded-3xl border border-rose-200 bg-white/95 p-4 shadow-sm sm:p-8">
             <div class="flex min-w-0 flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                 <div class="min-w-0">

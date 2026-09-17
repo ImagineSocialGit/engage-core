@@ -923,6 +923,8 @@
 │   │   │   │   └── Commands
 │   │   │   │       ├── AuditEmailHygieneCommand.php
 │   │   │   │       └── SyncMessageTemplatePresetsCommand.php
+│   │   │   ├── Contacts
+│   │   │   │   └── OutboundContactResultActionContributor.php
 │   │   │   ├── Contracts
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailMessage.php
@@ -945,7 +947,8 @@
 │   │   │   │   │   ├── CreateReusableMessageTemplateController.php
 │   │   │   │   │   ├── DeleteMessageTemplatePresetController.php
 │   │   │   │   │   ├── MessageDeliveryIssueController.php
-│   │   │   │   │   └── MessageTemplatePresetController.php
+│   │   │   │   │   ├── MessageTemplatePresetController.php
+│   │   │   │   │   └── OutboundMessageController.php
 │   │   │   │   ├── Public
 │   │   │   │   │   ├── ConsentRevocationController.php
 │   │   │   │   │   ├── ContactPermissionInvitationController.php
@@ -1112,6 +1115,7 @@
 │   │   │   │   ├── MessageTemplateTokenValidator.php
 │   │   │   │   ├── MessageTemplateUsageResolver.php
 │   │   │   │   ├── MessageTokenFallbackResolver.php
+│   │   │   │   ├── OutboundMessageIndex.php
 │   │   │   │   ├── PhoneNumberNormalizer.php
 │   │   │   │   ├── ProviderSubmissionLimiter.php
 │   │   │   │   ├── ReplyProfiles
@@ -2659,6 +2663,7 @@
 │       │   │   ├── message-chain-carousel.blade.php
 │       │   │   ├── message-editor-carousel.blade.php
 │       │   │   ├── message-media-authoring.blade.php
+│       │   │   ├── outbound-launcher.blade.php
 │       │   │   └── route-message-template-picker.blade.php
 │       │   ├── public-surface
 │       │   │   ├── button.blade.php
@@ -2777,9 +2782,13 @@
 │       │   ├── messaging
 │       │   │   ├── delivery-issues
 │       │   │   │   └── index.blade.php
-│       │   │   └── message-templates
-│       │   │       ├── create.blade.php
-│       │   │       └── index.blade.php
+│       │   │   ├── message-templates
+│       │   │   │   ├── create.blade.php
+│       │   │   │   └── index.blade.php
+│       │   │   └── outbound
+│       │   │       ├── contact-result-action.blade.php
+│       │   │       ├── index.blade.php
+│       │   │       └── workspace.blade.php
 │       │   ├── process-highway
 │       │   │   ├── _business-process.blade.php
 │       │   │   ├── index.blade.php
@@ -3300,6 +3309,8 @@
 │   │   │   ├── MessagingIndexShapeTest.php
 │   │   │   ├── MessagingSetupValidationContributorTest.php
 │   │   │   ├── ModuleOwnedMessageTemplateSyncTest.php
+│   │   │   ├── OutboundContextLaunchersTest.php
+│   │   │   ├── OutboundMessageWorkspaceTest.php
 │   │   │   ├── ProviderSubmissionLimiterTest.php
 │   │   │   ├── ProviderSuppressionRuntimeSafetyTest.php
 │   │   │   ├── PublishMessageTemplatePresetOverrideActionTest.php
@@ -3612,4 +3623,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-849 directories, 2764 files
+851 directories, 2773 files

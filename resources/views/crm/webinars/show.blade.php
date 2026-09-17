@@ -35,6 +35,13 @@
                     </p>
                 </div>
 
+                @if(function_exists('module_enabled') && module_enabled('messaging'))
+                    <x-messaging.outbound-launcher
+                        :url="route('crm.messaging.outbound.index', ['scope' => 'webinar', 'scope_id' => $webinar->getKey(), 'module' => 'webinars', 'period' => 'upcoming', 'embedded' => 1])"
+                        label="Upcoming messages for this session"
+                    />
+                @endif
+
                 <div class="flex flex-wrap gap-2">
                     @if($webinar->ends_at?->isPast())
                         <a

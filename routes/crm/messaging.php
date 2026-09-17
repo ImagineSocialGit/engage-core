@@ -6,8 +6,21 @@ use App\Modules\Messaging\Controllers\CRM\DeleteMessageTemplatePresetController;
 use App\Modules\Messaging\Controllers\CRM\ContactDirectMessageController;
 use App\Modules\Messaging\Controllers\CRM\MessageDeliveryIssueController;
 use App\Modules\Messaging\Controllers\CRM\MessageTemplatePresetController;
+use App\Modules\Messaging\Controllers\CRM\OutboundMessageController;
 use Illuminate\Support\Facades\Route;
 
+
+Route::middleware('module:messaging')
+    ->prefix('settings/outbound-messages')
+    ->name('crm.messaging.outbound.')
+    ->group(function () {
+        Route::get('/', [OutboundMessageController::class, 'index'])->name('index');
+        Route::post('/contact-group', [OutboundMessageController::class, 'contactGroup'])
+            ->name('contact-group');
+        Route::post('/{scheduledMessage}', [OutboundMessageController::class, 'control'])
+            ->middleware('capability:contacts.manage')
+            ->name('control');
+    });
 
 Route::middleware('module:messaging')
     ->prefix(config('contacts.routes.plural'))

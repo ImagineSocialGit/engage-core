@@ -18,6 +18,13 @@
             </div>
         @endif
 
+        @if(function_exists('module_enabled') && module_enabled('messaging'))
+            <x-messaging.outbound-launcher
+                :url="route('crm.messaging.outbound.index', ['module' => 'webinars', 'period' => 'upcoming', 'embedded' => 1])"
+                label="Upcoming webinar messages"
+            />
+        @endif
+
         <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div class="max-w-3xl">

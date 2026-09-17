@@ -57,6 +57,34 @@ return [
         'reporting',
     ],
 
+    // Stored morph types only; Messaging does not depend on these modules.
+    'outbound_message_sources' => [
+        'webinars' => [
+            'origin' => ['App\\Modules\\Webinars\\Models\\Webinar'],
+            'context' => [
+                'App\\Modules\\Webinars\\Models\\WebinarRegistration',
+                'App\\Modules\\Webinars\\Models\\WebinarWaitlistSignup',
+            ],
+        ],
+        'campaigns' => [
+            'origin' => ['App\\Modules\\Campaigns\\Models\\Campaign'],
+            'context' => [
+                'App\\Modules\\Campaigns\\Models\\CampaignEnrollment',
+                'App\\Modules\\Campaigns\\Models\\CampaignTouchProgram',
+            ],
+            'behavior_owner' => ['App\\Modules\\Campaigns\\Models\\CampaignTouchDate'],
+        ],
+        'broadcasts' => [
+            'context' => ['App\\Modules\\Broadcasts\\Models\\Broadcast'],
+        ],
+        'scheduling' => [
+            'context' => ['App\\Modules\\Scheduling\\Models\\Appointment'],
+        ],
+        'flow_routes' => [
+            'behavior_owner' => ['App\\Modules\\FlowRoutes\\Models\\FlowRoutePoint'],
+        ],
+    ],
+
 
     /*
     |--------------------------------------------------------------------------
@@ -531,12 +559,22 @@ return [
                 'priority' => 80,
             ],
             'settings' => [
-                'key' => 'message_templates',
-                'category' => 'communications',
-                'label' => 'Message templates',
-                'description' => 'Edit reusable email and text-message wording. Saved changes are used by future messages that select those templates.',
-                'route' => 'crm.messaging.message-templates.index',
-                'priority' => 40,
+                [
+                    'key' => 'outbound_messages',
+                    'category' => 'communications',
+                    'label' => 'Outbound messages',
+                    'description' => 'Review scheduled and recent messages, and manage messages that have not sent.',
+                    'route' => 'crm.messaging.outbound.index',
+                    'priority' => 30,
+                ],
+                [
+                    'key' => 'message_templates',
+                    'category' => 'communications',
+                    'label' => 'Message templates',
+                    'description' => 'Edit reusable email and text-message wording. Saved changes are used by future messages that select those templates.',
+                    'route' => 'crm.messaging.message-templates.index',
+                    'priority' => 40,
+                ],
             ],
             'depends_on' => ['core'],
             'providers' => [
