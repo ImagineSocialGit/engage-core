@@ -2,6 +2,7 @@
 
 namespace App\Modules\Messaging\Listeners;
 
+use App\Modules\Messaging\Events\ScheduledMessageCancelled;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
@@ -13,7 +14,7 @@ class MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped
         private readonly ContactPermissionInvitationService $permissionInvitationService,
     ) {}
 
-    public function handle(ScheduledMessageSkipped $event): void
+    public function handle(ScheduledMessageSkipped|ScheduledMessageCancelled $event): void
     {
         DB::transaction(function () use ($event): void {
             $scheduledMessage = $event->scheduledMessage;

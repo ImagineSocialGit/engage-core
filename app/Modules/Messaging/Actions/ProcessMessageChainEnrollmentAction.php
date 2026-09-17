@@ -629,10 +629,12 @@ class ProcessMessageChainEnrollmentAction
             'sent' => $message->status === ScheduledMessage::STATUS_SENT,
             'skipped' => $message->status === ScheduledMessage::STATUS_SKIPPED,
             'failed' => $message->status === ScheduledMessage::STATUS_FAILED,
+            'cancelled' => $message->status === ScheduledMessage::STATUS_CANCELLED,
             'terminal' => in_array($message->status, [
                 ScheduledMessage::STATUS_SENT,
                 ScheduledMessage::STATUS_SKIPPED,
                 ScheduledMessage::STATUS_FAILED,
+                ScheduledMessage::STATUS_CANCELLED,
             ], true),
             default => false,
         };
@@ -665,6 +667,7 @@ class ProcessMessageChainEnrollmentAction
             'sent',
             'skipped',
             'failed',
+            'cancelled',
             'terminal',
             'unavailable',
         ]));
@@ -883,6 +886,7 @@ class ProcessMessageChainEnrollmentAction
             ScheduledMessage::STATUS_SENT,
             ScheduledMessage::STATUS_SKIPPED,
             ScheduledMessage::STATUS_FAILED,
+            ScheduledMessage::STATUS_CANCELLED,
         ];
         $allTerminal = $messages->every(
             fn (ScheduledMessage $message): bool =>

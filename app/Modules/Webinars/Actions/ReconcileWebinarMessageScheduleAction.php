@@ -99,6 +99,8 @@ class ReconcileWebinarMessageScheduleAction
                         $newDue = $currentStart->copy()->addSeconds((int) $messageStep->offset_seconds);
 
                         if ($enrollment->status !== MessageChainEnrollment::STATUS_ACTIVE
+                            || $message->operational_state !== ScheduledMessage::OPERATIONAL_ACTIVE
+                            || $message->manual_schedule_override_at !== null
                             || $message->send_at === null
                             || ! $message->send_at->equalTo($oldDue)
                             || $message->renderContext()->exists()

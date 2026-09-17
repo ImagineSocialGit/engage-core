@@ -66,7 +66,7 @@ return [
 
         'messaging' => [
             'path' => 'database/migrations/modules/messaging',
-            'schema_version' => 4,
+            'schema_version' => 5,
             'migrations' => [
                 '2026_05_15_215534_create_message_consents_table.php',
                 '2026_05_15_215834_create_consent_revocations_table.php',
@@ -82,6 +82,7 @@ return [
                 '2026_07_30_224001_create_message_chain_runtime_support_tables.php',
                 '2026_08_20_203000_create_scheduled_message_cta_engagements_table.php',
                 '2026_08_29_053500_prune_redundant_messaging_indexes.php',
+                '2026_09_17_140000_add_scheduled_message_operations.php',
             ],
         ],
 

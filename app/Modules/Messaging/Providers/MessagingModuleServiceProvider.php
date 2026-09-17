@@ -20,6 +20,7 @@ use App\Modules\Messaging\ConfigContracts\SmsMessageDefinitionConfigContract;
 use App\Modules\Messaging\Console\Commands\AuditEmailHygieneCommand;
 use App\Modules\Messaging\Console\Commands\SyncMessageTemplatePresetsCommand;
 use App\Modules\Messaging\Deployment\MessagingDeploymentPlanContributor;
+use App\Modules\Messaging\Events\ScheduledMessageCancelled;
 use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
@@ -260,6 +261,15 @@ class MessagingModuleServiceProvider extends ServiceProvider
         );
         Event::listen(
             ScheduledMessageSkipped::class,
+            AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal::class,
+        );
+
+        Event::listen(
+            ScheduledMessageCancelled::class,
+            MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped::class,
+        );
+        Event::listen(
+            ScheduledMessageCancelled::class,
             AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal::class,
         );
 

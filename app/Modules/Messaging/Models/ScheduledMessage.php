@@ -25,6 +25,11 @@ class ScheduledMessage extends Model
     public const STATUS_SENT = 'sent';
     public const STATUS_SKIPPED = 'skipped';
     public const STATUS_FAILED = 'failed';
+    public const STATUS_CANCELLED = 'cancelled';
+
+    public const OPERATIONAL_ACTIVE = 'active';
+    public const OPERATIONAL_HELD = 'held';
+    public const OPERATIONAL_CANCELLED = 'cancelled';
 
     protected $fillable = [
         'recipient_type',
@@ -48,6 +53,8 @@ class ScheduledMessage extends Model
         'payload',
         'send_at',
         'status',
+        'operational_state',
+        'manual_schedule_override_at',
         'provider_idempotency_key',
         'dedupe_key',
         'meta',
@@ -65,6 +72,7 @@ class ScheduledMessage extends Model
             'dispatch_keys' => 'array',
             'payload' => 'array',
             'send_at' => 'datetime',
+            'manual_schedule_override_at' => 'datetime',
             'meta' => 'array',
         ];
     }
@@ -120,6 +128,12 @@ class ScheduledMessage extends Model
             && trim($variant->reply_profile_key) !== ''
                 ? trim($variant->reply_profile_key)
                 : null;
+    }
+
+    public function operationalEvents(): HasMany
+    {
+        return $this->hasMany(ScheduledMessageOperationalEvent::class)
+            ->orderBy('id');
     }
 
     public function deliveryAttempts(): HasMany

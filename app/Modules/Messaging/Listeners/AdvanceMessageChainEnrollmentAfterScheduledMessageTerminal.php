@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Listeners;
 
 use App\Modules\Messaging\Actions\ProcessMessageChainEnrollmentAction;
+use App\Modules\Messaging\Events\ScheduledMessageCancelled;
 use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
@@ -14,7 +15,7 @@ class AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal
     ) {}
 
     public function handle(
-        ScheduledMessageSent|ScheduledMessageSkipped|ScheduledMessageFailed $event,
+        ScheduledMessageSent|ScheduledMessageSkipped|ScheduledMessageFailed|ScheduledMessageCancelled $event,
     ): void {
         $this->processEnrollment->handleTerminal(
             $event->scheduledMessage,

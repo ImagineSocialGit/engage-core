@@ -72,6 +72,7 @@ class RecoverStaleScheduledMessageClaimsJob implements ShouldBeUnique, ShouldQue
 
         $pendingQueueValues = ScheduledMessage::query()
             ->where('status', ScheduledMessage::STATUS_PENDING)
+            ->where('operational_state', ScheduledMessage::OPERATIONAL_ACTIVE)
             ->distinct()
             ->pluck('queue');
 
@@ -102,6 +103,7 @@ class RecoverStaleScheduledMessageClaimsJob implements ShouldBeUnique, ShouldQue
         $overdueBefore = now()->subSeconds($graceSeconds);
         $overdueQuery = ScheduledMessage::query()
             ->where('status', ScheduledMessage::STATUS_PENDING)
+            ->where('operational_state', ScheduledMessage::OPERATIONAL_ACTIVE)
             ->whereNotNull('send_at')
             ->where('send_at', '<=', $overdueBefore);
         $overdueCount = (clone $overdueQuery)->count();
@@ -137,6 +139,7 @@ class RecoverStaleScheduledMessageClaimsJob implements ShouldBeUnique, ShouldQue
     {
         return ScheduledMessage::query()
             ->where('status', ScheduledMessage::STATUS_PENDING)
+            ->where('operational_state', ScheduledMessage::OPERATIONAL_ACTIVE)
             ->when(
                 $queue === null,
                 fn ($query) => $query->whereNull('queue'),

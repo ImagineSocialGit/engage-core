@@ -40,7 +40,7 @@ class ContactScheduledMessagesVisibilityDataProvider implements ContactShowDataP
 
         $recentMessages = (clone $baseQuery)
             ->with('terminalOutboxEvent.deliveryAttempt')
-            ->whereIn('status', ['sent', 'failed', 'skipped'])
+            ->whereIn('status', ['sent', 'failed', 'skipped', 'cancelled'])
             ->latest('updated_at')
             ->limit(10)
             ->get();
@@ -78,7 +78,12 @@ class ContactScheduledMessagesVisibilityDataProvider implements ContactShowDataP
                     $this->label($message->purpose),
                     $this->label($message->scope),
                 ]))),
-                'status' => $this->label($message->status),
+                'status' => $this->label(
+                    $message->status === ScheduledMessage::STATUS_PENDING
+                        && $message->operational_state === ScheduledMessage::OPERATIONAL_HELD
+                            ? 'held'
+                            : $message->status,
+                ),
                 'meta' => $this->meta($message),
             ])
             ->all();
@@ -106,6 +111,7 @@ class ContactScheduledMessagesVisibilityDataProvider implements ContactShowDataP
             ScheduledMessage::STATUS_SENT,
             ScheduledMessage::STATUS_SKIPPED,
             ScheduledMessage::STATUS_FAILED,
+            ScheduledMessage::STATUS_CANCELLED,
         ], true)
             ? ScheduledMessageTerminalResult::fromScheduledMessage($message)
             : null;
@@ -121,6 +127,11 @@ class ContactScheduledMessagesVisibilityDataProvider implements ContactShowDataP
 
             ScheduledMessage::STATUS_SKIPPED => array_merge($meta, [
                 'Skipped At' => $this->date($terminalResult?->occurredAt),
+                'Reason' => $terminalResult?->reason,
+            ]),
+
+            ScheduledMessage::STATUS_CANCELLED => array_merge($meta, [
+                'Cancelled At' => $this->date($terminalResult?->occurredAt),
                 'Reason' => $terminalResult?->reason,
             ]),
 

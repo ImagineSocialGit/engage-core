@@ -26,6 +26,7 @@ final readonly class ScheduledMessageTerminalResult
             ScheduledMessage::STATUS_SENT,
             ScheduledMessage::STATUS_SKIPPED,
             ScheduledMessage::STATUS_FAILED,
+            ScheduledMessage::STATUS_CANCELLED,
         ], true)) {
             throw new InvalidArgumentException(
                 "Unsupported ScheduledMessage terminal status [{$this->status}].",
@@ -97,6 +98,11 @@ final readonly class ScheduledMessageTerminalResult
         );
     }
 
+    public function isCancelled(): bool
+    {
+        return $this->status === ScheduledMessage::STATUS_CANCELLED;
+    }
+
     public function isSent(): bool
     {
         return $this->status === ScheduledMessage::STATUS_SENT;
@@ -123,7 +129,10 @@ final readonly class ScheduledMessageTerminalResult
                 );
             }
 
-            if ($outboxEvent->event_type !== ScheduledMessage::STATUS_SKIPPED) {
+            if (! in_array($outboxEvent->event_type, [
+                ScheduledMessage::STATUS_SKIPPED,
+                ScheduledMessage::STATUS_CANCELLED,
+            ], true)) {
                 throw new LogicException(
                     "ScheduledMessage terminal event [{$outboxEvent->event_type}] requires a delivery attempt.",
                 );

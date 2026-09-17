@@ -114,6 +114,45 @@ class WebinarResyncReminderTimingTest extends TestCase
         $this->assertSame('America/Chicago', $webinar->fresh()->timezone);
     }
 
+    public function test_resync_flags_held_and_manually_overridden_messages_even_if_old_time_matches(): void
+    {
+        Queue::fake();
+        Carbon::setTestNow('2026-09-17 12:00:00 UTC');
+        $oldStart = Carbon::parse('2026-09-20 16:00:00 UTC');
+        $newStart = $oldStart->copy()->addHour();
+        $series = WebinarSeries::factory()->create();
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+            'starts_at' => $oldStart,
+        ]);
+        [$step, $variant] = $this->anchoredStep();
+        $enrollment = $this->enrollment($webinar, $step, null, 'operational');
+        $manual = ScheduledMessage::factory()->create([
+            'message_chain_enrollment_id' => $enrollment->getKey(),
+            'message_chain_step_variant_id' => $variant->getKey(),
+            'send_at' => $oldStart->copy()->subHour(),
+            'manual_schedule_override_at' => now(),
+        ]);
+        $held = ScheduledMessage::factory()->create([
+            'message_chain_enrollment_id' => $enrollment->getKey(),
+            'message_chain_step_variant_id' => $variant->getKey(),
+            'send_at' => $oldStart->copy()->subHour(),
+            'operational_state' => ScheduledMessage::OPERATIONAL_HELD,
+        ]);
+
+        $this->providerStartsAt($series, $webinar, $newStart, 'America/Chicago');
+        $result = app(SyncWebinarSeriesFromProviderAction::class)->execute($series);
+
+        $this->assertSame(2, $result['message_schedule']['review_required']);
+        $this->assertEqualsCanonicalizing(
+            [$manual->getKey(), $held->getKey()],
+            $result['message_schedule']['review_message_ids'],
+        );
+        $this->assertTrue($manual->fresh()->send_at->equalTo($oldStart->copy()->subHour()));
+        $this->assertTrue($held->fresh()->send_at->equalTo($oldStart->copy()->subHour()));
+        $this->assertNull(app(ClaimScheduledMessageForSendingAction::class)->handle($held));
+    }
+
     /** @return array{MessageChainStep, MessageChainStepVariant} */
     private function anchoredStep(): array
     {

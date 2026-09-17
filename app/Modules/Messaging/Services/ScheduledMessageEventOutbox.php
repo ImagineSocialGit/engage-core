@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Services;
 
 use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
+use App\Modules\Messaging\Events\ScheduledMessageCancelled;
 use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
@@ -265,6 +266,10 @@ class ScheduledMessageEventOutbox
                 $scheduledMessage,
                 $terminalResult,
             ),
+            ScheduledMessage::STATUS_CANCELLED => new ScheduledMessageCancelled(
+                $scheduledMessage,
+                $terminalResult,
+            ),
             ScheduledMessage::STATUS_FAILED => new ScheduledMessageFailed(
                 $scheduledMessage,
                 $terminalResult,
@@ -281,6 +286,7 @@ class ScheduledMessageEventOutbox
             ScheduledMessage::STATUS_SENT,
             ScheduledMessage::STATUS_SKIPPED,
             ScheduledMessage::STATUS_FAILED,
+            ScheduledMessage::STATUS_CANCELLED,
         ], true)) {
             throw new InvalidArgumentException(
                 "Unsupported ScheduledMessage outbox event [{$eventType}].",
@@ -305,7 +311,10 @@ class ScheduledMessageEventOutbox
         ?ScheduledMessageDeliveryAttempt $deliveryAttempt,
     ): void {
         if (! $deliveryAttempt instanceof ScheduledMessageDeliveryAttempt) {
-            if ($eventType !== ScheduledMessage::STATUS_SKIPPED) {
+            if (! in_array($eventType, [
+                ScheduledMessage::STATUS_SKIPPED,
+                ScheduledMessage::STATUS_CANCELLED,
+            ], true)) {
                 throw new LogicException(
                     "ScheduledMessage terminal event [{$eventType}] requires a delivery attempt.",
                 );

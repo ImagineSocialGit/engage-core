@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 7,
+    'version' => 8,
     'tables' => [
         'message_template_presets' => [
             'mode' => 'upsert',
@@ -507,6 +507,8 @@ return [
                 'payload',
                 'send_at',
                 'status',
+                'operational_state',
+                'manual_schedule_override_at',
                 'provider_idempotency_key',
                 'dedupe_key',
                 'meta',
@@ -732,6 +734,29 @@ return [
                 'scheduled_message_id' => 'scheduled_messages',
                 'message_template_version_id' => 'message_template_versions',
                 'message_consent_id' => 'message_consents',
+            ],
+        ],
+
+        'scheduled_message_operational_events' => [
+            'mode' => 'insert_empty',
+            'preserve_id' => true,
+            'order_by' => ['id'],
+            'columns' => [
+                'id',
+                'scheduled_message_id',
+                'actor_id',
+                'actor_email',
+                'action',
+                'reason',
+                'previous_send_at',
+                'current_send_at',
+                'previous_operational_state',
+                'current_operational_state',
+                'occurred_at',
+                'created_at',
+            ],
+            'references' => [
+                'scheduled_message_id' => 'scheduled_messages',
             ],
         ],
 

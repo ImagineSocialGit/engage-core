@@ -878,6 +878,7 @@
 │   │   │   │   ├── CancelContactMessagingRuntimeAction.php
 │   │   │   │   ├── CancelMessageChainEnrollmentAction.php
 │   │   │   │   ├── ClaimScheduledMessageForSendingAction.php
+│   │   │   │   ├── ControlScheduledMessageAction.php
 │   │   │   │   ├── CreateReusableMessageTemplateAction.php
 │   │   │   │   ├── DeleteMessageTemplatePresetAction.php
 │   │   │   │   ├── DispatchConsentOptInMessageAction.php
@@ -981,6 +982,7 @@
 │   │   │   │   ├── AutomationMessageScheduled.php
 │   │   │   │   ├── MessageConsentGranted.php
 │   │   │   │   ├── MessageConsentRevoked.php
+│   │   │   │   ├── ScheduledMessageCancelled.php
 │   │   │   │   ├── ScheduledMessageFailed.php
 │   │   │   │   ├── ScheduledMessageSent.php
 │   │   │   │   └── ScheduledMessageSkipped.php
@@ -1019,6 +1021,7 @@
 │   │   │   │   ├── ScheduledMessageComponent.php
 │   │   │   │   ├── ScheduledMessageCtaEngagement.php
 │   │   │   │   ├── ScheduledMessageDeliveryAttempt.php
+│   │   │   │   ├── ScheduledMessageOperationalEvent.php
 │   │   │   │   ├── ScheduledMessageOutboxEvent.php
 │   │   │   │   ├── ScheduledMessage.php
 │   │   │   │   └── ScheduledMessageRenderContext.php
@@ -2350,7 +2353,8 @@
 │   │   │   │   ├── 2026_07_30_224000_create_message_template_and_chain_tables.php
 │   │   │   │   ├── 2026_07_30_224001_create_message_chain_runtime_support_tables.php
 │   │   │   │   ├── 2026_08_20_203000_create_scheduled_message_cta_engagements_table.php
-│   │   │   │   └── 2026_08_29_053500_prune_redundant_messaging_indexes.php
+│   │   │   │   ├── 2026_08_29_053500_prune_redundant_messaging_indexes.php
+│   │   │   │   └── 2026_09_17_140000_add_scheduled_message_operations.php
 │   │   │   ├── portal
 │   │   │   │   ├── 2026_04_15_195870_create_portal_users_table.php
 │   │   │   │   ├── 2026_04_15_195871_create_portal_contact_links_table.php
@@ -3310,6 +3314,7 @@
 │   │   │   ├── ScheduledMessageEventOutboxTest.php
 │   │   │   ├── ScheduledMessageFlowRoutesBoundaryTest.php
 │   │   │   ├── ScheduledMessageMetaCanonicalizerTest.php
+│   │   │   ├── ScheduledMessageOperationsTest.php
 │   │   │   ├── ScheduledMessagePayloadCanonicalizerTest.php
 │   │   │   ├── ScheduledMessagePayloadResolverTest.php
 │   │   │   ├── ScheduledMessageTerminalEventContractTest.php
@@ -3607,4 +3612,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-849 directories, 2759 files
+849 directories, 2764 files
