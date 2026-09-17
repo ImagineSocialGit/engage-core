@@ -11,6 +11,7 @@ use App\Support\Modules\Migrations\ModuleMigrationStatusInspector;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use InvalidArgumentException;
 use Tests\TestCase;
 
@@ -187,5 +188,56 @@ class ModuleMigrationPlanningAndStatusTest extends TestCase
             'Unknown module [unknown].',
             Artisan::output(),
         );
+    }
+
+    public function test_newly_discovered_migration_is_pending_then_runs_and_becomes_current(): void
+    {
+        $registry = app(ModuleMigrationRegistry::class);
+        $inspector = app(ModuleMigrationStatusInspector::class);
+        $scope = $registry->requireModule('core');
+        $filename = '2026_09_17_235959_test_module_inventory_discovery.php';
+        $path = base_path($scope->path.'/'.$filename);
+
+        $this->assertSame(0, Artisan::call('modules:reconcile', ['module' => 'core']));
+        $this->assertTrue($inspector->inspectModule('core')->current());
+        $this->assertFalse(File::exists($path));
+
+        File::put($path, <<<'PHP'
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+
+return new class extends Migration {
+    public function up(): void {}
+    public function down(): void {}
+};
+PHP);
+
+        try {
+            $migrationCountBefore = DB::table('migrations')->count();
+            $installationBefore = ModuleInstallation::query()->findOrFail('core');
+            $hashBefore = $installationBefore->manifest_hash;
+
+            $this->assertSame(0, Artisan::call('modules:status', ['module' => 'core']));
+            $this->assertSame($migrationCountBefore, DB::table('migrations')->count());
+            $this->assertSame($hashBefore, ModuleInstallation::query()->findOrFail('core')->manifest_hash);
+
+            $pending = $inspector->inspectModule('core');
+            $this->assertFalse($pending->current());
+            $this->assertContains($filename, $pending->pendingMigrationFiles);
+            $this->assertFalse($pending->ledgerCurrent());
+
+            $this->assertSame(0, Artisan::call('modules:migrate', ['module' => 'core']));
+
+            $current = $inspector->inspectModule('core');
+            $this->assertTrue($current->current());
+            $this->assertTrue($current->ledgerCurrent());
+            $this->assertSame([], $current->pendingMigrationFiles);
+            $this->assertDatabaseHas('migrations', [
+                'migration' => pathinfo($filename, PATHINFO_FILENAME),
+            ]);
+        } finally {
+            File::delete($path);
+        }
     }
 }

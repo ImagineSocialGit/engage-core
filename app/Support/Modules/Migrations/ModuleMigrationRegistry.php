@@ -7,11 +7,6 @@ use InvalidArgumentException;
 
 final class ModuleMigrationRegistry
 {
-    /**
-     * @var array<string, MigrationScopeDefinition>|null
-     */
-    private ?array $resolved = null;
-
     public function __construct(
         private readonly ModuleManager $modules,
     ) {}
@@ -65,10 +60,6 @@ final class ModuleMigrationRegistry
      */
     public function definitions(): array
     {
-        if ($this->resolved !== null) {
-            return $this->resolved;
-        }
-
         $configuration = config('module_migrations');
 
         if (! is_array($configuration)) {
@@ -110,7 +101,10 @@ final class ModuleMigrationRegistry
         }
 
         $definitions = [
-            'platform' => MigrationScopeDefinition::platform($platform),
+            'platform' => $this->withDiscoveredMigrations(
+                MigrationScopeDefinition::platform($platform),
+                $platform,
+            ),
         ];
 
         foreach ($moduleDefinitions as $moduleKey => $definition) {
@@ -134,16 +128,46 @@ final class ModuleMigrationRegistry
                 );
             }
 
-            $definitions[$moduleKey] = MigrationScopeDefinition::module(
-                moduleKey: $moduleKey,
-                definition: $definition,
+            $definitions[$moduleKey] = $this->withDiscoveredMigrations(
+                MigrationScopeDefinition::module($moduleKey, $definition),
+                $definition,
             );
         }
 
         $this->assertUniquePaths($definitions);
         $this->assertUniqueMigrationOwners($definitions);
 
-        return $this->resolved = $definitions;
+        return $definitions;
+    }
+
+    /**
+     * Laravel's migrator scans every PHP file in a scope directory. Status and
+     * the installation contract must include those same files, even before the
+     * committed manifest has been updated. Resolve on each call so a long-lived
+     * process also sees migrations added after an earlier inspection.
+     *
+     * @param array<string, mixed> $definition
+     */
+    private function withDiscoveredMigrations(
+        MigrationScopeDefinition $scope,
+        array $definition,
+    ): MigrationScopeDefinition {
+        $discovered = glob(base_path($scope->path).'/*.php');
+
+        if ($discovered === false || $discovered === []) {
+            return $scope;
+        }
+
+        $files = array_map('basename', $discovered);
+        sort($files);
+        $definition['migrations'] = array_values(array_unique([
+            ...$scope->migrationFiles,
+            ...$files,
+        ]));
+
+        return $scope->isPlatform()
+            ? MigrationScopeDefinition::platform($definition)
+            : MigrationScopeDefinition::module((string) $scope->moduleKey, $definition);
     }
 
     public function manifestHash(MigrationScopeDefinition $definition): string
