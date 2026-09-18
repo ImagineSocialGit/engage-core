@@ -112,5 +112,24 @@ final class MediaStorageDeploymentPlanContributor implements DeploymentPlanContr
             ],
             priority: 30,
         );
+
+        if ((bool) config('media.video_posters.enabled', true)) {
+            yield new DeploymentSetupStep(
+                key: 'media.video_posters',
+                title: 'Video poster generation',
+                reason: 'Video email cards use a poster generated from the uploaded file; the queue worker needs FFmpeg and enough temporary disk space to stream the video.',
+                instructions: [
+                    'Install FFmpeg on each queue worker. For a nonstandard executable path, set media.video_posters.ffmpeg_binary in the client configuration.',
+                    'Allow temporary disk space for the largest permitted upload plus its poster; poster generation streams Spaces objects to disk without loading the whole video into PHP memory.',
+                    'For 300 MB uploads, configure PHP upload_max_filesize=300M, post_max_size=320M, and the front proxy upload limit to at least 320m.',
+                ],
+                environmentKeys: [],
+                verification: [
+                    'Run php artisan setup:validate and confirm there is no FFmpeg availability warning.',
+                    'Upload a short staging video, let the Media job finish, and verify its email card opens the player with a generated poster.',
+                ],
+                priority: 31,
+            );
+        }
     }
 }

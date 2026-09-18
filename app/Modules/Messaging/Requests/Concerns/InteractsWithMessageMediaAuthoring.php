@@ -18,7 +18,11 @@ trait InteractsWithMessageMediaAuthoring
         $presentKey = $this->messageMediaKey($prefix, 'media_present');
         $uploadKey = $this->messageMediaKey($prefix, 'media_upload');
 
-        return $this->hasFile($uploadKey)
+        return filter_var(
+            data_get($this->all(), $this->messageMediaKey($prefix, 'attachments_present')),
+            FILTER_VALIDATE_BOOLEAN,
+        ) || $this->hasFile($this->messageMediaKey($prefix, 'attachment_upload'))
+            || $this->hasFile($uploadKey)
             || filter_var(
                 data_get($this->all(), $presentKey),
                 FILTER_VALIDATE_BOOLEAN,
@@ -33,6 +37,38 @@ trait InteractsWithMessageMediaAuthoring
     public function messageMediaPosterAssetUuid(string $prefix = ''): ?string
     {
         return $this->nullableMessageMediaString($prefix, 'media_poster_asset_uuid');
+    }
+
+    public function messageMediaSize(string $prefix = ''): ?string
+    {
+        return $this->nullableMessageMediaString($prefix, 'media_size');
+    }
+
+    /** @return array<int, string>|null */
+    public function messageAttachmentValues(string $prefix = ''): ?array
+    {
+        if (! filter_var(
+            data_get($this->all(), $this->messageMediaKey($prefix, 'attachments_present')),
+            FILTER_VALIDATE_BOOLEAN,
+        )) {
+            return null;
+        }
+
+        $values = data_get($this->validated(), $this->messageMediaKey($prefix, 'attachment_refs'), []);
+
+        return is_array($values) ? array_values($values) : [];
+    }
+
+    public function messageAttachmentUpload(string $prefix = ''): ?UploadedFile
+    {
+        $file = $this->file($this->messageMediaKey($prefix, 'attachment_upload'));
+
+        return $file instanceof UploadedFile ? $file : null;
+    }
+
+    public function messageAttachmentUploadSource(string $prefix = ''): ?string
+    {
+        return $this->nullableMessageMediaString($prefix, 'attachment_upload_source');
     }
 
     public function messageMediaTitle(string $prefix = ''): ?string

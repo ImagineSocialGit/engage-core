@@ -452,6 +452,8 @@
 │   │   │   ├── Actions
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
+│   │   │   │   └── CRM
+│   │   │   │       └── DocumentLibraryController.php
 │   │   │   ├── Data
 │   │   │   ├── Models
 │   │   │   │   ├── DocumentRequest.php
@@ -462,6 +464,7 @@
 │   │   │   │   └── DocumentsModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
+│   │   │   │   └── DocumentAttachmentLibrary.php
 │   │   │   └── Support
 │   │   ├── Events
 │   │   │   ├── Contracts
@@ -847,15 +850,18 @@
 │   │   │   │       ├── BackfillMediaImageFingerprintsCommand.php
 │   │   │   │       └── BackfillMediaImageVariantsCommand.php
 │   │   │   ├── Controllers
-│   │   │   │   └── CRM
-│   │   │   │       ├── MediaAssetController.php
-│   │   │   │       └── MediaUploadSimilarityController.php
+│   │   │   │   ├── CRM
+│   │   │   │   │   ├── MediaAssetController.php
+│   │   │   │   │   └── MediaUploadSimilarityController.php
+│   │   │   │   └── Public
+│   │   │   │       └── MediaVideoPlayerController.php
 │   │   │   ├── Data
 │   │   │   │   └── ImagePerceptualFingerprint.php
 │   │   │   ├── Deployment
 │   │   │   │   └── MediaStorageDeploymentPlanContributor.php
 │   │   │   ├── Jobs
-│   │   │   │   └── GenerateMediaImageVariantsJob.php
+│   │   │   │   ├── GenerateMediaImageVariantsJob.php
+│   │   │   │   └── GenerateMediaVideoPosterJob.php
 │   │   │   ├── Models
 │   │   │   │   └── MediaAsset.php
 │   │   │   ├── Providers
@@ -867,7 +873,8 @@
 │   │   │   │   ├── MediaFileIdentity.php
 │   │   │   │   ├── MediaImageSimilarityInspector.php
 │   │   │   │   ├── MediaImageVariantGenerator.php
-│   │   │   │   └── MediaUploadPolicy.php
+│   │   │   │   ├── MediaUploadPolicy.php
+│   │   │   │   └── MediaVideoPosterGenerator.php
 │   │   │   └── Validation
 │   │   │       └── MediaSetupValidationContributor.php
 │   │   ├── Messaging
@@ -1081,6 +1088,8 @@
 │   │   │   │   │   ├── EmailHygieneService.php
 │   │   │   │   │   ├── EmailMessagingService.php
 │   │   │   │   │   └── EmailProviderManager.php
+│   │   │   │   ├── MessageAttachmentAuthoringService.php
+│   │   │   │   ├── MessageAttachmentRegistry.php
 │   │   │   │   ├── MessageChainExecutionContextResolver.php
 │   │   │   │   ├── MessageChainPresentationService.php
 │   │   │   │   ├── MessageChainTimingResolver.php
@@ -1147,6 +1156,7 @@
 │   │   │   │   ├── CtaTrackingLinkGenerator.php
 │   │   │   │   ├── EmailConsentRevocationLinkGenerator.php
 │   │   │   │   ├── EmailReplyAddressGenerator.php
+│   │   │   │   ├── MessageAttachmentReferences.php
 │   │   │   │   ├── MessageDefinitionConfigPath.php
 │   │   │   │   └── MessageMediaPayload.php
 │   │   │   ├── TokenContracts
@@ -1878,6 +1888,10 @@
 │   │   │   └── Validation
 │   │   │       └── ModuleFactsSetupValidationContributor.php
 │   │   ├── ModuleIntegrations
+│   │   │   ├── Documents
+│   │   │   │   ├── Contracts
+│   │   │   │   │   └── DocumentAttachmentSource.php
+│   │   │   │   └── DocumentAttachment.php
 │   │   │   ├── Forms
 │   │   │   │   ├── Contracts
 │   │   │   │   │   ├── FormSubmissionAutomationWorkspace.php
@@ -1905,16 +1919,24 @@
 │   │   │   │   │   └── TeamMemberTaskAssigneeOptionProvider.php
 │   │   │   │   └── UserTeamMemberBridge.php
 │   │   │   ├── Messaging
+│   │   │   │   ├── Attachments
+│   │   │   │   │   └── AttachmentFile.php
 │   │   │   │   ├── Broadcasts
 │   │   │   │   │   └── BroadcastMessageTemplateDeletionReferenceContributor.php
 │   │   │   │   ├── Campaigns
 │   │   │   │   │   └── CampaignTouchMessageTemplateDeletionReferenceContributor.php
 │   │   │   │   ├── Contracts
-│   │   │   │   │   └── MessageMediaLibrary.php
+│   │   │   │   │   ├── MessageAttachmentSource.php
+│   │   │   │   │   ├── MessageAttachmentUploadSource.php
+│   │   │   │   │   ├── MessageMediaLibrary.php
+│   │   │   │   │   └── SelectableMessageAttachmentSource.php
+│   │   │   │   ├── Documents
+│   │   │   │   │   └── DocumentMessageAttachmentSource.php
 │   │   │   │   ├── FlowRoutes
 │   │   │   │   │   ├── FlowRouteMessageTemplateDeletionReferenceContributor.php
 │   │   │   │   │   └── FlowRouteReusableMessageTemplateAuthoringContributor.php
 │   │   │   │   ├── Media
+│   │   │   │   │   ├── MediaMessageAttachmentSource.php
 │   │   │   │   │   └── MediaMessageMediaLibrary.php
 │   │   │   │   └── UnavailableMessageMediaLibrary.php
 │   │   │   ├── RelationshipLocationAreaBridge.php
@@ -2107,6 +2129,7 @@
 │   ├── contact_imports.php
 │   ├── contacts.php
 │   ├── database.php
+│   ├── documents.php
 │   ├── events.php
 │   ├── filesystems.php
 │   ├── flow_routes.php
@@ -2714,6 +2737,7 @@
 │       │   │   ├── layout
 │       │   │   │   ├── page-header.blade.php
 │       │   │   │   └── section.blade.php
+│       │   │   ├── message-attachment-editor.blade.php
 │       │   │   ├── message-editor.blade.php
 │       │   │   └── message-media-editor.blade.php
 │       │   └── webinars
@@ -2773,6 +2797,8 @@
 │       │   │   └── show.blade.php
 │       │   ├── dashboard.blade.php
 │       │   ├── dashboard-tasks-print.blade.php
+│       │   ├── documents
+│       │   │   └── index.blade.php
 │       │   ├── flow-routes
 │       │   │   ├── bindings
 │       │   │   │   └── index.blade.php
@@ -2877,6 +2903,8 @@
 │       ├── email-text.blade.php
 │       ├── forms
 │       │   └── show.blade.php
+│       ├── media
+│       │   └── video-player.blade.php
 │       ├── messaging
 │       │   ├── permission-invitations
 │       │   │   ├── accepted.blade.php
@@ -2915,6 +2943,7 @@
 │   │   ├── broadcasts.php
 │   │   ├── campaigns.php
 │   │   ├── core.php
+│   │   ├── documents.php
 │   │   ├── flow-routes.php
 │   │   ├── forms.php
 │   │   ├── inbound-messaging.php
@@ -2979,6 +3008,7 @@
 │   │   │   ├── RecordAutomationBehaviorOccurrenceActionTest.php
 │   │   │   └── RecordAutomationEventCorrelationEvidenceActionTest.php
 │   │   ├── Broadcasts
+│   │   │   ├── BroadcastAttachmentsTest.php
 │   │   │   ├── BroadcastAudiencePreviewTest.php
 │   │   │   ├── BroadcastAudienceReviewAndExclusionTest.php
 │   │   │   ├── BroadcastBulkSchedulingTest.php
@@ -3128,7 +3158,8 @@
 │   │   │   ├── LaunchClientEnvironmentAuditScriptTest.php
 │   │   │   └── LaunchClientEnvironmentScriptTest.php
 │   │   ├── Documents
-│   │   │   └── DocumentsFoundationTest.php
+│   │   │   ├── DocumentsFoundationTest.php
+│   │   │   └── PrivateDocumentLibraryTest.php
 │   │   ├── Email
 │   │   │   └── HandleInboundEmailWebhookActionTest.php
 │   │   ├── Events
@@ -3244,6 +3275,7 @@
 │   │   │   ├── MediaFoundationTest.php
 │   │   │   ├── MediaImageSimilarityTest.php
 │   │   │   ├── MediaImageVariantsTest.php
+│   │   │   ├── MediaVideoPlayerTest.php
 │   │   │   └── MediaWorkspaceTest.php
 │   │   ├── Messaging
 │   │   │   ├── AuditEmailHygieneCommandTest.php
@@ -3275,6 +3307,7 @@
 │   │   │   ├── EmailPayloadTest.php
 │   │   │   ├── EmailReplyAddressGeneratorTest.php
 │   │   │   ├── FlowRouteReusableMessageTemplateAuthoringTest.php
+│   │   │   ├── GenericMessageAttachmentsTest.php
 │   │   │   ├── GrantMessageConsentActionTest.php
 │   │   │   ├── GuidedReusableMessageTemplateAuthoringTest.php
 │   │   │   ├── ImportMessageConsentActionTest.php
@@ -3286,6 +3319,8 @@
 │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest.php
 │   │   │   ├── MarkClaimedPermissionInvitationSentAfterScheduledMessageSentTest.php
 │   │   │   ├── MarketingPermissionContactImportPostProcessorTest.php
+│   │   │   ├── MessageAttachmentAuthoringTest.php
+│   │   │   ├── MessageAttachmentInlineUploadTest.php
 │   │   │   ├── MessageChainBulkDrainTest.php
 │   │   │   ├── MessageChainDuplicationTest.php
 │   │   │   ├── MessageChainEnrollmentPauseResumeTest.php
@@ -3650,4 +3685,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-851 directories, 2800 files
+859 directories, 2827 files

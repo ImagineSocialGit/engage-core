@@ -22,6 +22,18 @@ final class MessageMediaPayload
 
     public const TRACKING_KEY = 'media_primary';
 
+    public const DISPLAY_SIZES = ['small', 'medium', 'large', 'full'];
+
+    public static function displayWidth(mixed $size): int
+    {
+        return match ($size) {
+            'small' => 240,
+            'medium' => 360,
+            'large' => 480,
+            default => 576,
+        };
+    }
+
     /**
      * @return array<int, array{path: string, message: string}>
      */
@@ -43,6 +55,7 @@ final class MessageMediaPayload
             'mime_type',
             'poster_asset_uuid',
             'poster_url',
+            'display_size',
             'tracking_key',
         ];
         $unsupported = array_values(array_diff(array_keys($value), $allowed));
@@ -112,6 +125,21 @@ final class MessageMediaPayload
             ];
         }
 
+        if (array_key_exists('display_size', $value)) {
+            if (! is_string($value['display_size'])
+                || ! in_array($value['display_size'], self::DISPLAY_SIZES, true)) {
+                $errors[] = [
+                    'path' => 'display_size',
+                    'message' => 'Media display_size must be small, medium, large, or full.',
+                ];
+            } elseif (! in_array($kind, [self::KIND_IMAGE, self::KIND_VIDEO], true)) {
+                $errors[] = [
+                    'path' => 'display_size',
+                    'message' => 'Media sizing applies only to images and video.',
+                ];
+            }
+        }
+
         $posterUuid = self::filledString($value['poster_asset_uuid'] ?? null)
             ? trim((string) $value['poster_asset_uuid'])
             : null;
@@ -119,10 +147,10 @@ final class MessageMediaPayload
             ? trim((string) $value['poster_url'])
             : null;
 
-        if (($posterUuid === null) !== ($posterUrl === null)) {
+        if ($posterUuid !== null && $posterUrl === null) {
             $errors[] = [
                 'path' => 'poster_url',
-                'message' => 'Media poster_asset_uuid and poster_url must be supplied together.',
+                'message' => 'Media poster_asset_uuid requires poster_url.',
             ];
         }
 

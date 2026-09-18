@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\LoginController;
 use App\Modules\Messaging\Controllers\Public\ContactPermissionInvitationController;
 use App\Modules\Messaging\Controllers\Public\CtaEngagementRedirectController;
+use App\Modules\Media\Controllers\Public\MediaVideoPlayerController;
 use Illuminate\Support\Facades\Route;
 
 $legacyCtaHost = parse_url((string) config('app.crm_url'), PHP_URL_HOST);
@@ -13,6 +14,11 @@ $legacyCtaHost = is_string($legacyCtaHost) && $legacyCtaHost !== ''
 Route::get('/login', [LoginController::class, 'create'])->name('login');
 Route::post('/login', [LoginController::class, 'store'])->name('login.store');
 Route::post('/logout', [LoginController::class, 'destroy'])->middleware('auth')->name('logout');
+
+Route::get('/watch/{assetUuid}', MediaVideoPlayerController::class)
+    ->middleware('module:media')
+    ->whereUuid('assetUuid')
+    ->name('media.video.show');
 
 Route::get('/preferences/{token}', [ContactPermissionInvitationController::class, 'show'])
     ->name('messaging.permission-invitations.show');

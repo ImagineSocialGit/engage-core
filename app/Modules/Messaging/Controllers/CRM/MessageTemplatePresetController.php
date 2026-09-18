@@ -523,6 +523,10 @@ class MessageTemplatePresetController extends Controller
                 assetUuid: $request->mediaAssetUuid(),
                 posterAssetUuid: $request->mediaPosterAssetUuid(),
                 title: $request->mediaTitle(),
+                displaySize: $request->mediaSize(),
+                attachmentValues: $request->attachmentValues(),
+                attachmentUpload: $request->attachmentUpload(),
+                attachmentUploadSource: $request->attachmentUploadSource(),
                 currentMedia: $this->currentMediaSnapshot($preset),
                 uploadedBy: $actor,
             );

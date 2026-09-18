@@ -4,6 +4,7 @@ namespace App\Modules\Media\Actions;
 
 use App\Modules\Media\Data\ImagePerceptualFingerprint;
 use App\Modules\Media\Jobs\GenerateMediaImageVariantsJob;
+use App\Modules\Media\Jobs\GenerateMediaVideoPosterJob;
 use App\Modules\Media\Models\MediaAsset;
 use App\Modules\Media\Services\ImagePerceptualHasher;
 use App\Modules\Media\Services\MediaFileIdentity;
@@ -87,6 +88,7 @@ final class StoreMediaAssetAction
             ]);
 
             $this->queueImageVariants($asset);
+            $this->queueVideoPoster($asset);
 
             return $asset;
         } catch (QueryException $exception) {
@@ -133,6 +135,7 @@ final class StoreMediaAssetAction
         }
 
         $this->queueImageVariants($asset);
+        $this->queueVideoPoster($asset);
 
         return $asset;
     }
@@ -153,6 +156,22 @@ final class StoreMediaAssetAction
             ))->onQueue($queue);
 
             dispatch($job);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    private function queueVideoPoster(MediaAsset $asset): void
+    {
+        if ($asset->kind !== MediaAsset::KIND_VIDEO
+            || ! (bool) config('media.video_posters.enabled', true)
+            || $asset->videoPosterUrl() !== null) {
+            return;
+        }
+
+        try {
+            $queue = $this->queueContract->assertDispatchable(null);
+            dispatch((new GenerateMediaVideoPosterJob((int) $asset->getKey()))->onQueue($queue));
         } catch (Throwable $exception) {
             report($exception);
         }

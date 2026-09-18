@@ -13,6 +13,8 @@
         mediaAssetUuid: @js(old('direct_message.media_asset_uuid', '')),
         mediaPosterAssetUuid: @js(old('direct_message.media_poster_asset_uuid', '')),
         mediaTitle: @js(old('direct_message.media_title', '')),
+        mediaSize: @js(old('direct_message.media_size', 'full')),
+        attachmentKeys: @js(old('direct_message.attachment_refs', [])),
         reasonOptions() {
             return this.reasonsByChannel[this.channel] || [];
         },
@@ -46,6 +48,8 @@
             this.mediaAssetUuid = template.media_asset_uuid || '';
             this.mediaPosterAssetUuid = template.media_poster_asset_uuid || '';
             this.mediaTitle = template.media_title || '';
+            this.mediaSize = template.media_size || 'full';
+            this.attachmentKeys = template.attachment_keys || [];
         },
     }"
     class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
@@ -243,9 +247,18 @@
                         asset-model="mediaAssetUuid"
                         poster-model="mediaPosterAssetUuid"
                         title-model="mediaTitle"
+                        size-model="mediaSize"
                         :selected-asset-uuid="old('direct_message.media_asset_uuid', '')"
                         :selected-poster-asset-uuid="old('direct_message.media_poster_asset_uuid', '')"
                         :selected-title="old('direct_message.media_title', '')"
+                        :selected-size="old('direct_message.media_size', 'full')"
+                    />
+                    <x-ui.message-attachment-editor
+                        :options="$directMessageComposer['attachments']['options'] ?? []"
+                        field-prefix="direct_message"
+                        visible-bind="channel === 'email'"
+                        selection-model="attachmentKeys"
+                        :upload-sources="$directMessageComposer['attachments']['upload_sources'] ?? []"
                     />
 
                     <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-end">

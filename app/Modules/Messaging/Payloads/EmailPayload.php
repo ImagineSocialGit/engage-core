@@ -10,6 +10,9 @@ use App\Modules\Messaging\Support\CtaTrackingLinkGenerator;
 use App\Modules\Messaging\Support\EmailConsentRevocationLinkGenerator;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Modules\Messaging\Support\MessageMediaPayload;
+use App\Support\ModuleIntegrations\Messaging\Contracts\MessageMediaLibrary;
+use App\Modules\Messaging\Support\MessageAttachmentReferences;
+use App\Modules\Messaging\Services\MessageAttachmentRegistry;
 use App\Support\Clients\ViewResolver;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Arr;
@@ -17,6 +20,7 @@ use Illuminate\Support\Facades\View;
 use InvalidArgumentException;
 use Stringable;
 use Symfony\Component\Mime\Email;
+use Throwable;
 
 class EmailPayload implements EmailMessage, ThreadedEmailMessage
 {
@@ -37,6 +41,8 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
         public readonly array $ctas = [],
         public readonly array $secondaryLink = [],
         public readonly array $media = [],
+        public readonly array $attachments = [],
+        private readonly bool $attachmentsProvided = false,
         public readonly ?string $footer = null,
         public readonly ?string $unsubscribeUrl = null,
         public readonly ?string $transactionalOptOutUrl = null,
@@ -90,6 +96,8 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
             secondaryLink: self::arrayValue($payload['secondary_link'] ?? null),
 
             media: self::arrayValue($payload['media'] ?? null),
+            attachments: MessageAttachmentReferences::normalize($payload['attachments'] ?? []),
+            attachmentsProvided: array_key_exists('attachments', $payload),
 
             footer: self::nullableString($payload['footer'] ?? null),
 
@@ -285,6 +293,18 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
             );
         }
 
+        $references = $this->attachmentReferences();
+        if ($references !== []) {
+            foreach (app(MessageAttachmentRegistry::class)->resolve($references, $this->contactId) as $attachment) {
+                $mailable->attachFromStorageDisk(
+                    $attachment->disk,
+                    $attachment->path,
+                    $attachment->filename,
+                    ['mime' => $attachment->mimeType],
+                );
+            }
+        }
+
         return $mailable;
     }
 
@@ -359,6 +379,7 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
             'ctas' => $this->resolvedListArray('ctas', $this->ctas),
             'secondary_link' => $this->resolvedArray('secondary_link', $this->secondaryLink),
             'media' => $this->resolvedMedia(),
+            'attachments' => $this->validatedAttachmentReferences(),
             'footer' => $this->footer ?? $this->configValue('footer'),
             'unsubscribe_url' => $this->marketingUnsubscribeUrl(),
             'transactional_opt_out_url' => $this->transactionalOptOutUrl(),
@@ -412,6 +433,27 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
 
         $media = $this->interpolateRecursive($media);
 
+        if (($media['kind'] ?? null) === MessageMediaPayload::KIND_VIDEO
+            && is_string($media['asset_uuid'] ?? null)
+            && app()->bound(MessageMediaLibrary::class)) {
+            try {
+                $library = app(MessageMediaLibrary::class);
+                if ($library->available()) {
+                    // The original poster URL remains valid even if its asset is archived.
+                    // Resolve the video independently so an archived poster cannot keep
+                    // an older direct-file link in a message awaiting delivery.
+                    $updated = $library->snapshot($media['asset_uuid']);
+                    $media['url'] = $updated['url'] ?? $media['url'];
+                    if (! isset($media['poster_asset_uuid'])
+                        && is_string($updated['poster_url'] ?? null)) {
+                        $media['poster_url'] = $updated['poster_url'];
+                    }
+                }
+            } catch (Throwable) {
+                // Retain the published snapshot if its source is no longer available.
+            }
+        }
+
         return MessageMediaPayload::valid($media) ? $media : [];
     }
 
@@ -437,6 +479,7 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
             [
                 'media' => $media,
                 'sourceUrl' => $sourceMedia['url'],
+                'displayWidth' => MessageMediaPayload::displayWidth($sourceMedia['display_size'] ?? null),
             ],
         )->render();
     }
@@ -480,6 +523,27 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
         return is_array($value)
             ? $value
             : [];
+    }
+
+    /** @return array<int, array{source: string, id: string}> */
+    private function attachmentReferences(): array
+    {
+        return MessageAttachmentReferences::normalize(
+            $this->attachmentsProvided || $this->attachments !== []
+                ? $this->attachments
+                : $this->configArray('attachments'),
+        );
+    }
+
+    /** @return array<int, array{source: string, id: string}> */
+    private function validatedAttachmentReferences(): array
+    {
+        $references = $this->attachmentReferences();
+        if ($references !== []) {
+            app(MessageAttachmentRegistry::class)->resolve($references, $this->contactId);
+        }
+
+        return $references;
     }
 
     private function payloadConfigPath(string $key): string

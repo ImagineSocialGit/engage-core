@@ -29,6 +29,10 @@ final class ContactDirectMessageController extends Controller
             mediaAssetUuid: $request->messageMediaAssetUuid('direct_message'),
             mediaPosterAssetUuid: $request->messageMediaPosterAssetUuid('direct_message'),
             mediaTitle: $request->messageMediaTitle('direct_message'),
+            mediaSize: $request->messageMediaSize('direct_message'),
+            attachmentValues: $request->messageAttachmentValues('direct_message'),
+            attachmentUpload: $request->messageAttachmentUpload('direct_message'),
+            attachmentUploadSource: $request->messageAttachmentUploadSource('direct_message'),
             actor: $request->user(),
         );
 

@@ -16,7 +16,7 @@ return [
 
     'directory' => 'media',
 
-    'max_upload_kilobytes' => 262144,
+    'max_upload_kilobytes' => 307200,
 
     'allowed_mime_types' => [
         'image/jpeg',
@@ -60,6 +60,12 @@ return [
             'image/png',
             'image/webp',
         ],
+    ],
+
+    'video_posters' => [
+        'enabled' => true,
+        'ffmpeg_binary' => 'ffmpeg',
+        'timeout_seconds' => 120,
     ],
 
     /*

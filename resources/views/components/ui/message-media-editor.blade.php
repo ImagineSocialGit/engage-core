@@ -6,9 +6,11 @@
     'selectedAssetUuid' => '',
     'selectedPosterAssetUuid' => '',
     'selectedTitle' => '',
+    'selectedSize' => 'full',
     'assetModel' => null,
     'posterModel' => null,
     'titleModel' => null,
+    'sizeModel' => null,
 ])
 
 @if(($presentation['available'] ?? false) === true)
@@ -31,7 +33,7 @@
             <div>
                 <h4 class="text-sm font-black text-slate-950">Media</h4>
                 <p class="mt-1 text-xs leading-5 text-slate-600">
-                    Choose a reusable asset or upload a new one. Put <code>{media}</code> in the email body to choose its exact position; otherwise Engage appends it after the body copy.
+                    Choose a reusable asset or upload a new one. Put <code>{media}</code> in the email body to choose its exact position; otherwise it appears after the body copy.
                 </p>
             </div>
 
@@ -116,7 +118,7 @@
                 @if(filled($posterModel)) x-model="{{ $posterModel }}" @endif
                 class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900"
             >
-                <option value="">Use generic video card</option>
+                <option value="">Generate a poster from the video</option>
                 @foreach(($presentation['image_assets'] ?? []) as $asset)
                     <option
                         value="{{ $asset['uuid'] }}"
@@ -127,9 +129,30 @@
                 @endforeach
             </select>
             <p class="mt-2 text-xs leading-5 text-slate-500">
-                Poster images apply only to video. Without one, email rendering uses the safe video-card fallback instead of relying on inconsistent in-inbox playback.
+                Poster images apply only to video. Without one, a poster is generated from the uploaded video when FFmpeg is available. The email card links to the hosted video player.
             </p>
             @error($fieldPrefix !== '' ? $fieldPrefix.'.media_poster_asset_uuid' : 'media_poster_asset_uuid')
+                <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
+            @enderror
+        </div>
+
+        <div class="mt-4">
+            <label class="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-600">Media display size</label>
+            <select
+                @if(filled($namePrefixBind))
+                    x-bind:name="{{ $namePrefixBind }} + '[media_size]'"
+                @else
+                    name="{{ $fieldPrefix !== '' ? $fieldPrefix.'[media_size]' : 'media_size' }}"
+                @endif
+                @if(filled($sizeModel)) x-model="{{ $sizeModel }}" @endif
+                class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900"
+            >
+                @foreach(['small' => 'Small', 'medium' => 'Medium', 'large' => 'Large', 'full' => 'Full width'] as $size => $label)
+                    <option value="{{ $size }}" @selected(! filled($sizeModel) && $selectedSize === $size)>{{ $label }}</option>
+                @endforeach
+            </select>
+            <p class="mt-2 text-xs leading-5 text-slate-500">Applies to images and video cards in email. Other files keep their regular link.</p>
+            @error($fieldPrefix !== '' ? $fieldPrefix.'.media_size' : 'media_size')
                 <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
             @enderror
         </div>

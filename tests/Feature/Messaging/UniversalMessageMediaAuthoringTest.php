@@ -84,6 +84,18 @@ class UniversalMessageMediaAuthoringTest extends TestCase
         $this->assertSame($current, $resolved);
         $this->assertSame(0, $library->snapshotCalls);
 
+        $resized = $service->resolve(
+            submitted: true,
+            assetUuid: $current['asset_uuid'],
+            posterAssetUuid: $current['poster_asset_uuid'],
+            currentMedia: $current,
+            displaySize: 'small',
+        );
+
+        $this->assertSame('small', $resized['display_size']);
+        $this->assertArrayNotHasKey('display_size', $current);
+        $this->assertSame(0, $library->snapshotCalls);
+
         $preservedPayload = $service->apply(
             payload: ['subject' => 'Hello', 'body' => 'World'],
             submitted: false,
@@ -166,6 +178,13 @@ class UniversalMessageMediaAuthoringTest extends TestCase
         $this->assertSame(1, $library->storeCalls);
 
         $this->assertNull($service->resolve(submitted: true));
+
+        $large = $service->resolve(
+            submitted: true,
+            assetUuid: '44444444-4444-4444-8444-444444444444',
+            displaySize: 'large',
+        );
+        $this->assertSame('large', $large['display_size']);
     }
 
     public function test_every_email_authoring_surface_reaches_the_shared_media_authoring_contract(): void

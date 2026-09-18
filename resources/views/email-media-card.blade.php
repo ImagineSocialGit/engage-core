@@ -19,11 +19,11 @@
 @endphp
 
 @if($url !== '')
-    <a href="{{ $url }}" style="display:block; margin:6px 0; color:#0f172a; text-decoration:none;">
+    <a href="{{ $url }}" style="display:block; width:{{ $displayWidth }}px; max-width:100%; margin:6px 0; color:#0f172a; text-decoration:none;">
         @if($kind === 'image')
-            <img src="{{ $sourceUrl }}" alt="{{ $title }}" width="576" style="display:block; width:100%; max-width:576px; height:auto; border:0; border-radius:14px;">
+            <img src="{{ $sourceUrl }}" alt="{{ $title }}" width="{{ $displayWidth }}" style="display:block; width:100%; max-width:{{ $displayWidth }}px; height:auto; border:0; border-radius:14px;">
         @elseif($kind === 'video' && $posterUrl !== '')
-            <img src="{{ $posterUrl }}" alt="{{ $title }} — {{ $actionLabel }}" width="576" style="display:block; width:100%; max-width:576px; height:auto; border:0; border-radius:14px 14px 0 0;">
+            <img src="{{ $posterUrl }}" alt="{{ $title }} — {{ $actionLabel }}" width="{{ $displayWidth }}" style="display:block; width:100%; max-width:{{ $displayWidth }}px; height:auto; border:0; border-radius:14px 14px 0 0;">
             <span style="display:block; padding:13px 16px; border:1px solid #e2e8f0; border-top:0; border-radius:0 0 14px 14px; background:#f8fafc; font-size:14px; line-height:20px; font-weight:700; color:#0f172a;">
                 {{ $actionLabel }} · {{ $title }}
             </span>

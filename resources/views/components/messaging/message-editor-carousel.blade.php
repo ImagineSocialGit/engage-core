@@ -761,6 +761,7 @@
 
                                         <x-messaging.message-media-authoring
                                             :current-media="$editMedia"
+                                            :current-attachments="$editPayload['attachments'] ?? []"
                                             field-prefix="payload"
                                             :failed="$failedThisMessage"
                                         />

@@ -6,6 +6,7 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Support\CtaTrackingLinkGenerator;
 use App\Modules\Messaging\Support\MessageMediaPayload;
+use App\Modules\Messaging\Support\MessageAttachmentReferences;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Support\Queues\QueueContract;
 
@@ -595,6 +596,19 @@ class MessageConfigValidator
                     $mediaPath !== '' ? "{$path}.media.{$mediaPath}" : "{$path}.media",
                     (string) ($mediaError['message'] ?? 'Payload media is invalid.'),
                 );
+            }
+        }
+
+        if (array_key_exists('attachments', $payload)) {
+            try {
+                MessageAttachmentReferences::normalize($payload['attachments']);
+                if ($channel !== MessageChannel::Email->value
+                    && ! str_ends_with((string) $payloadClass, '\\EmailPayload')
+                    && ! str_ends_with((string) $payloadClass, '\\InternalEmailNotificationPayload')) {
+                    $issues[] = $this->issue('error', "{$path}.attachments", 'Attachments are supported only for email.');
+                }
+            } catch (\InvalidArgumentException $exception) {
+                $issues[] = $this->issue('error', "{$path}.attachments", $exception->getMessage());
             }
         }
 

@@ -113,6 +113,10 @@ class BroadcastController extends Controller
                     posterAssetUuid: $request->messageMediaPosterAssetUuid(),
                     title: $request->messageMediaTitle(),
                     uploadedBy: $request->user(),
+                    displaySize: $request->messageMediaSize(),
+                    attachmentValues: $request->messageAttachmentValues(),
+                    attachmentUpload: $request->messageAttachmentUpload(),
+                    attachmentUploadSource: $request->messageAttachmentUploadSource(),
                 );
             }
 
@@ -380,6 +384,12 @@ class BroadcastController extends Controller
             $payload = $request->messagePayload();
 
             if ((string) $broadcast->channel === 'email') {
+                if ($request->messageAttachmentValues() === null
+                    && $request->messageAttachmentUpload() === null
+                    && is_array($currentPayload['attachments'] ?? null)) {
+                    $payload['attachments'] = $currentPayload['attachments'];
+                }
+
                 $payload = $mediaAuthoring->apply(
                     payload: $payload,
                     submitted: $request->hasMessageMediaSubmission(),
@@ -389,6 +399,10 @@ class BroadcastController extends Controller
                     title: $request->messageMediaTitle(),
                     currentMedia: $currentMedia,
                     uploadedBy: $request->user(),
+                    displaySize: $request->messageMediaSize(),
+                    attachmentValues: $request->messageAttachmentValues(),
+                    attachmentUpload: $request->messageAttachmentUpload(),
+                    attachmentUploadSource: $request->messageAttachmentUploadSource(),
                 );
             }
 

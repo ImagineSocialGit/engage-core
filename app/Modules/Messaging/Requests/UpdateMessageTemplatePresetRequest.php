@@ -133,7 +133,9 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
         $payload = $this->input('payload', []);
         $payload = is_array($payload) ? $payload : [];
 
-        return $this->hasFile('payload.media_upload')
+        return $this->hasFile('payload.attachment_upload')
+            || in_array($payload['attachments_present'] ?? null, [true, 1, '1', 'true', 'on'], true)
+            || $this->hasFile('payload.media_upload')
             || in_array(
                 $payload['media_present'] ?? null,
                 [true, 1, '1', 'true', 'on'],
@@ -157,6 +159,41 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
         return is_string($value) && trim($value) !== ''
             ? trim($value)
             : null;
+    }
+
+    public function mediaSize(): ?string
+    {
+        $value = $this->validated('payload.media_size');
+
+        return is_string($value) && trim($value) !== '' ? trim($value) : null;
+    }
+
+    /** @return array<int, string>|null */
+    public function attachmentValues(): ?array
+    {
+        $payload = $this->input('payload', []);
+        if (! $this->hasFile('payload.attachment_upload') && (! is_array($payload)
+            || ! in_array($payload['attachments_present'] ?? null, [true, 1, '1', 'true', 'on'], true))) {
+            return null;
+        }
+
+        $values = $this->validated('payload.attachment_refs', []);
+
+        return is_array($values) ? array_values($values) : [];
+    }
+
+    public function attachmentUpload(): ?UploadedFile
+    {
+        $file = $this->file('payload.attachment_upload');
+
+        return $file instanceof UploadedFile ? $file : null;
+    }
+
+    public function attachmentUploadSource(): ?string
+    {
+        $value = $this->validated('payload.attachment_upload_source');
+
+        return is_string($value) ? trim($value) : null;
     }
 
     public function mediaTitle(): ?string

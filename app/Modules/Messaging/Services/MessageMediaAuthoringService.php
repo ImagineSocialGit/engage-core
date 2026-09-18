@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Services;
 
 use App\Support\ModuleIntegrations\Messaging\Contracts\MessageMediaLibrary;
+use App\Modules\Messaging\Support\MessageMediaPayload;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Route;
@@ -128,17 +129,18 @@ final class MessageMediaAuthoringService
             ? $field
             : $prefix.'.'.$field;
 
-        return [
+        return array_merge([
             $key('media_present') => ['nullable', 'boolean'],
             $key('media_asset_uuid') => ['nullable', 'uuid'],
             $key('media_poster_asset_uuid') => ['nullable', 'uuid'],
             $key('media_title') => ['nullable', 'string', 'max:255'],
+            $key('media_size') => ['nullable', 'string', 'in:small,medium,large,full'],
             $key('media_upload') => [
                 'nullable',
                 'file',
                 'max:'.max(1, (int) config('media.max_upload_kilobytes', 262144)),
             ],
-        ];
+        ], app(MessageAttachmentAuthoringService::class)->validationRules($prefix));
     }
 
     /**
@@ -155,6 +157,10 @@ final class MessageMediaAuthoringService
         ?string $title = null,
         array $currentMedia = [],
         ?Model $uploadedBy = null,
+        ?string $displaySize = null,
+        ?array $attachmentValues = null,
+        ?UploadedFile $attachmentUpload = null,
+        ?string $attachmentUploadSource = null,
     ): array {
         if (! $submitted) {
             if ($currentMedia !== []) {
@@ -164,25 +170,33 @@ final class MessageMediaAuthoringService
             return $payload;
         }
 
-        $media = $this->resolve(
-            submitted: true,
-            upload: $upload,
-            assetUuid: $assetUuid,
-            posterAssetUuid: $posterAssetUuid,
-            title: $title,
-            currentMedia: $currentMedia,
-            uploadedBy: $uploadedBy,
-        );
+        $media = ! $this->available()
+            && ! ($upload instanceof UploadedFile)
+            && ($assetUuid === null || trim($assetUuid) === '')
+            ? ($currentMedia !== [] ? $currentMedia : null)
+            : $this->resolve(
+                submitted: true,
+                upload: $upload,
+                assetUuid: $assetUuid,
+                posterAssetUuid: $posterAssetUuid,
+                title: $title,
+                currentMedia: $currentMedia,
+                uploadedBy: $uploadedBy,
+                displaySize: $displaySize,
+            );
 
         if ($media === null) {
             unset($payload['media']);
-
-            return $payload;
+        } else {
+            $payload['media'] = $media;
         }
 
-        $payload['media'] = $media;
-
-        return $payload;
+        return $attachmentValues !== null || $attachmentUpload !== null
+            ? app(MessageAttachmentAuthoringService::class)->apply(
+                $payload, $attachmentValues ?? [], null, $attachmentUpload,
+                $attachmentUploadSource, $uploadedBy,
+            )
+            : $payload;
     }
 
     /**
@@ -197,6 +211,7 @@ final class MessageMediaAuthoringService
         ?string $title = null,
         array $currentMedia = [],
         ?Model $uploadedBy = null,
+        ?string $displaySize = null,
     ): ?array {
         if (! $submitted) {
             return $currentMedia !== [] ? $currentMedia : null;
@@ -211,15 +226,23 @@ final class MessageMediaAuthoringService
         $assetUuid = is_string($assetUuid) ? trim($assetUuid) : '';
         $posterAssetUuid = is_string($posterAssetUuid) ? trim($posterAssetUuid) : '';
         $title = is_string($title) && trim($title) !== '' ? trim($title) : null;
+        $displaySize = is_string($displaySize) && trim($displaySize) !== ''
+            ? trim($displaySize)
+            : null;
+        if ($displaySize !== null && ! in_array($displaySize, MessageMediaPayload::DISPLAY_SIZES, true)) {
+            throw new InvalidArgumentException('Choose a supported media size.');
+        }
 
         try {
             if ($upload instanceof UploadedFile) {
-                return $this->messageMediaLibrary->store(
+                $snapshot = $this->messageMediaLibrary->store(
                     file: $upload,
                     title: $title,
                     posterAssetUuid: $posterAssetUuid !== '' ? $posterAssetUuid : null,
                     uploadedBy: $uploadedBy,
                 );
+
+                return $this->withDisplaySize($snapshot, $displaySize);
             }
 
             if ($assetUuid === '') {
@@ -237,16 +260,36 @@ final class MessageMediaAuthoringService
                 && $posterAssetUuid === $currentPosterUuid
                 && $currentMedia !== []
             ) {
-                return $currentMedia;
+                return $this->withDisplaySize($currentMedia, $displaySize);
             }
 
-            return $this->messageMediaLibrary->snapshot(
+            return $this->withDisplaySize($this->messageMediaLibrary->snapshot(
                 assetUuid: $assetUuid,
                 posterAssetUuid: $posterAssetUuid !== '' ? $posterAssetUuid : null,
-            );
+            ), $displaySize);
         } catch (Throwable $exception) {
             throw new InvalidArgumentException($exception->getMessage(), previous: $exception);
         }
+    }
+
+    /** @param array<string, mixed> $snapshot
+     *  @return array<string, mixed>
+     */
+    private function withDisplaySize(array $snapshot, ?string $displaySize): array
+    {
+        if (! in_array($snapshot['kind'] ?? null, [MessageMediaPayload::KIND_IMAGE, MessageMediaPayload::KIND_VIDEO], true)) {
+            unset($snapshot['display_size']);
+
+            return $snapshot;
+        }
+
+        if ($displaySize !== null) {
+            $snapshot['display_size'] = $displaySize;
+        }
+
+        MessageMediaPayload::assertValid($snapshot);
+
+        return $snapshot;
     }
 
     private function available(): bool

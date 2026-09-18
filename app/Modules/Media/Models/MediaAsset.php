@@ -143,6 +143,20 @@ class MediaAsset extends Model
         return $this->urlForPath((string) $this->path);
     }
 
+    public function videoPosterUrl(): ?string
+    {
+        if ($this->kind !== self::KIND_VIDEO
+            || (int) data_get($this->meta, 'video_poster.version') !== 1) {
+            return null;
+        }
+
+        $path = data_get($this->meta, 'video_poster.path');
+
+        return is_string($path) && trim($path) !== ''
+            ? $this->urlForPath(trim($path))
+            : null;
+    }
+
     private function urlForPath(string $path): ?string
     {
         if ($this->disk === null || trim($path) === '') {

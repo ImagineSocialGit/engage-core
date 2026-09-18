@@ -46,6 +46,8 @@ use App\Modules\Messaging\Services\Dashboard\MessagingDeliveryIssuesDashboardPan
 use App\Modules\Messaging\Services\Email\EmailProviderManager;
 use App\Modules\Messaging\Services\MessageChainExecutionContextResolver;
 use App\Modules\Messaging\Services\MessageMediaAuthoringService;
+use App\Modules\Messaging\Services\MessageAttachmentRegistry;
+use App\Support\ModuleIntegrations\Messaging\Contracts\MessageAttachmentSource;
 use App\Modules\Messaging\Services\MessageRecipientGateRegistry;
 use App\Modules\Messaging\Services\MessageRecipientPayloadProviderRegistry;
 use App\Modules\Messaging\Services\MessageTemplateDefinitionRegistry;
@@ -72,6 +74,11 @@ class MessagingModuleServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->scoped(MessageMediaAuthoringService::class);
+        $this->app->singleton(MessageAttachmentRegistry::class, function ($app) {
+            return new MessageAttachmentRegistry(
+                $app->tagged(MessageAttachmentSource::TAG),
+            );
+        });
         $this->app->tag(
             OutboundContactResultActionContributor::class,
             ContactResultActionRegistry::CONTRIBUTOR_TAG,

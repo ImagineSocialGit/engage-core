@@ -46,6 +46,10 @@ class CreateFlowRouteMessageTemplateController extends Controller
                     assetUuid: $request->messageMediaAssetUuid(),
                     posterAssetUuid: $request->messageMediaPosterAssetUuid(),
                     title: $request->messageMediaTitle(),
+                    displaySize: $request->messageMediaSize(),
+                    attachmentValues: $request->messageAttachmentValues(),
+                    attachmentUpload: $request->messageAttachmentUpload(),
+                    attachmentUploadSource: $request->messageAttachmentUploadSource(),
                     uploadedBy: $request->user(),
                 );
             }

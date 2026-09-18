@@ -38,6 +38,28 @@ class MessageMediaPayloadValidationTest extends TestCase
         MessageMediaPayload::assertValid($invalidPoster);
     }
 
+    public function test_generated_video_poster_does_not_require_a_separate_media_asset(): void
+    {
+        $media = $this->media();
+        $media['poster_url'] = 'https://cdn.example.test/generated-poster.jpg';
+
+        $this->assertSame([], MessageMediaPayload::validationErrors($media));
+    }
+
+    public function test_display_size_is_limited_to_visual_media_and_known_presets(): void
+    {
+        $media = $this->media();
+        $media['display_size'] = 'small';
+        $this->assertSame([], MessageMediaPayload::validationErrors($media));
+
+        $media['display_size'] = '9999px';
+        $this->assertNotSame([], MessageMediaPayload::validationErrors($media));
+
+        $media['kind'] = 'file';
+        $media['display_size'] = 'small';
+        $this->assertNotSame([], MessageMediaPayload::validationErrors($media));
+    }
+
     /** @return array<string, string> */
     private function media(): array
     {

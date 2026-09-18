@@ -5,6 +5,7 @@ namespace App\Modules\Messaging\Services;
 use App\Modules\Messaging\Models\MessageTemplateCompositionLayer;
 use App\Modules\Messaging\Support\CtaTrackingLinkGenerator;
 use App\Modules\Messaging\Support\MessageMediaPayload;
+use App\Modules\Messaging\Support\MessageAttachmentReferences;
 use InvalidArgumentException;
 
 class MessageTemplateCompositionSchema
@@ -86,7 +87,7 @@ class MessageTemplateCompositionSchema
         }
 
         $allowed = $channel === 'email'
-            ? ['subject', 'body', 'footer', 'cta', 'ctas', 'secondary_link', 'media', 'token_fallbacks']
+            ? ['subject', 'body', 'footer', 'cta', 'ctas', 'secondary_link', 'media', 'attachments', 'token_fallbacks']
             : ['message', 'token_fallbacks'];
 
         foreach ($payload as $key => $value) {
@@ -124,6 +125,12 @@ class MessageTemplateCompositionSchema
 
             if ($key === 'media') {
                 MessageMediaPayload::assertValid($value);
+
+                continue;
+            }
+
+            if ($key === 'attachments') {
+                MessageAttachmentReferences::normalize($value);
 
                 continue;
             }

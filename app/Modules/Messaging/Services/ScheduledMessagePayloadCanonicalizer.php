@@ -7,6 +7,7 @@ use App\Modules\Messaging\Contracts\Sms\SmsMessage;
 use App\Modules\Messaging\Payloads\Internal\InternalEmailNotificationPayload;
 use App\Modules\Messaging\Payloads\Internal\InternalSmsNotificationPayload;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
+use App\Modules\Messaging\Support\MessageAttachmentReferences;
 use DateTimeInterface;
 use Illuminate\Support\Arr;
 use InvalidArgumentException;
@@ -82,6 +83,10 @@ class ScheduledMessagePayloadCanonicalizer
         array $conditions = [],
     ): array {
         $kind = $this->payloadKind($payloadClass);
+        if (! in_array($kind, [self::KIND_EMAIL, self::KIND_INTERNAL_EMAIL], true)
+            && array_key_exists('attachments', $payload)) {
+            throw new InvalidArgumentException('Attachments are supported only for email messages.');
+        }
         $tokens = is_array($payload['tokens'] ?? null)
             ? $payload['tokens']
             : [];
@@ -89,7 +94,7 @@ class ScheduledMessagePayloadCanonicalizer
 
         $this->copyDestination($canonical, $payload, $kind);
 
-        if ($kind === self::KIND_EMAIL) {
+        if (in_array($kind, [self::KIND_EMAIL, self::KIND_INTERNAL_EMAIL], true)) {
             $this->copyNullableInt(
                 target: $canonical,
                 key: 'contact_id',
@@ -190,6 +195,7 @@ class ScheduledMessagePayloadCanonicalizer
                 'ctas',
                 'secondary_link',
                 'media',
+                'attachments',
                 'footer',
                 'unsubscribe_url',
                 'transactional_opt_out_url',
@@ -327,6 +333,9 @@ class ScheduledMessagePayloadCanonicalizer
             $payload['secondary_link'] ?? null,
         );
         $this->copyArray($canonical, 'media', $payload['media'] ?? null);
+        if (array_key_exists('attachments', $payload)) {
+            $canonical['attachments'] = MessageAttachmentReferences::normalize($payload['attachments']);
+        }
         $this->copyNullableString($canonical, 'footer', $payload['footer'] ?? null);
         $this->copyNullableString(
             $canonical,
@@ -422,6 +431,9 @@ class ScheduledMessagePayloadCanonicalizer
         $this->copyStringMap($canonical, 'details', $payload['details'] ?? null);
         $this->copyArray($canonical, 'cta', $payload['cta'] ?? null);
         $this->copyNullableString($canonical, 'footer', $payload['footer'] ?? null);
+        if (array_key_exists('attachments', $payload)) {
+            $canonical['attachments'] = MessageAttachmentReferences::normalize($payload['attachments']);
+        }
         $this->copyList($canonical, 'token_fallbacks', $payload['token_fallbacks'] ?? null);
         $this->copyNullableString(
             $canonical,

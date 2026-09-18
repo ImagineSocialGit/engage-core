@@ -57,7 +57,7 @@ class MessagingMediaLibraryTest extends TestCase
         $this->assertSame('Welcome greeting', $video['title']);
         $this->assertSame(MessageMediaPayload::TRACKING_KEY, $video['tracking_key']);
         $this->assertSame($poster['asset_uuid'], $video['poster_asset_uuid']);
-        $this->assertStringStartsWith('https://cdn.example.test/', $video['url']);
+        $this->assertSame(route('media.video.show', ['assetUuid' => $video['asset_uuid']]), $video['url']);
         $this->assertStringStartsWith('https://cdn.example.test/', $video['poster_url']);
         $this->assertSame(2, MediaAsset::query()->count());
     }
@@ -103,16 +103,42 @@ class MessagingMediaLibraryTest extends TestCase
 
         $this->assertSame([], $library->selectableAssets());
         $this->assertSame('Welcome greeting', $snapshot['title']);
-        $this->assertStringStartsWith('https://cdn.example.test/', $snapshot['url']);
+        $this->assertSame(route('media.video.show', ['assetUuid' => $snapshot['asset_uuid']]), $snapshot['url']);
 
         $this->expectException(\RuntimeException::class);
         $library->snapshot($snapshot['asset_uuid']);
+    }
+
+    public function test_generated_video_poster_is_available_to_later_message_snapshots(): void
+    {
+        $this->configureMedia();
+        $library = app(MediaMessageMediaLibrary::class);
+        $snapshot = $library->store(
+            file: UploadedFile::fake()->create('introduction.mp4', 128, 'video/mp4'),
+        );
+        $asset = MediaAsset::query()->where('uuid', $snapshot['asset_uuid'])->firstOrFail();
+        $asset->forceFill(['meta' => [
+            'video_poster' => [
+                'version' => 1,
+                'path' => dirname($asset->path).'/video-poster.jpg',
+            ],
+        ]])->save();
+
+        $updated = $library->snapshot($snapshot['asset_uuid']);
+
+        $this->assertSame(route('media.video.show', ['assetUuid' => $asset->uuid]), $updated['url']);
+        $this->assertSame(
+            'https://cdn.example.test/'.dirname($asset->path).'/video-poster.jpg',
+            $updated['poster_url'],
+        );
+        $this->assertArrayNotHasKey('poster_asset_uuid', $updated);
     }
 
     private function configureMedia(): void
     {
         config()->set('modules.enabled', ['messaging', 'media']);
         config()->set('media.disk', 'spaces');
+        config()->set('media.video_posters.enabled', false);
         config()->set('filesystems.disks.spaces', [
             'driver' => 's3',
             'key' => 'test',

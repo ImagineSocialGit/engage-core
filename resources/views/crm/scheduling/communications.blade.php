@@ -108,6 +108,8 @@
                             media_asset_uuid: '',
                             media_poster_asset_uuid: '',
                             media_title: '',
+                            media_size: 'full',
+                            attachment_keys: [],
                         };
                     },
                     addStep() {
@@ -248,6 +250,14 @@
                                 asset-model="step.media_asset_uuid"
                                 poster-model="step.media_poster_asset_uuid"
                                 title-model="step.media_title"
+                                size-model="step.media_size"
+                            />
+                            <x-ui.message-attachment-editor
+                                :options="$plan['attachment_authoring']['options'] ?? []"
+                                name-prefix-bind="`steps[${index}]`"
+                                visible-bind="step.channels.includes('email')"
+                                selection-model="step.attachment_keys"
+                                :upload-sources="$plan['attachment_authoring']['upload_sources'] ?? []"
                             />
                         </div>
                     </template>

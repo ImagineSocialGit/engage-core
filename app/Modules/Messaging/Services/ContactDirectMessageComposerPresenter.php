@@ -94,6 +94,7 @@ final class ContactDirectMessageComposerPresenter
             'default_reason' => $defaultReason,
             'templates' => $templates,
             'media' => $this->mediaAuthoring->presentation($currentSnapshots),
+            'attachments' => app(MessageAttachmentAuthoringService::class)->presentation([], (int) $contact->getKey()),
             'request_key' => (string) Str::uuid(),
         ];
     }
@@ -166,12 +167,19 @@ final class ContactDirectMessageComposerPresenter
                     'body' => is_string($payload['body'] ?? null) ? $payload['body'] : '',
                     'message' => is_string($payload['message'] ?? null) ? $payload['message'] : '',
                     'media' => $media,
+                    'attachment_keys' => array_values(array_map(
+                        static fn (array $reference): string => $reference['source'].':'.$reference['id'],
+                        is_array($payload['attachments'] ?? null) ? $payload['attachments'] : [],
+                    )),
                     'media_asset_uuid' => is_string($media['asset_uuid'] ?? null)
                         ? $media['asset_uuid']
                         : '',
                     'media_poster_asset_uuid' => is_string($media['poster_asset_uuid'] ?? null)
                         ? $media['poster_asset_uuid']
                         : '',
+                    'media_size' => is_string($media['display_size'] ?? null)
+                        ? $media['display_size']
+                        : 'full',
                     'media_title' => is_string($media['title'] ?? null)
                         ? $media['title']
                         : '',

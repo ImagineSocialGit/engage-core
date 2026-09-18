@@ -18,6 +18,7 @@ use App\Modules\Messaging\Services\MessageEligibilityGate;
 use App\Modules\Messaging\Services\MessageMediaAuthoringService;
 use App\Modules\Messaging\Services\MessageRecipientPayloadResolver;
 use App\Modules\Messaging\Services\ReusableMessageTemplateCatalog;
+use App\Support\ModuleIntegrations\Messaging\Contracts\MessageMediaLibrary;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -50,6 +51,10 @@ final class SendContactDirectMessageAction
         ?string $mediaPosterAssetUuid = null,
         ?string $mediaTitle = null,
         ?User $actor = null,
+        ?string $mediaSize = null,
+        ?array $attachmentValues = null,
+        ?UploadedFile $attachmentUpload = null,
+        ?string $attachmentUploadSource = null,
     ): ScheduledMessage {
         $channel = strtolower(trim($channel));
         $purpose = strtolower(trim($purpose));
@@ -91,7 +96,9 @@ final class SendContactDirectMessageAction
                 ? $payload['media']
                 : [];
 
-            if ($mediaSubmitted) {
+            if ($mediaSubmitted && ($mediaUpload !== null
+                || $mediaAssetUuid !== null
+                || ($currentMedia !== [] && app(MessageMediaLibrary::class)->available()))) {
                 try {
                     $resolvedMedia = $this->mediaAuthoring->resolve(
                         submitted: true,
@@ -99,6 +106,7 @@ final class SendContactDirectMessageAction
                         assetUuid: $mediaAssetUuid,
                         posterAssetUuid: $mediaPosterAssetUuid,
                         title: $mediaTitle,
+                        displaySize: $mediaSize,
                         currentMedia: $currentMedia,
                         uploadedBy: $actor,
                     );
@@ -112,6 +120,20 @@ final class SendContactDirectMessageAction
                     unset($payload['media']);
                 } else {
                     $payload['media'] = $resolvedMedia;
+                }
+            }
+
+            if ($attachmentValues !== null || $attachmentUpload !== null) {
+                try {
+                    $payload = app(\App\Modules\Messaging\Services\MessageAttachmentAuthoringService::class)
+                        ->apply(
+                            $payload, $attachmentValues ?? [], (int) $contact->getKey(),
+                            $attachmentUpload, $attachmentUploadSource, $actor,
+                        );
+                } catch (\Throwable $exception) {
+                    throw ValidationException::withMessages([
+                        'direct_message.attachment_refs' => $exception->getMessage(),
+                    ]);
                 }
             }
         } else {

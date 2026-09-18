@@ -75,7 +75,18 @@ class MessageDefinitionSchema
             'mime_type' => ConfigField::optional(ConfigSchema::string(nullable: true)),
             'poster_asset_uuid' => ConfigField::optional(ConfigSchema::string(nullable: true)),
             'poster_url' => ConfigField::optional(ConfigSchema::string(nullable: true)),
+            'display_size' => ConfigField::optional(ConfigSchema::string(
+                allowedValues: MessageMediaPayload::DISPLAY_SIZES,
+            )),
             'tracking_key' => ConfigField::optional(ConfigSchema::string()),
         ]);
+    }
+
+    public static function attachments(): ConfigSchema
+    {
+        return ConfigSchema::listOf(ConfigSchema::object([
+            'source' => ConfigField::required(ConfigSchema::string()),
+            'id' => ConfigField::required(ConfigSchema::string()),
+        ]));
     }
 }

@@ -89,7 +89,9 @@ final class MediaMessageMediaLibrary implements MessageMediaLibrary
             'asset_uuid' => (string) $asset->uuid,
             'kind' => (string) $asset->kind,
             'title' => (string) $asset->title,
-            'url' => trim($url),
+            'url' => $asset->kind === MediaAsset::KIND_VIDEO
+                ? route('media.video.show', ['assetUuid' => $asset->uuid])
+                : trim($url),
             'mime_type' => is_string($asset->mime_type) && trim($asset->mime_type) !== ''
                 ? trim($asset->mime_type)
                 : null,
@@ -123,6 +125,12 @@ final class MediaMessageMediaLibrary implements MessageMediaLibrary
 
             $snapshot['poster_asset_uuid'] = (string) $poster->uuid;
             $snapshot['poster_url'] = trim($posterUrl);
+        } elseif ($asset->kind === MediaAsset::KIND_VIDEO) {
+            $generatedPoster = $asset->videoPosterUrl();
+
+            if (is_string($generatedPoster) && trim($generatedPoster) !== '') {
+                $snapshot['poster_url'] = trim($generatedPoster);
+            }
         }
 
         $snapshot = array_filter(

@@ -14,6 +14,11 @@ return [
 
     'provider' => env('EMAIL_PROVIDER', 'resend'),
 
+    'attachments' => [
+        'max_file_bytes' => (int) env('EMAIL_ATTACHMENT_MAX_FILE_BYTES', 10485760),
+        'max_total_bytes' => (int) env('EMAIL_ATTACHMENT_MAX_TOTAL_BYTES', 15728640),
+    ],
+
     'inbound_domain' => env('INBOUND_EMAIL_DOMAIN'),
 
     'from' => [

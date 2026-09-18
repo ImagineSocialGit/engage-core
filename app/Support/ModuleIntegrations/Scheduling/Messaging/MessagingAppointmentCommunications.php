@@ -85,6 +85,7 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
             'steps' => $steps,
             'channels' => $this->presentedChannels(),
             'media_authoring' => $this->mediaAuthoring->presentation($currentMedia),
+            'attachment_authoring' => app(\App\Modules\Messaging\Services\MessageAttachmentAuthoringService::class)->presentation(),
             'tokens' => [
                 '{first_name}',
                 '{appointment_date}',
@@ -604,6 +605,9 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
                         title: is_string($step['media_title'] ?? null)
                             ? $step['media_title']
                             : null,
+                        displaySize: is_string($step['media_size'] ?? null)
+                            ? $step['media_size']
+                            : null,
                         currentMedia: $currentMedia,
                         uploadedBy: $actor,
                     );
@@ -616,6 +620,25 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
                 $media = null;
             }
 
+            $attachmentPayload = ['attachments' => is_array($step['attachments'] ?? null) ? $step['attachments'] : []];
+            if (in_array(MessageChannel::Email->value, $channels, true)
+                && filter_var($step['attachments_present'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                try {
+                    $attachmentPayload = app(\App\Modules\Messaging\Services\MessageAttachmentAuthoringService::class)->apply(
+                        $attachmentPayload,
+                        is_array($step['attachment_refs'] ?? null) ? $step['attachment_refs'] : [],
+                        null,
+                        ($step['attachment_upload'] ?? null) instanceof UploadedFile ? $step['attachment_upload'] : null,
+                        is_string($step['attachment_upload_source'] ?? null) ? $step['attachment_upload_source'] : null,
+                        $actor,
+                    );
+                } catch (\Throwable $exception) {
+                    throw ValidationException::withMessages([
+                        "steps.{$index}.attachment_refs" => $exception->getMessage(),
+                    ]);
+                }
+            }
+
             $normalized[] = [
                 'key' => $key,
                 'name' => mb_substr($name, 0, 80),
@@ -626,6 +649,7 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
                 'subject' => $subject !== '' ? $subject : 'Appointment reminder',
                 'message' => $message,
                 'media' => is_array($media) && ! array_is_list($media) ? $media : [],
+                'attachments' => $attachmentPayload['attachments'] ?? [],
             ];
         }
 
@@ -654,6 +678,10 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
             && $step['media'] !== []
         ) {
             $payload['media'] = $step['media'];
+        }
+
+        if ($channel === MessageChannel::Email->value && ($step['attachments'] ?? []) !== []) {
+            $payload['attachments'] = $step['attachments'];
         }
 
         if (str_contains($step['message'], '{first_name}')
@@ -1169,6 +1197,12 @@ final class MessagingAppointmentCommunications implements AppointmentCommunicati
                     'media_asset_uuid' => is_string($media['asset_uuid'] ?? null) ? $media['asset_uuid'] : '',
                     'media_poster_asset_uuid' => is_string($media['poster_asset_uuid'] ?? null) ? $media['poster_asset_uuid'] : '',
                     'media_title' => '',
+                    'media_size' => is_string($media['display_size'] ?? null) ? $media['display_size'] : 'full',
+                    'attachments' => is_array($payload['attachments'] ?? null) ? $payload['attachments'] : [],
+                    'attachment_keys' => array_map(
+                        static fn (array $reference): string => $reference['source'].':'.$reference['id'],
+                        is_array($payload['attachments'] ?? null) ? $payload['attachments'] : [],
+                    ),
                 ];
             })
             ->values()

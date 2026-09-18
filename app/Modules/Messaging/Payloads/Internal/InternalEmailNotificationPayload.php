@@ -3,6 +3,8 @@
 namespace App\Modules\Messaging\Payloads\Internal;
 
 use App\Modules\Messaging\Contracts\Email\EmailMessage;
+use App\Modules\Messaging\Services\MessageAttachmentRegistry;
+use App\Modules\Messaging\Support\MessageAttachmentReferences;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\View;
 use InvalidArgumentException;
@@ -32,6 +34,8 @@ class InternalEmailNotificationPayload implements EmailMessage
         public readonly ?string $footer = null,
         public readonly ?string $sourceIp = null,
         public readonly array $meta = [],
+        public readonly ?int $contactId = null,
+        public readonly array $attachments = [],
     ) {}
 
     public static function fromArray(array $payload): self
@@ -61,6 +65,10 @@ class InternalEmailNotificationPayload implements EmailMessage
                     ?? null,
             ),
             meta: self::arrayValue($payload['meta'] ?? []),
+            contactId: is_numeric($payload['contact_id'] ?? null) && (int) $payload['contact_id'] > 0
+                ? (int) $payload['contact_id']
+                : null,
+            attachments: MessageAttachmentReferences::normalize($payload['attachments'] ?? []),
         );
     }
 
@@ -71,7 +79,7 @@ class InternalEmailNotificationPayload implements EmailMessage
 
     public function mailable(): Mailable
     {
-        return new class(
+        $mailable = new class(
             $this->subject,
             $this->html(),
             $this->fromAddress(),
@@ -92,6 +100,19 @@ class InternalEmailNotificationPayload implements EmailMessage
                     ->html($this->htmlBody);
             }
         };
+
+        if ($this->attachments !== []) {
+            foreach (app(MessageAttachmentRegistry::class)->resolve($this->attachments, $this->contactId) as $attachment) {
+                $mailable->attachFromStorageDisk(
+                    $attachment->disk,
+                    $attachment->path,
+                    $attachment->filename,
+                    ['mime' => $attachment->mimeType],
+                );
+            }
+        }
+
+        return $mailable;
     }
 
     public function devPayload(): array
@@ -115,8 +136,20 @@ class InternalEmailNotificationPayload implements EmailMessage
             'cta' => $this->cta,
             'footer' => $this->footer,
             'meta' => $this->meta,
+            'contact_id' => $this->contactId,
+            'attachments' => $this->validatedAttachmentReferences(),
             'source_ip' => $this->sourceIp,
         ];
+    }
+
+    /** @return array<int, array{source: string, id: string}> */
+    private function validatedAttachmentReferences(): array
+    {
+        if ($this->attachments !== []) {
+            app(MessageAttachmentRegistry::class)->resolve($this->attachments, $this->contactId);
+        }
+
+        return $this->attachments;
     }
 
     private function html(): string

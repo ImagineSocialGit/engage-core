@@ -129,4 +129,9 @@ class DocumentUpload extends Model
     {
         return $this->hasMany(DocumentReviewEvent::class);
     }
+
+    public function downloadUrl(): string
+    {
+        return route('crm.documents.download', $this);
+    }
 }

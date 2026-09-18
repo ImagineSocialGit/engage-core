@@ -264,6 +264,7 @@
 
                 <x-messaging.message-media-authoring
                     :current-media="is_array($broadcast->messagePayload()['media'] ?? null) ? $broadcast->messagePayload()['media'] : []"
+                    :current-attachments="is_array($broadcast->messagePayload()['attachments'] ?? null) ? $broadcast->messagePayload()['attachments'] : []"
                     :visible-bind="$emailFieldVisibility"
                     :failed="$errors->any()"
                 />

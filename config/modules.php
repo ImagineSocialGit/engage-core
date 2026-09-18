@@ -48,6 +48,7 @@ return [
         'workflow',
         'flow_routes',
         'messaging',
+        'documents',
         'inbound_messaging',
         'internal_notifications',
         'campaigns',
@@ -709,6 +710,20 @@ return [
             'name' => 'Documents',
             'ui' => [
                 'tone' => 'stone',
+            ],
+            'nav' => [
+                'label' => 'Documents',
+                'description' => 'Upload and manage private documents.',
+                'route' => 'crm.documents.index',
+                'priority' => 36,
+            ],
+            'settings' => [
+                'key' => 'document_library',
+                'category' => 'communications',
+                'label' => 'Documents',
+                'description' => 'Upload private documents for use across your workflows.',
+                'route' => 'crm.documents.index',
+                'priority' => 65,
             ],
             'depends_on' => ['core'],
             'providers' => [
