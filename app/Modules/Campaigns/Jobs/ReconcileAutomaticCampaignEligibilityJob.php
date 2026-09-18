@@ -16,7 +16,7 @@ final class ReconcileAutomaticCampaignEligibilityJob implements ShouldBeUnique, 
 
     public function __construct()
     {
-        $this->onQueue('campaigns');
+        $this->onQueue('default');
     }
 
     public function uniqueId(): string

@@ -30,7 +30,7 @@ final class ReconcileContactCampaignEligibilityJob implements ShouldQueue
         public readonly array $criterionKeys,
         public readonly string $occurredAt,
     ) {
-        $this->onQueue('campaigns');
+        $this->onQueue('default');
         $this->afterCommit();
     }
 

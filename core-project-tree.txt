@@ -3038,6 +3038,7 @@
 │   │   │   ├── CampaignEligibilityFamilyReconciliationTest.php
 │   │   │   ├── CampaignEligibilityFoundationTest.php
 │   │   │   ├── CampaignEligibilityLifecycleRuntimeTest.php
+│   │   │   ├── CampaignEligibilityQueueRoutingTest.php
 │   │   │   ├── CampaignEnrollmentContactImportPostProcessorTest.php
 │   │   │   ├── CampaignEnrollmentLifecycleBridgeTest.php
 │   │   │   ├── CampaignFamilyLifecycleAutomationCapabilityTest.php
@@ -3685,4 +3686,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-859 directories, 2827 files
+859 directories, 2828 files
