@@ -448,7 +448,16 @@ final class ContactImportBatchProcessor
             $treatmentResolution,
         );
 
-        if (array_key_exists('phone', $mapping)
+        if (array_key_exists('phone', $contactData)) {
+            $normalizedPhone = $this->normalizeImportedPhone($contactData['phone']);
+
+            if ($normalizedPhone === null) {
+                unset($contactData['phone']);
+                $stats['phone_warning_count']++;
+            } else {
+                $contactData['phone'] = $normalizedPhone;
+            }
+        } elseif (array_key_exists('phone', $mapping)
             && $this->contactImportRegistry->mappedValue(
                 row: $data,
                 mapping: $mapping,
@@ -619,6 +628,42 @@ final class ContactImportBatchProcessor
         $stats['created_count']++;
 
         return 'created';
+    }
+
+    private function normalizeImportedPhone(mixed $phone): ?string
+    {
+        if (! is_string($phone) && ! is_int($phone) && ! is_float($phone)) {
+            return null;
+        }
+
+        $value = trim((string) $phone);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $explicitInternational = str_starts_with($value, '+');
+        $digits = preg_replace('/\D+/', '', $value);
+
+        if (! is_string($digits) || $digits === '') {
+            return null;
+        }
+
+        if ($explicitInternational) {
+            return preg_match('/^[1-9]\d{1,14}$/', $digits) === 1
+                ? '+'.$digits
+                : null;
+        }
+
+        if (strlen($digits) === 10) {
+            return '+1'.$digits;
+        }
+
+        if (strlen($digits) === 11 && str_starts_with($digits, '1')) {
+            return '+'.$digits;
+        }
+
+        return null;
     }
 
     /**
