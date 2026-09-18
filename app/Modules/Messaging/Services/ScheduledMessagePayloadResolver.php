@@ -21,6 +21,7 @@ class ScheduledMessagePayloadResolver
         private readonly ScheduledMessageComponentComposer $componentComposer,
         private readonly MessageTokenFallbackResolver $tokenFallbackResolver,
         private readonly ScheduledMessageContentEditor $contentEditor,
+        private readonly CampaignEmailFooter $campaignEmailFooter,
     ) {}
 
     /**
@@ -269,7 +270,7 @@ class ScheduledMessagePayloadResolver
 
         return $this->withProviderIdempotencyKey(
             scheduledMessage: $scheduledMessage,
-            payload: $payload,
+            payload: $this->campaignEmailFooter->apply($scheduledMessage, $payload),
         );
     }
 

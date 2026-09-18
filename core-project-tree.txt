@@ -1062,6 +1062,7 @@
 │   │   │   │   └── MessageConsentRules.php
 │   │   │   ├── Services
 │   │   │   │   ├── BulkMessageDeliveryPolicy.php
+│   │   │   │   ├── CampaignEmailFooter.php
 │   │   │   │   ├── ConditionChecker.php
 │   │   │   │   ├── Consent
 │   │   │   │   │   └── MessageConsentStateResolver.php
@@ -3681,9 +3682,11 @@
 │   │   └── UsesSyntheticDeploymentEnvironment.php
 │   ├── TestCase.php
 │   └── Unit
+│       ├── Messaging
+│       │   └── CampaignEmailFooterTest.php
 │       └── Support
 │           └── Presets
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-859 directories, 2828 files
+860 directories, 2830 files
