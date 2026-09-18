@@ -17,8 +17,13 @@ class CampaignEmailFooterRuntimeTest extends TestCase
 
     public function test_it_resolves_campaign_footer_from_real_message_chain_identity(): void
     {
-        config()->set('messaging.campaign_email_footers', [
-            'cold_lead_nurture' => "Phone - (407) 761-3797\nEmail - stacey@slamdunkhomeloans.com\nSchedule - https://calendly.com/stacey-slamdunkhomeloans/consult",
+        config()->set('messaging.campaign_email_contact_blocks', [
+            'cold_lead_nurture' => [
+                'phone' => '(407) 761-3797',
+                'email' => 'stacey@slamdunkhomeloans.com',
+                'schedule_url' => 'https://calendly.com/stacey-slamdunkhomeloans/consult',
+                'schedule_label' => 'Schedule a consultation',
+            ],
         ]);
 
         $message = $this->messageForChain(
@@ -38,16 +43,21 @@ class CampaignEmailFooterRuntimeTest extends TestCase
 
         $this->assertSame($payload['subject'], $actual['subject']);
         $this->assertSame($payload['body'], $actual['body']);
+        $this->assertSame('(407) 761-3797', data_get($actual, 'campaign_contact.phone'));
+        $this->assertSame('tel:+14077613797', data_get($actual, 'campaign_contact.phone_url'));
         $this->assertSame(
-            config('messaging.campaign_email_footers.cold_lead_nurture'),
-            $actual['footer'],
+            'https://calendly.com/stacey-slamdunkhomeloans/consult',
+            data_get($actual, 'campaign_contact.schedule_url'),
         );
+        $this->assertArrayNotHasKey('footer', $actual);
     }
 
     public function test_it_does_not_treat_a_non_campaign_surface_as_campaign_identity(): void
     {
-        config()->set('messaging.campaign_email_footers', [
-            'cold_lead_nurture' => 'Configured campaign footer',
+        config()->set('messaging.campaign_email_contact_blocks', [
+            'cold_lead_nurture' => [
+                'email' => 'stacey@slamdunkhomeloans.com',
+            ],
         ]);
 
         $message = $this->messageForChain(
@@ -61,7 +71,7 @@ class CampaignEmailFooterRuntimeTest extends TestCase
             ['subject' => 'Subject', 'body' => 'Body'],
         );
 
-        $this->assertArrayNotHasKey('footer', $actual);
+        $this->assertArrayNotHasKey('campaign_contact', $actual);
     }
 
     private function messageForChain(

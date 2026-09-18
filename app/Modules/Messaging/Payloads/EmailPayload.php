@@ -40,6 +40,7 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
         public readonly array $cta = [],
         public readonly array $ctas = [],
         public readonly array $secondaryLink = [],
+        public readonly array $campaignContact = [],
         public readonly array $media = [],
         public readonly array $attachments = [],
         private readonly bool $attachmentsProvided = false,
@@ -94,6 +95,8 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
             ctas: self::listArrayValue($payload['ctas'] ?? null),
 
             secondaryLink: self::arrayValue($payload['secondary_link'] ?? null),
+
+            campaignContact: self::arrayValue($payload['campaign_contact'] ?? null),
 
             media: self::arrayValue($payload['media'] ?? null),
             attachments: MessageAttachmentReferences::normalize($payload['attachments'] ?? []),
@@ -186,6 +189,12 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
                 .trim((string) $secondaryLink['url']);
         }
 
+        $campaignContact = $this->campaignContactPlainTextBlock();
+
+        if ($campaignContact !== '') {
+            $sections[] = $campaignContact;
+        }
+
         $footer = $this->footer ?? $this->configValue('footer');
 
         if (is_string($footer) && trim($footer) !== '') {
@@ -239,6 +248,8 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
                 'ctas' => $this->resolvedListArray('ctas', $this->ctas),
 
                 'secondary_link' => $this->resolvedArray('secondary_link', $this->secondaryLink),
+
+                'campaignContact' => $this->campaignContact,
 
                 'footer' => $this->footer ?? $this->configValue('footer'),
 
@@ -378,6 +389,7 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
             'cta' => $this->resolvedArray('cta', $this->cta),
             'ctas' => $this->resolvedListArray('ctas', $this->ctas),
             'secondary_link' => $this->resolvedArray('secondary_link', $this->secondaryLink),
+            'campaign_contact' => $this->campaignContact,
             'media' => $this->resolvedMedia(),
             'attachments' => $this->validatedAttachmentReferences(),
             'footer' => $this->footer ?? $this->configValue('footer'),
@@ -482,6 +494,28 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
                 'displayWidth' => MessageMediaPayload::displayWidth($sourceMedia['display_size'] ?? null),
             ],
         )->render();
+    }
+
+    private function campaignContactPlainTextBlock(): string
+    {
+        $lines = [];
+
+        foreach ([
+            'Phone' => $this->campaignContact['phone'] ?? null,
+            'Email' => $this->campaignContact['email'] ?? null,
+        ] as $label => $value) {
+            if (is_string($value) && trim($value) !== '') {
+                $lines[] = $label.' - '.trim($value);
+            }
+        }
+
+        $scheduleUrl = $this->campaignContact['schedule_url'] ?? null;
+
+        if (is_string($scheduleUrl) && trim($scheduleUrl) !== '') {
+            $lines[] = 'Schedule - '.trim($scheduleUrl);
+        }
+
+        return implode("\n", $lines);
     }
 
     private function plainTextMediaBlock(): string

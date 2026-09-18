@@ -2,6 +2,7 @@
 
 namespace App\Modules\Messaging\Services;
 
+use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Contracts\Email\EmailMessage;
 use App\Modules\Messaging\Contracts\Sms\SmsMessage;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
@@ -267,11 +268,40 @@ class ScheduledMessagePayloadResolver
             'scope' => $scheduledMessage->scope,
             'message_type' => $scheduledMessage->message_type,
         ]);
+        $payload = $this->withRecipientIdentity(
+            scheduledMessage: $scheduledMessage,
+            payload: $payload,
+        );
 
         return $this->withProviderIdempotencyKey(
             scheduledMessage: $scheduledMessage,
             payload: $this->campaignEmailFooter->apply($scheduledMessage, $payload),
         );
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function withRecipientIdentity(
+        ScheduledMessage $scheduledMessage,
+        array $payload,
+    ): array {
+        if ($scheduledMessage->channel !== 'email'
+            || is_numeric($payload['contact_id'] ?? null)
+        ) {
+            return $payload;
+        }
+
+        $recipient = $scheduledMessage->relationLoaded('recipient')
+            ? $scheduledMessage->getRelation('recipient')
+            : $scheduledMessage->recipient()->first();
+
+        if ($recipient instanceof Contact) {
+            $payload['contact_id'] = (int) $recipient->getKey();
+        }
+
+        return $payload;
     }
 
     /**

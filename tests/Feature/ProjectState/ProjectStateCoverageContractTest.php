@@ -51,6 +51,24 @@ class ProjectStateCoverageContractTest extends TestCase
         );
     }
 
+    public function test_recent_operational_tables_are_explicitly_blocked_from_project_state_export(): void
+    {
+        $policies = config('project_state.table_policies');
+        $exportedTables = collect(config('project_state.sections'))
+            ->flatMap(fn (array $section): array => array_keys($section['tables']))
+            ->values()
+            ->all();
+
+        foreach ([
+            'scheduled_message_edits',
+            'scheduled_message_bulk_edits',
+            'webinar_schedule_changes',
+        ] as $table) {
+            $this->assertSame('must_be_empty', $policies[$table]['mode'] ?? null);
+            $this->assertNotContains($table, $exportedTables);
+        }
+    }
+
     public function test_export_reads_section_tables_inside_one_database_transaction(): void
     {
         $transactionLevels = [];

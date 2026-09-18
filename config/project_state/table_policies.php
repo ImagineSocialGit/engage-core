@@ -70,6 +70,19 @@ return [
         'reason' => 'Active Contact imports depend on an environment-local staged CSV and queue checkpoint. Finish or fail the import before export; failed run diagnostics remain local and are not transferred.',
     ],
 
+    'scheduled_message_edits' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Project State does not transfer scheduled-message content edit history. Export must fail rather than silently omit active Messaging override state.',
+    ],
+    'scheduled_message_bulk_edits' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Project State does not transfer scheduled-message bulk edit rules. Export must fail rather than silently omit active Messaging override state.',
+    ],
+    'webinar_schedule_changes' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Project State does not transfer Webinar schedule-change notification state. Export must fail rather than silently omit active or historical schedule-change state.',
+    ],
+
     'dashboard_acknowledgements' => [
         'mode' => 'resettable',
         'reason' => 'Per-user dashboard acknowledgement state intentionally resets.',

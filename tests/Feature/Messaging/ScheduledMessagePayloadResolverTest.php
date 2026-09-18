@@ -264,4 +264,64 @@ class ScheduledMessagePayloadResolverTest extends TestCase
         $this->assertSame(1, ScheduledMessageRenderContext::query()->count());
     }
 
+    public function test_frozen_marketing_retry_preserves_contact_identity_for_unsubscribe_generation(): void
+    {
+        $contact = Contact::factory()->create([
+            'first_name' => 'Jeff',
+            'email' => 'fixture@example.test',
+        ]);
+
+        $template = MessageTemplate::query()->create([
+            'key' => 'email.marketing.fixture.unsubscribe-retry',
+            'name' => 'Unsubscribe Retry Fixture',
+            'channel' => 'email',
+            'status' => MessageTemplate::STATUS_ACTIVE,
+            'source' => 'test',
+        ]);
+
+        $version = app(PublishMessageTemplateVersionAction::class)->handle(
+            messageTemplate: $template,
+            payload: [
+                'subject' => 'Hello {first_name}',
+                'body' => 'Marketing follow-up for {first_name}.',
+            ],
+        );
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'recipient_type' => $contact->getMorphClass(),
+            'recipient_id' => $contact->getKey(),
+            'context_type' => null,
+            'context_id' => null,
+            'message_template_version_id' => $version->getKey(),
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'fixture',
+            'message_type' => 'unsubscribe_retry',
+            'payload_class' => EmailPayload::class,
+            'payload' => [
+                'to' => 'fixture@example.test',
+            ],
+            'meta' => [],
+            'status' => ScheduledMessage::STATUS_PENDING,
+        ]);
+
+        $resolver = app(ScheduledMessagePayloadResolver::class);
+        $firstPayload = $resolver->resolve($scheduledMessage);
+        $firstUnsubscribeUrl = data_get($firstPayload->devPayload(), 'unsubscribe_url');
+
+        $this->assertIsString($firstUnsubscribeUrl);
+        $this->assertNotSame('', trim($firstUnsubscribeUrl));
+        $this->assertSame(1, ScheduledMessageRenderContext::query()->count());
+
+        $retryPayload = $resolver->resolve($scheduledMessage->fresh());
+        $retryUnsubscribeUrl = data_get($retryPayload->devPayload(), 'unsubscribe_url');
+
+        $this->assertIsString($retryUnsubscribeUrl);
+        $this->assertNotSame('', trim($retryUnsubscribeUrl));
+        $this->assertSame(
+            parse_url($firstUnsubscribeUrl, PHP_URL_PATH),
+            parse_url($retryUnsubscribeUrl, PHP_URL_PATH),
+        );
+    }
+
 }

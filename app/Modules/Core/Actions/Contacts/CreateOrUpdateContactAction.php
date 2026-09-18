@@ -4,12 +4,14 @@ namespace App\Modules\Core\Actions\Contacts;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactStatus;
+use App\Modules\Core\Support\Contacts\ContactNameNormalizer;
 
 class CreateOrUpdateContactAction
 {
     public function __construct(
         private readonly ResolveContactStatusAction $resolveContactStatus,
         private readonly UpdateContactStatusAction $updateContactStatus,
+        private readonly ContactNameNormalizer $contactNameNormalizer,
     ) {}
 
     public function handle(
@@ -17,6 +19,7 @@ class CreateOrUpdateContactAction
         ?string $statusKey = null,
         ?string $statusChangeReason = null,
     ): Contact {
+        $data = $this->contactNameNormalizer->normalizeFields($data);
         $email = strtolower(trim((string) $data['email']));
 
         $targetStatusId = $data['contact_status_id'] ?? null;

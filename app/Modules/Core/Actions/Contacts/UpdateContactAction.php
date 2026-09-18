@@ -3,6 +3,7 @@
 namespace App\Modules\Core\Actions\Contacts;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Support\Contacts\ContactNameNormalizer;
 use Illuminate\Support\Arr;
 
 final class UpdateContactAction
@@ -18,12 +19,19 @@ final class UpdateContactAction
         'subsource',
     ];
 
+    public function __construct(
+        private readonly ContactNameNormalizer $contactNameNormalizer,
+    ) {}
+
     /**
      * @param array<string, mixed> $data
      */
     public function handle(Contact $contact, array $data): Contact
     {
-        $contact->fill(Arr::only($data, self::EDITABLE_FIELDS));
+        $editable = Arr::only($data, self::EDITABLE_FIELDS);
+        $editable = $this->contactNameNormalizer->normalizeFields($editable);
+
+        $contact->fill($editable);
 
         if ($contact->isDirty()) {
             $contact->save();
