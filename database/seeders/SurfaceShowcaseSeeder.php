@@ -732,6 +732,9 @@ class SurfaceShowcaseSeeder extends Seeder
             'perceptual_hash_algorithm' => 'dhash',
             'image_width' => 1200,
             'image_height' => 1200,
+            'ingestion_status' => 'ready',
+            'ingestion_error' => null,
+            'ingested_at' => $this->now->subMonths(6),
             'visibility' => 'public',
             'source' => 'crm',
             'meta' => $this->meta([
@@ -762,10 +765,40 @@ class SurfaceShowcaseSeeder extends Seeder
             'perceptual_hash_algorithm' => 'dhash',
             'image_width' => 600,
             'image_height' => 600,
+            'ingestion_status' => 'ready',
+            'ingestion_error' => null,
+            'ingested_at' => $this->now->subYear(),
             'visibility' => 'private',
             'source' => 'crm',
             'meta' => $this->meta(['archive_reason' => 'Replaced by current headshot']),
             'archived_at' => $this->now->subYear(),
+        ]);
+
+        $this->row('media_assets', [
+            'uuid' => '...',
+        ], [
+            'uploaded_by_type' => 'App\\Models\\User',
+            'uploaded_by_id' => $this->refs['owner'],
+            'title' => 'Failed video ingestion example',
+            'kind' => 'video',
+            'disk' => 'spaces',
+            'path' => 'showcase/media/failed-video-source.mov',
+            'original_filename' => 'failed-video.mov',
+            'mime_type' => 'video/quicktime',
+            'extension' => 'mov',
+            'size_bytes' => 41558356,
+            'ingestion_status' => 'failed',
+            'ingestion_error' => 'Video normalization failed during the showcase ingestion example.',
+            'ingested_at' => null,
+            'checksum_sha256' => hash('sha256', self::MARKER.'-failed-video'),
+            'perceptual_hash' => null,
+            'perceptual_hash_algorithm' => null,
+            'image_width' => null,
+            'image_height' => null,
+            'visibility' => 'public',
+            'source' => 'crm',
+            'meta' => $this->meta(['scenario' => 'failed_video_ingestion']),
+            'archived_at' => null,
         ]);
 
         $this->seededModules[] = 'media';

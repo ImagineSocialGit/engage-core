@@ -27,6 +27,7 @@
 /storage/framework/sessions/*
 /storage/framework/views/*
 /storage/logs/*
+storage/file_dumps/*
 /vendor
 _ide_helper.php
 Homestead.json
