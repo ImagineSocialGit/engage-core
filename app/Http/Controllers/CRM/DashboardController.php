@@ -28,14 +28,10 @@ class DashboardController extends Controller
         $panelsBySlot = $dashboardPanels->panelsFor($request);
         $workPanels = $panelsBySlot->get('immediate_work', collect())->values();
         $contextPanels = $panelsBySlot->get('context', collect())->values();
-        $allPanels = $workPanels->concat($contextPanels)->values();
-
         return view('crm.dashboard', [
             'title' => 'Dashboard',
             'heading' => 'Today',
-            'subheading' => 'A clear place to start, without turning the CRM into a cockpit.',
-            'summary' => $this->summary($allPanels),
-            'primaryAction' => $this->primaryAction($workPanels),
+            'subheading' => null,
             'rightNowCards' => $this->rightNowCards($workPanels, $contextPanels),
             'workPanels' => $workPanels,
             'contextPanels' => $contextPanels,
@@ -173,47 +169,6 @@ class DashboardController extends Controller
 
         return redirect($this->safeReturnTo($validated['return_to'] ?? null))
             ->with('success', 'Cleared from today’s dashboard.');
-    }
-
-    /**
-     * @param Collection<int, array<string, mixed>> $panels
-     * @return array<string, mixed>
-     */
-    private function summary(Collection $panels): array
-    {
-        $panelCounts = $panels
-            ->mapWithKeys(fn (array $panel): array => [
-                (string) $panel['key'] => [
-                    'count' => (int) ($panel['count'] ?? 0),
-                    'attention_count' => (int) ($panel['attention_count'] ?? 0),
-                ],
-            ])
-            ->all();
-
-        return [
-            'attention_count' => $panels
-                ->sum(fn (array $panel): int => (int) ($panel['attention_count'] ?? 0)),
-            'panels' => $panelCounts,
-        ];
-    }
-
-    /**
-     * @param Collection<int, array<string, mixed>> $workPanels
-     * @return array<string, mixed>|null
-     */
-    private function primaryAction(Collection $workPanels): ?array
-    {
-        return $workPanels
-            ->map(fn (array $panel): ?array => $panel['primary_action'] ?? null)
-            ->filter(fn (?array $action): bool =>
-                filled($action['href'] ?? null)
-                || filled($action['summary'] ?? null)
-            )
-            ->first() ?: [
-                'label' => 'View '.config('contacts.labels.plural'),
-                'href' => route('crm.contacts.index'),
-                'summary' => 'No urgent item is waiting. Review '.config('contacts.labels.plural').' when you are ready.',
-            ];
     }
 
     /**

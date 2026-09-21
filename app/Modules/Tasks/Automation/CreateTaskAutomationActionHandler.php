@@ -78,6 +78,14 @@ class CreateTaskAutomationActionHandler implements AutomationActionHandler
                     'due_at' => $definition->dueAt,
                     'due_offset_minutes' => $definition->dueOffsetMinutes,
                     'priority' => $definition->priority,
+                    'meta' => [
+                        'automation' => [
+                            'surface' => $context->surface,
+                            'execution_key' => $context->executionKey,
+                            'occurred_at' => $context->occurredAt?->format(DATE_ATOM),
+                            'provenance' => $this->automationProvenance($context),
+                        ],
+                    ],
                 ], static fn (mixed $value): bool => $value !== null),
             );
         } catch (ModelNotFoundException) {
@@ -168,5 +176,33 @@ class CreateTaskAutomationActionHandler implements AutomationActionHandler
                 'role' => TaskLink::ROLE_CONTEXT,
             ],
         ];
+    }
+
+    /** @return array<string, mixed> */
+    private function automationProvenance(AutomationActionContext $context): array
+    {
+        $allowed = array_fill_keys([
+            'flow_route_progress_id',
+            'flow_route_plan_id',
+            'flow_route_plan_item_id',
+            'flow_route_progress_item_id',
+            'flow_route_id',
+            'flow_route_key',
+            'flow_route_name',
+            'flow_route_point_id',
+            'flow_route_point_key',
+            'flow_route_point_name',
+            'flow_route_capability_id',
+            'point_type',
+            'contact_id',
+            'contact_status_id',
+            'contact_status_key',
+            'contact_status_name',
+            'workflow_profile_id',
+            'subject_type',
+            'subject_id',
+        ], true);
+
+        return array_intersect_key($context->runtimeContext, $allowed);
     }
 }

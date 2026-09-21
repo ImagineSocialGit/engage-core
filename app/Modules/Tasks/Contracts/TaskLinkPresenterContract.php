@@ -15,7 +15,12 @@ interface TaskLinkPresenterContract
      *     label: string,
      *     name: string,
      *     url: ?string,
-     *     details: array<string, string>
+     *     details: array<string, string>,
+     *     kind?: string,
+     *     message?: ?string,
+     *     channel?: ?string,
+     *     occurred_at?: ?string,
+     *     reply_to?: ?array<string, mixed>
      * }
      */
     public function present(Model $linkable): array;

@@ -438,6 +438,7 @@
 │   │   │   │       ├── ContactImportPostProcessorRegistry.php
 │   │   │   │       ├── ContactImportRegistry.php
 │   │   │   │       ├── ContactImportTreatmentRegistry.php
+│   │   │   │       ├── ContactNameNormalizer.php
 │   │   │   │       ├── ContactPanelRegistry.php
 │   │   │   │       ├── ContactResultActionRegistry.php
 │   │   │   │       └── ContactShowDataRegistry.php
@@ -781,12 +782,14 @@
 │   │   │   │   │   ├── InboundReplyProfilePresentationProvider.php
 │   │   │   │   │   ├── ReplyProfileDefinitionNormalizer.php
 │   │   │   │   │   └── ReplyProfileWorkspace.php
-│   │   │   │   └── Sms
-│   │   │   │       ├── InboundSmsMessageClassifier.php
-│   │   │   │       ├── InboundSmsPurposeResolver.php
-│   │   │   │       ├── InboundSmsSenderResolver.php
-│   │   │   │       ├── SmsWebhookHandlerResolver.php
-│   │   │   │       └── SmsWebhookPayload.php
+│   │   │   │   ├── Sms
+│   │   │   │   │   ├── InboundSmsMessageClassifier.php
+│   │   │   │   │   ├── InboundSmsPurposeResolver.php
+│   │   │   │   │   ├── InboundSmsSenderResolver.php
+│   │   │   │   │   ├── SmsWebhookHandlerResolver.php
+│   │   │   │   │   └── SmsWebhookPayload.php
+│   │   │   │   └── Tasks
+│   │   │   │       └── InboundMessageTaskLinkPresenter.php
 │   │   │   ├── Support
 │   │   │   └── Validation
 │   │   │       └── InboundMessagingSetupValidationContributor.php
@@ -1149,10 +1152,13 @@
 │   │   │   │   ├── ScheduledMessageMetaCanonicalizer.php
 │   │   │   │   ├── ScheduledMessagePayloadCanonicalizer.php
 │   │   │   │   ├── ScheduledMessagePayloadResolver.php
-│   │   │   │   └── Sms
-│   │   │   │       ├── SmsMessagingService.php
-│   │   │   │       ├── SmsProviderManager.php
-│   │   │   │       └── SmsSendGuard.php
+│   │   │   │   ├── ScheduledMessageSummary.php
+│   │   │   │   ├── Sms
+│   │   │   │   │   ├── SmsMessagingService.php
+│   │   │   │   │   ├── SmsProviderManager.php
+│   │   │   │   │   └── SmsSendGuard.php
+│   │   │   │   └── Tasks
+│   │   │   │       └── ScheduledMessageTaskLinkPresenter.php
 │   │   │   ├── Support
 │   │   │   │   ├── CtaTrackingLinkGenerator.php
 │   │   │   │   ├── EmailConsentRevocationLinkGenerator.php
@@ -1508,6 +1514,7 @@
 │   │   │   │   ├── TaskContactLinkResolver.php
 │   │   │   │   ├── TaskLinkPresentationResolver.php
 │   │   │   │   ├── TaskNotificationScheduler.php
+│   │   │   │   ├── TaskShowPresenter.php
 │   │   │   │   ├── TaskTemplateAssignmentResolver.php
 │   │   │   │   ├── TaskTemplatePresentationResolver.php
 │   │   │   │   └── TaskTemplateTimingResolver.php
@@ -2461,6 +2468,7 @@
 │   ├── schema
 │   └── seeders
 │       ├── DatabaseSeeder.php
+│       ├── SurfaceShowcaseSeeder.php
 │       └── WebinarSeeder.php
 ├── docs
 │   ├── architecture
@@ -2625,6 +2633,7 @@
 ├── phpunit.xml
 ├── public
 │   ├── favicon.ico
+│   ├── hot
 │   ├── images
 │   │   └── processed
 │   │       ├── brand
@@ -3107,6 +3116,7 @@
 │   │   │   ├── ContactImportBatchMembershipQueryTest.php
 │   │   │   ├── ContactImportHandlerContextIntegrationTest.php
 │   │   │   ├── ContactImportModeControllerTest.php
+│   │   │   ├── ContactImportPhoneNormalizationTest.php
 │   │   │   ├── ContactImportPostProcessingControllerTest.php
 │   │   │   ├── ContactImportPostProcessorExtensionContractTest.php
 │   │   │   ├── ContactImportPostProcessorRegistryTest.php
@@ -3119,6 +3129,7 @@
 │   │   │   ├── ContactImportTreatmentRegistryTest.php
 │   │   │   ├── ContactIndexFilterTest.php
 │   │   │   ├── ContactLookupControllerTest.php
+│   │   │   ├── ContactNameNormalizationTest.php
 │   │   │   ├── ContactOperationalFilterTest.php
 │   │   │   ├── ContactQuickEditTest.php
 │   │   │   ├── ContactResultActionTest.php
@@ -3144,6 +3155,7 @@
 │   │   │   ├── UpdateContactStatusActionTest.php
 │   │   │   ├── WebinarSeriesAuthoringGuardTest.php
 │   │   │   └── WebinarSyncTest.php
+│   │   ├── Database
 │   │   ├── Deployment
 │   │   │   ├── CoreDeploymentPlanContributorTest.php
 │   │   │   ├── DeploymentPlanRegistrationTest.php
@@ -3282,6 +3294,7 @@
 │   │   ├── Messaging
 │   │   │   ├── AuditEmailHygieneCommandTest.php
 │   │   │   ├── BulkMessageDeliveryPolicyTest.php
+│   │   │   ├── CampaignEmailFooterRuntimeTest.php
 │   │   │   ├── CampaignVariantTemplateAssignmentResolutionTest.php
 │   │   │   ├── CanonicalMessageTemplateRuntimeCutoverTest.php
 │   │   │   ├── ConditionCheckerTest.php
@@ -3689,4 +3702,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-860 directories, 2830 files
+863 directories, 2840 files

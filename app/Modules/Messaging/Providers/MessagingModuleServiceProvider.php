@@ -55,6 +55,7 @@ use App\Modules\Messaging\Services\MessageTemplatePublicationHookRegistry;
 use App\Modules\Messaging\Services\ReplyProfiles\MessagingReplyProfileDependencyContributor;
 use App\Modules\Messaging\Services\ReusableMessageTemplateAuthoringGuide;
 use App\Modules\Messaging\Services\Sms\SmsProviderManager;
+use App\Modules\Messaging\Services\Tasks\ScheduledMessageTaskLinkPresenter;
 use App\Modules\Messaging\TokenContracts\MessagingTokenContextProvider;
 use App\Modules\Messaging\Validation\MessagingSetupValidationContributor;
 use App\Modules\Messaging\View\Components\MessageMediaAuthoring;
@@ -135,6 +136,10 @@ class MessagingModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             MessagingDeliveryIssuesDashboardPanelProvider::class,
         ], DashboardPanelRegistry::providerTag());
+
+        $this->app->tag([
+            ScheduledMessageTaskLinkPresenter::class,
+        ], 'tasks.link_presenters');
 
         $this->app->singleton(Client::class, function () {
             return new Client(

@@ -39,7 +39,12 @@ class TaskLinkPresentationResolver
      *     label: string,
      *     name: string,
      *     url: ?string,
-     *     details: array<string, string>
+     *     details: array<string, string>,
+     *     kind?: string,
+     *     message?: ?string,
+     *     channel?: ?string,
+     *     occurred_at?: ?string,
+     *     reply_to?: ?array<string, mixed>
      * }>
      */
     public function forTask(Task $task): Collection
@@ -72,7 +77,12 @@ class TaskLinkPresentationResolver
      *     label: string,
      *     name: string,
      *     url: ?string,
-     *     details: array<string, string>
+     *     details: array<string, string>,
+     *     kind?: string,
+     *     message?: ?string,
+     *     channel?: ?string,
+     *     occurred_at?: ?string,
+     *     reply_to?: ?array<string, mixed>
      * }|null
      */
     public function primary(Task $task): ?array
@@ -90,7 +100,12 @@ class TaskLinkPresentationResolver
      *     label: string,
      *     name: string,
      *     url: ?string,
-     *     details: array<string, string>
+     *     details: array<string, string>,
+     *     kind?: string,
+     *     message?: ?string,
+     *     channel?: ?string,
+     *     occurred_at?: ?string,
+     *     reply_to?: ?array<string, mixed>
      * }
      */
     public function present(TaskLink $link): array
@@ -129,7 +144,12 @@ class TaskLinkPresentationResolver
      *     label: string,
      *     name: string,
      *     url: ?string,
-     *     details: array<string, string>
+     *     details: array<string, string>,
+     *     kind?: string,
+     *     message?: ?string,
+     *     channel?: ?string,
+     *     occurred_at?: ?string,
+     *     reply_to?: ?array<string, mixed>
      * }
      */
     private function fallback(TaskLink $link, ?Model $linkable): array

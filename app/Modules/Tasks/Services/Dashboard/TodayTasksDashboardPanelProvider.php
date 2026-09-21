@@ -180,7 +180,9 @@ class TodayTasksDashboardPanelProvider implements DashboardPanelProvider
         Carbon $todayStart,
         Carbon $todayEnd,
     ): array {
-        $primaryLink = $this->linkPresentation->primary($task);
+        $links = $this->linkPresentation->forTask($task);
+        $primaryLink = $links->firstWhere('kind', 'contact')
+            ?? $links->first();
         $dueAt = $task->due_at;
         $isOverdue = $dueAt && $dueAt->lt($todayStart);
         $isDueToday = $dueAt && $dueAt->betweenIncluded($todayStart, $todayEnd);

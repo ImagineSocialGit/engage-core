@@ -14,6 +14,7 @@ use Illuminate\Validation\ValidationException;
 use App\Modules\Tasks\Services\TaskAssigneeOptionsResolver;
 use App\Modules\Tasks\Services\TaskContactLinkResolver;
 use App\Modules\Tasks\Services\TaskLinkPresentationResolver;
+use App\Modules\Tasks\Services\TaskShowPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -104,7 +105,7 @@ class TaskController extends Controller
     public function show(
         Request $request,
         Task $task,
-        TaskLinkPresentationResolver $linkPresentation,
+        TaskShowPresenter $showPresenter,
         TaskAssigneeOptionsResolver $assigneeOptions,
     ): View {
         $task->load([
@@ -115,12 +116,18 @@ class TaskController extends Controller
         ]);
 
         $options = $assigneeOptions->options($request->user());
+        $taskContext = $showPresenter->present($task);
 
         return view('crm.tasks.show', [
             'title' => $task->title,
             'heading' => $task->title,
             'task' => $task,
-            'presentedLinks' => $linkPresentation->forTask($task),
+            'taskContext' => $taskContext,
+            'contactContext' => $taskContext['contact'],
+            'inboundContext' => $taskContext['inbound'],
+            'outboundContext' => $taskContext['outbound'],
+            'origin' => $taskContext['origin'],
+            'presentedLinks' => $taskContext['links'],
             'taskAssigneeOptions' => $options,
             'currentTaskAssigneeKey' => $options->first(fn ($option): bool =>
                 $task->assignedTo

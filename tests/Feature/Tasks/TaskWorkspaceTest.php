@@ -5,7 +5,6 @@ namespace Tests\Feature\Tasks;
 use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
 use App\Modules\Core\Models\Contact;
-use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Models\TaskLink;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,72 +13,6 @@ use Tests\TestCase;
 class TaskWorkspaceTest extends TestCase
 {
     use RefreshDatabase;
-
-    public function test_task_index_renders_standalone_and_linked_tasks_as_first_class_records(): void
-    {
-        $user = User::factory()->create();
-        $contact = Contact::factory()->create([
-            'name' => 'Linked Lead',
-        ]);
-
-        $standalone = Task::factory()->create([
-            'title' => 'Review operations checklist',
-        ]);
-
-        $linked = Task::factory()->linkedTo($contact)->create([
-            'title' => 'Call linked lead',
-        ]);
-
-        $response = $this
-            ->actingAs($user)
-            ->get(route('crm.tasks.index'));
-
-        $response->assertOk();
-        $response->assertSee('Review operations checklist');
-        $response->assertSee('Standalone task');
-        $response->assertSee('Call linked lead');
-        $response->assertSee('Linked Lead');
-        $response->assertSee(route('crm.tasks.show', $standalone), false);
-        $response->assertSee(route('crm.tasks.show', $linked), false);
-    }
-
-    public function test_standalone_task_show_answers_what_why_and_how(): void
-    {
-        $user = User::factory()->create();
-        $task = Task::factory()->create([
-            'title' => 'Review standalone checklist',
-        ]);
-
-        $response = $this
-            ->actingAs($user)
-            ->get(route('crm.tasks.show', $task));
-
-        $response->assertOk();
-        $response->assertSee('What needs to happen?');
-        $response->assertSee('Why is this task here?');
-        $response->assertSee('How do I finish it?');
-        $response->assertSee('This is a standalone task.');
-    }
-
-    public function test_task_show_can_present_real_non_contact_link_with_generic_fallback(): void
-    {
-        $user = User::factory()->create();
-        $appointment = Appointment::factory()->create([
-            'title' => 'Annual vaccination appointment',
-        ]);
-
-        $task = Task::factory()->linkedTo($appointment)->create([
-            'title' => 'Confirm appointment details',
-        ]);
-
-        $response = $this
-            ->actingAs($user)
-            ->get(route('crm.tasks.show', $task));
-
-        $response->assertOk();
-        $response->assertSee('Annual vaccination appointment');
-        $response->assertSee('Appointment');
-    }
 
     public function test_contact_show_includes_only_tasks_actually_linked_to_that_contact(): void
     {

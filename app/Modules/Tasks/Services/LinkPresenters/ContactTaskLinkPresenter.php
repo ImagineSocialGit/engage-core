@@ -25,16 +25,30 @@ class ContactTaskLinkPresenter implements TaskLinkPresenterContract
      */
     public function present(Model $linkable): array
     {
+        $linkable->loadMissing('tags');
+
+        $status = null;
+
+        if (module_enabled('workflow')) {
+            $linkable->loadMissing('workflowProfile.contactStatus');
+            $status = $linkable->workflowProfile?->contactStatus;
+        }
+
+        $details = [
+            ...($status !== null ? ['Status' => $status->name ?: 'No status'] : []),
+            'Tags' => $linkable->tags->pluck('tag')->filter()->join(', ') ?: 'No tags',
+            'Email' => $linkable->email ?: '—',
+            'Phone' => $linkable->phone ?: '—',
+        ];
+
         return [
             'record' => $linkable,
             'type' => $linkable->getMorphClass(),
+            'kind' => 'contact',
             'label' => config('contacts.labels.singular', 'Contact'),
             'name' => $this->contactName($linkable),
             'url' => route('crm.contacts.show', $linkable),
-            'details' => [
-                'Email' => $linkable->email ?: '—',
-                'Phone' => $linkable->phone ?: '—',
-            ],
+            'details' => $details,
         ];
     }
 

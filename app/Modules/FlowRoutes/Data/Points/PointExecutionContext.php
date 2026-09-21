@@ -36,15 +36,28 @@ class PointExecutionContext
      */
     public function flowRouteProvenance(): array
     {
+        $flowRoute = $this->progress->relationLoaded('flowRoute')
+            ? $this->progress->flowRoute
+            : $this->progress->flowRoute()->first();
+        $contactStatus = $this->progress->relationLoaded('contactStatus')
+            ? $this->progress->contactStatus
+            : $this->progress->contactStatus()->first();
+
         return [
             'flow_route_progress_id' => $this->progress->getKey(),
             'flow_route_plan_id' => $this->plan?->getKey(),
             'flow_route_plan_item_id' => $this->planItem?->getKey(),
             'flow_route_progress_item_id' => $this->progressItem?->getKey(),
             'flow_route_id' => $this->progress->flow_route_id,
+            'flow_route_key' => $flowRoute?->key,
+            'flow_route_name' => $flowRoute?->name,
             'flow_route_point_id' => $this->flowRoutePoint->getKey(),
+            'flow_route_point_key' => $this->flowRoutePoint->key,
+            'flow_route_point_name' => $this->flowRoutePoint->name,
             'flow_route_capability_id' => $this->flowRoutePoint->flow_route_capability_id,
             'point_type' => $this->flowRoutePoint->type,
+            'contact_status_key' => $contactStatus?->key,
+            'contact_status_name' => $contactStatus?->name,
             'subject_type' => $this->progress->subject_type,
             'subject_id' => $this->progress->subject_id,
         ];
