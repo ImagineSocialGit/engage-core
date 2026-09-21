@@ -2,9 +2,15 @@
 
 use App\Modules\Messaging\Controllers\Public\ConsentRevocationController;
 use App\Modules\Messaging\Controllers\Public\CtaEngagementRedirectController;
+use App\Modules\Media\Controllers\Public\MediaVideoPlayerController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('module:messaging')->group(function () {
+    Route::get('/watch/{assetUuid}', MediaVideoPlayerController::class)
+        ->middleware('module:media')
+        ->whereUuid('assetUuid')
+        ->name('media.video.show');
+
     Route::get('/messaging/click/{message}/{cta}', CtaEngagementRedirectController::class)
         ->middleware('signed')
         ->whereNumber('message')

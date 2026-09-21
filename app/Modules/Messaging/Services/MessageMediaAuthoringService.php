@@ -35,6 +35,7 @@ final class MessageMediaAuthoringService
                 'asset_uuids' => [],
                 'image_asset_uuids' => [],
                 'library_url' => null,
+                'authoring_upload_url' => null,
             ];
         }
 
@@ -119,6 +120,9 @@ final class MessageMediaAuthoringService
             'library_url' => Route::has('crm.media.index')
                 ? route('crm.media.index')
                 : null,
+            'authoring_upload_url' => Route::has('crm.media.authoring.upload')
+                ? route('crm.media.authoring.upload')
+                : null,
         ];
     }
 
@@ -139,6 +143,29 @@ final class MessageMediaAuthoringService
                 'nullable',
                 'file',
                 'max:'.max(1, (int) config('media.max_upload_kilobytes', 262144)),
+                static function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! $value instanceof UploadedFile) {
+                        return;
+                    }
+
+                    $mimeType = $value->getMimeType();
+                    $mimeType = is_string($mimeType)
+                        ? strtolower(trim($mimeType))
+                        : '';
+
+                    if (in_array($mimeType, ['', 'application/octet-stream', 'application/x-empty'], true)) {
+                        $clientMimeType = $value->getClientMimeType();
+                        $mimeType = is_string($clientMimeType)
+                            ? strtolower(trim($clientMimeType))
+                            : '';
+                    }
+
+                    if (str_starts_with($mimeType, 'video/')) {
+                        $fail(
+                            'This video must finish Media processing in the editor before the message can be saved.',
+                        );
+                    }
+                },
             ],
         ], app(MessageAttachmentAuthoringService::class)->validationRules($prefix));
     }

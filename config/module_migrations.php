@@ -175,9 +175,10 @@ return [
 
         'media' => [
             'path' => 'database/migrations/modules/media',
-            'schema_version' => 3,
+            'schema_version' => 4,
             'migrations' => [
                 '2026_09_03_010000_create_media_assets_table.php',
+                '2026_09_21_183000_add_ingestion_state_to_media_assets_table.php',
             ],
         ],
 

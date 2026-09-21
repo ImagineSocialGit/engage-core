@@ -135,6 +135,10 @@ return [
             'description' => 'Bounded bulk message orchestration and delivery work for large recipient sets.',
             'status' => 'active',
         ],
+        'media_processing' => [
+            'description' => 'CPU-intensive Media video normalization and poster generation.',
+            'status' => 'active',
+        ],
         'emails' => [
             'description' => 'Generic email and Broadcast delivery work.',
             'status' => 'active',

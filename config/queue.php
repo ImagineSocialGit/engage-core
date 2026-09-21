@@ -73,6 +73,15 @@ return [
             'after_commit' => false,
         ],
 
+        'redis-media' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => 'media_processing',
+            'retry_after' => (int) env('MEDIA_PROCESSING_RETRY_AFTER', 2400),
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
         'deferred' => [
             'driver' => 'deferred',
         ],

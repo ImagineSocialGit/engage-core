@@ -14,6 +14,13 @@ Route::middleware('module:media')
         Route::post('/similarity/inspect', MediaUploadSimilarityController::class)
             ->name('similarity.inspect');
 
+        Route::post('/authoring/uploads', [MediaAssetController::class, 'storeForAuthoring'])
+            ->name('authoring.upload');
+
+        Route::get('/authoring/uploads/{assetUuid}', [MediaAssetController::class, 'authoringStatus'])
+            ->whereUuid('assetUuid')
+            ->name('authoring.status');
+
         Route::post('/', [MediaAssetController::class, 'store'])
             ->name('store');
 

@@ -126,7 +126,21 @@
                 <x-ui.card>
                     <article class="space-y-4" data-media-asset-id="{{ $asset->getKey() }}" data-media-kind="{{ $asset->kind }}">
                         <div class="overflow-hidden rounded-xl bg-slate-100">
-                            @if($asset->publicUrl() && $asset->kind === \App\Modules\Media\Models\MediaAsset::KIND_IMAGE)
+                            @if($asset->isProcessing())
+                                <div class="flex aspect-video items-center justify-center px-6 text-center">
+                                    <div>
+                                        <p class="text-sm font-bold text-slate-800">Processing video</p>
+                                        <p class="mt-1 text-xs leading-5 text-slate-500">Media is creating a web-safe MP4 and poster. It will become selectable when processing finishes.</p>
+                                    </div>
+                                </div>
+                            @elseif($asset->hasIngestionFailed())
+                                <div class="flex aspect-video items-center justify-center px-6 text-center">
+                                    <div>
+                                        <p class="text-sm font-bold text-red-800">Video processing failed</p>
+                                        <p class="mt-1 text-xs leading-5 text-red-700">Re-upload the same source file to retry ingestion.</p>
+                                    </div>
+                                </div>
+                            @elseif($asset->publicUrl() && $asset->kind === \App\Modules\Media\Models\MediaAsset::KIND_IMAGE)
                                 <x-media.progressive-image
                                     :asset="$asset"
                                     :alt="$asset->title"
@@ -153,6 +167,13 @@
                             <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $asset->kind }}</p>
                             <h3 class="mt-1 truncate text-base font-semibold text-slate-950">{{ $asset->title }}</h3>
                             <p class="mt-1 truncate text-xs text-slate-500">{{ $asset->original_filename }}</p>
+                            @if($asset->isProcessing())
+                                <p class="mt-2 text-xs font-bold text-amber-700">Processing</p>
+                            @elseif($asset->hasIngestionFailed())
+                                <p class="mt-2 text-xs font-bold text-red-700">Failed</p>
+                            @elseif($asset->kind === \App\Modules\Media\Models\MediaAsset::KIND_VIDEO)
+                                <p class="mt-2 text-xs font-bold text-emerald-700">Ready · Web-safe MP4</p>
+                            @endif
                         </div>
 
                         @if($asset->publicUrl())

@@ -62,10 +62,18 @@ return [
         ],
     ],
 
-    'video_posters' => [
+    'video_ingestion' => [
         'enabled' => true,
+        'queue' => 'media_processing',
+        'connection' => 'redis-media',
+        'temporary_directory' => 'media-ingest',
         'ffmpeg_binary' => 'ffmpeg',
-        'timeout_seconds' => 120,
+        'ffprobe_binary' => 'ffprobe',
+        'timeout_seconds' => 1800,
+        'probe_timeout_seconds' => 60,
+        'preset' => 'medium',
+        'crf' => 23,
+        'audio_bitrate' => '128k',
     ],
 
     /*

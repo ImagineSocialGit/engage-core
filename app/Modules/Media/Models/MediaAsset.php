@@ -22,6 +22,16 @@ class MediaAsset extends Model
 
     public const VISIBILITY_PUBLIC = 'public';
 
+    public const INGESTION_PROCESSING = 'processing';
+    public const INGESTION_READY = 'ready';
+    public const INGESTION_FAILED = 'failed';
+
+    public const INGESTION_STATUSES = [
+        self::INGESTION_PROCESSING,
+        self::INGESTION_READY,
+        self::INGESTION_FAILED,
+    ];
+
     protected $fillable = [
         'uuid',
         'uploaded_by_type',
@@ -34,6 +44,9 @@ class MediaAsset extends Model
         'mime_type',
         'extension',
         'size_bytes',
+        'ingestion_status',
+        'ingestion_error',
+        'ingested_at',
         'checksum_sha256',
         'perceptual_hash',
         'perceptual_hash_algorithm',
@@ -55,6 +68,7 @@ class MediaAsset extends Model
         return [
             'uploaded_by_id' => 'integer',
             'size_bytes' => 'integer',
+            'ingested_at' => 'datetime',
             'image_width' => 'integer',
             'image_height' => 'integer',
             'meta' => 'array',
@@ -75,6 +89,37 @@ class MediaAsset extends Model
     public function scopeArchived(Builder $query): Builder
     {
         return $query->whereNotNull('archived_at');
+    }
+
+    public function scopeReady(Builder $query): Builder
+    {
+        return $query->where('ingestion_status', self::INGESTION_READY);
+    }
+
+    public function ingestionStatus(): string
+    {
+        $status = is_string($this->ingestion_status)
+            ? trim($this->ingestion_status)
+            : '';
+
+        return in_array($status, self::INGESTION_STATUSES, true)
+            ? $status
+            : self::INGESTION_READY;
+    }
+
+    public function isProcessing(): bool
+    {
+        return $this->ingestionStatus() === self::INGESTION_PROCESSING;
+    }
+
+    public function isReady(): bool
+    {
+        return $this->ingestionStatus() === self::INGESTION_READY;
+    }
+
+    public function hasIngestionFailed(): bool
+    {
+        return $this->ingestionStatus() === self::INGESTION_FAILED;
     }
 
     public function hasProgressiveImageVariants(): bool
@@ -136,7 +181,7 @@ class MediaAsset extends Model
 
     public function publicUrl(): ?string
     {
-        if ($this->path === null) {
+        if (! $this->isReady() || $this->path === null) {
             return null;
         }
 

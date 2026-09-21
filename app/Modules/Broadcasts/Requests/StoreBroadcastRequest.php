@@ -114,6 +114,7 @@ class StoreBroadcastRequest extends FormRequest
             $issues = app(BroadcastMessageTokenValidator::class)->issues(
                 payload: $payload,
                 channel: $channel,
+                authoringRenderSlots: $this->authoringRenderSlots(),
             );
 
             foreach ($issues as $issue) {
@@ -485,6 +486,24 @@ class StoreBroadcastRequest extends FormRequest
             [true, 1, '1', 'true', 'on'],
             true,
         );
+    }
+
+    /** @return array<int, string> */
+    private function authoringRenderSlots(): array
+    {
+        if ($this->regularBroadcastChannelInput() !== 'email') {
+            return [];
+        }
+
+        if ($this->hasFile('media_upload')) {
+            return ['media'];
+        }
+
+        $assetUuid = $this->input('media_asset_uuid');
+
+        return is_string($assetUuid) && trim($assetUuid) !== ''
+            ? ['media']
+            : [];
     }
 
     private function formErrorPath(mixed $path): string

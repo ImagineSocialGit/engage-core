@@ -11,6 +11,7 @@ use App\Support\ModuleIntegrations\Messaging\UnavailableMessageMediaLibrary;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 use Tests\TestCase;
 
 class MessagingMediaLibraryTest extends TestCase
@@ -36,7 +37,7 @@ class MessagingMediaLibraryTest extends TestCase
         );
     }
 
-    public function test_media_bridge_uploads_and_snapshots_video_with_optional_poster(): void
+    public function test_media_bridge_snapshots_ready_video_with_optional_poster(): void
     {
         $this->configureMedia();
         $actor = User::factory()->create();
@@ -46,11 +47,22 @@ class MessagingMediaLibraryTest extends TestCase
             title: 'Greeting poster',
             uploadedBy: $actor,
         );
-        $video = $library->store(
-            file: UploadedFile::fake()->create('welcome.mp4', 512, 'video/mp4'),
-            title: 'Welcome greeting',
+
+        Storage::disk('spaces')->put('media/video/welcome.mp4', 'video');
+        $asset = MediaAsset::factory()->video()->create([
+            'uploaded_by_type' => $actor->getMorphClass(),
+            'uploaded_by_id' => $actor->getKey(),
+            'title' => 'Welcome greeting',
+            'disk' => 'spaces',
+            'path' => 'media/video/welcome.mp4',
+            'mime_type' => 'video/mp4',
+            'extension' => 'mp4',
+            'ingestion_status' => MediaAsset::INGESTION_READY,
+        ]);
+
+        $video = $library->snapshot(
+            assetUuid: $asset->uuid,
             posterAssetUuid: $poster['asset_uuid'],
-            uploadedBy: $actor,
         );
 
         $this->assertSame('video', $video['kind']);
@@ -60,6 +72,19 @@ class MessagingMediaLibraryTest extends TestCase
         $this->assertSame(route('media.video.show', ['assetUuid' => $video['asset_uuid']]), $video['url']);
         $this->assertStringStartsWith('https://cdn.example.test/', $video['poster_url']);
         $this->assertSame(2, MediaAsset::query()->count());
+    }
+
+    public function test_synchronous_media_store_rejects_video_until_media_ingestion_is_complete(): void
+    {
+        $this->configureMedia();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Video uploads must finish Media ingestion before Messaging can snapshot them.');
+
+        app(MediaMessageMediaLibrary::class)->store(
+            file: UploadedFile::fake()->create('welcome.mp4', 512, 'video/mp4'),
+            title: 'Welcome greeting',
+        );
     }
 
     public function test_media_bridge_reuses_exact_upload_content_across_different_filenames(): void
@@ -93,42 +118,54 @@ class MessagingMediaLibraryTest extends TestCase
     public function test_archived_assets_leave_new_selection_but_existing_snapshot_remains_self_contained(): void
     {
         $this->configureMedia();
+        Storage::disk('spaces')->put('media/video/welcome.mp4', 'video');
+
+        $asset = MediaAsset::factory()->video()->create([
+            'title' => 'Welcome greeting',
+            'disk' => 'spaces',
+            'path' => 'media/video/welcome.mp4',
+            'mime_type' => 'video/mp4',
+            'extension' => 'mp4',
+            'ingestion_status' => MediaAsset::INGESTION_READY,
+        ]);
         $library = app(MediaMessageMediaLibrary::class);
-        $snapshot = $library->store(
-            file: UploadedFile::fake()->create('welcome.mp4', 128, 'video/mp4'),
-            title: 'Welcome greeting',
-        );
-        $asset = MediaAsset::query()->where('uuid', $snapshot['asset_uuid'])->firstOrFail();
+        $snapshot = $library->snapshot($asset->uuid);
+
         $asset->forceFill(['archived_at' => now()])->save();
 
         $this->assertSame([], $library->selectableAssets());
         $this->assertSame('Welcome greeting', $snapshot['title']);
         $this->assertSame(route('media.video.show', ['assetUuid' => $snapshot['asset_uuid']]), $snapshot['url']);
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $library->snapshot($snapshot['asset_uuid']);
     }
 
     public function test_generated_video_poster_is_available_to_later_message_snapshots(): void
     {
         $this->configureMedia();
-        $library = app(MediaMessageMediaLibrary::class);
-        $snapshot = $library->store(
-            file: UploadedFile::fake()->create('introduction.mp4', 128, 'video/mp4'),
-        );
-        $asset = MediaAsset::query()->where('uuid', $snapshot['asset_uuid'])->firstOrFail();
-        $asset->forceFill(['meta' => [
-            'video_poster' => [
-                'version' => 1,
-                'path' => dirname($asset->path).'/video-poster.jpg',
-            ],
-        ]])->save();
+        Storage::disk('spaces')->put('media/video/introduction.mp4', 'video');
+        Storage::disk('spaces')->put('media/video/video-poster.jpg', 'poster');
 
-        $updated = $library->snapshot($snapshot['asset_uuid']);
+        $asset = MediaAsset::factory()->video()->create([
+            'disk' => 'spaces',
+            'path' => 'media/video/introduction.mp4',
+            'mime_type' => 'video/mp4',
+            'extension' => 'mp4',
+            'ingestion_status' => MediaAsset::INGESTION_READY,
+            'meta' => [
+                'video_poster' => [
+                    'version' => 1,
+                    'path' => 'media/video/video-poster.jpg',
+                ],
+            ],
+        ]);
+
+        $updated = app(MediaMessageMediaLibrary::class)->snapshot($asset->uuid);
 
         $this->assertSame(route('media.video.show', ['assetUuid' => $asset->uuid]), $updated['url']);
         $this->assertSame(
-            'https://cdn.example.test/'.dirname($asset->path).'/video-poster.jpg',
+            'https://cdn.example.test/media/video/video-poster.jpg',
             $updated['poster_url'],
         );
         $this->assertArrayNotHasKey('poster_asset_uuid', $updated);
@@ -138,7 +175,6 @@ class MessagingMediaLibraryTest extends TestCase
     {
         config()->set('modules.enabled', ['messaging', 'media']);
         config()->set('media.disk', 'spaces');
-        config()->set('media.video_posters.enabled', false);
         config()->set('filesystems.disks.spaces', [
             'driver' => 's3',
             'key' => 'test',

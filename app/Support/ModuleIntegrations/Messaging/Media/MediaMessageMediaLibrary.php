@@ -4,6 +4,7 @@ namespace App\Support\ModuleIntegrations\Messaging\Media;
 
 use App\Modules\Media\Actions\StoreMediaAssetAction;
 use App\Modules\Media\Models\MediaAsset;
+use App\Modules\Media\Services\MediaUploadPolicy;
 use App\Modules\Messaging\Support\MessageMediaPayload;
 use App\Support\ModuleIntegrations\Messaging\Contracts\MessageMediaLibrary;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,7 @@ final class MediaMessageMediaLibrary implements MessageMediaLibrary
 {
     public function __construct(
         private readonly StoreMediaAssetAction $storeMediaAsset,
+        private readonly MediaUploadPolicy $uploadPolicy,
     ) {}
 
     public function available(): bool
@@ -25,6 +27,7 @@ final class MediaMessageMediaLibrary implements MessageMediaLibrary
     {
         return MediaAsset::query()
             ->active()
+            ->ready()
             ->latest('id')
             ->limit(200)
             ->get()
@@ -63,6 +66,16 @@ final class MediaMessageMediaLibrary implements MessageMediaLibrary
         ?string $posterAssetUuid = null,
         ?Model $uploadedBy = null,
     ): array {
+        $mimeType = $this->uploadPolicy->effectiveMimeType($file);
+
+        if (is_string($mimeType)
+            && $this->uploadPolicy->kindForMimeType($mimeType) === MediaAsset::KIND_VIDEO
+        ) {
+            throw new RuntimeException(
+                'Video uploads must finish Media ingestion before Messaging can snapshot them.',
+            );
+        }
+
         $asset = $this->storeMediaAsset->handle(
             file: $file,
             title: $title,
@@ -148,7 +161,7 @@ final class MediaMessageMediaLibrary implements MessageMediaLibrary
         $uuid = trim($uuid);
 
         $asset = $uuid !== ''
-            ? MediaAsset::query()->active()->where('uuid', $uuid)->first()
+            ? MediaAsset::query()->active()->ready()->where('uuid', $uuid)->first()
             : null;
 
         if (! $asset instanceof MediaAsset) {

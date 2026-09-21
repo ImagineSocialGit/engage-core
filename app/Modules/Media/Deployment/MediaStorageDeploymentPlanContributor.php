@@ -113,20 +113,24 @@ final class MediaStorageDeploymentPlanContributor implements DeploymentPlanContr
             priority: 30,
         );
 
-        if ((bool) config('media.video_posters.enabled', true)) {
+        if ((bool) config('media.video_ingestion.enabled', true)) {
             yield new DeploymentSetupStep(
-                key: 'media.video_posters',
-                title: 'Video poster generation',
-                reason: 'Video email cards use a poster generated from the uploaded file; the queue worker needs FFmpeg and enough temporary disk space to stream the video.',
+                key: 'media.video_ingestion',
+                title: 'Video ingestion',
+                reason: 'Video uploads are normalized once during Media ingestion so Messaging and public playback never transcode at send or click time.',
                 instructions: [
-                    'Install FFmpeg on each queue worker. For a nonstandard executable path, set media.video_posters.ffmpeg_binary in the client configuration.',
-                    'Allow temporary disk space for the largest permitted upload plus its poster; poster generation streams Spaces objects to disk without loading the whole video into PHP memory.',
+                    'Install FFmpeg and FFprobe on each Media queue worker.',
+                    'Keep the media_processing Horizon supervisor at low concurrency; one process per client/environment is the default.',
+                    'Allow temporary disk space for the largest permitted source plus the normalized MP4 and poster.',
                     'For 300 MB uploads, configure PHP upload_max_filesize=300M, post_max_size=320M, and the front proxy upload limit to at least 320m.',
+                    'Keep MEDIA_PROCESSING_RETRY_AFTER greater than HORIZON_MEDIA_PROCESSING_TIMEOUT so a long transcode cannot be reserved twice.',
                 ],
                 environmentKeys: [],
                 verification: [
-                    'Run php artisan setup:validate and confirm there is no FFmpeg availability warning.',
-                    'Upload a short staging video, let the Media job finish, and verify its email card opens the player with a generated poster.',
+                    'Run php artisan setup:validate and confirm there is no FFmpeg/FFprobe availability warning.',
+                    'Upload a short non-H.264 staging video and verify it moves from Processing to Ready.',
+                    'Confirm the durable Media object is video/mp4 using H.264/yuv420p and the temporary source object has been deleted.',
+                    'Confirm the generated poster appears in an email video card and the card opens messaging.<root-domain>/watch/<uuid>.',
                 ],
                 priority: 31,
             );

@@ -178,6 +178,68 @@
                             </div>
                         </div>
 
+                        @if(is_array($broadcast->messagePayload()['media'] ?? null))
+                            <div data-message-media-preview class="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <div class="text-xs font-extrabold uppercase tracking-wide text-violet-700">
+                                            {{ ucfirst((string) ($broadcast->messagePayload()['media']['kind'] ?? 'media')) }}
+                                        </div>
+                                        <div class="mt-1 text-sm font-black text-slate-950">
+                                            {{ $broadcast->messagePayload()['media']['title'] ?? 'Media' }}
+                                        </div>
+                                    </div>
+
+                                    @if(filled($broadcast->messagePayload()['media']['url'] ?? null))
+                                        <a
+                                            href="{{ $broadcast->messagePayload()['media']['url'] }}"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="text-xs font-extrabold text-violet-800 underline decoration-violet-300 underline-offset-4"
+                                        >
+                                            Open media
+                                        </a>
+                                    @endif
+                                </div>
+
+                                @if(($broadcast->messagePayload()['media']['kind'] ?? null) === 'image'
+                                    && filled($broadcast->messagePayload()['media']['url'] ?? null))
+                                    <img
+                                        src="{{ $broadcast->messagePayload()['media']['url'] }}"
+                                        alt="{{ $broadcast->messagePayload()['media']['title'] ?? 'Broadcast media' }}"
+                                        class="mt-4 max-h-80 w-full rounded-xl object-contain"
+                                    >
+                                @elseif(($broadcast->messagePayload()['media']['kind'] ?? null) === 'video')
+                                    @if(filled($broadcast->messagePayload()['media']['poster_url'] ?? null))
+                                        <a
+                                            href="{{ $broadcast->messagePayload()['media']['url'] }}"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="relative mt-4 block overflow-hidden rounded-xl bg-slate-950"
+                                        >
+                                            <img
+                                                src="{{ $broadcast->messagePayload()['media']['poster_url'] }}"
+                                                alt="{{ $broadcast->messagePayload()['media']['title'] ?? 'Video preview' }}"
+                                                class="max-h-80 w-full object-contain"
+                                            >
+                                            <span class="absolute inset-0 flex items-center justify-center">
+                                                <span class="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-2xl text-slate-950 shadow">▶</span>
+                                            </span>
+                                        </a>
+                                    @else
+                                        <a
+                                            href="{{ $broadcast->messagePayload()['media']['url'] }}"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="mt-4 flex min-h-32 items-center justify-center rounded-xl border border-violet-200 bg-white text-sm font-extrabold text-violet-800"
+                                        >
+                                            ▶ Watch video
+                                        </a>
+                                    @endif
+                                @endif
+                            </div>
+                        @endif
+
                         @if(is_array($broadcastCta) && filled($broadcastCta['label'] ?? null) && filled($broadcastCta['url'] ?? null))
                             <div data-broadcast-cta-preview>
                                 <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">

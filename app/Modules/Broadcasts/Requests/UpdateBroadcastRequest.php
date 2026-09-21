@@ -8,6 +8,7 @@ use App\Modules\Broadcasts\Services\BroadcastMessageTokenValidator;
 use App\Modules\Core\Requests\Concerns\NormalizesContactFilter;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
+use App\Modules\Messaging\Support\MessageMediaPayload;
 use App\Modules\Messaging\Requests\Concerns\InteractsWithMessageMediaAuthoring;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\MessageTokenFallbackResolver;
@@ -109,6 +110,7 @@ class UpdateBroadcastRequest extends FormRequest
             $issues = app(BroadcastMessageTokenValidator::class)->issues(
                 payload: $payload,
                 channel: $channel,
+                authoringRenderSlots: $this->authoringRenderSlots(),
             );
 
             foreach ($issues as $issue) {
@@ -478,6 +480,37 @@ class UpdateBroadcastRequest extends FormRequest
             [true, 1, '1', 'true', 'on'],
             true,
         );
+    }
+
+    /** @return array<int, string> */
+    private function authoringRenderSlots(): array
+    {
+        if ($this->regularBroadcastChannelInput() !== 'email') {
+            return [];
+        }
+
+        if ($this->hasFile('media_upload')) {
+            return ['media'];
+        }
+
+        $assetUuid = $this->input('media_asset_uuid');
+
+        if (is_string($assetUuid) && trim($assetUuid) !== '') {
+            return ['media'];
+        }
+
+        if (filter_var($this->input('media_present'), FILTER_VALIDATE_BOOLEAN)) {
+            return [];
+        }
+
+        $broadcast = $this->route('broadcast');
+        $media = $broadcast instanceof Broadcast
+            ? ($broadcast->messagePayload()['media'] ?? null)
+            : null;
+
+        return MessageMediaPayload::valid($media)
+            ? ['media']
+            : [];
     }
 
     private function formErrorPath(mixed $path): string

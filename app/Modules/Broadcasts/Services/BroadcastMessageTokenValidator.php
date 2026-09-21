@@ -20,6 +20,7 @@ class BroadcastMessageTokenValidator
         array $payload,
         string $channel,
         string $dispatchKey = Broadcast::DEFAULT_DISPATCH_KEY,
+        array $authoringRenderSlots = [],
     ): array {
         return $this->messageTemplateTokenValidator->validatePayload(
             payload: $payload,
@@ -29,6 +30,7 @@ class BroadcastMessageTokenValidator
             scope: 'broadcast',
             surface: 'broadcasts',
             path: 'payload',
+            authoringRenderSlots: $authoringRenderSlots,
         );
     }
 

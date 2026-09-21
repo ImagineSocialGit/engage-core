@@ -60,14 +60,16 @@ class MessageTemplateTokenValidator
         ?string $scope = null,
         ?string $surface = null,
         string $path = 'payload',
+        array $authoringRenderSlots = [],
     ): array {
         $contentPayload = $this->contentPayload($payload);
+        $authoringRenderSlots = $this->normalizeList($authoringRenderSlots);
         $occurrences = array_values(array_filter(
             $this->tokenOccurrences($contentPayload, $path),
             fn (array $occurrence): bool => ! $this->isAllowedRenderSlot(
                 token: $occurrence['token'],
                 payload: $payload,
-            ),
+            ) && ! in_array($occurrence['token'], $authoringRenderSlots, true),
         ));
 
         if ($occurrences === []) {

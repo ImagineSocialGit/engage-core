@@ -14,6 +14,7 @@ final class MediaVideoPlayerController extends Controller
             ->where('uuid', $assetUuid)
             ->where('kind', MediaAsset::KIND_VIDEO)
             ->where('visibility', MediaAsset::VISIBILITY_PUBLIC)
+            ->ready()
             ->firstOrFail();
         $url = $asset->publicUrl();
         abort_unless(is_string($url) && preg_match('~^https?://~i', $url) === 1, 404);

@@ -4,7 +4,7 @@ namespace App\Modules\Media\Actions;
 
 use App\Modules\Media\Data\ImagePerceptualFingerprint;
 use App\Modules\Media\Jobs\GenerateMediaImageVariantsJob;
-use App\Modules\Media\Jobs\GenerateMediaVideoPosterJob;
+use App\Modules\Media\Jobs\ProcessMediaVideoIngestionJob;
 use App\Modules\Media\Models\MediaAsset;
 use App\Modules\Media\Services\ImagePerceptualHasher;
 use App\Modules\Media\Services\MediaFileIdentity;
@@ -42,30 +42,30 @@ final class StoreMediaAssetAction
         $existing = $this->existingAssetForChecksum($checksum);
 
         if ($existing instanceof MediaAsset) {
-            return $this->restoreForReuse($existing);
+            return $this->reuseExisting(
+                asset: $existing,
+                file: $file,
+                mimeType: $mimeType,
+            );
         }
 
         $kind = $this->uploadPolicy->kindForMimeType($mimeType);
+
+        if ($kind === MediaAsset::KIND_VIDEO
+            && ! (bool) config('media.video_ingestion.enabled', true)
+        ) {
+            throw new RuntimeException('Video ingestion is disabled.');
+        }
+
         $fingerprint = $kind === MediaAsset::KIND_IMAGE
             ? $this->perceptualHasher->fingerprint($file)
             : null;
         $disk = $this->disk();
         $uuid = (string) Str::uuid();
         $extension = $this->extension($file);
-        $filename = $uuid.($extension !== null ? '.'.$extension : '');
-        $directory = trim((string) config('media.directory', 'media'), '/');
-        $directory = ($directory !== '' ? $directory.'/' : '').$uuid;
-
-        $storedPath = Storage::disk($disk)->putFileAs(
-            $directory,
-            $file,
-            $filename,
-            ['visibility' => MediaAsset::VISIBILITY_PUBLIC],
-        );
-
-        if (! is_string($storedPath) || trim($storedPath) === '') {
-            throw new RuntimeException("Media upload to disk [{$disk}] failed.");
-        }
+        $storedPath = $kind === MediaAsset::KIND_VIDEO
+            ? $this->storeVideoSource($disk, $uuid, $file, $extension)
+            : $this->storeDurableAsset($disk, $uuid, $file, $extension);
 
         try {
             $asset = MediaAsset::query()->create([
@@ -80,15 +80,25 @@ final class StoreMediaAssetAction
                 'mime_type' => $mimeType,
                 'extension' => $extension,
                 'size_bytes' => is_int($file->getSize()) ? $file->getSize() : null,
+                'ingestion_status' => $kind === MediaAsset::KIND_VIDEO
+                    ? MediaAsset::INGESTION_PROCESSING
+                    : MediaAsset::INGESTION_READY,
+                'ingestion_error' => null,
+                'ingested_at' => $kind === MediaAsset::KIND_VIDEO ? null : now(),
                 'checksum_sha256' => $checksum,
                 ...$this->fingerprintAttributes($fingerprint),
                 'visibility' => MediaAsset::VISIBILITY_PUBLIC,
                 'source' => 'crm',
-                'meta' => null,
+                'meta' => $kind === MediaAsset::KIND_VIDEO
+                    ? $this->videoIngestionMeta($mimeType, $extension, $file)
+                    : null,
             ]);
 
-            $this->queueImageVariants($asset);
-            $this->queueVideoPoster($asset);
+            if ($asset->kind === MediaAsset::KIND_VIDEO) {
+                $this->queueVideoIngestion($asset);
+            } else {
+                $this->queueImageVariants($asset);
+            }
 
             return $asset;
         } catch (QueryException $exception) {
@@ -98,7 +108,11 @@ final class StoreMediaAssetAction
                 $existing = $this->existingAssetForChecksum($checksum);
 
                 if ($existing instanceof MediaAsset) {
-                    return $this->restoreForReuse($existing);
+                    return $this->reuseExisting(
+                        asset: $existing,
+                        file: $file,
+                        mimeType: $mimeType,
+                    );
                 }
             }
 
@@ -128,16 +142,85 @@ final class StoreMediaAssetAction
             ->first();
     }
 
-    private function restoreForReuse(MediaAsset $asset): MediaAsset
-    {
+    private function reuseExisting(
+        MediaAsset $asset,
+        UploadedFile $file,
+        string $mimeType,
+    ): MediaAsset {
+        if ($asset->kind === MediaAsset::KIND_VIDEO
+            && $asset->hasIngestionFailed()
+        ) {
+            return $this->restartFailedVideoIngestion(
+                asset: $asset,
+                file: $file,
+                mimeType: $mimeType,
+            );
+        }
+
         if ($asset->archived_at !== null) {
             $asset->forceFill(['archived_at' => null])->save();
         }
 
-        $this->queueImageVariants($asset);
-        $this->queueVideoPoster($asset);
+        if ($asset->kind === MediaAsset::KIND_IMAGE) {
+            $this->queueImageVariants($asset);
+        }
 
         return $asset;
+    }
+
+    private function restartFailedVideoIngestion(
+        MediaAsset $asset,
+        UploadedFile $file,
+        string $mimeType,
+    ): MediaAsset {
+        $disk = $this->disk();
+        $extension = $this->extension($file);
+        $storedPath = $this->storeVideoSource(
+            disk: $disk,
+            uuid: (string) $asset->uuid,
+            file: $file,
+            extension: $extension,
+        );
+
+        $oldDisk = trim((string) $asset->disk);
+        $oldPath = trim((string) $asset->path);
+
+        $asset->forceFill([
+            'disk' => $disk,
+            'path' => $storedPath,
+            'original_filename' => $file->getClientOriginalName(),
+            'mime_type' => $mimeType,
+            'extension' => $extension,
+            'size_bytes' => is_int($file->getSize()) ? $file->getSize() : null,
+            'ingestion_status' => MediaAsset::INGESTION_PROCESSING,
+            'ingestion_error' => null,
+            'ingested_at' => null,
+            'archived_at' => null,
+            'meta' => $this->videoIngestionMeta($mimeType, $extension, $file),
+        ])->save();
+
+        if ($oldDisk !== '' && $oldPath !== '' && $oldPath !== $storedPath) {
+            try {
+                Storage::disk($oldDisk)->delete($oldPath);
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        }
+
+        try {
+            $this->queueVideoIngestion($asset);
+        } catch (Throwable $exception) {
+            Storage::disk($disk)->delete($storedPath);
+
+            $asset->forceFill([
+                'ingestion_status' => MediaAsset::INGESTION_FAILED,
+                'ingestion_error' => mb_substr($exception->getMessage(), 0, 2000),
+            ])->save();
+
+            throw $exception;
+        }
+
+        return $asset->refresh();
     }
 
     private function queueImageVariants(MediaAsset $asset): void
@@ -161,20 +244,102 @@ final class StoreMediaAssetAction
         }
     }
 
-    private function queueVideoPoster(MediaAsset $asset): void
+    private function queueVideoIngestion(MediaAsset $asset): void
     {
-        if ($asset->kind !== MediaAsset::KIND_VIDEO
-            || ! (bool) config('media.video_posters.enabled', true)
-            || $asset->videoPosterUrl() !== null) {
-            return;
+        try {
+            $queue = $this->queueContract->assertDispatchable(
+                trim((string) config(
+                    'media.video_ingestion.queue',
+                    QueueContract::MEDIA_PROCESSING,
+                )) ?: QueueContract::MEDIA_PROCESSING,
+            );
+
+            $connection = trim((string) config(
+                'media.video_ingestion.connection',
+                'redis-media',
+            )) ?: 'redis-media';
+
+            dispatch(
+                (new ProcessMediaVideoIngestionJob((int) $asset->getKey()))
+                    ->onConnection($connection)
+                    ->onQueue($queue),
+            );
+        } catch (Throwable $exception) {
+            $asset->forceFill([
+                'ingestion_status' => MediaAsset::INGESTION_FAILED,
+                'ingestion_error' => mb_substr($exception->getMessage(), 0, 2000),
+            ])->save();
+
+            throw $exception;
+        }
+    }
+
+    private function storeDurableAsset(
+        string $disk,
+        string $uuid,
+        UploadedFile $file,
+        ?string $extension,
+    ): string {
+        $filename = $uuid.($extension !== null ? '.'.$extension : '');
+        $directory = trim((string) config('media.directory', 'media'), '/');
+        $directory = ($directory !== '' ? $directory.'/' : '').$uuid;
+
+        $storedPath = Storage::disk($disk)->putFileAs(
+            $directory,
+            $file,
+            $filename,
+            ['visibility' => MediaAsset::VISIBILITY_PUBLIC],
+        );
+
+        if (! is_string($storedPath) || trim($storedPath) === '') {
+            throw new RuntimeException("Media upload to disk [{$disk}] failed.");
         }
 
-        try {
-            $queue = $this->queueContract->assertDispatchable(null);
-            dispatch((new GenerateMediaVideoPosterJob((int) $asset->getKey()))->onQueue($queue));
-        } catch (Throwable $exception) {
-            report($exception);
+        return trim($storedPath);
+    }
+
+    private function storeVideoSource(
+        string $disk,
+        string $uuid,
+        UploadedFile $file,
+        ?string $extension,
+    ): string {
+        $filename = 'source'.($extension !== null ? '.'.$extension : '');
+        $directory = trim(
+            (string) config('media.video_ingestion.temporary_directory', 'media-ingest'),
+            '/',
+        );
+        $directory = ($directory !== '' ? $directory.'/' : '').$uuid;
+
+        $storedPath = Storage::disk($disk)->putFileAs(
+            $directory,
+            $file,
+            $filename,
+            ['visibility' => 'private'],
+        );
+
+        if (! is_string($storedPath) || trim($storedPath) === '') {
+            throw new RuntimeException("Video upload to ingestion storage [{$disk}] failed.");
         }
+
+        return trim($storedPath);
+    }
+
+    /** @return array<string, mixed> */
+    private function videoIngestionMeta(
+        string $mimeType,
+        ?string $extension,
+        UploadedFile $file,
+    ): array {
+        return [
+            'video_ingestion' => [
+                'version' => 1,
+                'source_mime_type' => $mimeType,
+                'source_extension' => $extension,
+                'source_size_bytes' => is_int($file->getSize()) ? $file->getSize() : null,
+                'queued_at' => now()->toIso8601String(),
+            ],
+        ];
     }
 
     private function isChecksumUniquenessViolation(QueryException $exception): bool

@@ -8,6 +8,8 @@ final class QueueContract
 {
     public const BULK_MESSAGES = 'bulk_messages';
 
+    public const MEDIA_PROCESSING = 'media_processing';
+
     public const QUEUES = [
         'default',
         'notifications',
@@ -17,6 +19,7 @@ final class QueueContract
         'post_event',
         'marketing',
         self::BULK_MESSAGES,
+        self::MEDIA_PROCESSING,
         'emails',
         'sms',
         'webinars',
@@ -98,10 +101,6 @@ final class QueueContract
         $queues = [];
 
         foreach ($this->resolvedSupervisors() as $supervisor) {
-            if (($supervisor['connection'] ?? null) !== $this->defaultConnection()) {
-                continue;
-            }
-
             $queues = array_merge(
                 $queues,
                 $this->normalizeQueueNames($supervisor['queue'] ?? []),

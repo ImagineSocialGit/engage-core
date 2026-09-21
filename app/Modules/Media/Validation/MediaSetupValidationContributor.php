@@ -4,7 +4,7 @@ namespace App\Modules\Media\Validation;
 
 use App\Modules\Media\Services\ImagePerceptualHasher;
 use App\Modules\Media\Services\MediaImageVariantGenerator;
-use App\Modules\Media\Services\MediaVideoPosterGenerator;
+use App\Modules\Media\Services\MediaVideoIngestor;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 
@@ -13,7 +13,7 @@ final class MediaSetupValidationContributor implements SetupValidationContributo
     public function __construct(
         private readonly ImagePerceptualHasher $hasher,
         private readonly ?MediaImageVariantGenerator $variantGenerator = null,
-        private readonly ?MediaVideoPosterGenerator $videoPosterGenerator = null,
+        private readonly ?MediaVideoIngestor $videoIngestor = null,
     ) {}
 
     /** @return iterable<int, SetupValidationFinding> */
@@ -46,16 +46,16 @@ final class MediaSetupValidationContributor implements SetupValidationContributo
             );
         }
 
-        if ((bool) config('media.video_posters.enabled', true)
-            && $this->videoPosterGenerator instanceof MediaVideoPosterGenerator
-            && ! $this->videoPosterGenerator->available()
+        if ((bool) config('media.video_ingestion.enabled', true)
+            && $this->videoIngestor instanceof MediaVideoIngestor
+            && ! $this->videoIngestor->available()
         ) {
             yield new SetupValidationFinding(
                 severity: SetupValidationFinding::SEVERITY_WARNING,
-                code: 'media.video_posters.ffmpeg_unavailable',
-                message: 'Video poster generation is enabled, but FFmpeg is unavailable. Video emails use the accessible video-card fallback until FFmpeg is installed.',
-                source: 'media.video_posters',
-                path: 'media.video_posters.ffmpeg_binary',
+                code: 'media.video_ingestion.ffmpeg_unavailable',
+                message: 'Video ingestion is enabled, but FFmpeg or FFprobe is unavailable. New video uploads cannot become ready until both executables are installed.',
+                source: 'media.video_ingestion',
+                path: 'media.video_ingestion.ffmpeg_binary',
                 module: 'media',
             );
         }

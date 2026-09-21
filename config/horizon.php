@@ -17,7 +17,10 @@ $supervisorQueues = is_string($configuredSupervisorQueues)
 
 $primarySupervisorQueues = array_values(array_filter(
     $supervisorQueues,
-    static fn (string $queue): bool => $queue !== QueueContract::BULK_MESSAGES,
+    static fn (string $queue): bool => ! in_array($queue, [
+        QueueContract::BULK_MESSAGES,
+        QueueContract::MEDIA_PROCESSING,
+    ], true),
 ));
 
 $splitProcessBudget = static function (
@@ -241,9 +244,10 @@ return [
     |--------------------------------------------------------------------------
     |
     | QueueContract::QUEUES is the executable inventory. Bulk message work is
-    | isolated on supervisor-bulk while supervisor-1 retains the normal queue
-    | set. The environment max-process values remain total worker budgets and
-    | are split between these supervisors. Setup validation rejects queue drift.
+    | isolated on supervisor-bulk and CPU-heavy video ingestion is isolated on
+    | supervisor-media while supervisor-1 retains the normal queue set. The
+    | primary/bulk process budget remains shared; Media gets a separate low
+    | concurrency worker. Setup validation rejects queue drift.
     |
     */
 
@@ -274,6 +278,18 @@ return [
             'timeout' => env('HORIZON_TIMEOUT', 60),
             'nice' => 0,
         ],
+        'supervisor-media' => [
+            'connection' => 'redis-media',
+            'queue' => [QueueContract::MEDIA_PROCESSING],
+            'balance' => 'simple',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => env('HORIZON_MEDIA_PROCESSING_MEMORY', 256),
+            'tries' => 1,
+            'timeout' => env('HORIZON_MEDIA_PROCESSING_TIMEOUT', 2200),
+            'nice' => 0,
+        ],
     ],
 
     'environments' => [
@@ -290,6 +306,10 @@ return [
                 'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 3),
                 'queue' => [QueueContract::BULK_MESSAGES],
             ],
+            'supervisor-media' => [
+                'maxProcesses' => max(1, (int) env('HORIZON_PRODUCTION_MEDIA_MAX_PROCESSES', 1)),
+                'queue' => [QueueContract::MEDIA_PROCESSING],
+            ],
         ],
 
         'staging' => [
@@ -301,6 +321,10 @@ return [
                 'maxProcesses' => $stagingBulkProcesses,
                 'queue' => [QueueContract::BULK_MESSAGES],
             ],
+            'supervisor-media' => [
+                'maxProcesses' => max(1, (int) env('HORIZON_STAGING_MEDIA_MAX_PROCESSES', 1)),
+                'queue' => [QueueContract::MEDIA_PROCESSING],
+            ],
         ],
 
         'local' => [
@@ -311,6 +335,10 @@ return [
             'supervisor-bulk' => [
                 'maxProcesses' => $localBulkProcesses,
                 'queue' => [QueueContract::BULK_MESSAGES],
+            ],
+            'supervisor-media' => [
+                'maxProcesses' => max(1, (int) env('HORIZON_LOCAL_MEDIA_MAX_PROCESSES', 1)),
+                'queue' => [QueueContract::MEDIA_PROCESSING],
             ],
         ],
     ],
