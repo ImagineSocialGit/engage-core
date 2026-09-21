@@ -622,7 +622,8 @@ class SurfaceShowcaseSeeder extends Seeder
             'responsible_party' => 'contact',
             'responsible_type' => 'App\\Modules\\Core\\Models\\Contact',
             'responsible_id' => $this->refs['contact_marcus'],
-            'task_template_id' => (int) $template->id,
+            'task_template_id' => null,
+            'task_template_key' => null,
             'source' => 'manual',
             'description' => 'Completed example with history and ownership populated.',
             'status' => 'completed',
@@ -642,16 +643,21 @@ class SurfaceShowcaseSeeder extends Seeder
         if (is_numeric($completedTaskId)) {
             $this->refs['task_completed'] = (int) $completedTaskId;
             $this->update('tasks', $this->refs['task_completed'], [
-                'task_template_key' => (string) $template->key,
                 'title' => 'Review Marcus Chen closing document',
                 ...$completedTaskValues,
             ]);
         } else {
             $this->refs['task_completed'] = $this->row('tasks', [
-                'task_template_key' => (string) $template->key,
                 'title' => 'Review Marcus Chen closing document',
             ], $completedTaskValues);
         }
+
+        $this->row('task_links', [
+            'task_id' => $this->refs['task_completed'],
+            'linkable_type' => 'App\\Modules\\Core\\Models\\Contact',
+            'linkable_id' => $this->refs['contact_marcus'],
+            'role' => 'subject',
+        ]);
 
         $canceledTaskValues = [
             'assigned_to_type' => 'App\\Models\\User',

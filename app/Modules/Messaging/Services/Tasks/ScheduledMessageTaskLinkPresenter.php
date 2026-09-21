@@ -29,6 +29,11 @@ class ScheduledMessageTaskLinkPresenter implements TaskLinkPresenterContract
             'kind' => 'scheduled_message',
             'label' => 'Outbound message',
             'name' => $summary['name'],
+            'scheduled_message_id' => $summary['scheduled_message_id'],
+            'conversation_label' => $summary['conversation_label'],
+            'template_name' => $summary['template_name'],
+            'template_url' => $summary['template_url'],
+            'subject' => $summary['subject'],
             'url' => $summary['url'],
             'details' => array_filter([
                 'Channel' => $summary['channel'],
@@ -38,6 +43,8 @@ class ScheduledMessageTaskLinkPresenter implements TaskLinkPresenterContract
             'message' => $summary['message'],
             'channel' => $summary['channel'],
             'occurred_at' => $summary['occurred_at'],
+            'occurred_at_label' => $summary['occurred_at_label'],
+            'status' => $summary['status'],
             'reply_to' => null,
         ];
     }

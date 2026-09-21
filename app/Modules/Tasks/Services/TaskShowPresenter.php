@@ -21,27 +21,44 @@ class TaskShowPresenter
         $inbound = $links->firstWhere('kind', 'inbound_message');
         $outbound = is_array($inbound['reply_to'] ?? null)
             ? $inbound['reply_to']
-            : $links->firstWhere('kind', 'scheduled_message');
+            : null;
 
         return [
             'links' => $links,
             'contact' => $contact,
             'inbound' => $inbound,
             'outbound' => $outbound,
-            'other_links' => $this->otherLinks($links),
+            'other_links' => $this->otherLinks($links, $outbound),
             'origin' => $this->origin($task, $contact, $inbound, $outbound),
+            'due_state' => $this->dueState($task),
         ];
     }
 
-    /** @param Collection<int, array<string, mixed>> $links */
-    private function otherLinks(Collection $links): Collection
+    /**
+     * @param Collection<int, array<string, mixed>> $links
+     * @param array<string, mixed>|null $conversationOutbound
+     */
+    private function otherLinks(Collection $links, ?array $conversationOutbound): Collection
     {
+        $conversationOutboundId = is_numeric($conversationOutbound['scheduled_message_id'] ?? null)
+            ? (int) $conversationOutbound['scheduled_message_id']
+            : null;
+
         return $links
-            ->reject(fn (array $link): bool => in_array(
-                $link['kind'] ?? null,
-                ['contact', 'inbound_message', 'scheduled_message'],
-                true,
-            ))
+            ->reject(function (array $link) use ($conversationOutboundId): bool {
+                $kind = $link['kind'] ?? null;
+
+                if (in_array($kind, ['contact', 'inbound_message'], true)) {
+                    return true;
+                }
+
+                if ($kind !== 'scheduled_message' || $conversationOutboundId === null) {
+                    return false;
+                }
+
+                return is_numeric($link['scheduled_message_id'] ?? null)
+                    && (int) $link['scheduled_message_id'] === $conversationOutboundId;
+            })
             ->values();
     }
 
@@ -67,6 +84,25 @@ class TaskShowPresenter
             ? route('crm.flow-routes.show', (int) $routeId)
             : null;
         $template = $task->taskTemplate;
+        $templateLabel = $template?->name ?: $template?->title ?: $task->task_template_key;
+        $templateUrl = $template && Route::has('crm.tasks.templates.edit')
+            ? route('crm.tasks.templates.edit', $template)
+            : null;
+
+        if ($task->source === Task::SOURCE_MANUAL) {
+            return [
+                'kind' => 'manual',
+                'route_label' => null,
+                'route_url' => null,
+                'contact' => $contact,
+                'status_label' => null,
+                'inbound' => $inbound,
+                'reply_summary' => null,
+                'outbound' => null,
+                'template_label' => $templateLabel,
+                'template_url' => $templateUrl,
+            ];
+        }
 
         if ($routeId !== null || $routeName !== null || $routeKey !== null) {
             return [
@@ -81,47 +117,44 @@ class TaskShowPresenter
                     ? Str::limit(trim((string) $inbound['message']), 90)
                     : null,
                 'outbound' => $outbound,
-                'template_label' => $template?->name ?: $template?->title,
-                'template_url' => $template && Route::has('crm.tasks.templates.edit')
-                    ? route('crm.tasks.templates.edit', $template)
-                    : null,
-                'missing_provenance' => false,
-            ];
-        }
-
-        if ($task->source !== Task::SOURCE_MANUAL || $task->task_template_id !== null) {
-            return [
-                'kind' => 'automation',
-                'route_label' => null,
-                'route_url' => null,
-                'contact' => $contact,
-                'status_label' => null,
-                'inbound' => $inbound,
-                'reply_summary' => filled($inbound['message'] ?? null)
-                    ? Str::limit(trim((string) $inbound['message']), 90)
-                    : null,
-                'outbound' => $outbound,
-                'template_label' => $template?->name ?: $template?->title ?: $task->task_template_key,
-                'template_url' => $template && Route::has('crm.tasks.templates.edit')
-                    ? route('crm.tasks.templates.edit', $template)
-                    : null,
-                'missing_provenance' => true,
+                'template_label' => $templateLabel,
+                'template_url' => $templateUrl,
             ];
         }
 
         return [
-            'kind' => 'manual',
+            'kind' => 'automation',
             'route_label' => null,
             'route_url' => null,
             'contact' => $contact,
             'status_label' => null,
             'inbound' => $inbound,
-            'reply_summary' => null,
+            'reply_summary' => filled($inbound['message'] ?? null)
+                ? Str::limit(trim((string) $inbound['message']), 90)
+                : null,
             'outbound' => $outbound,
-            'template_label' => null,
-            'template_url' => null,
-            'missing_provenance' => false,
+            'template_label' => $templateLabel,
+            'template_url' => $templateUrl,
         ];
+    }
+
+    private function dueState(Task $task): ?string
+    {
+        if ($task->status !== Task::STATUS_OPEN || $task->due_at === null) {
+            return null;
+        }
+
+        $timezone = config('client.timezone', config('app.timezone', 'UTC'));
+        $dueAt = $task->due_at->copy()->timezone($timezone);
+        $today = now($timezone);
+
+        if ($dueAt->isSameDay($today)) {
+            return 'today';
+        }
+
+        return $dueAt->lt($today->copy()->startOfDay())
+            ? 'overdue'
+            : 'upcoming';
     }
 
     private function string(mixed $value): ?string
