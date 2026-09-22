@@ -80,6 +80,23 @@
                         </button>
                     </form>
                 @endif
+
+                @can('settings.manage')
+                    <form
+                        method="POST"
+                        action="{{ route('crm.inbound-messaging.inbox.destroy', $message) }}"
+                        onsubmit="return confirm('Delete this inbound message? This removes the Inbox record permanently. Any consent opt-out already recorded stays in place.');"
+                    >
+                        @csrf
+                        @method('DELETE')
+                        <button
+                            type="submit"
+                            class="rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 hover:text-red-800"
+                        >
+                            Delete message
+                        </button>
+                    </form>
+                @endcan
             </div>
         </div>
 

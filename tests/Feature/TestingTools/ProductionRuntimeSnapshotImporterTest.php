@@ -14,6 +14,190 @@ final class ProductionRuntimeSnapshotImporterTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_it_maps_module_installations_by_string_primary_key_without_assuming_an_id_column(): void
+    {
+        DB::table('module_installations')->insert([
+            'module_key' => 'core',
+            'status' => 'installed',
+            'schema_version' => 1,
+            'manifest_hash' => str_repeat('a', 64),
+            'installed_at' => now(),
+            'last_migrated_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $path = $this->writeSnapshot([
+            [
+                'type' => 'dump_meta',
+                'generated_at' => '2026-09-21T21:00:39+00:00',
+                'database' => 'production_snapshot_test',
+                'mode' => 'runtime_state_with_definition_replay_v2',
+            ],
+            $this->schema('module_installations', [
+                'module_key', 'status', 'schema_version', 'manifest_hash',
+                'installed_at', 'last_migrated_at', 'created_at', 'updated_at',
+            ]),
+            $this->row('module_installations', 'identity_only', [
+                'module_key' => 'core',
+            ]),
+        ]);
+
+        try {
+            $result = app(ProductionRuntimeSnapshotImporter::class)
+                ->import($path, dryRun: true);
+
+            $this->assertTrue($result['dry_run']);
+            $this->assertSame(1, $result['mapped_reference_rows']);
+            $this->assertSame([], $result['imported_counts']);
+        } finally {
+            File::delete($path);
+        }
+    }
+
+    public function test_it_isolates_active_message_chain_enrollments_without_inventing_a_meta_column(): void
+    {
+        $chainId = DB::table('message_chains')->insertGetId([
+            'key' => 'snapshot-isolation-chain',
+            'name' => 'Snapshot Isolation Chain',
+            'description' => null,
+            'status' => 'active',
+            'current_version_id' => null,
+            'source' => 'config',
+            'source_version' => '1',
+            'is_customized' => false,
+            'customized_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $versionId = DB::table('message_chain_versions')->insertGetId([
+            'message_chain_id' => $chainId,
+            'version' => 1,
+            'exit_conditions' => null,
+            'content_hash' => str_repeat('b', 64),
+            'published_at' => now(),
+            'created_by' => null,
+            'created_at' => now(),
+        ]);
+
+        DB::table('message_chains')
+            ->where('id', $chainId)
+            ->update(['current_version_id' => $versionId]);
+
+        $path = $this->writeSnapshot([
+            [
+                'type' => 'dump_meta',
+                'generated_at' => '2026-09-21T21:00:39+00:00',
+                'database' => 'production_snapshot_test',
+                'mode' => 'runtime_state_with_definition_replay_v2',
+            ],
+            $this->schema('message_chains', [
+                'id', 'key', 'name', 'status', 'current_version_id',
+            ]),
+            $this->row('message_chains', 'identity_only', [
+                'id' => 91,
+                'key' => 'snapshot-isolation-chain',
+                'name' => 'Snapshot Isolation Chain',
+                'status' => 'active',
+                'current_version_id' => 92,
+            ]),
+            $this->schema('message_chain_versions', [
+                'id', 'message_chain_id', 'version', 'content_hash',
+            ]),
+            $this->row('message_chain_versions', 'identity_only', [
+                'id' => 92,
+                'message_chain_id' => 91,
+                'version' => 1,
+                'content_hash' => str_repeat('b', 64),
+            ]),
+            $this->schema('contacts', [
+                'id', 'first_name', 'email', 'source', 'meta', 'created_at', 'updated_at',
+            ]),
+            $this->row('contacts', 'full', [
+                'id' => 7001,
+                'first_name' => 'Snapshot',
+                'email' => 'snapshot-isolation@example.test',
+                'source' => 'snapshot_test',
+                'meta' => '[]',
+                'created_at' => '2026-09-21 18:00:00',
+                'updated_at' => '2026-09-21 18:00:00',
+            ]),
+            $this->schema('message_chain_enrollments', [
+                'id',
+                'message_chain_version_id',
+                'recipient_type',
+                'recipient_id',
+                'context_type',
+                'context_id',
+                'origin_type',
+                'origin_id',
+                'surface',
+                'current_message_chain_step_id',
+                'next_action_at',
+                'status',
+                'dedupe_key',
+                'started_at',
+                'paused_at',
+                'resumed_at',
+                'exited_at',
+                'exit_reason_code',
+                'completed_at',
+                'cancelled_at',
+                'created_at',
+                'updated_at',
+            ]),
+            $this->row('message_chain_enrollments', 'full', [
+                'id' => 8001,
+                'message_chain_version_id' => 92,
+                'recipient_type' => 'App\\Modules\\Core\\Models\\Contact',
+                'recipient_id' => 7001,
+                'context_type' => null,
+                'context_id' => null,
+                'origin_type' => null,
+                'origin_id' => null,
+                'surface' => 'campaigns',
+                'current_message_chain_step_id' => null,
+                'next_action_at' => '2026-09-23 13:30:22',
+                'status' => 'active',
+                'dedupe_key' => 'snapshot-isolation-enrollment',
+                'started_at' => '2026-09-18 13:30:04',
+                'paused_at' => null,
+                'resumed_at' => null,
+                'exited_at' => null,
+                'exit_reason_code' => null,
+                'completed_at' => null,
+                'cancelled_at' => null,
+                'created_at' => '2026-09-18 13:30:04',
+                'updated_at' => '2026-09-20 13:30:22',
+            ]),
+        ]);
+
+        try {
+            $result = app(ProductionRuntimeSnapshotImporter::class)
+                ->import($path);
+
+            $this->assertSame(1, $result['isolated_message_chain_enrollments']);
+            $this->assertSame(1, $result['imported_counts']['message_chain_enrollments']);
+
+            $enrollment = DB::table('message_chain_enrollments')
+                ->where('id', 8001)
+                ->first();
+
+            $this->assertNotNull($enrollment);
+            $this->assertSame($versionId, (int) $enrollment->message_chain_version_id);
+            $this->assertSame(7001, (int) $enrollment->recipient_id);
+            $this->assertSame('active', $enrollment->status);
+            $this->assertSame(
+                'testing:production_snapshot:campaigns',
+                $enrollment->surface,
+            );
+            $this->assertFalse(property_exists($enrollment, 'meta'));
+        } finally {
+            File::delete($path);
+        }
+    }
+
     public function test_it_maps_synced_definitions_and_replays_production_authored_message_definitions(): void
     {
         $statusId = DB::table('contact_statuses')->insertGetId([

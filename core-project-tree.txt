@@ -8,6 +8,7 @@
 │   │   │   ├── EngageRefreshCommand.php
 │   │   │   ├── EngageUserAddCommand.php
 │   │   │   ├── EngageUserPasswordCommand.php
+│   │   │   ├── ImportProductionRuntimeSnapshotCommand.php
 │   │   │   ├── ModulesInstallCommand.php
 │   │   │   ├── ModulesMigrateCommand.php
 │   │   │   ├── ModulesReconcileCommand.php
@@ -300,6 +301,7 @@
 │   │   │   │   ├── Contacts
 │   │   │   │   │   ├── CreateManualContactAction.php
 │   │   │   │   │   ├── CreateOrUpdateContactAction.php
+│   │   │   │   │   ├── NormalizeContactsAction.php
 │   │   │   │   │   ├── RecordContactFilterFactsChangedAction.php
 │   │   │   │   │   ├── ResolveContactByEmailAction.php
 │   │   │   │   │   ├── ResolveContactStatusAction.php
@@ -344,6 +346,7 @@
 │   │   │   │   ├── ContactController.php
 │   │   │   │   ├── ContactImportBatchController.php
 │   │   │   │   ├── ContactLookupController.php
+│   │   │   │   ├── ContactMaintenanceController.php
 │   │   │   │   ├── ContactNoteController.php
 │   │   │   │   ├── ContactResultActionController.php
 │   │   │   │   ├── ContactTagController.php
@@ -416,6 +419,7 @@
 │   │   │   │   │   ├── BusinessCalendarDateCalculator.php
 │   │   │   │   │   └── DefaultBusinessCalendarResolver.php
 │   │   │   │   ├── Contacts
+│   │   │   │   │   ├── ContactDuplicateInspector.php
 │   │   │   │   │   ├── ContactFilterResolver.php
 │   │   │   │   │   ├── ContactImportBatchProcessor.php
 │   │   │   │   │   ├── ContactImportHeaderMapper.php
@@ -440,6 +444,7 @@
 │   │   │   │       ├── ContactImportTreatmentRegistry.php
 │   │   │   │       ├── ContactNameNormalizer.php
 │   │   │   │       ├── ContactPanelRegistry.php
+│   │   │   │       ├── ContactPhoneNormalizer.php
 │   │   │   │       ├── ContactResultActionRegistry.php
 │   │   │   │       └── ContactShowDataRegistry.php
 │   │   │   ├── TokenContracts
@@ -685,6 +690,7 @@
 │   │   │   │   │   └── SaveInboundEmailRouteAction.php
 │   │   │   │   ├── Inbox
 │   │   │   │   │   ├── CreateInboundMessageContactAction.php
+│   │   │   │   │   ├── DeleteInboundMessageAction.php
 │   │   │   │   │   ├── LinkInboundMessageContactAction.php
 │   │   │   │   │   └── UpdateInboundMessageInboxStateAction.php
 │   │   │   │   ├── ProcessInboundMessageAction.php
@@ -701,7 +707,8 @@
 │   │   │   │       │   ├── GrantSmsConsentFromInboundMessageAction.php
 │   │   │   │       │   ├── RespondToSmsHelpInboundMessageAction.php
 │   │   │   │       │   └── RevokeSmsConsentFromInboundMessageAction.php
-│   │   │   │       └── ProcessInboundSmsMessageAction.php
+│   │   │   │       ├── ProcessInboundSmsMessageAction.php
+│   │   │   │       └── ReconcileInboundSmsHistoryAction.php
 │   │   │   ├── Automation
 │   │   │   │   ├── InboundEmailRouteAutomationTriggerAuthoringContributor.php
 │   │   │   │   ├── InboundMessagingAutomationPointAuthoringContributor.php
@@ -725,7 +732,8 @@
 │   │   │   │   │   ├── ContactConversationReplyController.php
 │   │   │   │   │   ├── InboundEmailRouteController.php
 │   │   │   │   │   ├── InboundInboxController.php
-│   │   │   │   │   └── InboundReplyProfileController.php
+│   │   │   │   │   ├── InboundReplyProfileController.php
+│   │   │   │   │   └── InboundSmsMaintenanceController.php
 │   │   │   │   └── Webhooks
 │   │   │   │       ├── EmailWebhookController.php
 │   │   │   │       └── SmsWebhookController.php
@@ -783,6 +791,7 @@
 │   │   │   │   │   ├── ReplyProfileDefinitionNormalizer.php
 │   │   │   │   │   └── ReplyProfileWorkspace.php
 │   │   │   │   ├── Sms
+│   │   │   │   │   ├── CanonicalSmsPhoneMatcher.php
 │   │   │   │   │   ├── InboundSmsMessageClassifier.php
 │   │   │   │   │   ├── InboundSmsPurposeResolver.php
 │   │   │   │   │   ├── InboundSmsSenderResolver.php
@@ -2090,6 +2099,7 @@
 │   │   │   ├── ArtisanTestDatabaseLock.php
 │   │   │   └── ArtisanTestEnvironmentBootstrap.php
 │   │   ├── TestingTools
+│   │   │   ├── ProductionRuntimeSnapshotImporter.php
 │   │   │   ├── TestingToolGuard.php
 │   │   │   └── TestingToolRuntime.php
 │   │   ├── TokenContracts
@@ -2830,8 +2840,9 @@
 │       │   │   ├── inbox
 │       │   │   │   ├── index.blade.php
 │       │   │   │   └── show.blade.php
-│       │   │   └── reply-profiles
-│       │   │       └── index.blade.php
+│       │   │   ├── reply-profiles
+│       │   │   │   └── index.blade.php
+│       │   │   └── sms-maintenance.blade.php
 │       │   ├── media
 │       │   │   └── index.blade.php
 │       │   ├── messaging
@@ -2884,6 +2895,7 @@
 │       │   │   └── staff
 │       │   │       └── index.blade.php
 │       │   ├── settings
+│       │   │   ├── contact-maintenance.blade.php
 │       │   │   ├── index.blade.php
 │       │   │   └── team.blade.php
 │       │   ├── tasks
@@ -3130,6 +3142,7 @@
 │   │   │   ├── ContactImportTreatmentRegistryTest.php
 │   │   │   ├── ContactIndexFilterTest.php
 │   │   │   ├── ContactLookupControllerTest.php
+│   │   │   ├── ContactMaintenanceTest.php
 │   │   │   ├── ContactNameNormalizationTest.php
 │   │   │   ├── ContactOperationalFilterTest.php
 │   │   │   ├── ContactQuickEditTest.php
@@ -3246,6 +3259,7 @@
 │   │   ├── InboundMessaging
 │   │   │   ├── ContactConversationReplyControllerTest.php
 │   │   │   ├── ContactConversationShowDataProviderTest.php
+│   │   │   ├── DeleteInboundMessageActionTest.php
 │   │   │   ├── HandleInboundEmailWebhookActionTest.php
 │   │   │   ├── InboundAutoResponseAutomationTest.php
 │   │   │   ├── InboundEmailContactExtractionTest.php
@@ -3264,6 +3278,8 @@
 │   │   │   ├── InboundReplyProfileGuardTest.php
 │   │   │   ├── InboundReplyProfileSyncTest.php
 │   │   │   ├── InboundReplyProfileWorkspaceTest.php
+│   │   │   ├── InboundSmsCanonicalPhoneIdentityTest.php
+│   │   │   ├── InboundSmsHistoryReconciliationTest.php
 │   │   │   ├── InboundSmsReOptInTest.php
 │   │   │   ├── ProcessInboundSmsMessageActionTest.php
 │   │   │   ├── ReplyProfileContextualUpdateTest.php
@@ -3591,6 +3607,8 @@
 │   │   │   ├── TasksSetupValidationContributorTest.php
 │   │   │   ├── TaskTemplateWorkspaceTest.php
 │   │   │   └── TaskWorkspaceTest.php
+│   │   ├── TestingTools
+│   │   │   └── ProductionRuntimeSnapshotImporterTest.php
 │   │   ├── Ui
 │   │   │   └── MessageEditorComponentTest.php
 │   │   ├── Users
@@ -3704,4 +3722,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-863 directories, 2842 files
+864 directories, 2859 files

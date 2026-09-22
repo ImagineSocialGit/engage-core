@@ -3,34 +3,38 @@
 namespace App\Modules\InboundMessaging\Services\Sms;
 
 use App\Modules\Core\Models\Contact;
-use App\Modules\Messaging\Services\PhoneNumberNormalizer;
-use InvalidArgumentException;
 
 class InboundSmsSenderResolver
 {
     public function __construct(
-        private readonly PhoneNumberNormalizer $phoneNumberNormalizer,
+        private readonly CanonicalSmsPhoneMatcher $phoneMatcher,
     ) {}
 
     public function resolve(?string $from): ?Contact
     {
-        $from = $this->normalizePhone($from);
+        $normalized = $this->normalizePhone($from);
 
-        if ($from === null) {
+        if ($normalized === null) {
             return null;
         }
 
-        return Contact::query()
-            ->where('phone', $from)
-            ->first();
+        $matches = $this->phoneMatcher
+            ->whereEquivalent(
+                Contact::query()->whereNotNull('phone'),
+                'contacts.phone',
+                $normalized,
+            )
+            ->orderBy('contacts.id')
+            ->limit(2)
+            ->get();
+
+        return $matches->count() === 1
+            ? $matches->first()
+            : null;
     }
 
     public function normalizePhone(?string $phone): ?string
     {
-        try {
-            return $this->phoneNumberNormalizer->normalize($phone);
-        } catch (InvalidArgumentException) {
-            return null;
-        }
+        return $this->phoneMatcher->normalize($phone);
     }
 }

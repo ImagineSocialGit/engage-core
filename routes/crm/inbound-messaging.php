@@ -4,7 +4,23 @@ use App\Modules\InboundMessaging\Controllers\CRM\ContactConversationReplyControl
 use App\Modules\InboundMessaging\Controllers\CRM\InboundEmailRouteController;
 use App\Modules\InboundMessaging\Controllers\CRM\InboundInboxController;
 use App\Modules\InboundMessaging\Controllers\CRM\InboundReplyProfileController;
+use App\Modules\InboundMessaging\Controllers\CRM\InboundSmsMaintenanceController;
 use Illuminate\Support\Facades\Route;
+
+Route::middleware([
+    'module:inbound_messaging',
+    'capability:settings.manage',
+])
+    ->prefix('settings/inbound-message-repair')
+    ->name('crm.inbound-messaging.sms-maintenance.')
+    ->group(function (): void {
+        Route::get('/', [InboundSmsMaintenanceController::class, 'index'])
+            ->name('index');
+
+        Route::post('/reconcile', [InboundSmsMaintenanceController::class, 'reconcile'])
+            ->middleware('throttle:2,1')
+            ->name('reconcile');
+    });
 
 Route::middleware('module:inbound_messaging')
     ->prefix('inbox')
@@ -15,6 +31,10 @@ Route::middleware('module:inbound_messaging')
 
         Route::get('/{inboundMessage}', [InboundInboxController::class, 'show'])
             ->name('show');
+
+        Route::delete('/{inboundMessage}', [InboundInboxController::class, 'destroy'])
+            ->middleware('capability:settings.manage')
+            ->name('destroy');
 
         Route::patch('/{inboundMessage}/status', [InboundInboxController::class, 'state'])
             ->name('state');

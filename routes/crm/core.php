@@ -8,6 +8,7 @@ use App\Modules\Core\Access\Controllers\TeamAccessController;
 use App\Modules\Core\Controllers\BusinessCalendarController;
 use App\Modules\Core\Controllers\ContactController;
 use App\Modules\Core\Controllers\ContactImportBatchController;
+use App\Modules\Core\Controllers\ContactMaintenanceController;
 use App\Modules\Core\Controllers\ContactLookupController;
 use App\Modules\Core\Controllers\ContactNoteController;
 use App\Modules\Core\Controllers\ContactResultActionController;
@@ -31,6 +32,14 @@ Route::put('/business-days', [BusinessCalendarController::class, 'update'])
 
 Route::get('/settings', SettingsController::class)
     ->name('crm.settings.index');
+
+Route::get('/settings/contact-maintenance', [ContactMaintenanceController::class, 'index'])
+    ->middleware('capability:settings.manage')
+    ->name('crm.settings.contact-maintenance.index');
+
+Route::post('/settings/contact-maintenance/normalize', [ContactMaintenanceController::class, 'normalize'])
+    ->middleware(['capability:settings.manage', 'throttle:2,1'])
+    ->name('crm.settings.contact-maintenance.normalize');
 
 Route::get('/settings/team', [TeamAccessController::class, 'index'])
     ->name('crm.settings.team.index');

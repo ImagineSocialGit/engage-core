@@ -5,6 +5,7 @@ namespace App\Modules\InboundMessaging\Controllers\CRM;
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Models\Contact;
 use App\Modules\InboundMessaging\Actions\Inbox\CreateInboundMessageContactAction;
+use App\Modules\InboundMessaging\Actions\Inbox\DeleteInboundMessageAction;
 use App\Modules\InboundMessaging\Actions\Inbox\LinkInboundMessageContactAction;
 use App\Modules\InboundMessaging\Actions\Inbox\UpdateInboundMessageInboxStateAction;
 use App\Modules\InboundMessaging\Models\InboundMessage;
@@ -91,6 +92,17 @@ final class InboundInboxController extends Controller
 
         return $this->redirectTo($inboundMessage)
             ->with('status', config('contacts.labels.singular').' link removed.');
+    }
+
+    public function destroy(
+        InboundMessage $inboundMessage,
+        DeleteInboundMessageAction $deleteInboundMessage,
+    ): RedirectResponse {
+        $deleteInboundMessage->handle($inboundMessage);
+
+        return redirect()
+            ->route('crm.inbound-messaging.inbox.index')
+            ->with('status', 'Inbound message deleted.');
     }
 
     public function createContact(

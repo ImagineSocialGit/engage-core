@@ -481,25 +481,22 @@ final class ProductionRuntimeSnapshotImporter
         $mapped = 0;
 
         foreach ($rowsByTable['module_installations'] ?? [] as $row) {
-            $sourceId = $row['data']['id'] ?? null;
             $moduleKey = $row['data']['module_key'] ?? null;
 
             if (! is_string($moduleKey) || trim($moduleKey) === '') {
                 throw new RuntimeException('Production module_installations row is missing module_key.');
             }
 
-            $targetId = DB::table('module_installations')
-                ->where('module_key', $moduleKey)
-                ->value('id');
+            $moduleKey = trim($moduleKey);
 
-            if ($targetId === null) {
+            $installed = DB::table('module_installations')
+                ->where('module_key', $moduleKey)
+                ->exists();
+
+            if (! $installed) {
                 throw new RuntimeException(
                     "Installed production module [{$moduleKey}] is not installed in the target DEV database.",
                 );
-            }
-
-            if ($sourceId !== null) {
-                $this->idMaps['module_installations'][$sourceId] = (int) $targetId;
             }
 
             $mapped++;
@@ -1417,17 +1414,8 @@ final class ProductionRuntimeSnapshotImporter
         if ($table === 'message_chain_enrollments'
             && ($row['status'] ?? null) === 'active'
         ) {
-            $originalSurface = $row['surface'] ?? null;
-            $row['surface'] = 'testing:production_snapshot';
-            $row['meta'] = $this->mergeJsonObject(
-                $row['meta'] ?? null,
-                [
-                    'production_snapshot' => [
-                        'source_status' => 'active',
-                        'source_surface' => $originalSurface,
-                        'runtime_isolation' => 'testing_surface',
-                    ],
-                ],
+            $row['surface'] = $this->isolatedMessageChainSurface(
+                $row['surface'] ?? null,
             );
             $summary['isolated_message_chain_enrollments']++;
         }
@@ -1462,6 +1450,19 @@ final class ProductionRuntimeSnapshotImporter
         }
 
         return $row;
+    }
+
+    private function isolatedMessageChainSurface(mixed $sourceSurface): string
+    {
+        $source = is_string($sourceSurface) && trim($sourceSurface) !== ''
+            ? trim($sourceSurface)
+            : 'unspecified';
+
+        return Str::limit(
+            'testing:production_snapshot:'.$source,
+            96,
+            '',
+        );
     }
 
     /** @param array<string, mixed> $overlay */
