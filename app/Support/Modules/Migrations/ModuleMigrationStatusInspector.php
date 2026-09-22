@@ -42,6 +42,8 @@ final class ModuleMigrationStatusInspector
             ? array_fill_keys($this->migrator->getRepository()->getRan(), true)
             : [];
         $ledgerExists = Schema::hasTable('module_installations');
+        $checksumLedgerExists = $ledgerExists
+            && Schema::hasColumn('module_installations', 'migration_checksums');
         $installations = $this->installationsByModuleKey($scopes, $ledgerExists);
         $statuses = [];
 
@@ -65,6 +67,12 @@ final class ModuleMigrationStatusInspector
                 : ($ledgerExists
                     ? ModuleMigrationStatus::LEDGER_UNTRACKED
                     : ModuleMigrationStatus::LEDGER_MISSING);
+            $integrity = $this->integrity(
+                scope: $scope,
+                installation: $installation,
+                ranMigrations: $ranMigrations,
+                checksumLedgerExists: $checksumLedgerExists,
+            );
 
             $statuses[] = new ModuleMigrationStatus(
                 scope: $scope,
@@ -88,6 +96,11 @@ final class ModuleMigrationStatusInspector
                 recordedManifestHash: $installation instanceof ModuleInstallation
                     ? $installation->manifest_hash
                     : null,
+                integrityState: $integrity['state'],
+                changedAppliedMigrationFiles: $integrity['changed'],
+                missingRecordedMigrationFiles: $integrity['missing'],
+                untrackedAppliedMigrationFiles: $integrity['untracked_applied'],
+                recordedMigrationChecksums: $integrity['recorded'],
             );
         }
 
@@ -134,6 +147,128 @@ final class ModuleMigrationStatusInspector
             )
                 ? ModuleMigrationStatus::CONTRACT_CURRENT
                 : ModuleMigrationStatus::CONTRACT_DRIFT;
+    }
+
+    /**
+     * @param array<string, bool> $ranMigrations
+     * @return array{
+     *     state: string,
+     *     changed: array<int, string>,
+     *     missing: array<int, string>,
+     *     untracked_applied: array<int, string>,
+     *     recorded: array<string, string>|null
+     * }
+     */
+    private function integrity(
+        MigrationScopeDefinition $scope,
+        mixed $installation,
+        array $ranMigrations,
+        bool $checksumLedgerExists,
+    ): array {
+        $empty = [
+            'changed' => [],
+            'missing' => [],
+            'untracked_applied' => [],
+            'recorded' => null,
+        ];
+
+        if (! $checksumLedgerExists) {
+            return [
+                'state' => ModuleMigrationStatus::INTEGRITY_UNAVAILABLE,
+                ...$empty,
+            ];
+        }
+
+        if (! $installation instanceof ModuleInstallation) {
+            return [
+                'state' => ModuleMigrationStatus::INTEGRITY_UNTRACKED,
+                ...$empty,
+            ];
+        }
+
+        $rawChecksums = $installation->getRawOriginal('migration_checksums');
+
+        if ($rawChecksums === null) {
+            return [
+                'state' => ModuleMigrationStatus::INTEGRITY_BASELINE_MISSING,
+                ...$empty,
+            ];
+        }
+
+        $recorded = $this->normalizeChecksums($installation->migration_checksums);
+
+        if ($recorded === null) {
+            return [
+                'state' => ModuleMigrationStatus::INTEGRITY_DRIFT,
+                ...$empty,
+            ];
+        }
+
+        $missing = array_values(array_diff(
+            array_keys($recorded),
+            $scope->migrationFiles,
+        ));
+        $changed = [];
+        $untrackedApplied = [];
+
+        foreach ($scope->migrationFiles as $migrationFile) {
+            $migrationName = pathinfo($migrationFile, PATHINFO_FILENAME);
+
+            if (! isset($ranMigrations[$migrationName])) {
+                continue;
+            }
+
+            $recordedChecksum = $recorded[$migrationFile] ?? null;
+
+            if (! is_string($recordedChecksum)) {
+                $untrackedApplied[] = $migrationFile;
+
+                continue;
+            }
+
+            if (! hash_equals($recordedChecksum, $scope->checksum($migrationFile))) {
+                $changed[] = $migrationFile;
+            }
+        }
+
+        sort($changed, SORT_STRING);
+        sort($missing, SORT_STRING);
+        sort($untrackedApplied, SORT_STRING);
+
+        return [
+            'state' => $changed !== [] || $missing !== [] || $untrackedApplied !== []
+                ? ModuleMigrationStatus::INTEGRITY_DRIFT
+                : ModuleMigrationStatus::INTEGRITY_CURRENT,
+            'changed' => $changed,
+            'missing' => $missing,
+            'untracked_applied' => $untrackedApplied,
+            'recorded' => $recorded,
+        ];
+    }
+
+    /** @return array<string, string>|null */
+    private function normalizeChecksums(mixed $checksums): ?array
+    {
+        if (! is_array($checksums) || $checksums === []) {
+            return null;
+        }
+
+        $normalized = [];
+
+        foreach ($checksums as $file => $checksum) {
+            if (! is_string($file)
+                || ! is_string($checksum)
+                || preg_match('/^[a-f0-9]{64}$/D', $checksum) !== 1
+            ) {
+                return null;
+            }
+
+            $normalized[$file] = $checksum;
+        }
+
+        ksort($normalized, SORT_STRING);
+
+        return $normalized;
     }
 
     /**

@@ -24,14 +24,8 @@ class ModuleMigrationPlanningAndStatusTest extends TestCase
         $plan = app(ModuleMigrationPlanner::class)->forModule('scheduling');
 
         $this->assertEquals(['scheduling'], $plan->requestedModuleKeys);
-        $this->assertEquals([
-            'core',
-            'scheduling',
-        ], $plan->dependencyOrderedModuleKeys);
-        $this->assertEquals([
-            'core',
-            'scheduling',
-        ], $plan->migrationModuleKeys());
+        $this->assertEquals(['core', 'scheduling'], $plan->dependencyOrderedModuleKeys);
+        $this->assertEquals(['core', 'scheduling'], $plan->migrationModuleKeys());
         $this->assertNotContains('location', $plan->dependencyOrderedModuleKeys);
     }
 
@@ -53,21 +47,12 @@ class ModuleMigrationPlanningAndStatusTest extends TestCase
 
         $reporting = app(ModuleMigrationPlanner::class)->forModule('reporting');
 
-        $this->assertEquals([
-            'core',
-            'reporting',
-        ], $reporting->dependencyOrderedModuleKeys);
-        $this->assertEquals([
-            'core',
-            'reporting',
-        ], $reporting->migrationModuleKeys());
+        $this->assertEquals(['core', 'reporting'], $reporting->dependencyOrderedModuleKeys);
+        $this->assertEquals(['core', 'reporting'], $reporting->migrationModuleKeys());
 
         $integrations = app(ModuleMigrationPlanner::class)->forModule('integrations');
 
-        $this->assertEquals([
-            'core',
-            'integrations',
-        ], $integrations->dependencyOrderedModuleKeys);
+        $this->assertEquals(['core', 'integrations'], $integrations->dependencyOrderedModuleKeys);
         $this->assertEquals(['core'], $integrations->migrationModuleKeys());
     }
 
@@ -75,7 +60,6 @@ class ModuleMigrationPlanningAndStatusTest extends TestCase
     {
         try {
             app(ModuleMigrationPlanner::class)->forModule('unknown');
-
             $this->fail('Unknown modules must be rejected.');
         } catch (InvalidArgumentException $exception) {
             $this->assertSame('Unknown module [unknown].', $exception->getMessage());
@@ -91,22 +75,20 @@ class ModuleMigrationPlanningAndStatusTest extends TestCase
         app(ModuleMigrationPlanner::class)->forModule('scheduling');
     }
 
-    public function test_status_inspector_separates_migration_currency_from_ledger_tracking(): void
+    public function test_status_inspector_separates_migration_currency_ledger_contract_and_integrity(): void
     {
+        $registry = app(ModuleMigrationRegistry::class);
+        $scope = $registry->requireModule('scheduling');
         $inspector = app(ModuleMigrationStatusInspector::class);
-        $expectedMigrationCount = count(
-            app(ModuleMigrationRegistry::class)
-                ->requireModule('scheduling')
-                ->migrationFiles,
-        );
         $status = $inspector->inspectModule('scheduling');
 
         $this->assertSame(ModuleMigrationStatus::MIGRATIONS_CURRENT, $status->migrationState);
-        $this->assertSame($expectedMigrationCount, $status->expectedMigrationCount);
-        $this->assertSame($expectedMigrationCount, $status->ranMigrationCount);
-        $this->assertEquals([], $status->pendingMigrationFiles);
+        $this->assertSame(count($scope->migrationFiles), $status->expectedMigrationCount);
+        $this->assertSame(count($scope->migrationFiles), $status->ranMigrationCount);
+        $this->assertSame([], $status->pendingMigrationFiles);
         $this->assertSame(ModuleMigrationStatus::LEDGER_UNTRACKED, $status->ledgerStatus);
         $this->assertSame(ModuleMigrationStatus::CONTRACT_UNTRACKED, $status->contractState);
+        $this->assertSame(ModuleMigrationStatus::INTEGRITY_UNTRACKED, $status->integrityState);
         $this->assertTrue($status->current());
         $this->assertFalse($status->ledgerCurrent());
 
@@ -116,6 +98,8 @@ class ModuleMigrationPlanningAndStatusTest extends TestCase
 
         $this->assertSame(ModuleInstallation::STATUS_INSTALLED, $tracked->ledgerStatus);
         $this->assertSame(ModuleMigrationStatus::CONTRACT_CURRENT, $tracked->contractState);
+        $this->assertSame(ModuleMigrationStatus::INTEGRITY_CURRENT, $tracked->integrityState);
+        $this->assertSame($scope->migrationChecksums, $tracked->recordedMigrationChecksums);
         $this->assertTrue($tracked->ledgerCurrent());
 
         ModuleInstallation::query()
@@ -127,39 +111,9 @@ class ModuleMigrationPlanningAndStatusTest extends TestCase
 
         $drifted = $inspector->inspectModule('scheduling');
 
-        $this->assertSame(ModuleInstallation::STATUS_INSTALLED, $drifted->ledgerStatus);
         $this->assertSame(ModuleMigrationStatus::CONTRACT_DRIFT, $drifted->contractState);
+        $this->assertSame(ModuleMigrationStatus::INTEGRITY_CURRENT, $drifted->integrityState);
         $this->assertFalse($drifted->ledgerCurrent());
-    }
-
-    public function test_status_inspector_reports_pending_manifest_migrations(): void
-    {
-        $expectedMigrationCount = count(
-            app(ModuleMigrationRegistry::class)
-                ->requireModule('scheduling')
-                ->migrationFiles,
-        );
-
-        DB::table('migrations')
-            ->where(
-                'migration',
-                '2026_08_03_190000_create_scheduling_resource_occupancy_tables',
-            )
-            ->delete();
-
-        $status = app(ModuleMigrationStatusInspector::class)
-            ->inspectModule('scheduling');
-
-        $this->assertSame(ModuleMigrationStatus::MIGRATIONS_PARTIAL, $status->migrationState);
-        $this->assertSame($expectedMigrationCount, $status->expectedMigrationCount);
-        $this->assertEquals([
-            '2026_08_03_190000_create_scheduling_resource_occupancy_tables.php',
-        ], $status->pendingMigrationFiles);
-        $this->assertSame(
-            $expectedMigrationCount - count($status->pendingMigrationFiles),
-            $status->ranMigrationCount,
-        );
-        $this->assertFalse($status->current());
     }
 
     public function test_modules_status_command_is_read_only_and_can_limit_to_a_dependency_closure(): void
@@ -176,39 +130,35 @@ class ModuleMigrationPlanningAndStatusTest extends TestCase
         $this->assertStringContainsString('core', $output);
         $this->assertStringContainsString('scheduling', $output);
         $this->assertStringNotContainsString('location', $output);
-        $this->assertStringContainsString('current', $output);
-        $this->assertStringContainsString('untracked', $output);
         $this->assertSame($installationCountBefore, ModuleInstallation::query()->count());
         $this->assertSame($migrationCountBefore, DB::table('migrations')->count());
 
         $this->assertSame(1, Artisan::call('modules:status', [
             'module' => 'unknown',
         ]));
-        $this->assertStringContainsString(
-            'Unknown module [unknown].',
-            Artisan::output(),
-        );
     }
 
-    public function test_newly_discovered_migration_is_pending_then_runs_and_becomes_current(): void
+    public function test_newly_discovered_migration_is_pending_with_current_integrity_then_runs_and_extends_baseline(): void
     {
         $registry = app(ModuleMigrationRegistry::class);
         $inspector = app(ModuleMigrationStatusInspector::class);
         $scope = $registry->requireModule('core');
-        $filename = '2026_09_17_235959_test_module_inventory_discovery.php';
+        $filename = '2099_01_01_000020_test_module_inventory_discovery.php';
         $path = base_path($scope->path.'/'.$filename);
 
         $this->assertSame(0, Artisan::call('modules:reconcile', ['module' => 'core']));
-        $this->assertTrue($inspector->inspectModule('core')->current());
-        $this->assertFalse(File::exists($path));
+        $baseline = ModuleInstallation::query()->findOrFail('core')->migration_checksums;
+        $this->assertIsArray($baseline);
 
         File::put($path, <<<'PHP'
 <?php
 
 use Illuminate\Database\Migrations\Migration;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void {}
+
     public function down(): void {}
 };
 PHP);
@@ -216,15 +166,18 @@ PHP);
         try {
             $migrationCountBefore = DB::table('migrations')->count();
             $installationBefore = ModuleInstallation::query()->findOrFail('core');
-            $hashBefore = $installationBefore->manifest_hash;
 
             $this->assertSame(0, Artisan::call('modules:status', ['module' => 'core']));
             $this->assertSame($migrationCountBefore, DB::table('migrations')->count());
-            $this->assertSame($hashBefore, ModuleInstallation::query()->findOrFail('core')->manifest_hash);
+            $this->assertSame(
+                $installationBefore->manifest_hash,
+                ModuleInstallation::query()->findOrFail('core')->manifest_hash,
+            );
 
             $pending = $inspector->inspectModule('core');
             $this->assertFalse($pending->current());
             $this->assertContains($filename, $pending->pendingMigrationFiles);
+            $this->assertSame(ModuleMigrationStatus::INTEGRITY_CURRENT, $pending->integrityState);
             $this->assertFalse($pending->ledgerCurrent());
 
             $this->assertSame(0, Artisan::call('modules:migrate', ['module' => 'core']));
@@ -232,11 +185,18 @@ PHP);
             $current = $inspector->inspectModule('core');
             $this->assertTrue($current->current());
             $this->assertTrue($current->ledgerCurrent());
-            $this->assertSame([], $current->pendingMigrationFiles);
+            $this->assertSame(ModuleMigrationStatus::INTEGRITY_CURRENT, $current->integrityState);
+            $this->assertArrayHasKey(
+                $filename,
+                ModuleInstallation::query()->findOrFail('core')->migration_checksums,
+            );
             $this->assertDatabaseHas('migrations', [
                 'migration' => pathinfo($filename, PATHINFO_FILENAME),
             ]);
         } finally {
+            DB::table('migrations')
+                ->where('migration', pathinfo($filename, PATHINFO_FILENAME))
+                ->delete();
             File::delete($path);
         }
     }

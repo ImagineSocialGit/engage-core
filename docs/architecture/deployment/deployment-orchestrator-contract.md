@@ -227,7 +227,7 @@ Secrets never belong in the state file.
 - pulls approved Core/client commits;
 - installs dependencies/builds assets;
 - reruns the deployment-plan/setup-step loop for any newly required environment/provider values;
-- runs platform migrations, installed-module migrations, preset sync, status, and setup validation;
+- runs platform migrations, read-only module migration preflight, installed-module migrations, preset sync, status, and setup validation;
 - refreshes runtime processes/host configuration;
 - runs safe verification.
 
@@ -244,7 +244,7 @@ bash scripts/operations/launch-client-environment.sh add-modules /path/to/state.
   --module scheduling
 ```
 
-The launcher refuses a requested module that is not enabled by the pulled client configuration. For each requested module it runs the application-owned `modules:install <module> --force` dependency closure, then preset sync/status/setup validation and runtime/host verification.
+The launcher refuses a requested module that is not enabled by the pulled client configuration. For each requested module it runs `modules:preflight <module>` immediately before the application-owned `modules:install <module> --force` dependency closure, then preset sync/status/setup validation and runtime/host verification.
 
 This flow may activate new deployment-plan requirements or provider setup steps before schema installation.
 
@@ -275,7 +275,7 @@ The auditor may inspect:
 - duplicate readable Redis/cache/Horizon prefixes across `/var/www`, using one pruned environment scan for all three namespace keys;
 - `engage:deployment-plan --json`;
 - `modules:status`;
-- enabled-module migration state and installation-ledger state, using the application migration planner/status inspector read-only;
+- enabled-module migration state, installation-ledger state, and accepted migration-checksum integrity, using the application migration planner/status inspector read-only;
 - `setup:validate`;
 - runtime-directory effective access without creating probe files;
 - Supervisor/Horizon config/process state;
@@ -301,6 +301,10 @@ MANUAL VERIFICATION REQUIRED
 Nginx runtime ownership is determined from application-serving blocks with a document root. Redirect-only/Certbot companion blocks may repeat the same `server_name`, but they do not count as a second application owner. Multiple distinct application document roots claiming the same CRM hostname are `BREAKING`.
 
 The audit implementation must not call mutating launcher helpers or commands. In particular it must not write environment files/state, run `engage:environment:sync --write-missing`, change permissions, migrate/install schema, alter Nginx/Supervisor/cron, issue certificates, reload services, clear Redis, or change provider/DNS state.
+
+Migration inventory comes from direct-child PHP files inside the paths declared by `config/module_migrations.php`; the config does not duplicate filenames or schema-version counters. The derived schema version is compatibility metadata only. The accepted checksum map in `module_installations` is the history-integrity contract used by audit, preflight, setup validation, and the module executor.
+
+Automatic schema repair may run platform migrations and then preflight, but it must not auto-normalize checksum drift. Changed, removed, or unmanaged applied migration history remains a manual investigation blocker.
 
 For staging `.env` files, the currently proven convention is deploy-user ownership, deploy-user primary group, and mode `0664`. Runtime-directory correctness is tested through effective deploy/web write access; metadata divergence from the launcher convention is `INFO` when access is still effective.
 

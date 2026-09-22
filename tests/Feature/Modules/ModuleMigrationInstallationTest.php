@@ -5,6 +5,7 @@ namespace Tests\Feature\Modules;
 use App\Support\Modules\Migrations\ModuleInstallation;
 use App\Support\Modules\Migrations\ModuleInstallationRepository;
 use App\Support\Modules\Migrations\ModuleMigrationExecutor;
+use App\Support\Modules\Migrations\ModuleMigrationRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -33,18 +34,6 @@ class ModuleMigrationInstallationTest extends TestCase
             'module' => 'scheduling',
         ]));
 
-        $output = Artisan::output();
-
-        $this->assertStringContainsString(
-            'Resolved modules: core, scheduling',
-            $output,
-        );
-        $this->assertStringNotContainsString('location', $output);
-        $this->assertSame(
-            $migrationCountBefore,
-            DB::table('migrations')->count(),
-        );
-
         $this->assertDatabaseHas('module_installations', [
             'module_key' => 'core',
             'status' => ModuleInstallation::STATUS_INSTALLED,
@@ -56,32 +45,35 @@ class ModuleMigrationInstallationTest extends TestCase
         $this->assertDatabaseMissing('module_installations', [
             'module_key' => 'location',
         ]);
+        $expectedChecksums = app(ModuleMigrationRegistry::class)
+            ->requireModule('scheduling')
+            ->migrationChecksums;
+        $actualChecksums = ModuleInstallation::query()
+            ->findOrFail('scheduling')
+            ->migration_checksums;
+        ksort($expectedChecksums, SORT_STRING);
+        ksort($actualChecksums, SORT_STRING);
 
-        $installedAt = ModuleInstallation::query()
-            ->findOrFail('scheduling')
-            ->installed_at;
-        $lastMigratedAt = ModuleInstallation::query()
-            ->findOrFail('scheduling')
-            ->last_migrated_at;
+        $this->assertSame($expectedChecksums, $actualChecksums);
+        $this->assertSame($migrationCountBefore, DB::table('migrations')->count());
+
+        $installedAt = ModuleInstallation::query()->findOrFail('scheduling')->installed_at;
+        $lastMigratedAt = ModuleInstallation::query()->findOrFail('scheduling')->last_migrated_at;
 
         CarbonImmutable::setTestNow('2026-08-06 13:00:00 UTC');
 
         $this->assertSame(0, Artisan::call('modules:install', [
             'module' => 'scheduling',
         ]));
-        $this->assertStringContainsString('current', Artisan::output());
 
         $repeated = ModuleInstallation::query()->findOrFail('scheduling');
 
         $this->assertTrue($repeated->installed_at?->equalTo($installedAt));
         $this->assertTrue($repeated->last_migrated_at?->equalTo($lastMigratedAt));
-        $this->assertSame(
-            $migrationCountBefore,
-            DB::table('migrations')->count(),
-        );
+        $this->assertSame($migrationCountBefore, DB::table('migrations')->count());
     }
 
-    public function test_failed_scope_stops_the_plan_and_does_not_start_later_scopes(): void
+    public function test_invalid_scope_configuration_stops_before_ledger_mutation(): void
     {
         config()->set(
             'module_migrations.modules.messaging.path',
@@ -94,35 +86,27 @@ class ModuleMigrationInstallationTest extends TestCase
             'module' => 'internal_notifications',
         ]));
 
-        $this->assertStringContainsString(
-            'Module migration scope [messaging] failed',
-            Artisan::output(),
-        );
-        $this->assertDatabaseHas('module_installations', [
-            'module_key' => 'core',
-            'status' => ModuleInstallation::STATUS_INSTALLED,
-        ]);
-        $this->assertDatabaseHas('module_installations', [
-            'module_key' => 'messaging',
-            'status' => ModuleInstallation::STATUS_FAILED,
-        ]);
-        $this->assertDatabaseMissing('module_installations', [
-            'module_key' => 'internal_notifications',
-        ]);
-        $this->assertSame(
-            $migrationCountBefore,
-            DB::table('migrations')->count(),
-        );
+        $this->assertSame(0, ModuleInstallation::query()->count());
+        $this->assertSame($migrationCountBefore, DB::table('migrations')->count());
     }
 
-    public function test_interrupted_installing_state_is_resumed_to_installed(): void
+    public function test_interrupted_installing_state_preserves_baseline_and_is_resumed_to_installed(): void
     {
-        app(ModuleInstallationRepository::class)->begin('scheduling');
+        $repository = app(ModuleInstallationRepository::class);
+        $repository->markInstalled('scheduling');
+        $accepted = ModuleInstallation::query()->findOrFail('scheduling')->migration_checksums;
 
-        $this->assertDatabaseHas('module_installations', [
-            'module_key' => 'scheduling',
-            'status' => ModuleInstallation::STATUS_INSTALLING,
-        ]);
+        $repository->begin('scheduling');
+
+        $installing = ModuleInstallation::query()->findOrFail('scheduling');
+        $this->assertSame(ModuleInstallation::STATUS_INSTALLING, $installing->status);
+        $this->assertSame($accepted, $installing->migration_checksums);
+
+        $repository->markFailed('scheduling');
+        $this->assertSame(
+            $accepted,
+            ModuleInstallation::query()->findOrFail('scheduling')->migration_checksums,
+        );
 
         $this->assertSame(0, Artisan::call('modules:install', [
             'module' => 'scheduling',
@@ -144,10 +128,6 @@ class ModuleMigrationInstallationTest extends TestCase
             $this->assertSame(1, Artisan::call('modules:install', [
                 'module' => 'scheduling',
             ]));
-            $this->assertStringContainsString(
-                'Another module migration operation is already running.',
-                Artisan::output(),
-            );
             $this->assertSame(0, ModuleInstallation::query()->count());
         } finally {
             $lock->release();

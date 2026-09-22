@@ -16,9 +16,7 @@ final class ModuleMigrationRegistry
         return $this->definitions()['platform'];
     }
 
-    /**
-     * @return array<string, MigrationScopeDefinition>
-     */
+    /** @return array<string, MigrationScopeDefinition> */
     public function modules(): array
     {
         return array_filter(
@@ -55,9 +53,7 @@ final class ModuleMigrationRegistry
         return $this->module($moduleKey) instanceof MigrationScopeDefinition;
     }
 
-    /**
-     * @return array<string, MigrationScopeDefinition>
-     */
+    /** @return array<string, MigrationScopeDefinition> */
     public function definitions(): array
     {
         $configuration = config('module_migrations');
@@ -77,7 +73,7 @@ final class ModuleMigrationRegistry
         ));
 
         if ($unknownRootFields !== []) {
-            sort($unknownRootFields);
+            sort($unknownRootFields, SORT_STRING);
 
             throw new InvalidArgumentException(sprintf(
                 'module_migrations contains unsupported root field(s): [%s].',
@@ -101,10 +97,7 @@ final class ModuleMigrationRegistry
         }
 
         $definitions = [
-            'platform' => $this->withDiscoveredMigrations(
-                MigrationScopeDefinition::platform($platform),
-                $platform,
-            ),
+            'platform' => MigrationScopeDefinition::platform($platform),
         ];
 
         foreach ($moduleDefinitions as $moduleKey => $definition) {
@@ -128,8 +121,8 @@ final class ModuleMigrationRegistry
                 );
             }
 
-            $definitions[$moduleKey] = $this->withDiscoveredMigrations(
-                MigrationScopeDefinition::module($moduleKey, $definition),
+            $definitions[$moduleKey] = MigrationScopeDefinition::module(
+                $moduleKey,
                 $definition,
             );
         }
@@ -140,44 +133,13 @@ final class ModuleMigrationRegistry
         return $definitions;
     }
 
-    /**
-     * Laravel's migrator scans every PHP file in a scope directory. Status and
-     * the installation contract must include those same files, even before the
-     * committed manifest has been updated. Resolve on each call so a long-lived
-     * process also sees migrations added after an earlier inspection.
-     *
-     * @param array<string, mixed> $definition
-     */
-    private function withDiscoveredMigrations(
-        MigrationScopeDefinition $scope,
-        array $definition,
-    ): MigrationScopeDefinition {
-        $discovered = glob(base_path($scope->path).'/*.php');
-
-        if ($discovered === false || $discovered === []) {
-            return $scope;
-        }
-
-        $files = array_map('basename', $discovered);
-        sort($files);
-        $definition['migrations'] = array_values(array_unique([
-            ...$scope->migrationFiles,
-            ...$files,
-        ]));
-
-        return $scope->isPlatform()
-            ? MigrationScopeDefinition::platform($definition)
-            : MigrationScopeDefinition::module((string) $scope->moduleKey, $definition);
-    }
-
     public function manifestHash(MigrationScopeDefinition $definition): string
     {
         return hash('sha256', json_encode([
             'key' => $definition->key,
             'module_key' => $definition->moduleKey,
             'path' => $definition->path,
-            'schema_version' => $definition->schemaVersion,
-            'migrations' => $definition->migrationFiles,
+            'migrations' => $definition->migrationChecksums,
         ], JSON_THROW_ON_ERROR));
     }
 
@@ -194,27 +156,21 @@ final class ModuleMigrationRegistry
         return null;
     }
 
-    /**
-     * @return array<int, string>
-     */
+    /** @return array<int, string> */
     public function migrationFiles(): array
     {
         $files = [];
 
         foreach ($this->definitions() as $definition) {
-            foreach ($definition->migrationFiles as $migrationFile) {
-                $files[] = $migrationFile;
-            }
+            $files = [...$files, ...$definition->migrationFiles];
         }
 
-        sort($files);
+        sort($files, SORT_STRING);
 
         return $files;
     }
 
-    /**
-     * @param array<string, MigrationScopeDefinition> $definitions
-     */
+    /** @param array<string, MigrationScopeDefinition> $definitions */
     private function assertUniquePaths(array $definitions): void
     {
         $ownersByPath = [];
@@ -232,9 +188,7 @@ final class ModuleMigrationRegistry
         }
     }
 
-    /**
-     * @param array<string, MigrationScopeDefinition> $definitions
-     */
+    /** @param array<string, MigrationScopeDefinition> $definitions */
     private function assertUniqueMigrationOwners(array $definitions): void
     {
         $ownersByFile = [];

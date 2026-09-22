@@ -93,7 +93,25 @@ class LaunchClientEnvironmentScriptTest extends TestCase
         $this->assertStringContainsString('engage:deployment-plan --json', $launcher);
         $this->assertStringContainsString('run-setup-steps', $launcher);
         $this->assertStringContainsString('modules:install', $launcher);
+        $this->assertStringContainsString('modules:preflight', $launcher);
         $this->assertStringNotContainsString('HORIZON_PRIMARY_QUEUES', $launcher);
+
+        $updateStart = strpos($launcher, 'update_application() {');
+        $updateEnd = strpos($launcher, 'install_added_modules() {', $updateStart);
+
+        $this->assertNotFalse($updateStart);
+        $this->assertNotFalse($updateEnd);
+
+        $update = substr($launcher, $updateStart, $updateEnd - $updateStart);
+        $platformMigrationPosition = strpos($update, 'artisan migrate --force');
+        $preflightPosition = strpos($update, 'artisan modules:preflight');
+        $moduleMigrationPosition = strpos($update, 'artisan modules:migrate --force');
+
+        $this->assertNotFalse($platformMigrationPosition);
+        $this->assertNotFalse($preflightPosition);
+        $this->assertNotFalse($moduleMigrationPosition);
+        $this->assertLessThan($preflightPosition, $platformMigrationPosition);
+        $this->assertLessThan($moduleMigrationPosition, $preflightPosition);
     }
 
     public function test_machine_requirement_json_exposes_non_secret_expected_value(): void

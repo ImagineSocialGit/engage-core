@@ -25,17 +25,17 @@ final class ModuleInstallation extends Model
         'status',
         'schema_version',
         'manifest_hash',
+        'migration_checksums',
         'installed_at',
         'last_migrated_at',
     ];
 
-    /**
-     * @return array<string, string>
-     */
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
             'schema_version' => 'integer',
+            'migration_checksums' => 'array',
             'installed_at' => 'immutable_datetime',
             'last_migrated_at' => 'immutable_datetime',
         ];

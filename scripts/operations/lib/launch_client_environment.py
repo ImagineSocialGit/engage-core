@@ -554,6 +554,9 @@ def command_module_status_audit(args: argparse.Namespace) -> None:
     ledger_exists = bool(
         isinstance(platform, dict) and platform.get('ledger_exists') is True
     )
+    checksum_ledger_exists = bool(
+        isinstance(platform, dict) and platform.get('checksum_ledger_exists') is True
+    )
 
     if not repository_exists:
         audit_line(
@@ -579,6 +582,19 @@ def command_module_status_audit(args: argparse.Namespace) -> None:
             'PASS',
             'module_migrations.platform_ledger',
             'The module installation ledger exists.',
+        )
+
+    if not checksum_ledger_exists:
+        audit_line(
+            'BREAKING',
+            'module_migrations.checksum_ledger',
+            'The module installation ledger does not support migration checksums. Run platform migrations before module schema changes.',
+        )
+    else:
+        audit_line(
+            'PASS',
+            'module_migrations.checksum_ledger',
+            'The module migration checksum ledger is available.',
         )
 
     for scope in scopes:
@@ -608,6 +624,69 @@ def command_module_status_audit(args: argparse.Namespace) -> None:
                 'BREAKING',
                 f'module_migrations.{module}.schema',
                 f'Enabled schema scope [{module}] is {migration_state} ({progress}). Pending: {pending_summary}.',
+            )
+
+        integrity_state = audit_text(scope.get('integrity_state', 'unavailable'))
+        changed = [
+            audit_text(item)
+            for item in scope.get('changed_applied_migrations', [])
+            if isinstance(item, str) and item.strip()
+        ]
+        missing = [
+            audit_text(item)
+            for item in scope.get('missing_recorded_migrations', [])
+            if isinstance(item, str) and item.strip()
+        ]
+        untracked_applied = [
+            audit_text(item)
+            for item in scope.get('untracked_applied_migrations', [])
+            if isinstance(item, str) and item.strip()
+        ]
+
+        if integrity_state == 'current':
+            audit_line(
+                'PASS',
+                f'module_migrations.{module}.integrity',
+                f'Enabled schema scope [{module}] accepted migration history matches source.',
+            )
+        elif integrity_state == 'baseline_missing':
+            if pending:
+                audit_line(
+                    'BREAKING',
+                    f'module_migrations.{module}.integrity',
+                    f'Enabled schema scope [{module}] has no accepted checksum baseline and also has pending migrations.',
+                )
+            else:
+                audit_line(
+                    'WARNING',
+                    f'module_migrations.{module}.integrity',
+                    f'Enabled schema scope [{module}] has no accepted checksum baseline yet; a schema-current migration operation may establish it.',
+                )
+        elif integrity_state == 'drift':
+            details = []
+            if changed:
+                details.append('changed: '+', '.join(changed[:3]))
+            if missing:
+                details.append('missing: '+', '.join(missing[:3]))
+            if untracked_applied:
+                details.append('untracked applied: '+', '.join(untracked_applied[:3]))
+            summary = '; '.join(details) if details else 'stored checksum baseline is invalid'
+            audit_line(
+                'BREAKING',
+                f'module_migrations.{module}.integrity',
+                f'Enabled schema scope [{module}] has migration history integrity drift ({summary}).',
+            )
+        elif integrity_state == 'untracked':
+            audit_line(
+                'INFO',
+                f'module_migrations.{module}.integrity',
+                f'Enabled schema scope [{module}] has no accepted checksum baseline because it is not tracked as installed.',
+            )
+        else:
+            audit_line(
+                'BREAKING',
+                f'module_migrations.{module}.integrity',
+                f'Enabled schema scope [{module}] migration integrity is unavailable.',
             )
 
         if not ledger_exists:
@@ -651,16 +730,20 @@ def command_module_status_fix_modules(args: argparse.Namespace) -> None:
         migration_state = scope.get('migration_state')
         ledger_status = scope.get('ledger_status')
         contract_state = scope.get('contract_state')
+        integrity_state = scope.get('integrity_state')
+
+        if integrity_state == 'drift':
+            continue
 
         if (
             migration_state == 'current'
             and ledger_status == 'installed'
             and contract_state == 'current'
+            and integrity_state == 'current'
         ):
             continue
 
         print(module.strip())
-
 
 def command_plan_audit(args: argparse.Namespace) -> None:
     try:
@@ -994,8 +1077,6 @@ def command_nginx_host_owners_stdin(args: argparse.Namespace) -> None:
         _nginx_host_owners_from_sections(_nginx_dump_sections(text), host),
         sort_keys=True,
     ))
-
-
 def command_origin_host(args: argparse.Namespace) -> None:
     parsed = urlparse(args.origin.strip())
     if parsed.scheme not in {'http', 'https'} or not parsed.hostname:

@@ -10,7 +10,7 @@ use Tests\TestCase;
 
 class ModuleMigrationRegistryTest extends TestCase
 {
-    public function test_registry_declares_platform_and_schema_managed_module_ownership(): void
+    public function test_registry_discovers_platform_and_schema_managed_module_contracts_from_paths(): void
     {
         $registry = app(ModuleMigrationRegistry::class);
         $platformDefinition = config('module_migrations.platform');
@@ -21,18 +21,9 @@ class ModuleMigrationRegistryTest extends TestCase
 
         $platform = $registry->platform();
 
-        $this->assertSame(
-            (string) $platformDefinition['path'],
-            $platform->path,
-        );
-        $this->assertSame(
-            (int) $platformDefinition['schema_version'],
-            $platform->schemaVersion,
-        );
-        $this->assertEquals(
-            array_values($platformDefinition['migrations']),
-            $platform->migrationFiles,
-        );
+        $this->assertSame((string) $platformDefinition['path'], $platform->path);
+        $this->assertSame(count($platform->migrationFiles), $platform->schemaVersion);
+        $this->assertSame($platform->migrationFiles, array_keys($platform->migrationChecksums));
 
         $this->assertEquals(
             array_keys($moduleDefinitions),
@@ -41,24 +32,17 @@ class ModuleMigrationRegistryTest extends TestCase
 
         foreach ($moduleDefinitions as $moduleKey => $definition) {
             $this->assertIsArray($definition);
+            $this->assertSame(['path'], array_keys($definition));
 
             $scope = $registry->requireModule((string) $moduleKey);
 
-            $this->assertSame(
-                (string) $definition['path'],
-                $scope->path,
-                "Migration scope [{$moduleKey}] path drifted from module_migrations config.",
-            );
-            $this->assertSame(
-                (int) $definition['schema_version'],
-                $scope->schemaVersion,
-                "Migration scope [{$moduleKey}] schema version drifted from module_migrations config.",
-            );
-            $this->assertEquals(
-                array_values($definition['migrations']),
-                $scope->migrationFiles,
-                "Migration scope [{$moduleKey}] manifest drifted from module_migrations config.",
-            );
+            $this->assertSame((string) $definition['path'], $scope->path);
+            $this->assertSame(count($scope->migrationFiles), $scope->schemaVersion);
+            $this->assertSame($scope->migrationFiles, array_keys($scope->migrationChecksums));
+
+            foreach ($scope->migrationChecksums as $checksum) {
+                $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/D', $checksum);
+            }
         }
 
         $this->assertFalse($registry->hasModule('dashboard'));
@@ -91,10 +75,39 @@ class ModuleMigrationRegistryTest extends TestCase
         $this->assertEquals($currentFiles, $registry->migrationFiles());
 
         foreach ($currentFiles as $migrationFile) {
-            $this->assertNotNull(
-                $registry->ownerFor($migrationFile),
-                "Migration [{$migrationFile}] has no registered owner.",
+            $this->assertNotNull($registry->ownerFor($migrationFile));
+        }
+    }
+
+    public function test_new_migration_is_discovered_without_configuration_changes_and_changes_manifest_when_contents_change(): void
+    {
+        $filename = '2099_01_01_000001_test_registry_discovery.php';
+        $path = database_path('migrations/modules/core/'.$filename);
+
+        File::put($path, "<?php\n\n// original\nreturn new class {};\n");
+
+        try {
+            $registry = app(ModuleMigrationRegistry::class);
+            $scope = $registry->requireModule('core');
+            $originalHash = $registry->manifestHash($scope);
+
+            $this->assertContains($filename, $scope->migrationFiles);
+            $this->assertSame(count($scope->migrationFiles), $scope->schemaVersion);
+
+            File::put($path, "<?php\n\n// changed\nreturn new class {};\n");
+
+            $changed = $registry->requireModule('core');
+
+            $this->assertNotSame(
+                $originalHash,
+                $registry->manifestHash($changed),
             );
+            $this->assertNotSame(
+                $scope->checksum($filename),
+                $changed->checksum($filename),
+            );
+        } finally {
+            File::delete($path);
         }
     }
 
@@ -107,20 +120,8 @@ class ModuleMigrationRegistryTest extends TestCase
         $this->assertEquals(['core'], $modules->dependencies('location'));
         $this->assertTrue($registry->hasModule('scheduling'));
         $this->assertTrue($registry->hasModule('location'));
-
-        $scheduling = $registry->requireModule('scheduling');
-
-        $this->assertFalse($scheduling->owns(
-            '2026_08_10_040000_add_range_duration_policy_to_bookable_services.php',
-        ));
-        $this->assertTrue($scheduling->owns(
-            '2026_04_15_195860_create_bookable_services_table.php',
-        ));
-        $this->assertFalse($scheduling->owns(
-            '2026_08_04_190000_add_location_snapshots_to_booking_holds.php',
-        ));
         $this->assertNotSame(
-            $scheduling->path,
+            $registry->requireModule('scheduling')->path,
             $registry->requireModule('location')->path,
         );
     }
@@ -128,11 +129,7 @@ class ModuleMigrationRegistryTest extends TestCase
     public function test_registry_rejects_unknown_module_keys(): void
     {
         config()->set('module_migrations.modules.unknown_module', [
-            'path' => 'database/migrations/modules/unknown_module',
-            'schema_version' => 1,
-            'migrations' => [
-                '2026_08_05_000000_create_unknown_table.php',
-            ],
+            'path' => 'database/migrations/modules/core',
         ]);
 
         $this->expectException(InvalidArgumentException::class);
@@ -158,37 +155,109 @@ class ModuleMigrationRegistryTest extends TestCase
         app(ModuleMigrationRegistry::class)->definitions();
     }
 
-    public function test_registry_rejects_duplicate_migration_ownership(): void
+    public function test_registry_rejects_duplicate_discovered_migration_ownership(): void
     {
-        $duplicate = config(
-            'module_migrations.modules.scheduling.migrations.0',
-        );
+        $filename = '2099_01_01_000002_test_duplicate_migration_owner.php';
+        $schedulingPath = database_path('migrations/modules/scheduling/'.$filename);
+        $locationPath = database_path('migrations/modules/location/'.$filename);
+        $source = "<?php\n\nreturn new class {};\n";
 
-        config()->push(
-            'module_migrations.modules.location.migrations',
-            $duplicate,
-        );
+        File::put($schedulingPath, $source);
+        File::put($locationPath, $source);
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            "Migration [{$duplicate}] is owned by both [scheduling] and [location].",
-        );
+        try {
+            app(ModuleMigrationRegistry::class)->definitions();
 
-        app(ModuleMigrationRegistry::class)->definitions();
+            $this->fail('Duplicate migration ownership must be rejected.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame(
+                "Migration [{$filename}] is owned by both [scheduling] and [location].",
+                $exception->getMessage(),
+            );
+        } finally {
+            File::delete([$schedulingPath, $locationPath]);
+        }
     }
 
-    public function test_scope_definitions_reject_unsafe_paths_and_unknown_fields(): void
+    public function test_scope_definitions_reject_unsafe_unknown_missing_empty_and_escaping_paths(): void
     {
         config()->set(
             'module_migrations.modules.core.path',
             'database/migrations/../outside',
         );
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            'Migration scope [core] path must be a normalized repository-relative directory under database/migrations.',
-        );
+        try {
+            app(ModuleMigrationRegistry::class)->definitions();
+            $this->fail('Unsafe migration paths must be rejected.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertStringContainsString(
+                'must be a normalized repository-relative directory',
+                $exception->getMessage(),
+            );
+        }
 
-        app(ModuleMigrationRegistry::class)->definitions();
+        config()->set('module_migrations.modules.core', [
+            'path' => 'database/migrations/modules/core',
+            'migrations' => [],
+        ]);
+
+        try {
+            app(ModuleMigrationRegistry::class)->definitions();
+            $this->fail('Unknown migration-scope fields must be rejected.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertStringContainsString(
+                'contains unsupported field(s): [migrations]',
+                $exception->getMessage(),
+            );
+        }
+
+        config()->set('module_migrations.modules.core', [
+            'path' => 'database/migrations/modules/missing-core',
+        ]);
+
+        try {
+            app(ModuleMigrationRegistry::class)->definitions();
+            $this->fail('Missing migration directories must be rejected.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertStringContainsString('does not exist', $exception->getMessage());
+        }
+
+        $emptyPath = database_path('migrations/modules/test-empty-scope');
+        File::ensureDirectoryExists($emptyPath);
+        config()->set('module_migrations.modules.core', [
+            'path' => 'database/migrations/modules/test-empty-scope',
+        ]);
+
+        try {
+            app(ModuleMigrationRegistry::class)->definitions();
+            $this->fail('Empty migration directories must be rejected.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertStringContainsString('contains no migration files', $exception->getMessage());
+        } finally {
+            File::deleteDirectory($emptyPath);
+        }
+
+        $outsidePath = storage_path('framework/testing/migration-scope-outside');
+        $linkPath = database_path('migrations/modules/test-escaping-scope');
+        File::ensureDirectoryExists($outsidePath);
+        File::put($outsidePath.'/2099_01_01_000003_test_escape.php', "<?php\nreturn new class {};\n");
+        @unlink($linkPath);
+        symlink($outsidePath, $linkPath);
+        config()->set('module_migrations.modules.core', [
+            'path' => 'database/migrations/modules/test-escaping-scope',
+        ]);
+
+        try {
+            app(ModuleMigrationRegistry::class)->definitions();
+            $this->fail('Migration directories resolving outside database/migrations must be rejected.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertStringContainsString(
+                'must resolve beneath database/migrations',
+                $exception->getMessage(),
+            );
+        } finally {
+            @unlink($linkPath);
+            File::deleteDirectory($outsidePath);
+        }
     }
 }

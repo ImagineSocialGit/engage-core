@@ -24,9 +24,7 @@ final class ModuleInstallationRepository
             === ModuleInstallation::STATUS_INSTALLED;
     }
 
-    /**
-     * @return array<int, string>
-     */
+    /** @return array<int, string> */
     public function installedModuleKeys(): array
     {
         return ModuleInstallation::query()
@@ -46,11 +44,15 @@ final class ModuleInstallationRepository
             $installation = ModuleInstallation::query()->firstOrNew([
                 'module_key' => $scope->moduleKey,
             ]);
+            $acceptedChecksums = $installation->exists
+                ? $installation->migration_checksums
+                : null;
 
             $installation->fill([
                 'status' => ModuleInstallation::STATUS_INSTALLING,
                 'schema_version' => $scope->schemaVersion,
                 'manifest_hash' => $this->registry->manifestHash($scope),
+                'migration_checksums' => $acceptedChecksums,
                 'installed_at' => $installation->installed_at,
                 'last_migrated_at' => $installation->last_migrated_at,
             ]);
@@ -76,6 +78,7 @@ final class ModuleInstallationRepository
                 'status' => ModuleInstallation::STATUS_INSTALLED,
                 'schema_version' => $scope->schemaVersion,
                 'manifest_hash' => $this->registry->manifestHash($scope),
+                'migration_checksums' => $scope->migrationChecksums,
                 'installed_at' => $installation->installed_at ?? $occurredAt,
                 'last_migrated_at' => $occurredAt,
             ]);
@@ -93,11 +96,15 @@ final class ModuleInstallationRepository
             $installation = ModuleInstallation::query()->firstOrNew([
                 'module_key' => $scope->moduleKey,
             ]);
+            $acceptedChecksums = $installation->exists
+                ? $installation->migration_checksums
+                : null;
 
             $installation->fill([
                 'status' => ModuleInstallation::STATUS_FAILED,
                 'schema_version' => $scope->schemaVersion,
                 'manifest_hash' => $this->registry->manifestHash($scope),
+                'migration_checksums' => $acceptedChecksums,
                 'installed_at' => $installation->installed_at,
                 'last_migrated_at' => $installation->last_migrated_at,
             ]);

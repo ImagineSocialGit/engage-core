@@ -20,6 +20,7 @@ final class ModuleMigrationExecutor
         private readonly Migrator $migrator,
         private readonly ModuleMigrationStatusInspector $statusInspector,
         private readonly ModuleInstallationRepository $installations,
+        private readonly ModuleMigrationPreflightInspector $preflight,
     ) {}
 
     public function execute(
@@ -71,6 +72,8 @@ final class ModuleMigrationExecutor
         }
 
         try {
+            $this->preflight->assertSafe($plan);
+
             return $operation();
         } finally {
             $lock->release();
@@ -321,7 +324,7 @@ final class ModuleMigrationExecutor
 
             if (! is_file(base_path($targetPath))) {
                 throw new RuntimeException(
-                    "Registered module migration [{$targetPath}] does not exist.",
+                    "Discovered module migration [{$targetPath}] does not exist.",
                 );
             }
         }

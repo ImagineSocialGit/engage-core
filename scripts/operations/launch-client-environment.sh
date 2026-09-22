@@ -626,6 +626,7 @@ update_application() {
     cd "$APP_PATH"
     verify_database_connection
     "$PHP_BIN" artisan migrate --force
+    "$PHP_BIN" artisan modules:preflight
     "$PHP_BIN" artisan modules:migrate --force
     "$PHP_BIN" artisan presets:sync
     "$PHP_BIN" artisan modules:status
@@ -643,6 +644,7 @@ install_added_modules() {
         if ! module_enabled "$module"; then
             fail "Requested module [$module] is not enabled by the pulled client configuration. Enable/test/commit it in development first."
         fi
+        "$PHP_BIN" artisan modules:preflight "$module"
         "$PHP_BIN" artisan modules:install "$module" --force
     done
     "$PHP_BIN" artisan presets:sync
@@ -1709,6 +1711,8 @@ $payload = [
     "platform" => [
         "repository_exists" => $migrator->repositoryExists(),
         "ledger_exists" => \Illuminate\Support\Facades\Schema::hasTable("module_installations"),
+        "checksum_ledger_exists" => \Illuminate\Support\Facades\Schema::hasTable("module_installations")
+            && \Illuminate\Support\Facades\Schema::hasColumn("module_installations", "migration_checksums"),
     ],
     "scopes" => array_map(
         static fn (\App\Support\Modules\Migrations\ModuleMigrationStatus $status): array => [
@@ -1718,6 +1722,10 @@ $payload = [
             "pending_migrations" => $status->pendingMigrationFiles,
             "ledger_status" => $status->ledgerStatus,
             "contract_state" => $status->contractState,
+            "integrity_state" => $status->integrityState,
+            "changed_applied_migrations" => $status->changedAppliedMigrationFiles,
+            "missing_recorded_migrations" => $status->missingRecordedMigrationFiles,
+            "untracked_applied_migrations" => $status->untrackedAppliedMigrationFiles,
         ],
         $statuses,
     ),
@@ -1995,7 +2003,6 @@ for owner in owners:
         audit_result BREAKING nginx.document_root \
             "CRM Nginx ownership does not resolve to $APP_PATH/public."
     fi
-
     if [[ "$crm_fastcgi" == "unix:$PHP_FPM_SOCKET" ]]; then
         audit_result PASS nginx.php_fpm \
             "The CRM application-serving block uses expected PHP-FPM socket $PHP_FPM_SOCKET."
@@ -2915,6 +2922,7 @@ fix_schema_plan() {
 
     echo "  [schema] cd $APP_PATH"
     echo "           $PHP_BIN artisan migrate --force"
+    echo "           $PHP_BIN artisan modules:preflight"
     local module
     for module in "${modules[@]}"; do
         echo "           $PHP_BIN artisan modules:install $module --force"
@@ -2945,6 +2953,7 @@ fix_apply_schema() {
 
     cd "$APP_PATH" || return 1
     "$PHP_BIN" artisan migrate --force || return 1
+    "$PHP_BIN" artisan modules:preflight || return 1
 
     local module
     for module in "${modules[@]}"; do
@@ -2996,7 +3005,6 @@ fix_host_dns_ready() {
         expected="$(curl -fsS --max-time 4 https://api.ipify.org 2>/dev/null || true)"
         [[ "$expected" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || expected=""
     fi
-
     [[ -n "$expected" ]] || return 1
     dns_host_ready "$host" "$expected"
 }

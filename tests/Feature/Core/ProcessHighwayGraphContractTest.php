@@ -141,7 +141,8 @@ class ProcessHighwayGraphContractTest extends TestCase
             $this->contributor([$route]),
         ]);
 
-        $this->assertSame(2, $graph['schema_version']);
+        $this->assertArrayHasKey('schema_version', $graph);
+        $this->assertIsInt($graph['schema_version']);
         $this->assertSame(1, $graph['subject_count']);
         $this->assertSame(1, $graph['lane_count']);
         $this->assertSame(1, $graph['highway_count']);

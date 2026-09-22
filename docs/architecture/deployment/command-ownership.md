@@ -26,6 +26,8 @@ optional module schema
 
 Runtime module enablement, provider loading, and migration-directory existence are not substitutes for installation-ledger state.
 
+Migration ownership is explicit at the directory boundary. `config/module_migrations.php` declares owned paths only; direct-child migration files inside those paths are the authoritative inventory. `schemaVersion` is derived from the discovered file count for compatibility and is not a manually maintained release number. The installation ledger records the accepted SHA-256 checksum map for each installed module scope.
+
 ## Command ownership
 
 ### `engage:deployment-plan`
@@ -74,13 +76,24 @@ platform migrations only
 
 Do not treat it as an all-module migration command.
 
+### `modules:preflight [module]`
+
+```text
+read-only
+inspects the enabled schema set or one module dependency closure
+compares accepted migration checksums with discovered source and Laravel migration history
+blocks changed or removed accepted history and unsafe first-baseline rollouts
+does not write migration or module-installation ledgers
+```
+
 ### `modules:install <module> --force`
 
 ```text
 installs the requested module's schema-owning dependency closure
-uses registered migration manifests
+uses migration files discovered inside explicitly owned directories
 adopts an already-current untracked scope through the normal executor
-runs only required pending registered migrations
+runs only required pending discovered migrations
+runs checksum/history preflight under the migration lock before mutation
 does not install unrelated optional modules
 ```
 
@@ -88,6 +101,8 @@ does not install unrelated optional modules
 
 ```text
 upgrades every ledger-installed module scope
+runs checksum/history preflight before any module migration or ledger mutation
+accepts the new checksum baseline only after the scope reaches installed/current state
 does not install arbitrary enabled-but-uninstalled optional modules
 ```
 
@@ -102,14 +117,14 @@ upgrades one installed module dependency closure
 ```text
 adopts already-current schema into the module installation ledger
 runs no migrations
-must not be used to conceal partial or missing schema
+must not be used to conceal partial, missing, or checksum-drifted migration history
 ```
 
 ### `modules:status [module]`
 
 ```text
 read-only
-inspects migration files, ledger state, schema version, and manifest identity
+inspects discovered migration files, ledger state, derived schema version, manifest identity, and checksum integrity
 ```
 
 ### `presets:sync`
@@ -160,14 +175,17 @@ do not bulk-reconcile.
 The safe executor path is:
 
 ```text
-run platform migration so module_installations exists
+run platform migrations so module_installations and its checksum column exist
+run modules:preflight before module mutation
 use modules:install for enabled schema scopes that require installation/adoption
 allow the normal executor to adopt current scopes
 allow the normal executor to run registered pending migrations for partial/not_migrated scopes
 ignore disabled optional scopes
 ```
 
-The audit/fix path automates this decision and must never edit installation-ledger rows directly.
+The audit/fix path automates this decision and must never edit installation-ledger rows directly. A migration already accepted on a live database is immutable: change schema with a new migration rather than editing or deleting accepted history.
+
+For the first checksum-ledger rollout, deploy this infrastructure without unrelated module migrations. Run platform migrations first, then `modules:preflight`; schema-current installed scopes may report baseline warnings. `modules:migrate --force` records those initial baselines without replaying current migrations, after which preflight must be clean.
 
 ## Module-specific post-install registry
 

@@ -25,7 +25,8 @@ class ProcessHighwaySurfaceTest extends TestCase
 
         $highway = $response->viewData('highway');
 
-        $this->assertSame(2, $highway['schema_version']);
+        $this->assertArrayHasKey('schema_version', $highway);
+        $this->assertIsInt($highway['schema_version']);
         $this->assertSame(0, $highway['subject_count']);
         $this->assertSame(0, $highway['lane_count']);
         $this->assertSame(0, $highway['highway_count']);

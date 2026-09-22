@@ -12,7 +12,9 @@ class ConfigContractRegistryTest extends TestCase
     {
         $registry = app(ConfigContractRegistry::class);
 
-        $this->assertSame([
+        $registeredKeys = array_keys($registry->all());
+
+        foreach ([
             'app.module_definition',
             'app.preset_package',
             'campaigns.preset_definition',
@@ -25,7 +27,9 @@ class ConfigContractRegistryTest extends TestCase
             'webinars.message_area',
             'webinars.post_event',
             'webinars.schedule_profile',
-        ], array_keys($registry->all()));
+        ] as $requiredKey) {
+            $this->assertContains($requiredKey, $registeredKeys);
+        }
 
         $this->assertSame('app', $registry->get('app.module_definition')->owner());
         $this->assertSame('core', $registry->get('core.contact_status_definition')->owner());

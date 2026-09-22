@@ -75,6 +75,10 @@ class PlatformMigrationFoundationTest extends TestCase
         );
 
         $this->assertTrue(Schema::hasTable('module_installations'));
+        $this->assertTrue(Schema::hasColumn(
+            'module_installations',
+            'migration_checksums',
+        ));
     }
 
     public function test_no_module_owned_migrations_exist_in_the_legacy_root(): void
@@ -112,12 +116,19 @@ class PlatformMigrationFoundationTest extends TestCase
             $registry->manifestHash($scope),
             $installing->manifest_hash,
         );
+        $this->assertNull($installing->migration_checksums);
         $this->assertNull($installing->installed_at);
         $this->assertNull($installing->last_migrated_at);
 
         $installed = $repository->markInstalled('scheduling');
 
         $this->assertSame(ModuleInstallation::STATUS_INSTALLED, $installed->status);
+        $expectedChecksums = $scope->migrationChecksums;
+        $actualChecksums = $installed->migration_checksums;
+        ksort($expectedChecksums, SORT_STRING);
+        ksort($actualChecksums, SORT_STRING);
+
+        $this->assertSame($expectedChecksums, $actualChecksums);
         $this->assertSame(
             '2026-08-05 18:30:00',
             $installed->installed_at?->format('Y-m-d H:i:s'),
@@ -137,6 +148,9 @@ class PlatformMigrationFoundationTest extends TestCase
         $this->assertDatabaseHas('migrations', [
             'migration' => '2026_08_05_180000_create_module_installations_table',
         ]);
+        $this->assertDatabaseHas('migrations', [
+            'migration' => '2026_09_22_190000_add_migration_checksums_to_module_installations_table',
+        ]);
     }
 
     public function test_failed_installation_state_remains_distinct_from_installed_state(): void
@@ -147,6 +161,7 @@ class PlatformMigrationFoundationTest extends TestCase
 
         $this->assertSame(ModuleInstallation::STATUS_FAILED, $failed->status);
         $this->assertFalse($repository->installed('location'));
+        $this->assertNull($failed->migration_checksums);
         $this->assertNull($failed->installed_at);
         $this->assertNull($failed->last_migrated_at);
     }

@@ -418,6 +418,7 @@ NGINX;
             'platform' => [
                 'repository_exists' => true,
                 'ledger_exists' => false,
+                'checksum_ledger_exists' => false,
             ],
             'scopes' => [
                 [
@@ -427,6 +428,10 @@ NGINX;
                     'pending_migrations' => ['2026_08_19_161800_create_contact_import_occurrences_table.php'],
                     'ledger_status' => 'ledger_missing',
                     'contract_state' => 'unavailable',
+                    'integrity_state' => 'unavailable',
+                    'changed_applied_migrations' => [],
+                    'missing_recorded_migrations' => [],
+                    'untracked_applied_migrations' => [],
                 ],
                 [
                     'module_key' => 'tasks',
@@ -435,6 +440,10 @@ NGINX;
                     'pending_migrations' => [],
                     'ledger_status' => 'ledger_missing',
                     'contract_state' => 'unavailable',
+                    'integrity_state' => 'unavailable',
+                    'changed_applied_migrations' => [],
+                    'missing_recorded_migrations' => [],
+                    'untracked_applied_migrations' => [],
                 ],
             ],
         ];
@@ -451,6 +460,14 @@ NGINX;
 
         $this->assertStringContainsString(
             "BREAKING\tmodule_migrations.platform_ledger\t",
+            $output,
+        );
+        $this->assertStringContainsString(
+            "BREAKING\tmodule_migrations.checksum_ledger\t",
+            $output,
+        );
+        $this->assertStringContainsString(
+            "BREAKING\tmodule_migrations.core.integrity\t",
             $output,
         );
         $this->assertStringContainsString(
@@ -471,6 +488,7 @@ NGINX;
             'platform' => [
                 'repository_exists' => true,
                 'ledger_exists' => true,
+                'checksum_ledger_exists' => true,
             ],
             'scopes' => [
                 [
@@ -478,18 +496,28 @@ NGINX;
                     'migration_state' => 'partial',
                     'ledger_status' => 'untracked',
                     'contract_state' => 'untracked',
+                    'integrity_state' => 'untracked',
                 ],
                 [
                     'module_key' => 'tasks',
                     'migration_state' => 'current',
                     'ledger_status' => 'untracked',
                     'contract_state' => 'untracked',
+                    'integrity_state' => 'untracked',
                 ],
                 [
                     'module_key' => 'workflow',
                     'migration_state' => 'current',
                     'ledger_status' => 'installed',
                     'contract_state' => 'current',
+                    'integrity_state' => 'current',
+                ],
+                [
+                    'module_key' => 'messaging',
+                    'migration_state' => 'current',
+                    'ledger_status' => 'installed',
+                    'contract_state' => 'drift',
+                    'integrity_state' => 'drift',
                 ],
             ],
         ];

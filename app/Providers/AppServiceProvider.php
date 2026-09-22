@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Console\Commands\EngageDeploymentPlanCommand;
 use App\Console\Commands\EngageEnvironmentSyncCommand;
+use App\Console\Commands\ModuleMigrationPreflightCommand;
 use App\Console\Commands\SyncPresetsCommand;
 use App\Console\Commands\ValidateSetupCommand;
 use App\Modules\Core\Data\Contacts\ContactImportField;
@@ -466,6 +467,7 @@ class AppServiceProvider extends ServiceProvider
             $this->commands([
                 EngageDeploymentPlanCommand::class,
                 EngageEnvironmentSyncCommand::class,
+                ModuleMigrationPreflightCommand::class,
                 SyncPresetsCommand::class,
                 ValidateSetupCommand::class,
             ]);

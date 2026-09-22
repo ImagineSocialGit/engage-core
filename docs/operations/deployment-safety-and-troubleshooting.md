@@ -841,11 +841,20 @@ ps aux | grep "[a]rtisan horizon"
 
 ## Deployment and validation
 
+For an existing database with real data, module schema changes use the checksum/history gate:
+
 ```bash
-php artisan modules:status
+php artisan migrate --force
+php artisan modules:preflight
+php artisan modules:migrate --force
 php artisan presets:sync
+php artisan modules:status
 php artisan setup:validate
 ```
+
+Migration ownership config declares directories only. Direct-child migration files inside an owned directory are authoritative, the compatibility schema version is derived from their count, and `module_installations.migration_checksums` records accepted file contents. Do not edit or delete an already-applied migration; add a new migration. Do not alter the module installation ledger to suppress checksum drift. `modules:reconcile` may adopt already-current untracked schema, but it is not a way to conceal migration-history drift.
+
+On the first checksum-ledger rollout, ship this infrastructure without unrelated module migrations. The platform migration adds the nullable checksum column; the first preflight may warn that schema-current installed scopes have no baseline; `modules:migrate --force` establishes those baselines without replaying current files. Run preflight again and require it to be clean before continuing.
 
 For operator-facing new-client, existing-client, audit/fix, module-addition, and controlled-rebuild entry points, use `docs/operations/deployment-runbook.md`. For command ownership semantics, use `docs/architecture/deployment/command-ownership.md`.
 

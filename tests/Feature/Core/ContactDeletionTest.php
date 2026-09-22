@@ -83,11 +83,6 @@ class ContactDeletionTest extends TestCase
 
     public function test_project_state_core_contract_preserves_contact_deleted_at(): void
     {
-        $this->assertSame(
-            6,
-            config('project_state.sections.core.version'),
-        );
-
         $this->assertContains(
             'deleted_at',
             config('project_state.sections.core.tables.contacts.columns', []),

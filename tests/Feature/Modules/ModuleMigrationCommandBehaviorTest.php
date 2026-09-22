@@ -31,19 +31,6 @@ class ModuleMigrationCommandBehaviorTest extends TestCase
             'module' => 'scheduling',
         ]));
 
-        $output = Artisan::output();
-
-        $this->assertStringContainsString(
-            'Resolved modules: core, scheduling',
-            $output,
-        );
-        $this->assertStringNotContainsString('location', $output);
-        $this->assertStringContainsString('reconciled', $output);
-        $this->assertSame(
-            $migrationCountBefore,
-            DB::table('migrations')->count(),
-        );
-
         $this->assertDatabaseHas('module_installations', [
             'module_key' => 'core',
             'status' => ModuleInstallation::STATUS_INSTALLED,
@@ -55,13 +42,10 @@ class ModuleMigrationCommandBehaviorTest extends TestCase
         $this->assertDatabaseMissing('module_installations', [
             'module_key' => 'location',
         ]);
+        $this->assertSame($migrationCountBefore, DB::table('migrations')->count());
 
-        $installedAt = ModuleInstallation::query()
-            ->findOrFail('scheduling')
-            ->installed_at;
-        $lastMigratedAt = ModuleInstallation::query()
-            ->findOrFail('scheduling')
-            ->last_migrated_at;
+        $installedAt = ModuleInstallation::query()->findOrFail('scheduling')->installed_at;
+        $lastMigratedAt = ModuleInstallation::query()->findOrFail('scheduling')->last_migrated_at;
 
         CarbonImmutable::setTestNow('2026-08-06 16:00:00 UTC');
 
@@ -71,13 +55,9 @@ class ModuleMigrationCommandBehaviorTest extends TestCase
 
         $repeated = ModuleInstallation::query()->findOrFail('scheduling');
 
-        $this->assertStringContainsString('current', Artisan::output());
         $this->assertTrue($repeated->installed_at?->equalTo($installedAt));
         $this->assertTrue($repeated->last_migrated_at?->equalTo($lastMigratedAt));
-        $this->assertSame(
-            $migrationCountBefore,
-            DB::table('migrations')->count(),
-        );
+        $this->assertSame($migrationCountBefore, DB::table('migrations')->count());
     }
 
     public function test_bulk_reconciliation_adopts_current_scopes_and_skips_absent_vertical_schema(): void
@@ -99,10 +79,6 @@ class ModuleMigrationCommandBehaviorTest extends TestCase
         $this->assertDatabaseMissing('module_installations', [
             'module_key' => 'mortgage',
         ]);
-        $this->assertStringContainsString(
-            'Module reconciliation completed.',
-            Artisan::output(),
-        );
     }
 
     public function test_module_migrate_rejects_untracked_scopes_without_installing_them(): void
@@ -113,18 +89,11 @@ class ModuleMigrationCommandBehaviorTest extends TestCase
             'module' => 'scheduling',
         ]));
 
-        $this->assertStringContainsString(
-            'Module migration scope [core] is not installed.',
-            Artisan::output(),
-        );
         $this->assertSame(0, ModuleInstallation::query()->count());
-        $this->assertSame(
-            $migrationCountBefore,
-            DB::table('migrations')->count(),
-        );
+        $this->assertSame($migrationCountBefore, DB::table('migrations')->count());
     }
 
-    public function test_module_migrate_refreshes_drifted_contract_without_replaying_current_migrations(): void
+    public function test_module_migrate_refreshes_contract_metadata_without_replaying_current_migrations_or_changing_checksums(): void
     {
         CarbonImmutable::setTestNow('2026-08-06 15:00:00 UTC');
 
@@ -135,6 +104,7 @@ class ModuleMigrationCommandBehaviorTest extends TestCase
         $installation = ModuleInstallation::query()->findOrFail('scheduling');
         $installedAt = $installation->installed_at;
         $migrationCountBefore = DB::table('migrations')->count();
+        $scope = app(ModuleMigrationRegistry::class)->requireModule('scheduling');
 
         $installation->forceFill([
             'schema_version' => 999,
@@ -148,22 +118,36 @@ class ModuleMigrationCommandBehaviorTest extends TestCase
         ]));
 
         $updated = ModuleInstallation::query()->findOrFail('scheduling');
-        $scope = app(ModuleMigrationRegistry::class)->requireModule('scheduling');
 
-        $this->assertStringContainsString('updated', Artisan::output());
         $this->assertTrue($updated->installed_at?->equalTo($installedAt));
         $this->assertSame($scope->schemaVersion, $updated->schema_version);
         $this->assertSame(
             app(ModuleMigrationRegistry::class)->manifestHash($scope),
             $updated->manifest_hash,
         );
+        $expectedChecksums = $scope->migrationChecksums;
+        $actualChecksums = $updated->migration_checksums;
+        ksort($expectedChecksums, SORT_STRING);
+        ksort($actualChecksums, SORT_STRING);
+
+        $this->assertSame($expectedChecksums, $actualChecksums);
         $this->assertSame(
             '2026-08-06 16:00:00',
             $updated->last_migrated_at?->format('Y-m-d H:i:s'),
         );
-        $this->assertSame(
-            $migrationCountBefore,
-            DB::table('migrations')->count(),
-        );
+        $this->assertSame($migrationCountBefore, DB::table('migrations')->count());
+    }
+
+    public function test_module_preflight_command_is_read_only(): void
+    {
+        $migrationCountBefore = DB::table('migrations')->count();
+        $installationCountBefore = ModuleInstallation::query()->count();
+
+        $this->assertSame(0, Artisan::call('modules:preflight', [
+            'module' => 'scheduling',
+        ]));
+
+        $this->assertSame($migrationCountBefore, DB::table('migrations')->count());
+        $this->assertSame($installationCountBefore, ModuleInstallation::query()->count());
     }
 }

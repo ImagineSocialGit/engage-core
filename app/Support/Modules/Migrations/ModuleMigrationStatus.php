@@ -24,8 +24,22 @@ final readonly class ModuleMigrationStatus
 
     public const CONTRACT_DRIFT = 'drift';
 
+    public const INTEGRITY_UNAVAILABLE = 'unavailable';
+
+    public const INTEGRITY_UNTRACKED = 'untracked';
+
+    public const INTEGRITY_BASELINE_MISSING = 'baseline_missing';
+
+    public const INTEGRITY_CURRENT = 'current';
+
+    public const INTEGRITY_DRIFT = 'drift';
+
     /**
      * @param array<int, string> $pendingMigrationFiles
+     * @param array<int, string> $changedAppliedMigrationFiles
+     * @param array<int, string> $missingRecordedMigrationFiles
+     * @param array<int, string> $untrackedAppliedMigrationFiles
+     * @param array<string, string>|null $recordedMigrationChecksums
      */
     public function __construct(
         public MigrationScopeDefinition $scope,
@@ -37,6 +51,11 @@ final readonly class ModuleMigrationStatus
         public string $contractState,
         public ?int $recordedSchemaVersion,
         public ?string $recordedManifestHash,
+        public string $integrityState,
+        public array $changedAppliedMigrationFiles,
+        public array $missingRecordedMigrationFiles,
+        public array $untrackedAppliedMigrationFiles,
+        public ?array $recordedMigrationChecksums,
     ) {}
 
     public function current(): bool
@@ -47,7 +66,18 @@ final readonly class ModuleMigrationStatus
     public function ledgerCurrent(): bool
     {
         return $this->ledgerStatus === ModuleInstallation::STATUS_INSTALLED
-            && $this->contractState === self::CONTRACT_CURRENT;
+            && $this->contractState === self::CONTRACT_CURRENT
+            && $this->integrityCurrent();
+    }
+
+    public function integrityCurrent(): bool
+    {
+        return $this->integrityState === self::INTEGRITY_CURRENT;
+    }
+
+    public function integrityBlocked(): bool
+    {
+        return $this->integrityState === self::INTEGRITY_DRIFT;
     }
 
     public function progress(): string

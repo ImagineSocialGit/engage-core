@@ -169,6 +169,7 @@ install production dependencies
 build assets
 resolve new deployment requirements
 run platform migrations
+run read-only module migration preflight
 run installed-module migrations
 sync presets
 validate setup
@@ -207,6 +208,7 @@ For an already-installed database with real data:
 
 ```bash
 php artisan migrate --force
+php artisan modules:preflight
 php artisan modules:migrate --force
 php artisan presets:sync
 php artisan modules:status
@@ -218,6 +220,9 @@ Important ownership:
 ```text
 migrate
     platform migrations only
+
+modules:preflight
+    read-only checksum/history integrity gate for enabled schema scopes
 
 modules:migrate
     ledger-installed module scopes only
@@ -237,6 +242,26 @@ If queued-job runtime code changed, restart the actual Supervisor-managed Horizo
 Also verify the Scheduler entry and effective schedule.
 
 Do not run `migrate:fresh` on a normal production update.
+
+## Migration ownership and first checksum-baseline rollout
+
+`config/module_migrations.php` declares only the platform/module migration directories. Migration files inside each owned directory are discovered from the filesystem; adding a normal migration does not require a config manifest or manual schema-version increment. The reported schema version is derived from the discovered file count.
+
+`module_installations.migration_checksums` stores the accepted SHA-256 map for installed module migration history. Never edit or delete an already-applied migration to change production schema; add a new migration. Never bypass an integrity blocker by editing `module_installations` directly.
+
+For the first rollout of checksum tracking, deploy this infrastructure batch without unrelated module migrations, then run:
+
+```bash
+php artisan optimize:clear
+php artisan migrate --force
+php artisan modules:preflight
+php artisan modules:migrate --force
+php artisan modules:preflight
+php artisan modules:status
+php artisan setup:validate
+```
+
+The first preflight may report baseline warnings on schema-current installed scopes. `modules:migrate` records the baseline without replaying current migrations. The second preflight must be clean; any integrity blocker requires investigation before further module schema work.
 
 # 4. Audit an existing deployment
 
