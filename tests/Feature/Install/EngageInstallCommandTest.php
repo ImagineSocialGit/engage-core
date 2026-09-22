@@ -4,11 +4,13 @@ namespace Tests\Feature\Install;
 
 use App\Models\User;
 use App\Support\Modules\Migrations\ModuleInstallation;
+use App\Support\Modules\Migrations\ModuleMigrationRegistry;
 use App\Support\SetupValidation\Contributors\ModuleMigrationsSetupValidationContributor;
 use App\Support\SetupValidation\SetupValidationManager;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Tests\Support\UsesSyntheticDeploymentEnvironment;
@@ -190,6 +192,124 @@ class EngageInstallCommandTest extends TestCase
         );
     }
 
+    public function test_failed_partial_platform_migration_is_cleaned_up_and_same_install_command_can_be_rerun(): void
+    {
+        config()->set('modules.enabled', ['tasks']);
+        $this->useMigrationOnlySetupValidation();
+
+        $scope = app(ModuleMigrationRegistry::class)->platform();
+        $filename = '2099_01_01_000090_test_interrupted_platform_install_recovery.php';
+        $migrationPath = base_path($scope->path.'/'.$filename);
+        $markerPath = storage_path(
+            'framework/testing/interrupted-platform-install-recovery-ready',
+        );
+        $table = 'interrupted_platform_install_recovery';
+
+        File::ensureDirectoryExists(dirname($markerPath));
+        File::delete([$migrationPath, $markerPath]);
+        File::put(
+            $migrationPath,
+            $this->interruptedInstallMigrationSource($table, $markerPath),
+        );
+
+        try {
+            $this->assertSame(1, Artisan::call('engage:install', [
+                '--modules' => 'tasks',
+                '--no-create-user' => true,
+            ]));
+
+            $this->assertFalse(Schema::hasTable($table));
+            $this->assertDatabaseMissing('migrations', [
+                'migration' => pathinfo($filename, PATHINFO_FILENAME),
+            ]);
+            $this->assertSame(0, ModuleInstallation::query()->count());
+
+            File::put($markerPath, 'ready');
+
+            $this->assertSame(0, Artisan::call('engage:install', [
+                '--modules' => 'tasks',
+                '--no-create-user' => true,
+            ]));
+
+            $this->assertTrue(Schema::hasTable($table));
+            $this->assertDatabaseHas('migrations', [
+                'migration' => pathinfo($filename, PATHINFO_FILENAME),
+            ]);
+            $this->assertDatabaseHas('module_installations', [
+                'module_key' => 'core',
+                'status' => ModuleInstallation::STATUS_INSTALLED,
+            ]);
+            $this->assertDatabaseHas('module_installations', [
+                'module_key' => 'tasks',
+                'status' => ModuleInstallation::STATUS_INSTALLED,
+            ]);
+        } finally {
+            File::delete([$migrationPath, $markerPath]);
+        }
+    }
+
+    public function test_failed_partial_module_migration_is_cleaned_up_and_same_install_command_can_be_rerun(): void
+    {
+        config()->set('modules.enabled', ['tasks']);
+        $this->useMigrationOnlySetupValidation();
+
+        $scope = app(ModuleMigrationRegistry::class)->requireModule('core');
+        $filename = '2099_01_01_000091_test_interrupted_module_install_recovery.php';
+        $migrationPath = base_path($scope->path.'/'.$filename);
+        $markerPath = storage_path(
+            'framework/testing/interrupted-module-install-recovery-ready',
+        );
+        $table = 'interrupted_module_install_recovery';
+
+        File::ensureDirectoryExists(dirname($markerPath));
+        File::delete([$migrationPath, $markerPath]);
+        File::put(
+            $migrationPath,
+            $this->interruptedInstallMigrationSource($table, $markerPath),
+        );
+
+        try {
+            $this->assertSame(1, Artisan::call('engage:install', [
+                '--modules' => 'tasks',
+                '--no-create-user' => true,
+            ]));
+
+            $this->assertFalse(Schema::hasTable($table));
+            $this->assertDatabaseMissing('migrations', [
+                'migration' => pathinfo($filename, PATHINFO_FILENAME),
+            ]);
+            $this->assertDatabaseHas('module_installations', [
+                'module_key' => 'core',
+                'status' => ModuleInstallation::STATUS_FAILED,
+            ]);
+            $this->assertDatabaseMissing('module_installations', [
+                'module_key' => 'tasks',
+            ]);
+
+            File::put($markerPath, 'ready');
+
+            $this->assertSame(0, Artisan::call('engage:install', [
+                '--modules' => 'tasks',
+                '--no-create-user' => true,
+            ]));
+
+            $this->assertTrue(Schema::hasTable($table));
+            $this->assertDatabaseHas('migrations', [
+                'migration' => pathinfo($filename, PATHINFO_FILENAME),
+            ]);
+            $this->assertDatabaseHas('module_installations', [
+                'module_key' => 'core',
+                'status' => ModuleInstallation::STATUS_INSTALLED,
+            ]);
+            $this->assertDatabaseHas('module_installations', [
+                'module_key' => 'tasks',
+                'status' => ModuleInstallation::STATUS_INSTALLED,
+            ]);
+        } finally {
+            File::delete([$migrationPath, $markerPath]);
+        }
+    }
+
     public function test_install_can_create_the_initial_user_without_internal_notifications(): void
     {
         config()->set('modules.enabled', ['tasks']);
@@ -245,6 +365,41 @@ class EngageInstallCommandTest extends TestCase
         RefreshDatabaseState::$migrated = false;
 
         parent::tearDown();
+    }
+
+    private function interruptedInstallMigrationSource(
+        string $table,
+        string $markerPath,
+    ): string {
+        $tableLiteral = var_export($table, true);
+        $markerLiteral = var_export($markerPath, true);
+
+        return <<<PHP
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create({$tableLiteral}, function (Blueprint \$table): void {
+            \$table->id();
+        });
+
+        if (! is_file({$markerLiteral})) {
+            throw new \RuntimeException('Intentional interrupted install migration failure.');
+        }
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists({$tableLiteral});
+    }
+};
+PHP;
     }
 
     private function useMigrationOnlySetupValidation(): void

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Console\Concerns\InteractsWithDeploymentPlan;
 use App\Support\Deployment\DeploymentPlanResolver;
+use App\Support\Modules\Migrations\MigrationFailureRecovery;
 use App\Support\Modules\Migrations\ModuleMigrationExecutionResult;
 use App\Support\Modules\Migrations\ModuleMigrationExecutor;
 use App\Support\Modules\Migrations\ModuleMigrationPlan;
@@ -37,6 +38,7 @@ final class EngageInstallCommand extends Command
         ModuleMigrationRegistry $registry,
         ModuleMigrationPlanner $planner,
         ModuleMigrationExecutor $executor,
+        MigrationFailureRecovery $failureRecovery,
         CrmUserManager $users,
     ): int {
         try {
@@ -82,19 +84,28 @@ final class EngageInstallCommand extends Command
         $this->newLine();
         $this->info('[1/4] Platform migrations');
 
+        $failureRecovery->begin();
+
         try {
-            $exitCode = $this->call('migrate', [
-                '--path' => [$registry->platform()->path],
-                '--force' => true,
-            ]);
-        } catch (Throwable $exception) {
-            $this->error($exception->getMessage());
+            try {
+                $exitCode = $this->call('migrate', [
+                    '--path' => [$registry->platform()->path],
+                    '--force' => true,
+                ]);
+            } catch (Throwable $exception) {
+                $this->error($exception->getMessage());
+                $this->recoverInterruptedMigration($failureRecovery);
 
-            return $this->stageFailure('platform migrations');
-        }
+                return $this->stageFailure('platform migrations');
+            }
 
-        if ($exitCode !== self::SUCCESS) {
-            return $this->stageFailure('platform migrations');
+            if ($exitCode !== self::SUCCESS) {
+                $this->recoverInterruptedMigration($failureRecovery);
+
+                return $this->stageFailure('platform migrations');
+            }
+        } finally {
+            $failureRecovery->finish();
         }
 
         $this->newLine();
@@ -377,6 +388,16 @@ final class EngageInstallCommand extends Command
             'Module installation stage completed. %d migration(s) ran.',
             $result->totalRanMigrationCount(),
         ));
+    }
+
+    private function recoverInterruptedMigration(
+        MigrationFailureRecovery $failureRecovery,
+    ): void {
+        try {
+            $failureRecovery->recover();
+        } catch (Throwable $recoveryException) {
+            $this->error($recoveryException->getMessage());
+        }
     }
 
     private function stageFailure(string $stage): int

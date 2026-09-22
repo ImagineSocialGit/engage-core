@@ -21,6 +21,7 @@ final class ModuleMigrationExecutor
         private readonly ModuleMigrationStatusInspector $statusInspector,
         private readonly ModuleInstallationRepository $installations,
         private readonly ModuleMigrationPreflightInspector $preflight,
+        private readonly MigrationFailureRecovery $failureRecovery,
     ) {}
 
     public function execute(
@@ -241,13 +242,39 @@ final class ModuleMigrationExecutor
             $this->installations->begin($moduleKey);
             $this->assertScopeFilesExist($scope);
 
-            $this->migrator->run(
-                [base_path($scope->path)],
-                [
-                    'pretend' => false,
-                    'step' => false,
-                ],
-            );
+            $recoverPartialFailure = $before->ledgerStatus
+                !== ModuleInstallation::STATUS_INSTALLED;
+
+            if ($recoverPartialFailure) {
+                $this->failureRecovery->begin();
+            }
+
+            try {
+                $this->migrator->run(
+                    [base_path($scope->path)],
+                    [
+                        'pretend' => false,
+                        'step' => false,
+                    ],
+                );
+            } catch (Throwable $migrationException) {
+                if ($recoverPartialFailure) {
+                    try {
+                        $this->failureRecovery->recover();
+                    } catch (Throwable $recoveryException) {
+                        throw new RuntimeException(
+                            $migrationException->getMessage().' '.$recoveryException->getMessage(),
+                            previous: $migrationException,
+                        );
+                    }
+                }
+
+                throw $migrationException;
+            } finally {
+                if ($recoverPartialFailure) {
+                    $this->failureRecovery->finish();
+                }
+            }
 
             $after = $this->statusInspector->inspectModule($moduleKey);
 

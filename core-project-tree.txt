@@ -2054,6 +2054,7 @@
 │   │   │           └── WebinarRegistrantBookingEligibilityProvider.php
 │   │   ├── Modules
 │   │   │   ├── Migrations
+│   │   │   │   ├── MigrationFailureRecovery.php
 │   │   │   │   ├── MigrationScopeDefinition.php
 │   │   │   │   ├── ModuleInstallation.php
 │   │   │   │   ├── ModuleInstallationRepository.php
@@ -3801,4 +3802,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-874 directories, 2928 files
+874 directories, 2929 files
