@@ -70,6 +70,7 @@ class MessagingMediaLibraryTest extends TestCase
         $this->assertSame(MessageMediaPayload::TRACKING_KEY, $video['tracking_key']);
         $this->assertSame($poster['asset_uuid'], $video['poster_asset_uuid']);
         $this->assertSame(route('media.video.show', ['assetUuid' => $video['asset_uuid']]), $video['url']);
+        $this->assertSame('https://cdn.example.test/media/video/welcome.mp4', $video['playback_url']);
         $this->assertStringStartsWith('https://cdn.example.test/', $video['poster_url']);
         $this->assertSame(2, MediaAsset::query()->count());
     }
@@ -136,6 +137,7 @@ class MessagingMediaLibraryTest extends TestCase
         $this->assertSame([], $library->selectableAssets());
         $this->assertSame('Welcome greeting', $snapshot['title']);
         $this->assertSame(route('media.video.show', ['assetUuid' => $snapshot['asset_uuid']]), $snapshot['url']);
+        $this->assertSame('https://cdn.example.test/media/video/welcome.mp4', $snapshot['playback_url']);
 
         $this->expectException(RuntimeException::class);
         $library->snapshot($snapshot['asset_uuid']);
@@ -164,6 +166,7 @@ class MessagingMediaLibraryTest extends TestCase
         $updated = app(MediaMessageMediaLibrary::class)->snapshot($asset->uuid);
 
         $this->assertSame(route('media.video.show', ['assetUuid' => $asset->uuid]), $updated['url']);
+        $this->assertSame('https://cdn.example.test/media/video/introduction.mp4', $updated['playback_url']);
         $this->assertSame(
             'https://cdn.example.test/media/video/video-poster.jpg',
             $updated['poster_url'],

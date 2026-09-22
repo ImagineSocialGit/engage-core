@@ -105,6 +105,9 @@ final class MediaMessageMediaLibrary implements MessageMediaLibrary
             'url' => $asset->kind === MediaAsset::KIND_VIDEO
                 ? route('media.video.show', ['assetUuid' => $asset->uuid])
                 : trim($url),
+            'playback_url' => $asset->kind === MediaAsset::KIND_VIDEO
+                ? trim($url)
+                : null,
             'mime_type' => is_string($asset->mime_type) && trim($asset->mime_type) !== ''
                 ? trim($asset->mime_type)
                 : null,

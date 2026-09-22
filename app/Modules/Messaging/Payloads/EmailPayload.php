@@ -259,7 +259,10 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
             ]
         )->render();
 
-        return str_replace('{media}', $this->mediaCardHtml(), $html);
+        $mediaHtml = $this->mediaCardHtml();
+        $html = str_replace('{media}', $mediaHtml, $html);
+
+        return $this->withEmailVideoFallbackStyles($html, $mediaHtml);
     }
 
     public function mailable(): Mailable
@@ -456,6 +459,9 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
                     // an older direct-file link in a message awaiting delivery.
                     $updated = $library->snapshot($media['asset_uuid']);
                     $media['url'] = $updated['url'] ?? $media['url'];
+                    if (is_string($updated['playback_url'] ?? null)) {
+                        $media['playback_url'] = $updated['playback_url'];
+                    }
                     if (! isset($media['poster_asset_uuid'])
                         && is_string($updated['poster_url'] ?? null)) {
                         $media['poster_url'] = $updated['poster_url'];
@@ -491,9 +497,60 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
             [
                 'media' => $media,
                 'sourceUrl' => $sourceMedia['url'],
+                'videoSourceUrl' => $this->videoSourceUrl($sourceMedia),
                 'displayWidth' => MessageMediaPayload::displayWidth($sourceMedia['display_size'] ?? null),
             ],
         )->render();
+    }
+
+    /** @param array<string, mixed> $media */
+    private function videoSourceUrl(array $media): ?string
+    {
+        if (($media['kind'] ?? null) !== MessageMediaPayload::KIND_VIDEO
+            || strtolower(trim((string) ($media['mime_type'] ?? ''))) !== 'video/mp4'
+        ) {
+            return null;
+        }
+
+        $playbackUrl = $media['playback_url'] ?? null;
+
+        if (CtaTrackingLinkGenerator::isTrackableDestination($playbackUrl)) {
+            return trim((string) $playbackUrl);
+        }
+
+        $url = $media['url'] ?? null;
+
+        if (! CtaTrackingLinkGenerator::isTrackableDestination($url)) {
+            return null;
+        }
+
+        $path = parse_url(trim((string) $url), PHP_URL_PATH);
+
+        return is_string($path) && str_ends_with(strtolower($path), '.mp4')
+            ? trim((string) $url)
+            : null;
+    }
+
+    private function withEmailVideoFallbackStyles(string $html, string $mediaHtml): string
+    {
+        if (stripos($mediaHtml, '<video') === false) {
+            return $html;
+        }
+
+        $styles = '<style type="text/css">'
+            .'.engage-email-video\0{display:none!important;}'
+            .'.engage-email-video-fallback\0{display:block!important;}'
+            .'</style>';
+
+        $headClose = stripos($html, '</head>');
+
+        if ($headClose === false) {
+            return $styles.$html;
+        }
+
+        return substr($html, 0, $headClose)
+            .$styles
+            .substr($html, $headClose);
     }
 
     private function campaignContactPlainTextBlock(): string

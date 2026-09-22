@@ -46,6 +46,24 @@ class MessageMediaPayloadValidationTest extends TestCase
         $this->assertSame([], MessageMediaPayload::validationErrors($media));
     }
 
+
+    public function test_video_playback_url_is_validated_and_limited_to_video_media(): void
+    {
+        $media = $this->media();
+        $media['playback_url'] = 'https://cdn.example.test/welcome.mp4';
+
+        $this->assertSame([], MessageMediaPayload::validationErrors($media));
+
+        $media['playback_url'] = 'javascript:alert(1)';
+        $this->assertNotSame([], MessageMediaPayload::validationErrors($media));
+
+        $media = $this->media();
+        $media['kind'] = 'image';
+        $media['playback_url'] = 'https://cdn.example.test/welcome.mp4';
+
+        $this->assertNotSame([], MessageMediaPayload::validationErrors($media));
+    }
+
     public function test_display_size_is_limited_to_visual_media_and_known_presets(): void
     {
         $media = $this->media();

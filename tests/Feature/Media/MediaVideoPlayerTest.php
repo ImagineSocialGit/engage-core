@@ -20,6 +20,7 @@ class MediaVideoPlayerTest extends TestCase
         $snapshot = app(MediaMessageMediaLibrary::class)->snapshot($asset->uuid);
 
         $this->assertSame(route('media.video.show', ['assetUuid' => $asset->uuid]), $snapshot['url']);
+        $this->assertSame('https://cdn.example.test/media/video/welcome.mp4', $snapshot['playback_url']);
         $this->assertStringContainsString('video-poster.jpg', $snapshot['poster_url']);
 
         $payload = EmailPayload::fromArray([
@@ -35,7 +36,8 @@ class MediaVideoPlayerTest extends TestCase
 
         $this->assertStringContainsString($snapshot['url'], $payload->html());
         $this->assertStringContainsString('video-poster.jpg', $payload->html());
-        $this->assertStringNotContainsString('<video', $payload->html());
+        $this->assertStringContainsString('<video', $payload->html());
+        $this->assertStringContainsString('src="https://cdn.example.test/media/video/welcome.mp4"', $payload->html());
         $this->assertStringContainsString($snapshot['url'], $payload->plainText());
         $this->assertStringNotContainsString('welcome.mp4', $payload->plainText());
 

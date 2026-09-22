@@ -55,6 +55,7 @@ final class MessageMediaPayload
             'mime_type',
             'poster_asset_uuid',
             'poster_url',
+            'playback_url',
             'display_size',
             'tracking_key',
         ];
@@ -102,6 +103,26 @@ final class MessageMediaPayload
             $errors[] = [
                 'path' => 'url',
                 'message' => 'Media URL must be an absolute HTTP or HTTPS URL.',
+            ];
+        }
+
+        $playbackUrl = self::filledString($value['playback_url'] ?? null)
+            ? trim((string) $value['playback_url'])
+            : null;
+
+        if ($playbackUrl !== null
+            && ! CtaTrackingLinkGenerator::isTrackableDestination($playbackUrl)
+        ) {
+            $errors[] = [
+                'path' => 'playback_url',
+                'message' => 'Media playback_url must be an absolute HTTP or HTTPS URL.',
+            ];
+        }
+
+        if ($playbackUrl !== null && $kind !== self::KIND_VIDEO) {
+            $errors[] = [
+                'path' => 'playback_url',
+                'message' => 'Media playback_url may only be attached to video media.',
             ];
         }
 

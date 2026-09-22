@@ -28,7 +28,7 @@ class EmailPayloadMediaTest extends TestCase
         $this->assertSame(576, MessageMediaPayload::displayWidth(null));
     }
 
-    public function test_video_media_renders_email_safe_card_and_plain_text_link(): void
+    public function test_video_media_renders_progressive_embed_with_fallback_and_plain_text_link(): void
     {
         $payload = EmailPayload::fromArray([
             'to' => 'fan@example.test',
@@ -47,7 +47,8 @@ class EmailPayloadMediaTest extends TestCase
         $this->assertStringContainsString('https://cdn.example.test/welcome-poster.jpg', $html);
         $this->assertStringContainsString('https://cdn.example.test/welcome.mp4', $html);
         $this->assertStringContainsString('Welcome from the band', $html);
-        $this->assertStringNotContainsString('<video', strtolower($html));
+        $this->assertStringContainsString('<video', strtolower($html));
+        $this->assertStringContainsString('src="https://cdn.example.test/welcome.mp4"', $html);
         $this->assertStringNotContainsString('{media}', $html);
         $this->assertStringContainsString('Watch Welcome from the band:', $plain);
         $this->assertStringContainsString('https://cdn.example.test/welcome.mp4', $plain);
@@ -88,10 +89,13 @@ class EmailPayloadMediaTest extends TestCase
         ]);
 
         $resolved = $payload->devPayload()['media'];
+        $html = $payload->html();
 
         $this->assertSame(MessageMediaPayload::TRACKING_KEY, $resolved['tracking_key']);
         $this->assertNotSame('https://cdn.example.test/welcome.mp4', $resolved['url']);
         $this->assertStringContainsString('media_primary', urldecode($resolved['url']));
+        $this->assertStringContainsString('src="https://cdn.example.test/welcome.mp4"', $html);
+        $this->assertStringContainsString('href="'.e($resolved['url']).'"', $html);
     }
 
     public function test_tracked_image_keeps_raw_cdn_url_as_image_source(): void
@@ -133,6 +137,7 @@ class EmailPayloadMediaTest extends TestCase
             'kind' => 'video',
             'title' => 'Welcome from the band',
             'url' => 'https://cdn.example.test/welcome.mp4',
+            'playback_url' => 'https://cdn.example.test/welcome.mp4',
             'mime_type' => 'video/mp4',
             'poster_asset_uuid' => '22222222-2222-4222-8222-222222222222',
             'poster_url' => 'https://cdn.example.test/welcome-poster.jpg',
