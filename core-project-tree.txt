@@ -140,7 +140,8 @@
 │   │   │   │   ├── ResumeCampaignEnrollmentAction.php
 │   │   │   │   ├── ScheduleCampaignImportBatchInitialMessagesAction.php
 │   │   │   │   ├── SyncCampaignPresetsAction.php
-│   │   │   │   └── UpdateCampaignEligibilityAction.php
+│   │   │   │   ├── UpdateCampaignEligibilityAction.php
+│   │   │   │   └── UpdateCampaignSendPatternAction.php
 │   │   │   ├── Automation
 │   │   │   │   ├── CampaignAnnualTouchAutomationTriggerAuthoringContributor.php
 │   │   │   │   ├── CampaignsAutomationPointAuthoringContributor.php
@@ -224,6 +225,7 @@
 │   │   │   │   ├── UpdateCampaignMessageReplyHandlingRequest.php
 │   │   │   │   ├── UpdateCampaignMessageRequest.php
 │   │   │   │   ├── UpdateCampaignScheduleRequest.php
+│   │   │   │   ├── UpdateCampaignSendPatternRequest.php
 │   │   │   │   └── UpdateCampaignStepMessageTemplateRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── CampaignAnnualTouchAudienceService.php
@@ -239,6 +241,8 @@
 │   │   │   │   ├── CampaignMessageDefinitionResolver.php
 │   │   │   │   ├── CampaignMessageReviewPresenter.php
 │   │   │   │   ├── CampaignScheduleAuthoringPresenter.php
+│   │   │   │   ├── CampaignSendPatternConstraintProvider.php
+│   │   │   │   ├── CampaignSendPatternService.php
 │   │   │   │   ├── CampaignSimulationService.php
 │   │   │   │   ├── CampaignWorkspacePresenter.php
 │   │   │   │   ├── ContactShow
@@ -804,10 +808,13 @@
 │   │   │       └── InboundMessagingSetupValidationContributor.php
 │   │   ├── InternalNotifications
 │   │   │   ├── Actions
+│   │   │   │   ├── SaveInternalNotificationRecipientAction.php
 │   │   │   │   └── ScheduleInternalNotificationAction.php
 │   │   │   ├── Contracts
 │   │   │   │   └── InternalNotificationPreferenceResolver.php
 │   │   │   ├── Controllers
+│   │   │   │   ├── CRM
+│   │   │   │   │   └── InternalNotificationSettingsController.php
 │   │   │   │   └── TeamMemberController.php
 │   │   │   ├── Data
 │   │   │   ├── Deployment
@@ -958,6 +965,7 @@
 │   │   │   │   ├── MessageTemplateDeletionReferenceContributor.php
 │   │   │   │   ├── MessageTemplatePublicationHook.php
 │   │   │   │   ├── ReusableMessageTemplateAuthoringOptionContributor.php
+│   │   │   │   ├── ScheduledMessageSendAtConstraintProvider.php
 │   │   │   │   └── Sms
 │   │   │   │       ├── SmsMessage.php
 │   │   │   │       └── SmsProvider.php
@@ -996,7 +1004,8 @@
 │   │   │   │   ├── MessageTemplatePresetPublicationResult.php
 │   │   │   │   ├── ResolvedMessageDispatch.php
 │   │   │   │   ├── ReusableMessageTemplateAuthoringContext.php
-│   │   │   │   └── ReusableMessageTemplateAuthoringOption.php
+│   │   │   │   ├── ReusableMessageTemplateAuthoringOption.php
+│   │   │   │   └── ScheduledMessagePlanningContext.php
 │   │   │   ├── Deployment
 │   │   │   │   └── MessagingDeploymentPlanContributor.php
 │   │   │   ├── Enums
@@ -1161,13 +1170,13 @@
 │   │   │   │   ├── ScheduledMessageMetaCanonicalizer.php
 │   │   │   │   ├── ScheduledMessagePayloadCanonicalizer.php
 │   │   │   │   ├── ScheduledMessagePayloadResolver.php
+│   │   │   │   ├── ScheduledMessageSendAtConstraintResolver.php
 │   │   │   │   ├── ScheduledMessageSummary.php
 │   │   │   │   ├── Sms
 │   │   │   │   │   ├── SmsMessagingService.php
 │   │   │   │   │   ├── SmsProviderManager.php
 │   │   │   │   │   └── SmsSendGuard.php
 │   │   │   │   └── Tasks
-│   │   │   │       └── ScheduledMessageTaskLinkPresenter.php
 │   │   │   ├── Support
 │   │   │   │   ├── CtaTrackingLinkGenerator.php
 │   │   │   │   ├── EmailConsentRevocationLinkGenerator.php
@@ -1265,24 +1274,33 @@
 │   │   ├── Reporting
 │   │   │   ├── Actions
 │   │   │   │   ├── ImportReportingExternalMeasurementsCsvAction.php
+│   │   │   │   ├── ProcessDueScheduledReportsAction.php
 │   │   │   │   ├── ProjectReportingDailyMetricsAction.php
 │   │   │   │   ├── PruneReportingImportFilesAction.php
 │   │   │   │   ├── RecordReportingObservationAction.php
+│   │   │   │   ├── SaveScheduledReportSubscriptionAction.php
+│   │   │   │   ├── SendScheduledReportNowAction.php
 │   │   │   │   └── UpsertReportingExternalMeasurementAction.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
 │   │   │   │       └── ProjectReportingMetricsCommand.php
 │   │   │   ├── Contracts
+│   │   │   │   ├── ScheduledReportDeliveryDriver.php
+│   │   │   │   ├── ScheduledReportProvider.php
+│   │   │   │   └── ScheduledReportRecipientOptionProvider.php
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
 │   │   │   │   │   ├── ReportingController.php
-│   │   │   │   │   └── ReportingExternalMeasurementImportController.php
+│   │   │   │   │   ├── ReportingExternalMeasurementImportController.php
+│   │   │   │   │   └── ScheduledReportController.php
 │   │   │   │   └── Public
 │   │   │   │       └── ReportingObservationController.php
 │   │   │   ├── Data
 │   │   │   │   ├── NormalizedReportingAttribution.php
 │   │   │   │   ├── ReportingExternalMeasurementData.php
-│   │   │   │   └── ReportingRequestClassification.php
+│   │   │   │   ├── ReportingRequestClassification.php
+│   │   │   │   ├── ScheduledReportRecipientOption.php
+│   │   │   │   └── ScheduledReportResult.php
 │   │   │   ├── Deployment
 │   │   │   │   └── ReportingDeploymentPlanContributor.php
 │   │   │   ├── EventDefinitions
@@ -1292,7 +1310,9 @@
 │   │   │   │   ├── ReportingExternalMeasurement.php
 │   │   │   │   ├── ReportingObservation.php
 │   │   │   │   ├── ReportingProjectionCheckpoint.php
-│   │   │   │   └── ReportingSession.php
+│   │   │   │   ├── ReportingSession.php
+│   │   │   │   ├── ScheduledReportSubscription.php
+│   │   │   │   └── ScheduledReportSubscriptionRecipient.php
 │   │   │   ├── Providers
 │   │   │   │   └── ReportingModuleServiceProvider.php
 │   │   │   ├── Requests
@@ -1304,6 +1324,10 @@
 │   │   │   │   ├── ReportingPublicCollectionPolicy.php
 │   │   │   │   ├── ReportingSessionResolver.php
 │   │   │   │   ├── ReportingWorkspaceReadService.php
+│   │   │   │   ├── ScheduledReportDeliveryRegistry.php
+│   │   │   │   ├── ScheduledReportRecipientRegistry.php
+│   │   │   │   ├── ScheduledReportRegistry.php
+│   │   │   │   ├── ScheduledReportScheduleCalculator.php
 │   │   │   │   └── SchedulingReportingWorkspaceReadService.php
 │   │   │   ├── Support
 │   │   │   └── Validation
@@ -1719,6 +1743,7 @@
 │   │   │   │   ├── WebinarScheduleProfileDefinitionResolver.php
 │   │   │   │   ├── WebinarScheduleProfileResolver.php
 │   │   │   │   ├── WebinarSeriesHistoryResolver.php
+│   │   │   │   ├── WebinarSessionRegistrationSummary.php
 │   │   │   │   ├── WebinarStateCanonicalizer.php
 │   │   │   │   ├── WebinarTimeChangeTemplates.php
 │   │   │   │   ├── WebinarTimezoneResolver.php
@@ -1955,9 +1980,18 @@
 │   │   │   │   ├── Media
 │   │   │   │   │   ├── MediaMessageAttachmentSource.php
 │   │   │   │   │   └── MediaMessageMediaLibrary.php
+│   │   │   │   ├── Tasks
+│   │   │   │   │   └── ScheduledMessageTaskLinkPresenter.php
 │   │   │   │   └── UnavailableMessageMediaLibrary.php
 │   │   │   ├── RelationshipLocationAreaBridge.php
 │   │   │   ├── RelationshipLocationAreaImportHandler.php
+│   │   │   ├── Reporting
+│   │   │   │   ├── DailyFollowUp
+│   │   │   │   │   ├── DailyFollowUpReportBuilder.php
+│   │   │   │   │   └── DailyFollowUpScheduledReportProvider.php
+│   │   │   │   └── InternalNotifications
+│   │   │   │       ├── InternalNotificationScheduledReportDeliveryDriver.php
+│   │   │   │       └── TeamMemberScheduledReportRecipientProvider.php
 │   │   │   └── Scheduling
 │   │   │       ├── Automation
 │   │   │       │   ├── AppointmentHostNotificationAutomationCapabilityContributor.php
@@ -2335,7 +2369,8 @@
 │   │   │   │   ├── 2026_08_22_114000_add_campaign_touch_runtime.php
 │   │   │   │   ├── 2026_08_23_203900_add_campaign_eligibility_foundation.php
 │   │   │   │   ├── 2026_08_25_220000_decouple_campaign_touch_programs_from_campaigns.php
-│   │   │   │   └── 2026_08_27_213000_add_audience_filter_to_campaign_touch_programs_table.php
+│   │   │   │   ├── 2026_08_27_213000_add_audience_filter_to_campaign_touch_programs_table.php
+│   │   │   │   └── 2026_09_22_130000_add_send_pattern_to_campaigns_table.php
 │   │   │   ├── commerce
 │   │   │   │   ├── 2026_07_02_000005_create_commerce_customers_table.php
 │   │   │   │   ├── 2026_07_02_000006_create_commerce_products_table.php
@@ -2426,7 +2461,8 @@
 │   │   │   ├── relationships
 │   │   │   │   └── 2026_08_19_175000_create_contact_relationships_table.php
 │   │   │   ├── reporting
-│   │   │   │   └── 2026_08_15_063500_create_reporting_foundation_tables.php
+│   │   │   │   ├── 2026_08_15_063500_create_reporting_foundation_tables.php
+│   │   │   │   └── 2026_09_22_120000_create_reporting_scheduled_report_subscriptions.php
 │   │   │   ├── scheduling
 │   │   │   │   ├── 2026_04_15_195859_create_scheduling_hosts_table.php
 │   │   │   │   ├── 2026_04_15_195860_create_bookable_services_table.php
@@ -2843,6 +2879,9 @@
 │       │   │   ├── reply-profiles
 │       │   │   │   └── index.blade.php
 │       │   │   └── sms-maintenance.blade.php
+│       │   ├── internal-notifications
+│       │   │   └── settings
+│       │   │       └── index.blade.php
 │       │   ├── media
 │       │   │   └── index.blade.php
 │       │   ├── messaging
@@ -2871,8 +2910,12 @@
 │       │   │   │   ├── create.blade.php
 │       │   │   │   └── preview.blade.php
 │       │   │   ├── index.blade.php
-│       │   │   └── partials
-│       │   │       └── scheduling-public-booking.blade.php
+│       │   │   ├── partials
+│       │   │   │   └── scheduling-public-booking.blade.php
+│       │   │   └── scheduled-reports
+│       │   │       ├── index.blade.php
+│       │   │       └── parameters
+│       │   │           └── daily-follow-up.blade.php
 │       │   ├── scheduling
 │       │   │   ├── after-booking.blade.php
 │       │   │   ├── availability.blade.php
@@ -2969,6 +3012,7 @@
 │   │   ├── flow-routes.php
 │   │   ├── forms.php
 │   │   ├── inbound-messaging.php
+│   │   ├── internal-notifications.php
 │   │   ├── media.php
 │   │   ├── messaging.php
 │   │   ├── relationships.php
@@ -3076,6 +3120,7 @@
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
 │   │   │   ├── CampaignMessageTemplateDefinitionContributorTest.php
 │   │   │   ├── CampaignProcessHighwayContributorTest.php
+│   │   │   ├── CampaignSendPatternTest.php
 │   │   │   ├── CampaignSetupActionabilityTest.php
 │   │   │   ├── CampaignSimulatorTest.php
 │   │   │   ├── CampaignsSetupValidationContributorTest.php
@@ -3296,6 +3341,7 @@
 │   │   │           └── Telnyx
 │   │   │               └── TelnyxSmsProviderRealSendTest.php
 │   │   ├── InternalNotifications
+│   │   │   ├── InboundReplyNotificationRecipientsTest.php
 │   │   │   └── InternalNotificationsDeploymentPlanContributorTest.php
 │   │   ├── Location
 │   │   │   ├── LocationAreaAssignmentCapabilityTest.php
@@ -3519,7 +3565,9 @@
 │   │   │   ├── ReportingObservationFoundationTest.php
 │   │   │   ├── ReportingProjectionFactRegistryTest.php
 │   │   │   ├── ReportingPublicTransportTest.php
+│   │   │   ├── ReportingWebinarOccurrenceScopeTest.php
 │   │   │   ├── ReportingWorkspaceTest.php
+│   │   │   ├── ScheduledReportSubscriptionTest.php
 │   │   │   └── SchedulingDailyProjectionTest.php
 │   │   ├── Scheduling
 │   │   │   ├── AppointmentAutomationAuthoringTest.php
@@ -3699,6 +3747,7 @@
 │   │   │   ├── WebinarsDeploymentPlanContributorTest.php
 │   │   │   ├── WebinarSeriesLifecycleTest.php
 │   │   │   ├── WebinarSeriesMessageChainOwnershipTest.php
+│   │   │   ├── WebinarSessionRegistrationSummaryTest.php
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
 │   │   │   ├── WebinarStateCanonicalizerTest.php
 │   │   │   ├── WebinarTimeChangeAutoSendTest.php
@@ -3722,4 +3771,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-864 directories, 2859 files
+873 directories, 2899 files

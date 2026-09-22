@@ -280,6 +280,8 @@ class ReportingFoundationTest extends TestCase
             'reporting_external_measurements',
             'reporting_daily_metrics',
             'reporting_projection_checkpoints',
+            'reporting_scheduled_report_subscriptions',
+            'reporting_scheduled_report_recipients',
         ], $section['activation_tables'] ?? []);
         $this->assertArrayHasKey(
             'reporting_daily_metrics',

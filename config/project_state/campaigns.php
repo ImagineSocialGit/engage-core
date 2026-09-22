@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 9,
+    'version' => 10,
     'tables' => [
         'campaigns' => [
             'mode' => 'upsert',
@@ -28,10 +28,11 @@ return [
                 'is_customized',
                 'customized_at',
                 'meta',
+                'send_pattern',
                 'created_at',
                 'updated_at',
             ],
-            'json_columns' => ['eligibility_filter', 'meta'],
+            'json_columns' => ['eligibility_filter', 'meta', 'send_pattern'],
             'references' => [
                 'message_chain_id' => 'message_chains',
             ],

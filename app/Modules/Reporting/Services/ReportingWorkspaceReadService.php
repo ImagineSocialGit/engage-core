@@ -17,14 +17,14 @@ final class ReportingWorkspaceReadService
     /**
      * @return array<string, mixed>
      */
-    public function webinarRegistration(int $days): array
+    public function webinarRegistration(int $days, ?int $occurrenceId = null): array
     {
         $days = in_array($days, [7, 30, 90], true) ? $days : 30;
         $timezone = $this->reportingTimezone();
         $through = CarbonImmutable::now($timezone)->startOfDay();
         $from = $through->subDays($days - 1);
 
-        $rows = ReportingDailyMetric::query()
+        $allRows = ReportingDailyMetric::query()
             ->where('metric_version', ProjectReportingDailyMetricsAction::METRIC_VERSION)
             ->whereBetween('metric_date', [
                 $from->toDateString(),
@@ -33,6 +33,12 @@ final class ReportingWorkspaceReadService
             ->where('metric_key', 'like', 'webinar.%')
             ->orderBy('metric_date')
             ->get();
+
+        $occurrenceOptions = $this->occurrenceScopeOptions($allRows);
+        $selectedOccurrence = $occurrenceId !== null
+            ? collect($occurrenceOptions)->firstWhere('id', $occurrenceId)
+            : null;
+        $rows = $this->rowsForOccurrenceScope($allRows, $occurrenceId);
 
         $traffic = $this->trafficSummary($rows);
         $funnel = $this->funnel($rows);
@@ -61,9 +67,42 @@ final class ReportingWorkspaceReadService
             'webinar.validation_failures',
             'field_key',
         );
-        $adPlatformComparisons = $this->adPlatformComparisons($from, $through);
+        $adPlatformComparisons = $occurrenceId === null
+            ? $this->adPlatformComparisons($from, $through)
+            : [];
         $performanceComparisons = $this->performanceComparisons($rows);
         $classificationResolution = $this->classificationResolutionSummary($rows);
+        $localRegistrations = $this->countMetric(
+            $rows,
+            'webinar.local_registrations',
+            ['slice' => 'all'],
+        );
+        $attributedRegistrations = $this->countMetric(
+            $rows,
+            'webinar.attributed_registrations',
+            ['slice' => 'all'],
+        );
+        $registrationTraffic = [
+            'likely_human' => $this->countMetric(
+                $rows,
+                'webinar.registration_traffic_class',
+                ['slice' => 'all', 'traffic_class' => 'likely_human'],
+            ),
+            'likely_automated' => $this->countMetric(
+                $rows,
+                'webinar.registration_traffic_class',
+                ['slice' => 'all', 'traffic_class' => 'likely_automated'],
+            ),
+            'unknown' => $this->countMetric(
+                $rows,
+                'webinar.registration_traffic_class',
+                ['slice' => 'all', 'traffic_class' => 'unknown'],
+            ),
+        ];
+        $registrationTraffic['uncorrelated'] = max(
+            0,
+            $localRegistrations - array_sum($registrationTraffic),
+        );
 
         return [
             'has_data' => $rows->isNotEmpty(),
@@ -73,6 +112,13 @@ final class ReportingWorkspaceReadService
                 'from' => $from,
                 'through' => $through,
             ],
+            'scope' => [
+                'occurrence_id' => $occurrenceId,
+                'label' => is_array($selectedOccurrence)
+                    ? $selectedOccurrence['label']
+                    : 'All webinar sessions',
+                'options' => $occurrenceOptions,
+            ],
             'updated_at' => $this->latestProjectionTime($rows),
             'summary' => [
                 'likely_human_sessions' => $traffic['likely_human']['count'],
@@ -81,6 +127,15 @@ final class ReportingWorkspaceReadService
                 'validation_failure_rate' => $validationFailure,
                 'correlation_coverage' => $correlationCoverage,
             ],
+            'measurement_coverage' => [
+                'local_registrations' => $localRegistrations,
+                'browser_correlated_registrations' => $attributedRegistrations,
+                'outside_browser_measurement' => max(
+                    0,
+                    $localRegistrations - $attributedRegistrations,
+                ),
+            ],
+            'registration_traffic' => $registrationTraffic,
             'decision_summary' => $this->decisionSummary(
                 rows: $rows,
                 traffic: $traffic,
@@ -142,16 +197,8 @@ final class ReportingWorkspaceReadService
                 identityKeys: ['device_class'],
             ),
             'after_registration' => [
-                'local_registrations' => $this->countMetric(
-                    $rows,
-                    'webinar.local_registrations',
-                    ['slice' => 'all'],
-                ),
-                'attributed_registrations' => $this->countMetric(
-                    $rows,
-                    'webinar.attributed_registrations',
-                    ['slice' => 'all'],
-                ),
+                'local_registrations' => $localRegistrations,
+                'attributed_registrations' => $attributedRegistrations,
                 'meta_click_registrations' => $this->countMetric(
                     $rows,
                     'webinar.registration_attribution_evidence',
@@ -198,12 +245,12 @@ final class ReportingWorkspaceReadService
                 'webinar.attendance_outcomes',
             ),
             'series' => $this->producerBreakdown(
-                rows: $rows,
+                rows: $allRows,
                 slice: 'series',
                 identityKeys: ['series_id', 'series_slug'],
             ),
             'occurrences' => $this->producerBreakdown(
-                rows: $rows,
+                rows: $allRows,
                 slice: 'occurrence',
                 identityKeys: [
                     'series_id',
@@ -225,6 +272,104 @@ final class ReportingWorkspaceReadService
                 ),
             ],
         ];
+    }
+
+    /**
+     * @return array<int, array{
+     *     id: int,
+     *     label: string,
+     *     series_slug: ?string,
+     *     occurrence_slug: ?string,
+     *     local_registrations: int
+     * }>
+     */
+    private function occurrenceScopeOptions(Collection $rows): array
+    {
+        return collect($this->producerBreakdown(
+            rows: $rows,
+            slice: 'occurrence',
+            identityKeys: [
+                'series_id',
+                'series_slug',
+                'occurrence_id',
+                'occurrence_slug',
+            ],
+        ))
+            ->map(function (array $row): ?array {
+                $dimensions = is_array($row['dimensions'] ?? null)
+                    ? $row['dimensions']
+                    : [];
+                $id = (int) ($dimensions['occurrence_id'] ?? 0);
+
+                if ($id < 1) {
+                    return null;
+                }
+
+                $seriesSlug = is_string($dimensions['series_slug'] ?? null)
+                    ? trim((string) $dimensions['series_slug'])
+                    : null;
+                $occurrenceSlug = is_string($dimensions['occurrence_slug'] ?? null)
+                    ? trim((string) $dimensions['occurrence_slug'])
+                    : null;
+                $identity = $occurrenceSlug !== null && $occurrenceSlug !== ''
+                    ? $occurrenceSlug
+                    : 'Session #'.$id;
+
+                if ($seriesSlug !== null && $seriesSlug !== ''
+                    && $seriesSlug !== $occurrenceSlug
+                ) {
+                    $identity = $seriesSlug.' · '.$identity;
+                }
+
+                return [
+                    'id' => $id,
+                    'label' => $identity.' · '.number_format(
+                        (int) ($row['local_registrations'] ?? 0),
+                    ).' registrations',
+                    'series_slug' => $seriesSlug,
+                    'occurrence_slug' => $occurrenceSlug,
+                    'local_registrations' => (int) (
+                        $row['local_registrations'] ?? 0
+                    ),
+                ];
+            })
+            ->filter()
+            ->sortByDesc('id')
+            ->values()
+            ->all();
+    }
+
+    private function rowsForOccurrenceScope(
+        Collection $rows,
+        ?int $occurrenceId,
+    ): Collection {
+        if ($occurrenceId === null) {
+            return $rows;
+        }
+
+        return $rows
+            ->filter(function (ReportingDailyMetric $row) use (
+                $occurrenceId,
+            ): bool {
+                $dimensions = is_array($row->dimensions)
+                    ? $row->dimensions
+                    : [];
+
+                return ($dimensions['slice'] ?? null) === 'occurrence'
+                    && (int) ($dimensions['occurrence_id'] ?? 0)
+                        === $occurrenceId;
+            })
+            ->map(function (ReportingDailyMetric $row): ReportingDailyMetric {
+                $scoped = clone $row;
+                $dimensions = is_array($scoped->dimensions)
+                    ? $scoped->dimensions
+                    : [];
+                $dimensions['slice'] = 'all';
+                $scoped->setAttribute('dimensions', $dimensions);
+
+                return $scoped;
+            })
+            ->values();
     }
 
     /**

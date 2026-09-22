@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 2,
+    'version' => 3,
     'optional' => true,
     'activation_tables' => [
         'reporting_sessions',
@@ -9,8 +9,61 @@ return [
         'reporting_external_measurements',
         'reporting_daily_metrics',
         'reporting_projection_checkpoints',
+        'reporting_scheduled_report_subscriptions',
+        'reporting_scheduled_report_recipients',
     ],
     'tables' => [
+        'reporting_scheduled_report_subscriptions' => [
+            'mode' => 'upsert',
+            'identity' => ['uuid'],
+            'preserve_id' => false,
+            'order_by' => ['report_key', 'name', 'uuid'],
+            'columns' => [
+                'id',
+                'uuid',
+                'report_key',
+                'name',
+                'channel',
+                'days_of_week',
+                'send_time',
+                'timezone',
+                'parameters',
+                'is_enabled',
+                'last_sent_at',
+                'next_send_at',
+                'created_at',
+                'updated_at',
+            ],
+            'json_columns' => [
+                'days_of_week',
+                'parameters',
+            ],
+        ],
+        'reporting_scheduled_report_recipients' => [
+            'mode' => 'upsert',
+            'identity' => [
+                'scheduled_report_subscription_id',
+                'recipient_type',
+                'recipient_id',
+            ],
+            'preserve_id' => false,
+            'order_by' => [
+                'scheduled_report_subscription_id',
+                'recipient_type',
+                'recipient_id',
+            ],
+            'columns' => [
+                'id',
+                'scheduled_report_subscription_id',
+                'recipient_type',
+                'recipient_id',
+                'created_at',
+                'updated_at',
+            ],
+            'references' => [
+                'scheduled_report_subscription_id' => 'reporting_scheduled_report_subscriptions',
+            ],
+        ],
         'reporting_daily_metrics' => [
             'mode' => 'upsert',
             'identity' => [

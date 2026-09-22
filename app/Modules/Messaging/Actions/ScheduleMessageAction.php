@@ -2,6 +2,7 @@
 
 namespace App\Modules\Messaging\Actions;
 
+use App\Modules\Messaging\Data\ScheduledMessagePlanningContext;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
@@ -11,10 +12,12 @@ use App\Modules\Messaging\Models\MessageChainStepVariant;
 use App\Modules\Messaging\Models\MessageTemplateVersion;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ScheduledMessageMetaCanonicalizer;
+use App\Modules\Messaging\Services\ScheduledMessageSendAtConstraintResolver;
 use App\Modules\Messaging\Services\ScheduledMessagePayloadCanonicalizer;
 use App\Support\Queues\QueueContract;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class ScheduleMessageAction
@@ -23,6 +26,7 @@ class ScheduleMessageAction
         private readonly QueueContract $queueContract,
         private readonly ScheduledMessageMetaCanonicalizer $metaCanonicalizer,
         private readonly ScheduledMessagePayloadCanonicalizer $payloadCanonicalizer,
+        private readonly ScheduledMessageSendAtConstraintResolver $sendAtConstraints,
     ) {}
 
     public function handle(
@@ -119,63 +123,107 @@ class ScheduleMessageAction
 
         $meta = $this->metaCanonicalizer->forPersistence($meta);
 
-        $attributes = [
-            'recipient_type' => $recipient->getMorphClass(),
-            'recipient_id' => $recipient->getKey(),
-            'message_template_version_id' => $messageTemplateVersionId,
-            'message_chain_enrollment_id' => $messageChainEnrollmentId,
-            'message_chain_step_variant_id' => $messageChainStepVariantId,
-            'channel' => $channel,
-            'message_type' => $messageType,
-            'reply_profile_key' => $messageChainStepVariantId === null
-                ? $replyProfileKey
-                : null,
-            'purpose' => $purpose,
-            'scope' => $scope,
-            'payload_class' => $payloadClass,
-            'queue' => $queue,
-            'dispatch_keys' => $dispatchKeys,
-            'definition_config_path' => $definitionConfigPath,
-            'payload' => $payload,
-            'send_at' => $sendAt,
-            'status' => ScheduledMessage::STATUS_PENDING,
-            'meta' => $meta,
-        ];
+        return DB::transaction(function () use (
+            $recipient,
+            $channel,
+            $purpose,
+            $scope,
+            $messageType,
+            $payloadClass,
+            $payload,
+            $sendAt,
+            $context,
+            $behaviorOwner,
+            $dedupeKey,
+            $meta,
+            $queue,
+            $dispatchKeys,
+            $definitionConfigPath,
+            $messageTemplateVersionId,
+            $messageChainEnrollmentId,
+            $messageChainStepVariantId,
+            $replyProfileKey,
+        ): ScheduledMessage {
+            if ($dedupeKey !== null) {
+                $existing = ScheduledMessage::query()
+                    ->where('dedupe_key', $dedupeKey)
+                    ->first();
 
-        if ($context) {
-            $attributes['context_type'] = $context->getMorphClass();
-            $attributes['context_id'] = $context->getKey();
-        }
+                if ($existing instanceof ScheduledMessage) {
+                    return $existing;
+                }
+            }
 
-        if ($behaviorOwner) {
-            $attributes['behavior_owner_type'] = $behaviorOwner->getMorphClass();
-            $attributes['behavior_owner_id'] = $behaviorOwner->getKey();
-        }
-
-        $scheduledMessage = $dedupeKey
-            ? ScheduledMessage::query()->firstOrCreate(
-                ['dedupe_key' => $dedupeKey],
-                $attributes + ['dedupe_key' => $dedupeKey],
-            )
-            : ScheduledMessage::query()->create($attributes);
-
-        $wasRecentlyCreated = $scheduledMessage->wasRecentlyCreated;
-
-        if ($wasRecentlyCreated) {
-            SendScheduledMessageJob::dispatch(
-                scheduledMessageId: $scheduledMessage->id,
-                horizon: $this->horizonPayload(
-                    $scheduledMessage,
-                    $sendAt,
-                    $context,
+            $sendAt = $this->sendAtConstraints->resolve(
+                context: new ScheduledMessagePlanningContext(
+                    recipient: $recipient,
+                    channel: $channel,
+                    purpose: $purpose,
+                    scope: $scope,
+                    messageType: $messageType,
+                    context: $context,
+                    behaviorOwner: $behaviorOwner,
+                    dedupeKey: $dedupeKey,
                 ),
-            )
-                ->delay($sendAt)
-                ->afterCommit()
-                ->onQueue($queue);
-        }
+                requestedSendAt: $sendAt,
+            );
 
-        return $scheduledMessage;
+            $attributes = [
+                'recipient_type' => $recipient->getMorphClass(),
+                'recipient_id' => $recipient->getKey(),
+                'message_template_version_id' => $messageTemplateVersionId,
+                'message_chain_enrollment_id' => $messageChainEnrollmentId,
+                'message_chain_step_variant_id' => $messageChainStepVariantId,
+                'channel' => $channel,
+                'message_type' => $messageType,
+                'reply_profile_key' => $messageChainStepVariantId === null
+                    ? $replyProfileKey
+                    : null,
+                'purpose' => $purpose,
+                'scope' => $scope,
+                'payload_class' => $payloadClass,
+                'queue' => $queue,
+                'dispatch_keys' => $dispatchKeys,
+                'definition_config_path' => $definitionConfigPath,
+                'payload' => $payload,
+                'send_at' => $sendAt,
+                'status' => ScheduledMessage::STATUS_PENDING,
+                'meta' => $meta,
+            ];
+
+            if ($context) {
+                $attributes['context_type'] = $context->getMorphClass();
+                $attributes['context_id'] = $context->getKey();
+            }
+
+            if ($behaviorOwner) {
+                $attributes['behavior_owner_type'] = $behaviorOwner->getMorphClass();
+                $attributes['behavior_owner_id'] = $behaviorOwner->getKey();
+            }
+
+            $scheduledMessage = $dedupeKey
+                ? ScheduledMessage::query()->firstOrCreate(
+                    ['dedupe_key' => $dedupeKey],
+                    $attributes + ['dedupe_key' => $dedupeKey],
+                )
+                : ScheduledMessage::query()->create($attributes);
+
+            if ($scheduledMessage->wasRecentlyCreated) {
+                SendScheduledMessageJob::dispatch(
+                    scheduledMessageId: $scheduledMessage->id,
+                    horizon: $this->horizonPayload(
+                        $scheduledMessage,
+                        $sendAt,
+                        $context,
+                    ),
+                )
+                    ->delay($sendAt)
+                    ->afterCommit()
+                    ->onQueue($queue);
+            }
+
+            return $scheduledMessage;
+        }, 3);
     }
 
     private function messageTemplateVersion(

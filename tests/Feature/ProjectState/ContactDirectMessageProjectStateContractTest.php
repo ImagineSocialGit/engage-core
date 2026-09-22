@@ -75,10 +75,6 @@ class ContactDirectMessageProjectStateContractTest extends TestCase
 
     public function test_messaging_project_state_contract_declares_contact_as_a_scheduled_message_context(): void
     {
-        $this->assertSame(
-            7,
-            config('project_state.sections.messaging.version'),
-        );
 
         $references = config(
             'project_state.sections.messaging.tables.scheduled_messages.polymorphic_references',

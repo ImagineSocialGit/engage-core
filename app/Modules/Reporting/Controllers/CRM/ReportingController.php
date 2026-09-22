@@ -23,6 +23,7 @@ final class ReportingController extends Controller
         ModuleManager $modules,
     ): View {
         $days = $this->normalizedDays($request);
+        $occurrenceId = $this->normalizedOccurrenceId($request);
 
         $schedulingReport = $schedulingWorkspace->publicBooking($days);
         $showSchedulingReport = $modules->enabled('scheduling')
@@ -32,7 +33,7 @@ final class ReportingController extends Controller
             'title' => 'Reporting',
             'heading' => 'Reporting',
             'subheading' => 'See where real visitors move forward, get stuck, or fail to complete public actions.',
-            'report' => $workspace->webinarRegistration($days),
+            'report' => $workspace->webinarRegistration($days, $occurrenceId),
             'schedulingReport' => $showSchedulingReport
                 ? $schedulingReport
                 : null,
@@ -45,6 +46,7 @@ final class ReportingController extends Controller
         ProjectReportingDailyMetricsAction $project,
     ): RedirectResponse {
         $days = $this->normalizedDays($request);
+        $occurrenceId = $this->normalizedOccurrenceId($request);
         $timezone = $this->reportingTimezone();
         $through = CarbonImmutable::now($timezone)->startOfDay();
 
@@ -54,7 +56,10 @@ final class ReportingController extends Controller
         );
 
         return redirect()
-            ->route('crm.reporting.index', ['days' => $days])
+            ->route('crm.reporting.index', array_filter([
+                'days' => $days,
+                'webinar_id' => $occurrenceId,
+            ]))
             ->with('success', 'Recent Reporting data refreshed.');
     }
 
@@ -65,6 +70,15 @@ final class ReportingController extends Controller
         return in_array($days, self::RANGE_OPTIONS, true)
             ? $days
             : 30;
+    }
+
+    private function normalizedOccurrenceId(Request $request): ?int
+    {
+        $occurrenceId = $request->integer('webinar_id');
+
+        return $occurrenceId > 0
+            ? $occurrenceId
+            : null;
     }
 
     private function reportingTimezone(): string

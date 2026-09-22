@@ -17,7 +17,7 @@ final class ProjectReportingDailyMetricsAction
 {
     public const PROJECTOR_KEY = 'public_funnel';
 
-    public const PROJECTOR_VERSION = 4;
+    public const PROJECTOR_VERSION = 5;
 
     public const METRIC_VERSION = 2;
 
@@ -36,6 +36,7 @@ final class ProjectReportingDailyMetricsAction
         'webinar.funnel_sessions',
         'webinar.registration_conversion',
         'webinar.attributed_registrations',
+        'webinar.registration_traffic_class',
         'webinar.registration_attribution_evidence',
         'webinar.validation_failure_rate',
         'webinar.validation_failures',
@@ -511,6 +512,16 @@ final class ProjectReportingDailyMetricsAction
                         metrics: $metrics,
                         metricKey: 'webinar.attributed_registrations',
                         dimensions: $slice,
+                    );
+
+                    $this->incrementCount(
+                        metrics: $metrics,
+                        metricKey: 'webinar.registration_traffic_class',
+                        dimensions: [
+                            ...$slice,
+                            'traffic_class' => $attributionProfile['traffic_class']
+                                ?? 'unknown',
+                        ],
                     );
 
                     $this->incrementCount(
@@ -1509,6 +1520,10 @@ final class ProjectReportingDailyMetricsAction
                 'external_placement' => $session->external_placement,
                 'page_revision' => $properties['page_revision'] ?? null,
                 'presentation' => $properties['presentation'] ?? null,
+                'series_id' => $properties['series_id'] ?? null,
+                'series_slug' => $properties['series_slug'] ?? null,
+                'occurrence_id' => $properties['occurrence_id'] ?? null,
+                'occurrence_slug' => $properties['occurrence_slug'] ?? null,
                 'device_class' => $session->device_class,
             ];
         }
@@ -1661,6 +1676,24 @@ final class ProjectReportingDailyMetricsAction
             'slice' => 'all',
         ]];
 
+        if (filled($profile['series_slug'] ?? null)) {
+            $slices[] = [
+                'slice' => 'series',
+                'series_id' => $profile['series_id'] ?? null,
+                'series_slug' => $profile['series_slug'],
+            ];
+        }
+
+        if (filled($profile['occurrence_id'] ?? null)) {
+            $slices[] = [
+                'slice' => 'occurrence',
+                'series_id' => $profile['series_id'] ?? null,
+                'series_slug' => $profile['series_slug'] ?? null,
+                'occurrence_id' => $profile['occurrence_id'],
+                'occurrence_slug' => $profile['occurrence_slug'] ?? null,
+            ];
+        }
+
         if (filled($profile['path'] ?? null)) {
             $slices[] = [
                 'slice' => 'path',
@@ -1723,6 +1756,24 @@ final class ProjectReportingDailyMetricsAction
         $slices = [[
             'slice' => 'all',
         ]];
+
+        if (filled($profile['series_slug'] ?? null)) {
+            $slices[] = [
+                'slice' => 'series',
+                'series_id' => $profile['series_id'] ?? null,
+                'series_slug' => $profile['series_slug'],
+            ];
+        }
+
+        if (filled($profile['occurrence_id'] ?? null)) {
+            $slices[] = [
+                'slice' => 'occurrence',
+                'series_id' => $profile['series_id'] ?? null,
+                'series_slug' => $profile['series_slug'] ?? null,
+                'occurrence_id' => $profile['occurrence_id'],
+                'occurrence_slug' => $profile['occurrence_slug'] ?? null,
+            ];
+        }
 
         if (filled($profile['path'] ?? null)) {
             $slices[] = [

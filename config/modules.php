@@ -631,6 +631,14 @@ return [
             'ui' => [
                 'tone' => 'indigo',
             ],
+            'settings' => [
+                'key' => 'notification_recipients',
+                'category' => 'communications',
+                'label' => 'Team notifications',
+                'description' => 'Choose which email addresses receive immediate reply alerts and the daily follow-up email.',
+                'route' => 'crm.internal-notifications.settings.index',
+                'priority' => 60,
+            ],
             'depends_on' => ['messaging'],
             'providers' => [
                 InternalNotificationsModuleServiceProvider::class,

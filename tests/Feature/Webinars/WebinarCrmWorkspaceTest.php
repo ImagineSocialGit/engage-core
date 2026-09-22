@@ -169,11 +169,14 @@ class WebinarCrmWorkspaceTest extends TestCase
             ->get(route('crm.webinars.show', $webinar))
             ->assertOk()
             ->assertViewIs('crm.webinars.show')
-            ->assertViewHas('registrations', function ($registrations) use ($registration): bool {
-                $loaded = $registrations->getCollection()->first();
+            ->assertViewHas('registrationSummary', function (array $summary) use ($registration): bool {
+                $loaded = collect($summary['registrants'] ?? [])->firstWhere(
+                    'registration_id',
+                    (int) $registration->getKey(),
+                );
 
-                return $loaded instanceof WebinarRegistration
-                    && $loaded->is($registration);
+                return ($summary['registrant_count'] ?? null) === 1
+                    && is_array($loaded);
             })
             ->assertViewHas('registrationCounts', fn (array $counts): bool =>
                 $counts['total'] === 1

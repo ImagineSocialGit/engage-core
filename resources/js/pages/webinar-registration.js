@@ -19,6 +19,14 @@ function normalizedStringList(values) {
     ))
 }
 
+function normalizedPositiveInteger(value) {
+    const number = Number(value)
+
+    return Number.isInteger(number) && number > 0
+        ? number
+        : null
+}
+
 export default function webinarRegistrationPage(config = {}) {
     const reporting = typeof config.reporting === 'object' && config.reporting !== null
         ? config.reporting
@@ -41,6 +49,10 @@ export default function webinarRegistrationPage(config = {}) {
         reportingEnabled: reporting.enabled !== false,
         reportingPageRevision: normalizedString(reporting.pageRevision, 'webinar-register-v1'),
         reportingPresentation: normalizedString(reporting.presentation, 'modal'),
+        reportingSeriesId: normalizedPositiveInteger(reporting.seriesId),
+        reportingSeriesSlug: normalizedString(reporting.seriesSlug),
+        reportingOccurrenceId: normalizedPositiveInteger(reporting.occurrenceId),
+        reportingOccurrenceSlug: normalizedString(reporting.occurrenceSlug),
         reportingValidationFields: normalizedStringList(reporting.validationFields),
         reportingThrottleReason: normalizedString(reporting.throttleReason),
         reportingBotProtectionOutcome: normalizedString(reporting.botProtectionOutcome),
@@ -95,9 +107,28 @@ export default function webinarRegistrationPage(config = {}) {
         },
 
         reportingProperties(properties = {}) {
+            const identity = {}
+
+            if (this.reportingSeriesId !== null) {
+                identity.series_id = this.reportingSeriesId
+            }
+
+            if (this.reportingSeriesSlug) {
+                identity.series_slug = this.reportingSeriesSlug
+            }
+
+            if (this.reportingOccurrenceId !== null) {
+                identity.occurrence_id = this.reportingOccurrenceId
+            }
+
+            if (this.reportingOccurrenceSlug) {
+                identity.occurrence_slug = this.reportingOccurrenceSlug
+            }
+
             return {
                 page_revision: this.reportingPageRevision,
                 presentation: this.reportingPresentation,
+                ...identity,
                 ...properties,
             }
         },

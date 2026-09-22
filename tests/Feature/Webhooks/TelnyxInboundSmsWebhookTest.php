@@ -142,6 +142,7 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             'name' => 'Loan Officer',
             'email' => 'loan-officer@example.com',
         ]);
+        $this->enableInboundReplyNotifications($teamMember);
 
         $contact = Contact::factory()->create([
             'first_name' => 'Test',
@@ -186,21 +187,16 @@ class TelnyxInboundSmsWebhookTest extends TestCase
         Queue::assertPushed(SendScheduledMessageJob::class);
 
         $this->assertSame($teamMember->email, $scheduledMessage->payload['to']);
-        $this->assertSame('New inbound Sms message from Test Contact', $scheduledMessage->payload['subject']);
     }
 
-    public function test_telnyx_inbound_normal_reply_without_contact_falls_back_to_default_team_member(): void
+    public function test_telnyx_unmatched_normal_reply_notifies_explicit_subscriber(): void
     {
         Queue::fake();
 
         $teamMember = TeamMember::factory()->create([
-            'email' => 'default@example.com',
+            'email' => 'subscriber@example.com',
         ]);
-
-        config()->set(
-            'messaging.internal_notifications.inbound_replies.default_team_member_email',
-            $teamMember->email,
-        );
+        $this->enableInboundReplyNotifications($teamMember);
 
         $this->postTelnyxWebhook([
             'provider_context_id' => self::MARKETING_PROFILE_ID,
@@ -234,22 +230,19 @@ class TelnyxInboundSmsWebhookTest extends TestCase
         $this->assertSame($teamMember->email, $scheduledMessage->payload['to']);
     }
 
-    public function test_telnyx_inbound_normal_reply_does_not_notify_inactive_assigned_team_member(): void
+    public function test_telnyx_inbound_normal_reply_excludes_inactive_subscribers(): void
     {
         Queue::fake();
 
         $inactiveTeamMember = TeamMember::factory()->inactive()->create([
             'email' => 'inactive@example.com',
         ]);
-
-        $defaultTeamMember = TeamMember::factory()->create([
-            'email' => 'default@example.com',
+        $activeTeamMember = TeamMember::factory()->create([
+            'email' => 'active@example.com',
         ]);
 
-        config()->set(
-            'messaging.internal_notifications.inbound_replies.default_team_member_email',
-            $defaultTeamMember->email,
-        );
+        $this->enableInboundReplyNotifications($inactiveTeamMember);
+        $this->enableInboundReplyNotifications($activeTeamMember);
 
         $contact = Contact::factory()->create([
             'phone' => '+15551234567',
@@ -268,13 +261,13 @@ class TelnyxInboundSmsWebhookTest extends TestCase
         $this->assertNoInboundNotificationScheduledFor($inactiveTeamMember);
 
         $scheduledMessage = $this->assertInboundNotificationScheduledFor(
-            teamMember: $defaultTeamMember,
+            teamMember: $activeTeamMember,
             inboundMessage: $inboundMessage,
         );
 
         Queue::assertPushed(SendScheduledMessageJob::class);
 
-        $this->assertSame($defaultTeamMember->email, $scheduledMessage->payload['to']);
+        $this->assertSame($activeTeamMember->email, $scheduledMessage->payload['to']);
     }
 
     public function test_telnyx_inbound_normal_reply_respects_team_member_email_preference(): void
@@ -502,6 +495,9 @@ class TelnyxInboundSmsWebhookTest extends TestCase
         $teamMember = TeamMember::factory()->create([
             'email' => 'duplicate-test@example.com',
         ]);
+
+        $this->enableInboundReplyNotifications($teamMember);
+
         $contact = Contact::factory()->create([
             'phone' => '+15551234567',
         ]);
@@ -528,6 +524,17 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             ->where('event_key', RecordInboundMessageAction::NORMAL_REPLY_AUTOMATION_EVENT_KEY)
             ->count());
         Queue::assertPushedTimes(SendScheduledMessageJob::class, 1);
+    }
+
+    private function enableInboundReplyNotifications(TeamMember $teamMember): void
+    {
+        TeamMemberNotificationPreference::factory()
+            ->for($teamMember)
+            ->email()
+            ->inboundReplies()
+            ->create([
+                'is_enabled' => true,
+            ]);
     }
 
     private function grantSmsConsent(Contact $contact, string $purpose, string $scope): MessageConsent

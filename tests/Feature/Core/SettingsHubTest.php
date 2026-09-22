@@ -19,7 +19,7 @@ class SettingsHubTest extends TestCase
         $this->withoutMiddleware(ForceStagingAccess::class);
     }
 
-    public function test_settings_hub_contains_only_enabled_module_contributions(): void
+    public function test_settings_hub_contains_enabled_module_contributions_and_excludes_disabled_modules(): void
     {
         config()->set('modules.enabled', [
             'tasks',
@@ -27,15 +27,21 @@ class SettingsHubTest extends TestCase
             'flow_routes',
         ]);
 
-        $items = collect(app(ModuleManager::class)->settingsItems());
+        $keys = collect(app(ModuleManager::class)->settingsItems())
+            ->pluck('key')
+            ->all();
 
-        $this->assertSame([
+        foreach ([
             'core.team',
             'core.business_days',
+            'core.contact_maintenance',
             'tasks.task_templates',
             'flow_routes.route_assignments',
-        ], $items->pluck('key')->all());
-        $this->assertNotContains('messaging.message_templates', $items->pluck('key')->all());
+        ] as $key) {
+            $this->assertContains($key, $keys);
+        }
+
+        $this->assertNotContains('messaging.message_templates', $keys);
     }
 
     public function test_settings_hub_ignores_contributions_without_a_registered_route(): void

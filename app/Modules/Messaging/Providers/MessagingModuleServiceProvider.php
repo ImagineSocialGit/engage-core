@@ -50,12 +50,12 @@ use App\Modules\Messaging\Services\MessageAttachmentRegistry;
 use App\Support\ModuleIntegrations\Messaging\Contracts\MessageAttachmentSource;
 use App\Modules\Messaging\Services\MessageRecipientGateRegistry;
 use App\Modules\Messaging\Services\MessageRecipientPayloadProviderRegistry;
+use App\Modules\Messaging\Services\ScheduledMessageSendAtConstraintResolver;
 use App\Modules\Messaging\Services\MessageTemplateDefinitionRegistry;
 use App\Modules\Messaging\Services\MessageTemplatePublicationHookRegistry;
 use App\Modules\Messaging\Services\ReplyProfiles\MessagingReplyProfileDependencyContributor;
 use App\Modules\Messaging\Services\ReusableMessageTemplateAuthoringGuide;
 use App\Modules\Messaging\Services\Sms\SmsProviderManager;
-use App\Modules\Messaging\Services\Tasks\ScheduledMessageTaskLinkPresenter;
 use App\Modules\Messaging\TokenContracts\MessagingTokenContextProvider;
 use App\Modules\Messaging\Validation\MessagingSetupValidationContributor;
 use App\Modules\Messaging\View\Components\MessageMediaAuthoring;
@@ -137,10 +137,6 @@ class MessagingModuleServiceProvider extends ServiceProvider
             MessagingDeliveryIssuesDashboardPanelProvider::class,
         ], DashboardPanelRegistry::providerTag());
 
-        $this->app->tag([
-            ScheduledMessageTaskLinkPresenter::class,
-        ], 'tasks.link_presenters');
-
         $this->app->singleton(Client::class, function () {
             return new Client(
                 config('services.twilio.sid'),
@@ -173,6 +169,16 @@ class MessagingModuleServiceProvider extends ServiceProvider
                 ),
             );
         });
+
+        $this->app->singleton(
+            ScheduledMessageSendAtConstraintResolver::class,
+            fn ($app): ScheduledMessageSendAtConstraintResolver =>
+                new ScheduledMessageSendAtConstraintResolver(
+                    providers: $app->tagged(
+                        \App\Modules\Messaging\Contracts\ScheduledMessageSendAtConstraintProvider::TAG,
+                    ),
+                ),
+        );
 
         $this->app->singleton(MessageTemplateDefinitionRegistry::class, function ($app) {
             $moduleManager = $app->make(ModuleManager::class);

@@ -29,6 +29,7 @@ use App\Modules\Webinars\Requests\UpdateWebinarSeriesScheduleProfileRequest;
 use App\Modules\Webinars\Services\WebinarMessageChainPresentationService;
 use App\Modules\Webinars\Services\WebinarProviderSchedulePolicy;
 use App\Modules\Webinars\Services\WebinarSeriesHistoryResolver;
+use App\Modules\Webinars\Services\WebinarSessionRegistrationSummary;
 use App\Modules\Webinars\Services\WebinarScheduleProfileResolver;
 use App\Support\Reporting\PaidAdTrackingLinkGenerator;
 use Illuminate\Http\Client\ConnectionException;
@@ -511,6 +512,7 @@ class WebinarController extends Controller
         Webinar $webinar,
         WebinarMessageChainPresentationService $messageChainPresentation,
         WebinarScheduleProfileResolver $scheduleProfileResolver,
+        WebinarSessionRegistrationSummary $registrationSummaryService,
     ): View {
         $webinar->load([
             'webinarSeries.webinarScheduleProfile',
@@ -519,14 +521,7 @@ class WebinarController extends Controller
             'replacement',
         ]);
 
-        $registrations = $webinar->registrations()
-            ->with([
-                'contact',
-                'responses',
-            ])
-            ->latest('registered_at')
-            ->latest('id')
-            ->paginate(50);
+        $registrationSummary = $registrationSummaryService->forWebinar($webinar);
 
         $registrationCounts = [
             'total' => $webinar->registrations()->count(),
@@ -599,7 +594,7 @@ class WebinarController extends Controller
             'heading' => $webinar->title,
             'webinar' => $webinar,
             'series' => $webinar->webinarSeries,
-            'registrations' => $registrations,
+            'registrationSummary' => $registrationSummary,
             'registrationCounts' => $registrationCounts,
             'messageReview' => $messageReview,
             'messageProfile' => [

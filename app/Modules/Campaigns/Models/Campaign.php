@@ -65,6 +65,7 @@ class Campaign extends Model
         'is_customized',
         'customized_at',
         'meta',
+        'send_pattern',
     ];
 
     protected function casts(): array
@@ -76,6 +77,7 @@ class Campaign extends Model
             'is_customized' => 'boolean',
             'customized_at' => 'datetime',
             'meta' => 'array',
+            'send_pattern' => 'array',
         ];
     }
 

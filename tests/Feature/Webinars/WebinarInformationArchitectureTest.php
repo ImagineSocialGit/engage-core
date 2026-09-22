@@ -139,12 +139,17 @@ class WebinarInformationArchitectureTest extends TestCase
                 'missed' => 0,
                 'cancelled' => 0,
             ])
-            ->assertViewHas('registrations', function ($registrations) use ($registration): bool {
-                $loaded = $registrations->getCollection()->first();
+            ->assertViewHas('registrationSummary', function (array $summary) use ($registration): bool {
+                $loaded = collect($summary['registrants'] ?? [])->firstWhere(
+                    'registration_id',
+                    (int) $registration->getKey(),
+                );
+                $question = ($summary['questions'] ?? [])[0] ?? null;
 
-                return $loaded instanceof WebinarRegistration
-                    && $loaded->is($registration)
-                    && $loaded->responses->count() === 1;
+                return ($summary['registrant_count'] ?? null) === 1
+                    && is_array($loaded)
+                    && is_array($question)
+                    && ($question['response_count'] ?? null) === 1;
             });
     }
 

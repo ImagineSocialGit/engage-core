@@ -174,6 +174,24 @@ final class WebinarBehaviorEventDefinitionContributor implements ReportingEventD
                     'inline',
                 ],
             ],
+            'series_id' => [
+                'type' => ReportingEventDefinition::PROPERTY_INTEGER,
+                'required' => false,
+            ],
+            'series_slug' => [
+                'type' => ReportingEventDefinition::PROPERTY_STRING,
+                'required' => false,
+                'max_length' => 191,
+            ],
+            'occurrence_id' => [
+                'type' => ReportingEventDefinition::PROPERTY_INTEGER,
+                'required' => false,
+            ],
+            'occurrence_slug' => [
+                'type' => ReportingEventDefinition::PROPERTY_STRING,
+                'required' => false,
+                'max_length' => 191,
+            ],
         ];
     }
 

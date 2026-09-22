@@ -28,9 +28,11 @@ class ScheduleInboundMessageInternalNotification
             return;
         }
 
-        $recipient = $this->recipientResolver->resolve($inboundMessage);
+        foreach ($this->recipientResolver->resolveAll($inboundMessage) as $recipient) {
+            if (! $recipient instanceof InternalNotificationRecipient) {
+                continue;
+            }
 
-        if ($recipient instanceof InternalNotificationRecipient) {
             $this->scheduleInternalNotification->handle(
                 recipient: $recipient,
                 scope: 'inbound_messages',
@@ -70,16 +72,34 @@ class ScheduleInboundMessageInternalNotification
                 'Received' => $this->receivedAt($inboundMessage),
                 'Message' => $inboundMessage->body ?: '(No message body)',
             ],
-            'cta' => $contact ? [
-                'label' => 'View CRM Contact',
-                'url' => route('crm.contacts.show', $contact),
-            ] : [],
+            'cta' => $this->cta($inboundMessage, $contact),
             'sms_message' => 'New inbound '.$channelLabel.' message from '.$this->subjectSender($contactName, $sender).'.',
             'meta' => [
                 'inbound_message_id' => $inboundMessage->id,
                 'sender_type' => $inboundMessage->sender_type,
                 'sender_id' => $inboundMessage->sender_id,
+                'related_contact_id' => $inboundMessage->related_contact_id,
             ],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function cta(
+        InboundMessage $inboundMessage,
+        ?Contact $contact,
+    ): array {
+        if ($contact instanceof Contact) {
+            return [
+                'label' => 'View CRM Contact',
+                'url' => route('crm.contacts.show', $contact),
+            ];
+        }
+
+        return [
+            'label' => 'Open Inbox Message',
+            'url' => route('crm.inbound-messaging.inbox.show', $inboundMessage),
         ];
     }
 
@@ -87,7 +107,13 @@ class ScheduleInboundMessageInternalNotification
     {
         $sender = $inboundMessage->sender;
 
-        return $sender instanceof Contact ? $sender : null;
+        if ($sender instanceof Contact) {
+            return $sender;
+        }
+
+        $related = $inboundMessage->relatedContact;
+
+        return $related instanceof Contact ? $related : null;
     }
 
     private function contactName(?Contact $contact): ?string

@@ -1,5 +1,9 @@
 <x-layouts.crm :title="$title" :heading="$heading">
-    <div class="space-y-6" data-webinar-session-detail="{{ $webinar->getKey() }}">
+    <div
+        class="space-y-6"
+        data-webinar-session-detail="{{ $webinar->getKey() }}"
+        x-data="{ registrantsOpen: false }"
+    >
         <div class="flex flex-wrap items-center gap-2 text-sm">
             <a href="{{ route('crm.webinar-series.index') }}" class="font-semibold text-slate-600 underline">Webinar types</a>
             @if($series)
@@ -115,94 +119,128 @@
         @endif
 
         <section class="rounded-2xl border border-slate-200 bg-white shadow-sm" data-webinar-session-participants>
-            <div class="border-b border-slate-200 px-5 py-4 sm:px-7">
-                <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">People</p>
-                <h2 class="mt-2 text-xl font-semibold text-slate-950">Registration and participation</h2>
-                <p class="mt-1 text-sm leading-6 text-slate-600">
-                    Attendance and time-in-session come from the provider attendance record. Registration answers are the questions collected when the person signed up.
-                </p>
+            <div class="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-7">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Registration insights</p>
+                    <h2 class="mt-2 text-xl font-semibold text-slate-950">What registrants told you</h2>
+                    <p class="mt-1 text-sm leading-6 text-slate-600">
+                        Answers are grouped once by question so common responses are easy to scan. Free-form responses remain visible separately.
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    x-on:click="registrantsOpen = true"
+                    class="inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                >
+                    View all {{ number_format($registrationSummary['registrant_count']) }} registrants
+                </button>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        <tr>
-                            <th class="px-5 py-3 sm:px-7">Person</th>
-                            <th class="px-5 py-3">Result</th>
-                            <th class="px-5 py-3">Participation</th>
-                            <th class="px-5 py-3">Registration answers</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100 bg-white">
-                        @forelse($registrations as $registration)
-                            <tr>
-                                <td class="px-5 py-4 align-top sm:px-7">
-                                    @if($registration->contact)
-                                        <a href="{{ route('crm.contacts.show', $registration->contact) }}" class="font-semibold text-slate-900 underline">
-                                            {{ $registration->contact->name ?? $registration->contact->email ?? 'Contact' }}
-                                        </a>
-                                        <div class="mt-1 text-xs text-slate-500">{{ $registration->contact->email }}</div>
-                                    @else
-                                        <div class="font-semibold text-slate-900">{{ data_get($registration->meta, 'email') ?: 'Unlinked registration' }}</div>
-                                    @endif
-                                </td>
-                                <td class="px-5 py-4 align-top">
-                                    <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                                        {{ ucfirst((string) $registration->status) }}
-                                    </span>
-                                </td>
-                                <td class="px-5 py-4 align-top">
-                                    @if(data_get($registration->meta, 'attendance.status') === 'attended' || $registration->attended_at)
-                                        <div class="space-y-1 text-xs text-slate-600">
-                                            @if(data_get($registration->meta, 'attendance.duration'))
-                                                <div>{{ round(((int) data_get($registration->meta, 'attendance.duration')) / 60) }} minutes</div>
-                                            @endif
-                                            @if(data_get($registration->meta, 'attendance.join_time'))
-                                                <div>Joined: {{ data_get($registration->meta, 'attendance.join_time') }}</div>
-                                            @endif
-                                            @if(data_get($registration->meta, 'attendance.leave_time'))
-                                                <div>Left: {{ data_get($registration->meta, 'attendance.leave_time') }}</div>
-                                            @endif
-                                            @if(data_get($registration->meta, 'attendance.provider'))
-                                                <div>Source: {{ ucfirst((string) data_get($registration->meta, 'attendance.provider')) }}</div>
-                                            @endif
+            @if($registrationSummary['questions'] === [])
+                <div class="px-5 py-8 text-sm text-slate-500 sm:px-7">
+                    No registration-question answers have been saved for this session yet.
+                </div>
+            @else
+                <div class="flex flex-col gap-4 p-5 sm:p-7 lg:flex-row lg:flex-wrap lg:items-start">
+                    @foreach($registrationSummary['questions'] as $question)
+                        <article class="rounded-2xl border border-slate-200 bg-slate-50 p-5 lg:min-w-[20rem] lg:flex-1">
+                            <div class="flex items-start justify-between gap-4">
+                                <h3 class="font-semibold leading-6 text-slate-950">{{ $question['label'] }}</h3>
+                                <span class="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
+                                    {{ number_format($question['response_count']) }} responses
+                                </span>
+                            </div>
+
+                            @if($question['answer_counts'] !== [])
+                                <div class="mt-4 grid gap-2">
+                                    @foreach($question['answer_counts'] as $answer)
+                                        <div class="flex items-center justify-between gap-4 rounded-xl bg-white px-4 py-3 ring-1 ring-slate-200">
+                                            <span class="text-sm text-slate-800">{{ $answer['label'] }}</span>
+                                            <span class="shrink-0 text-sm font-bold text-slate-950">{{ number_format($answer['count']) }}</span>
                                         </div>
-                                    @elseif($registration->status === 'missed')
-                                        <span class="text-xs font-semibold text-amber-700">Did not attend</span>
-                                    @else
-                                        <span class="text-xs text-slate-400">No participation record yet</span>
-                                    @endif
-                                </td>
-                                <td class="px-5 py-4 align-top">
-                                    @if($registration->responses->isNotEmpty())
-                                        <dl class="space-y-2 text-xs">
-                                            @foreach($registration->responses as $answer)
-                                                <div>
-                                                    <dt class="font-semibold text-slate-700">{{ $answer->question_label ?: $answer->question_key }}</dt>
-                                                    <dd class="mt-0.5 text-slate-600">{{ $answer->answer_label ?: $answer->answer_text ?: $answer->answer_key ?: '—' }}</dd>
-                                                </div>
-                                            @endforeach
-                                        </dl>
-                                    @else
-                                        <span class="text-xs text-slate-400">No saved answers</span>
-                                    @endif
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="4" class="px-5 py-8 text-center text-sm text-slate-500">No registrations for this session.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+                                    @endforeach
+                                </div>
+                            @endif
 
-            @if($registrations->hasPages())
-                <div class="border-t border-slate-200 px-5 py-4 sm:px-7">
-                    {{ $registrations->links() }}
+                            @if($question['custom_responses'] !== [])
+                                <div class="mt-4 border-t border-slate-200 pt-4">
+                                    <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Custom responses</div>
+                                    <div class="mt-3 space-y-2">
+                                        @foreach($question['custom_responses'] as $response)
+                                            <div class="rounded-xl bg-white p-3 text-sm leading-6 text-slate-700 ring-1 ring-slate-200">
+                                                <div>{{ $response['text'] }}</div>
+                                                @if($response['respondent'])
+                                                    <div class="mt-1 text-xs font-semibold text-slate-500">{{ $response['respondent'] }}</div>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+                        </article>
+                    @endforeach
                 </div>
             @endif
         </section>
+
+        <div
+            x-show="registrantsOpen"
+            x-cloak
+            x-on:keydown.escape.window="registrantsOpen = false"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Webinar registrants"
+        >
+            <button
+                type="button"
+                class="absolute inset-0 bg-slate-950/50"
+                aria-label="Close registrants"
+                x-on:click="registrantsOpen = false"
+            ></button>
+
+            <section class="relative z-10 flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+                <div class="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-7">
+                    <div>
+                        <h2 class="text-xl font-semibold text-slate-950">Registrants</h2>
+                        <p class="mt-1 text-sm text-slate-600">{{ number_format($registrationSummary['registrant_count']) }} registered for this session.</p>
+                    </div>
+                    <button
+                        type="button"
+                        x-on:click="registrantsOpen = false"
+                        class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700"
+                    >
+                        Close
+                    </button>
+                </div>
+
+                <div class="overflow-y-auto p-5 sm:p-7">
+                    @if($registrationSummary['registrants'] === [])
+                        <p class="text-sm text-slate-500">No registrants yet.</p>
+                    @else
+                        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            @foreach($registrationSummary['registrants'] as $registrant)
+                                <article class="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    @if($registrant['contact_url'])
+                                        <a href="{{ $registrant['contact_url'] }}" class="font-semibold text-slate-950 underline decoration-slate-300 underline-offset-2">
+                                            {{ $registrant['name'] }}
+                                        </a>
+                                    @else
+                                        <div class="font-semibold text-slate-950">{{ $registrant['name'] }}</div>
+                                    @endif
+                                    @if($registrant['email'])
+                                        <div class="mt-1 truncate text-xs text-slate-600">{{ $registrant['email'] }}</div>
+                                    @endif
+                                    <div class="mt-3 inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
+                                        {{ $registrant['status'] }}
+                                    </div>
+                                </article>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            </section>
+        </div>
 
         @if(function_exists('module_enabled') && module_enabled('messaging') && $canNotifyScheduleChanges)
             <section class="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm sm:p-7">

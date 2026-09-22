@@ -83,6 +83,8 @@ return [
                 '2026_08_20_203000_create_scheduled_message_cta_engagements_table.php',
                 '2026_08_29_053500_prune_redundant_messaging_indexes.php',
                 '2026_09_17_140000_add_scheduled_message_operations.php',
+                '2026_09_17_140100_create_scheduled_message_edits_table.php',
+                '2026_09_17_140200_create_scheduled_message_bulk_edits_table.php',
             ],
         ],
 
@@ -240,7 +242,7 @@ return [
 
         'campaigns' => [
             'path' => 'database/migrations/modules/campaigns',
-            'schema_version' => 7,
+            'schema_version' => 8,
             'migrations' => [
                 '2026_06_12_050337_create_campaigns_table.php',
                 '2026_06_12_050338_create_campaign_steps_table.php',
@@ -250,6 +252,7 @@ return [
                 '2026_08_23_203900_add_campaign_eligibility_foundation.php',
                 '2026_08_25_220000_decouple_campaign_touch_programs_from_campaigns.php',
                 '2026_08_27_213000_add_audience_filter_to_campaign_touch_programs_table.php',
+                '2026_09_22_130000_add_send_pattern_to_campaigns_table.php',
             ],
         ],
 
@@ -265,7 +268,7 @@ return [
 
         'webinars' => [
             'path' => 'database/migrations/modules/webinars',
-            'schema_version' => 3,
+            'schema_version' => 4,
             'migrations' => [
                 '2026_06_18_203546_create_webinar_schedule_profiles_table.php',
                 '2026_06_18_203547_create_webinar_series_table.php',
@@ -277,14 +280,17 @@ return [
                 '2026_08_01_023600_create_webinar_series_message_chain_bindings_table.php',
                 '2026_08_27_120000_add_provider_lifecycle_to_webinars_table.php',
                 '2026_08_27_194500_add_occurrence_visibility_and_suppressions.php',
+                '2026_09_17_140300_create_webinar_schedule_changes_table.php',
+                '2026_09_17_140400_add_notification_templates_to_webinar_schedule_changes.php',
             ],
         ],
 
         'reporting' => [
             'path' => 'database/migrations/modules/reporting',
-            'schema_version' => 1,
+            'schema_version' => 2,
             'migrations' => [
                 '2026_08_15_063500_create_reporting_foundation_tables.php',
+                '2026_09_22_120000_create_reporting_scheduled_report_subscriptions.php',
             ],
         ],
 

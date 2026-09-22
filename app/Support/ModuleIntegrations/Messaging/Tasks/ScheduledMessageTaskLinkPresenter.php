@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Modules\Messaging\Services\Tasks;
+namespace App\Support\ModuleIntegrations\Messaging\Tasks;
 
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ScheduledMessageSummary;
 use App\Modules\Tasks\Contracts\TaskLinkPresenterContract;
 use Illuminate\Database\Eloquent\Model;
 
-class ScheduledMessageTaskLinkPresenter implements TaskLinkPresenterContract
+final class ScheduledMessageTaskLinkPresenter implements TaskLinkPresenterContract
 {
     public function __construct(
         private readonly ScheduledMessageSummary $summary,

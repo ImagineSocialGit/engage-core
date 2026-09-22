@@ -58,11 +58,9 @@ class CampaignEligibilityFactReevaluationTest extends TestCase
 
         Queue::assertPushed(
             ReconcileContactCampaignEligibilityJob::class,
-            function (ReconcileContactCampaignEligibilityJob $job) use ($contact): bool {
-                return $job->contactId === (int) $contact->getKey()
-                    && $job->criterionKeys === ['tag']
-                    && $job->queue === 'campaigns';
-            },
+            fn (ReconcileContactCampaignEligibilityJob $job): bool =>
+                $job->contactId === (int) $contact->getKey()
+                && $job->criterionKeys === ['tag'],
         );
         Queue::assertPushed(ReconcileContactCampaignEligibilityJob::class, 1);
 

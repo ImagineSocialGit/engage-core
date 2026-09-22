@@ -7,6 +7,12 @@ use App\Modules\Reporting\Actions\RecordReportingObservationAction;
 use App\Modules\Reporting\Console\Commands\ProjectReportingMetricsCommand;
 use App\Modules\Reporting\Controllers\Public\ReportingObservationController;
 use App\Modules\Reporting\Deployment\ReportingDeploymentPlanContributor;
+use App\Modules\Reporting\Contracts\ScheduledReportDeliveryDriver;
+use App\Modules\Reporting\Contracts\ScheduledReportProvider;
+use App\Modules\Reporting\Contracts\ScheduledReportRecipientOptionProvider;
+use App\Modules\Reporting\Services\ScheduledReportDeliveryRegistry;
+use App\Modules\Reporting\Services\ScheduledReportRecipientRegistry;
+use App\Modules\Reporting\Services\ScheduledReportRegistry;
 use App\Modules\Reporting\EventDefinitions\ConfigReportingEventDefinitionContributor;
 use App\Modules\Reporting\Validation\ReportingSetupValidationContributor;
 use App\Support\Reporting\Contracts\ReportingObservationRecorder;
@@ -21,6 +27,27 @@ class ReportingModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->singleton(
+            ScheduledReportRegistry::class,
+            fn ($app): ScheduledReportRegistry => new ScheduledReportRegistry(
+                $app->tagged(ScheduledReportProvider::TAG),
+            ),
+        );
+
+        $this->app->singleton(
+            ScheduledReportRecipientRegistry::class,
+            fn ($app): ScheduledReportRecipientRegistry => new ScheduledReportRecipientRegistry(
+                $app->tagged(ScheduledReportRecipientOptionProvider::TAG),
+            ),
+        );
+
+        $this->app->singleton(
+            ScheduledReportDeliveryRegistry::class,
+            fn ($app): ScheduledReportDeliveryRegistry => new ScheduledReportDeliveryRegistry(
+                $app->tagged(ScheduledReportDeliveryDriver::TAG),
+            ),
+        );
+
         $this->app->singleton(
             ReportingObservationRecorder::class,
             RecordReportingObservationAction::class,
@@ -50,6 +77,11 @@ class ReportingModuleServiceProvider extends ServiceProvider
         $this->callAfterResolving(
             Schedule::class,
             function (Schedule $schedule): void {
+                $schedule
+                    ->command('reporting:project --days=1')
+                    ->everyMinute()
+                    ->withoutOverlapping(5);
+
                 $schedule
                     ->command('reporting:project --days=2')
                     ->everyTenMinutes()

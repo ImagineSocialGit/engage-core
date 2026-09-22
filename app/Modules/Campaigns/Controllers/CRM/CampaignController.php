@@ -9,16 +9,19 @@ use App\Modules\Campaigns\Actions\CreateCampaignAction;
 use App\Modules\Campaigns\Actions\DeactivateCampaignAction;
 use App\Modules\Campaigns\Actions\PublishCampaignMessageChainVersionAction;
 use App\Modules\Campaigns\Actions\UpdateCampaignEligibilityAction;
+use App\Modules\Campaigns\Actions\UpdateCampaignSendPatternAction;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Requests\CampaignEligibilityAuthoringRequest;
 use App\Modules\Campaigns\Requests\StoreCampaignRequest;
 use App\Modules\Campaigns\Requests\UpdateCampaignMessageRequest;
 use App\Modules\Campaigns\Requests\UpdateCampaignMessageReplyHandlingRequest;
 use App\Modules\Campaigns\Requests\UpdateCampaignScheduleRequest;
+use App\Modules\Campaigns\Requests\UpdateCampaignSendPatternRequest;
 use App\Modules\Campaigns\Services\CampaignCreationGuide;
 use App\Modules\Campaigns\Services\CampaignEligibilityAuthoringService;
 use App\Modules\Campaigns\Services\CampaignMessageReviewPresenter;
 use App\Modules\Campaigns\Services\CampaignScheduleAuthoringPresenter;
+use App\Modules\Campaigns\Services\CampaignSendPatternService;
 use App\Modules\Campaigns\Services\CampaignWorkspacePresenter;
 use App\Modules\Messaging\Actions\PublishMessageTemplatePresetOverrideAction;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
@@ -170,10 +173,13 @@ class CampaignController extends Controller
     public function show(
         Campaign $campaign,
         CampaignWorkspacePresenter $workspacePresenter,
+        CampaignSendPatternService $sendPatterns,
     ): View {
         return view('crm.campaigns.show', [
             'campaign' => $campaign,
             'workspace' => $workspacePresenter->forCampaign($campaign),
+            'sendPattern' => $sendPatterns->forCampaign($campaign),
+            'sendPatternTimezones' => timezone_identifiers_list(),
         ]);
     }
 
@@ -201,6 +207,21 @@ class CampaignController extends Controller
             'scheduleAuthoring' => $scheduleAuthoring,
             'initialPanel' => $this->initialPanel($request),
         ]);
+    }
+
+    public function updateSendPattern(
+        UpdateCampaignSendPatternRequest $request,
+        Campaign $campaign,
+        UpdateCampaignSendPatternAction $updateSendPattern,
+    ): RedirectResponse {
+        $updateSendPattern->handle(
+            campaign: $campaign,
+            pattern: $request->sendPattern(),
+        );
+
+        return redirect()
+            ->route('crm.campaigns.show', $campaign)
+            ->with('status', 'Campaign send pattern updated.');
     }
 
     public function updateSchedule(

@@ -24,6 +24,7 @@ class TeamMemberNotificationPreference extends Model
     public const TYPE_TASK_ASSIGNED = 'task_assigned';
     public const TYPE_TASK_DUE = 'task_due';
     public const TYPE_DAILY_DIGEST = 'daily_digest';
+    public const TYPE_SCHEDULED_REPORT = 'scheduled_report';
     public const TYPE_WEEKLY_DIGEST = 'weekly_digest';
 
     protected $fillable = [

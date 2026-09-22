@@ -43,7 +43,7 @@
                         <div class="mt-2 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
                             @foreach($rangeOptions as $rangeDays)
                                 <a
-                                    href="{{ route('crm.reporting.index', ['days' => $rangeDays]) }}"
+                                    href="{{ route('crm.reporting.index', array_filter(['days' => $rangeDays, 'webinar_id' => $report['scope']['occurrence_id']])) }}"
                                     class="inline-flex min-h-10 w-full items-center justify-center rounded-xl px-3 text-sm font-semibold transition sm:w-auto sm:px-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 {{ $report['range']['days'] === $rangeDays ? 'bg-slate-950 text-white' : 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-100' }}"
                                 >
                                     {{ $rangeDays }} days
@@ -58,9 +58,19 @@
                                 Import ad platform report
                             </a>
 
+                            <a
+                                href="{{ route('crm.reporting.scheduled-reports.index') }}"
+                                class="inline-flex w-full text-sm font-semibold text-slate-700 hover:text-slate-950 hover:underline sm:w-auto"
+                            >
+                                Scheduled reports
+                            </a>
+
                             <form method="POST" action="{{ route('crm.reporting.refresh') }}" class="w-full sm:w-auto">
                                 @csrf
                                 <input type="hidden" name="days" value="{{ $report['range']['days'] }}">
+                                @if($report['scope']['occurrence_id'])
+                                    <input type="hidden" name="webinar_id" value="{{ $report['scope']['occurrence_id'] }}">
+                                @endif
                                 <button
                                     type="submit"
                                     class="inline-flex w-full text-left text-sm font-semibold text-slate-700 hover:text-slate-950 hover:underline sm:w-auto"
@@ -92,9 +102,41 @@
         @endif
 
         <section id="webinar-registration-report" class="scroll-mt-6 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm sm:p-8" data-report-surface="webinar-registration">
-            <p class="text-sm font-semibold uppercase tracking-[0.16em] text-slate-600">Webinar Registration</p>
-            <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">See where visitors stop before they register</h2>
-            <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-700">This report separates likely-human traffic from automation and connects browser activity to authoritative registration outcomes.</p>
+            <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                    <p class="text-sm font-semibold uppercase tracking-[0.16em] text-slate-600">Webinar Registration</p>
+                    <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">See where visitors stop before they register</h2>
+                    <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-700">This report separates likely-human traffic from automation and connects browser activity to authoritative registration outcomes.</p>
+                </div>
+
+                @if($report['scope']['options'] !== [])
+                    <form method="GET" action="{{ route('crm.reporting.index') }}" class="w-full lg:w-auto">
+                        <input type="hidden" name="days" value="{{ $report['range']['days'] }}">
+                        <label for="reporting-webinar-session" class="block text-xs font-bold uppercase tracking-wide text-slate-500">Webinar session</label>
+                        <div class="mt-2 flex gap-2">
+                            <select
+                                id="reporting-webinar-session"
+                                name="webinar_id"
+                                class="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 lg:w-80"
+                            >
+                                <option value="">All webinar sessions</option>
+                                @foreach($report['scope']['options'] as $option)
+                                    <option value="{{ $option['id'] }}" @selected($report['scope']['occurrence_id'] === $option['id'])>
+                                        {{ $option['label'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <button type="submit" class="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white">View</button>
+                        </div>
+                    </form>
+                @endif
+            </div>
+
+            @if($report['scope']['occurrence_id'])
+                <div class="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    Showing this session only: <span class="font-semibold text-slate-950">{{ $report['scope']['label'] }}</span>
+                </div>
+            @endif
         </section>
 
         @if($report['has_data'])
@@ -102,6 +144,56 @@
                 $decisionSummary = $report['decision_summary'];
                 $primaryDecision = $decisionSummary['primary'];
             @endphp
+            <section class="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm sm:p-8">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Registration measurement coverage</p>
+                        <h2 class="mt-2 text-xl font-semibold text-slate-950">Reconcile the CRM total with the measured browser funnel</h2>
+                        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-700">
+                            Authoritative registrations and browser-correlated registrations are different populations. Imported, provider-created, older, JavaScript-disabled, or otherwise uncorrelated registrations remain real registrations but cannot be used as measured landing-page conversions.
+                        </p>
+                    </div>
+                    <div class="text-sm font-semibold text-slate-700">{{ $report['scope']['label'] }}</div>
+                </div>
+
+                <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                    <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                        <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Authoritative registrations</div>
+                        <div class="mt-2 text-3xl font-bold text-slate-950">{{ number_format($report['measurement_coverage']['local_registrations']) }}</div>
+                    </div>
+                    <div class="rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-200">
+                        <div class="text-xs font-bold uppercase tracking-wide text-emerald-700">Browser-correlated</div>
+                        <div class="mt-2 text-3xl font-bold text-emerald-950">{{ number_format($report['measurement_coverage']['browser_correlated_registrations']) }}</div>
+                    </div>
+                    <div class="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
+                        <div class="text-xs font-bold uppercase tracking-wide text-amber-700">Outside browser measurement</div>
+                        <div class="mt-2 text-3xl font-bold text-amber-950">{{ number_format($report['measurement_coverage']['outside_browser_measurement']) }}</div>
+                    </div>
+                </div>
+
+                <div class="mt-5 border-t border-slate-200 pt-5">
+                    <div class="text-sm font-semibold text-slate-950">Registration traffic quality</div>
+                    <p class="mt-1 text-sm leading-6 text-slate-600">
+                        This classifies registrations that can be tied to a measured browser session. Uncorrelated registrations remain valid CRM registrations but cannot be assigned a browser traffic class.
+                    </p>
+                    <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        @foreach([
+                            ['key' => 'likely_human', 'label' => 'Likely human'],
+                            ['key' => 'likely_automated', 'label' => 'Likely automated'],
+                            ['key' => 'unknown', 'label' => 'Unknown'],
+                            ['key' => 'uncorrelated', 'label' => 'No browser correlation'],
+                        ] as $row)
+                            <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ $row['label'] }}</div>
+                                <div class="mt-2 text-2xl font-bold text-slate-950">
+                                    {{ number_format($report['registration_traffic'][$row['key']]) }}
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </section>
+
             <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
                 <div class="border-b border-slate-100 p-5 sm:p-8">
                     <h2 class="text-xl font-semibold tracking-tight text-slate-950">What to look at first</h2>
