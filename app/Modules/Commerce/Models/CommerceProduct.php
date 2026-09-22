@@ -54,6 +54,16 @@ class CommerceProduct extends Model
         ];
     }
 
+    public function variants(): HasMany
+    {
+        return $this->hasMany(CommerceProductVariant::class);
+    }
+
+    public function providerMappings(): HasMany
+    {
+        return $this->hasMany(CommerceProductProviderMapping::class);
+    }
+
     public function orderItems(): HasMany
     {
         return $this->hasMany(CommerceOrderItem::class);

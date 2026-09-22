@@ -17,16 +17,30 @@ Implemented foundation:
 ```text
 commerce_customers
 commerce_products
+commerce_product_variants
+commerce_product_provider_mappings
+commerce_product_variant_provider_mappings
 commerce_orders
 commerce_order_items
 commerce_order_events
+commerce_inventory_effects
+commerce_inventory_adjustments
 
 CommerceCustomer
 CommerceProduct
+CommerceProductVariant
+CommerceProductProviderMapping
+CommerceProductVariantProviderMapping
 CommerceOrder
 CommerceOrderItem
 CommerceOrderEvent
+CommerceInventoryEffect
+CommerceInventoryAdjustment
 
+CommerceProviderRegistry
+CommerceProviderRoleResolver
+provider-neutral Commerce capability contracts
+durable inventory-effect recording/idempotency
 CommerceModuleServiceProvider
 ```
 
@@ -34,23 +48,18 @@ Current limitations:
 
 ```text
 no Commerce public routes or storefront surface
-no product-variant model
 no Commerce offer model
-no provider contracts or provider manager/role registry
-no normalized multi-provider product/variant mapping
 no provider-authoritative pricing/promotion read model or resolver
 no durable promotion/source attribution seam
-no inventory-effect/adjustment orchestration
-no configured inventory-authority resolution
+no provider-backed inventory adjustment executor/reconciler
 no provider adapters for the planned Commerce seams
 no provider-backed cart/checkout orchestration
 no verified commerce-provider webhook handlers
 no provider-neutral purchase-confirmed public signal
-no Commerce Project State transfer section
 no Commerce CRM operations
 ```
 
-The existing tables are a useful normalized purchase-history base. They are not yet sufficient for the approved provider-neutral storefront, cross-provider inventory coordination, or optional-module purchasing flows.
+The current foundation now provides canonical product/variant identity, explicit multi-provider mappings, provider-role resolution, and durable inventory-effect identity. It is not yet sufficient for production storefront checkout, provider reconciliation, or outbound authoritative inventory adjustment.
 
 ## Product barometer
 
@@ -285,22 +294,26 @@ Current owned tables:
 ```text
 commerce_customers
 commerce_products
+commerce_product_variants
+commerce_product_provider_mappings
+commerce_product_variant_provider_mappings
 commerce_orders
 commerce_order_items
 commerce_order_events
+commerce_inventory_effects
+commerce_inventory_adjustments
 ```
 
 Approved next durable concepts include:
 
 ```text
-commerce_product_variants
 commerce_offers
 commerce_offer_variants
-normalized provider mappings for canonical products/variants
-durable inventory-effect/adjustment state sufficient for idempotent orchestration
+provider-authoritative storefront price/promotion projections when durable projection state is justified
+durable promotion/source attribution when the storefront/checkout workflow requires it
 ```
 
-Exact mapping/inventory table names, columns, and indexes must be confirmed in the Commerce implementation audit against the current repository and first concrete provider ecosystem. Do not force a vendor-specific schema merely because the first implementation uses one vendor.
+The implemented provider mappings and inventory state are provider-neutral. Do not add vendor-specific columns merely because the first concrete integration uses a particular provider.
 
 ## Does not own
 
@@ -425,37 +438,43 @@ Existing in-repository adapters may remain until deliberately extracted. New Com
 
 ## Provider-neutral contracts
 
-Commerce should expose provider-neutral contracts before public pages or optional modules depend on provider internals.
+Commerce exposes provider-neutral contracts before public pages or optional modules depend on provider internals.
 
-Likely capability contracts/services include:
+Implemented provider foundation:
 
 ```text
+CommerceProvider
 CommerceProviderRegistry
 CommerceProviderRoleResolver
 CommerceCatalogProvider
 CommercePricingProvider
 CommercePromotionProvider
 CommerceCheckoutProvider
+CommercePaymentProvider
 CommerceOrderProvider
 CommerceInventoryProvider
-CommerceWebhookReconciler
-CommerceProductReadService
-CommerceVariantReadService
-CommerceOfferReadService
-CommerceStorefrontStateResolver
-CommercePromotionLinkResolver
-CommerceOrderReadService
-CommercePurchaseHistoryQuery
-CommerceContactLinker
-CommercePromotionGate
-CommerceCheckoutService
-CommercePurchaseOutcomePublisher
+CommerceFulfillmentProvider
+CommercePointOfSaleProvider
 CommerceInventoryEffectRecorder
-CommerceInventoryOrchestrator
-CommerceInventoryReconciler
 ```
 
-Exact class names should follow repository conventions confirmed during implementation.
+The capability interfaces are deliberately narrow marker contracts in this foundation slice. Concrete provider operations are added to the owning capability contract only when the corresponding orchestration path is implemented.
+
+External integration packages register their provider service with the public `commerce.providers` service tag. Commerce resolves configured provider keys by role and verifies that the selected provider implements the required role contract. Commerce never imports a vendor package class.
+
+Later public services/contracts are expected around:
+
+```text
+provider-authoritative catalog reads
+pricing/promotion projections
+checkout/session creation
+order reconciliation
+inventory adjustment and reconciliation
+webhook normalization
+product/variant/offer reads
+purchase history
+purchase outcomes
+```
 
 Do not require every provider package to implement every contract.
 
@@ -517,19 +536,22 @@ A Commerce product represents canonical provider-neutral product identity.
 
 A Commerce product variant represents the canonical sellable/inventory unit used by offers, purchases, inventory effects, and provider mapping.
 
-The existing `commerce_products` table remains useful for product-level identity and purchase intelligence, but its current provider/external identity assumptions must be audited before it is treated as the final cross-provider catalog shape.
+The existing `commerce_products.provider` / `external_id` fields remain compatibility snapshot fields for the original provider-history foundation. New cross-provider catalog identity must use the normalized provider mapping records rather than treating those legacy product fields as the one authoritative provider identity.
 
-The next schema slice should add normalized product variants rather than storing all variants in product metadata or raw provider payloads.
+The canonical variant schema is implemented. Variants must remain first-class records rather than being collapsed into product metadata or raw provider payloads.
 
-Expected canonical variant facts may include:
+Implemented canonical variant facts include:
 
 ```text
 commerce_product_id
-stable key
+stable key nullable
 sku nullable
-title/name
+barcode nullable
+title
 status
-presentation facts required by Commerce
+options
+presentation order
+meta for narrowly justified non-provider-specific extension state
 ```
 
 Provider-specific facts should not force the canonical row to represent only one provider.
@@ -543,7 +565,7 @@ Core variant 42
     -> provider C marketplace identity
 ```
 
-Use normalized provider mapping records when cross-provider orchestration requires them.
+Use the normalized product and variant provider mapping records for cross-provider orchestration.
 
 Do not rely on SKU equality as the only cross-provider identity rule.
 
@@ -594,7 +616,7 @@ inventory scope/location identity when the configured authority requires it
 authority/reconciliation context required to avoid duplicate mutation
 ```
 
-Exact persistence shape is deferred to the implementation audit.
+The implemented inventory-effect record carries these compact facts plus an idempotency fingerprint. Provider-specific adjustment execution remains a later integration/orchestration slice.
 
 ### One orchestration path, different authority behavior
 
@@ -822,7 +844,7 @@ record only minimal operational correlation and justified source/promotion attri
 
 Do not store raw payment data.
 
-Ephemeral carts and checkout sessions should not become durable Project State unless a later recovery requirement proves they must survive a clean rebuild.
+Ephemeral carts and checkout sessions should remain reconstructible operational state unless a later recovery requirement proves they must survive a clean rebuild.
 
 A checkout redirect, session creation, or browser success return is not an authoritative paid order.
 
@@ -882,7 +904,7 @@ external_url
 
 Order-item snapshots must remain stable when current provider product copy or price changes.
 
-The next implementation should link normalized order items to canonical `commerce_product_variants` where deterministically resolvable while retaining provider identity snapshots required for historical truth.
+`commerce_order_items` now supports a nullable canonical `commerce_product_variant_id`. Reconciliation should populate it only when the provider item can be deterministically mapped, while retaining provider identity snapshots required for historical truth.
 
 ## Order events and webhook inbox
 
@@ -1061,56 +1083,55 @@ FlowRoutes may coordinate purchase or inventory follow-up through Commerce publi
 
 Commerce must not import FlowRoutes models or store FlowRoutes-specific foreign keys merely for provenance symmetry.
 
-## Project State
+## Legacy Project State compatibility
 
-Current Commerce tables are explicitly discovered and policy-controlled by Project State, but Commerce has no first-class transfer section yet.
+Project State is no longer the mechanism for updating production client sites, so Commerce does not require or plan a first-class Project State transfer section before becoming operational.
 
-That is acceptable only while Commerce remains an unused foundation whose tables must be empty.
+The legacy Project State subsystem may remain useful for diagnostics and historical tooling. While it remains in the repository, every Commerce table should stay explicitly classified so coverage checks do not silently omit newly added schema.
 
-Before provider-backed Commerce becomes operational, Project State must transfer all durable Commerce state required to survive a controlled clean rebuild.
+Commerce tables are intentionally policy-controlled rather than transferred. The legacy export should fail once durable Commerce rows exist instead of producing a file that looks portable while omitting live Commerce state.
 
-Expected transfer coverage includes at least:
-
-```text
-commerce_customers
-commerce_products
-commerce_product_variants
-commerce_offers
-commerce_offer_variants
-commerce_orders
-commerce_order_items
-commerce_order_events
-provider product/variant mappings once implemented
-durable inventory orchestration records once implemented
-```
-
-Transfer:
+Production Commerce durability instead depends on the normal deployment and recovery path:
 
 ```text
-Engage Core-authored offers and mappings
-provider identity mappings
-Contact associations
-normalized customers/products/variants/orders/items
-compact operational lifecycle history
-current publication state
-durable inventory effects required for idempotency/reconciliation
+committed module migrations
+client repository/config deployment
+database backup and restore/recovery procedures
+provider reconciliation where the external provider remains authoritative
 ```
 
-Do not transfer as durable state:
+Provider credentials, webhook secrets, ephemeral carts/checkouts, short-lived signed URLs, and reconstructible caches remain outside durable Commerce state.
+
+This Commerce workstream must not add a Project State section, section-version bump, or tests that hard-code Project State version values.
+
+## Migration registry and application
+
+Commerce migration ownership remains directory-based:
 
 ```text
-provider access tokens
-webhook secrets
-provider credentials
-ephemeral carts
-short-lived checkout sessions
-reconstructible caches
-full redundant provider payload archives
+database/migrations/modules/commerce
 ```
 
-Do not enable production Commerce workflows while Commerce remains under a must-be-empty Project State policy.
+`config/module_migrations.php` declares only the Commerce migration directory. The migration registry discovers Commerce migration files from that directory, derives the current schema version from the discovered files, and derives the manifest/checksum contract from those file contents. Adding a Commerce migration does not require editing a migration filename list or manual schema-version number.
 
-The expected Project State version must be recalculated from the fresh repository snapshot when the Commerce section lands. Do not preserve a predicted version number as architectural truth.
+Applied/accepted Commerce migration files are immutable. Schema changes after acceptance use a new append-only migration rather than editing an accepted migration in place.
+
+For an existing tracked Commerce installation:
+
+```bash
+php artisan modules:preflight commerce
+php artisan modules:migrate commerce
+```
+
+Preflight must pass before migration mutation. It validates the accepted migration checksum history and blocks changed or missing accepted files.
+
+For a fresh Commerce installation:
+
+```bash
+php artisan modules:install commerce
+```
+
+The normal deployment/update pipeline remains platform migration first, then module preflight and module migration. Commerce does not bypass or duplicate the shared migration registry/preflight infrastructure.
 
 ## Setup validation
 
@@ -1128,7 +1149,6 @@ provider-backed promotion links/contexts can be resolved without Core inventing 
 configured inventory authority is resolvable
 an inventory effect cannot be routed into an impossible/missing authority path
 Event-linked offers can resolve the Events promotion gate when Events is enabled
-Project State no longer classifies operational Commerce tables as must-be-empty
 ```
 
 Validation should report actionable findings without making external provider calls unless an explicit connectivity check is requested.
@@ -1136,26 +1156,21 @@ Validation should report actionable findings without making external provider ca
 ## Implementation order
 
 ```text
-1. Commerce architecture audit against current tables and the first concrete client provider ecosystem
-2. provider-neutral capability/role contracts and provider registration
-3. canonical product-variant schema/model
-4. normalized multi-provider product/variant mapping
-5. provider-authoritative pricing/promotion read and projection contracts
-6. Commerce offer/storefront presentation schema/model
-7. durable promotion/source attribution seam for storefront/checkout/purchase flows
-8. durable inventory-effect/orchestration contract with idempotency and loop prevention
-9. Project State Commerce section and current-format version bump
-10. first required external provider package(s) for the concrete client roles
-11. verified webhook inbox integration and idempotent order/inventory reconciliation
-12. provider-neutral purchase-confirmed outcome
-13. Commerce CRM operations
-14. client-configured public storefront/offer surface with provider-backed promotions and checkout
-15. optional Event promotion gate integration
-16. Experiences package mapping/grant and inventory-component consumption
-17. optional Contact filters, Messaging, FlowRoutes, and Reporting contributors
+1. provider-authoritative pricing/promotion read and projection contracts
+2. Commerce offer/storefront presentation schema/model
+3. durable promotion/source attribution seam for storefront/checkout/purchase flows
+4. first required external provider package(s) for the concrete client roles
+5. verified webhook inbox integration and idempotent order/inventory reconciliation
+6. provider-backed inventory adjustment orchestration using the recorded inventory effects
+7. provider-neutral purchase-confirmed outcome
+8. Commerce CRM operations
+9. client-configured public storefront/offer surface with provider-backed promotions and checkout
+10. optional Event promotion gate integration
+11. Experiences package mapping/grant and inventory-component consumption
+12. optional Contact filters, Messaging, FlowRoutes, and Reporting contributors
 ```
 
-Provider/contracts, canonical mappings, persistence, Project State, and reconciliation must precede production cross-provider orchestration.
+Provider packages remain separate integrations. Commerce must continue depending only on provider-neutral contracts and normalized persistence; provider-specific API clients, credentials, webhook verification, and payload translation stay outside the module.
 
 ## Illustrative provider ecosystem only
 
@@ -1165,22 +1180,24 @@ The following is the concrete example that motivated this architecture. It is on
 Engage Core
     owns custom storefront presentation and orchestration
 
-Shopify
-    owns authoritative catalog pricing for this client
+Shopify integration package
+    implements the configured Commerce provider roles for Shopify
+    Shopify owns authoritative catalog pricing for this client
     owns provider-native discounts/promotions and final discount calculation
     owns authoritative inventory
     owns online order/fulfillment operations
     owns or coordinates the provider-backed online checkout/payment path
 
-Square
-    owns venue POS/payment execution
+Square integration package
+    implements the configured Commerce POS/payment-facing role for Square
+    Square owns venue POS/payment execution
 
 Square venue sale
-    -> Square provider event/webhook
+    -> Square integration verifies/translates the provider event/webhook
     -> Commerce normalizes canonical item consumption
     -> Commerce adjusts Shopify because Shopify is the configured inventory authority
 
-Engage Core storefront sale completed through Shopify
+Engage Core storefront sale completed through the Shopify integration
     -> Core renders the storefront using current Shopify-authoritative pricing/promotion state
     -> Shopify processes the order, calculates the final provider-owned discount, and changes its own inventory
     -> Commerce reconciles the authoritative Shopify order/discount/inventory result
@@ -1244,4 +1261,5 @@ Distinguish adjustment-required effects from authority-already-mutated reconcili
 Keep order-item purchase snapshots stable.
 Keep provider payload retention minimal and justified.
 Keep vertical entitlement/experience meaning outside Commerce.
-Require Project State support before operational production use.
+Keep vendor integrations outside Commerce so one provider package can satisfy Commerce today and other module contracts later without transferring provider ownership to Commerce.
+Use committed migrations, client deployment configuration, database recovery, and provider reconciliation for production durability; do not make Project State a Commerce deployment prerequisite.

@@ -9,6 +9,7 @@
 │   │   │   ├── EngageUserAddCommand.php
 │   │   │   ├── EngageUserPasswordCommand.php
 │   │   │   ├── ImportProductionRuntimeSnapshotCommand.php
+│   │   │   ├── ModuleMigrationPreflightCommand.php
 │   │   │   ├── ModulesInstallCommand.php
 │   │   │   ├── ModulesMigrateCommand.php
 │   │   │   ├── ModulesReconcileCommand.php
@@ -260,18 +261,40 @@
 │   │   ├── Commerce
 │   │   │   ├── Actions
 │   │   │   ├── Contracts
+│   │   │   │   ├── CommerceCatalogProvider.php
+│   │   │   │   ├── CommerceCheckoutProvider.php
+│   │   │   │   ├── CommerceFulfillmentProvider.php
+│   │   │   │   ├── CommerceInventoryProvider.php
+│   │   │   │   ├── CommerceOrderProvider.php
+│   │   │   │   ├── CommercePaymentProvider.php
+│   │   │   │   ├── CommercePointOfSaleProvider.php
+│   │   │   │   ├── CommercePricingProvider.php
+│   │   │   │   ├── CommercePromotionProvider.php
+│   │   │   │   └── CommerceProvider.php
 │   │   │   ├── Controllers
 │   │   │   ├── Data
+│   │   │   │   └── CommerceInventoryEffectData.php
+│   │   │   ├── Enums
+│   │   │   │   ├── CommerceInventoryAuthorityMode.php
+│   │   │   │   └── CommerceProviderRole.php
 │   │   │   ├── Models
 │   │   │   │   ├── CommerceCustomer.php
+│   │   │   │   ├── CommerceInventoryAdjustment.php
+│   │   │   │   ├── CommerceInventoryEffect.php
 │   │   │   │   ├── CommerceOrderEvent.php
 │   │   │   │   ├── CommerceOrderItem.php
 │   │   │   │   ├── CommerceOrder.php
-│   │   │   │   └── CommerceProduct.php
+│   │   │   │   ├── CommerceProduct.php
+│   │   │   │   ├── CommerceProductProviderMapping.php
+│   │   │   │   ├── CommerceProductVariant.php
+│   │   │   │   └── CommerceProductVariantProviderMapping.php
 │   │   │   ├── Providers
 │   │   │   │   └── CommerceModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
+│   │   │   │   ├── CommerceInventoryEffectRecorder.php
+│   │   │   │   ├── CommerceProviderRegistry.php
+│   │   │   │   └── CommerceProviderRoleResolver.php
 │   │   │   └── Support
 │   │   ├── Core
 │   │   │   ├── Access
@@ -2039,6 +2062,8 @@
 │   │   │   │   ├── ModuleMigrationPathPolicy.php
 │   │   │   │   ├── ModuleMigrationPlanner.php
 │   │   │   │   ├── ModuleMigrationPlan.php
+│   │   │   │   ├── ModuleMigrationPreflightInspector.php
+│   │   │   │   ├── ModuleMigrationPreflightResult.php
 │   │   │   │   ├── ModuleMigrationRegistry.php
 │   │   │   │   ├── ModuleMigrationStatusInspector.php
 │   │   │   │   └── ModuleMigrationStatus.php
@@ -2178,6 +2203,7 @@
 │   ├── cache-keys.php
 │   ├── cache.php
 │   ├── client.php
+│   ├── commerce.php
 │   ├── contact_imports.php
 │   ├── contacts.php
 │   ├── database.php
@@ -2307,6 +2333,7 @@
 │   │   ├── CommerceOrderFactory.php
 │   │   ├── CommerceOrderItemFactory.php
 │   │   ├── CommerceProductFactory.php
+│   │   ├── CommerceProductVariantFactory.php
 │   │   ├── ContactFactory.php
 │   │   ├── ContactFlowRoutePlanFactory.php
 │   │   ├── ContactFlowRoutePlanItemFactory.php
@@ -2376,7 +2403,8 @@
 │   │   │   │   ├── 2026_07_02_000006_create_commerce_products_table.php
 │   │   │   │   ├── 2026_07_02_000007_create_commerce_orders_table.php
 │   │   │   │   ├── 2026_07_02_000008_create_commerce_order_items_table.php
-│   │   │   │   └── 2026_07_02_000009_create_commerce_order_events_table.php
+│   │   │   │   ├── 2026_07_02_000009_create_commerce_order_events_table.php
+│   │   │   │   └── 2026_09_22_190000_add_provider_neutral_catalog_inventory_foundation.php
 │   │   │   ├── core
 │   │   │   │   ├── 2026_04_15_195800_create_contact_statuses_table.php
 │   │   │   │   ├── 2026_04_15_195849_create_contact_import_batches_table.php
@@ -2506,7 +2534,8 @@
 │   │   │   ├── 2026_07_18_220001_create_automation_event_consumer_receipts_table.php
 │   │   │   ├── 2026_07_19_040000_create_webhook_inbox_receipts_table.php
 │   │   │   ├── 2026_08_02_013000_create_project_state_resume_items_table.php
-│   │   │   └── 2026_08_05_180000_create_module_installations_table.php
+│   │   │   ├── 2026_08_05_180000_create_module_installations_table.php
+│   │   │   └── 2026_09_22_190000_add_migration_checksums_to_module_installations_table.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -3493,6 +3522,7 @@
 │   │   │   ├── ModuleMigrationCommandBehaviorTest.php
 │   │   │   ├── ModuleMigrationInstallationTest.php
 │   │   │   ├── ModuleMigrationPlanningAndStatusTest.php
+│   │   │   ├── ModuleMigrationPreflightTest.php
 │   │   │   ├── ModuleMigrationRegistryTest.php
 │   │   │   ├── ModuleNavigationTest.php
 │   │   │   ├── ModuleRouteMiddlewareTest.php
@@ -3771,4 +3801,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-873 directories, 2899 files
+874 directories, 2928 files

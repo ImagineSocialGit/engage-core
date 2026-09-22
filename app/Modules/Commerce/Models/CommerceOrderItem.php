@@ -28,6 +28,7 @@ class CommerceOrderItem extends Model
     protected $fillable = [
         'commerce_order_id',
         'commerce_product_id',
+        'commerce_product_variant_id',
         'item_type',
         'sku',
         'name',
@@ -56,6 +57,7 @@ class CommerceOrderItem extends Model
         return [
             'commerce_order_id' => 'integer',
             'commerce_product_id' => 'integer',
+            'commerce_product_variant_id' => 'integer',
             'options' => 'array',
             'quantity' => 'decimal:4',
             'unit_price_cents' => 'integer',
@@ -75,5 +77,10 @@ class CommerceOrderItem extends Model
     public function commerceProduct(): BelongsTo
     {
         return $this->belongsTo(CommerceProduct::class);
+    }
+
+    public function commerceProductVariant(): BelongsTo
+    {
+        return $this->belongsTo(CommerceProductVariant::class);
     }
 }

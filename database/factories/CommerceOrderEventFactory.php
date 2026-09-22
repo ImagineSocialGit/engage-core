@@ -25,8 +25,8 @@ class CommerceOrderEventFactory extends Factory
             'to_status' => CommerceOrder::STATUS_CLOSED,
             'occurred_at' => now(),
             'source' => 'provider',
-            'provider' => 'shopify',
-            'external_id' => 'gid://shopify/Order/3001:updated',
+            'provider' => 'provider-a',
+            'external_id' => 'order-3001:updated',
             'payload' => null,
             'meta' => null,
         ];

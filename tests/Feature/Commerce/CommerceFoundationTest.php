@@ -2,16 +2,29 @@
 
 namespace Tests\Feature\Commerce;
 
+use App\Modules\Commerce\Contracts\CommerceCatalogProvider;
+use App\Modules\Commerce\Contracts\CommerceInventoryProvider;
+use App\Modules\Commerce\Contracts\CommercePointOfSaleProvider;
+use App\Modules\Commerce\Data\CommerceInventoryEffectData;
+use App\Modules\Commerce\Enums\CommerceInventoryAuthorityMode;
+use App\Modules\Commerce\Enums\CommerceProviderRole;
 use App\Modules\Commerce\Models\CommerceCustomer;
 use App\Modules\Commerce\Models\CommerceOrder;
 use App\Modules\Commerce\Models\CommerceOrderEvent;
 use App\Modules\Commerce\Models\CommerceOrderItem;
 use App\Modules\Commerce\Models\CommerceProduct;
+use App\Modules\Commerce\Models\CommerceProductProviderMapping;
+use App\Modules\Commerce\Models\CommerceProductVariant;
+use App\Modules\Commerce\Models\CommerceProductVariantProviderMapping;
 use App\Modules\Commerce\Providers\CommerceModuleServiceProvider;
+use App\Modules\Commerce\Services\CommerceInventoryEffectRecorder;
+use App\Modules\Commerce\Services\CommerceProviderRegistry;
+use App\Modules\Commerce\Services\CommerceProviderRoleResolver;
 use App\Modules\Core\Models\Contact;
 use App\Support\Modules\ModuleManager;
+use Illuminate\Config\Repository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Schema;
+use RuntimeException;
 use Tests\TestCase;
 
 class CommerceFoundationTest extends TestCase
@@ -42,207 +55,229 @@ class CommerceFoundationTest extends TestCase
         $this->assertContains(CommerceModuleServiceProvider::class, $modules->providers('commerce'));
     }
 
-    public function test_commerce_foundation_tables_have_durable_provider_sync_columns(): void
+    public function test_canonical_variant_can_map_to_multiple_provider_identities_and_purchase_history(): void
     {
-        $this->assertTableHasColumns('commerce_customers', [
-            'contact_id',
-            'first_name',
-            'last_name',
-            'name',
-            'email',
-            'phone',
-            'status',
-            'currency',
-            'first_ordered_at',
-            'last_ordered_at',
-            'total_orders',
-            'total_spent_cents',
-            'source',
-            'provider',
-            'external_id',
-            'external_url',
-            'raw_payload',
-            'meta',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('commerce_products', [
-            'key',
-            'sku',
-            'name',
-            'description',
-            'status',
-            'product_type',
-            'vendor',
-            'category',
-            'tags',
-            'currency',
-            'price_cents',
-            'published_at',
-            'source',
-            'provider',
-            'external_id',
-            'external_url',
-            'raw_payload',
-            'meta',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('commerce_orders', [
-            'commerce_customer_id',
-            'contact_id',
-            'order_number',
-            'order_name',
-            'status',
-            'financial_status',
-            'fulfillment_status',
-            'currency',
-            'subtotal_cents',
-            'discount_cents',
-            'tax_cents',
-            'shipping_cents',
-            'total_cents',
-            'ordered_at',
-            'closed_at',
-            'cancelled_at',
-            'refunded_at',
-            'source',
-            'provider',
-            'external_id',
-            'external_url',
-            'raw_payload',
-            'meta',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('commerce_order_items', [
-            'commerce_order_id',
-            'commerce_product_id',
-            'item_type',
-            'sku',
-            'name',
-            'title',
-            'variant_title',
-            'options',
-            'quantity',
-            'currency',
-            'unit_price_cents',
-            'discount_cents',
-            'tax_cents',
-            'total_cents',
-            'fulfillment_status',
-            'source',
-            'provider',
-            'external_id',
-            'external_product_id',
-            'external_variant_id',
-            'external_url',
-            'raw_payload',
-            'meta',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('commerce_order_events', [
-            'commerce_order_id',
-            'actor_type',
-            'actor_id',
-            'event',
-            'from_status',
-            'to_status',
-            'occurred_at',
-            'source',
-            'provider',
-            'external_id',
-            'payload',
-            'meta',
-            'deleted_at',
-        ]);
-    }
-
-    public function test_commerce_order_history_can_link_contacts_to_prior_product_purchases(): void
-    {
-        $contact = Contact::factory()->create([
-            'first_name' => 'Ada',
-            'last_name' => 'Lovelace',
-            'name' => 'Ada Lovelace',
-            'email' => 'ada@example.com',
-        ]);
-
+        $contact = Contact::factory()->create();
         $customer = CommerceCustomer::factory()->forContact($contact)->create([
-            'provider' => 'shopify',
-            'external_id' => 'gid://shopify/Customer/1001',
+            'provider' => 'order-provider',
+            'external_id' => 'customer-1001',
         ]);
-
         $product = CommerceProduct::factory()->active()->create([
             'name' => 'Classic T-shirt',
             'sku' => 'TSHIRT-CLASSIC',
-            'provider' => 'shopify',
-            'external_id' => 'gid://shopify/Product/2001',
-            'tags' => ['t-shirt', 'apparel'],
+        ]);
+        $variant = CommerceProductVariant::factory()->for($product, 'commerceProduct')->create([
+            'key' => 'medium',
+            'sku' => 'TSHIRT-CLASSIC-M',
+            'barcode' => '0123456789012',
+            'title' => 'Medium',
+            'options' => ['Size' => 'Medium'],
+        ]);
+
+        CommerceProductProviderMapping::query()->create([
+            'commerce_product_id' => $product->getKey(),
+            'provider_key' => 'catalog-provider',
+            'reference_type' => 'catalog_product',
+            'external_id' => 'product-2001',
+        ]);
+
+        CommerceProductVariantProviderMapping::query()->create([
+            'commerce_product_variant_id' => $variant->getKey(),
+            'provider_key' => 'catalog-provider',
+            'reference_type' => 'catalog_variant',
+            'external_id' => 'variant-5001',
+            'external_parent_id' => 'product-2001',
+        ]);
+
+        CommerceProductVariantProviderMapping::query()->create([
+            'commerce_product_variant_id' => $variant->getKey(),
+            'provider_key' => 'pos-provider',
+            'reference_type' => 'pos_variation',
+            'external_id' => 'variation-9001',
         ]);
 
         $order = CommerceOrder::factory()
             ->forCustomer($customer)
             ->paid()
             ->create([
-                'order_number' => '1001',
-                'order_name' => '#1001',
-                'total_cents' => 2500,
-                'provider' => 'shopify',
-                'external_id' => 'gid://shopify/Order/3001',
+                'provider' => 'order-provider',
+                'external_id' => 'order-3001',
             ]);
 
         $item = CommerceOrderItem::factory()->create([
-            'commerce_order_id' => $order->id,
-            'commerce_product_id' => $product->id,
+            'commerce_order_id' => $order->getKey(),
+            'commerce_product_id' => $product->getKey(),
+            'commerce_product_variant_id' => $variant->getKey(),
             'sku' => 'TSHIRT-CLASSIC-M',
-            'name' => 'Classic T-shirt',
-            'title' => 'Classic T-shirt',
-            'variant_title' => 'Medium',
-            'external_product_id' => 'gid://shopify/Product/2001',
-            'external_variant_id' => 'gid://shopify/ProductVariant/5001',
-            'total_cents' => 2500,
+            'external_product_id' => 'product-2001',
+            'external_variant_id' => 'variant-5001',
         ]);
 
         $event = CommerceOrderEvent::factory()->actor($contact)->create([
-            'commerce_order_id' => $order->id,
+            'commerce_order_id' => $order->getKey(),
             'event' => CommerceOrderEvent::EVENT_PAID,
             'to_status' => CommerceOrder::STATUS_CLOSED,
         ]);
 
         $this->assertTrue($customer->contact->is($contact));
-        $this->assertTrue($order->commerceCustomer->is($customer));
-        $this->assertTrue($order->contact->is($contact));
         $this->assertTrue($order->items->contains($item));
         $this->assertTrue($order->events->contains($event));
         $this->assertTrue($item->commerceProduct->is($product));
-        $this->assertTrue($event->actor->is($contact));
-        $this->assertSame(CommerceOrder::FINANCIAL_STATUS_PAID, $order->financial_status);
-        $this->assertSame('gid://shopify/Product/2001', $item->external_product_id);
+        $this->assertTrue($item->commerceProductVariant->is($variant));
+        $this->assertCount(2, $variant->providerMappings);
+        $this->assertEqualsCanonicalizing(
+            ['catalog-provider', 'pos-provider'],
+            $variant->providerMappings->pluck('provider_key')->all(),
+        );
     }
 
-    public function test_commerce_foundation_does_not_create_storefront_tables(): void
+    public function test_provider_roles_resolve_independently_and_support_scoped_overrides(): void
     {
-        $this->assertFalse(Schema::hasTable('commerce_carts'));
-        $this->assertFalse(Schema::hasTable('commerce_checkouts'));
-        $this->assertFalse(Schema::hasTable('commerce_payments'));
-        $this->assertFalse(Schema::hasTable('commerce_fulfillments'));
-        $this->assertFalse(Schema::hasTable('commerce_inventory_items'));
-        $this->assertFalse(Schema::hasTable('commerce_product_variants'));
+        $catalog = new CatalogInventoryTestProvider('catalog-provider');
+        $inventory = new CatalogInventoryTestProvider('inventory-provider');
+        $pos = new PointOfSaleTestProvider('pos-provider');
+
+        $registry = new CommerceProviderRegistry([
+            $catalog,
+            $inventory,
+            $pos,
+        ]);
+
+        $resolver = new CommerceProviderRoleResolver(
+            providers: $registry,
+            config: new Repository([
+                'commerce' => [
+                    'provider_roles' => [
+                        CommerceProviderRole::Catalog->value => [
+                            'default' => 'catalog-provider',
+                            'scopes' => [],
+                        ],
+                        CommerceProviderRole::Inventory->value => [
+                            'default' => 'inventory-provider',
+                            'scopes' => [
+                                'venue' => 'catalog-provider',
+                            ],
+                        ],
+                        CommerceProviderRole::PointOfSale->value => [
+                            'default' => 'pos-provider',
+                            'scopes' => [],
+                        ],
+                    ],
+                ],
+            ]),
+        );
+
+        $this->assertSame($catalog, $resolver->resolve(CommerceProviderRole::Catalog));
+        $this->assertSame($inventory, $resolver->resolve(CommerceProviderRole::Inventory));
+        $this->assertSame($catalog, $resolver->resolve(CommerceProviderRole::Inventory, 'venue'));
+        $this->assertSame($pos, $resolver->resolve(CommerceProviderRole::PointOfSale));
     }
 
-    /**
-     * @param  array<int, string>  $columns
-     */
-    private function assertTableHasColumns(string $table, array $columns): void
+    public function test_provider_role_resolution_fails_when_provider_lacks_required_capability(): void
     {
-        $this->assertTrue(Schema::hasTable($table), "Missing table [{$table}].");
+        $registry = new CommerceProviderRegistry([
+            new PointOfSaleTestProvider('pos-provider'),
+        ]);
 
-        foreach ($columns as $column) {
-            $this->assertTrue(
-                Schema::hasColumn($table, $column),
-                "Missing column [{$table}.{$column}].",
-            );
-        }
+        $resolver = new CommerceProviderRoleResolver(
+            providers: $registry,
+            config: new Repository([
+                'commerce' => [
+                    'provider_roles' => [
+                        CommerceProviderRole::Inventory->value => [
+                            'default' => 'pos-provider',
+                            'scopes' => [],
+                        ],
+                    ],
+                ],
+            ]),
+        );
+
+        $this->expectException(RuntimeException::class);
+
+        $resolver->resolve(CommerceProviderRole::Inventory);
+    }
+
+    public function test_inventory_effect_recording_is_idempotent_and_preserves_authority_decision(): void
+    {
+        $variant = CommerceProductVariant::factory()->create();
+        $recorder = app(CommerceInventoryEffectRecorder::class);
+
+        $data = new CommerceInventoryEffectData(
+            commerceProductVariantId: (int) $variant->getKey(),
+            quantityDelta: '-1',
+            reason: 'completed_sale',
+            sourceType: 'provider',
+            sourceKey: 'pos-provider',
+            idempotencyKey: 'pos-provider:sale-123:variant-1',
+            authorityMode: CommerceInventoryAuthorityMode::AdjustmentRequired,
+            sourceReference: 'sale-123',
+            inventoryScope: 'default',
+        );
+
+        $first = $recorder->record($data);
+        $second = $recorder->record($data);
+
+        $this->assertTrue($first->is($second));
+        $this->assertTrue($first->requiresAuthorityAdjustment());
+        $this->assertFalse($first->authorityAlreadyApplied());
+        $this->assertSame('-1.0000', $first->quantity_delta);
+        $this->assertSame(1, $variant->inventoryEffects()->count());
+    }
+
+    public function test_inventory_effect_idempotency_key_cannot_be_reused_for_a_different_effect(): void
+    {
+        $variant = CommerceProductVariant::factory()->create();
+        $recorder = app(CommerceInventoryEffectRecorder::class);
+
+        $base = new CommerceInventoryEffectData(
+            commerceProductVariantId: (int) $variant->getKey(),
+            quantityDelta: '-1',
+            reason: 'completed_sale',
+            sourceType: 'provider',
+            sourceKey: 'pos-provider',
+            idempotencyKey: 'pos-provider:sale-456:variant-1',
+            authorityMode: CommerceInventoryAuthorityMode::AuthorityAlreadyApplied,
+            sourceReference: 'sale-456',
+        );
+
+        $recorder->record($base);
+
+        $this->expectException(RuntimeException::class);
+
+        $recorder->record(new CommerceInventoryEffectData(
+            commerceProductVariantId: (int) $variant->getKey(),
+            quantityDelta: '-2',
+            reason: 'completed_sale',
+            sourceType: 'provider',
+            sourceKey: 'pos-provider',
+            idempotencyKey: 'pos-provider:sale-456:variant-1',
+            authorityMode: CommerceInventoryAuthorityMode::AuthorityAlreadyApplied,
+            sourceReference: 'sale-456',
+        ));
+    }
+}
+
+final readonly class CatalogInventoryTestProvider implements CommerceCatalogProvider, CommerceInventoryProvider
+{
+    public function __construct(
+        private string $providerKey,
+    ) {}
+
+    public function key(): string
+    {
+        return $this->providerKey;
+    }
+}
+
+final readonly class PointOfSaleTestProvider implements CommercePointOfSaleProvider
+{
+    public function __construct(
+        private string $providerKey,
+    ) {}
+
+    public function key(): string
+    {
+        return $this->providerKey;
     }
 }

@@ -186,22 +186,42 @@ return [
 
     'commerce_customers' => [
         'mode' => 'must_be_empty',
-        'reason' => 'Commerce transfer support has not been added yet.',
+        'reason' => 'Legacy Project State does not transfer Commerce state. Production Commerce uses normal migrations and database backup/recovery; once Commerce is operational, do not use Project State as a transfer mechanism.',
     ],
     'commerce_products' => [
         'mode' => 'must_be_empty',
-        'reason' => 'Commerce transfer support has not been added yet.',
+        'reason' => 'Legacy Project State does not transfer Commerce state. Production Commerce uses normal migrations and database backup/recovery; once Commerce is operational, do not use Project State as a transfer mechanism.',
+    ],
+    'commerce_product_variants' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Legacy Project State does not transfer Commerce state. Production Commerce uses normal migrations and database backup/recovery; once Commerce is operational, do not use Project State as a transfer mechanism.',
+    ],
+    'commerce_product_provider_mappings' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Legacy Project State does not transfer Commerce state. Production Commerce uses normal migrations and database backup/recovery; once Commerce is operational, do not use Project State as a transfer mechanism.',
+    ],
+    'commerce_product_variant_provider_mappings' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Legacy Project State does not transfer Commerce state. Production Commerce uses normal migrations and database backup/recovery; once Commerce is operational, do not use Project State as a transfer mechanism.',
     ],
     'commerce_orders' => [
         'mode' => 'must_be_empty',
-        'reason' => 'Commerce transfer support has not been added yet.',
+        'reason' => 'Legacy Project State does not transfer Commerce state. Production Commerce uses normal migrations and database backup/recovery; once Commerce is operational, do not use Project State as a transfer mechanism.',
     ],
     'commerce_order_items' => [
         'mode' => 'must_be_empty',
-        'reason' => 'Commerce transfer support has not been added yet.',
+        'reason' => 'Legacy Project State does not transfer Commerce state. Production Commerce uses normal migrations and database backup/recovery; once Commerce is operational, do not use Project State as a transfer mechanism.',
     ],
     'commerce_order_events' => [
         'mode' => 'must_be_empty',
-        'reason' => 'Commerce transfer support has not been added yet.',
+        'reason' => 'Legacy Project State does not transfer Commerce state. Production Commerce uses normal migrations and database backup/recovery; once Commerce is operational, do not use Project State as a transfer mechanism.',
+    ],
+    'commerce_inventory_effects' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Legacy Project State does not transfer Commerce state. Production Commerce uses normal migrations and database backup/recovery; once Commerce is operational, do not use Project State as a transfer mechanism.',
+    ],
+    'commerce_inventory_adjustments' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Legacy Project State does not transfer Commerce state. Production Commerce uses normal migrations and database backup/recovery; once Commerce is operational, do not use Project State as a transfer mechanism.',
     ],
 ];

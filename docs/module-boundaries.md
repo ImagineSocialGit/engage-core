@@ -559,9 +559,14 @@ Current ownership:
 | media_assets | Media |
 | commerce_customers | Commerce |
 | commerce_products | Commerce |
+| commerce_product_variants | Commerce |
+| commerce_product_provider_mappings | Commerce |
+| commerce_product_variant_provider_mappings | Commerce |
 | commerce_orders | Commerce |
 | commerce_order_items | Commerce |
 | commerce_order_events | Commerce |
+| commerce_inventory_effects | Commerce |
+| commerce_inventory_adjustments | Commerce |
 | locations | Location |
 | contact_locations | Location |
 | location_areas | Location |
@@ -630,7 +635,6 @@ events                         Events
 event_external_references      Events
 event_stakeholders             Events
 event_attendances              Events
-commerce_product_variants      Commerce
 commerce_offers                Commerce
 commerce_offer_variants        Commerce
 Experience-owned tables        Experiences, after its schema is approved
