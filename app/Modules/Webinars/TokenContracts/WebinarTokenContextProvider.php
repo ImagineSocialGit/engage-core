@@ -89,5 +89,25 @@ class WebinarTokenContextProvider implements TokenContextProvider
             ['webinar'],
             ['webinar_registrations'],
         );
+
+        yield new TokenContextDefinition(
+            'webinar_post_event_plan',
+            'webinars',
+            'Messages chosen by an enabled post-webinar plan.',
+            [
+                ...self::CONTACT,
+                ...self::CLIENT_IDENTITY,
+                ...self::WEBINAR,
+                ...self::SERIES,
+                'webinar_playback_url',
+                'webinar_end_date',
+                'webinar_end_time',
+                'webinar_end_datetime',
+            ],
+            ['email', 'sms'],
+            ['transactional'],
+            ['webinar'],
+            ['webinar_registrations'],
+        );
     }
 }

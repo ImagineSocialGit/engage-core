@@ -11,6 +11,7 @@ class RecordWebinarProviderAttendanceAction
 {
     public function __construct(
         private readonly RecordWebinarAttendanceAction $recordWebinarAttendanceAction,
+        private readonly RunWebinarPostEventPlanAction $postEventPlan,
     ) {}
 
     public function execute(
@@ -71,6 +72,8 @@ class RecordWebinarProviderAttendanceAction
                 finalized: true,
                 finalizationReason: 'authoritative_snapshot',
             );
+
+            $this->postEventPlan->execute($webinar, $event);
 
             return true;
         }

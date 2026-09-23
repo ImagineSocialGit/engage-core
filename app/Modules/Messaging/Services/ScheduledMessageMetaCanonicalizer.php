@@ -494,6 +494,10 @@ class ScheduledMessageMetaCanonicalizer
 
         $canonical = [];
         $this->copyString($canonical, 'type', $value['type'] ?? null);
+        $this->copyString($canonical, 'activation', $value['activation'] ?? null);
+        $this->copyString($canonical, 'template_key', $value['template_key'] ?? null);
+        $this->copyString($canonical, 'rule_key', $value['rule_key'] ?? null);
+        $this->copyInteger($canonical, 'revision', $value['revision'] ?? null);
 
         if (is_bool($value['attended'] ?? null)) {
             $canonical['attended'] = $value['attended'];

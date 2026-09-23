@@ -78,6 +78,9 @@
 
                 <div class="flex flex-wrap gap-2">
                     @if(function_exists('module_enabled') && module_enabled('messaging'))
+                        <a href="{{ route('crm.webinar-series.post-event-plan.show', $series) }}" class="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Post-webinar plan</a>
+                    @endif
+                    @if(function_exists('module_enabled') && module_enabled('messaging'))
                         <x-messaging.outbound-launcher
                             :url="route('crm.messaging.outbound.index', ['scope' => 'webinar_series', 'scope_id' => $series->getKey(), 'module' => 'webinars', 'period' => 'upcoming', 'embedded' => 1])"
                             label="Upcoming messages for this series"

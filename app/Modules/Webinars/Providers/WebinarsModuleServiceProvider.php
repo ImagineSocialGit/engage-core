@@ -3,6 +3,9 @@
 namespace App\Modules\Webinars\Providers;
 
 use App\Modules\Webinars\Automation\WebinarAutomationTriggerAuthoringContributor;
+use App\Modules\Webinars\Conditions\RecordingExistsCondition;
+use App\Modules\Webinars\Conditions\RecordingMissingCondition;
+use App\Modules\Webinars\Contracts\WebinarPostEventSendCondition;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Webinars\ConfigContracts\WebinarMessageAreaConfigContract;
 use App\Modules\Webinars\ConfigContracts\WebinarPostEventConfigContract;
@@ -14,6 +17,8 @@ use App\Modules\Webinars\Console\Commands\SyncWebinarScheduleProfilesCommand;
 use App\Modules\Webinars\Deployment\WebinarsDeploymentPlanContributor;
 use App\Modules\Webinars\EventDefinitions\WebinarBehaviorEventDefinitionContributor;
 use App\Modules\Webinars\Jobs\RecoverWebinarRegistrationFinalizationsJob;
+use App\Modules\Webinars\Messaging\WebinarPostEventReusableMessageTemplateAuthoringContributor;
+use App\Modules\Messaging\Contracts\ReusableMessageTemplateAuthoringOptionContributor;
 use App\Modules\Webinars\ReadModels\WebinarFunnelFactContributor;
 use App\Modules\Webinars\Services\Contacts\Filters\WebinarAttendanceContactFilterCriterion;
 use App\Modules\Webinars\Services\Contacts\Filters\WebinarOutcomeContactFilterCriterion;
@@ -21,6 +26,7 @@ use App\Modules\Webinars\Services\ContactPanels\WebinarContactPanelProvider;
 use App\Modules\Webinars\Services\Dashboard\WebinarActivityDashboardPanelProvider;
 use App\Modules\Webinars\Services\WebinarMessageChainExecutionContextProvider;
 use App\Modules\Webinars\Services\WebinarPostEventMessageRecipientGate;
+use App\Modules\Webinars\Services\WebinarPostEventSendConditionRegistry;
 use App\Modules\Webinars\Services\WebinarScheduleChangeMessageGate;
 use App\Modules\Webinars\TokenContracts\WebinarTokenContextProvider;
 use App\Modules\Webinars\TokenContracts\WebinarTokenSourceProvider;
@@ -46,6 +52,15 @@ class WebinarsModuleServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->tag([
+            RecordingExistsCondition::class,
+            RecordingMissingCondition::class,
+        ], WebinarPostEventSendCondition::TAG);
+        $this->app->singleton(WebinarPostEventSendConditionRegistry::class,
+            fn ($app) => new WebinarPostEventSendConditionRegistry(
+                $app->tagged(WebinarPostEventSendCondition::TAG),
+            ));
+
+        $this->app->tag([
             WebinarAutomationTriggerAuthoringContributor::class,
         ], 'automation.trigger_authoring_contributors');
 
@@ -61,6 +76,10 @@ class WebinarsModuleServiceProvider extends ServiceProvider
         );
         $this->app->tag(WebinarTokenSourceProvider::class, 'token.source_providers');
         $this->app->tag(WebinarTokenContextProvider::class, 'token.context_providers');
+        $this->app->tag(
+            WebinarPostEventReusableMessageTemplateAuthoringContributor::class,
+            ReusableMessageTemplateAuthoringOptionContributor::TAG,
+        );
         $this->app->tag(
             WebinarMessageChainExecutionContextProvider::class,
             'messaging.message_chain_execution_context_providers',

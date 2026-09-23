@@ -4,16 +4,20 @@ namespace App\Modules\Webinars\Actions\PostEvent;
 
 use App\Modules\Webinars\Contracts\WebinarProvider;
 use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Services\WebinarPostEventPlanService;
 use Illuminate\Support\Facades\DB;
 
 class EnsureWebinarPostEventReviewAction
 {
+    public function __construct(private readonly WebinarPostEventPlanService $postEventPlans) {}
+
     public function execute(
         WebinarProvider $provider,
         Webinar $webinar,
         string $event,
     ): bool {
-        if (! config('webinars.post_event.review.required', false)) {
+        if ($this->postEventPlans->activeFor($webinar) !== null
+            || ! config('webinars.post_event.review.required', false)) {
             return true;
         }
 

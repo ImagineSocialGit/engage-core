@@ -11,6 +11,7 @@ use App\Modules\Webinars\Data\WebinarFollowUpDispatchResult;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Services\WebinarMessageAreaRegistry;
+use App\Modules\Webinars\Services\WebinarPostEventPlanService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -29,6 +30,7 @@ class DispatchPostWebinarFollowUpsAction
         private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
         private readonly WebinarMessageAreaRegistry $messageAreaRegistry,
         private readonly StartWebinarMessageChainEnrollmentAction $startMessageChainEnrollment,
+        private readonly WebinarPostEventPlanService $postEventPlans,
     ) {}
 
     public function execute(
@@ -37,6 +39,11 @@ class DispatchPostWebinarFollowUpsAction
         string $event,
     ): bool {
         $webinar = $webinar->fresh() ?? $webinar;
+        if ($this->postEventPlans->activeFor($webinar) !== null) {
+            $this->emitWebinarEndedIfNeeded($provider, $webinar, $event);
+
+            return true;
+        }
         $reviewStatus = data_get(
             $webinar->meta,
             'normalized.post_event.review.status',
@@ -168,6 +175,14 @@ class DispatchPostWebinarFollowUpsAction
                     registration: $registration,
                     outcome: $outcome,
                     reason: 'webinar_missing',
+                );
+            }
+
+            if ($this->postEventPlans->activeFor($registration->webinar) !== null) {
+                return $this->recordNotApplicable(
+                    registration: $registration,
+                    outcome: $outcome,
+                    reason: 'post_event_plan_active',
                 );
             }
 

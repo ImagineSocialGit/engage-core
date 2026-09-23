@@ -4,6 +4,7 @@ use App\Modules\Webinars\Controllers\CRM\WebinarController;
 use App\Modules\Webinars\Controllers\CRM\WebinarDevController;
 use App\Modules\Webinars\Controllers\CRM\WebinarMessageTemplateController;
 use App\Modules\Webinars\Controllers\CRM\WebinarPostEventReviewController;
+use App\Modules\Webinars\Controllers\CRM\WebinarPostEventPlanController;
 use App\Modules\Webinars\Controllers\CRM\WebinarProviderCancellationController;
 use App\Modules\Webinars\Controllers\CRM\WebinarRegistrationFinalizationController;
 use App\Modules\Webinars\Controllers\CRM\WebinarRegistrationFollowUpController;
@@ -30,6 +31,18 @@ Route::middleware('module:webinars')->group(function () {
         ->name('crm.webinars.show');
 
     Route::middleware('module:messaging')->group(function () {
+        Route::get('/webinar-series/{series}/post-event-plan', [WebinarPostEventPlanController::class, 'show'])
+            ->name('crm.webinar-series.post-event-plan.show');
+        Route::patch('/webinar-series/{series}/post-event-plan', [WebinarPostEventPlanController::class, 'update'])
+            ->name('crm.webinar-series.post-event-plan.update');
+        Route::post('/webinar-series/{series}/post-event-plan/rules', [WebinarPostEventPlanController::class, 'addRule'])
+            ->name('crm.webinar-series.post-event-plan.rules.store');
+        Route::patch('/webinar-series/{series}/post-event-plan/rules/{ruleId}', [WebinarPostEventPlanController::class, 'updateRule'])
+            ->name('crm.webinar-series.post-event-plan.rules.update');
+        Route::delete('/webinar-series/{series}/post-event-plan/rules/{ruleId}', [WebinarPostEventPlanController::class, 'deleteRule'])
+            ->name('crm.webinar-series.post-event-plan.rules.destroy');
+        Route::patch('/webinar-series/{series}/post-event-plan/rules/{ruleId}/copy', [WebinarPostEventPlanController::class, 'updateCopy'])
+            ->name('crm.webinar-series.post-event-plan.rules.copy');
         Route::get('/webinar-series/{series}/time-change-messages', [WebinarTimeChangeSettingsController::class, 'show'])
             ->name('crm.webinar-series.time-change-settings.show');
         Route::post('/webinar-series/{series}/time-change-messages/template', [WebinarTimeChangeSettingsController::class, 'saveTemplate'])
