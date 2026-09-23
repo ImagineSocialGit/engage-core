@@ -66,11 +66,15 @@ class ReportingExternalMeasurementImportTest extends TestCase
             ],
         );
 
-        $preview
-            ->assertOk()
-            ->assertSee('What Reporting recognized')
-            ->assertSee('Name fallback')
-            ->assertSee('exact automatic ad-to-Engage reconciliation', false);
+        $preview->assertOk();
+
+        $previewData = $preview->viewData('preview');
+
+        $this->assertIsArray($previewData);
+        $this->assertSame(1, $previewData['valid_count']);
+        $this->assertSame(0, $previewData['identity_counts']['stable_ids']);
+        $this->assertSame(1, $previewData['identity_counts']['name_fallback']);
+        $this->assertSame(0, $previewData['skipped_count']);
 
         $this->assertDatabaseCount('reporting_external_measurements', 0);
 

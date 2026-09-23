@@ -19,6 +19,9 @@ Route::middleware('module:reporting')
         Route::get('/scheduled-reports', [ScheduledReportController::class, 'index'])
             ->name('scheduled-reports.index');
 
+        Route::match(['POST', 'PATCH'], '/scheduled-reports/preview', [ScheduledReportController::class, 'preview'])
+            ->name('scheduled-reports.preview');
+
         Route::post('/scheduled-reports', [ScheduledReportController::class, 'store'])
             ->name('scheduled-reports.store');
 

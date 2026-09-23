@@ -7,8 +7,13 @@
     <div class="w-full max-w-6xl space-y-6">
         <section class="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
             <div class="border-b border-slate-100 p-5 sm:p-8">
-                <h2 class="text-xl font-semibold tracking-tight text-slate-950">What Reporting recognized</h2>
-                <p class="mt-1 text-sm leading-6 text-slate-700">Nothing has been imported yet.</p>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h2 class="text-xl font-semibold tracking-tight text-slate-950">Import readiness</h2>
+                        <p class="mt-1 text-sm leading-6 text-slate-700">Nothing has been stored yet. Review the recognized scope and identity quality before importing.</p>
+                    </div>
+                    <a href="{{ route('crm.reporting.imports.create') }}" class="text-sm font-semibold text-slate-600 hover:underline">Upload a different CSV</a>
+                </div>
             </div>
 
             <div class="grid gap-4 p-5 sm:grid-cols-2 sm:p-8 lg:grid-cols-4">
@@ -32,6 +37,7 @@
 
             @if($preview['warnings'] !== [])
                 <div class="space-y-2 border-t border-slate-100 p-5 sm:p-8">
+                    <div class="text-xs font-bold uppercase tracking-wide text-amber-800">Review before importing</div>
                     @foreach($preview['warnings'] as $warning)
                         <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">{{ $warning }}</div>
                     @endforeach
@@ -51,7 +57,7 @@
             </div>
 
             <div class="overflow-x-auto">
-                <table class="min-w-[60rem] divide-y divide-slate-200 text-sm">
+                <table class="min-w-[66rem] divide-y divide-slate-200 text-sm">
                     <thead class="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                         <tr>
                             <th class="px-5 py-3">Ad / creative</th>
@@ -79,14 +85,20 @@
                 </table>
             </div>
 
-            <form method="POST" action="{{ route('crm.reporting.imports.store') }}" class="grid gap-3 border-t border-slate-100 p-5 sm:flex sm:flex-wrap sm:items-center sm:p-8">
-                @csrf
-                <input type="hidden" name="import_token" value="{{ $importToken }}">
-                <input type="hidden" name="account_id" value="{{ $accountId }}">
-                <input type="hidden" name="account_timezone" value="{{ $accountTimezone }}">
-                <x-ui.button type="submit" class="w-full sm:w-auto">Import {{ number_format((int) $preview['valid_count']) }} row(s)</x-ui.button>
-                <a href="{{ route('crm.reporting.imports.create') }}" class="text-center text-sm font-semibold text-slate-600 hover:underline sm:text-left">Upload a different CSV</a>
-            </form>
+            <div class="border-t border-slate-100 p-5 sm:p-8">
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                    Importing these rows adds external ad-platform measurement evidence. Stable IDs improve later reconciliation; name-fallback rows remain useful historical measurements without being treated as exact first-party matches.
+                </div>
+
+                <form method="POST" action="{{ route('crm.reporting.imports.store') }}" class="mt-4 grid gap-3 sm:flex sm:flex-wrap sm:items-center">
+                    @csrf
+                    <input type="hidden" name="import_token" value="{{ $importToken }}">
+                    <input type="hidden" name="account_id" value="{{ $accountId }}">
+                    <input type="hidden" name="account_timezone" value="{{ $accountTimezone }}">
+                    <x-ui.button type="submit" class="w-full sm:w-auto">Import {{ number_format((int) $preview['valid_count']) }} row(s)</x-ui.button>
+                    <a href="{{ route('crm.reporting.imports.create') }}" class="text-center text-sm font-semibold text-slate-600 hover:underline sm:text-left">Cancel and upload another file</a>
+                </form>
+            </div>
         </section>
 
         @if($preview['errors'] !== [])

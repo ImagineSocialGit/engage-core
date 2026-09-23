@@ -158,14 +158,19 @@ final class DailyFollowUpScheduledReportProvider implements ScheduledReportProvi
         $total = (int) $digest['total_count'];
         $body = [
             $total > 0
-                ? 'Here are the people and work that need attention.'
+                ? 'These are the people and follow-up items that need attention now.'
                 : 'Nothing currently matches this report’s saved follow-up rules.',
         ];
 
         foreach ($digest['sections'] as $section) {
+            $count = (int) $section['count'];
+
+            if ($count <= 0) {
+                continue;
+            }
+
             $body[] = '';
-            $body[] = strtoupper($section['label'])
-                .' — '.number_format((int) $section['count']);
+            $body[] = $section['label'].' — '.number_format($count);
 
             foreach ($section['items'] as $item) {
                 $line = '• '.$item['title'];
@@ -174,15 +179,14 @@ final class DailyFollowUpScheduledReportProvider implements ScheduledReportProvi
                     $line .= ' — '.$item['detail'];
                 }
 
-                if (filled($item['url'] ?? null)) {
-                    $line .= ' — '.$item['url'];
-                }
-
                 $body[] = $line;
+
+                if (filled($item['url'] ?? null)) {
+                    $body[] = '  Open: '.$item['url'];
+                }
             }
 
-            $remaining = (int) $section['count']
-                - count($section['items']);
+            $remaining = $count - count($section['items']);
 
             if ($remaining > 0) {
                 $body[] = '• And '.number_format($remaining).' more.';
@@ -201,6 +205,9 @@ final class DailyFollowUpScheduledReportProvider implements ScheduledReportProvi
                 : 'No follow-up items are currently waiting.',
             body: $body,
             details: collect($digest['sections'])
+                ->filter(fn (array $section): bool =>
+                    (int) $section['count'] > 0
+                )
                 ->mapWithKeys(fn (array $section): array => [
                     $section['label'] => number_format(
                         (int) $section['count'],
@@ -214,6 +221,11 @@ final class DailyFollowUpScheduledReportProvider implements ScheduledReportProvi
             meta: [
                 'generated_at' => $digest['generated_at']->toIso8601String(),
                 'total_count' => $total,
+                'section_counts' => collect($digest['sections'])
+                    ->mapWithKeys(fn (array $section): array => [
+                        (string) $section['key'] => (int) $section['count'],
+                    ])
+                    ->all(),
             ],
         );
     }
