@@ -31,6 +31,12 @@
                 <div>
                     <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Specific session</p>
                     <h1 class="mt-2 text-2xl font-semibold text-slate-950">{{ $webinar->title }}</h1>
+                    @if($variant)
+                        <div class="mt-2 inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-sm font-semibold text-white">
+                            Market: {{ $variant->displayName() }}
+                        </div>
+                        <p class="mt-2 text-xs font-medium text-slate-500">{{ $variant->timezone }}</p>
+                    @endif
                     <p class="mt-2 text-sm text-slate-600">
                         {{ $webinar->starts_at?->copy()->setTimezone($webinar->timezone)->format('M j, Y · g:i A T') ?? 'Date unavailable' }}
                         @if($webinar->ends_at)

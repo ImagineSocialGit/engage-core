@@ -30,11 +30,19 @@ class DispatchWebinarWaitlistMessagesAction
             return;
         }
 
-        $webinar->loadMissing('webinarSeries');
+        $webinar->loadMissing(['webinarSeries', 'webinarSeriesVariant']);
 
         $signups = WebinarWaitlistSignup::query()
             ->with(['contact', 'webinarSeries'])
             ->where('webinar_series_id', $webinar->webinar_series_id)
+            ->when(
+                $webinar->webinar_series_variant_id !== null,
+                fn ($query) => $query->where(
+                    'webinar_series_variant_id',
+                    $webinar->webinar_series_variant_id,
+                ),
+                fn ($query) => $query->whereNull('webinar_series_variant_id'),
+            )
             ->eligibleForNotification($notificationMode)
             ->get();
 

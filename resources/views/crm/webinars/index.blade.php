@@ -496,6 +496,9 @@
                             <div class="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                     <p class="text-sm font-semibold text-slate-900">{{ $seriesItem->webinars->first()->title }}</p>
+                                    @if($seriesItem->webinars->first()->webinarSeriesVariant)
+                                        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Market: {{ $seriesItem->webinars->first()->webinarSeriesVariant->displayName() }}</p>
+                                    @endif
                                     <p class="text-sm text-slate-600">
                                         {{ $seriesItem->webinars->first()->starts_at?->copy()->setTimezone($seriesItem->webinars->first()->timezone)->format('M j, Y · g:i A T') }}
                                     </p>
@@ -513,10 +516,17 @@
                         @if(! $showArchivedTypes)
                             <form method="POST" action="{{ route('crm.webinar-series.sync') }}">
                                 @csrf
-                                <input type="hidden" name="webinar_series_id" value="{{ $seriesItem->getKey() }}">
-                                <button type="submit" class="text-sm font-semibold text-slate-700 underline">
-                                    Sync from Zoom
-                                </button>
+                                @if($seriesItem->variants->count() === 1)
+                                    <input type="hidden" name="webinar_series_variant_id" value="{{ $seriesItem->variants->first()->getKey() }}">
+                                    <button type="submit" class="text-sm font-semibold text-slate-700 underline">
+                                        Sync from Zoom
+                                    </button>
+                                @else
+                                    <input type="hidden" name="webinar_series_id" value="{{ $seriesItem->getKey() }}">
+                                    <button type="submit" class="text-sm font-semibold text-slate-700 underline">
+                                        Sync primary market
+                                    </button>
+                                @endif
                             </form>
 
                             <a href="{{ route('crm.webinar-series.show', $seriesItem) }}#links" class="text-sm font-semibold text-slate-700 underline">

@@ -27,6 +27,7 @@ class Webinar extends Model
 
     protected $fillable = [
         'webinar_series_id',
+        'webinar_series_variant_id',
         'replacement_of_webinar_id',
         'webinar_schedule_profile_id',
         'title',
@@ -67,12 +68,14 @@ class Webinar extends Model
     {
         static::creating(function (Webinar $webinar): void {
             if (blank($webinar->platform)) {
-                $webinar->platform = $webinar->webinarSeries?->providerKey()
+                $webinar->platform = $webinar->webinarSeriesVariant?->providerKey()
+                    ?? $webinar->webinarSeries?->providerKey()
                     ?? static::configuredProviderKey();
             }
 
             $webinar->provider_event_type = WebinarProviderEventType::normalize(
                 $webinar->provider_event_type
+                    ?? $webinar->webinarSeriesVariant?->providerEventTypeKey()
                     ?? $webinar->webinarSeries?->providerEventTypeKey()
                     ?? config('webinars.provider_event_type'),
             );
@@ -89,6 +92,7 @@ class Webinar extends Model
                     'starts_at',
                     'ends_at',
                     'webinar_series_id',
+                    'webinar_series_variant_id',
                     'replacement_of_webinar_id',
                     'webinar_schedule_profile_id',
                     'platform',
@@ -119,6 +123,14 @@ class Webinar extends Model
         return $this->belongsTo(WebinarSeries::class);
     }
 
+    public function webinarSeriesVariant(): BelongsTo
+    {
+        return $this->belongsTo(
+            WebinarSeriesVariant::class,
+            'webinar_series_variant_id',
+        );
+    }
+
     public function replacementOf(): BelongsTo
     {
         return $this->belongsTo(self::class, 'replacement_of_webinar_id');
@@ -145,21 +157,52 @@ class Webinar extends Model
     ): Builder {
         return $query
             ->where('webinar_series_id', $series->getKey())
-            ->where('platform', $series->providerKey())
-            ->where('provider_event_type', $series->providerEventTypeKey());
+            ->matchingCurrentSeriesProvider();
+    }
+
+    public function scopeForVariantProviderIdentity(
+        Builder $query,
+        WebinarSeriesVariant $variant,
+    ): Builder {
+        return $query
+            ->where('webinar_series_id', $variant->webinar_series_id)
+            ->where('webinar_series_variant_id', $variant->getKey())
+            ->where('platform', $variant->providerKey())
+            ->where('provider_event_type', $variant->providerEventTypeKey());
     }
 
     public function scopeMatchingCurrentSeriesProvider(Builder $query): Builder
     {
-        return $query->whereHas(
-            'webinarSeries',
-            fn (Builder $seriesQuery): Builder => $seriesQuery
-                ->whereColumn('webinar_series.platform', 'webinars.platform')
-                ->whereColumn(
-                    'webinar_series.provider_event_type',
-                    'webinars.provider_event_type',
-                ),
-        );
+        return $query->where(function (Builder $identity): void {
+            $identity
+                ->where(function (Builder $variantBound): void {
+                    $variantBound
+                        ->whereNotNull('webinar_series_variant_id')
+                        ->whereHas(
+                            'webinarSeriesVariant',
+                            fn (Builder $variantQuery): Builder => $variantQuery
+                                ->where('webinar_series_variants.status', 'active')
+                                ->whereColumn('webinar_series_variants.platform', 'webinars.platform')
+                                ->whereColumn(
+                                    'webinar_series_variants.provider_event_type',
+                                    'webinars.provider_event_type',
+                                ),
+                        );
+                })
+                ->orWhere(function (Builder $legacy): void {
+                    $legacy
+                        ->whereNull('webinar_series_variant_id')
+                        ->whereHas(
+                            'webinarSeries',
+                            fn (Builder $seriesQuery): Builder => $seriesQuery
+                                ->whereColumn('webinar_series.platform', 'webinars.platform')
+                                ->whereColumn(
+                                    'webinar_series.provider_event_type',
+                                    'webinars.provider_event_type',
+                                ),
+                        );
+                });
+        });
     }
 
     public function scopeProviderActive(Builder $query): Builder
@@ -202,10 +245,31 @@ class Webinar extends Model
             ? $this->getRelation('webinarSeries')
             : $this->webinarSeries()->first();
 
-        return $series instanceof WebinarSeries
-            && (int) $this->webinar_series_id === (int) $series->getKey()
-            && $this->providerKey() === $series->providerKey()
+        if (! $series instanceof WebinarSeries
+            || (int) $this->webinar_series_id !== (int) $series->getKey()
+        ) {
+            return false;
+        }
+
+        $variant = $this->relationLoaded('webinarSeriesVariant')
+            ? $this->getRelation('webinarSeriesVariant')
+            : $this->webinarSeriesVariant()->first();
+
+        if ($variant instanceof WebinarSeriesVariant) {
+            return $this->matchesVariantProviderIdentity($variant);
+        }
+
+        return $this->providerKey() === $series->providerKey()
             && $this->providerEventTypeKey() === $series->providerEventTypeKey();
+    }
+
+    public function matchesVariantProviderIdentity(
+        WebinarSeriesVariant $variant,
+    ): bool {
+        return (int) $this->webinar_series_id === (int) $variant->webinar_series_id
+            && (int) $this->webinar_series_variant_id === (int) $variant->getKey()
+            && $this->providerKey() === $variant->providerKey()
+            && $this->providerEventTypeKey() === $variant->providerEventTypeKey();
     }
 
     public function providerKey(): string

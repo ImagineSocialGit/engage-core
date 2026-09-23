@@ -231,6 +231,33 @@ final class WebinarAttendanceContactFilterCriterion implements ContactFilterCrit
                             },
                         );
 
+                        $subquery->where(function (QueryBuilder $variant) use ($anchorId): void {
+                            $variant
+                                ->where(
+                                    'audience_w.webinar_series_variant_id',
+                                    function (QueryBuilder $anchor) use ($anchorId): void {
+                                        $anchor
+                                            ->select('anchor_webinar.webinar_series_variant_id')
+                                            ->from('webinars as anchor_webinar')
+                                            ->where('anchor_webinar.id', $anchorId)
+                                            ->whereNull('anchor_webinar.hidden_at')
+                                            ->limit(1);
+                                    },
+                                )
+                                ->orWhere(function (QueryBuilder $legacy) use ($anchorId): void {
+                                    $legacy
+                                        ->whereNull('audience_w.webinar_series_variant_id')
+                                        ->whereNotExists(function (QueryBuilder $anchorVariant) use ($anchorId): void {
+                                            $anchorVariant
+                                                ->selectRaw('1')
+                                                ->from('webinars as anchor_variant_webinar')
+                                                ->where('anchor_variant_webinar.id', $anchorId)
+                                                ->whereNull('anchor_variant_webinar.hidden_at')
+                                                ->whereNotNull('anchor_variant_webinar.webinar_series_variant_id');
+                                        });
+                                });
+                        });
+
                         $operator = match ($target['scope']) {
                             'before_session' => '<',
                             'on_or_after_session' => '>=',
@@ -332,7 +359,10 @@ final class WebinarAttendanceContactFilterCriterion implements ContactFilterCrit
         }
 
         $occurrences = Webinar::query()
-            ->with('webinarSeries:id,title,slug')
+            ->with([
+                'webinarSeries:id,title,slug',
+                'webinarSeriesVariant:id,name,timezone',
+            ])
             ->withCount('registrations')
             ->whereIn('webinar_series_id', $series->pluck('id')->all())
             ->whereNotNull('starts_at')
@@ -372,8 +402,11 @@ final class WebinarAttendanceContactFilterCriterion implements ContactFilterCrit
             ->setTimezone($webinar->timezone)
             ->format('M j, Y · g:i A T');
 
+        $market = trim((string) ($webinar->webinarSeriesVariant?->displayName() ?? ''));
+        $session = trim(implode(' · ', array_filter([$market, $startsAt])));
+
         if (! $includeSeries) {
-            return $startsAt ?? 'Session #'.$webinar->getKey();
+            return $session !== '' ? $session : 'Session #'.$webinar->getKey();
         }
 
         $seriesTitle = trim((string) ($webinar->webinarSeries?->title ?? ''));
@@ -381,7 +414,7 @@ final class WebinarAttendanceContactFilterCriterion implements ContactFilterCrit
             ? $seriesTitle
             : trim((string) $webinar->title);
 
-        return trim(implode(' — ', array_filter([$title, $startsAt])))
+        return trim(implode(' — ', array_filter([$title, $session])))
             ?: 'Session #'.$webinar->getKey();
     }
 }

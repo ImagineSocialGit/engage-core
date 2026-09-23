@@ -7,6 +7,7 @@ use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Webinars\Actions\CreateWebinarRegistrationAction;
 use App\Modules\Webinars\Actions\GetActiveWebinarSeriesAction;
 use App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction;
+use App\Modules\Webinars\Actions\ResolvePublicWebinarSeriesVariantAction;
 use App\Modules\Webinars\Actions\ResolveWebinarRegistrationPublicStatusAction;
 use App\Modules\Webinars\Actions\ResolveWebinarRegistrationReplacementChainAction;
 use App\Modules\Webinars\Models\WebinarRegistration;
@@ -31,12 +32,12 @@ class WebinarRegistrationController extends Controller
 
     public function show(
         string $seriesSlug,
-        GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
+        ResolvePublicWebinarSeriesVariantAction $resolvePublicVariant,
         GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction
     ): Response {
         return response($this->renderShowPage(
             $seriesSlug,
-            $getActiveWebinarSeriesAction,
+            $resolvePublicVariant,
             $getNextUpcomingWebinarAction,
         ));
     }
@@ -44,14 +45,17 @@ class WebinarRegistrationController extends Controller
     public function showFromWaitlist(
         string $seriesSlug,
         int $signup,
-        GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
+        ResolvePublicWebinarSeriesVariantAction $resolvePublicVariant,
         GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction,
     ) {
-        $series = $getActiveWebinarSeriesAction->findBySlug($seriesSlug);
+        $variant = $resolvePublicVariant->findByPublicSlug($seriesSlug);
+        $series = $variant?->webinarSeries;
 
-        abort_unless($series, 404);
+        abort_unless($variant && $series, 404);
 
-        $webinar = $getNextUpcomingWebinarAction->getForSeries($series);
+        $webinar = $variant->exists
+            ? $getNextUpcomingWebinarAction->getForVariant($variant)
+            : $getNextUpcomingWebinarAction->getForSeries($series);
 
         abort_unless($webinar, 404);
 
@@ -59,6 +63,11 @@ class WebinarRegistrationController extends Controller
             ->with('contact')
             ->whereKey($signup)
             ->where('webinar_series_id', $series->getKey())
+            ->when(
+                $variant->exists,
+                fn ($query) => $query->where('webinar_series_variant_id', $variant->getKey()),
+                fn ($query) => $query->whereNull('webinar_series_variant_id'),
+            )
             ->firstOrFail();
 
         $contact = $waitlistSignup->contact;
@@ -72,7 +81,7 @@ class WebinarRegistrationController extends Controller
 
         return response($this->renderShowPage(
             $seriesSlug,
-            $getActiveWebinarSeriesAction,
+            $resolvePublicVariant,
             $getNextUpcomingWebinarAction,
             [
                 'first_name' => $contact?->first_name,
@@ -85,15 +94,18 @@ class WebinarRegistrationController extends Controller
 
     private function renderShowPage(
         string $seriesSlug,
-        GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
+        ResolvePublicWebinarSeriesVariantAction $resolvePublicVariant,
         GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction,
         array $registrationPrefill = [],
     ): string {
-        $series = $getActiveWebinarSeriesAction->findBySlug($seriesSlug);
+        $variant = $resolvePublicVariant->findByPublicSlug($seriesSlug);
+        $series = $variant?->webinarSeries;
 
-        abort_unless($series, 404);
+        abort_unless($variant && $series, 404);
 
-        $webinar = $getNextUpcomingWebinarAction->getForSeries($series);
+        $webinar = $variant->exists
+            ? $getNextUpcomingWebinarAction->getForVariant($variant)
+            : $getNextUpcomingWebinarAction->getForSeries($series);
 
         $config = app(WebinarRegisterPageConfig::class);
         $channelAvailability = app(MessageChannelAvailability::class);
@@ -101,8 +113,9 @@ class WebinarRegistrationController extends Controller
         if (! $webinar) {
             return view('webinar.notify-me', [
                 'series' => $series,
-                'page' => $config->content('notify-me', $series->slug, $series->meta ?? []),
-                'style' => $config->style('notify-me', $series->slug),
+                'variant' => $variant,
+                'page' => $config->content('notify-me', (string) $series->slug, $series->meta ?? []),
+                'style' => $config->style('notify-me', (string) $series->slug),
                 'webinarWaitlistChannels' => [
                     'marketing' => $channelAvailability->visibleChannelsForSurface(
                         surface: 'webinar_waitlists',
@@ -116,8 +129,9 @@ class WebinarRegistrationController extends Controller
         return view('webinar.register', [
             'webinar' => $webinar,
             'series' => $series,
-            'page' => $config->content('register', $series->slug, $series->meta ?? []),
-            'style' => $config->style('register', $series->slug),
+            'variant' => $variant,
+            'page' => $config->content('register', (string) $series->slug, $series->meta ?? []),
+            'style' => $config->style('register', (string) $series->slug),
             'registrationPrefill' => $registrationPrefill,
             'webinarRegistrationChannels' => [
                 'transactional' => $channelAvailability->visibleChannelsForSurface(
@@ -138,21 +152,22 @@ class WebinarRegistrationController extends Controller
         StoreWebinarRegistrationRequest $request,
         string $seriesSlug,
         CreateWebinarRegistrationAction $createWebinarRegistrationAction,
-        GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
+        ResolvePublicWebinarSeriesVariantAction $resolvePublicVariant,
         WebinarRegisterPageConfig $config,
         WebinarRegistrationQuestionResolver $questionResolver,
         WebinarRegistrationPostQuestionLinkGenerator $postQuestionLinks,
         WebinarRegistrationThankYouLinkGenerator $thankYouLinks,
     ): RedirectResponse {
-        $series = $getActiveWebinarSeriesAction->findBySlug($seriesSlug);
+        $variant = $resolvePublicVariant->findByPublicSlug($seriesSlug);
+        $series = $variant?->webinarSeries;
 
-        abort_unless($series, 404);
+        abort_unless($variant && $series, 404);
 
         $webinar = $request->registerableWebinar();
 
         if (! $webinar) {
             return redirect()->route('webinar.show', [
-                'seriesSlug' => $series->slug,
+                'seriesSlug' => $seriesSlug,
             ]);
         }
 
@@ -171,7 +186,7 @@ class WebinarRegistrationController extends Controller
 
         $content = $config->content(
             page: 'register',
-            seriesSlug: $series->slug,
+            seriesSlug: (string) $series->slug,
             seriesMeta: is_array($series->meta) ? $series->meta : [],
         );
         $postRegistrationQuestions = $questionResolver->resolveForPlacement(
@@ -189,21 +204,24 @@ class WebinarRegistrationController extends Controller
     public function showThankYou(
         string $seriesSlug,
         WebinarRegistration $registration,
-        GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
+        ResolvePublicWebinarSeriesVariantAction $resolvePublicVariant,
         ResolveWebinarRegistrationReplacementChainAction $resolveReplacementChain,
         ResolveWebinarRegistrationPublicStatusAction $resolvePublicStatus,
         WebinarRegisterPageConfig $config,
     ): View {
-        $series = $getActiveWebinarSeriesAction->findBySlug($seriesSlug);
+        $variant = $resolvePublicVariant->findByPublicSlug($seriesSlug);
+        $series = $variant?->webinarSeries;
 
-        abort_unless($series, 404);
+        abort_unless($variant && $series, 404);
 
         $chain = $resolveReplacementChain->handle($registration);
         $originalWebinar = $chain->original->webinar;
 
         abort_unless(
             $originalWebinar
-            && (int) $originalWebinar->webinar_series_id === (int) $series->getKey(),
+            && (int) $originalWebinar->webinar_series_id === (int) $series->getKey()
+            && (! $variant->exists
+                || (int) $originalWebinar->webinar_series_variant_id === (int) $variant->getKey()),
             404,
         );
 
@@ -214,14 +232,16 @@ class WebinarRegistrationController extends Controller
 
         abort_unless(
             $webinar
-            && (int) $webinar->webinar_series_id === (int) $series->getKey(),
+            && (int) $webinar->webinar_series_id === (int) $series->getKey()
+            && (! $variant->exists
+                || (int) $webinar->webinar_series_variant_id === (int) $variant->getKey()),
             404,
         );
 
         $registrationStatus = $resolvePublicStatus->handleChain($chain);
         $page = $config->content(
             'thank-you',
-            $series->slug,
+            (string) $series->slug,
             $series->meta ?? [],
         );
         $stateContent = data_get($page, "states.{$registrationStatus}", []);
@@ -244,12 +264,13 @@ class WebinarRegistrationController extends Controller
 
         return view('webinar.thank-you', [
             'series' => $series,
+            'variant' => $variant,
             'webinar' => $webinar,
             'registration' => $registration,
             'registrationStatus' => $registrationStatus,
             'refreshSeconds' => $refreshSeconds,
             'page' => $page,
-            'style' => $config->style('thank-you', $series->slug),
+            'style' => $config->style('thank-you', (string) $series->slug),
         ]);
     }
 }

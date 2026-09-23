@@ -2,7 +2,7 @@
 
 namespace App\Modules\Webinars\Requests;
 
-use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Actions\ResolvePublicWebinarSeriesVariantAction;
 use App\Modules\Webinars\Services\WebinarRegistrationQuestionResolver;
 use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
 use Illuminate\Foundation\Http\FormRequest;
@@ -53,15 +53,14 @@ class StoreWebinarPostRegistrationQuestionsRequest extends FormRequest
         }
 
         $seriesSlug = trim((string) $this->route('seriesSlug'));
-        $series = $seriesSlug !== ''
-            ? WebinarSeries::query()
-                ->where('slug', $seriesSlug)
-                ->where('status', 'active')
-                ->first()
+        $variant = $seriesSlug !== ''
+            ? app(ResolvePublicWebinarSeriesVariantAction::class)
+                ->findByPublicSlug($seriesSlug)
             : null;
+        $series = $variant?->webinarSeries;
         $content = app(WebinarRegisterPageConfig::class)->content(
             page: 'register',
-            seriesSlug: $seriesSlug,
+            seriesSlug: (string) ($series?->slug ?? $seriesSlug),
             seriesMeta: is_array($series?->meta) ? $series->meta : [],
         );
 

@@ -4,7 +4,7 @@ namespace App\Modules\Webinars\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Webinars\Actions\CreateWebinarWaitlistSignupAction;
-use App\Modules\Webinars\Actions\GetActiveWebinarSeriesAction;
+use App\Modules\Webinars\Actions\ResolvePublicWebinarSeriesVariantAction;
 use App\Modules\Webinars\Requests\StoreWebinarWaitlistSignupRequest;
 use Illuminate\Http\RedirectResponse;
 
@@ -13,22 +13,24 @@ class WebinarWaitlistSignupController extends Controller
     public function __invoke(
         StoreWebinarWaitlistSignupRequest $request,
         string $seriesSlug,
-        GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
+        ResolvePublicWebinarSeriesVariantAction $resolvePublicVariant,
         CreateWebinarWaitlistSignupAction $createWebinarWaitlistSignupAction,
     ): RedirectResponse {
-        $series = $getActiveWebinarSeriesAction->findBySlug($seriesSlug);
+        $variant = $resolvePublicVariant->findByPublicSlug($seriesSlug);
+        $series = $variant?->webinarSeries;
 
-        abort_unless($series, 404);
+        abort_unless($variant && $series, 404);
 
         $createWebinarWaitlistSignupAction->handle(
             validated: $request->validated(),
             request: $request,
             series: $series,
             acceptedChannels: $request->acceptedMarketingChannels(),
+            variant: $variant,
         );
 
         return redirect()
-            ->route('webinar.show', $series->slug)
+            ->route('webinar.show', $seriesSlug)
             ->with('webinar_waitlist_success', true)
             ->with(
                 'success',

@@ -14,6 +14,7 @@ class WebinarContactPanelProvider implements ContactPanelProvider
         $registrations = WebinarRegistration::query()
             ->with([
                 'webinar.webinarSeries',
+                'webinar.webinarSeriesVariant',
                 'responses',
             ])
             ->where('contact_id', $contact->id)
@@ -33,6 +34,10 @@ class WebinarContactPanelProvider implements ContactPanelProvider
                 view: 'crm.contacts.panels.webinar-history',
                 data: [
                     'registrations' => $registrations,
+                    'clientTimezone' => config(
+                        'client.timezone',
+                        config('app.timezone', 'UTC'),
+                    ),
                 ],
                 sort: 100,
                 module: 'webinars',

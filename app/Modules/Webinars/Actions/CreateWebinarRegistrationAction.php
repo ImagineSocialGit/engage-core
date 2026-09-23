@@ -94,6 +94,8 @@ class CreateWebinarRegistrationAction
         Request $request,
         Webinar $webinar,
     ): WebinarRegistrationResult {
+        $webinar->loadMissing(['webinarSeries', 'webinarSeriesVariant']);
+
         $email = strtolower(trim((string) $validated['email']));
         $normalizedPhone = $this->phoneNumberNormalizer->normalize(
             $validated['phone'] ?? null,
@@ -113,7 +115,8 @@ class CreateWebinarRegistrationAction
 
         if (! $existingContact instanceof Contact) {
             $contactData['source'] = 'webinar';
-            $contactData['subsource'] = $webinar->slug;
+            $contactData['subsource'] = $webinar->webinarSeriesVariant?->publicSlug()
+                ?? $webinar->slug;
         }
 
         $contact = $this->createOrUpdateContact->handle(
@@ -169,6 +172,15 @@ class CreateWebinarRegistrationAction
                     $validated['public_submission_attempt_id'] ?? null,
                 )
                     ? strtolower(trim($validated['public_submission_attempt_id']))
+                    : null,
+                'webinar_series_variant' => $webinar->webinarSeriesVariant
+                    ? [
+                        'id' => (int) $webinar->webinarSeriesVariant->getKey(),
+                        'key' => $webinar->webinarSeriesVariant->key,
+                        'name' => $webinar->webinarSeriesVariant->displayName(),
+                        'public_slug' => $webinar->webinarSeriesVariant->publicSlug(),
+                        'timezone' => $webinar->webinarSeriesVariant->timezone,
+                    ]
                     : null,
                 'accepted_channels' => [
                     'transactional' => $this->acceptedChannels(
@@ -403,6 +415,8 @@ class CreateWebinarRegistrationAction
                     'webinar_registration_id' => $registration->getKey(),
                     'webinar_id' => $registration->webinar_id,
                     'webinar_slug' => $registration->webinar_slug,
+                    'webinar_series_variant_id' => $webinar->webinar_series_variant_id,
+                    'webinar_series_variant_key' => $webinar->webinarSeriesVariant?->key,
                     'consent_basis' => 'registration_submission',
                 ],
             ];
@@ -444,6 +458,8 @@ class CreateWebinarRegistrationAction
                     'webinar_registration_id' => $registration->getKey(),
                     'webinar_id' => $registration->webinar_id,
                     'webinar_slug' => $registration->webinar_slug,
+                    'webinar_series_variant_id' => $webinar->webinar_series_variant_id,
+                    'webinar_series_variant_key' => $webinar->webinarSeriesVariant?->key,
                     'consent_basis' => 'explicit_selection',
                 ],
             ];
@@ -559,7 +575,7 @@ class CreateWebinarRegistrationAction
     /** @return array<int, string> */
     private function registrationGrantedTransactionalChannels(Webinar $webinar): array
     {
-        $webinar->loadMissing('webinarSeries');
+        $webinar->loadMissing(['webinarSeries', 'webinarSeriesVariant']);
         $series = $webinar->webinarSeries;
 
         if (! $series) {
@@ -568,7 +584,7 @@ class CreateWebinarRegistrationAction
 
         $content = $this->registerPageConfig->content(
             page: 'register',
-            seriesSlug: $series->slug,
+            seriesSlug: $webinar->webinarSeriesVariant?->publicSlug() ?? $series->slug,
             seriesMeta: is_array($series->meta) ? $series->meta : [],
         );
         $channels = data_get(

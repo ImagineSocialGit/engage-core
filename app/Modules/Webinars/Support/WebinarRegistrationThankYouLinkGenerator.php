@@ -11,9 +11,13 @@ class WebinarRegistrationThankYouLinkGenerator
 {
     public function forRegistration(WebinarRegistration $registration): string
     {
-        $registration->loadMissing('webinar.webinarSeries');
+        $registration->loadMissing([
+            'webinar.webinarSeries',
+            'webinar.webinarSeriesVariant',
+        ]);
 
-        $seriesSlug = $registration->webinar?->webinarSeries?->slug;
+        $seriesSlug = $registration->webinar?->webinarSeriesVariant?->publicSlug()
+            ?? $registration->webinar?->webinarSeries?->slug;
 
         if (! is_string($seriesSlug) || trim($seriesSlug) === '') {
             throw new LogicException(

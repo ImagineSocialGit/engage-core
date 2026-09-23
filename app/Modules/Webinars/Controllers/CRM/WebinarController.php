@@ -21,15 +21,19 @@ use App\Modules\Webinars\Models\WebinarOccurrenceSuppression;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Models\WebinarSeriesVariant;
 use App\Modules\Webinars\Requests\ReplaceWebinarOccurrenceRequest;
 use App\Modules\Webinars\Requests\StoreWebinarSeriesRequest;
+use App\Modules\Webinars\Requests\StoreWebinarSeriesVariantRequest;
 use App\Modules\Webinars\Requests\SyncWebinarSeriesRequest;
+use App\Modules\Webinars\Requests\UpdateWebinarSeriesVariantRequest;
 use App\Modules\Webinars\Requests\UpdateWebinarSeriesProviderEventTypeRequest;
 use App\Modules\Webinars\Requests\UpdateWebinarSeriesScheduleProfileRequest;
 use App\Modules\Webinars\Services\WebinarMessageChainPresentationService;
 use App\Modules\Webinars\Services\WebinarProviderSchedulePolicy;
 use App\Modules\Webinars\Services\WebinarSeriesHistoryResolver;
 use App\Modules\Webinars\Services\WebinarSessionRegistrationSummary;
+use App\Modules\Webinars\Services\WebinarTimezoneResolver;
 use App\Modules\Webinars\Services\WebinarScheduleProfileResolver;
 use App\Support\Reporting\PaidAdTrackingLinkGenerator;
 use Illuminate\Http\Client\ConnectionException;
@@ -37,6 +41,7 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use LogicException;
@@ -63,10 +68,12 @@ class WebinarController extends Controller
             ->where('status', $showArchivedTypes ? 'inactive' : 'active')
             ->with([
                 'webinarScheduleProfile',
+                'variants',
                 'messageChainBindings' => fn ($query) => $query
                     ->active()
                     ->with('messageChain.currentVersion'),
                 'webinars' => fn ($query) => $query
+                    ->with('webinarSeriesVariant')
                     ->withCount('registrations')
                     ->whereNull('hidden_at')
                     ->orderBy('starts_at')
@@ -119,6 +126,7 @@ class WebinarController extends Controller
             ->with([
                 'webinarScheduleProfile',
                 'webinarSeries.webinarScheduleProfile',
+                'webinarSeriesVariant',
             ])
             ->withCount('registrations')
             ->where('ends_at', '>', now())
@@ -407,6 +415,7 @@ class WebinarController extends Controller
     ): View {
         $series->load([
             'webinarScheduleProfile',
+            'variants',
             'messageChainBindings' => fn ($query) => $query
                 ->active()
                 ->with('messageChain.currentVersion'),
@@ -419,6 +428,7 @@ class WebinarController extends Controller
             ->withCount('registrations')
             ->with([
                 'webinarScheduleProfile',
+                'webinarSeriesVariant',
                 'replacementOf',
                 'replacement',
             ])
@@ -426,11 +436,9 @@ class WebinarController extends Controller
             ->orderBy('id')
             ->get();
 
-        $currentEventType = $series->providerEventTypeKey();
-
         $currentTypeOccurrences = $occurrences
             ->filter(fn (Webinar $webinar): bool =>
-                $webinar->providerEventTypeKey() === $currentEventType
+                $webinar->matchesSeriesProviderIdentity($series)
                 && $providerSchedulePolicy->allowsStoredOccurrence($webinar)
             );
 
@@ -480,6 +488,39 @@ class WebinarController extends Controller
                 ? $paidAdTrackingLinkGenerator->platforms()
                 : [];
 
+        $variantRows = $series->variants
+            ->map(function (WebinarSeriesVariant $variant) use ($occurrences): array {
+                $variantOccurrences = $occurrences
+                    ->where('webinar_series_variant_id', $variant->getKey())
+                    ->values();
+                $next = $variantOccurrences
+                    ->filter(fn (Webinar $webinar): bool =>
+                        ! $webinar->isHidden()
+                        && $webinar->isProviderActive()
+                        && ($webinar->ends_at?->isFuture() ?? false)
+                    )
+                    ->sortBy(fn (Webinar $webinar): string =>
+                        $webinar->starts_at?->format('Y-m-d H:i:s') ?? ''
+                    )
+                    ->first();
+
+                return [
+                    'variant' => $variant,
+                    'registration_url' => route('webinar.show', [
+                        'seriesSlug' => $variant->publicSlug(),
+                    ]),
+                    'next_webinar' => $next,
+                    'occurrence_count' => $variantOccurrences->count(),
+                    'registration_count' => $variantOccurrences->sum(
+                        fn (Webinar $webinar): int => (int) ($webinar->registrations_count ?? 0),
+                    ),
+                ];
+            })
+            ->values();
+        $defaultVariant = $series->variants
+            ->first(fn (WebinarSeriesVariant $variant): bool => $variant->is_default)
+            ?? $series->variants->first();
+
         return view('crm.webinars.series-show', [
             'title' => $series->title,
             'heading' => $series->title,
@@ -498,12 +539,21 @@ class WebinarController extends Controller
                 ->map(fn (string $channel): string => strtoupper($channel))
                 ->implode(', '),
             'registrationUrl' => route('webinar.show', [
-                'seriesSlug' => $series->slug,
+                'seriesSlug' => $defaultVariant?->publicSlug() ?? $series->slug,
             ]),
+            'variantRows' => $variantRows,
+            'defaultVariant' => $defaultVariant,
             'paidAdTrackingPlatforms' => $paidAdTrackingPlatforms,
             'providerEventTypeLabel' => $this->providerEventTypeLabel(
-                $series->providerEventTypeKey(),
+                $defaultVariant?->providerEventTypeKey() ?? $series->providerEventTypeKey(),
             ),
+            'providerEventTypeOptions' => $this->providerEventTypeOptions(),
+            'marketTimezoneOptions' => [
+                'America/New_York' => 'Eastern',
+                'America/Chicago' => 'Central',
+                'America/Denver' => 'Mountain',
+                'America/Los_Angeles' => 'Pacific',
+            ],
             'seriesRemovalPlan' => $removeWebinarSeries->plan($series),
         ]);
     }
@@ -516,6 +566,7 @@ class WebinarController extends Controller
     ): View {
         $webinar->load([
             'webinarSeries.webinarScheduleProfile',
+            'webinarSeriesVariant',
             'webinarScheduleProfile',
             'replacementOf',
             'replacement',
@@ -594,6 +645,7 @@ class WebinarController extends Controller
             'heading' => $webinar->title,
             'webinar' => $webinar,
             'series' => $webinar->webinarSeries,
+            'variant' => $webinar->webinarSeriesVariant,
             'registrationSummary' => $registrationSummary,
             'registrationCounts' => $registrationCounts,
             'messageReview' => $messageReview,
@@ -646,33 +698,119 @@ class WebinarController extends Controller
             );
     }
 
-    public function storeSeries(StoreWebinarSeriesRequest $request): RedirectResponse
-    {
-        WebinarSeries::query()->create($request->validated());
+    public function storeSeries(
+        StoreWebinarSeriesRequest $request,
+        WebinarTimezoneResolver $timezoneResolver,
+    ): RedirectResponse {
+        $series = DB::transaction(function () use ($request, $timezoneResolver): WebinarSeries {
+            $series = WebinarSeries::query()->create($request->validated());
+            $timezone = $timezoneResolver->resolve();
 
-        $this->flushWebinarCachesAction->handle();
+            WebinarSeriesVariant::query()->create([
+                'webinar_series_id' => $series->getKey(),
+                'key' => 'default',
+                'name' => $this->marketLabel($timezone),
+                'public_slug' => $series->slug,
+                'timezone' => $timezone,
+                'platform' => $series->providerKey(),
+                'provider_event_type' => $series->providerEventTypeKey(),
+                'provider_match_title' => $series->title,
+                'status' => 'active',
+                'is_default' => true,
+                'meta' => [
+                    'compatibility' => [
+                        'preserves_series_public_slug' => true,
+                    ],
+                ],
+            ]);
+
+            return $series;
+        }, 3);
+
+        $this->flushWebinarCachesAction->handle(seriesSlug: $series->slug);
 
         return redirect()
             ->route('crm.webinar-series.index')
             ->with('success', 'Webinar series created.');
     }
 
+    public function storeSeriesVariant(
+        StoreWebinarSeriesVariantRequest $request,
+        WebinarSeries $series,
+    ): RedirectResponse {
+        WebinarSeriesVariant::query()->create([
+            ...$request->validated(),
+            'webinar_series_id' => $series->getKey(),
+            'key' => $this->variantKey(
+                series: $series,
+                name: (string) $request->validated('name'),
+            ),
+            'platform' => $series->providerKey(),
+            'status' => 'active',
+            'is_default' => false,
+        ]);
+
+        return redirect()
+            ->route('crm.webinar-series.show', $series)
+            ->with('success', 'Webinar market added.');
+    }
+
+    public function updateSeriesVariant(
+        UpdateWebinarSeriesVariantRequest $request,
+        WebinarSeries $series,
+        WebinarSeriesVariant $variant,
+    ): RedirectResponse {
+        $this->assertVariantBelongsToSeries($series, $variant);
+
+        $variant->fill($request->validated());
+        $variant->save();
+
+        if ($variant->is_default) {
+            $series->forceFill([
+                'platform' => $variant->providerKey(),
+                'provider_event_type' => $variant->providerEventTypeKey(),
+            ])->save();
+        }
+
+        return redirect()
+            ->route('crm.webinar-series.show', $series)
+            ->with('success', 'Webinar market updated.');
+    }
+
     public function syncSeries(
         SyncWebinarSeriesRequest $request,
         SyncWebinarSeriesFromProviderAction $syncWebinarSeriesFromProviderAction,
     ): RedirectResponse {
-        $series = WebinarSeries::query()->findOrFail($request->validated('webinar_series_id'));
+        $validated = $request->validated();
+        $variant = isset($validated['webinar_series_variant_id'])
+            ? WebinarSeriesVariant::query()->with('webinarSeries')->findOrFail(
+                (int) $validated['webinar_series_variant_id'],
+            )
+            : null;
+        $series = $variant?->webinarSeries
+            ?? WebinarSeries::query()->findOrFail((int) $validated['webinar_series_id']);
 
-        if ((string) $series->status !== 'active') {
+        if ((string) $series->status !== 'active'
+            || ($variant instanceof WebinarSeriesVariant && ! $variant->isActive())
+        ) {
             return redirect()
-                ->route('crm.webinar-series.show', $series)
-                ->with('error', 'Restore this webinar type before syncing it from Zoom.');
+                ->route(
+                    $variant instanceof WebinarSeriesVariant
+                        ? 'crm.webinar-series.show'
+                        : 'crm.webinar-series.index',
+                    $variant instanceof WebinarSeriesVariant ? $series : [],
+                )
+                ->with('error', 'Restore this webinar type and market before syncing it from Zoom.');
         }
 
-        $eventTypeLabel = $this->providerEventTypeLabel($series->providerEventTypeKey());
+        $eventTypeLabel = $this->providerEventTypeLabel(
+            $variant?->providerEventTypeKey() ?? $series->providerEventTypeKey(),
+        );
 
         try {
-            $result = $syncWebinarSeriesFromProviderAction->execute($series);
+            $result = $variant instanceof WebinarSeriesVariant
+                ? $syncWebinarSeriesFromProviderAction->executeVariant($variant)
+                : $syncWebinarSeriesFromProviderAction->execute($series);
         } catch (RequestException $e) {
             report($e);
 
@@ -700,6 +838,14 @@ class WebinarController extends Controller
                 .Str::plural('event', $suppressedCount).' kept out.';
         }
 
+        $ignoredVariantMismatches = (int) ($result['ignored_variant_mismatches'] ?? 0);
+
+        if ($ignoredVariantMismatches > 0) {
+            $syncSummary .= ' '.number_format($ignoredVariantMismatches).' provider '
+                .Str::plural('event', $ignoredVariantMismatches)
+                .' outside this market timezone ignored.';
+        }
+
         $ignoredScheduleOutliers = (int) ($result['ignored_schedule_outliers'] ?? 0);
 
         if ($ignoredScheduleOutliers > 0) {
@@ -725,7 +871,12 @@ class WebinarController extends Controller
         }
 
         $redirect = redirect()
-            ->route('crm.webinar-series.index')
+            ->route(
+                $variant instanceof WebinarSeriesVariant
+                    ? 'crm.webinar-series.show'
+                    : 'crm.webinar-series.index',
+                $variant instanceof WebinarSeriesVariant ? $series : [],
+            )
             ->with('success', $syncSummary)
             ->with('sync_conflicts', $result['conflicts'])
             ->with('sync_missing', $result['missing']);
@@ -763,9 +914,15 @@ class WebinarController extends Controller
     ): RedirectResponse {
         $eventType = (string) $request->validated('provider_event_type');
 
-        $series->forceFill([
-            'provider_event_type' => $eventType,
-        ])->save();
+        DB::transaction(function () use ($series, $eventType): void {
+            $series->forceFill([
+                'provider_event_type' => $eventType,
+            ])->save();
+
+            $series->defaultVariant()->update([
+                'provider_event_type' => $eventType,
+            ]);
+        }, 3);
 
         return redirect()
             ->route('crm.webinar-series.index')
@@ -978,6 +1135,12 @@ class WebinarController extends Controller
                             return false;
                         }
 
+                        if ((int) ($candidate->webinar_series_variant_id ?? 0)
+                            !== (int) ($source->webinar_series_variant_id ?? 0)
+                        ) {
+                            return false;
+                        }
+
                         return $candidate->replacement_of_webinar_id === null
                             || (int) $candidate->replacement_of_webinar_id === (int) $source->getKey();
                     })
@@ -1004,4 +1167,41 @@ class WebinarController extends Controller
     {
         return app()->environment(['local', 'staging']);
     }
+
+    private function assertVariantBelongsToSeries(
+        WebinarSeries $series,
+        WebinarSeriesVariant $variant,
+    ): void {
+        abort_unless(
+            (int) $variant->webinar_series_id === (int) $series->getKey(),
+            404,
+        );
+    }
+
+    private function variantKey(WebinarSeries $series, string $name): string
+    {
+        $base = Str::slug($name);
+        $base = $base !== '' ? $base : 'market';
+        $candidate = $base;
+        $suffix = 2;
+
+        while ($series->variants()->where('key', $candidate)->exists()) {
+            $candidate = $base.'-'.$suffix;
+            $suffix++;
+        }
+
+        return $candidate;
+    }
+
+    private function marketLabel(string $timezone): string
+    {
+        return match ($timezone) {
+            'America/New_York' => 'Eastern',
+            'America/Chicago' => 'Central',
+            'America/Denver' => 'Mountain',
+            'America/Los_Angeles' => 'Pacific',
+            default => str_replace('_', ' ', Str::afterLast($timezone, '/')),
+        };
+    }
+
 }

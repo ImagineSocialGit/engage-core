@@ -4,10 +4,9 @@ namespace App\Modules\Webinars\Requests;
 
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\PhoneNumberNormalizer;
-use App\Modules\Webinars\Actions\GetActiveWebinarSeriesAction;
+use App\Modules\Webinars\Actions\ResolvePublicWebinarSeriesVariantAction;
 use App\Modules\Webinars\Actions\ResolveRegisterableWebinarAction;
 use App\Modules\Webinars\Models\Webinar;
-use App\Modules\Webinars\Models\WebinarSeries;
 use App\Modules\Webinars\Services\WebinarRegistrationEligibilityService;
 use App\Modules\Webinars\Services\WebinarRegistrationQuestionResolver;
 use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
@@ -471,19 +470,18 @@ class StoreWebinarRegistrationRequest extends FormRequest
             return $this->registrationContent;
         }
 
-        $seriesSlug = (string) $this->route('seriesSlug');
-        $series = $seriesSlug !== ''
-            ? WebinarSeries::query()
-                ->where('slug', $seriesSlug)
-                ->where('status', 'active')
-                ->first()
+        $publicSlug = (string) $this->route('seriesSlug');
+        $variant = $publicSlug !== ''
+            ? app(ResolvePublicWebinarSeriesVariantAction::class)
+                ->findByPublicSlug($publicSlug)
             : null;
+        $series = $variant?->webinarSeries;
 
         return $this->registrationContent = app(
             WebinarRegisterPageConfig::class,
         )->content(
             page: 'register',
-            seriesSlug: $seriesSlug,
+            seriesSlug: (string) ($series?->slug ?? $publicSlug),
             seriesMeta: is_array($series?->meta) ? $series->meta : [],
         );
     }
@@ -525,20 +523,18 @@ class StoreWebinarRegistrationRequest extends FormRequest
             return null;
         }
 
-        $series = app(GetActiveWebinarSeriesAction::class)->findBySlug(
-            $seriesSlug,
-        );
+        $variant = app(ResolvePublicWebinarSeriesVariantAction::class)
+            ->findByPublicSlug($seriesSlug);
 
-        if (! $series) {
+        if (! $variant || ! $variant->webinarSeries) {
             return null;
         }
 
-        return $this->resolvedRegisterableWebinar = app(
-            ResolveRegisterableWebinarAction::class,
-        )->findForSeries(
-            series: $series,
-            webinarId: $webinarId,
-        );
+        $resolver = app(ResolveRegisterableWebinarAction::class);
+
+        return $this->resolvedRegisterableWebinar = $variant->exists
+            ? $resolver->findForVariant($variant, $webinarId)
+            : $resolver->findForSeries($variant->webinarSeries, $webinarId);
     }
 
     private function trimmedString(mixed $value): mixed

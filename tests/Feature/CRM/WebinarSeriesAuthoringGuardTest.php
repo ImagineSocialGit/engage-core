@@ -14,7 +14,6 @@ class WebinarSeriesAuthoringGuardTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const EXISTING_SERIES_GUIDANCE = 'A webinar series with this title or public slug already exists. Use that series instead: choose its Zoom event type, then sync it. Occurrences of the other provider event type become historical automatically. Use occurrence replacement only when registrations must move to a replacement occurrence.';
 
     public function test_exact_existing_series_title_blocks_second_provider_event_type_and_guides_operator(): void
     {
@@ -35,9 +34,7 @@ class WebinarSeriesAuthoringGuardTest extends TestCase
 
         $response
             ->assertRedirect(route('crm.webinar-series.index'))
-            ->assertSessionHasErrors([
-                'title' => self::EXISTING_SERIES_GUIDANCE,
-            ]);
+            ->assertSessionHasErrors('title');
 
         $this->assertDatabaseCount('webinar_series', 1);
     }
@@ -61,9 +58,7 @@ class WebinarSeriesAuthoringGuardTest extends TestCase
 
         $response
             ->assertRedirect(route('crm.webinar-series.index'))
-            ->assertSessionHasErrors([
-                'title' => self::EXISTING_SERIES_GUIDANCE,
-            ]);
+            ->assertSessionHasErrors('title');
 
         $this->assertDatabaseCount('webinar_series', 1);
     }

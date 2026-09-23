@@ -13,6 +13,7 @@ use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarScheduleChange;
 use App\Modules\Webinars\Models\WebinarOccurrenceSuppression;
 use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Models\WebinarSeriesVariant;
 use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use App\Modules\Webinars\Services\WebinarProviderManager;
 use App\Modules\Webinars\Services\WebinarProviderSchedulePolicy;
@@ -35,34 +36,74 @@ class SyncWebinarSeriesFromProviderAction
 
     public function execute(WebinarSeries $series): array
     {
+        $variant = $series->relationLoaded('defaultVariant')
+            ? $series->defaultVariant
+            : $series->defaultVariant()->where('status', 'active')->first();
+
+        return $variant instanceof WebinarSeriesVariant
+            ? $this->executeVariant($variant)
+            : $this->executeIdentity($series, null);
+    }
+
+    public function executeVariant(WebinarSeriesVariant $variant): array
+    {
+        $variant->loadMissing('webinarSeries');
+        $series = $variant->webinarSeries;
+
+        if (! $series instanceof WebinarSeries) {
+            throw new \LogicException('A Webinar variant must belong to a Webinar series before it can be synced.');
+        }
+
+        return $this->executeIdentity($series, $variant);
+    }
+
+    private function executeIdentity(
+        WebinarSeries $series,
+        ?WebinarSeriesVariant $variant,
+    ): array {
         $hadUpcomingWebinarBeforeSync = filled(
-            $this->getNextUpcomingWebinarAction->getForSeries($series)
+            $variant instanceof WebinarSeriesVariant
+                ? $this->getNextUpcomingWebinarAction->getForVariant($variant)
+                : $this->getNextUpcomingWebinarAction->getForSeries($series)
         );
 
-        $webinarProvider = $this->webinarProviderManager->forSeries($series);
-        $provider = $series->providerKey();
-        $providerEventType = $series->providerEventTypeKey();
+        $webinarProvider = $variant instanceof WebinarSeriesVariant
+            ? $this->webinarProviderManager->forVariant($variant)
+            : $this->webinarProviderManager->forSeries($series);
+        $provider = $variant?->providerKey() ?? $series->providerKey();
+        $providerEventType = $variant?->providerEventTypeKey()
+            ?? $series->providerEventTypeKey();
+        $providerMatchTitle = $variant?->providerMatchTitle() ?? $series->title;
 
         $snapshot = $this->providerSnapshot(
-            $webinarProvider->listWebinarsByTitle($series->title),
+            $webinarProvider->listWebinarsByTitle($providerMatchTitle),
         );
         $providerWebinars = collect($snapshot->webinars)->values();
+        $variantMatchedProviderWebinars = $variant instanceof WebinarSeriesVariant
+            ? $providerWebinars
+                ->filter(fn (ProviderWebinarData $webinar): bool =>
+                    $webinar->timezone === $variant->timezone
+                )
+                ->values()
+            : $providerWebinars;
+        $ignoredVariantMismatches = $providerWebinars->count()
+            - $variantMatchedProviderWebinars->count();
 
-        $providerReturnedExternalIds = $providerWebinars
+        $providerReturnedExternalIds = $variantMatchedProviderWebinars
             ->map(fn (ProviderWebinarData $webinar) => $webinar->externalId)
             ->filter()
             ->values()
             ->all();
 
-        $scheduleEligibleProviderWebinars = $providerWebinars
+        $scheduleEligibleProviderWebinars = $variantMatchedProviderWebinars
             ->filter(fn (ProviderWebinarData $webinar): bool =>
                 $this->providerSchedulePolicy->allowsProviderOccurrence(
-                    $series,
+                    $variant ?? $series,
                     $webinar,
                 )
             )
             ->values();
-        $ignoredScheduleOutliers = $providerWebinars->count()
+        $ignoredScheduleOutliers = $variantMatchedProviderWebinars->count()
             - $scheduleEligibleProviderWebinars->count();
 
         $suppressedExternalIds = $this->suppressedExternalIds(
@@ -94,6 +135,7 @@ class SyncWebinarSeriesFromProviderAction
 
         $fetchedWebinars->each(function (ProviderWebinarData $fetchedWebinar) use (
             $series,
+            $variant,
             $provider,
             $providerEventType,
             &$created,
@@ -104,6 +146,7 @@ class SyncWebinarSeriesFromProviderAction
             $outcome = DB::transaction(function () use (
                 $fetchedWebinar,
                 $series,
+                $variant,
                 $provider,
                 $providerEventType,
             ): array {
@@ -112,11 +155,13 @@ class SyncWebinarSeriesFromProviderAction
                     'provider_event_type' => $providerEventType,
                     'external_id' => $fetchedWebinar->externalId,
                     'webinar_series_id' => $series->id,
+                    'webinar_series_variant_id' => $variant?->getKey(),
                 ]);
 
                 $attributes = [
                     'platform' => $provider,
                     'provider_event_type' => $providerEventType,
+                    'webinar_series_variant_id' => $variant?->getKey(),
                     'title' => $fetchedWebinar->title,
                     'join_url' => $fetchedWebinar->joinUrl,
                     'registration_url' => $fetchedWebinar->registrationUrl ?? $webinar->registration_url,
@@ -163,8 +208,7 @@ class SyncWebinarSeriesFromProviderAction
                 }
 
                 if ($previousStart !== null && $webinar->starts_at !== null
-                    && (! $previousStart->equalTo($webinar->starts_at)
-                        || $previousTimezone !== $webinar->timezone)
+                    && ! $previousStart->equalTo($webinar->starts_at)
                 ) {
                     // Keep the old display zone: provider resync has already
                     // replaced the occurrence's timezone at this point.
@@ -271,6 +315,7 @@ class SyncWebinarSeriesFromProviderAction
         if ($messageSchedule['review_required'] > 0) {
             Log::warning('Webinar reminder schedules require review after provider resync.', [
                 'series_id' => $series->getKey(),
+                'variant_id' => $variant?->getKey(),
                 'review_required' => $messageSchedule['review_required'],
                 'review_enrollment_ids' => $messageSchedule['review_enrollment_ids'],
                 'review_message_ids' => $messageSchedule['review_message_ids'],
@@ -280,6 +325,7 @@ class SyncWebinarSeriesFromProviderAction
         if ($snapshot->authoritative) {
             foreach ($this->missingWebinars(
                 series: $series,
+                variant: $variant,
                 provider: $provider,
                 providerEventType: $providerEventType,
                 fetchedExternalIds: $providerReturnedExternalIds,
@@ -302,31 +348,44 @@ class SyncWebinarSeriesFromProviderAction
             }
         }
 
-        $this->getNextUpcomingWebinarAction->forgetForSeries($series);
+        if ($variant instanceof WebinarSeriesVariant) {
+            $this->getNextUpcomingWebinarAction->forgetForVariant($variant);
+        } else {
+            $this->getNextUpcomingWebinarAction->forgetForSeries($series);
+        }
         $this->getNextUpcomingWebinarAction->forgetGlobal();
 
-        $this->flushWebinarCachesAction->handle(seriesSlug: $series->slug);
-
-        $hasUpcomingWebinarAfterSync = filled(
-            $this->getNextUpcomingWebinarAction->getForSeries($series)
+        $this->flushWebinarCachesAction->handle(
+            seriesSlug: $variant?->publicSlug() ?? $series->slug,
         );
+
+        $nextWebinarAfterSync = $variant instanceof WebinarSeriesVariant
+            ? $this->getNextUpcomingWebinarAction->getForVariant($variant)
+            : $this->getNextUpcomingWebinarAction->getForSeries($series);
+        $hasUpcomingWebinarAfterSync = filled($nextWebinarAfterSync);
 
         if (
             $hasUpcomingWebinarAfterSync
             && (
                 ! $hadUpcomingWebinarBeforeSync
-                || $this->hasUnnotifiedWaitlistSignups($series)
+                || $this->hasUnnotifiedWaitlistSignups($series, $variant)
             )
         ) {
-            NotifyWebinarWaitlistJob::dispatch($series->id);
+            NotifyWebinarWaitlistJob::dispatch(
+                (int) $series->getKey(),
+                $nextWebinarAfterSync?->getKey(),
+                null,
+                $variant?->getKey(),
+            );
         }
 
-        if ($this->hasActiveRecurringWaitlistSubscriptions($series)) {
+        if ($this->hasActiveRecurringWaitlistSubscriptions($series, $variant)) {
             foreach ($createdWebinarIds as $webinarId) {
                 NotifyWebinarWaitlistJob::dispatch(
                     (int) $series->getKey(),
                     $webinarId,
                     WebinarWaitlistSignup::NOTIFICATION_MODE_RECURRING,
+                    $variant?->getKey(),
                 );
             }
         }
@@ -338,6 +397,9 @@ class SyncWebinarSeriesFromProviderAction
             'removed_from_provider' => count($missing),
             'suppressed' => count($suppressedExternalIds),
             'ignored_schedule_outliers' => $ignoredScheduleOutliers,
+            'ignored_variant_mismatches' => $ignoredVariantMismatches,
+            'variant_id' => $variant?->getKey(),
+            'variant_name' => $variant?->displayName(),
             'conflicts' => [],
             'missing' => $missing,
             'message_schedule' => $messageSchedule,
@@ -348,6 +410,8 @@ class SyncWebinarSeriesFromProviderAction
                 'provider_event_type' => $providerEventType,
                 'missing_candidates' => count($missing),
                 'ignored_schedule_outliers' => $ignoredScheduleOutliers,
+                'ignored_variant_mismatches' => $ignoredVariantMismatches,
+                'variant_id' => $variant?->getKey(),
             ],
         ];
     }
@@ -387,19 +451,32 @@ class SyncWebinarSeriesFromProviderAction
         return $meta;
     }
 
-    private function hasUnnotifiedWaitlistSignups(WebinarSeries $series): bool
-    {
+    private function hasUnnotifiedWaitlistSignups(
+        WebinarSeries $series,
+        ?WebinarSeriesVariant $variant,
+    ): bool {
         return WebinarWaitlistSignup::query()
             ->where('webinar_series_id', $series->getKey())
+            ->when(
+                $variant?->exists,
+                fn ($query) => $query->where('webinar_series_variant_id', $variant->getKey()),
+                fn ($query) => $query->whereNull('webinar_series_variant_id'),
+            )
             ->eligibleForNotification(WebinarWaitlistSignup::NOTIFICATION_MODE_ONCE)
             ->exists();
     }
 
     private function hasActiveRecurringWaitlistSubscriptions(
         WebinarSeries $series,
+        ?WebinarSeriesVariant $variant,
     ): bool {
         return WebinarWaitlistSignup::query()
             ->where('webinar_series_id', $series->getKey())
+            ->when(
+                $variant?->exists,
+                fn ($query) => $query->where('webinar_series_variant_id', $variant->getKey()),
+                fn ($query) => $query->whereNull('webinar_series_variant_id'),
+            )
             ->eligibleForNotification(WebinarWaitlistSignup::NOTIFICATION_MODE_RECURRING)
             ->exists();
     }
@@ -432,11 +509,17 @@ class SyncWebinarSeriesFromProviderAction
 
     protected function missingWebinars(
         WebinarSeries $series,
+        ?WebinarSeriesVariant $variant,
         string $provider,
         string $providerEventType,
         array $fetchedExternalIds,
     ): Collection {
         return $series->webinars()
+            ->when(
+                $variant?->exists,
+                fn ($query) => $query->where('webinar_series_variant_id', $variant->getKey()),
+                fn ($query) => $query->whereNull('webinar_series_variant_id'),
+            )
             ->where('platform', $provider)
             ->where('provider_event_type', $providerEventType)
             ->providerActive()

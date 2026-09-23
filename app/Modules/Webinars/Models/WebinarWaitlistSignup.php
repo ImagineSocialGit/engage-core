@@ -26,6 +26,7 @@ class WebinarWaitlistSignup extends Model
     protected $fillable = [
         'contact_id',
         'webinar_series_id',
+        'webinar_series_variant_id',
         'notified_at',
         'notification_mode',
         'expires_at',
@@ -52,6 +53,14 @@ class WebinarWaitlistSignup extends Model
     public function webinarSeries(): BelongsTo
     {
         return $this->belongsTo(WebinarSeries::class);
+    }
+
+    public function webinarSeriesVariant(): BelongsTo
+    {
+        return $this->belongsTo(
+            WebinarSeriesVariant::class,
+            'webinar_series_variant_id',
+        );
     }
 
     public function scopeEligibleForNotification(

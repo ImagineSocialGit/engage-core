@@ -35,11 +35,15 @@ final class WebinarSeriesHistoryResolver
 
     private function slotKey(Webinar $webinar): string
     {
+        $variantKey = $webinar->webinar_series_variant_id !== null
+            ? 'variant:'.(string) $webinar->webinar_series_variant_id
+            : 'variant:legacy';
+
         if ($webinar->starts_at === null) {
-            return 'webinar:'.(string) $webinar->getKey();
+            return $variantKey.':webinar:'.(string) $webinar->getKey();
         }
 
-        return 'starts_at:'.$webinar->starts_at
+        return $variantKey.':starts_at:'.$webinar->starts_at
             ->copy()
             ->utc()
             ->format('Y-m-d H:i:s');

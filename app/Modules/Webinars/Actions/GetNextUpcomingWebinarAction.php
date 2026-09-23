@@ -4,6 +4,7 @@ namespace App\Modules\Webinars\Actions;
 
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Models\WebinarSeriesVariant;
 use App\Support\Caching\CacheKey;
 use Illuminate\Support\Facades\Cache;
 
@@ -77,6 +78,51 @@ class GetNextUpcomingWebinarAction
         return $webinar;
     }
 
+
+    public function getForVariant(WebinarSeriesVariant $variant): ?Webinar
+    {
+        if (! $variant->exists) {
+            return $this->getForSeries($variant->webinarSeries);
+        }
+
+        $cacheKey = $this->variantCacheKey($variant);
+        $cached = $this->cachedWebinarId($cacheKey);
+
+        if ($cached['found']) {
+            if ($cached['webinar_id'] === null) {
+                return null;
+            }
+
+            $webinar = Webinar::query()
+                ->with(['webinarSeries', 'webinarSeriesVariant'])
+                ->whereKey($cached['webinar_id'])
+                ->where('webinar_series_variant_id', $variant->getKey())
+                ->first();
+
+            if ($webinar && $this->resolveRegisterableWebinar->isRegisterable($webinar)) {
+                return $webinar;
+            }
+
+            Cache::forget($cacheKey);
+        }
+
+        $webinar = $this->resolveRegisterableWebinar->getForVariant($variant);
+        $this->cacheResolvedWebinar($cacheKey, $webinar);
+
+        return $webinar;
+    }
+
+    public function forgetForVariant(WebinarSeriesVariant $variant): void
+    {
+        if ($variant->exists) {
+            Cache::forget($this->variantCacheKey($variant));
+        }
+
+        if ($variant->webinarSeries) {
+            $this->forgetForSeries($variant->webinarSeries);
+        }
+    }
+
     public function forgetGlobal(): void
     {
         Cache::forget($this->globalCacheKey());
@@ -91,7 +137,9 @@ class GetNextUpcomingWebinarAction
     {
         $this->forgetGlobal();
 
-        if ($webinar->webinarSeries) {
+        if ($webinar->webinarSeriesVariant) {
+            $this->forgetForVariant($webinar->webinarSeriesVariant);
+        } elseif ($webinar->webinarSeries) {
             $this->forgetForSeries($webinar->webinarSeries);
         }
     }
@@ -155,7 +203,7 @@ class GetNextUpcomingWebinarAction
     private function hydrateGlobal(int $webinarId): ?Webinar
     {
         return Webinar::query()
-            ->with('webinarSeries')
+            ->with(['webinarSeries', 'webinarSeriesVariant'])
             ->whereKey($webinarId)
             ->first();
     }
@@ -213,5 +261,10 @@ class GetNextUpcomingWebinarAction
     private function seriesCacheKey(WebinarSeries $series): string
     {
         return CacheKey::nextUpcomingWebinar($series->slug);
+    }
+
+    private function variantCacheKey(WebinarSeriesVariant $variant): string
+    {
+        return CacheKey::nextUpcomingWebinar($variant->publicSlug());
     }
 }

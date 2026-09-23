@@ -32,8 +32,12 @@ class WebinarRegistrationPostQuestionLinkGenerator
         string $routeName,
         WebinarRegistration $registration,
     ): string {
-        $registration->loadMissing('webinar.webinarSeries');
-        $seriesSlug = $registration->webinar?->webinarSeries?->slug;
+        $registration->loadMissing([
+            'webinar.webinarSeries',
+            'webinar.webinarSeriesVariant',
+        ]);
+        $seriesSlug = $registration->webinar?->webinarSeriesVariant?->publicSlug()
+            ?? $registration->webinar?->webinarSeries?->slug;
 
         if (! is_string($seriesSlug) || trim($seriesSlug) === '') {
             throw new LogicException(

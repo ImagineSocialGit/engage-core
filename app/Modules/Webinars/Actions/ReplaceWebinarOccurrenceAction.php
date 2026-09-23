@@ -218,6 +218,14 @@ class ReplaceWebinarOccurrenceAction
             );
         }
 
+        if ((int) ($source->webinar_series_variant_id ?? 0)
+            !== (int) ($replacement->webinar_series_variant_id ?? 0)
+        ) {
+            throw new LogicException(
+                'A Webinar occurrence replacement must remain within the same Webinar market.',
+            );
+        }
+
         $ancestorId = $source->replacement_of_webinar_id;
         $visited = [];
 

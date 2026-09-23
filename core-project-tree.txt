@@ -1615,6 +1615,7 @@
 │   │   │   │   ├── RemoveWebinarOccurrenceAction.php
 │   │   │   │   ├── RemoveWebinarSeriesAction.php
 │   │   │   │   ├── ReplaceWebinarOccurrenceAction.php
+│   │   │   │   ├── ResolvePublicWebinarSeriesVariantAction.php
 │   │   │   │   ├── ResolveRegisterableWebinarAction.php
 │   │   │   │   ├── ResolveWebinarJoinUrlAction.php
 │   │   │   │   ├── ResolveWebinarPlaybackUrlAction.php
@@ -1721,6 +1722,7 @@
 │   │   │   │   ├── WebinarScheduleProfile.php
 │   │   │   │   ├── WebinarSeriesMessageChainBinding.php
 │   │   │   │   ├── WebinarSeries.php
+│   │   │   │   ├── WebinarSeriesVariant.php
 │   │   │   │   └── WebinarWaitlistSignup.php
 │   │   │   ├── Presets
 │   │   │   │   └── WebinarsPresetContributor.php
@@ -1734,12 +1736,14 @@
 │   │   │   │   ├── StoreWebinarPostRegistrationQuestionsRequest.php
 │   │   │   │   ├── StoreWebinarRegistrationRequest.php
 │   │   │   │   ├── StoreWebinarSeriesRequest.php
+│   │   │   │   ├── StoreWebinarSeriesVariantRequest.php
 │   │   │   │   ├── StoreWebinarWaitlistSignupRequest.php
 │   │   │   │   ├── SyncWebinarSeriesRequest.php
 │   │   │   │   ├── UpdateWebinarMessageTemplateRequest.php
 │   │   │   │   ├── UpdateWebinarSeriesMessageTemplateRequest.php
 │   │   │   │   ├── UpdateWebinarSeriesProviderEventTypeRequest.php
-│   │   │   │   └── UpdateWebinarSeriesScheduleProfileRequest.php
+│   │   │   │   ├── UpdateWebinarSeriesScheduleProfileRequest.php
+│   │   │   │   └── UpdateWebinarSeriesVariantRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── ContactPanels
 │   │   │   │   │   └── WebinarContactPanelProvider.php
@@ -2387,6 +2391,7 @@
 │   │   ├── WebinarScheduleProfileFactory.php
 │   │   ├── WebinarScheduleProfileItemFactory.php
 │   │   ├── WebinarSeriesFactory.php
+│   │   ├── WebinarSeriesVariantFactory.php
 │   │   └── WebinarWaitlistSignupFactory.php
 │   ├── migrations
 │   │   ├── modules
@@ -2527,7 +2532,8 @@
 │   │   │   │   ├── 2026_08_27_120000_add_provider_lifecycle_to_webinars_table.php
 │   │   │   │   ├── 2026_08_27_194500_add_occurrence_visibility_and_suppressions.php
 │   │   │   │   ├── 2026_09_17_140300_create_webinar_schedule_changes_table.php
-│   │   │   │   └── 2026_09_17_140400_add_notification_templates_to_webinar_schedule_changes.php
+│   │   │   │   ├── 2026_09_17_140400_add_notification_templates_to_webinar_schedule_changes.php
+│   │   │   │   └── 2026_09_22_233000_create_webinar_series_variants.php
 │   │   │   └── workflow
 │   │   │       └── 2026_04_15_195900_create_contact_workflow_profiles_table.php
 │   │   ├── platform
@@ -3791,6 +3797,7 @@
 │   │   │   ├── WebinarsDeploymentPlanContributorTest.php
 │   │   │   ├── WebinarSeriesLifecycleTest.php
 │   │   │   ├── WebinarSeriesMessageChainOwnershipTest.php
+│   │   │   ├── WebinarSeriesVariantContractTest.php
 │   │   │   ├── WebinarSessionRegistrationSummaryTest.php
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
 │   │   │   ├── WebinarStateCanonicalizerTest.php
@@ -3815,4 +3822,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-875 directories, 2941 files
+875 directories, 2948 files

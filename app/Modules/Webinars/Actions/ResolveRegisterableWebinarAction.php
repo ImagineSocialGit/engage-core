@@ -4,6 +4,7 @@ namespace App\Modules\Webinars\Actions;
 
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Models\WebinarSeriesVariant;
 use App\Modules\Webinars\Services\WebinarProviderSchedulePolicy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -39,6 +40,63 @@ class ResolveRegisterableWebinarAction
         return $this->firstScheduleEligible(
             $this->registerableQuery()
                 ->forSeriesProviderIdentity($series)
+                ->orderBy('starts_at'),
+        );
+    }
+
+
+    public function getForVariant(WebinarSeriesVariant $variant): ?Webinar
+    {
+        if (! $variant->isActive() || ! $variant->exists) {
+            return $variant->exists ? null : $this->getForSeries($variant->webinarSeries);
+        }
+
+        return $this->firstScheduleEligible(
+            $this->registerableQuery()
+                ->forVariantProviderIdentity($variant)
+                ->orderBy('starts_at'),
+        );
+    }
+
+    public function findForVariant(
+        WebinarSeriesVariant $variant,
+        int $webinarId,
+    ): ?Webinar {
+        if (! $variant->exists) {
+            return $this->findForSeries($variant->webinarSeries, $webinarId);
+        }
+
+        if (! $variant->isActive()) {
+            return null;
+        }
+
+        $webinar = $this->registerableQuery()
+            ->forVariantProviderIdentity($variant)
+            ->whereKey($webinarId)
+            ->first();
+
+        return $webinar instanceof Webinar
+            && $this->providerSchedulePolicy->allowsStoredOccurrence($webinar)
+                ? $webinar
+                : null;
+    }
+
+    public function getFutureForVariant(WebinarSeriesVariant $variant): ?Webinar
+    {
+        if (! $variant->exists) {
+            return $this->getFutureForSeries($variant->webinarSeries);
+        }
+
+        if (! $variant->isActive()) {
+            return null;
+        }
+
+        return $this->firstScheduleEligible(
+            Webinar::query()
+                ->forVariantProviderIdentity($variant)
+                ->providerActive()
+                ->visible()
+                ->where('starts_at', '>', now())
                 ->orderBy('starts_at'),
         );
     }

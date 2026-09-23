@@ -3,11 +3,12 @@
 namespace App\Modules\Webinars\Controllers\Public;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Webinars\Actions\GetActiveWebinarSeriesAction;
+use App\Modules\Webinars\Actions\ResolvePublicWebinarSeriesVariantAction;
 use App\Modules\Webinars\Actions\ResolveWebinarRegistrationPublicStatusAction;
 use App\Modules\Webinars\Actions\ResolveWebinarRegistrationReplacementChainAction;
 use App\Modules\Webinars\Actions\StoreWebinarRegistrationResponsesAction;
 use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Models\WebinarSeriesVariant;
 use App\Modules\Webinars\Requests\StoreWebinarPostRegistrationQuestionsRequest;
 use App\Modules\Webinars\Services\WebinarRegistrationQuestionResolver;
 use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
@@ -21,7 +22,7 @@ class WebinarPostRegistrationQuestionController extends Controller
     public function show(
         string $seriesSlug,
         WebinarRegistration $registration,
-        GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
+        ResolvePublicWebinarSeriesVariantAction $resolvePublicVariant,
         ResolveWebinarRegistrationReplacementChainAction $resolveReplacementChain,
         ResolveWebinarRegistrationPublicStatusAction $resolvePublicStatus,
         WebinarRegisterPageConfig $config,
@@ -29,10 +30,10 @@ class WebinarPostRegistrationQuestionController extends Controller
         WebinarRegistrationPostQuestionLinkGenerator $postQuestionLinks,
         WebinarRegistrationThankYouLinkGenerator $thankYouLinks,
     ): View|RedirectResponse {
-        [$series, $chain, $registration] = $this->resolveRegistration(
+        [$series, $chain, $registration, $variant] = $this->resolveRegistration(
             seriesSlug: $seriesSlug,
             registration: $registration,
-            getActiveWebinarSeriesAction: $getActiveWebinarSeriesAction,
+            resolvePublicVariant: $resolvePublicVariant,
             resolveReplacementChain: $resolveReplacementChain,
         );
 
@@ -44,7 +45,7 @@ class WebinarPostRegistrationQuestionController extends Controller
 
         $content = $config->content(
             page: 'register',
-            seriesSlug: $series->slug,
+            seriesSlug: (string) $series->slug,
             seriesMeta: is_array($series->meta) ? $series->meta : [],
         );
         $questions = $questionResolver->resolveForPlacement(
@@ -67,13 +68,14 @@ class WebinarPostRegistrationQuestionController extends Controller
 
         return view('webinar.post-registration-questions', [
             'series' => $series,
+            'variant' => $variant,
             'webinar' => $registration->webinar,
             'registration' => $registration,
             'registrationStatus' => $registrationStatus,
             'page' => $page,
             'eventDetails' => data_get($content, 'landing.event_details', []),
             'questions' => $questions,
-            'style' => $config->style('register', $series->slug),
+            'style' => $config->style('register', (string) $series->slug),
             'formAction' => $postQuestionLinks->formAction($registration),
         ]);
     }
@@ -82,7 +84,7 @@ class WebinarPostRegistrationQuestionController extends Controller
         StoreWebinarPostRegistrationQuestionsRequest $request,
         string $seriesSlug,
         WebinarRegistration $registration,
-        GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
+        ResolvePublicWebinarSeriesVariantAction $resolvePublicVariant,
         ResolveWebinarRegistrationReplacementChainAction $resolveReplacementChain,
         ResolveWebinarRegistrationPublicStatusAction $resolvePublicStatus,
         StoreWebinarRegistrationResponsesAction $storeResponses,
@@ -91,7 +93,7 @@ class WebinarPostRegistrationQuestionController extends Controller
         [, $chain, $registration] = $this->resolveRegistration(
             seriesSlug: $seriesSlug,
             registration: $registration,
-            getActiveWebinarSeriesAction: $getActiveWebinarSeriesAction,
+            resolvePublicVariant: $resolvePublicVariant,
             resolveReplacementChain: $resolveReplacementChain,
         );
 
@@ -116,38 +118,46 @@ class WebinarPostRegistrationQuestionController extends Controller
     }
 
     /**
-     * @return array{0: mixed, 1: mixed, 2: WebinarRegistration}
+     * @return array{0: mixed, 1: mixed, 2: WebinarRegistration, 3: WebinarSeriesVariant}
      */
     private function resolveRegistration(
         string $seriesSlug,
         WebinarRegistration $registration,
-        GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
+        ResolvePublicWebinarSeriesVariantAction $resolvePublicVariant,
         ResolveWebinarRegistrationReplacementChainAction $resolveReplacementChain,
     ): array {
-        $series = $getActiveWebinarSeriesAction->findBySlug($seriesSlug);
+        $variant = $resolvePublicVariant->findByPublicSlug($seriesSlug);
+        $series = $variant?->webinarSeries;
 
-        abort_unless($series, 404);
+        abort_unless($variant && $series, 404);
 
         $chain = $resolveReplacementChain->handle($registration);
         $originalWebinar = $chain->original->webinar;
 
         abort_unless(
             $originalWebinar
-            && (int) $originalWebinar->webinar_series_id === (int) $series->getKey(),
+            && (int) $originalWebinar->webinar_series_id === (int) $series->getKey()
+            && (! $variant->exists
+                || (int) $originalWebinar->webinar_series_variant_id === (int) $variant->getKey()),
             404,
         );
         abort_unless($chain->safeForPublicLifecycle(), 404);
 
         $registration = $chain->canonical;
-        $registration->loadMissing('webinar.webinarSeries');
+        $registration->loadMissing([
+            'webinar.webinarSeries',
+            'webinar.webinarSeriesVariant',
+        ]);
         $webinar = $registration->webinar;
 
         abort_unless(
             $webinar
-            && (int) $webinar->webinar_series_id === (int) $series->getKey(),
+            && (int) $webinar->webinar_series_id === (int) $series->getKey()
+            && (! $variant->exists
+                || (int) $webinar->webinar_series_variant_id === (int) $variant->getKey()),
             404,
         );
 
-        return [$series, $chain, $registration];
+        return [$series, $chain, $registration, $variant];
     }
 }

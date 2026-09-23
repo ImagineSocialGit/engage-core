@@ -72,6 +72,13 @@ Route::middleware('module:webinars')->group(function () {
     Route::post('/webinar-series', [WebinarController::class, 'storeSeries'])
         ->name('crm.webinar-series.store');
 
+    Route::post('/webinar-series/{series}/variants', [WebinarController::class, 'storeSeriesVariant'])
+        ->name('crm.webinar-series.variants.store');
+
+    Route::patch('/webinar-series/{series}/variants/{variant}', [WebinarController::class, 'updateSeriesVariant'])
+        ->whereNumber('variant')
+        ->name('crm.webinar-series.variants.update');
+
     Route::post('/webinar-series/sync', [WebinarController::class, 'syncSeries'])
         ->name('crm.webinar-series.sync');
 

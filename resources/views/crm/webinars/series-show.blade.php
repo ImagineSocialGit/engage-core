@@ -157,6 +157,152 @@
         @endif
 
         @if($series->status === 'active')
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7" data-webinar-variants>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Markets</p>
+                    <h2 class="mt-2 text-xl font-semibold text-slate-950">Webinar variants</h2>
+                    <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                        Each market keeps its own public page, timezone, and Zoom schedule while registrations and messaging stay grouped under this webinar series.
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-5 space-y-4">
+                @foreach($variantRows as $row)
+                    <div class="rounded-xl border border-slate-200 p-4" data-webinar-variant="{{ $row['variant']->getKey() }}">
+                        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h3 class="font-semibold text-slate-950">{{ $row['variant']->displayName() }}</h3>
+                                    @if($row['variant']->is_default)
+                                        <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">Primary URL</span>
+                                    @endif
+                                    @if($row['variant']->status !== 'active')
+                                        <span class="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">Inactive</span>
+                                    @endif
+                                </div>
+                                <p class="mt-1 text-sm text-slate-600">
+                                    {{ $row['variant']->timezone }} · {{ ucfirst($row['variant']->providerEventTypeKey()) }} · Zoom title: {{ $row['variant']->providerMatchTitle() }}
+                                </p>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    {{ number_format($row['occurrence_count']) }} sessions · {{ number_format($row['registration_count']) }} registrations
+                                </p>
+                                @if($row['next_webinar'])
+                                    <p class="mt-1 text-xs font-medium text-slate-600">
+                                        Next: {{ $row['next_webinar']->starts_at?->copy()->setTimezone($row['variant']->timezone)->format('M j, Y · g:i A T') }}
+                                    </p>
+                                @endif
+                            </div>
+                            <form method="POST" action="{{ route('crm.webinar-series.sync') }}">
+                                @csrf
+                                <input type="hidden" name="webinar_series_variant_id" value="{{ $row['variant']->getKey() }}">
+                                <button type="submit" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700" @disabled($row['variant']->status !== 'active')>
+                                    Sync this market
+                                </button>
+                            </form>
+                        </div>
+
+                        <div class="mt-4 flex flex-col gap-2 sm:flex-row">
+                            <input type="text" readonly value="{{ $row['registration_url'] }}" class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                            <button type="button" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700" x-on:click="copyValue(@js($row['registration_url']), @js('variant-'.$row['variant']->getKey()))">
+                                Copy link
+                            </button>
+                        </div>
+
+                        <details class="mt-4 rounded-lg bg-slate-50 p-3">
+                            <summary class="cursor-pointer text-sm font-semibold text-slate-700">Edit market</summary>
+                            <form method="POST" action="{{ route('crm.webinar-series.variants.update', [$series, $row['variant']]) }}" class="mt-4 grid gap-3 lg:grid-cols-2">
+                                @csrf
+                                @method('PATCH')
+                                <label class="block">
+                                    <span class="text-xs font-semibold text-slate-600">Market name</span>
+                                    <input name="name" value="{{ $row['variant']->name }}" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                </label>
+                                <label class="block">
+                                    <span class="text-xs font-semibold text-slate-600">Timezone</span>
+                                    <select name="timezone" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                        @foreach($marketTimezoneOptions as $timezone => $label)
+                                            <option value="{{ $timezone }}" @selected($row['variant']->timezone === $timezone)>{{ $label }} · {{ $timezone }}</option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                                <label class="block lg:col-span-2">
+                                    <span class="text-xs font-semibold text-slate-600">Public URL slug</span>
+                                    <input name="public_slug" value="{{ $row['variant']->public_slug }}" required @readonly($row['variant']->is_default) class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100">
+                                    @if($row['variant']->is_default)
+                                        <span class="mt-1 block text-xs text-slate-500">This primary slug stays locked to preserve existing ads and links.</span>
+                                    @endif
+                                </label>
+                                <label class="block lg:col-span-2">
+                                    <span class="text-xs font-semibold text-slate-600">Zoom meeting/webinar title</span>
+                                    <input name="provider_match_title" value="{{ $row['variant']->provider_match_title }}" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                </label>
+                                <label class="block">
+                                    <span class="text-xs font-semibold text-slate-600">Zoom event type</span>
+                                    <select name="provider_event_type" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                        @foreach($providerEventTypeOptions as $value => $label)
+                                            <option value="{{ $value }}" @selected($row['variant']->providerEventTypeKey() === $value)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                                <label class="block">
+                                    <span class="text-xs font-semibold text-slate-600">Status</span>
+                                    <select name="status" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                        <option value="active" @selected($row['variant']->status === 'active')>Active</option>
+                                        <option value="inactive" @selected($row['variant']->status === 'inactive')>Inactive</option>
+                                    </select>
+                                </label>
+                                <div class="lg:col-span-2">
+                                    <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Save market</button>
+                                </div>
+                            </form>
+                        </details>
+                    </div>
+                @endforeach
+            </div>
+
+            <details class="mt-5 rounded-xl border border-dashed border-slate-300 p-4">
+                <summary class="cursor-pointer text-sm font-semibold text-slate-800">Add another market</summary>
+                <form method="POST" action="{{ route('crm.webinar-series.variants.store', $series) }}" class="mt-4 grid gap-3 lg:grid-cols-2">
+                    @csrf
+                    <label class="block">
+                        <span class="text-xs font-semibold text-slate-600">Market name</span>
+                        <input name="name" required placeholder="Eastern" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="text-xs font-semibold text-slate-600">Timezone</span>
+                        <select name="timezone" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            @foreach($marketTimezoneOptions as $timezone => $label)
+                                <option value="{{ $timezone }}">{{ $label }} · {{ $timezone }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="block lg:col-span-2">
+                        <span class="text-xs font-semibold text-slate-600">Public URL slug</span>
+                        <input name="public_slug" required placeholder="va-homebuyer-eastern" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    </label>
+                    <label class="block lg:col-span-2">
+                        <span class="text-xs font-semibold text-slate-600">Zoom meeting/webinar title</span>
+                        <input name="provider_match_title" required placeholder="VA Homebuyer Masterclass - Eastern" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="text-xs font-semibold text-slate-600">Zoom event type</span>
+                        <select name="provider_event_type" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            @foreach($providerEventTypeOptions as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <div class="flex items-end">
+                        <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Add market</button>
+                    </div>
+                </form>
+            </details>
+        </section>
+        @endif
+
+        @if($series->status === 'active')
         <section id="links" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7" data-webinar-type-links>
             <div class="max-w-3xl">
                 <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Links</p>
@@ -242,6 +388,9 @@
                             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                     <p class="font-semibold text-slate-900">{{ $missing->title }}</p>
+                                    @if($missing->webinarSeriesVariant)
+                                        <p class="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">Market: {{ $missing->webinarSeriesVariant->displayName() }}</p>
+                                    @endif
                                     <p class="text-sm text-slate-600">
                                         {{ $missing->starts_at?->copy()->setTimezone($missing->timezone)->format('M j, Y · g:i A T') ?? 'Date unavailable' }}
                                         · {{ (int) $missing->registrations_count }} registrations
@@ -266,6 +415,9 @@
                     <div class="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <p class="font-semibold text-slate-900">{{ $session->title }}</p>
+                                    @if($session->webinarSeriesVariant)
+                                        <p class="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">Market: {{ $session->webinarSeriesVariant->displayName() }}</p>
+                                    @endif
                             <p class="mt-1 text-sm text-slate-600">
                                 {{ $session->starts_at?->copy()->setTimezone($session->timezone)->format('M j, Y · g:i A T') }}
                                 · {{ (int) $session->registrations_count }} registrations
@@ -295,6 +447,9 @@
                     <div class="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <p class="font-semibold text-slate-900">{{ $session->title }}</p>
+                                    @if($session->webinarSeriesVariant)
+                                        <p class="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">Market: {{ $session->webinarSeriesVariant->displayName() }}</p>
+                                    @endif
                             <p class="mt-1 text-sm text-slate-600">
                                 {{ $session->starts_at?->copy()->setTimezone($session->timezone)->format('M j, Y · g:i A T') ?? 'Date unavailable' }}
                                 · {{ (int) $session->registrations_count }} registrations
@@ -346,6 +501,9 @@
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <p class="font-semibold text-slate-900">{{ $removed->title }}</p>
+                                    @if($removed->webinarSeriesVariant)
+                                        <p class="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">Market: {{ $removed->webinarSeriesVariant->displayName() }}</p>
+                                    @endif
                                 <p class="mt-1 text-sm text-slate-600">
                                     {{ $removed->starts_at?->copy()->setTimezone($removed->timezone)->format('M j, Y · g:i A T') ?? 'Date unavailable' }}
                                     · history preserved

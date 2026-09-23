@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 4,
+    'version' => 5,
     'tables' => [
         'webinar_schedule_profiles' => [
             'mode' => 'upsert',
@@ -100,6 +100,32 @@ return [
             ],
         ],
 
+        'webinar_series_variants' => [
+            'mode' => 'insert_empty',
+            'preserve_id' => true,
+            'order_by' => ['webinar_series_id', 'id'],
+            'columns' => [
+                'id',
+                'webinar_series_id',
+                'key',
+                'name',
+                'public_slug',
+                'timezone',
+                'platform',
+                'provider_event_type',
+                'provider_match_title',
+                'status',
+                'is_default',
+                'meta',
+                'created_at',
+                'updated_at',
+            ],
+            'json_columns' => ['meta'],
+            'references' => [
+                'webinar_series_id' => 'webinar_series',
+            ],
+        ],
+
         'webinars' => [
             'mode' => 'insert_empty',
             'preserve_id' => true,
@@ -107,6 +133,7 @@ return [
             'columns' => [
                 'id',
                 'webinar_series_id',
+                'webinar_series_variant_id',
                 'replacement_of_webinar_id',
                 'webinar_schedule_profile_id',
                 'title',
@@ -140,6 +167,7 @@ return [
             ],
             'references' => [
                 'webinar_series_id' => 'webinar_series',
+                'webinar_series_variant_id' => 'webinar_series_variants',
                 'webinar_schedule_profile_id' => 'webinar_schedule_profiles',
             ],
             'deferred_references' => [
@@ -252,6 +280,7 @@ return [
                 'id',
                 'contact_id',
                 'webinar_series_id',
+                'webinar_series_variant_id',
                 'notified_at',
                 'notification_mode',
                 'expires_at',
@@ -265,6 +294,7 @@ return [
             'references' => [
                 'contact_id' => 'contacts',
                 'webinar_series_id' => 'webinar_series',
+                'webinar_series_variant_id' => 'webinar_series_variants',
             ],
         ],
 

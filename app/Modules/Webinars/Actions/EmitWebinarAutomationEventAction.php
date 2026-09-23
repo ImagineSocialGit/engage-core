@@ -29,6 +29,7 @@ class EmitWebinarAutomationEventAction
         $registration->loadMissing([
             'webinar',
             'webinar.webinarSeries',
+            'webinar.webinarSeriesVariant',
         ]);
 
         $this->outbox->record(
@@ -46,6 +47,8 @@ class EmitWebinarAutomationEventAction
                     'webinar_registration_id' => $registration->getKey(),
                     'webinar_id' => $registration->webinar_id,
                     'webinar_slug' => $registration->webinar_slug,
+                    'webinar_series_variant_id' => $registration->webinar?->webinar_series_variant_id,
+                    'webinar_series_variant_key' => $registration->webinar?->webinarSeriesVariant?->key,
                 ], $this->eventMeta($meta)),
             ),
             idempotencyKey: $this->idempotencyKey($eventKey, $registration),
@@ -63,7 +66,7 @@ class EmitWebinarAutomationEventAction
         array $payload = [],
         array $meta = [],
     ): void {
-        $webinar->loadMissing('webinarSeries');
+        $webinar->loadMissing(['webinarSeries', 'webinarSeriesVariant']);
 
         $this->outbox->record(
             AutomationEventData::forSubject(
@@ -79,6 +82,8 @@ class EmitWebinarAutomationEventAction
                     'source_module' => 'webinars',
                     'webinar_id' => $webinar->getKey(),
                     'webinar_slug' => $webinar->slug,
+                    'webinar_series_variant_id' => $webinar->webinar_series_variant_id,
+                    'webinar_series_variant_key' => $webinar->webinarSeriesVariant?->key,
                 ], $this->eventMeta($meta)),
             ),
             idempotencyKey: $this->idempotencyKey($eventKey, $webinar),
@@ -107,6 +112,9 @@ class EmitWebinarAutomationEventAction
             'webinar_series' => $this->webinarSeriesPayload(
                 $registration->webinar?->webinarSeries,
             ),
+            'webinar_series_variant' => $this->webinarSeriesVariantPayload(
+                $registration->webinar?->webinarSeriesVariant,
+            ),
         ];
     }
 
@@ -119,6 +127,7 @@ class EmitWebinarAutomationEventAction
             'webinar' => $this->compact([
                 'id' => $webinar->getKey(),
                 'webinar_series_id' => $webinar->webinar_series_id,
+                'webinar_series_variant_id' => $webinar->webinar_series_variant_id,
                 'slug' => $webinar->slug,
                 'starts_at' => $webinar->starts_at?->toISOString(),
                 'ends_at' => $webinar->ends_at?->toISOString(),
@@ -126,6 +135,9 @@ class EmitWebinarAutomationEventAction
             ]),
             'webinar_series' => $this->webinarSeriesPayload(
                 $webinar->webinarSeries,
+            ),
+            'webinar_series_variant' => $this->webinarSeriesVariantPayload(
+                $webinar->webinarSeriesVariant,
             ),
         ];
     }
@@ -143,6 +155,24 @@ class EmitWebinarAutomationEventAction
             'id' => $series->getKey(),
             'slug' => $series->slug,
             'status' => $series->status,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function webinarSeriesVariantPayload(mixed $variant): array
+    {
+        if (! $variant) {
+            return [];
+        }
+
+        return $this->compact([
+            'id' => $variant->getKey(),
+            'key' => $variant->key,
+            'name' => $variant->displayName(),
+            'public_slug' => $variant->publicSlug(),
+            'timezone' => $variant->timezone,
         ]);
     }
 

@@ -6,6 +6,7 @@ use App\Modules\Webinars\Contracts\WebinarProvider;
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Models\WebinarSeriesVariant;
 use Illuminate\Contracts\Container\Container;
 use InvalidArgumentException;
 
@@ -45,6 +46,14 @@ class WebinarProviderManager
         return $this->provider(
             name: $series->providerKey(),
             eventType: $series->providerEventTypeKey(),
+        );
+    }
+
+    public function forVariant(WebinarSeriesVariant $variant): WebinarProvider
+    {
+        return $this->provider(
+            name: $variant->providerKey(),
+            eventType: $variant->providerEventTypeKey(),
         );
     }
 

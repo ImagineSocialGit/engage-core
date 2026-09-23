@@ -30,7 +30,12 @@ readonly class WebinarMessageData extends MessageData
 
     public static function fromRegistration(WebinarRegistration $registration): self
     {
-        $registration->loadMissing(['contact', 'webinar', 'webinar.webinarSeries']);
+        $registration->loadMissing([
+            'contact',
+            'webinar',
+            'webinar.webinarSeries',
+            'webinar.webinarSeriesVariant',
+        ]);
 
         return new self(
             contact: $registration->contact,
@@ -45,8 +50,8 @@ readonly class WebinarMessageData extends MessageData
 
     public static function fromWaitlistSignup(WebinarWaitlistSignup $signup, Webinar $webinar): self
     {
-        $signup->loadMissing(['contact', 'webinarSeries']);
-        $webinar->loadMissing('webinarSeries');
+        $signup->loadMissing(['contact', 'webinarSeries', 'webinarSeriesVariant']);
+        $webinar->loadMissing(['webinarSeries', 'webinarSeriesVariant']);
 
         return new self(
             contact: $signup->contact,
@@ -67,6 +72,7 @@ readonly class WebinarMessageData extends MessageData
         $startsAt = $this->webinar->starts_at;
         $endsAt = $this->webinar->ends_at;
         $webinarSeries = $this->webinar->webinarSeries;
+        $webinarSeriesVariant = $this->webinar->webinarSeriesVariant;
 
         $playbackUrl = filled($this->webinar->playback_url)
             ? app(WebinarPlaybackLinkGenerator::class)->forWebinar($this->webinar)
@@ -83,6 +89,7 @@ readonly class WebinarMessageData extends MessageData
             'webinar_waitlist_signup' => $this->compactWaitlistSignup(),
             'webinar' => $this->compactWebinar($timezone),
             'webinar_series' => $this->compactWebinarSeries($webinarSeries),
+            'webinar_series_variant' => $this->compactWebinarSeriesVariant($webinarSeriesVariant),
 
             'registration_id' => $this->registration?->getKey(),
             'webinar_registration_id' => $this->registration?->getKey(),
@@ -115,6 +122,12 @@ readonly class WebinarMessageData extends MessageData
             'webinar_series_slug' => $webinarSeries?->slug,
             'webinar_series_title' => $webinarSeries?->title,
             'webinar_series_status' => $webinarSeries?->status,
+
+            'webinar_series_variant_id' => $webinarSeriesVariant?->getKey(),
+            'webinar_series_variant_key' => $webinarSeriesVariant?->key,
+            'webinar_series_variant_name' => $webinarSeriesVariant?->displayName(),
+            'webinar_series_variant_public_slug' => $webinarSeriesVariant?->publicSlug(),
+            'webinar_series_variant_timezone' => $webinarSeriesVariant?->timezone,
         ];
     }
 
@@ -176,6 +189,7 @@ readonly class WebinarMessageData extends MessageData
             'id' => $this->waitlistSignup->getKey(),
             'contact_id' => $this->waitlistSignup->contact_id,
             'webinar_series_id' => $this->waitlistSignup->webinar_series_id,
+            'webinar_series_variant_id' => $this->waitlistSignup->webinar_series_variant_id,
             'source_page' => $this->waitlistSignup->source_page,
             'notified_at' => $this->waitlistSignup->notified_at?->toIso8601String(),
             'accepted_channels' => $this->acceptedChannels(
@@ -192,6 +206,7 @@ readonly class WebinarMessageData extends MessageData
         return [
             'id' => $this->webinar->getKey(),
             'webinar_series_id' => $this->webinar->webinar_series_id,
+            'webinar_series_variant_id' => $this->webinar->webinar_series_variant_id,
             'webinar_schedule_profile_id' => $this->webinar->webinar_schedule_profile_id,
             'title' => $this->webinar->title,
             'slug' => $this->webinar->slug,
@@ -226,6 +241,25 @@ readonly class WebinarMessageData extends MessageData
         ];
     }
 
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function compactWebinarSeriesVariant(mixed $variant): array
+    {
+        if (! $variant) {
+            return [];
+        }
+
+        return [
+            'id' => $variant->getKey(),
+            'key' => $variant->key,
+            'name' => $variant->displayName(),
+            'public_slug' => $variant->publicSlug(),
+            'timezone' => $variant->timezone,
+            'provider_event_type' => $variant->providerEventTypeKey(),
+        ];
+    }
 
     private function registrationJoinClickedAt(): ?string
     {
@@ -278,8 +312,11 @@ readonly class WebinarMessageData extends MessageData
         }
 
         $series = $this->webinar->webinarSeries;
+        $variant = $this->webinar->webinarSeriesVariant
+            ?? $this->waitlistSignup->webinarSeriesVariant;
+        $publicSlug = $variant?->publicSlug() ?: trim((string) $series?->slug);
 
-        if (! $series || blank($series->slug)) {
+        if ($publicSlug === '') {
             return null;
         }
 
@@ -287,7 +324,7 @@ readonly class WebinarMessageData extends MessageData
             name: 'webinar.waitlist.register',
             expiration: now()->addDays((int) config('webinars.waitlist_registration_link_days', 14)),
             parameters: [
-                'seriesSlug' => $series->slug,
+                'seriesSlug' => $publicSlug,
                 'signup' => $this->waitlistSignup->getKey(),
             ],
             absolute: false,

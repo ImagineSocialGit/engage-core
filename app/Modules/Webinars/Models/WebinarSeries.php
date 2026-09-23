@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class WebinarSeries extends Model
@@ -77,6 +78,21 @@ class WebinarSeries extends Model
     public function webinars(): HasMany
     {
         return $this->hasMany(Webinar::class, 'webinar_series_id');
+    }
+
+    public function variants(): HasMany
+    {
+        return $this->hasMany(WebinarSeriesVariant::class)
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->orderBy('id');
+    }
+
+    public function defaultVariant(): HasOne
+    {
+        return $this->hasOne(WebinarSeriesVariant::class)
+            ->where('is_default', true)
+            ->orderBy('id');
     }
 
     public function occurrenceSuppressions(): HasMany

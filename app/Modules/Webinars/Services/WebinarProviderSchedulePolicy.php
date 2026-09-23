@@ -5,6 +5,7 @@ namespace App\Modules\Webinars\Services;
 use App\Modules\Webinars\Data\ProviderWebinarData;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Models\WebinarSeriesVariant;
 use Carbon\CarbonInterface;
 
 final class WebinarProviderSchedulePolicy
@@ -12,7 +13,7 @@ final class WebinarProviderSchedulePolicy
     public const PROVIDER_LIST_SCHEDULE_SOURCE = 'zoom_list_api';
 
     public function allowsProviderOccurrence(
-        WebinarSeries $series,
+        WebinarSeries|WebinarSeriesVariant $series,
         ProviderWebinarData $webinar,
     ): bool {
         if (! $this->providerDataCarriesScheduleEvidence($webinar->meta)) {

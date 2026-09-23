@@ -2128,11 +2128,27 @@ class SurfaceShowcaseSeeder extends Seeder
             ]),
         ]);
 
+        $this->refs['webinar_variant'] = $this->row('webinar_series_variants', [
+            'webinar_series_id' => $this->refs['webinar_series'],
+            'key' => 'central',
+        ], [
+            'name' => 'Central',
+            'public_slug' => 'showcase-va-homebuyer-game-plan',
+            'timezone' => 'America/Chicago',
+            'platform' => 'zoom',
+            'provider_event_type' => 'meeting',
+            'provider_match_title' => 'Showcase · VA Homebuyer Game Plan',
+            'status' => 'active',
+            'is_default' => true,
+            'meta' => $this->meta(['market' => 'Central', 'public_url_preserved' => true]),
+        ]);
+
         $this->refs['webinar_past'] = $this->row('webinars', [
             'external_id' => 'showcase-zoom-meeting-001',
             'provider_event_type' => 'meeting',
         ], [
             'webinar_series_id' => $this->refs['webinar_series'],
+            'webinar_series_variant_id' => $this->refs['webinar_variant'],
             'replacement_of_webinar_id' => null,
             'webinar_schedule_profile_id' => $this->refs['webinar_profile'],
             'title' => 'VA Homebuyer Game Plan · September',
@@ -2162,6 +2178,7 @@ class SurfaceShowcaseSeeder extends Seeder
             'provider_event_type' => 'meeting',
         ], [
             'webinar_series_id' => $this->refs['webinar_series'],
+            'webinar_series_variant_id' => $this->refs['webinar_variant'],
             'replacement_of_webinar_id' => $this->refs['webinar_past'],
             'webinar_schedule_profile_id' => $this->refs['webinar_profile'],
             'title' => 'VA Homebuyer Game Plan · October',
@@ -2252,6 +2269,7 @@ class SurfaceShowcaseSeeder extends Seeder
         $this->row('webinar_waitlist_signups', [
             'contact_id' => $this->refs['contact_ava'],
             'webinar_series_id' => $this->refs['webinar_series'],
+            'webinar_series_variant_id' => $this->refs['webinar_variant'],
         ], [
             'notified_at' => $this->now->subDays(3),
             'notification_mode' => 'recurring',

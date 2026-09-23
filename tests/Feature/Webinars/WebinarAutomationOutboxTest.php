@@ -194,10 +194,12 @@ class WebinarAutomationOutboxTest extends TestCase
                 'slug' => $series->slug,
                 'status' => $series->status,
             ],
+            'webinar_series_variant' => [],
         ];
         $baseWebinarPayload = [
             'webinar' => $baseRegistrationPayload['webinar'],
             'webinar_series' => $baseRegistrationPayload['webinar_series'],
+            'webinar_series_variant' => $baseRegistrationPayload['webinar_series_variant'],
         ];
 
         $this->assertEquals(
@@ -261,10 +263,14 @@ class WebinarAutomationOutboxTest extends TestCase
                         'webinar_registration_id' => $registration->getKey(),
                         'webinar_id' => $webinar->getKey(),
                         'webinar_slug' => $webinar->slug,
+                        'webinar_series_variant_id' => null,
+                        'webinar_series_variant_key' => null,
                     ]
                     : [
                         'webinar_id' => $webinar->getKey(),
                         'webinar_slug' => $webinar->slug,
+                        'webinar_series_variant_id' => null,
+                        'webinar_series_variant_key' => null,
                     ]),
                 'source' => 'generic_test',
             ], $event->meta);

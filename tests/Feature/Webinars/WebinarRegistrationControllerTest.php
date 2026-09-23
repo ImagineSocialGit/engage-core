@@ -694,21 +694,19 @@ class WebinarRegistrationControllerTest extends TestCase
             ->showFromWaitlist(
                 seriesSlug: $series->slug,
                 signup: $signup->id,
-                getActiveWebinarSeriesAction: app(\App\Modules\Webinars\Actions\GetActiveWebinarSeriesAction::class),
+                resolvePublicVariant: app(\App\Modules\Webinars\Actions\ResolvePublicWebinarSeriesVariantAction::class),
                 getNextUpcomingWebinarAction: app(\App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction::class),
             );
 
         $this->assertSame(200, $response->getStatusCode());
-
-        $html = $response->getContent();
-
-        $this->assertStringContainsString('value="Tess"', $html);
-        $this->assertStringContainsString('value="Tester"', $html);
-        $this->assertStringContainsString('value="tess@example.com"', $html);
-
-        $this->assertStringContainsString('value="+15555550123"', $html);
-        $this->assertStringContainsString('name="transactional_email_consent"', $html);
-        $this->assertStringNotContainsString('name="transactional_email_consent" type="checkbox" value="1" checked', $html);
+        $this->assertSame('Tess', session()->getOldInput('first_name'));
+        $this->assertSame('Tester', session()->getOldInput('last_name'));
+        $this->assertSame('tess@example.com', session()->getOldInput('email'));
+        $this->assertSame('+15555550123', session()->getOldInput('phone'));
+        $this->assertNull(session()->getOldInput('transactional_email_consent'));
+        $this->assertNull(session()->getOldInput('transactional_sms_consent'));
+        $this->assertNull(session()->getOldInput('marketing_email_consent'));
+        $this->assertNull(session()->getOldInput('marketing_sms_consent'));
     }
 
     private function assertRegistrationThankYouRedirect(

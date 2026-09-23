@@ -1,11 +1,3 @@
-@php
-    $clientTimezone = config('client.timezone', config('app.timezone', 'UTC'));
-
-    $formatDate = fn ($date) => $date
-        ?->timezone($clientTimezone)
-        ->format('M j, Y g:i A');
-@endphp
-
 <x-ui.card class="space-y-4 {{ module_tone('webinars', 'panel') }}" data-module-panel="webinars">
     <div>
         <h3 class="text-lg font-semibold tracking-tight">
@@ -23,13 +15,22 @@
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <p class="font-medium text-slate-900">
-                            {{ $registration->webinar?->title ?? $registration->webinar_slug ?? 'Webinar' }}
+                            {{ $registration->webinar?->webinarSeries?->title ?? $registration->webinar?->title ?? $registration->webinar_slug ?? 'Webinar' }}
                         </p>
+
+                        @if(filled($registration->webinar?->webinarSeriesVariant?->displayName() ?? data_get($registration->meta, 'webinar_series_variant.name')))
+                            <p class="mt-1 text-sm font-semibold text-slate-800">
+                                Market: {{ $registration->webinar?->webinarSeriesVariant?->displayName() ?? data_get($registration->meta, 'webinar_series_variant.name') }}
+                                @if(filled($registration->webinar?->webinarSeriesVariant?->timezone ?? data_get($registration->meta, 'webinar_series_variant.timezone')))
+                                    <span class="font-normal text-slate-500">· {{ $registration->webinar?->webinarSeriesVariant?->timezone ?? data_get($registration->meta, 'webinar_series_variant.timezone') }}</span>
+                                @endif
+                            </p>
+                        @endif
 
                         <p class="mt-1 text-sm text-slate-500">
                             Registered:
                             <span class="font-medium text-slate-700">
-                                {{ $formatDate($registration->registered_at) ?? '—' }}
+                                {{ $registration->registered_at?->timezone($clientTimezone)->format('M j, Y g:i A') ?? '—' }}
                             </span>
                         </p>
                     </div>
@@ -43,14 +44,14 @@
                     <p>
                         Webinar Date:
                         <span class="font-medium text-slate-700">
-                            {{ $formatDate($registration->webinar?->starts_at) ?? '—' }}
+                            {{ $registration->webinar?->starts_at?->timezone($clientTimezone)->format('M j, Y g:i A') ?? '—' }}
                         </span>
                     </p>
 
                     <p>
                         Attended:
                         <span class="font-medium text-slate-700">
-                            {{ $formatDate($registration->attended_at) ?? '—' }}
+                            {{ $registration->attended_at?->timezone($clientTimezone)->format('M j, Y g:i A') ?? '—' }}
                         </span>
                     </p>
                 </div>

@@ -5,6 +5,7 @@ namespace App\Modules\Webinars\Jobs;
 use App\Modules\Webinars\Actions\DispatchWebinarWaitlistMessagesAction;
 use App\Modules\Webinars\Actions\ResolveRegisterableWebinarAction;
 use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Models\WebinarSeriesVariant;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -16,6 +17,7 @@ class NotifyWebinarWaitlistJob implements ShouldQueue
         public int $seriesId,
         public ?int $webinarId = null,
         public ?string $notificationMode = null,
+        public ?int $variantId = null,
     ) {
         $this->onQueue(config('webinars.queues.notifications'));
     }
@@ -30,9 +32,20 @@ class NotifyWebinarWaitlistJob implements ShouldQueue
             return;
         }
 
+        $variant = $this->variantId !== null
+            ? WebinarSeriesVariant::query()
+                ->whereKey($this->variantId)
+                ->where('webinar_series_id', $series->getKey())
+                ->first()
+            : null;
+
         $webinar = $this->webinarId !== null
-            ? $resolveRegisterableWebinar->findForSeries($series, $this->webinarId)
-            : $resolveRegisterableWebinar->getFutureForSeries($series);
+            ? ($variant instanceof WebinarSeriesVariant
+                ? $resolveRegisterableWebinar->findForVariant($variant, $this->webinarId)
+                : $resolveRegisterableWebinar->findForSeries($series, $this->webinarId))
+            : ($variant instanceof WebinarSeriesVariant
+                ? $resolveRegisterableWebinar->getFutureForVariant($variant)
+                : $resolveRegisterableWebinar->getFutureForSeries($series));
 
         if (! $webinar) {
             return;
