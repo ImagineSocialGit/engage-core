@@ -817,15 +817,13 @@
 │   │   │   │   │   ├── InboundReplyProfilePresentationProvider.php
 │   │   │   │   │   ├── ReplyProfileDefinitionNormalizer.php
 │   │   │   │   │   └── ReplyProfileWorkspace.php
-│   │   │   │   ├── Sms
-│   │   │   │   │   ├── CanonicalSmsPhoneMatcher.php
-│   │   │   │   │   ├── InboundSmsMessageClassifier.php
-│   │   │   │   │   ├── InboundSmsPurposeResolver.php
-│   │   │   │   │   ├── InboundSmsSenderResolver.php
-│   │   │   │   │   ├── SmsWebhookHandlerResolver.php
-│   │   │   │   │   └── SmsWebhookPayload.php
-│   │   │   │   └── Tasks
-│   │   │   │       └── InboundMessageTaskLinkPresenter.php
+│   │   │   │   └── Sms
+│   │   │   │       ├── CanonicalSmsPhoneMatcher.php
+│   │   │   │       ├── InboundSmsMessageClassifier.php
+│   │   │   │       ├── InboundSmsPurposeResolver.php
+│   │   │   │       ├── InboundSmsSenderResolver.php
+│   │   │   │       ├── SmsWebhookHandlerResolver.php
+│   │   │   │       └── SmsWebhookPayload.php
 │   │   │   ├── Support
 │   │   │   └── Validation
 │   │   │       └── InboundMessagingSetupValidationContributor.php
@@ -1977,6 +1975,8 @@
 │   │   │   │   │   └── InboundEmailRouteAutomationWorkspace.php
 │   │   │   │   ├── FlowRoutes
 │   │   │   │   │   └── FlowRoutesInboundEmailRouteAutomationWorkspace.php
+│   │   │   │   ├── Tasks
+│   │   │   │   │   └── InboundMessageTaskLinkPresenter.php
 │   │   │   │   └── UnavailableInboundEmailRouteAutomationWorkspace.php
 │   │   │   ├── InternalNotifications
 │   │   │   │   ├── InboundMessaging
@@ -2951,8 +2951,9 @@
 │       │   │   │   └── scheduling-public-booking.blade.php
 │       │   │   └── scheduled-reports
 │       │   │       ├── index.blade.php
-│       │   │       └── parameters
-│       │   │           └── daily-follow-up.blade.php
+│       │   │       ├── parameters
+│       │   │       │   └── daily-follow-up.blade.php
+│       │   │       └── preview.blade.php
 │       │   ├── scheduling
 │       │   │   ├── after-booking.blade.php
 │       │   │   ├── availability.blade.php
@@ -3355,6 +3356,7 @@
 │   │   │   ├── InboundInboxWorkspaceTest.php
 │   │   │   ├── InboundMessageAutomationOutboxTest.php
 │   │   │   ├── InboundMessagingDeploymentPlanContributorTest.php
+│   │   │   ├── InboundMessagingTasksIntegrationBoundaryTest.php
 │   │   │   ├── InboundNormalReplyAutomationEventTest.php
 │   │   │   ├── InboundReplyFoundationTest.php
 │   │   │   ├── InboundReplyOutcomeClassifierTest.php
@@ -3604,6 +3606,7 @@
 │   │   │   ├── ReportingExternalMeasurementImportTest.php
 │   │   │   ├── ReportingFoundationTest.php
 │   │   │   ├── ReportingObservationFoundationTest.php
+│   │   │   ├── ReportingProductSurfacesTest.php
 │   │   │   ├── ReportingProjectionFactRegistryTest.php
 │   │   │   ├── ReportingPublicTransportTest.php
 │   │   │   ├── ReportingWebinarOccurrenceScopeTest.php
@@ -3812,4 +3815,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-875 directories, 2938 files
+875 directories, 2941 files

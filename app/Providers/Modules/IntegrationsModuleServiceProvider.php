@@ -5,6 +5,7 @@ namespace App\Providers\Modules;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use App\Modules\Messaging\Contracts\MessageTemplateDeletionReferenceContributor;
 use App\Modules\Messaging\Contracts\ReusableMessageTemplateAuthoringOptionContributor;
+use App\Support\ModuleIntegrations\InboundMessaging\Tasks\InboundMessageTaskLinkPresenter;
 use App\Support\ModuleIntegrations\Messaging\Broadcasts\BroadcastMessageTemplateDeletionReferenceContributor;
 use App\Support\ModuleIntegrations\Messaging\Campaigns\CampaignTouchMessageTemplateDeletionReferenceContributor;
 use App\Support\ModuleIntegrations\Messaging\FlowRoutes\FlowRouteMessageTemplateDeletionReferenceContributor;
@@ -59,6 +60,13 @@ class IntegrationsModuleServiceProvider extends ServiceProvider
         if ($this->has($enabled, ['messaging', 'tasks'])) {
             $this->app->tag(
                 ScheduledMessageTaskLinkPresenter::class,
+                'tasks.link_presenters',
+            );
+        }
+
+        if ($this->has($enabled, ['inbound_messaging', 'messaging', 'tasks'])) {
+            $this->app->tag(
+                InboundMessageTaskLinkPresenter::class,
                 'tasks.link_presenters',
             );
         }

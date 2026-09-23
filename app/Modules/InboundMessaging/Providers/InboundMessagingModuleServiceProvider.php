@@ -18,7 +18,6 @@ use App\Modules\InboundMessaging\Services\Email\EmailWebhookHandlerResolver;
 use App\Modules\InboundMessaging\Services\Email\RoutedInboundMessageConsumerRegistry;
 use App\Modules\InboundMessaging\Services\ReplyProfiles\InboundReplyProfilePresentationProvider;
 use App\Modules\InboundMessaging\Services\Sms\SmsWebhookHandlerResolver;
-use App\Modules\InboundMessaging\Services\Tasks\InboundMessageTaskLinkPresenter;
 use App\Modules\InboundMessaging\Validation\InboundMessagingSetupValidationContributor;
 use App\Modules\Messaging\Events\AutomationMessageScheduled;
 use App\Support\Dashboard\DashboardPanelRegistry;
@@ -89,10 +88,6 @@ class InboundMessagingModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             ContactConversationShowDataProvider::class,
         ], 'core.contact_show_data_providers');
-
-        $this->app->tag([
-            InboundMessageTaskLinkPresenter::class,
-        ], 'tasks.link_presenters');
 
         $this->app->tag([
             InboundMessagingSetupValidationContributor::class,

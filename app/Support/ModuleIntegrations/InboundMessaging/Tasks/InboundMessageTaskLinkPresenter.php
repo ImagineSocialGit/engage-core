@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\InboundMessaging\Services\Tasks;
+namespace App\Support\ModuleIntegrations\InboundMessaging\Tasks;
 
 use App\Modules\InboundMessaging\Models\InboundMessage;
 use App\Modules\Messaging\Services\ScheduledMessageSummary;
