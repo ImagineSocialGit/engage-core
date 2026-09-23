@@ -948,6 +948,7 @@
 │   │   │   │   ├── PublishMessageTemplateVersionAction.php
 │   │   │   │   ├── RecordMessageConsentAction.php
 │   │   │   │   ├── RecordScheduledMessageCtaEngagementAction.php
+│   │   │   │   ├── RecordScheduledMessageEmailOpenSignalAction.php
 │   │   │   │   ├── RecoverStaleScheduledMessageClaimsAction.php
 │   │   │   │   ├── ResumeMessageChainEnrollmentAction.php
 │   │   │   │   ├── RevokeMessageConsentAction.php
@@ -1080,6 +1081,7 @@
 │   │   │   │   ├── ScheduledMessageCtaEngagement.php
 │   │   │   │   ├── ScheduledMessageDeliveryAttempt.php
 │   │   │   │   ├── ScheduledMessageEdit.php
+│   │   │   │   ├── ScheduledMessageEmailOpenSignal.php
 │   │   │   │   ├── ScheduledMessageOperationalEvent.php
 │   │   │   │   ├── ScheduledMessageOutboxEvent.php
 │   │   │   │   ├── ScheduledMessage.php
@@ -1092,6 +1094,8 @@
 │   │   │   │   └── SmsPayload.php
 │   │   │   ├── Providers
 │   │   │   │   └── MessagingModuleServiceProvider.php
+│   │   │   ├── ReadModels
+│   │   │   │   └── MessagingEmailOpenFactContributor.php
 │   │   │   ├── Requests
 │   │   │   │   ├── Concerns
 │   │   │   │   │   └── InteractsWithMessageMediaAuthoring.php
@@ -2482,7 +2486,8 @@
 │   │   │   │   ├── 2026_08_29_053500_prune_redundant_messaging_indexes.php
 │   │   │   │   ├── 2026_09_17_140000_add_scheduled_message_operations.php
 │   │   │   │   ├── 2026_09_17_140100_create_scheduled_message_edits_table.php
-│   │   │   │   └── 2026_09_17_140200_create_scheduled_message_bulk_edits_table.php
+│   │   │   │   ├── 2026_09_17_140200_create_scheduled_message_bulk_edits_table.php
+│   │   │   │   └── 2026_09_22_000000_create_scheduled_message_email_open_signals_table.php
 │   │   │   ├── portal
 │   │   │   │   ├── 2026_04_15_195870_create_portal_users_table.php
 │   │   │   │   ├── 2026_04_15_195871_create_portal_contact_links_table.php
@@ -3332,6 +3337,7 @@
 │   │   │   ├── IssueExternalFormIntakeSecretCommandTest.php
 │   │   │   └── PublishedFormRuntimeTest.php
 │   │   ├── HumanVerification
+│   │   │   ├── PublicHumanVerificationSurfaceContractTest.php
 │   │   │   └── PublicHumanVerificationTest.php
 │   │   ├── InboundMessaging
 │   │   │   ├── ContactConversationReplyControllerTest.php
@@ -3414,6 +3420,7 @@
 │   │   │   ├── EmailDeliverabilityContractTest.php
 │   │   │   ├── EmailHygieneServiceTest.php
 │   │   │   ├── EmailMessagingServiceTest.php
+│   │   │   ├── EmailOpenEvidenceTest.php
 │   │   │   ├── EmailPayloadMediaTest.php
 │   │   │   ├── EmailPayloadTest.php
 │   │   │   ├── EmailReplyAddressGeneratorTest.php
@@ -3805,4 +3812,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-874 directories, 2932 files
+875 directories, 2938 files

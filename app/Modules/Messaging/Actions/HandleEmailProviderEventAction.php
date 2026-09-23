@@ -8,6 +8,8 @@ use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ConsentRevocation;
 use App\Modules\Messaging\Models\MessageSuppression;
 use App\Modules\Messaging\Services\MessageSuppressionService;
+use Carbon\CarbonImmutable;
+use Throwable;
 
 final class HandleEmailProviderEventAction
 {
@@ -15,6 +17,7 @@ final class HandleEmailProviderEventAction
         private readonly MessageSuppressionService $suppressions,
         private readonly RevokeMessageConsentAction $revokeMessageConsent,
         private readonly SkipScheduledMessagesAction $skipScheduledMessages,
+        private readonly RecordScheduledMessageEmailOpenSignalAction $recordEmailOpenSignal,
     ) {}
 
     /**
@@ -33,6 +36,20 @@ final class HandleEmailProviderEventAction
         $eventType = $this->eventType($event);
 
         if ($eventType === null) {
+            return;
+        }
+
+        if ($eventType === 'email.opened') {
+            $providerMessageId = $this->providerMessageId($event);
+
+            if ($providerMessageId !== null) {
+                $this->recordEmailOpenSignal->handle(
+                    provider: $provider,
+                    providerMessageId: $providerMessageId,
+                    occurredAt: $this->providerEventOccurredAt($event),
+                );
+            }
+
             return;
         }
 
@@ -254,6 +271,23 @@ final class HandleEmailProviderEventAction
         }
 
         return null;
+    }
+
+    /** @param array<string, mixed> $event */
+    private function providerEventOccurredAt(array $event): CarbonImmutable
+    {
+        $value = $this->nullableString($event['created_at'] ?? null);
+
+        if ($value !== null) {
+            try {
+                return CarbonImmutable::parse($value)->utc();
+            } catch (Throwable) {
+                // A verified provider event with an invalid timestamp remains
+                // usable evidence; receipt time is the conservative fallback.
+            }
+        }
+
+        return CarbonImmutable::now('UTC');
     }
 
     /** @param array<string, mixed> $event */

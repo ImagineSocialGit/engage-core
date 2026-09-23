@@ -30,7 +30,8 @@ Use for repeatable Messaging consent/channel checks. It is not backlog.
 - Configure `INBOUND_EMAIL_DOMAIN` only for the domain actually enabled for Resend Receiving.
 - Preserve the reserved `reply+` signed Reply-To namespace for ScheduledMessage correlation; authored inbound routes use other local parts.
 - A real reply test must prove webhook receipt, Receiving API retrieval, signed correlation, and durable InboundMessage creation.
-- Keep Resend Open Tracking and Click Tracking disabled while Engage Core owns CTA tracking through `tracking_key`.
+- Enable Resend Open Tracking when provider-reported email-open evidence is part of the client setup; keep Resend Click Tracking disabled because Engage Core owns CTA tracking through `tracking_key`.
+- Subscribe the Messaging-owned Resend message-events webhook to `email.opened` when open evidence is enabled. Treat that signal as weak tracking-pixel evidence, never proof of a human read.
 - Bounce, complaint, provider suppression, and definitive invalid-destination failures must remain Messaging-owned delivery-health consequences.
 - Complaint suppressions remain protected from casual operator release.
 - Editing a Contact destination must not delete historical suppression evidence; only current destination matches surface as active delivery issues.

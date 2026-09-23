@@ -38,6 +38,7 @@ use App\Modules\Messaging\Listeners\MarkClaimedPermissionInvitationSentAfterSche
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\ReadModels\MessagingEmailOpenFactContributor;
 use App\Modules\Messaging\Services\ContactPanels\ContactDirectMessagePanelProvider;
 use App\Modules\Messaging\Services\ContactPanels\MessageDeliveryIssueContactPanelProvider;
 use App\Modules\Messaging\Services\ContactShow\ContactMessagingShowDataProvider;
@@ -127,6 +128,11 @@ class MessagingModuleServiceProvider extends ServiceProvider
         $this->app->tag(
             MessagingDeploymentPlanContributor::class,
             'deployment.plan_contributors',
+        );
+
+        $this->app->tag(
+            MessagingEmailOpenFactContributor::class,
+            'reporting.projection_fact_contributors',
         );
 
         $this->app->tag([

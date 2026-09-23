@@ -59,6 +59,7 @@ The Messaging-owned delivery/lifecycle endpoint receives:
 email.sent
 email.delivered
 email.delivery_delayed
+email.opened
 email.bounced
 email.complained
 email.suppressed
@@ -138,14 +139,17 @@ Authored inbound email routes may use other local parts on the same receiving do
 
 Engage Core owns explicit CTA engagement tracking through Messaging `tracking_key` links and signed redirect URLs.
 
-Keep Resend domain-level Open Tracking and Click Tracking disabled unless the platform deliberately adopts those provider features later.
+Enable Resend domain-level Open Tracking when this client should collect provider-reported email-open evidence. Keep Resend Click Tracking disabled because Engage Core owns explicit CTA engagement through its signed redirect URLs.
 
-In particular, Resend Click Tracking rewrites links through a Resend redirect. Enabling it on top of Engage Core CTA tracking would create a second redirect/tracking layer and competing engagement semantics.
+Open tracking is intentionally weak evidence. It is a provider-reported tracking-pixel load and may be caused by mailbox privacy proxies, image prefetching, or other non-human behavior. Engage Core stores it as `email_open_evidence`; it must not be presented as proof that a person read the message.
+
+Resend Click Tracking rewrites links through a Resend redirect. Enabling it on top of Engage Core CTA tracking would create a second redirect/tracking layer and competing engagement semantics.
 
 ## Resend durable consequences
 
 Messaging applies these durable consequences for provider feedback:
 
+- `email.opened` -> aggregate provider-reported open evidence correlated to the matching sent email by provider message ID;
 - `email.bounced` -> email suppression with reason `bounce`;
 - `email.complained` -> email suppression with reason `complaint`;
 - `email.suppressed` -> email suppression with reason `provider`;
@@ -156,7 +160,7 @@ Messaging applies these durable consequences for provider feedback:
 
 Informational delivery events may have no additional business consequence yet. They are still accepted through the Messaging endpoint and durably deduplicated by `WebhookInbox`.
 
-Raw provider payloads remain operational evidence in `webhook_inbox_receipts`. Message suppressions and consent revocations store only bounded normalized evidence needed for durable Messaging behavior.
+Raw provider payloads remain operational evidence in `webhook_inbox_receipts`. Email-open signals, message suppressions, and consent revocations store only bounded normalized evidence needed for durable Messaging behavior. Replayed webhook event IDs remain deduplicated by `WebhookInbox`; distinct provider open events for the same delivery increment one aggregate signal row rather than creating raw clickstream-style records.
 
 A current suppression affecting the Contact's current email destination becomes an operator-visible Messaging Delivery Issue. Editing the Contact to a different destination does not erase the old suppression record; it removes that historical destination from the Contact's current issue state. Complaint suppressions are not casually releasable through the normal resolution workflow.
 

@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 8,
+    'version' => 9,
     'tables' => [
         'message_template_presets' => [
             'mode' => 'upsert',
@@ -646,6 +646,26 @@ return [
             ],
             'references' => [
                 'scheduled_message_id' => 'scheduled_messages',
+            ],
+        ],
+
+        'scheduled_message_email_open_signals' => [
+            'mode' => 'insert_empty',
+            'preserve_id' => true,
+            'order_by' => ['id'],
+            'columns' => [
+                'id',
+                'scheduled_message_id',
+                'delivery_attempt_id',
+                'provider',
+                'provider_message_id',
+                'occurrence_count',
+                'first_occurred_at',
+                'last_occurred_at',
+            ],
+            'references' => [
+                'scheduled_message_id' => 'scheduled_messages',
+                'delivery_attempt_id' => 'scheduled_message_delivery_attempts',
             ],
         ],
 

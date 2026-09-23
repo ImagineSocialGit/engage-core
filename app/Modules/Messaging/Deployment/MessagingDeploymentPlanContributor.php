@@ -38,9 +38,9 @@ final class MessagingDeploymentPlanContributor implements DeploymentPlanContribu
         if ($this->selectedString('EMAIL_PROVIDER') === 'resend') {
             $instructions = [
                 'Open the client Resend account and create or select the sending domain for this environment.',
-                'Keep Open Tracking and Click Tracking disabled for the current Messaging contract.',
+                'Enable Open Tracking when this client should collect provider-reported email-open evidence; keep Click Tracking disabled because Engage Core owns CTA redirect tracking.',
                 "Create the delivery/lifecycle webhook at https://webhooks.{$rootDomain}/message-events/email/resend.",
-                'Subscribe that webhook to: email.sent, email.delivered, email.delivery_delayed, email.bounced, email.complained, email.suppressed, email.failed, and contact.updated.',
+                'Subscribe that webhook to: email.sent, email.delivered, email.delivery_delayed, email.opened, email.bounced, email.complained, email.suppressed, email.failed, and contact.updated.',
             ];
 
             if ($this->moduleEnabled('inbound_messaging')) {

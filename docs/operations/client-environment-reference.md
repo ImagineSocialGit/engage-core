@@ -740,7 +740,7 @@ Resend-specific override
 
 Do not set the Resend-specific override keys to blank values unless blank is truly intended.
 
-Keep provider-dashboard Open Tracking and Click Tracking disabled while Engage Core owns CTA engagement tracking through Messaging `tracking_key` redirects. Provider-level tracking is an operational setting rather than an environment variable.
+Provider-level tracking is an operational setting rather than an environment variable. Enable Resend Open Tracking when the client should collect provider-reported email-open evidence; keep Resend Click Tracking disabled because Engage Core owns CTA engagement through Messaging `tracking_key` redirects. Provider-reported opens are weak tracking-pixel evidence and are not proof of a human read.
 
 ### SMTP variables removed from the canonical Resend example
 
