@@ -273,9 +273,7 @@
         </section>
     </main>
 
-    @if($humanVerificationConfig !== null)
-        <x-public-surface.human-verification :human-verification-config="$humanVerificationConfig" />
-    @endif
+    <x-public-surface.human-verification surface="forms" />
 
     @if(! $submitted)
         <script type="application/json" data-hosted-form-conditions>@json($form['conditions'])</script>

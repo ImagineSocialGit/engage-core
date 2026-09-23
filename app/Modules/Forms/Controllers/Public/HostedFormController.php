@@ -39,7 +39,6 @@ final class HostedFormController
             'title' => $form->name,
             'form' => $presentation,
             'submitted' => $request->session()->get('forms.hosted.success') === $form->key,
-            'humanVerificationConfig' => $this->humanVerificationConfig(),
         ]);
     }
 
@@ -120,27 +119,6 @@ final class HostedFormController
         }
 
         return $form;
-    }
-
-    /**
-     * @return array<string, mixed>|null
-     */
-    private function humanVerificationConfig(): ?array
-    {
-        if (! $this->humanVerification->enabledForSurface(self::HUMAN_VERIFICATION_SURFACE)) {
-            return null;
-        }
-
-        $widget = $this->humanVerification->widgetForSurface(
-            self::HUMAN_VERIFICATION_SURFACE,
-        );
-
-        return [
-            'available' => $widget !== null,
-            'responseField' => $this->humanVerification->responseField(),
-            'widget' => $widget?->toArray(),
-            'excludedPathPrefixes' => [],
-        ];
     }
 
     private function verificationFromRequest(

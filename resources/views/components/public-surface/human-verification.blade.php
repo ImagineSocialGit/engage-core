@@ -27,11 +27,11 @@
             role="alert"
         ></p>
 
-        @error('human_verification')
+        @if(isset($errors) && $errors->has('human_verification'))
             <p class="mt-4 text-sm font-semibold text-red-700" role="alert">
-                {{ $message }}
+                {{ $errors->first('human_verification') }}
             </p>
-        @enderror
+        @endif
 
         <div class="mt-6 flex justify-end">
             <button
