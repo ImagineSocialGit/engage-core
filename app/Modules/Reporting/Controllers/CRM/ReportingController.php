@@ -4,6 +4,7 @@ namespace App\Modules\Reporting\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Reporting\Actions\ProjectReportingDailyMetricsAction;
+use App\Modules\Reporting\Services\ReportingCollectionHealthReadService;
 use App\Modules\Reporting\Services\ReportingWorkspaceReadService;
 use App\Modules\Reporting\Services\SchedulingReportingWorkspaceReadService;
 use App\Support\Modules\ModuleManager;
@@ -20,6 +21,7 @@ final class ReportingController extends Controller
         Request $request,
         ReportingWorkspaceReadService $workspace,
         SchedulingReportingWorkspaceReadService $schedulingWorkspace,
+        ReportingCollectionHealthReadService $collectionHealth,
         ModuleManager $modules,
     ): View {
         $days = $this->normalizedDays($request);
@@ -38,6 +40,7 @@ final class ReportingController extends Controller
                 ? $schedulingReport
                 : null,
             'rangeOptions' => self::RANGE_OPTIONS,
+            'collectionHealth' => $collectionHealth->read(),
         ]);
     }
 

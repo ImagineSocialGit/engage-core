@@ -95,6 +95,10 @@
             </div>
         </section>
 
+        @include('crm.reporting.partials.collection-health', [
+            'collectionHealth' => $collectionHealth,
+        ])
+
         @if($schedulingReport)
             @include('crm.reporting.partials.scheduling-public-booking', [
                 'schedulingReport' => $schedulingReport,

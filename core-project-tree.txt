@@ -1344,6 +1344,7 @@
 │   │   │   │   │   └── MetaAdsCsvParser.php
 │   │   │   │   ├── ReportingAttributionNormalizer.php
 │   │   │   │   ├── ReportingBrowserRequestClassifier.php
+│   │   │   │   ├── ReportingCollectionHealthReadService.php
 │   │   │   │   ├── ReportingPublicCollectionPolicy.php
 │   │   │   │   ├── ReportingSessionResolver.php
 │   │   │   │   ├── ReportingWorkspaceReadService.php
@@ -2941,6 +2942,7 @@
 │       │   │   │   └── preview.blade.php
 │       │   │   ├── index.blade.php
 │       │   │   ├── partials
+│       │   │   │   ├── collection-health.blade.php
 │       │   │   │   └── scheduling-public-booking.blade.php
 │       │   │   └── scheduled-reports
 │       │   │       ├── index.blade.php
@@ -3588,6 +3590,7 @@
 │   │   │   └── RelationshipStageAutomationCapabilityTest.php
 │   │   ├── Reporting
 │   │   │   ├── ReportingBrowserClientContractTest.php
+│   │   │   ├── ReportingCollectionHealthTest.php
 │   │   │   ├── ReportingDailyProjectionTest.php
 │   │   │   ├── ReportingDeploymentPlanContributorTest.php
 │   │   │   ├── ReportingExternalMeasurementFoundationTest.php
@@ -3802,4 +3805,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-874 directories, 2929 files
+874 directories, 2932 files
