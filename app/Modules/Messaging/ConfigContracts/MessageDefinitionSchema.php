@@ -20,6 +20,7 @@ class MessageDefinitionSchema
 
         $fields = [
             'key' => ConfigField::optional(ConfigSchema::string()),
+            'preset_key' => ConfigField::optional(ConfigSchema::string()),
             'enabled' => ConfigField::defaulted(ConfigSchema::boolean(), true),
             'message_type' => ConfigField::optional(ConfigSchema::string()),
             'reply_profile_key' => ConfigField::optional(ConfigSchema::string(nullable: true)),

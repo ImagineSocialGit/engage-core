@@ -58,6 +58,24 @@ class MessagingConfigContractTest extends TestCase
         $this->assertEquals([], $violations);
     }
 
+    public function test_email_and_sms_contracts_accept_explicit_preset_keys(): void
+    {
+        $registry = app(ConfigContractRegistry::class);
+
+        foreach (['email', 'sms'] as $channel) {
+            $contract = $registry->get("messaging.{$channel}_definition");
+            $definition = [
+                ...$contract->example(),
+                'preset_key' => "{$channel}.transactional.webinar.va_plan.attended_followup",
+            ];
+
+            $this->assertEquals(
+                [],
+                $contract->schema()->validate($definition, "messaging.{$channel}.definitions.transactional.webinar.post_event_plan.0"),
+            );
+        }
+    }
+
     public function test_email_and_sms_contracts_reject_cross_channel_and_behavior_fields(): void
     {
         $registry = app(ConfigContractRegistry::class);
