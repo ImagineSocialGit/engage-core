@@ -1,6 +1,6 @@
 # Events Module
 
-Events is a universal module with an approved architecture. Its definition registry and persistence foundation are implemented; operational lifecycle, promotion, attendance-writing, automation, and CRM administration remain to be completed.
+Events is a universal module with an approved architecture. Its definition registry, persistence foundation, readiness registry, announcement/promotion gates, and duplicate detector are implemented; operational lifecycle, attendance-writing, automation, scheduled reconciliation, setup validation, and CRM administration remain to be completed.
 
 Events is a thin catalog and reconciliation capability for concrete events that are operated, produced, ticketed, hosted, or streamed outside Engage Core.
 
@@ -819,19 +819,23 @@ Do not include Music, Bandsintown, Commerce, Experiences, FlowRoutes, Messaging,
 
 ## Implementation status
 
-Current repository status after the persistence foundation:
+Current repository status after the readiness and promotion foundation:
 
 ```text
 Events module directory: present
 Events config and definition registry: present
 Events tables: events, event_external_references, event_stakeholders, event_attendances
 Events models/factories: present for all four owned tables
+Events readiness registry and universal core readiness contributor: present
+Events announcement gate and authoritative promotion gate: present
+Events duplicate similarity detector: present
 Legacy Project State policy: all four Events tables explicitly classified must_be_empty; no Events transfer section is required for rollout
 Events CRM routes/navigation: not present
-Events readiness/promotion/lifecycle/attendance actions: not present
+Events lifecycle and attendance write actions: not present
 Events automation/scheduled reconciliation: not present
+Events setup validation: not present
 ```
 
-The next implementation work should follow the approved order above: readiness and promotion gates, lifecycle and attendance actions, scheduled reconciliation, setup validation, and CRM administration before optional consumers are added.
+The next implementation work should follow the approved order above: lifecycle and attendance actions plus neutral automation events, scheduled reconciliation, setup validation, and CRM administration before optional consumers are added.
 
 This document remains the canonical architecture reference. Exact file manifests still require a fresh dependency cone for every consumer module touched by a later integration batch.

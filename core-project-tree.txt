@@ -523,9 +523,13 @@
 │   │   │   └── Support
 │   │   ├── Events
 │   │   │   ├── Contracts
-│   │   │   │   └── EventDefinitionContributor.php
+│   │   │   │   ├── EventDefinitionContributor.php
+│   │   │   │   └── EventReadinessContributor.php
 │   │   │   ├── Data
-│   │   │   │   └── EventDefinitionContribution.php
+│   │   │   │   ├── EventDefinitionContribution.php
+│   │   │   │   ├── EventGateDecision.php
+│   │   │   │   ├── EventReadinessFinding.php
+│   │   │   │   └── EventReadinessResult.php
 │   │   │   ├── Enums
 │   │   │   │   ├── EventAttendanceMode.php
 │   │   │   │   ├── EventAttendanceStatus.php
@@ -537,8 +541,14 @@
 │   │   │   │   └── EventStakeholder.php
 │   │   │   ├── Providers
 │   │   │   │   └── EventsModuleServiceProvider.php
+│   │   │   ├── Readiness
+│   │   │   │   └── CoreEventReadinessContributor.php
 │   │   │   └── Services
-│   │   │       └── EventDefinitionRegistry.php
+│   │   │       ├── EventAnnouncementGate.php
+│   │   │       ├── EventDefinitionRegistry.php
+│   │   │       ├── EventDuplicateDetector.php
+│   │   │       ├── EventPromotionGate.php
+│   │   │       └── EventReadinessRegistry.php
 │   │   ├── FlowRoutes
 │   │   │   ├── Actions
 │   │   │   │   ├── AdvanceContactFlowRouteProgressAction.php
@@ -3342,6 +3352,7 @@
 │   │   │   └── HandleInboundEmailWebhookActionTest.php
 │   │   ├── Events
 │   │   │   ├── EventDefinitionRegistryTest.php
+│   │   │   ├── EventReadinessAndPromotionTest.php
 │   │   │   └── EventsFoundationTest.php
 │   │   ├── FlowRoutes
 │   │   │   ├── AutomationEventReceiptTest.php
@@ -3884,4 +3895,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-877 directories, 3008 files
+878 directories, 3018 files
