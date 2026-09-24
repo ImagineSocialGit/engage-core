@@ -178,6 +178,48 @@ Core runtime bootstrap intentionally does not run Composer or mutate the selecte
 
 Before the first package-backed production rollout, the deployment launcher should be verified or extended so the selected client's locked Composer install is performed as part of the normal deployment workflow rather than depending on an undocumented manual step.
 
+## Local package development
+
+Do not require a commit, GitHub push, and Composer update for every local edit to an Engage Core integration package.
+
+Engage Core provides a local-only development link workflow that temporarily replaces the selected client's Composer-installed package directory with a symlink to a local package checkout while leaving the client's committed `composer.json` and `composer.lock` unchanged.
+
+For example, while developing the Shopify integration package:
+
+```bash
+cd /var/www/engage-core
+
+./scripts/dev-link-package.sh \
+    imagine-social/engage-integration-shopify \
+    /var/www/engage-integration-shopify
+```
+
+The link script:
+
+- runs only when root `APP_ENV` resolves to `local`;
+- uses the selected root `CLIENT_KEY` unless an explicit matching client key is supplied;
+- verifies that the selected client actually requires the requested package;
+- verifies that the local package `composer.json` declares the same package name;
+- requires the normal Composer-managed package to be installed first;
+- requires the selected client's Composer `vendor-dir` to remain the default `vendor`, matching Core's runtime package bootstrap;
+- replaces only the installed package directory with a symlink to the local checkout;
+- does not rewrite the client's `composer.json` or `composer.lock`;
+- clears compiled Blade views after linking.
+
+While linked, ordinary PHP, Blade, CSS, JavaScript, and other source files that are read from the package checkout are available to the selected client without pushing Git or running Composer again. The installed client autoloader continues resolving the same package path; the package directory at that path is simply the local checkout.
+
+If a package changes its Composer dependency or autoload contract, treat that as a dependency change rather than a normal source edit. Restore the Composer-managed package, update the selected client's dependency normally, and then link the local checkout again.
+
+To restore the exact Composer-managed revision pinned in the selected client's lock file:
+
+```bash
+./scripts/dev-unlink-package.sh imagine-social/engage-integration-shopify
+```
+
+Before replacing the symlink, the unlink script verifies that the locked source repository is readable. It then uses Composer `reinstall` so the committed lock file remains authoritative and verifies that `composer.lock` did not change during the restore.
+
+Local package links are development state only. Never create or depend on these symlinks in staging or production.
+
 ## Boundary rules
 
 Private integration packages:
