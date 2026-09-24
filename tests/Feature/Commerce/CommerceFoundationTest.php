@@ -5,6 +5,8 @@ namespace Tests\Feature\Commerce;
 use App\Modules\Commerce\Contracts\CommerceCatalogProvider;
 use App\Modules\Commerce\Contracts\CommerceInventoryProvider;
 use App\Modules\Commerce\Contracts\CommercePointOfSaleProvider;
+use App\Modules\Commerce\Data\CommerceCatalogPage;
+use App\Modules\Commerce\Data\CommerceCatalogPageRequest;
 use App\Modules\Commerce\Data\CommerceInventoryEffectData;
 use App\Modules\Commerce\Enums\CommerceInventoryAuthorityMode;
 use App\Modules\Commerce\Enums\CommerceProviderRole;
@@ -267,6 +269,12 @@ final readonly class CatalogInventoryTestProvider implements CommerceCatalogProv
     public function key(): string
     {
         return $this->providerKey;
+    }
+
+    public function catalogPage(
+        CommerceCatalogPageRequest $request,
+    ): CommerceCatalogPage {
+        return new CommerceCatalogPage([]);
     }
 }
 

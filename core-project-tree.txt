@@ -273,6 +273,11 @@
 │   │   │   │   └── CommerceProvider.php
 │   │   │   ├── Controllers
 │   │   │   ├── Data
+│   │   │   │   ├── CommerceCatalogPage.php
+│   │   │   │   ├── CommerceCatalogPageRequest.php
+│   │   │   │   ├── CommerceCatalogProductData.php
+│   │   │   │   ├── CommerceCatalogSyncResult.php
+│   │   │   │   ├── CommerceCatalogVariantData.php
 │   │   │   │   ├── CommerceCheckoutRequest.php
 │   │   │   │   ├── CommerceCheckoutResult.php
 │   │   │   │   ├── CommerceInventoryEffectData.php
@@ -303,6 +308,7 @@
 │   │   │   │   └── CommerceModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
+│   │   │   │   ├── CommerceCatalogSyncService.php
 │   │   │   │   ├── CommerceCheckoutService.php
 │   │   │   │   ├── CommerceInventoryEffectRecorder.php
 │   │   │   │   ├── CommerceOfferPublicationEvaluator.php
@@ -3132,6 +3138,7 @@
 │   ├── make-automation-dependency-cone-dump.sh
 │   ├── make-crm-dependency-cone-dump.sh
 │   ├── make-module-dependency-cone-dump.sh
+│   ├── make-module-platform-infrastructure-dependency-cone-dump.sh
 │   ├── make-process-highway-dependency-cone-dump.sh
 │   ├── make-project-state-dependency-cone-dump.sh
 │   ├── make-setup-validation-config-contracts-dependency-cone-dump.sh
@@ -3236,6 +3243,7 @@
 │   │   │   ├── ExternalFormsClientEnvironmentContractTest.php
 │   │   │   └── ProjectStateClientEnvironmentContractTest.php
 │   │   ├── Commerce
+│   │   │   ├── CommerceCatalogSyncTest.php
 │   │   │   ├── CommerceFoundationTest.php
 │   │   │   └── CommerceStorefrontFoundationTest.php
 │   │   ├── ConfigContracts
@@ -3870,4 +3878,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-877 directories, 2994 files
+877 directories, 3002 files
