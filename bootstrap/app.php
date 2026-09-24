@@ -6,6 +6,8 @@ use App\Http\Middleware\RequestCorrelation;
 use App\Http\Middleware\RequireCapability;
 use App\Http\Middleware\RequirePublicHumanVerification;
 use App\Support\Clients\ClientEnvironmentLoader;
+use App\Support\Clients\ClientPackageManifestLoader;
+use App\Support\Clients\ClientPackageRuntime;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -137,10 +139,15 @@ $app = Application::configure(basePath: dirname(__DIR__))
     ->create();
 
 $app->afterLoadingEnvironment(function () use ($app): void {
-    if (
-        $app->configurationIsCached()
-        || Env::get('APP_ENV') === 'testing'
-    ) {
+    if (Env::get('APP_ENV') === 'testing') {
+        return;
+    }
+
+    ClientPackageRuntime::replace(
+        (new ClientPackageManifestLoader())->load($app->basePath()),
+    );
+
+    if ($app->configurationIsCached()) {
         return;
     }
 

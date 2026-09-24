@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\Clients\ClientPackageRuntime;
 use FilesystemIterator;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\View;
@@ -15,6 +16,10 @@ class ClientServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeClientConfig();
+
+        foreach (ClientPackageRuntime::manifest()->providers() as $provider) {
+            $this->app->register($provider);
+        }
     }
 
     public function boot(): void

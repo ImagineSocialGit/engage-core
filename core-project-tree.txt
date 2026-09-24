@@ -1918,6 +1918,9 @@
 │   │   │   └── CacheKey.php
 │   │   ├── Clients
 │   │   │   ├── ClientEnvironmentLoader.php
+│   │   │   ├── ClientPackageManifestLoader.php
+│   │   │   ├── ClientPackageManifest.php
+│   │   │   ├── ClientPackageRuntime.php
 │   │   │   └── ViewResolver.php
 │   │   ├── ConfigContracts
 │   │   │   ├── ConfigContractRegistry.php
@@ -2597,6 +2600,7 @@
 │       └── WebinarSeeder.php
 ├── docs
 │   ├── architecture
+│   │   ├── client-packages.md
 │   │   └── deployment
 │   │       ├── command-ownership.md
 │   │       ├── deployment-orchestrator-contract.md
@@ -2606,6 +2610,7 @@
 │   ├── config-templates
 │   │   ├── campaign-presets-template.php
 │   │   ├── client-environment.example
+│   │   ├── client-packages-template.php
 │   │   ├── client-presets
 │   │   │   ├── artist
 │   │   │   │   └── config
@@ -3222,6 +3227,8 @@
 │   │   │   ├── ClientDashboardLayoutConfigTest.php
 │   │   │   ├── ClientEnvironmentLoaderTest.php
 │   │   │   ├── ClientEnvironmentUnreadableFileTest.php
+│   │   │   ├── ClientPackageManifestLoaderTest.php
+│   │   │   ├── ClientPackageRuntimeTest.php
 │   │   │   ├── ClientViewOverrideTest.php
 │   │   │   ├── CreateClientScriptTest.php
 │   │   │   ├── ExternalFormsClientEnvironmentContractTest.php
@@ -3861,4 +3868,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-877 directories, 2985 files
+877 directories, 2992 files

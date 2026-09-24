@@ -2,6 +2,7 @@
 
 namespace App\Support\Environment;
 
+use App\Support\Clients\ClientPackageRuntime;
 use App\Support\Environment\Data\EnvironmentVariableDefinition;
 use InvalidArgumentException;
 
@@ -18,6 +19,29 @@ final class EnvironmentVariableCatalog
      */
     public static function definitions(): array
     {
+        $definitions = self::builtInDefinitions();
+
+        foreach (
+            ClientPackageRuntime::manifest()->environmentDefinitions()
+            as $key => $definition
+        ) {
+            if (array_key_exists($key, $definitions)) {
+                throw new InvalidArgumentException(
+                    "Client package environment variable [{$key}] conflicts with an Engage-owned environment variable.",
+                );
+            }
+
+            $definitions[$key] = $definition;
+        }
+
+        return $definitions;
+    }
+
+    /**
+     * @return array<string, EnvironmentVariableDefinition>
+     */
+    public static function builtInDefinitions(): array
+    {
         $definitions = [];
 
         foreach (self::specifications() as [$key, $scope, $owner, $secret]) {
@@ -30,6 +54,12 @@ final class EnvironmentVariableCatalog
         }
 
         return $definitions;
+    }
+
+    /** @return array<int, string> */
+    public static function builtInKeys(): array
+    {
+        return array_keys(self::builtInDefinitions());
     }
 
     public static function definition(string $key): EnvironmentVariableDefinition
