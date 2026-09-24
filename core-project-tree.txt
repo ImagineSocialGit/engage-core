@@ -2081,6 +2081,8 @@
 │   │   │   │   ├── MigrationScopeDefinition.php
 │   │   │   │   ├── ModuleInstallation.php
 │   │   │   │   ├── ModuleInstallationRepository.php
+│   │   │   │   ├── ModuleMigrationBaselineBootstrapAssessment.php
+│   │   │   │   ├── ModuleMigrationBaselineBootstrapper.php
 │   │   │   │   ├── ModuleMigrationExecutionResult.php
 │   │   │   │   ├── ModuleMigrationExecutor.php
 │   │   │   │   ├── ModuleMigrationPathPolicy.php
@@ -3839,4 +3841,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-877 directories, 2963 files
+877 directories, 2965 files

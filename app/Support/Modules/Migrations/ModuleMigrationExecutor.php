@@ -21,6 +21,7 @@ final class ModuleMigrationExecutor
         private readonly ModuleMigrationStatusInspector $statusInspector,
         private readonly ModuleInstallationRepository $installations,
         private readonly ModuleMigrationPreflightInspector $preflight,
+        private readonly ModuleMigrationBaselineBootstrapper $baselineBootstrapper,
         private readonly MigrationFailureRecovery $failureRecovery,
     ) {}
 
@@ -73,7 +74,8 @@ final class ModuleMigrationExecutor
         }
 
         try {
-            $this->preflight->assertSafe($plan);
+            $preflight = $this->preflight->assertSafe($plan);
+            $this->baselineBootstrapper->bootstrap($preflight->statuses);
 
             return $operation();
         } finally {

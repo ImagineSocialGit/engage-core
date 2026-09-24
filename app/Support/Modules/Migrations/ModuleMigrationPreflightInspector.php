@@ -11,6 +11,7 @@ final class ModuleMigrationPreflightInspector
     public function __construct(
         private readonly Migrator $migrator,
         private readonly ModuleMigrationStatusInspector $statuses,
+        private readonly ModuleMigrationBaselineBootstrapper $baselineBootstrapper,
     ) {}
 
     public function inspect(
@@ -115,14 +116,19 @@ final class ModuleMigrationPreflightInspector
             if ($status->ledgerStatus === ModuleInstallation::STATUS_INSTALLED
                 && $status->integrityState === ModuleMigrationStatus::INTEGRITY_BASELINE_MISSING
             ) {
-                if ($status->pendingMigrationFiles !== []) {
-                    $blockers[] = sprintf(
-                        'Module [%s] has no accepted checksum baseline and has pending migrations [%s]. Establish the baseline in a schema-current deployment before adding module migrations.',
-                        $moduleKey,
-                        implode(', ', $status->pendingMigrationFiles),
-                    );
+                $assessment = $this->baselineBootstrapper->assess($status);
+
+                if (! $assessment->ready) {
+                    $blockers[] = $assessment->blocker
+                        ?? "Module [{$moduleKey}] legacy checksum baseline cannot be reconstructed safely.";
                 } else {
-                    $warnings[] = "Module [{$moduleKey}] has no accepted checksum baseline. This schema-current operation may establish it.";
+                    $warnings[] = $status->pendingMigrationFiles === []
+                        ? "Module [{$moduleKey}] has no accepted checksum baseline. The next locked module operation will establish it from the applied Laravel migration prefix."
+                        : sprintf(
+                            'Module [%s] has no accepted checksum baseline. The next locked module operation will establish the applied Laravel migration prefix before running pending migrations [%s].',
+                            $moduleKey,
+                            implode(', ', $status->pendingMigrationFiles),
+                        );
                 }
             }
         }
@@ -134,12 +140,13 @@ final class ModuleMigrationPreflightInspector
         );
     }
 
-    public function assertSafe(ModuleMigrationPlan $plan): void
-    {
+    public function assertSafe(
+        ModuleMigrationPlan $plan,
+    ): ModuleMigrationPreflightResult {
         $result = $this->inspect($plan);
 
         if ($result->safe()) {
-            return;
+            return $result;
         }
 
         throw new RuntimeException(

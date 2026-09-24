@@ -148,25 +148,144 @@ class ModuleMigrationPreflightTest extends TestCase
         $this->assertNotSame([], $result->blockers);
     }
 
-    public function test_missing_baseline_is_safe_only_when_installed_scope_has_no_pending_migrations(): void
+    public function test_missing_legacy_baseline_with_append_only_pending_migration_is_safe_and_is_established_before_pending_execution(): void
     {
         app(ModuleInstallationRepository::class)->markInstalled('core');
         ModuleInstallation::query()->whereKey('core')->update([
             'migration_checksums' => null,
         ]);
 
-        $current = $this->preflight('core');
-
-        $this->assertTrue($current->safe());
-        $this->assertNotSame([], $current->warnings);
-
-        $path = $this->temporaryMigrationPath(
-            '2099_01_01_000014_test_pending_without_baseline.php',
+        $filename = '2099_01_01_000014_test_pending_after_legacy_baseline.php';
+        $path = $this->temporaryMigrationPath($filename);
+        File::put(
+            $path,
+            $this->migrationSourceRequiringAcceptedBaseline('core'),
         );
-        File::put($path, $this->migrationSource('pending without baseline'));
 
         try {
-            $this->assertFalse($this->preflight('core')->safe());
+            $beforeMigrations = DB::table('migrations')->count();
+            $beforeInstallation = ModuleInstallation::query()->findOrFail('core');
+
+            $result = $this->preflight('core');
+
+            $this->assertTrue($result->safe());
+            $this->assertNotSame([], $result->warnings);
+            $this->assertNull($beforeInstallation->getRawOriginal('migration_checksums'));
+            $this->assertSame($beforeMigrations, DB::table('migrations')->count());
+            $this->assertNull(
+                ModuleInstallation::query()
+                    ->findOrFail('core')
+                    ->getRawOriginal('migration_checksums'),
+            );
+
+            $this->assertSame(0, Artisan::call('modules:migrate', [
+                'module' => 'core',
+            ]));
+
+            $this->assertDatabaseHas('migrations', [
+                'migration' => pathinfo($filename, PATHINFO_FILENAME),
+            ]);
+
+            $scope = app(ModuleMigrationRegistry::class)->requireModule('core');
+            $expectedChecksums = $scope->migrationChecksums;
+            $actualChecksums = ModuleInstallation::query()
+                ->findOrFail('core')
+                ->migration_checksums;
+            ksort($expectedChecksums, SORT_STRING);
+            ksort($actualChecksums, SORT_STRING);
+
+            $this->assertSame($expectedChecksums, $actualChecksums);
+        } finally {
+            $this->deleteMigrationRecord($filename);
+            File::delete($path);
+        }
+    }
+
+    public function test_missing_legacy_baseline_allows_stale_ledger_contract_when_applied_history_is_an_exact_prefix(): void
+    {
+        app(ModuleInstallationRepository::class)->markInstalled('core');
+
+        $scopeBeforePending = app(ModuleMigrationRegistry::class)->requireModule('core');
+
+        ModuleInstallation::query()->whereKey('core')->update([
+            'schema_version' => max(1, $scopeBeforePending->schemaVersion - 1),
+            'manifest_hash' => str_repeat('0', 64),
+            'migration_checksums' => null,
+        ]);
+
+        $filename = '2099_01_01_000015_test_pending_after_stale_legacy_contract.php';
+        $path = $this->temporaryMigrationPath($filename);
+        File::put(
+            $path,
+            $this->migrationSourceRequiringAcceptedBaseline('core'),
+        );
+
+        try {
+            $before = ModuleInstallation::query()->findOrFail('core');
+            $this->assertNotSame(
+                app(ModuleMigrationRegistry::class)->requireModule('core')->schemaVersion,
+                $before->schema_version,
+            );
+
+            $result = $this->preflight('core');
+
+            $this->assertTrue($result->safe());
+            $this->assertNotSame([], $result->warnings);
+            $this->assertNull(
+                ModuleInstallation::query()
+                    ->findOrFail('core')
+                    ->getRawOriginal('migration_checksums'),
+            );
+
+            $this->assertSame(0, Artisan::call('modules:migrate', [
+                'module' => 'core',
+            ]));
+
+            $currentScope = app(ModuleMigrationRegistry::class)->requireModule('core');
+            $currentInstallation = ModuleInstallation::query()->findOrFail('core');
+
+            $this->assertSame(
+                $currentScope->schemaVersion,
+                $currentInstallation->schema_version,
+            );
+            $this->assertSame(
+                app(ModuleMigrationRegistry::class)->manifestHash($currentScope),
+                $currentInstallation->manifest_hash,
+            );
+
+            $expectedChecksums = $currentScope->migrationChecksums;
+            $actualChecksums = $currentInstallation->migration_checksums;
+            ksort($expectedChecksums, SORT_STRING);
+            ksort($actualChecksums, SORT_STRING);
+
+            $this->assertSame($expectedChecksums, $actualChecksums);
+        } finally {
+            $this->deleteMigrationRecord($filename);
+            File::delete($path);
+        }
+    }
+
+    public function test_missing_legacy_baseline_blocks_when_applied_history_is_not_a_current_inventory_prefix(): void
+    {
+        app(ModuleInstallationRepository::class)->markInstalled('core');
+        ModuleInstallation::query()->whereKey('core')->update([
+            'migration_checksums' => null,
+        ]);
+
+        $filename = '2000_01_01_000001_test_inserted_before_legacy_baseline.php';
+        $path = $this->temporaryMigrationPath($filename);
+        File::put($path, $this->migrationSource('inserted before legacy baseline'));
+
+        try {
+            $result = $this->preflight('core');
+
+            $this->assertFalse($result->safe());
+            $this->assertNotSame([], $result->blockers);
+            $this->assertNull(
+                ModuleInstallation::query()
+                    ->findOrFail('core')
+                    ->getRawOriginal('migration_checksums'),
+            );
         } finally {
             File::delete($path);
         }
@@ -217,6 +336,37 @@ class ModuleMigrationPreflightTest extends TestCase
         DB::table('migrations')
             ->where('migration', pathinfo($filename, PATHINFO_FILENAME))
             ->delete();
+    }
+
+    private function migrationSourceRequiringAcceptedBaseline(
+        string $moduleKey,
+    ): string {
+        $moduleKeyLiteral = var_export($moduleKey, true);
+
+        return <<<PHP
+<?php
+
+use Illuminate\\Database\\Migrations\\Migration;
+use Illuminate\\Support\\Facades\\DB;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        \$baseline = DB::table('module_installations')
+            ->where('module_key', {$moduleKeyLiteral})
+            ->value('migration_checksums');
+
+        if (\$baseline === null) {
+            throw new \\RuntimeException(
+                'Pending module migration ran before the legacy checksum baseline was established.',
+            );
+        }
+    }
+
+    public function down(): void {}
+};
+PHP;
     }
 
     private function migrationSource(string $marker): string
