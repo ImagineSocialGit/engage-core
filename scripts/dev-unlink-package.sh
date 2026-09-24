@@ -204,21 +204,57 @@ LOCK_HASH_BEFORE="$(
     php -r 'echo hash_file("sha256", $argv[1]);' "$CLIENT_LOCK"
 )"
 
-if ! (
-    cd "$CLIENT_DIR"
-    composer reinstall "$PACKAGE_NAME" --no-interaction
-); then
-    if [[ ! -e "$PACKAGE_TARGET" ]]; then
-        ln -s "$LOCAL_PACKAGE_DIR" "$PACKAGE_TARGET" || true
+restore_local_link() {
+    if [[ -L "$PACKAGE_TARGET" ]]; then
+        rm "$PACKAGE_TARGET"
+    elif [[ -e "$PACKAGE_TARGET" ]]; then
+        rm -rf "$PACKAGE_TARGET"
     fi
 
-    echo "Composer could not restore the locked package."
-    echo "The script attempted to preserve the local development link at: $PACKAGE_TARGET"
+    mkdir -p "$(dirname "$PACKAGE_TARGET")"
+
+    if ! ln -s "$LOCAL_PACKAGE_DIR" "$PACKAGE_TARGET"; then
+        echo "CRITICAL: unable to restore local package symlink after Composer restore failure."
+        echo "Local checkout remains at: $LOCAL_PACKAGE_DIR"
+        echo "Expected runtime link:     $PACKAGE_TARGET"
+        return 1
+    fi
+
+    return 0
+}
+
+# Composer must see an empty package target. Leaving the local development
+# symlink in place makes Composer inspect the local checkout against the locked
+# revision and reject normal ahead-of-lock development changes as modified
+# vendor files.
+rm "$PACKAGE_TARGET"
+
+if ! (
+    cd "$CLIENT_DIR"
+    composer install --no-interaction
+); then
+    RESTORE_FAILED=0
+    restore_local_link || RESTORE_FAILED=1
+
+    echo "Composer could not install the lock-pinned client dependencies."
+
+    if [[ "$RESTORE_FAILED" -eq 0 ]]; then
+        echo "The local development link was restored at: $PACKAGE_TARGET"
+    fi
+
     exit 1
 fi
 
-if [[ -L "$PACKAGE_TARGET" ]]; then
-    echo "Composer reinstall completed but the package path is still a symlink; refusing to report a successful restore."
+if [[ -L "$PACKAGE_TARGET" || ! -d "$PACKAGE_TARGET" ]]; then
+    RESTORE_FAILED=0
+    restore_local_link || RESTORE_FAILED=1
+
+    echo "Composer reinstall did not produce a normal package directory."
+
+    if [[ "$RESTORE_FAILED" -eq 0 ]]; then
+        echo "The local development link was restored at: $PACKAGE_TARGET"
+    fi
+
     exit 1
 fi
 
@@ -227,8 +263,16 @@ LOCK_HASH_AFTER="$(
 )"
 
 if [[ "$LOCK_HASH_BEFORE" != "$LOCK_HASH_AFTER" ]]; then
+    RESTORE_FAILED=0
+    restore_local_link || RESTORE_FAILED=1
+
     echo "composer.lock changed during package restore, which is not expected from composer reinstall."
-    echo "Review client/$CLIENT_KEY_VALUE/composer.lock before committing."
+    echo "Review client/$CLIENT_KEY_VALUE/composer.lock before continuing."
+
+    if [[ "$RESTORE_FAILED" -eq 0 ]]; then
+        echo "The local development link was restored at: $PACKAGE_TARGET"
+    fi
+
     exit 1
 fi
 
