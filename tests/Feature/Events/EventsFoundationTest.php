@@ -2,10 +2,14 @@
 
 namespace Tests\Feature\Events;
 
+use App\Modules\Core\Models\Contact;
 use App\Modules\Events\Enums\EventAttendanceMode;
+use App\Modules\Events\Enums\EventAttendanceStatus;
 use App\Modules\Events\Enums\EventStatus;
 use App\Modules\Events\Models\Event;
+use App\Modules\Events\Models\EventAttendance;
 use App\Modules\Events\Models\EventExternalReference;
+use App\Modules\Events\Models\EventStakeholder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
@@ -47,11 +51,33 @@ class EventsFoundationTest extends TestCase
             'label',
             'deleted_at',
         ]);
+
+        $this->assertTableHasColumns('event_stakeholders', [
+            'event_id',
+            'role_key',
+            'name',
+            'organization',
+            'email',
+            'phone',
+            'notes',
+            'deleted_at',
+        ]);
+
+        $this->assertTableHasColumns('event_attendances', [
+            'event_id',
+            'contact_id',
+            'status',
+            'observed_at',
+            'source_key',
+            'source_reference',
+            'deleted_at',
+        ]);
     }
 
-    public function test_event_factory_persists_enum_casts_and_historical_location_snapshot(): void
+    public function test_event_factory_persists_enum_casts_optional_type_and_historical_location_snapshot(): void
     {
         $event = Event::factory()->upcoming()->create([
+            'type_key' => null,
             'attendance_mode' => EventAttendanceMode::Hybrid->value,
             'ends_at' => null,
             'venue_name' => 'Civic Hall',
@@ -62,6 +88,7 @@ class EventsFoundationTest extends TestCase
 
         $event->refresh();
 
+        $this->assertNull($event->type_key);
         $this->assertSame(EventStatus::Upcoming, $event->status);
         $this->assertSame(EventAttendanceMode::Hybrid, $event->attendance_mode);
         $this->assertNull($event->ends_at);
@@ -98,6 +125,61 @@ class EventsFoundationTest extends TestCase
         $this->assertTrue($primary->event->is($event));
     }
 
+    public function test_event_owns_occurrence_specific_stakeholder_snapshots(): void
+    {
+        $event = Event::factory()->create();
+
+        $stakeholder = EventStakeholder::factory()->forEvent($event)->create([
+            'role_key' => 'promoter',
+            'name' => 'Alex Rivera',
+            'organization' => 'Riverfront Presents',
+            'email' => 'alex@example.test',
+            'phone' => '+1 312 555 0100',
+            'notes' => 'Day-of-show contact.',
+        ]);
+
+        $event->refresh();
+
+        $this->assertCount(1, $event->stakeholders);
+        $this->assertTrue($event->stakeholders->first()->is($stakeholder));
+        $this->assertTrue($stakeholder->event->is($event));
+        $this->assertSame('promoter', $stakeholder->role_key);
+        $this->assertSame('Riverfront Presents', $stakeholder->organization);
+    }
+
+    public function test_event_owns_one_generic_attendance_outcome_per_contact(): void
+    {
+        $event = Event::factory()->create();
+        $contact = Contact::factory()->create();
+
+        $attendance = EventAttendance::factory()
+            ->forEvent($event)
+            ->forContact($contact)
+            ->didNotAttend()
+            ->create([
+                'observed_at' => now()->subHour()->startOfSecond(),
+                'source_reference' => 'import-row-42',
+            ]);
+
+        $attendance->refresh();
+        $event->refresh();
+
+        $this->assertSame(
+            EventAttendanceStatus::DidNotAttend,
+            $attendance->status,
+        );
+        $this->assertTrue($attendance->event->is($event));
+        $this->assertTrue($attendance->contact->is($contact));
+        $this->assertTrue($event->attendances->contains($attendance));
+
+        $this->expectException(QueryException::class);
+
+        EventAttendance::factory()
+            ->forEvent($event)
+            ->forContact($contact)
+            ->create();
+    }
+
     public function test_external_provider_identity_cannot_be_reused_across_events(): void
     {
         EventExternalReference::factory()->create([
@@ -129,10 +211,17 @@ class EventsFoundationTest extends TestCase
         $this->assertNull($event->refresh()->primary_external_reference_id);
     }
 
-    public function test_force_deleting_an_event_cascades_its_external_references(): void
+    public function test_force_deleting_an_event_cascades_owned_foundation_rows(): void
     {
         $event = Event::factory()->create();
+        $contact = Contact::factory()->create();
+
         $reference = EventExternalReference::factory()->forEvent($event)->create();
+        $stakeholder = EventStakeholder::factory()->forEvent($event)->create();
+        $attendance = EventAttendance::factory()
+            ->forEvent($event)
+            ->forContact($contact)
+            ->create();
 
         $event->update([
             'primary_external_reference_id' => $reference->getKey(),
@@ -142,6 +231,12 @@ class EventsFoundationTest extends TestCase
 
         $this->assertDatabaseMissing('event_external_references', [
             'id' => $reference->getKey(),
+        ]);
+        $this->assertDatabaseMissing('event_stakeholders', [
+            'id' => $stakeholder->getKey(),
+        ]);
+        $this->assertDatabaseMissing('event_attendances', [
+            'id' => $attendance->getKey(),
         ]);
     }
 
@@ -162,15 +257,6 @@ class EventsFoundationTest extends TestCase
                 "Unexpected optional or generic column [events.{$column}].",
             );
         }
-
-        $this->assertSame(
-            'must_be_empty',
-            config('project_state.table_policies.events.mode'),
-        );
-        $this->assertSame(
-            'must_be_empty',
-            config('project_state.table_policies.event_external_references.mode'),
-        );
     }
 
     /**

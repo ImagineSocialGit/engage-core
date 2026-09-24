@@ -531,8 +531,10 @@
 │   │   │   │   ├── EventAttendanceStatus.php
 │   │   │   │   └── EventStatus.php
 │   │   │   ├── Models
+│   │   │   │   ├── EventAttendance.php
 │   │   │   │   ├── EventExternalReference.php
-│   │   │   │   └── Event.php
+│   │   │   │   ├── Event.php
+│   │   │   │   └── EventStakeholder.php
 │   │   │   ├── Providers
 │   │   │   │   └── EventsModuleServiceProvider.php
 │   │   │   └── Services
@@ -2399,8 +2401,10 @@
 │   │   ├── DocumentRequirementDefinitionFactory.php
 │   │   ├── DocumentReviewEventFactory.php
 │   │   ├── DocumentUploadFactory.php
+│   │   ├── EventAttendanceFactory.php
 │   │   ├── EventExternalReferenceFactory.php
 │   │   ├── EventFactory.php
+│   │   ├── EventStakeholderFactory.php
 │   │   ├── FlowRouteCapabilityBindingFactory.php
 │   │   ├── FlowRouteCapabilityFactory.php
 │   │   ├── FlowRouteFactory.php
@@ -2482,7 +2486,9 @@
 │   │   │   │   └── 2026_07_02_000004_create_document_review_events_table.php
 │   │   │   ├── events
 │   │   │   │   ├── 2026_08_03_200000_create_events_table.php
-│   │   │   │   └── 2026_08_03_200001_create_event_external_references_table.php
+│   │   │   │   ├── 2026_08_03_200001_create_event_external_references_table.php
+│   │   │   │   ├── 2026_08_03_200002_create_event_stakeholders_table.php
+│   │   │   │   └── 2026_08_03_200003_create_event_attendances_table.php
 │   │   │   ├── flow_routes
 │   │   │   │   ├── 2026_04_15_203500_create_flow_routes_table.php
 │   │   │   │   ├── 2026_04_15_203505_create_flow_route_trigger_bindings_table.php
@@ -3878,4 +3884,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-877 directories, 3002 files
+877 directories, 3008 files

@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('events', function (Blueprint $table): void {
             $table->id();
 
-            $table->string('type_key', 80)->index();
+            $table->string('type_key', 80)->nullable()->index();
             $table->string('title');
             $table->text('description')->nullable();
 

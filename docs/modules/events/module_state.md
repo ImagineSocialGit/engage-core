@@ -1,6 +1,6 @@
 # Events Module
 
-Events is a planned universal module with an approved architecture and no repository implementation yet.
+Events is a universal module with an approved architecture. Its definition registry and persistence foundation are implemented; operational lifecycle, promotion, attendance-writing, automation, and CRM administration remain to be completed.
 
 Events is a thin catalog and reconciliation capability for concrete events that are operated, produced, ticketed, hosted, or streamed outside Engage Core.
 
@@ -510,7 +510,7 @@ references remain passive integration data
 
 Do not duplicate that identity in a `public_url` Event column.
 
-Because `events` and `event_external_references` form a circular reference, create the tables first and add the primary-reference foreign key in a separate migration. Project State must restore that pointer through an explicit deferred reference.
+Because `events` and `event_external_references` form a circular reference, create the tables first and add the primary-reference foreign key in a separate migration. Any legacy transfer/diagnostic tooling that later supports Events must restore that pointer dependency-safely rather than changing the runtime schema.
 
 An external ticket page may become primary only through explicit admin selection.
 
@@ -790,23 +790,13 @@ no retained per-row payload copies
 generation time and adapter/template version in filename or artifact metadata
 ```
 
-## Project State
+## Legacy Project State classification
 
-Events durable state must be supported by Project State in the same implementation workstream as the Events foundation. Any Events transfer-contract change must deliberately bump the authoritative current Project State version in `config/project_state.php`; do not duplicate the current numeric version in module backlog text.
+Project State is retired as the production client-update mechanism. Events rollout, installation, upgrades, and client deployment must use the normal module migration/deployment flow and must not depend on a Project State export/import contract.
 
-Expected dependency-safe section order:
+Events-owned durable tables should still be classified explicitly in the legacy Project State table-policy registry so diagnostic/export tooling fails deliberately rather than silently omitting state. Until Events transfer support is intentionally added for a real legacy/diagnostic requirement, the Events tables may remain classified as `must_be_empty`.
 
-```text
-events
-event_external_references
-event_stakeholders
-event_attendances
-deferred events.primary_external_reference_id restoration
-```
-
-Project State must also classify the Event morph aliases used by Automation Events and any other supported polymorphic references.
-
-Do not ship operational Events while its durable tables remain under a must-be-empty table policy.
+Do not add an Events Project State section or bump the Project State version solely to implement or deploy Events. If legacy transfer support is later required, it must be treated as compatibility work rather than an Events runtime dependency and must restore `events.primary_external_reference_id` dependency-safely.
 
 Ephemeral caches or reconstructible export artifacts should not become transferred durable state.
 
@@ -815,30 +805,33 @@ Ephemeral caches or reconstructible export artifacts should not become transferr
 ```text
 1. module/config registration and definition registries
 2. Events schema, models, factories, and ownership tests
-3. Project State Events section and current-format version bump
-4. readiness, announcement, promotion, and duplicate gates
-5. lifecycle and attendance actions plus neutral automation events
-6. scheduled Event reconciliation
-7. setup validation
-8. CRM Event administration
-9. optional consumers through public seams
-10. Music/Bandsintown integration
-11. Experiences against the stable Events contract
+3. readiness, announcement, promotion, and duplicate gates
+4. lifecycle and attendance actions plus neutral automation events
+5. scheduled Event reconciliation
+6. setup validation
+7. CRM Event administration
+8. optional consumers through public seams
+9. Music/Bandsintown integration
+10. Experiences against the stable Events contract
 ```
 
 Do not include Music, Bandsintown, Commerce, Experiences, FlowRoutes, Messaging, or public storefront behavior in the Events foundation batch.
 
 ## Implementation status
 
-Current repository status:
+Current repository status after the persistence foundation:
 
 ```text
-Events module directory: not present
-Events tables: not present
-Events config: not present
-Events Project State section: not present
+Events module directory: present
+Events config and definition registry: present
+Events tables: events, event_external_references, event_stakeholders, event_attendances
+Events models/factories: present for all four owned tables
+Legacy Project State policy: all four Events tables explicitly classified must_be_empty; no Events transfer section is required for rollout
 Events CRM routes/navigation: not present
-Events runtime actions/services: not present
+Events readiness/promotion/lifecycle/attendance actions: not present
+Events automation/scheduled reconciliation: not present
 ```
 
-This document is the canonical architecture reference to use before implementation. Exact file manifests still require a fresh dependency cone for every consumer module touched by a later integration batch.
+The next implementation work should follow the approved order above: readiness and promotion gates, lifecycle and attendance actions, scheduled reconciliation, setup validation, and CRM administration before optional consumers are added.
+
+This document remains the canonical architecture reference. Exact file manifests still require a fresh dependency cone for every consumer module touched by a later integration batch.

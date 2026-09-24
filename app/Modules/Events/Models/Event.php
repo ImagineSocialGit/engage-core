@@ -71,4 +71,14 @@ class Event extends Model
             'primary_external_reference_id',
         );
     }
+
+    public function stakeholders(): HasMany
+    {
+        return $this->hasMany(EventStakeholder::class);
+    }
+
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(EventAttendance::class);
+    }
 }

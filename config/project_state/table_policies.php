@@ -183,6 +183,14 @@ return [
         'mode' => 'must_be_empty',
         'reason' => 'Events transfer support has not been added yet.',
     ],
+    'event_stakeholders' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Events transfer support has not been added yet.',
+    ],
+    'event_attendances' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Events transfer support has not been added yet.',
+    ],
 
     'commerce_customers' => [
         'mode' => 'must_be_empty',
