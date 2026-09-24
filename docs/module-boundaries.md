@@ -560,6 +560,8 @@ Current ownership:
 | commerce_customers | Commerce |
 | commerce_products | Commerce |
 | commerce_product_variants | Commerce |
+| commerce_offers | Commerce |
+| commerce_offer_variants | Commerce |
 | commerce_product_provider_mappings | Commerce |
 | commerce_product_variant_provider_mappings | Commerce |
 | commerce_orders | Commerce |
@@ -635,14 +637,12 @@ events                         Events
 event_external_references      Events
 event_stakeholders             Events
 event_attendances              Events
-commerce_offers                Commerce
-commerce_offer_variants        Commerce
 Experience-owned tables        Experiences, after its schema is approved
 ```
 
 Reserved ownership does not mean the tables currently exist. Add each table to the executable schema ownership and Project State coverage contracts in the same implementation workstream that creates it.
 
-No new durable feature table may become operational while Project State still treats it as unclassified or must-be-empty. Credentials, secrets, ephemeral carts/checkouts, signed URLs, caches, and other reconstructible runtime artifacts should remain outside durable transfer.
+Every new durable feature table must be explicitly classified in legacy Project State coverage so diagnostic/export tooling cannot silently omit it. A `must_be_empty` classification is acceptable for an operational table when Project State is not that feature's deployment/transfer mechanism; in that case legacy export intentionally fails once live state exists. Credentials, secrets, ephemeral carts/checkouts, signed URLs, caches, and other reconstructible runtime artifacts should remain outside durable transfer.
 
 ## Module Tiers
 

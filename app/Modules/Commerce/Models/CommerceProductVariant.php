@@ -60,6 +60,11 @@ class CommerceProductVariant extends Model
         return $this->hasMany(CommerceProductVariantProviderMapping::class);
     }
 
+    public function offerVariants(): HasMany
+    {
+        return $this->hasMany(CommerceOfferVariant::class);
+    }
+
     public function inventoryEffects(): HasMany
     {
         return $this->hasMany(CommerceInventoryEffect::class);

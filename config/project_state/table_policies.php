@@ -196,6 +196,14 @@ return [
         'mode' => 'must_be_empty',
         'reason' => 'Legacy Project State does not transfer Commerce state. Production Commerce uses normal migrations and database backup/recovery; once Commerce is operational, do not use Project State as a transfer mechanism.',
     ],
+    'commerce_offers' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Legacy Project State does not transfer Commerce state. Production Commerce uses normal migrations and database backup/recovery; once Commerce is operational, do not use Project State as a transfer mechanism.',
+    ],
+    'commerce_offer_variants' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Legacy Project State does not transfer Commerce state. Production Commerce uses normal migrations and database backup/recovery; once Commerce is operational, do not use Project State as a transfer mechanism.',
+    ],
     'commerce_product_provider_mappings' => [
         'mode' => 'must_be_empty',
         'reason' => 'Legacy Project State does not transfer Commerce state. Production Commerce uses normal migrations and database backup/recovery; once Commerce is operational, do not use Project State as a transfer mechanism.',

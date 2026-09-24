@@ -2,6 +2,7 @@
 
 use App\Modules\Commerce\Models\CommerceOrder;
 use App\Modules\Commerce\Models\CommerceProduct;
+use App\Modules\Commerce\Models\CommerceProductVariant;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -10,7 +11,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('commerce_order_items', function (Blueprint $table) {
+        Schema::create('commerce_order_items', function (Blueprint $table): void {
             $table->id();
 
             $table->foreignIdFor(CommerceOrder::class)
@@ -18,6 +19,11 @@ return new class extends Migration
                 ->cascadeOnDelete();
 
             $table->foreignIdFor(CommerceProduct::class)
+                ->nullable()
+                ->constrained()
+                ->nullOnDelete();
+
+            $table->foreignIdFor(CommerceProductVariant::class)
                 ->nullable()
                 ->constrained()
                 ->nullOnDelete();

@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Commerce\Enums\CommerceProviderRole;
+use App\Modules\Commerce\Enums\CommerceStorefrontView;
 
 return [
     /*
@@ -51,6 +52,28 @@ return [
         CommerceProviderRole::PointOfSale->value => [
             'default' => null,
             'scopes' => [],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Storefront Presentation
+    |--------------------------------------------------------------------------
+    |
+    | Commerce will ship a complete default Blade storefront. Client repos may
+    | override any logical storefront view independently without replacing
+    | Commerce controllers, view models, provider resolution, or checkout
+    | orchestration. The default public views themselves land with the public
+    | storefront surface; these names establish the presentation seam now.
+    |
+    */
+
+    'storefront' => [
+        'views' => [
+            CommerceStorefrontView::Home->value => CommerceStorefrontView::Home->defaultView(),
+            CommerceStorefrontView::Offer->value => CommerceStorefrontView::Offer->defaultView(),
+            CommerceStorefrontView::Cart->value => CommerceStorefrontView::Cart->defaultView(),
+            CommerceStorefrontView::CheckoutReturn->value => CommerceStorefrontView::CheckoutReturn->defaultView(),
         ],
     ],
 ];

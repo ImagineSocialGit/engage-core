@@ -18,6 +18,8 @@ Implemented foundation:
 commerce_customers
 commerce_products
 commerce_product_variants
+commerce_offers
+commerce_offer_variants
 commerce_product_provider_mappings
 commerce_product_variant_provider_mappings
 commerce_orders
@@ -29,6 +31,8 @@ commerce_inventory_adjustments
 CommerceCustomer
 CommerceProduct
 CommerceProductVariant
+CommerceOffer
+CommerceOfferVariant
 CommerceProductProviderMapping
 CommerceProductVariantProviderMapping
 CommerceOrder
@@ -39,27 +43,46 @@ CommerceInventoryAdjustment
 
 CommerceProviderRegistry
 CommerceProviderRoleResolver
+CommerceProviderVariantReferenceResolver
+CommerceOfferPublicationEvaluator
+CommerceStorefrontStateResolver
+CommerceCheckoutService
+CommerceStorefrontViewResolver
 provider-neutral Commerce capability contracts
+provider-authoritative pricing/promotion/checkout DTO contracts
 durable inventory-effect recording/idempotency
 CommerceModuleServiceProvider
+```
+
+Offer/storefront foundation now also owns:
+
+```text
+commerce_offers
+commerce_offer_variants
+CommerceOffer
+CommerceOfferVariant
+provider-ready offer publication evaluation
+default-variant selection
+provider-neutral authoritative pricing projection
+optional provider promotion projection/context
+provider-backed checkout handoff
+logical default-storefront view mapping with partial client overrides
 ```
 
 Current limitations:
 
 ```text
-no Commerce public routes or storefront surface
-no Commerce offer model
-no provider-authoritative pricing/promotion read model or resolver
+no Commerce public routes or default Blade storefront pages yet
+no provider integrations implementing the Commerce contracts yet
 no durable promotion/source attribution seam
 no provider-backed inventory adjustment executor/reconciler
-no provider adapters for the planned Commerce seams
-no provider-backed cart/checkout orchestration
 no verified commerce-provider webhook handlers
+no authoritative order reconciliation pipeline
 no provider-neutral purchase-confirmed public signal
 no Commerce CRM operations
 ```
 
-The current foundation now provides canonical product/variant identity, explicit multi-provider mappings, provider-role resolution, and durable inventory-effect identity. It is not yet sufficient for production storefront checkout, provider reconciliation, or outbound authoritative inventory adjustment.
+The current foundation now provides canonical product/variant identity, explicit multi-provider mappings, provider-role resolution, durable inventory-effect identity, Commerce-authored offers, provider-ready publication checks, authoritative storefront-state reads, and a secure provider-backed checkout handoff contract. The next provider package can implement those contracts without moving vendor behavior into Commerce. Public storefront routes/views, provider reconciliation, and outbound authoritative inventory adjustment remain separate work.
 
 ## Product barometer
 
@@ -295,6 +318,8 @@ Current owned tables:
 commerce_customers
 commerce_products
 commerce_product_variants
+commerce_offers
+commerce_offer_variants
 commerce_product_provider_mappings
 commerce_product_variant_provider_mappings
 commerce_orders
@@ -307,8 +332,6 @@ commerce_inventory_adjustments
 Approved next durable concepts include:
 
 ```text
-commerce_offers
-commerce_offer_variants
 provider-authoritative storefront price/promotion projections when durable projection state is justified
 durable promotion/source attribution when the storefront/checkout workflow requires it
 ```
@@ -731,7 +754,7 @@ optional Event linkage through a Commerce-owned relationship or subject seam
 optional vertical-owned mapping references
 ```
 
-Expected tables remain:
+Implemented tables:
 
 ```text
 commerce_offers
@@ -750,6 +773,25 @@ another marketplace/channel
 ```
 
 Commerce should not assume only one sales surface exists.
+
+### Default storefront and client presentation overrides
+
+Commerce should ship a small complete default Blade storefront rather than requiring every client to author a storefront before Commerce can be used. The public surface should consume Commerce-owned view models/storefront state and never call provider adapters directly from Blade.
+
+The presentation seam is a logical view map under `commerce.storefront.views`. The default map points at Commerce-owned Blade views. A client repo may replace one or more logical view names while inheriting every other default page.
+
+Conceptually:
+
+```text
+Commerce controller / storefront state
+    -> logical storefront view
+        -> client override when configured
+        -> otherwise Commerce default Blade view
+```
+
+Client overrides are presentation overrides, not Commerce forks. They may change layout, typography, navigation, product-card composition, hero treatment, and surrounding copy, but provider resolution, publication rules, canonical variant identity, pricing/promotion authority, and checkout orchestration remain Commerce-owned services.
+
+Engage Artist Sites is not a Commerce dependency. An artist client may make its Commerce storefront visually match its artist site through client-owned views/styles while another client may use the default Commerce presentation unchanged.
 
 ## Pricing, discounts, promotions, and attribution
 
@@ -1112,26 +1154,19 @@ Commerce migration ownership remains directory-based:
 database/migrations/modules/commerce
 ```
 
-`config/module_migrations.php` declares only the Commerce migration directory. The migration registry discovers Commerce migration files from that directory, derives the current schema version from the discovered files, and derives the manifest/checksum contract from those file contents. Adding a Commerce migration does not require editing a migration filename list or manual schema-version number.
+`config/module_migrations.php` declares only the Commerce migration directory. The migration registry discovers Commerce migration files dynamically and derives its schema/checksum metadata from those files. Commerce must not maintain a manual migration filename list or schema-version counter.
 
-Applied/accepted Commerce migration files are immutable. Schema changes after acceptance use a new append-only migration rather than editing an accepted migration in place.
+Commerce has not yet been deployed to staging or production. While that remains true, Commerce is a pre-release schema and its create migrations may be edited, renamed, or consolidated in place as the design evolves. Relationships added to an existing Commerce table belong in that table's current create migration rather than in a later `Schema::table(...)` migration. Entirely new Commerce tables may use focused create migrations, and those create migrations remain editable until the module first ships.
 
-For an existing tracked Commerce installation:
-
-```bash
-php artisan modules:preflight commerce
-php artisan modules:migrate commerce
-```
-
-Preflight must pass before migration mutation. It validates the accepted migration checksum history and blocks changed or missing accepted files.
-
-For a fresh Commerce installation:
+During this pre-release phase, dev applies Commerce schema changes through a clean rebuild:
 
 ```bash
-php artisan modules:install commerce
+php artisan engage:refresh
 ```
 
-The normal deployment/update pipeline remains platform migration first, then module preflight and module migration. Commerce does not bypass or duplicate the shared migration registry/preflight infrastructure.
+Do not use checksum preflight as a reason to preserve obsolete dev-only Commerce migration history. The refresh deliberately rebuilds the development schema and migration ledger from the current source.
+
+Once Commerce is deployed to staging or production, the rule changes immediately: deployed/accepted migration files become immutable, and subsequent Commerce schema changes use new append-only migrations through the normal `modules:preflight` then `modules:migrate --force` deployment path.
 
 ## Setup validation
 
@@ -1155,19 +1190,19 @@ Validation should report actionable findings without making external provider ca
 
 ## Implementation order
 
+The provider-neutral offer/storefront contracts and schema are now established. Continue in this order:
+
 ```text
-1. provider-authoritative pricing/promotion read and projection contracts
-2. Commerce offer/storefront presentation schema/model
-3. durable promotion/source attribution seam for storefront/checkout/purchase flows
-4. first required external provider package(s) for the concrete client roles
-5. verified webhook inbox integration and idempotent order/inventory reconciliation
-6. provider-backed inventory adjustment orchestration using the recorded inventory effects
-7. provider-neutral purchase-confirmed outcome
-8. Commerce CRM operations
-9. client-configured public storefront/offer surface with provider-backed promotions and checkout
-10. optional Event promotion gate integration
-11. Experiences package mapping/grant and inventory-component consumption
-12. optional Contact filters, Messaging, FlowRoutes, and Reporting contributors
+1. first required external provider package(s) for the concrete client roles
+2. verified webhook inbox integration and idempotent order/inventory reconciliation
+3. provider-backed inventory adjustment orchestration using the recorded inventory effects
+4. provider-neutral purchase-confirmed outcome
+5. durable promotion/source attribution required by public campaign/QR/storefront flows
+6. Commerce CRM operations
+7. client-configured public storefront/offer surface using the default-view/partial-override seam
+8. optional Event promotion gate integration
+9. Experiences package mapping/grant and inventory-component consumption
+10. optional Contact filters, Messaging, FlowRoutes, and Reporting contributors
 ```
 
 Provider packages remain separate integrations. Commerce must continue depending only on provider-neutral contracts and normalized persistence; provider-specific API clients, credentials, webhook verification, and payload translation stay outside the module.

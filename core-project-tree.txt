@@ -273,14 +273,25 @@
 │   │   │   │   └── CommerceProvider.php
 │   │   │   ├── Controllers
 │   │   │   ├── Data
-│   │   │   │   └── CommerceInventoryEffectData.php
+│   │   │   │   ├── CommerceCheckoutRequest.php
+│   │   │   │   ├── CommerceCheckoutResult.php
+│   │   │   │   ├── CommerceInventoryEffectData.php
+│   │   │   │   ├── CommerceOfferPublicationState.php
+│   │   │   │   ├── CommercePricingState.php
+│   │   │   │   ├── CommercePromotionState.php
+│   │   │   │   ├── CommerceProviderReferenceData.php
+│   │   │   │   ├── CommerceProviderVariantReference.php
+│   │   │   │   └── CommerceStorefrontState.php
 │   │   │   ├── Enums
 │   │   │   │   ├── CommerceInventoryAuthorityMode.php
-│   │   │   │   └── CommerceProviderRole.php
+│   │   │   │   ├── CommerceProviderRole.php
+│   │   │   │   └── CommerceStorefrontView.php
 │   │   │   ├── Models
 │   │   │   │   ├── CommerceCustomer.php
 │   │   │   │   ├── CommerceInventoryAdjustment.php
 │   │   │   │   ├── CommerceInventoryEffect.php
+│   │   │   │   ├── CommerceOffer.php
+│   │   │   │   ├── CommerceOfferVariant.php
 │   │   │   │   ├── CommerceOrderEvent.php
 │   │   │   │   ├── CommerceOrderItem.php
 │   │   │   │   ├── CommerceOrder.php
@@ -292,9 +303,14 @@
 │   │   │   │   └── CommerceModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
+│   │   │   │   ├── CommerceCheckoutService.php
 │   │   │   │   ├── CommerceInventoryEffectRecorder.php
+│   │   │   │   ├── CommerceOfferPublicationEvaluator.php
 │   │   │   │   ├── CommerceProviderRegistry.php
-│   │   │   │   └── CommerceProviderRoleResolver.php
+│   │   │   │   ├── CommerceProviderRoleResolver.php
+│   │   │   │   ├── CommerceProviderVariantReferenceResolver.php
+│   │   │   │   ├── CommerceStorefrontStateResolver.php
+│   │   │   │   └── CommerceStorefrontViewResolver.php
 │   │   │   └── Support
 │   │   ├── Core
 │   │   │   ├── Access
@@ -2356,6 +2372,8 @@
 │   │   ├── CampaignStepFactory.php
 │   │   ├── CampaignStepVariantFactory.php
 │   │   ├── CommerceCustomerFactory.php
+│   │   ├── CommerceOfferFactory.php
+│   │   ├── CommerceOfferVariantFactory.php
 │   │   ├── CommerceOrderEventFactory.php
 │   │   ├── CommerceOrderFactory.php
 │   │   ├── CommerceOrderItemFactory.php
@@ -2432,7 +2450,8 @@
 │   │   │   │   ├── 2026_07_02_000007_create_commerce_orders_table.php
 │   │   │   │   ├── 2026_07_02_000008_create_commerce_order_items_table.php
 │   │   │   │   ├── 2026_07_02_000009_create_commerce_order_events_table.php
-│   │   │   │   └── 2026_09_22_190000_add_provider_neutral_catalog_inventory_foundation.php
+│   │   │   │   ├── 2026_09_22_190000_create_commerce_inventory_foundation_tables.php
+│   │   │   │   └── 2026_09_22_200000_create_commerce_offer_storefront_foundation_tables.php
 │   │   │   ├── core
 │   │   │   │   ├── 2026_04_15_195800_create_contact_statuses_table.php
 │   │   │   │   ├── 2026_04_15_195849_create_contact_import_batches_table.php
@@ -3208,7 +3227,8 @@
 │   │   │   ├── ExternalFormsClientEnvironmentContractTest.php
 │   │   │   └── ProjectStateClientEnvironmentContractTest.php
 │   │   ├── Commerce
-│   │   │   └── CommerceFoundationTest.php
+│   │   │   ├── CommerceFoundationTest.php
+│   │   │   └── CommerceStorefrontFoundationTest.php
 │   │   ├── ConfigContracts
 │   │   │   ├── ComposedPresetConfigContractTargetProviderTest.php
 │   │   │   ├── ConfigContractRegistryTest.php
@@ -3841,4 +3861,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-877 directories, 2965 files
+877 directories, 2985 files
