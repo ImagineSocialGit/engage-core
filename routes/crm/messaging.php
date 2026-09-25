@@ -49,6 +49,9 @@ Route::middleware('module:messaging')
 
         Route::post('/{messageSuppression}/release', [MessageDeliveryIssueController::class, 'release'])
             ->name('release');
+
+        Route::post('/{messageSuppression}/dismiss', [MessageDeliveryIssueController::class, 'dismiss'])
+            ->name('dismiss');
     });
 
 Route::middleware('module:messaging')

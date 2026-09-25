@@ -76,6 +76,88 @@ class MessageDeliveryIssueReviewTest extends TestCase
         ]);
     }
 
+    public function test_soft_deleted_contact_does_not_keep_suppression_in_review_queue(): void
+    {
+        $contact = Contact::factory()->create([
+            'email' => 'deleted@example.com',
+        ]);
+
+        $suppression = $this->suppression(
+            channel: MessageChannel::Email->value,
+            destination: 'deleted@example.com',
+            reason: MessageSuppression::REASON_BOUNCE,
+        );
+
+        $this->assertTrue(
+            app(MessageDeliveryIssueReviewService::class)
+                ->query()
+                ->whereKey($suppression->getKey())
+                ->exists(),
+        );
+
+        $contact->delete();
+
+        $this->assertFalse(
+            app(MessageDeliveryIssueReviewService::class)
+                ->query()
+                ->whereKey($suppression->getKey())
+                ->exists(),
+        );
+
+        $this->assertDatabaseHas('message_suppressions', [
+            'id' => $suppression->getKey(),
+            'destination' => 'deleted@example.com',
+            'released_at' => null,
+        ]);
+    }
+
+    public function test_admin_can_dismiss_current_issue_without_releasing_suppression(): void
+    {
+        $user = User::factory()->create();
+        Contact::factory()->create([
+            'email' => 'dismiss@example.com',
+        ]);
+
+        $suppression = $this->suppression(
+            channel: MessageChannel::Email->value,
+            destination: 'dismiss@example.com',
+            reason: MessageSuppression::REASON_BOUNCE,
+            provider: MessageSuppression::PROVIDER_RESEND,
+        );
+
+        $this
+            ->actingAs($user)
+            ->post(
+                route('crm.messaging.delivery-issues.dismiss', $suppression),
+            )
+            ->assertRedirect(route('crm.messaging.delivery-issues.index'))
+            ->assertSessionHas(
+                'success',
+                'Delivery issue dismissed from review. The destination remains suppressed.',
+            );
+
+        $suppression->refresh();
+
+        $this->assertNull($suppression->released_at);
+        $this->assertNotNull(
+            data_get($suppression->meta, 'delivery_issue_review.dismissed_at'),
+        );
+        $this->assertSame(
+            $user->getKey(),
+            data_get(
+                $suppression->meta,
+                'delivery_issue_review.dismissed_by_user_id',
+            ),
+        );
+
+        $this->assertFalse(
+            app(MessageDeliveryIssueReviewService::class)
+                ->query()
+                ->whereKey($suppression->getKey())
+                ->exists(),
+        );
+    }
+
     public function test_contact_panel_flags_only_suppressions_matching_current_contact_information(): void
     {
         $contact = Contact::factory()->create([

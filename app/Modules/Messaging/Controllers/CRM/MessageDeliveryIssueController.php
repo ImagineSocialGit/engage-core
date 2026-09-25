@@ -92,6 +92,39 @@ final class MessageDeliveryIssueController extends Controller
             ->with('success', 'Messaging suppression released.');
     }
 
+    public function dismiss(
+        Request $request,
+        MessageSuppression $messageSuppression,
+        MessageDeliveryIssueReviewService $issues,
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'return_to' => ['nullable', 'string', 'max:2048'],
+        ]);
+
+        if (! $messageSuppression->isActive()) {
+            throw ValidationException::withMessages([
+                'delivery_issue' => 'This suppression has already been released.',
+            ]);
+        }
+
+        if (! $issues->isCurrentIssue($messageSuppression)) {
+            throw ValidationException::withMessages([
+                'delivery_issue' => 'This destination no longer matches current Contact information.',
+            ]);
+        }
+
+        $issues->dismiss(
+            suppression: $messageSuppression,
+            actorUserId: $request->user()?->getKey(),
+        );
+
+        return redirect($this->safeReturnTo($validated['return_to'] ?? null))
+            ->with(
+                'success',
+                'Delivery issue dismissed from review. The destination remains suppressed.',
+            );
+    }
+
     private function safeReturnTo(?string $returnTo): string
     {
         $fallback = route('crm.messaging.delivery-issues.index');

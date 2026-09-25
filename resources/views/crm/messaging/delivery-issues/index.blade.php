@@ -24,7 +24,9 @@
                 <p class="mt-1 text-sm leading-6 text-slate-600">
                     Correct bad Contact information instead of releasing its old suppression. Release a
                     suppression only when the current destination has been verified or the provider problem
-                    has actually been resolved. Complaint suppressions cannot be released here.
+                    has actually been resolved. Dismiss removes an item from operator review without reopening
+                    delivery. Deleted Contacts disappear from current review automatically. Complaint
+                    suppressions cannot be released here.
                 </p>
             </div>
         </x-ui.card>
@@ -115,6 +117,23 @@
                                 Complaint suppressions require a separate consent/provider remediation path and cannot be reopened here.
                             </div>
                         @endif
+
+                        <form
+                            method="POST"
+                            action="{{ route('crm.messaging.delivery-issues.dismiss', $suppression) }}"
+                            class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4"
+                        >
+                            @csrf
+                            <input type="hidden" name="return_to" value="{{ request()->getRequestUri() }}">
+
+                            <p class="text-sm text-slate-600">
+                                Dismiss this item from review without releasing the suppressed destination.
+                            </p>
+
+                            <x-ui.button type="submit" variant="secondary">
+                                Dismiss issue
+                            </x-ui.button>
+                        </form>
                     </x-ui.card>
                 @endforeach
             </div>

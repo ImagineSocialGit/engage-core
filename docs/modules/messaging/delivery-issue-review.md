@@ -51,6 +51,33 @@ Do not rewrite the historical suppression to the corrected destination.
 
 Do not release the historical suppression merely because the Contact record was corrected.
 
+## Dismissing operator review
+
+An authenticated CRM operator may dismiss a current delivery issue from the review queue without
+releasing the underlying destination suppression.
+
+Dismissal is review state only:
+
+```text
+message_suppressions.released_at
+    remains null
+
+delivery/runtime gate
+    remains suppressed
+
+CRM review queue / dashboard / Contact issue panel
+    no longer shows the dismissed issue
+```
+
+Dismissal evidence is stored under `message_suppressions.meta.delivery_issue_review`.
+
+If a later distinct provider event suppresses the same still-active destination again, Messaging
+reopens the delivery issue for operator review while preserving the prior dismissal evidence.
+
+A soft-deleted Contact is never a current delivery-issue owner. Raw current-contact matching must
+explicitly exclude `contacts.deleted_at` because Query Builder subqueries do not receive Eloquent's
+SoftDeletes global scope.
+
 ## Explicit suppression release
 
 When the current destination is genuinely correct and the underlying delivery/provider problem has

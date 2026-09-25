@@ -147,6 +147,80 @@ class MessageSuppressionServiceTest extends TestCase
         $this->assertSame(1, MessageSuppression::query()->count());
     }
 
+    public function test_new_suppression_event_reopens_a_dismissed_delivery_issue(): void
+    {
+        $service = app(MessageSuppressionService::class);
+
+        $suppression = $service->suppress(
+            channel: MessageChannel::Email,
+            destination: 'person@example.com',
+            reason: 'bounce',
+            provider: 'resend',
+            sourceEventId: 'evt_1',
+        );
+
+        $suppression->forceFill([
+            'meta' => [
+                'delivery_issue_review' => [
+                    'dismissed_at' => now()->subMinute()->toIso8601String(),
+                    'dismissed_by_user_id' => 123,
+                ],
+            ],
+        ])->save();
+
+        $sameEvent = $service->suppress(
+            channel: MessageChannel::Email,
+            destination: 'person@example.com',
+            reason: 'bounce',
+            provider: 'resend',
+            sourceEventId: 'evt_1',
+        );
+
+        $this->assertNotNull(
+            data_get(
+                $sameEvent->fresh()->meta,
+                'delivery_issue_review.dismissed_at',
+            ),
+        );
+
+        $newEvent = $service->suppress(
+            channel: MessageChannel::Email,
+            destination: 'person@example.com',
+            reason: 'bounce',
+            provider: 'resend',
+            sourceEventId: 'evt_2',
+        );
+
+        $newEvent->refresh();
+
+        $this->assertNull(
+            data_get(
+                $newEvent->meta,
+                'delivery_issue_review.dismissed_at',
+            ),
+        );
+        $this->assertSame(
+            123,
+            data_get(
+                $newEvent->meta,
+                'delivery_issue_review.last_dismissed_by_user_id',
+            ),
+        );
+        $this->assertSame(
+            'evt_2',
+            data_get(
+                $newEvent->meta,
+                'delivery_issue_review.reopened_source_event_id',
+            ),
+        );
+        $this->assertNotNull(
+            data_get(
+                $newEvent->meta,
+                'delivery_issue_review.reopened_at',
+            ),
+        );
+    }
+
     public function test_it_releases_an_active_suppression(): void
     {
         $service = app(MessageSuppressionService::class);
@@ -221,4 +295,3 @@ class MessageSuppressionServiceTest extends TestCase
         ]);
     }
 }
-

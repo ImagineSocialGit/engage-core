@@ -45,7 +45,10 @@ class MessageSuppressionService
                 ->first();
 
             if ($activeSuppression) {
-                return $activeSuppression;
+                return $this->reopenDeliveryIssueReviewIfDismissed(
+                    suppression: $activeSuppression,
+                    sourceEventId: $sourceEventId,
+                );
             }
 
             return MessageSuppression::query()->create([
@@ -109,6 +112,45 @@ class MessageSuppressionService
             ->active()
             ->forDestination($channel, $destination)
             ->exists();
+    }
+
+    private function reopenDeliveryIssueReviewIfDismissed(
+        MessageSuppression $suppression,
+        ?string $sourceEventId,
+    ): MessageSuppression {
+        $meta = is_array($suppression->meta) ? $suppression->meta : [];
+        $review = data_get($meta, 'delivery_issue_review', []);
+        $review = is_array($review) ? $review : [];
+        $dismissedAt = $review['dismissed_at'] ?? null;
+
+        if (! is_string($dismissedAt) || trim($dismissedAt) === '') {
+            return $suppression;
+        }
+
+        $review['last_dismissed_at'] = $dismissedAt;
+
+        if (array_key_exists('dismissed_by_user_id', $review)) {
+            $review['last_dismissed_by_user_id'] = $review['dismissed_by_user_id'];
+        }
+
+        unset(
+            $review['dismissed_at'],
+            $review['dismissed_by_user_id'],
+        );
+
+        $review['reopened_at'] = now()->toIso8601String();
+
+        if ($sourceEventId !== null) {
+            $review['reopened_source_event_id'] = $sourceEventId;
+        } else {
+            unset($review['reopened_source_event_id']);
+        }
+
+        data_set($meta, 'delivery_issue_review', $review);
+
+        $suppression->forceFill(['meta' => $meta])->save();
+
+        return $suppression->fresh() ?? $suppression;
     }
 
     private function validateDestination(string $destination): string
@@ -183,4 +225,3 @@ class MessageSuppressionService
         return $value === '' ? null : $value;
     }
 }
-

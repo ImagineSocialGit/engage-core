@@ -26,6 +26,7 @@ final class MessageDeliveryIssueReviewService
     {
         return MessageSuppression::query()
             ->active()
+            ->whereNull('meta->delivery_issue_review->dismissed_at')
             ->where(function (Builder $query): void {
                 $query
                     ->where(function (Builder $query): void {
@@ -35,6 +36,7 @@ final class MessageDeliveryIssueReviewService
                                 $contacts
                                     ->selectRaw('1')
                                     ->from('contacts')
+                                    ->whereNull('contacts.deleted_at')
                                     ->whereNotNull('contacts.email')
                                     ->whereRaw(
                                         'LOWER(contacts.email) = LOWER(message_suppressions.destination)',
@@ -48,6 +50,7 @@ final class MessageDeliveryIssueReviewService
                                 $contacts
                                     ->selectRaw('1')
                                     ->from('contacts')
+                                    ->whereNull('contacts.deleted_at')
                                     ->whereNotNull('contacts.phone')
                                     ->whereColumn(
                                         'contacts.phone',
@@ -74,6 +77,7 @@ final class MessageDeliveryIssueReviewService
 
         return MessageSuppression::query()
             ->active()
+            ->whereNull('meta->delivery_issue_review->dismissed_at')
             ->where(function (Builder $query) use ($email, $phone): void {
                 $hasCondition = false;
 
@@ -145,6 +149,43 @@ final class MessageDeliveryIssueReviewService
                 ];
             })
             ->values();
+    }
+
+    public function isDismissed(MessageSuppression $suppression): bool
+    {
+        $dismissedAt = data_get(
+            $suppression->meta,
+            'delivery_issue_review.dismissed_at',
+        );
+
+        return is_string($dismissedAt) && trim($dismissedAt) !== '';
+    }
+
+    public function dismiss(
+        MessageSuppression $suppression,
+        ?int $actorUserId,
+    ): MessageSuppression {
+        return DB::transaction(function () use (
+            $suppression,
+            $actorUserId,
+        ): MessageSuppression {
+            $locked = MessageSuppression::query()
+                ->lockForUpdate()
+                ->findOrFail($suppression->getKey());
+
+            $meta = is_array($locked->meta) ? $locked->meta : [];
+            $review = data_get($meta, 'delivery_issue_review', []);
+            $review = is_array($review) ? $review : [];
+
+            $review['dismissed_at'] = now()->toIso8601String();
+            $review['dismissed_by_user_id'] = $actorUserId;
+
+            data_set($meta, 'delivery_issue_review', $review);
+
+            $locked->forceFill(['meta' => $meta])->save();
+
+            return $locked->fresh() ?? $locked;
+        });
     }
 
     public function canRelease(MessageSuppression $suppression): bool
