@@ -453,6 +453,49 @@ final class ProductionRuntimeSnapshotImporterTest extends TestCase
         }
     }
 
+    public function test_it_accepts_equivalent_hyphenated_and_underscored_client_keys(): void
+    {
+        config()->set('client.key', 'rob-the-mortgage-coach');
+
+        $path = $this->writeSnapshot([
+            [
+                'type' => 'dump_meta',
+                'generated_at' => '2026-09-25T18:33:27+00:00',
+                'database' => 'crm_robthemortgagecoach',
+                'mode' => 'runtime_state_with_definition_replay_v2',
+            ],
+            $this->schema('message_template_composition_layers', [
+                'id',
+                'client_key',
+            ]),
+            $this->row('message_template_composition_layers', 'full', [
+                'id' => 7001,
+                'client_key' => 'rob_the_mortgage_coach',
+            ]),
+            $this->schema('webhook_inbox_receipts', [
+                'id',
+                'client_key',
+            ]),
+            $this->row('webhook_inbox_receipts', 'full', [
+                'id' => 8001,
+                'client_key' => 'rob-the-mortgage-coach',
+            ]),
+        ]);
+
+        try {
+            $result = app(ProductionRuntimeSnapshotImporter::class)
+                ->import($path, dryRun: true);
+
+            $this->assertTrue($result['dry_run']);
+            $this->assertSame(
+                'rob-the-mortgage-coach',
+                $result['source_client_key'],
+            );
+        } finally {
+            File::delete($path);
+        }
+    }
+
     /** @param list<array<string, mixed>> $records */
     private function writeSnapshot(array $records): string
     {

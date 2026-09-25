@@ -59,7 +59,10 @@ return new class extends Migration
 
             $table->index(['commerce_order_id', 'item_type'], 'commerce_order_items_order_type_index');
             $table->index(['commerce_product_id', 'item_type'], 'commerce_order_items_product_type_index');
-            $table->index(['provider', 'external_id'], 'commerce_order_items_provider_external_index');
+            $table->unique(
+                ['commerce_order_id', 'provider', 'external_id'],
+                'commerce_order_items_order_provider_external_unique',
+            );
             $table->index(['provider', 'external_product_id'], 'commerce_order_items_provider_product_index');
             $table->index(['provider', 'external_variant_id'], 'commerce_order_items_provider_variant_index');
         });

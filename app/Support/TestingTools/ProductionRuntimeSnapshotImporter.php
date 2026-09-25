@@ -387,40 +387,58 @@ final class ProductionRuntimeSnapshotImporter
      */
     private function assertClientMatchesSnapshot(array $rowsByTable): ?string
     {
-        $keys = [];
+        $rawKeys = [];
+        $canonicalKeys = [];
 
         foreach ($rowsByTable as $rows) {
             foreach ($rows as $row) {
                 $clientKey = $row['data']['client_key'] ?? null;
 
-                if (is_string($clientKey) && trim($clientKey) !== '') {
-                    $keys[trim($clientKey)] = true;
+                if (! is_string($clientKey) || trim($clientKey) === '') {
+                    continue;
                 }
+
+                $rawKey = trim($clientKey);
+                $canonicalKey = str_replace(
+                    '_',
+                    '-',
+                    mb_strtolower($rawKey),
+                );
+
+                $rawKeys[$rawKey] = true;
+                $canonicalKeys[$canonicalKey] = true;
             }
         }
 
-        $keys = array_keys($keys);
+        $rawKeys = array_keys($rawKeys);
+        $canonicalKeys = array_keys($canonicalKeys);
 
-        if (count($keys) > 1) {
+        if (count($canonicalKeys) > 1) {
             throw new RuntimeException(
-                'Snapshot contains more than one client_key: '.implode(', ', $keys).'.',
+                'Snapshot contains more than one client_key: '.implode(', ', $rawKeys).'.',
             );
         }
 
-        if ($keys === []) {
+        if ($canonicalKeys === []) {
             return null;
         }
 
-        $sourceClientKey = $keys[0];
+        $sourceClientKey = $canonicalKeys[0];
         $targetClientKey = trim((string) config('client.key', ''));
+        $canonicalTargetClientKey = str_replace(
+            '_',
+            '-',
+            mb_strtolower($targetClientKey),
+        );
 
-        if ($targetClientKey !== $sourceClientKey) {
+        if ($canonicalTargetClientKey !== $sourceClientKey) {
             throw new RuntimeException(
-                "Snapshot belongs to client [{$sourceClientKey}] but this DEV runtime is configured for [".($targetClientKey !== '' ? $targetClientKey : 'none').'].',
+                "Snapshot belongs to client [{$sourceClientKey}] but this DEV runtime is configured for [".
+                ($targetClientKey !== '' ? $targetClientKey : 'none').'].',
             );
         }
 
-        return $sourceClientKey;
+        return $targetClientKey;
     }
 
     /**

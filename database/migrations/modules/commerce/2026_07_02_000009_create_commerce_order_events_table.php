@@ -34,7 +34,7 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->index(['commerce_order_id', 'event'], 'commerce_order_events_order_event_index');
-            $table->index(['provider', 'external_id'], 'commerce_order_events_provider_external_index');
+            $table->unique(['provider', 'external_id'], 'commerce_order_events_provider_external_unique');
         });
     }
 

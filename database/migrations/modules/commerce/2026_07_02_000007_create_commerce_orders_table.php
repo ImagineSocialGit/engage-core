@@ -57,7 +57,7 @@ return new class extends Migration
             $table->index(['contact_id', 'status', 'ordered_at'], 'commerce_orders_contact_status_ordered_index');
             $table->index(['status', 'ordered_at'], 'commerce_orders_status_ordered_index');
             $table->index(['financial_status', 'ordered_at'], 'commerce_orders_financial_ordered_index');
-            $table->index(['provider', 'external_id'], 'commerce_orders_provider_external_index');
+            $table->unique(['provider', 'external_id'], 'commerce_orders_provider_external_unique');
         });
     }
 
