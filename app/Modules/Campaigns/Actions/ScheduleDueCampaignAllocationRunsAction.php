@@ -10,6 +10,8 @@ use App\Modules\Campaigns\Services\CampaignAllocationSettingsService;
 use App\Modules\Campaigns\Services\CampaignMessageStepResolver;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use App\Models\User;
 
 final class ScheduleDueCampaignAllocationRunsAction
 {
@@ -64,20 +66,65 @@ final class ScheduleDueCampaignAllocationRunsAction
         return $scheduled;
     }
 
+    public function scheduleNow(Campaign $campaign, User $actor, string $requestKey): CampaignAllocationRun
+    {
+        $requestKey = trim($requestKey);
+
+        if (! preg_match('/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i', $requestKey)) {
+            throw ValidationException::withMessages([
+                'request_key' => 'A valid run request is required.',
+            ]);
+        }
+
+        $run = $this->scheduleCampaign(
+            (int) $campaign->getKey(),
+            now()->utc(),
+            manualRequestKey: $requestKey,
+            actor: $actor,
+        );
+
+        if ($run->wasRecentlyCreated) {
+            ProcessCampaignAllocationRunJob::dispatch(
+                runId: (int) $run->getKey(),
+            )->afterCommit();
+        }
+
+        return $run;
+    }
+
     private function scheduleCampaign(
         int $campaignId,
         Carbon $at,
+        ?string $manualRequestKey = null,
+        ?User $actor = null,
     ): ?CampaignAllocationRun {
-        return DB::transaction(function () use ($campaignId, $at): ?CampaignAllocationRun {
+        return DB::transaction(function () use ($campaignId, $at, $manualRequestKey, $actor): ?CampaignAllocationRun {
             $campaign = Campaign::query()
                 ->whereKey($campaignId)
                 ->lockForUpdate()
                 ->first();
 
+            if ($manualRequestKey !== null) {
+                $runKey = 'campaign_allocation_manual:'.$campaignId.':'.$manualRequestKey;
+                $existingRequest = CampaignAllocationRun::query()
+                    ->where('run_key', $runKey)
+                    ->first();
+
+                if ($existingRequest instanceof CampaignAllocationRun) {
+                    return $existingRequest;
+                }
+            }
+
             if (! $campaign instanceof Campaign
                 || ! $this->availableCampaign($campaign)
                 || ! $this->hasActiveEnrollment($campaign)
             ) {
+                if ($manualRequestKey !== null) {
+                    throw ValidationException::withMessages([
+                        'campaign' => 'An active allocation Campaign with participating leads is required.',
+                    ]);
+                }
+
                 return null;
             }
 
@@ -88,29 +135,39 @@ final class ScheduleDueCampaignAllocationRunsAction
                 ->first();
 
             if ($latest instanceof CampaignAllocationRun) {
-                if ($latest->status === CampaignAllocationRun::STATUS_RUNNING) {
-                    return null;
+                if (in_array($latest->status, [
+                    CampaignAllocationRun::STATUS_RUNNING,
+                    CampaignAllocationRun::STATUS_SCHEDULED,
+                ], true)) {
+                    if ($manualRequestKey !== null) {
+                        throw ValidationException::withMessages([
+                            'campaign' => 'An allocation run is already scheduled or running.',
+                        ]);
+                    }
+
+                    return $latest->status === CampaignAllocationRun::STATUS_SCHEDULED
+                        ? $latest : null;
                 }
 
-                if ($latest->status === CampaignAllocationRun::STATUS_SCHEDULED) {
-                    return $latest;
-                }
-
-                if (! $this->cadenceElapsed($campaign, $latest, $at)) {
+                if ($manualRequestKey === null
+                    && ! $this->cadenceElapsed($campaign, $latest, $at)
+                ) {
                     return null;
                 }
             }
 
             $version = $this->messageSteps->currentVersion($campaign);
             $settings = $this->settings->forCampaign($campaign);
-            $runKey = implode(':', [
-                'campaign_allocation',
-                (int) $campaign->getKey(),
-                'after',
-                $latest instanceof CampaignAllocationRun
-                    ? (int) $latest->getKey()
-                    : 0,
-            ]);
+            $runKey = $manualRequestKey !== null
+                ? 'campaign_allocation_manual:'.$campaignId.':'.$manualRequestKey
+                : implode(':', [
+                    'campaign_allocation',
+                    (int) $campaign->getKey(),
+                    'after',
+                    $latest instanceof CampaignAllocationRun
+                        ? (int) $latest->getKey()
+                        : 0,
+                ]);
 
             return CampaignAllocationRun::query()->firstOrCreate(
                 ['run_key' => $runKey],
@@ -125,6 +182,8 @@ final class ScheduleDueCampaignAllocationRunsAction
                         'settings' => $settings,
                         'message_chain_id' => (int) $campaign->message_chain_id,
                         'message_chain_version_id' => (int) $version->getKey(),
+                        'trigger' => $manualRequestKey !== null ? 'operator' : 'schedule',
+                        'requested_by_user_id' => $actor?->getKey(),
                     ],
                 ],
             );

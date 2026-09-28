@@ -186,6 +186,7 @@
 │   │   │   ├── Controllers
 │   │   │   │   └── CRM
 │   │   │   │       ├── CampaignAllocationHistoryController.php
+│   │   │   │       ├── CampaignAllocationRunControlController.php
 │   │   │   │       ├── CampaignAnnualTouchController.php
 │   │   │   │       ├── CampaignAudienceController.php
 │   │   │   │       ├── CampaignController.php
@@ -271,6 +272,7 @@
 │   │   │   │   ├── CampaignAllocationCandidateSelector.php
 │   │   │   │   ├── CampaignAllocationHistoryService.php
 │   │   │   │   ├── CampaignAllocationMessagePlanner.php
+│   │   │   │   ├── CampaignAllocationRunPreviewService.php
 │   │   │   │   ├── CampaignAllocationSettingsService.php
 │   │   │   │   ├── CampaignAnnualTouchAudienceService.php
 │   │   │   │   ├── CampaignAudienceProgressService.php
@@ -3015,6 +3017,7 @@
 │       │   ├── campaigns
 │       │   │   ├── allocation-runs
 │       │   │   │   ├── index.blade.php
+│       │   │   │   ├── preview.blade.php
 │       │   │   │   └── show.blade.php
 │       │   │   ├── annual-touches
 │       │   │   │   └── index.blade.php
@@ -3302,6 +3305,7 @@
 │   │   │   └── ScheduleBroadcastActionTest.php
 │   │   ├── Campaigns
 │   │   │   ├── CampaignAllocationHistoryTest.php
+│   │   │   ├── CampaignAllocationRunControlTest.php
 │   │   │   ├── CampaignAnnualTouchAudienceServiceTest.php
 │   │   │   ├── CampaignAnnualTouchAuthoringTest.php
 │   │   │   ├── CampaignAnnualTouchRuntimeTest.php
@@ -4003,4 +4007,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-883 directories, 3121 files
+883 directories, 3125 files

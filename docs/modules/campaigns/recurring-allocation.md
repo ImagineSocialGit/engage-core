@@ -175,6 +175,17 @@ The run key is stable and idempotent for one pass after the previous durable run
 A scheduled run is redispatched if needed; the run processor and assignment
 uniqueness rules make retries safe.
 
+Operators can preview current potential recipients per active pinned message and
+start a run immediately from the Campaign workspace. The preview uses the same
+allocation candidate selector but makes no reservations or writes; it caps
+large previews at 250 potential recipients per message and labels those counts
+as lower bounds. The processor selects again at run time and applies message
+planning and send gates. Manual runs bypass the wait for the next cadence slot
+but never overlap an already scheduled or running run. A stable request UUID
+makes repeated submissions resolve to the same run. Manual starts snapshot the
+current settings and published version and become the next cadence anchor.
+The run records its operator user id in Campaign-owned metadata.
+
 Run completion means:
 
 ```text
@@ -581,7 +592,6 @@ This runtime batch does not add:
 ```text
 cross-strategy Campaign-family arbitration
 contact-import allocation floor/exclusion authoring
-manual run/preview controls
 ```
 
-Those remain future integration and operator-control work.
+Those remain future integration work.

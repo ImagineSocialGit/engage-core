@@ -140,7 +140,10 @@
                         <h2 class="text-lg font-semibold text-slate-950">Allocation runs</h2>
                         <p class="mt-1 text-sm text-slate-600">Assignments are planned per run. Delivery may continue afterward.</p>
                     </div>
-                    <a href="{{ route('crm.campaigns.runs.index', $campaign) }}" class="text-sm font-semibold text-slate-900 underline">All runs</a>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <a href="{{ route('crm.campaigns.runs.preview', $campaign) }}" class="inline-flex min-h-10 items-center rounded-full bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800">Preview next run</a>
+                        <a href="{{ route('crm.campaigns.runs.index', $campaign) }}" class="text-sm font-semibold text-slate-900 underline">All runs</a>
+                    </div>
                 </div>
                 @forelse($recentAllocationRuns as $run)
                     <a href="{{ route('crm.campaigns.runs.show', ['campaign' => $campaign, 'run' => $run]) }}" class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 px-4 py-3 hover:bg-slate-50">

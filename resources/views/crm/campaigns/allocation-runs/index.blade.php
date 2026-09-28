@@ -8,7 +8,10 @@
         <a href="{{ route('crm.campaigns.show', $campaign) }}" class="inline-block text-sm font-semibold text-slate-600 hover:text-slate-950">&larr; Campaign</a>
 
         <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-7">
-            <h2 class="text-xl font-semibold text-slate-950">Run history</h2>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h2 class="text-xl font-semibold text-slate-950">Run history</h2>
+                <a href="{{ route('crm.campaigns.runs.preview', $campaign) }}" class="inline-flex min-h-10 items-center rounded-full bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800">Preview next run</a>
+            </div>
             <p class="mt-2 text-sm text-slate-600">Assignment totals are fixed when a run completes. Sent totals update as scheduled messages are delivered.</p>
 
             <div class="mt-5 space-y-3">

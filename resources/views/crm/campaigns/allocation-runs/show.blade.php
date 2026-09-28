@@ -7,6 +7,10 @@
     <div class="space-y-6">
         <a href="{{ route('crm.campaigns.runs.index', $campaign) }}" class="inline-block text-sm font-semibold text-slate-600 hover:text-slate-950">&larr; All runs</a>
 
+        @if(session('status'))
+            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">{{ session('status') }}</div>
+        @endif
+
         <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-7">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
