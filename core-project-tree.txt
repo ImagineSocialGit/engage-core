@@ -138,6 +138,7 @@
 │   │   │   │   ├── ExcludeContactFromCampaignAllocationMessageAction.php
 │   │   │   │   ├── PauseCampaignEnrollmentAction.php
 │   │   │   │   ├── PauseCampaignFamilyEnrollmentsAction.php
+│   │   │   │   ├── ProcessCampaignAllocationRunAction.php
 │   │   │   │   ├── ProcessDueCampaignTouchDatesAction.php
 │   │   │   │   ├── PublishCampaignMessageChainVersionAction.php
 │   │   │   │   ├── ReconcileAutomaticCampaignEligibilityAction.php
@@ -149,6 +150,7 @@
 │   │   │   │   ├── RemoveContactCampaignAllocationMessageExclusionAction.php
 │   │   │   │   ├── ResumeCampaignEnrollmentAction.php
 │   │   │   │   ├── ScheduleCampaignImportBatchInitialMessagesAction.php
+│   │   │   │   ├── ScheduleDueCampaignAllocationRunsAction.php
 │   │   │   │   ├── StartCompletedCampaignAppendAction.php
 │   │   │   │   ├── SyncCampaignPresetsAction.php
 │   │   │   │   ├── UpdateCampaignAllocationSettingsAction.php
@@ -212,17 +214,21 @@
 │   │   │   │   ├── CheckCampaignAudienceCompletionJob.php
 │   │   │   │   ├── EmitDueAnnualTouchAutomationEventsJob.php
 │   │   │   │   ├── EnrollContactResultCampaignChunkJob.php
+│   │   │   │   ├── ProcessCampaignAllocationRunJob.php
 │   │   │   │   ├── ProcessCompletedCampaignAppendChunkJob.php
+│   │   │   │   ├── ProcessDueCampaignAllocationsJob.php
 │   │   │   │   ├── ProcessDueCampaignTouchDatesJob.php
 │   │   │   │   ├── ReconcileAutomaticCampaignEligibilityJob.php
 │   │   │   │   └── ReconcileContactCampaignEligibilityJob.php
 │   │   │   ├── Listeners
+│   │   │   │   ├── ReconcileCampaignAllocationAssignmentFromScheduledMessageTerminal.php
 │   │   │   │   ├── ReconcileCampaignEligibilityFromAutomationEvent.php
 │   │   │   │   └── ReconcileCampaignEligibilityFromContactFilterFactsChanged.php
 │   │   │   ├── MessageTemplates
 │   │   │   │   └── CampaignMessageTemplateDefinitionContributor.php
 │   │   │   ├── Messaging
 │   │   │   │   ├── AnnualTouchReusableMessageTemplateAuthoringContributor.php
+│   │   │   │   ├── CampaignAllocationRecipientGate.php
 │   │   │   │   ├── CampaignAppendContinuationProvider.php
 │   │   │   │   ├── CampaignPriorReceiptRecipientGate.php
 │   │   │   │   └── CampaignPriorReceiptStepBypass.php
@@ -254,6 +260,8 @@
 │   │   │   │   ├── UpdateCampaignSendPatternRequest.php
 │   │   │   │   └── UpdateCampaignStepMessageTemplateRequest.php
 │   │   │   ├── Services
+│   │   │   │   ├── CampaignAllocationCandidateSelector.php
+│   │   │   │   ├── CampaignAllocationMessagePlanner.php
 │   │   │   │   ├── CampaignAllocationSettingsService.php
 │   │   │   │   ├── CampaignAnnualTouchAudienceService.php
 │   │   │   │   ├── CampaignAudienceProgressService.php
@@ -3970,4 +3978,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-882 directories, 3089 files
+882 directories, 3097 files

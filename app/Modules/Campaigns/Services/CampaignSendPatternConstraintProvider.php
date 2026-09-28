@@ -3,6 +3,7 @@
 namespace App\Modules\Campaigns\Services;
 
 use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Campaigns\Models\CampaignAllocationAssignment;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Messaging\Contracts\ScheduledMessageSendAtConstraintProvider;
 use App\Modules\Messaging\Data\ScheduledMessagePlanningContext;
@@ -25,19 +26,18 @@ final class CampaignSendPatternConstraintProvider implements ScheduledMessageSen
     ): Carbon {
         if ($context->channel !== MessageChannel::Email->value
             || $context->purpose !== MessagePurpose::Marketing->value
-            || ! $context->context instanceof CampaignEnrollment
         ) {
             return $sendAt;
         }
 
-        $campaignEnrollment = $context->context;
+        $campaignId = $this->campaignId($context);
 
-        if ($campaignEnrollment->campaign_id === null) {
+        if ($campaignId === null) {
             return $sendAt;
         }
 
         $campaign = Campaign::query()
-            ->whereKey($campaignEnrollment->campaign_id)
+            ->whereKey($campaignId)
             ->lockForUpdate()
             ->first();
 
@@ -56,6 +56,26 @@ final class CampaignSendPatternConstraintProvider implements ScheduledMessageSen
             pattern: $pattern,
             requestedSendAt: $sendAt,
         );
+    }
+
+    private function campaignId(
+        ScheduledMessagePlanningContext $context,
+    ): ?int {
+        $messageContext = $context->context;
+
+        if ($messageContext instanceof CampaignEnrollment
+            && is_numeric($messageContext->campaign_id)
+        ) {
+            return (int) $messageContext->campaign_id;
+        }
+
+        if ($messageContext instanceof CampaignAllocationAssignment
+            && is_numeric($messageContext->campaign_id)
+        ) {
+            return (int) $messageContext->campaign_id;
+        }
+
+        return null;
     }
 
     /**
@@ -158,18 +178,54 @@ final class CampaignSendPatternConstraintProvider implements ScheduledMessageSen
         Carbon $dayEndUtc,
     ): Builder {
         $campaignEnrollment = new CampaignEnrollment();
+        $allocationAssignment = new CampaignAllocationAssignment();
 
         return ScheduledMessage::query()
-            ->where(
-                'context_type',
-                $campaignEnrollment->getMorphClass(),
-            )
-            ->whereIn(
-                'context_id',
-                CampaignEnrollment::query()
-                    ->select('id')
-                    ->where('campaign_id', $campaign->getKey()),
-            )
+            ->where(function (Builder $query) use (
+                $campaign,
+                $campaignEnrollment,
+                $allocationAssignment,
+            ): void {
+                $query
+                    ->where(function (Builder $query) use (
+                        $campaign,
+                        $campaignEnrollment,
+                    ): void {
+                        $query
+                            ->where(
+                                'context_type',
+                                $campaignEnrollment->getMorphClass(),
+                            )
+                            ->whereIn(
+                                'context_id',
+                                CampaignEnrollment::query()
+                                    ->select('id')
+                                    ->where(
+                                        'campaign_id',
+                                        $campaign->getKey(),
+                                    ),
+                            );
+                    })
+                    ->orWhere(function (Builder $query) use (
+                        $campaign,
+                        $allocationAssignment,
+                    ): void {
+                        $query
+                            ->where(
+                                'context_type',
+                                $allocationAssignment->getMorphClass(),
+                            )
+                            ->whereIn(
+                                'context_id',
+                                CampaignAllocationAssignment::query()
+                                    ->select('id')
+                                    ->where(
+                                        'campaign_id',
+                                        $campaign->getKey(),
+                                    ),
+                            );
+                    });
+            })
             ->where('channel', MessageChannel::Email->value)
             ->where('purpose', MessagePurpose::Marketing->value)
             ->whereBetween('send_at', [$dayStartUtc, $dayEndUtc])

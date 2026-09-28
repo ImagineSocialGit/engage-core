@@ -4,6 +4,7 @@ namespace App\Modules\Campaigns\Messaging;
 
 use App\Modules\Campaigns\Actions\RecordPriorCampaignMessageReceiptAction;
 use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Campaigns\Models\CampaignAllocationAssignment;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Contracts\MessageRecipientGate;
@@ -44,6 +45,50 @@ final class CampaignPriorReceiptRecipientGate implements MessageRecipientGate
             return null;
         }
 
+        $allocationAssignment = $message->context;
+
+        if ($allocationAssignment instanceof CampaignAllocationAssignment) {
+            return $this->allocationDenialReason(
+                recipient: $recipient,
+                assignment: $allocationAssignment,
+            );
+        }
+
+        return $this->sequenceDenialReason(
+            recipient: $recipient,
+            message: $message,
+        );
+    }
+
+    private function allocationDenialReason(
+        Contact $recipient,
+        CampaignAllocationAssignment $assignment,
+    ): ?string {
+        if ((int) $assignment->contact_id !== (int) $recipient->getKey()) {
+            return null;
+        }
+
+        $campaign = $assignment->campaign;
+
+        if (! $campaign instanceof Campaign
+            || (int) $assignment->campaign_id !== (int) $campaign->getKey()
+        ) {
+            return null;
+        }
+
+        return $this->receipts->recorded(
+            contact: $recipient,
+            campaign: $campaign,
+            messageStepKey: (string) $assignment->message_step_key,
+        )
+            ? 'Previously received outside this system.'
+            : null;
+    }
+
+    private function sequenceDenialReason(
+        Contact $recipient,
+        ScheduledMessage $message,
+    ): ?string {
         $enrollment = $message->messageChainEnrollment;
         $variant = $message->messageChainStepVariant;
 

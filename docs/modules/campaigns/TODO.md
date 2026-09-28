@@ -13,9 +13,10 @@ Work these in order. Keep Campaigns independent from FlowRoutes, Webinars, Forms
 - [x] Fail closed on unsupported recurring-allocation lifecycle combinations: automatic enrollment, Campaign-family arbitration, strategy switches with open participants/runs, and legacy sequential enrollment calls against allocation Campaigns.
 - [ ] Add automatic eligibility enrollment for recurring allocation after its lifecycle can target allocation participation rather than sequential MessageChain enrollment.
 - [ ] Add cross-strategy Campaign-family arbitration before recurring-allocation Campaigns may use `family_key`.
-- [ ] Add idempotent allocation-run scheduling/processing with one shared candidate pool and transactional distinct-Contact assignment.
-- [ ] Reuse existing prior-message receipts for allocation message exclusion and dated cooldown evidence.
-- [ ] Generalize Campaign send-pattern pacing so allocation ScheduledMessages reuse the existing Campaign daily email capacity instead of introducing a second limiter.
+- [x] Add idempotent allocation-run scheduling/processing with one shared candidate pool and transactional distinct-Contact assignment.
+- [x] Reuse existing prior-message receipts for allocation message exclusion and dated cooldown evidence.
+- [x] Generalize Campaign send-pattern pacing so allocation ScheduledMessages reuse the existing Campaign daily email capacity instead of introducing a second limiter.
+- [x] Add allocation send-time enrollment/exclusion/prior-receipt gates plus ScheduledMessage terminal reconciliation back to assignment delivery evidence.
 - [ ] Add bulk Contact-result orchestration for normal enrollment, sequential/allocation re-enrollment from a selected message, and allocation-only message exclusions; the underlying lifecycle actions now exist.
 - [ ] Add basic Campaign Setup/workspace surfaces for execution strategy and allocation settings.
 - [ ] Add focused runtime, concurrency/idempotency, boundary, and surface tests after behavior is implemented; do not assert evolving UI copy.

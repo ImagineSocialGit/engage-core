@@ -4,6 +4,7 @@ namespace App\Modules\Campaigns\Actions;
 
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignAllocationEnrollment;
+use App\Modules\Campaigns\Models\CampaignAllocationRun;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Messaging\Models\MessageChain;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
@@ -126,6 +127,31 @@ class DeactivateCampaignAction
                     0,
                 );
             }
+
+            CampaignAllocationRun::query()
+                ->where('campaign_id', $lockedCampaign->getKey())
+                ->whereIn('status', [
+                    CampaignAllocationRun::STATUS_SCHEDULED,
+                    CampaignAllocationRun::STATUS_RUNNING,
+                ])
+                ->lockForUpdate()
+                ->get()
+                ->each(function (CampaignAllocationRun $run) use ($now): void {
+                    $run->forceFill([
+                        'status' => CampaignAllocationRun::STATUS_CANCELLED,
+                        'completed_at' => $now,
+                        'failed_at' => null,
+                        'meta' => array_replace_recursive(
+                            is_array($run->meta) ? $run->meta : [],
+                            [
+                                'runtime' => [
+                                    'cancelled_reason' => self::REASON,
+                                    'cancelled_at' => $now->toISOString(),
+                                ],
+                            ],
+                        ),
+                    ])->save();
+                });
 
             return [
                 'campaign_id' => (int) $lockedCampaign->getKey(),

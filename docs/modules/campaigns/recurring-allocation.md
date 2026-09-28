@@ -2,26 +2,27 @@
 
 ## Purpose
 
-Campaigns supports two different execution shapes:
+Campaigns supports two execution shapes:
 
 ```text
 sequence
     A Contact enters one Messaging MessageChainEnrollment and progresses through
-    that immutable MessageChainVersion in order.
+    one immutable MessageChainVersion in order.
 
 recurring_allocation
     Campaigns periodically allocates distinct eligible Contacts to individual
-    messages from the Campaign's current published MessageChainVersion. There is
-    no per-Contact MessageChain progression state.
+    messages from an immutable Campaign MessageChainVersion. There is no
+    per-Contact MessageChain progression state.
 ```
 
-The execution strategy is Campaign-owned because it describes how a Campaign
-uses its message set. Messaging remains authoritative for reusable message copy,
-immutable MessageChain versions, consent, suppressions, destination/provider
-eligibility, ScheduledMessage delivery, and provider submission.
+Campaigns owns allocation cadence, participation, candidate selection, message
+assignment, cooldown, and allocation-run history. Messaging remains authoritative
+for reusable message copy, immutable MessageChain versions, consent,
+suppressions, destination/runtime availability, ScheduledMessage delivery,
+provider submission, and normal send-time recipient gates.
 
-Recurring allocation must not create fake sequential CampaignEnrollments or
-MessageChainEnrollments merely to reuse Messaging runtime behavior.
+Recurring allocation does not create fake sequential CampaignEnrollments or
+MessageChainEnrollments merely to reuse Messaging behavior.
 
 ## Campaign configuration
 
@@ -32,70 +33,77 @@ sequence
 recurring_allocation
 ```
 
-Existing Campaigns are migrated to `sequence`, so this foundation does not
-change existing runtime behavior.
+Existing Campaigns default to `sequence`.
 
-Recurring allocation settings are stored in `campaigns.allocation_settings`.
-The Campaign-owned allocation settings service now normalizes these keys and the configuration action changes execution strategy atomically:
+Recurring allocation settings are stored in `campaigns.allocation_settings`:
 
 ```text
 run_every_days
 allocation_size_per_message
 recipient_cooldown_days
+```
+
+Working defaults:
+
+```text
+run_every_days = 14
+allocation_size_per_message = 50
+recipient_cooldown_days = 14
 ```
 
 Meaning:
 
 ```text
 run_every_days
-    Minimum cadence between allocation runs.
+    Minimum cadence between completed/failed allocation runs.
 
 allocation_size_per_message
     Maximum number of distinct Contacts allocated to each active message in one
     allocation run.
 
 recipient_cooldown_days
-    Minimum time after a known prior send/receipt before the Contact may receive
-    another message from this allocation Campaign.
+    Minimum time after an allocation reservation or dated prior receipt before a
+    Contact can be allocated another message from this Campaign.
 ```
 
-Allocation size is not a provider or daily send limit. Campaign send-pattern
-pacing remains the separate authority for when allocated marketing email may be
-scheduled. `Spread throughout the day` can defer allocated messages across later
-allowed days when daily capacity is exhausted; `Send as due` does not gain a new
-Campaign daily cap merely because recurring allocation is enabled.
+An allocation assignment starts cooldown at `assigned_at`. This is deliberate:
+allocation is a reservation, and a Contact with a pending/sending allocation
+message is also excluded from new allocation regardless of cooldown. A dated
+external prior receipt participates in cooldown. An undated prior receipt still
+excludes that exact message but does not invent a Campaign-wide cooldown date.
 
-The lifecycle foundation currently permits recurring allocation only when:
+Allocation size is not a daily/provider send limit. Campaign send-pattern pacing
+remains the authority for marketing-email scheduling. In `spread` mode, the
+existing Campaign daily limit and delivery window count sequential Campaign
+messages and recurring-allocation messages together for the same Campaign.
+Recurring allocation does not introduce a competing limiter.
+
+Recurring allocation currently requires:
 
 ```text
 enrollment_mode = manual
 family_key = null
 ```
 
-That is deliberate fail-closed behavior. Existing automatic eligibility lifecycle
-and Campaign-family priority arbitration operate on sequential
-`CampaignEnrollment` / `MessageChainEnrollment` state. Recurring allocation must
-not silently bypass those contracts. Automatic allocation enrollment and
-cross-strategy family arbitration require an explicit later integration before
-those configurations are accepted.
+That remains deliberate fail-closed behavior. Existing automatic eligibility
+lifecycle and Campaign-family priority arbitration operate on sequential
+CampaignEnrollment / MessageChainEnrollment state. Automatic allocation
+enrollment and cross-strategy family arbitration require explicit later
+integration.
 
-Changing execution strategy is also guarded. A Campaign cannot switch from
+Changing execution strategy remains guarded. A Campaign cannot switch from
 sequence to recurring allocation while sequential enrollments are open, and it
-cannot switch back to sequence while allocation participation or a scheduled/running
-allocation run remains open. Historical terminal enrollment/assignment evidence is
-left intact.
+cannot switch back to sequence while allocation participation or a
+scheduled/running allocation run remains open. Historical terminal
+enrollment/assignment evidence remains intact.
 
 ## Allocation enrollment
 
-Recurring allocation has its own Campaign-owned enrollment history in:
+Recurring allocation participation is stored in:
 
 ```text
 campaign_allocation_enrollments
 ```
-
-An allocation enrollment identifies that one Contact is participating in one
-recurring allocation Campaign. It does not own generic message progression and
-therefore has no MessageChainEnrollment.
 
 Important fields:
 
@@ -105,32 +113,28 @@ contact_id
 source_type / source_id
 start_message_step_key
 status
-stable dedupe_key
+dedupe_key
 started_at
 completed_at
 cancelled_at
 meta
 ```
 
-`start_message_step_key` is an inclusive allocation floor. If a Contact is
-explicitly enrolled or re-enrolled starting at message C, messages before C are
-not allocation candidates for that enrollment. Those earlier messages are not
-recorded as sent or previously received merely because the floor starts later.
+`start_message_step_key` is an inclusive allocation floor. If a Contact starts at
+message C, A and B are not candidates for that enrollment. The floor does not
+claim A or B were sent or received.
 
 Re-enrollment creates a new allocation enrollment history row rather than
-rewriting historical assignments. The lifecycle actions now own active-enrollment replacement/cancellation and stable entry-key idempotency. Ordinary allocation enrollment returns an existing active enrollment rather than mutating its floor; changing the floor requires the explicit re-enrollment action.
+rewriting historical assignments. Prior assignments, prior receipts, and
+explicit exclusions survive re-enrollment.
 
 ## Allocation runs
 
-Each recurring allocation evaluation is durably represented by:
+Each recurring allocation pass is durable in:
 
 ```text
 campaign_allocation_runs
 ```
-
-A run stores a stable `run_key`, Campaign, scheduled time, lifecycle timestamps,
-status, and compact metadata. Runtime jobs use the run identity as the durable
-idempotency boundary for one allocation pass.
 
 Run lifecycle values are:
 
@@ -142,11 +146,48 @@ failed
 cancelled
 ```
 
-The run scheduler/processor remains a later runtime batch. Lifecycle actions in the current batch do not create runs or ScheduledMessages, so recurring sends remain inert until the allocator batch lands.
+The scheduler checks active recurring-allocation Campaigns every minute.
+
+The first run becomes due as soon as the Campaign has an active allocation
+enrollment. Later runs are due after `run_every_days` from the previous
+completed/failed run. A cancelled run does not impose a new cadence delay.
+
+A scheduled run snapshots:
+
+```text
+allocation settings
+selected MessageChain id
+current published MessageChainVersion id
+```
+
+The immutable MessageChainVersion is the message-definition authority for that
+run even if future Campaign authoring publishes a newer version while the run is
+processing.
+
+The run key is stable and idempotent for one pass after the previous durable run.
+A scheduled run is redispatched if needed; the run processor and assignment
+uniqueness rules make retries safe.
+
+Run completion means:
+
+```text
+candidate allocation and ScheduledMessage planning completed
+```
+
+It does not mean provider delivery completed. ScheduledMessage terminal delivery
+can happen later.
+
+A run may complete with zero assignments. Active allocation enrollments remain
+active so messages appended later can become eligible without re-enrolling the
+audience.
+
+Campaign deactivation immediately cancels active allocation enrollments, skips
+their pending assignment-context ScheduledMessages through Messaging, and marks
+scheduled/running allocation runs cancelled.
 
 ## Allocation assignments
 
-A successful allocation decision is durable in:
+A durable allocation decision is stored in:
 
 ```text
 campaign_allocation_assignments
@@ -155,70 +196,182 @@ campaign_allocation_assignments
 Each assignment records:
 
 ```text
-campaign
+Campaign
 Contact
 allocation run
 allocation enrollment
-exact Messaging MessageChainVersion
+immutable Messaging MessageChainVersion
 stable message_step_key
 optional ScheduledMessage
 assigned_at
 sent_at
+meta
 ```
 
-The stable message step key is the Campaign business identity for the message.
-The MessageChainVersion records the immutable Messaging definition that was
-current when the allocation was made.
+A Contact + Campaign + message step may be assigned only once. Re-enrollment
+does not make an already-assigned message eligible again.
 
-A Contact + Campaign + message step may be assigned only once. Re-enrolling a
-Contact does not erase prior assignment history and does not make an already
-allocated message eligible again.
+All active messages in one run draw from one shared Contact pool. Once a Contact
+is assigned to one message in a run, that Contact is unavailable to every other
+message in that run.
 
-Within one run, all active messages draw from one shared eligible Contact pool.
-Once a Contact is assigned to one message, that Contact is removed from the pool
-for the rest of that run. A single run therefore does not allocate several
-Campaign messages to the same Contact.
+Candidate ordering is deterministic and fairness-oriented:
 
-`scheduled_message_id` remains a logical cross-module reference. Campaigns
-depends on Messaging, but the Campaigns schema does not add physical foreign
-keys into Messaging-owned tables whose migration order is separate.
+```text
+never previously allocated / no dated prior receipt first
+then oldest last allocation activity
+then oldest enrollment/id as stable tie-breakers
+```
+
+This is not random A/B assignment.
+
+`scheduled_message_id` is a logical cross-module reference. Campaigns depends on
+Messaging, but Campaigns does not add physical foreign keys into
+Messaging-owned tables.
+
+## Candidate eligibility
+
+For one run/message, Campaigns requires all of the following before a Contact can
+be assigned:
+
+```text
+Campaign is active and recurring_allocation
+Campaign uses manual enrollment and no family_key
+allocation enrollment is active
+current Campaign eligibility criteria still pass when criteria are configured
+message is active in the run's pinned published MessageChainVersion
+message is at/after the enrollment start-message floor
+Contact has no prior receipt for this message
+Contact has no prior allocation assignment for this message
+Contact has no explicit allocation exclusion for this message
+Contact has no pending/sending allocation ScheduledMessage
+recipient cooldown has elapsed
+Contact has not already been assigned elsewhere in this run
+```
+
+The runtime currently requires allocation message steps to use:
+
+```text
+variant_strategy = first_available
+```
+
+The first currently plannable active variant is selected. Allocation does not
+reinterpret `send_all_eligible` or dependency-aware step semantics.
+
+Before an assignment is created, the selected variant must also pass the normal
+Messaging planning boundaries used by MessageChains:
+
+```text
+Campaigns surface channel availability
+step conditions
+variant conditions
+resolvable immutable MessageTemplateVersion
+recipient destination
+Messaging consent
+Messaging suppression
+```
+
+Messaging remains authoritative for those checks.
+
+## ScheduledMessage planning
+
+After Campaigns records the assignment, it schedules through
+`ScheduleMessageAction`.
+
+The ScheduledMessage uses:
+
+```text
+recipient
+    Contact
+
+context
+    CampaignAllocationAssignment
+
+behavior owner
+    CampaignAllocationAssignment
+
+message template version
+    immutable version selected by the pinned MessageChainVersion
+
+message-chain enrollment
+    none
+
+message-chain step variant runtime reference
+    none
+```
+
+This is intentionally not a fake MessageChain enrollment.
+
+The allocation ScheduledMessage carries Campaign-compatible runtime tokens,
+including:
+
+```text
+contact / recipient
+campaign
+campaign_enrollment
+campaign_allocation_enrollment
+campaign_allocation_assignment
+campaign_allocation_run
+```
+
+`campaign_enrollment` is retained as a compatibility alias for existing
+Campaign-authored token expectations; its value is the allocation enrollment,
+not a sequential CampaignEnrollment.
+
+The message also carries Campaign metadata such as `campaign_key` and the stable
+message step key so existing Campaign email presentation behavior can continue
+without changing Messaging ownership.
+
+Scheduling uses a stable dedupe key derived from the allocation assignment id.
+If a run job retries after the ScheduledMessage was already created, Messaging
+returns the same scheduled message rather than creating a duplicate.
+
+## Send-pattern pacing
+
+`CampaignSendPatternConstraintProvider` resolves Campaign ownership from either:
+
+```text
+CampaignEnrollment
+CampaignAllocationAssignment
+```
+
+For marketing email in `spread` mode, the existing pacing algorithm counts
+scheduled messages from both context types against the same Campaign daily
+capacity and window.
+
+That preserves one Campaign-owned pacing policy:
+
+```text
+allocation decides who/message
+send pattern decides when the marketing email can be scheduled
+Messaging decides whether/how it can actually be delivered
+```
 
 ## Prior-message evidence
 
-Existing `campaign_prior_message_receipts` remains the authority for known
-messages received outside the normal Campaign runtime.
-
-That evidence is intentionally different from an allocation assignment:
-
-```text
-prior receipt
-    The Contact is known to have actually received that Campaign message before.
-
-allocation assignment
-    This system selected that Contact/message pair for an allocation run.
-```
+`campaign_prior_message_receipts` remains the authority for known messages
+received outside the normal Campaign runtime.
 
 For recurring allocation:
 
-- a prior receipt excludes that same `message_step_key` from future allocation;
-- a prior receipt with `received_at` contributes known timing to recipient
-  cooldown evaluation;
-- a prior receipt without `received_at` still excludes that message, but does
-  not invent a date for Campaign-wide cooldown calculations;
-- no fictitious historical ScheduledMessage is created.
+- a prior receipt excludes that same `message_step_key`;
+- a receipt with `received_at` contributes to cooldown;
+- a receipt without `received_at` excludes only that message and does not invent
+  a date;
+- no fake ScheduledMessage is created.
 
-The existing Contact-import prior-message surface therefore remains reusable for
-allocation Campaigns.
+The send-time Campaign prior-receipt recipient gate now also understands
+`CampaignAllocationAssignment` context. If prior receipt evidence is recorded
+after allocation planning but before send, Messaging skips the scheduled
+allocation message rather than delivering a known duplicate.
 
 ## Explicit message exclusions
 
-A per-Contact allocation exclusion is durable in:
+Per-Contact allocation exclusions remain durable in:
 
 ```text
 campaign_allocation_message_exclusions
 ```
-
-This is intentionally separate from prior-message evidence.
 
 Example:
 
@@ -230,149 +383,101 @@ means:
 
 ```text
 A remains eligible if otherwise allowed.
-B is excluded for this Contact.
+B is excluded.
 C and later messages remain eligible.
 ```
 
-The exclusion must not claim B was sent, received, skipped by Messaging, or
-otherwise delivered. It records only an operator/system decision that B is not
-an allocation candidate for this Contact.
+An exclusion does not claim a send, receipt, or delivery failure.
 
-Exclusions use the stable Campaign message step key and retain optional source,
-operator, and reason provenance.
+The allocation candidate selector checks exclusions before assignment. A
+Campaign allocation recipient gate also checks the live exclusion at send time.
+That means an exclusion recorded after a ScheduledMessage was planned still
+prevents delivery.
 
-## Candidate eligibility contract
+## Send-time safety
 
-The runtime allocator will build candidates from active recurring-allocation
-enrollments and then apply Campaign-owned allocation rules before asking
-Messaging to plan delivery.
+Allocation ScheduledMessages continue through Messaging's normal send-time
+gates.
 
-Campaign-owned exclusion rules include:
-
-```text
-Campaign is active and uses recurring_allocation
-allocation enrollment is active
-current Campaign eligibility policy still permits participation
-message is active in the current published MessageChainVersion
-message is at/after the enrollment's start_message_step_key floor
-Contact has no prior receipt for that message
-Contact has no prior allocation assignment for that message
-Contact has no explicit allocation exclusion for that message
-Contact has no already-pending allocation assignment that would overlap this run
-known recipient cooldown has elapsed
-Contact has not already been selected by another message in the same run
-```
-
-Messaging then remains responsible for its normal planning and recipient gates,
-including consent, suppression, destination availability, provider/runtime
-availability, message payload resolution, and delivery.
-
-Allocation must not weaken those Messaging gates.
-
-## Re-enrollment semantics
-
-The underlying re-enrollment actions now support both execution strategies. The operator-facing bulk surface will call these actions in a later UI/runtime-operations batch.
-
-Sequential Campaign:
+Campaigns contributes two allocation-aware checks:
 
 ```text
-re-enroll starting at message C
-    terminate the current open sequential enrollment through the normal
-    Campaign/Messaging lifecycle path, then create a new CampaignEnrollment whose
-    MessageChainEnrollment starts at active step C.
+CampaignAllocationRecipientGate
+    Campaign is still active/recurring
+    allocation enrollment is still active
+    recipient identity still matches
+    no live explicit exclusion exists for the assigned message
+
+CampaignPriorReceiptRecipientGate
+    no prior receipt now exists for the assigned message
 ```
 
-The existing Campaign/Messaging enrollment seam already supports a `startStepKey`; the new deliberate sequential re-enrollment action cancels any open enrollment through the existing Campaign/Messaging lifecycle path and then creates a new enrollment pinned to the selected active current step. A stable entry key makes retries idempotent without changing ordinary enrollment arbitration. The ordinary sequential enrollment seam now rejects recurring-allocation Campaigns, so legacy import/contact-result/automation callers cannot accidentally create fake sequential progression after a Campaign changes strategy.
+These are in addition to Messaging consent, suppression, destination,
+conditions, and provider/runtime checks.
 
-Recurring allocation Campaign:
+## Delivery reconciliation
+
+Campaigns listens to Messaging terminal ScheduledMessage events:
 
 ```text
-re-enroll starting at message C
-    end/replace the current active allocation enrollment and create a new active
-    allocation enrollment with start_message_step_key = C.
+sent
+skipped
+failed
+cancelled
 ```
 
-Historical allocation assignments, prior receipts, and explicit exclusions are preserved. The new allocation re-enrollment action cancels current active allocation enrollment state, skips any pending assignment-context messages when they exist, and creates a fresh enrollment at the selected active current step. Re-enrollment changes the participation floor; it is not a history reset.
+For allocation-context messages, the matching assignment stores compact terminal
+delivery evidence in `meta.delivery`.
 
-## Lifecycle/configuration actions now available
+Only a `sent` result populates:
 
-The Campaign runtime now has explicit non-UI seams for:
+```text
+campaign_allocation_assignments.sent_at
+```
+
+Skipped, failed, and cancelled messages remain distinguishable from actual
+delivery.
+
+Allocation-run completion is not reopened or rewritten by later terminal
+delivery. Run history describes allocation/planning; assignment delivery evidence
+describes what happened afterward.
+
+## Lifecycle actions
+
+The runtime has explicit non-UI seams for:
 
 ```text
 UpdateCampaignAllocationSettingsAction
-    choose sequence vs recurring_allocation and normalize allocation settings
-
 EnrollContactInCampaignAllocationAction
-    create idempotent active allocation participation with an optional inclusive
-    start-message floor
-
 CancelCampaignAllocationEnrollmentAction
-    cancel allocation participation and, when allocation ScheduledMessages exist,
-    skip pending messages through Messaging rather than mutating them directly
-
 ReenrollContactInCampaignAllocationAction
-    replace current active allocation participation with a new floor while
-    preserving assignment/receipt/exclusion history
-
 ReenrollContactInCampaignAction
-    deliberately replace an open sequential enrollment and start the new
-    MessageChainEnrollment at a selected active current message
-
 ExcludeContactFromCampaignAllocationMessageAction
-    record an explicit per-Contact message exclusion without claiming prior
-    delivery
-
 RemoveContactCampaignAllocationMessageExclusionAction
-    reverse an explicit allocation exclusion without changing receipt or
-    assignment history
+ScheduleDueCampaignAllocationRunsAction
+ProcessCampaignAllocationRunAction
 ```
 
-All start-message and exclusion operations resolve against the Campaign's current published MessageChainVersion and require an active message-step key. Stable entry keys are required for explicit re-enrollment so queued/operator retries cannot create repeated replacement cycles.
-
-The allocation settings runtime defaults remain the agreed working defaults:
+The recurring scheduler is driven by:
 
 ```text
-run_every_days = 14
-allocation_size_per_message = 50
-recipient_cooldown_days = 14
+ProcessDueCampaignAllocationsJob
+ProcessCampaignAllocationRunJob
 ```
 
-A zero-day recipient cooldown is valid when explicitly authored. Allocation size remains separate from Campaign send-pattern capacity.
+## Still intentionally deferred
 
-## Foundation delivered so far
-
-The schema foundation adds:
+This runtime batch does not add:
 
 ```text
-campaigns.execution_strategy
-campaigns.allocation_settings
-campaign_allocation_enrollments
-campaign_allocation_runs
-campaign_allocation_assignments
-campaign_allocation_message_exclusions
-```
-
-and the corresponding Campaign-owned Eloquent models/relationships.
-
-The lifecycle/configuration batch adds the Campaign-owned settings, message-step resolution, enrollment/cancellation/re-enrollment, reversible explicit exclusion actions, execution-strategy transition guards, and deactivation cleanup described above. Campaign deactivation now cancels active allocation participation in addition to sequential Campaign enrollments.
-
-It deliberately does not yet add:
-
-```text
-allocation scheduler/jobs
-allocation candidate selection and shared-pool assignment
-allocation-run transaction/locking logic
-ScheduledMessage planning for assignments
-send-pattern bridge generalization
-sent/cooldown reconciliation listeners
 automatic eligibility enrollment for recurring allocation
 cross-strategy Campaign-family arbitration
-bulk Contact-result orchestration around the lifecycle actions
-import enrollment-floor/exclusion authoring
-CRM allocation settings
-Campaign workspace surfaces
-new recurring-allocation tests
+bulk Contact-result orchestration for allocation/re-enrollment/exclusions
+contact-import allocation floor/exclusion authoring
+CRM execution-strategy/allocation settings
+Campaign allocation run/history workspace UI
+manual run/preview controls
+new recurring-allocation test files
 ```
 
-Those belong to the actions/jobs, UI/surface, and test batches that follow this
-schema contract.
+Those belong to the UI/surface and dedicated test phases.

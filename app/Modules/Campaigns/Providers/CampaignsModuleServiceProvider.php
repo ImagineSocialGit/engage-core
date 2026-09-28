@@ -3,7 +3,6 @@
 namespace App\Modules\Campaigns\Providers;
 
 use App\Modules\Campaigns\Access\CampaignsAccessCapabilityContributor;
-use App\Modules\Campaigns\Contacts\CampaignContactResultActionContributor;
 use App\Modules\Campaigns\Automation\CampaignAnnualTouchAutomationTriggerAuthoringContributor;
 use App\Modules\Campaigns\Automation\CampaignsAutomationPointAuthoringContributor;
 use App\Modules\Campaigns\Automation\CampaignsAutomationPointDefinitionContributor;
@@ -18,13 +17,17 @@ use App\Modules\Campaigns\ConfigContracts\CampaignPresetConfigContractTargetProv
 use App\Modules\Campaigns\ConfigContracts\CampaignPresetDefinitionConfigContract;
 use App\Modules\Campaigns\Console\Commands\DeactivateCampaignCommand;
 use App\Modules\Campaigns\Console\Commands\SyncCampaignPresetsCommand;
-use App\Modules\Campaigns\Jobs\ProcessDueCampaignTouchDatesJob;
+use App\Modules\Campaigns\Contacts\CampaignContactResultActionContributor;
 use App\Modules\Campaigns\Jobs\CheckCampaignAudienceCompletionJob;
 use App\Modules\Campaigns\Jobs\EmitDueAnnualTouchAutomationEventsJob;
+use App\Modules\Campaigns\Jobs\ProcessDueCampaignAllocationsJob;
+use App\Modules\Campaigns\Jobs\ProcessDueCampaignTouchDatesJob;
 use App\Modules\Campaigns\Jobs\ReconcileAutomaticCampaignEligibilityJob;
+use App\Modules\Campaigns\Listeners\ReconcileCampaignAllocationAssignmentFromScheduledMessageTerminal;
 use App\Modules\Campaigns\Listeners\ReconcileCampaignEligibilityFromAutomationEvent;
 use App\Modules\Campaigns\Listeners\ReconcileCampaignEligibilityFromContactFilterFactsChanged;
 use App\Modules\Campaigns\Messaging\AnnualTouchReusableMessageTemplateAuthoringContributor;
+use App\Modules\Campaigns\Messaging\CampaignAllocationRecipientGate;
 use App\Modules\Campaigns\Messaging\CampaignAppendContinuationProvider;
 use App\Modules\Campaigns\Messaging\CampaignPriorReceiptRecipientGate;
 use App\Modules\Campaigns\Messaging\CampaignPriorReceiptStepBypass;
@@ -40,6 +43,10 @@ use App\Modules\Core\Events\ContactFilterFactsChanged;
 use App\Modules\Core\Support\Contacts\ContactResultActionRegistry;
 use App\Modules\Messaging\Contracts\ReusableMessageTemplateAuthoringOptionContributor;
 use App\Modules\Messaging\Contracts\ScheduledMessageSendAtConstraintProvider;
+use App\Modules\Messaging\Events\ScheduledMessageCancelled;
+use App\Modules\Messaging\Events\ScheduledMessageFailed;
+use App\Modules\Messaging\Events\ScheduledMessageSent;
+use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Event;
@@ -67,6 +74,7 @@ class CampaignsModuleServiceProvider extends ServiceProvider
         $this->app->tag(CampaignPriorReceiptStepBypass::class, 'messaging.message_chain_step_bypasses');
         $this->app->tag(CampaignAppendContinuationProvider::class, 'messaging.message_chain_continuations');
         $this->app->tag(CampaignPriorReceiptRecipientGate::class, 'messaging.message_recipient_gates');
+        $this->app->tag(CampaignAllocationRecipientGate::class, 'messaging.message_recipient_gates');
         $this->app->tag(
             CampaignSendPatternConstraintProvider::class,
             ScheduledMessageSendAtConstraintProvider::TAG,
@@ -107,11 +115,28 @@ class CampaignsModuleServiceProvider extends ServiceProvider
             ReconcileCampaignEligibilityFromAutomationEvent::class,
         );
 
+        foreach ([
+            ScheduledMessageSent::class,
+            ScheduledMessageSkipped::class,
+            ScheduledMessageFailed::class,
+            ScheduledMessageCancelled::class,
+        ] as $eventClass) {
+            Event::listen(
+                $eventClass,
+                ReconcileCampaignAllocationAssignmentFromScheduledMessageTerminal::class,
+            );
+        }
+
         $this->callAfterResolving(
             Schedule::class,
             function (Schedule $schedule): void {
                 $schedule
                     ->job(new ProcessDueCampaignTouchDatesJob())
+                    ->everyMinute()
+                    ->withoutOverlapping();
+
+                $schedule
+                    ->job(new ProcessDueCampaignAllocationsJob())
                     ->everyMinute()
                     ->withoutOverlapping();
 
