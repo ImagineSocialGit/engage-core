@@ -220,6 +220,10 @@
 │   │   │   │   ├── CampaignPriorReceiptRecipientGate.php
 │   │   │   │   └── CampaignPriorReceiptStepBypass.php
 │   │   │   ├── Models
+│   │   │   │   ├── CampaignAllocationAssignment.php
+│   │   │   │   ├── CampaignAllocationEnrollment.php
+│   │   │   │   ├── CampaignAllocationMessageExclusion.php
+│   │   │   │   ├── CampaignAllocationRun.php
 │   │   │   │   ├── CampaignEligibilityState.php
 │   │   │   │   ├── CampaignEnrollment.php
 │   │   │   │   ├── CampaignMessageChainAppend.php
@@ -2510,7 +2514,8 @@
 │   │   │   │   ├── 2026_08_27_213000_add_audience_filter_to_campaign_touch_programs_table.php
 │   │   │   │   ├── 2026_09_22_130000_add_send_pattern_to_campaigns_table.php
 │   │   │   │   ├── 2026_09_28_050000_create_campaign_prior_message_receipts_table.php
-│   │   │   │   └── 2026_09_28_060000_create_campaign_message_chain_appends_table.php
+│   │   │   │   ├── 2026_09_28_060000_create_campaign_message_chain_appends_table.php
+│   │   │   │   └── 2026_09_28_070000_add_recurring_allocation_foundation.php
 │   │   │   ├── commerce
 │   │   │   │   ├── 2026_07_02_000005_create_commerce_customers_table.php
 │   │   │   │   ├── 2026_07_02_000006_create_commerce_products_table.php
@@ -2729,6 +2734,7 @@
 │   │   │   ├── eligibility-runtime.md
 │   │   │   ├── entry-and-launch-safety.md
 │   │   │   ├── module_state.md
+│   │   │   ├── recurring-allocation.md
 │   │   │   ├── TODO.md
 │   │   │   └── webinar-outcome-eligibility.md
 │   │   ├── commerce
@@ -3951,4 +3957,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-882 directories, 3070 files
+882 directories, 3076 files

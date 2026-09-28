@@ -12,6 +12,24 @@ Messaging owns reusable MessageChains, immutable versions, MessageChainEnrollmen
 Campaigns references Messaging runtime state instead of maintaining a second chain engine.
 ```
 
+## Execution strategies and recurring allocation foundation
+
+Campaigns now has a schema-level execution-strategy contract:
+
+```text
+sequence
+    Existing behavior. One CampaignEnrollment wraps one Messaging MessageChainEnrollment.
+
+recurring_allocation
+    Campaigns periodically allocates distinct eligible Contacts to individual messages without creating per-Contact MessageChain progression.
+```
+
+Existing rows default to `sequence`. The recurring-allocation schema is deliberately inert until the allocation actions/jobs are added. Campaigns owns allocation enrollment, cadence, assignments, per-Contact allocation floors, and explicit message exclusions; Messaging remains authoritative for immutable message definitions, ScheduledMessage planning/delivery, consent, suppression, and provider/runtime gates.
+
+Allocation configuration lives in `campaigns.allocation_settings` with the planned normalized keys `run_every_days`, `allocation_size_per_message`, and `recipient_cooldown_days`. Allocation quota remains separate from the existing Campaign send-pattern daily email pacing.
+
+See `docs/modules/campaigns/recurring-allocation.md`.
+
 Campaign preset sync still converts the current compact Campaign step/variant authoring definition into a Messaging-owned MessageChain and immutable published MessageChainVersion, then stores the selected chain on `campaigns.message_chain_id`. That conversion is now only a temporary authoring bridge. `campaign_steps` and `campaign_step_variants` are not runtime progression state.
 
 

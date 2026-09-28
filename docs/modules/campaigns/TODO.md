@@ -2,6 +2,20 @@
 
 Work these in order. Keep Campaigns independent from FlowRoutes, Webinars, Forms, Scheduling, InboundMessaging, and other producer modules; use shared/public automation seams instead of direct module dependencies.
 
+## Current priority — recurring allocation campaigns
+
+- [x] Establish the append-only recurring-allocation schema without changing existing sequential Campaign behavior.
+- [x] Separate allocation enrollment, run, assignment, and explicit per-Contact message-exclusion state from sequential MessageChainEnrollment progression.
+- [ ] Add recurring-allocation configuration normalization/authoring for cadence, per-message allocation size, and recipient cooldown.
+- [ ] Add allocation enrollment/re-enrollment actions, including an inclusive `start_message_step_key` floor.
+- [ ] Add explicit per-Contact allocation message exclusions without misrepresenting them as prior receipts.
+- [ ] Add idempotent allocation-run scheduling/processing with one shared candidate pool and transactional distinct-Contact assignment.
+- [ ] Reuse existing prior-message receipts for allocation message exclusion and dated cooldown evidence.
+- [ ] Generalize Campaign send-pattern pacing so allocation ScheduledMessages reuse the existing Campaign daily email capacity instead of introducing a second limiter.
+- [ ] Add bulk Contact-result actions for normal enrollment, re-enrollment from a selected message, and allocation-only message exclusions.
+- [ ] Add basic Campaign Setup/workspace surfaces for execution strategy and allocation settings.
+- [ ] Add focused runtime, concurrency/idempotency, boundary, and surface tests after behavior is implemented; do not assert evolving UI copy.
+
 ## 1. Finish direct MessageChain authoring
 
 - [x] Add first-class CRM Campaign creation through the shared Builder shell. New Campaigns start inactive/manual, create their first immutable Messaging template plus a direct published MessageChain version, and do not create new `campaign_steps` / `campaign_step_variants` projection rows.

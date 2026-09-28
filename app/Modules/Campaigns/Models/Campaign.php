@@ -23,6 +23,13 @@ class Campaign extends Model
     public const STATUS_INACTIVE = 'inactive';
     public const STATUS_ARCHIVED = 'archived';
 
+    public const EXECUTION_STRATEGY_SEQUENCE = 'sequence';
+    public const EXECUTION_STRATEGY_RECURRING_ALLOCATION = 'recurring_allocation';
+    public const EXECUTION_STRATEGIES = [
+        self::EXECUTION_STRATEGY_SEQUENCE,
+        self::EXECUTION_STRATEGY_RECURRING_ALLOCATION,
+    ];
+
     public const ENROLLMENT_MODE_MANUAL = 'manual';
     public const ENROLLMENT_MODE_AUTOMATIC = 'automatic';
     public const ENROLLMENT_MODES = [
@@ -46,11 +53,17 @@ class Campaign extends Model
         self::INELIGIBLE_CANCEL,
     ];
 
+    protected $attributes = [
+        'execution_strategy' => self::EXECUTION_STRATEGY_SEQUENCE,
+    ];
+
     protected $fillable = [
         'key',
         'name',
         'description',
         'message_chain_id',
+        'execution_strategy',
+        'allocation_settings',
         'family_key',
         'priority',
         'eligibility_filter',
@@ -72,6 +85,7 @@ class Campaign extends Model
     {
         return [
             'message_chain_id' => 'integer',
+            'allocation_settings' => 'array',
             'priority' => 'integer',
             'eligibility_filter' => 'array',
             'is_customized' => 'boolean',
@@ -106,6 +120,26 @@ class Campaign extends Model
         return $this->hasMany(CampaignEligibilityState::class);
     }
 
+    public function allocationEnrollments(): HasMany
+    {
+        return $this->hasMany(CampaignAllocationEnrollment::class);
+    }
+
+    public function allocationRuns(): HasMany
+    {
+        return $this->hasMany(CampaignAllocationRun::class);
+    }
+
+    public function allocationAssignments(): HasMany
+    {
+        return $this->hasMany(CampaignAllocationAssignment::class);
+    }
+
+    public function allocationMessageExclusions(): HasMany
+    {
+        return $this->hasMany(CampaignAllocationMessageExclusion::class);
+    }
+
     public function hasEligibilityCriteria(): bool
     {
         return is_array($this->eligibility_filter)
@@ -135,6 +169,16 @@ class Campaign extends Model
     public function scopeNotCustomized(Builder $query): Builder
     {
         return $query->where('is_customized', false);
+    }
+
+    public function usesSequentialExecution(): bool
+    {
+        return $this->execution_strategy === self::EXECUTION_STRATEGY_SEQUENCE;
+    }
+
+    public function usesRecurringAllocation(): bool
+    {
+        return $this->execution_strategy === self::EXECUTION_STRATEGY_RECURRING_ALLOCATION;
     }
 
     public function isActive(): bool
