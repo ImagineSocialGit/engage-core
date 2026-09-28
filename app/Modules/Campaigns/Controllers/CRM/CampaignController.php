@@ -22,6 +22,7 @@ use App\Modules\Campaigns\Requests\UpdateCampaignMessageReplyHandlingRequest;
 use App\Modules\Campaigns\Requests\UpdateCampaignScheduleRequest;
 use App\Modules\Campaigns\Requests\UpdateCampaignSendPatternRequest;
 use App\Modules\Campaigns\Services\CampaignAllocationSettingsService;
+use App\Modules\Campaigns\Services\CampaignAllocationHistoryService;
 use App\Modules\Campaigns\Services\CampaignCreationGuide;
 use App\Modules\Campaigns\Services\CampaignAudienceProgressService;
 use App\Modules\Campaigns\Services\CampaignEligibilityAuthoringService;
@@ -193,6 +194,7 @@ class CampaignController extends Controller
         CampaignSendPatternService $sendPatterns,
         CampaignAudienceProgressService $audienceProgress,
         CampaignAllocationSettingsService $allocationSettings,
+        CampaignAllocationHistoryService $allocationHistory,
     ): View {
         return view('crm.campaigns.show', [
             'campaign' => $campaign,
@@ -203,6 +205,9 @@ class CampaignController extends Controller
             'allocationSettings' => $campaign->usesRecurringAllocation()
                 ? $allocationSettings->forCampaign($campaign)
                 : null,
+            'recentAllocationRuns' => $campaign->usesRecurringAllocation()
+                ? $allocationHistory->recent($campaign)
+                : collect(),
         ]);
     }
 

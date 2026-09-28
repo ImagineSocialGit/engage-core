@@ -3,6 +3,7 @@
 use App\Modules\Campaigns\Controllers\CRM\CampaignAnnualTouchController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignAudienceController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignController;
+use App\Modules\Campaigns\Controllers\CRM\CampaignAllocationHistoryController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignMessageTemplateController;
 use App\Modules\Campaigns\Access\CampaignsAccessCapabilityContributor;
 use App\Modules\Campaigns\Controllers\CRM\CampaignSimulatorController;
@@ -81,6 +82,13 @@ Route::middleware('module:campaigns')
 
         Route::get('/{campaign}/edit', [CampaignController::class, 'edit'])
             ->name('edit');
+
+        Route::get('/{campaign}/runs', [CampaignAllocationHistoryController::class, 'index'])
+            ->name('runs.index');
+
+        Route::get('/{campaign}/runs/{run}', [CampaignAllocationHistoryController::class, 'show'])
+            ->whereNumber('run')
+            ->name('runs.show');
 
         Route::get('/{campaign}/audience', [CampaignAudienceController::class, 'index'])
             ->name('audience.index');

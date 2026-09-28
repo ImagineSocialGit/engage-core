@@ -133,6 +133,26 @@
             </section>
         @endif
 
+        @if($campaign->usesRecurringAllocation())
+            <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-950">Allocation runs</h2>
+                        <p class="mt-1 text-sm text-slate-600">Assignments are planned per run. Delivery may continue afterward.</p>
+                    </div>
+                    <a href="{{ route('crm.campaigns.runs.index', $campaign) }}" class="text-sm font-semibold text-slate-900 underline">All runs</a>
+                </div>
+                @forelse($recentAllocationRuns as $run)
+                    <a href="{{ route('crm.campaigns.runs.show', ['campaign' => $campaign, 'run' => $run]) }}" class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 px-4 py-3 hover:bg-slate-50">
+                        <span class="font-semibold text-slate-950">{{ $run->scheduled_for?->format('M j, Y g:i A') ?? 'Run #'.$run->getKey() }}</span>
+                        <span class="text-sm text-slate-600">{{ \Illuminate\Support\Str::headline($run->status) }} · {{ number_format($run->assignments_count) }} assigned · {{ number_format($run->sent_messages_count) }} sent</span>
+                    </a>
+                @empty
+                    <p class="mt-4 text-sm text-slate-600">No allocation runs yet.</p>
+                @endforelse
+            </section>
+        @endif
+
         <section class="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div class="text-2xl font-bold text-slate-950">{{ $workspace['active_enrollment_count'] }}</div>

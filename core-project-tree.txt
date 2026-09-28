@@ -185,6 +185,7 @@
 │   │   │   │   └── CampaignAudienceCompletionNotifier.php
 │   │   │   ├── Controllers
 │   │   │   │   └── CRM
+│   │   │   │       ├── CampaignAllocationHistoryController.php
 │   │   │   │       ├── CampaignAnnualTouchController.php
 │   │   │   │       ├── CampaignAudienceController.php
 │   │   │   │       ├── CampaignController.php
@@ -268,6 +269,7 @@
 │   │   │   │   └── UpdateCampaignStepMessageTemplateRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── CampaignAllocationCandidateSelector.php
+│   │   │   │   ├── CampaignAllocationHistoryService.php
 │   │   │   │   ├── CampaignAllocationMessagePlanner.php
 │   │   │   │   ├── CampaignAllocationSettingsService.php
 │   │   │   │   ├── CampaignAnnualTouchAudienceService.php
@@ -3011,6 +3013,9 @@
 │       │   ├── business-calendar
 │       │   │   └── edit.blade.php
 │       │   ├── campaigns
+│       │   │   ├── allocation-runs
+│       │   │   │   ├── index.blade.php
+│       │   │   │   └── show.blade.php
 │       │   │   ├── annual-touches
 │       │   │   │   └── index.blade.php
 │       │   │   ├── audience.blade.php
@@ -3296,6 +3301,7 @@
 │   │   │   ├── MarkBroadcastRecipientTerminalStatusTest.php
 │   │   │   └── ScheduleBroadcastActionTest.php
 │   │   ├── Campaigns
+│   │   │   ├── CampaignAllocationHistoryTest.php
 │   │   │   ├── CampaignAnnualTouchAudienceServiceTest.php
 │   │   │   ├── CampaignAnnualTouchAuthoringTest.php
 │   │   │   ├── CampaignAnnualTouchRuntimeTest.php
@@ -3997,4 +4003,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-882 directories, 3116 files
+883 directories, 3121 files

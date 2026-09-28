@@ -572,6 +572,8 @@ Allocation candidate cooldown and fairness use known successful assignment `sent
 
 The workspace, Campaign index, and audience/progress read models are execution-strategy aware so active allocation participation is not reported as zero sequential enrollments.
 
+The Campaign workspace links to recent allocation runs and a paginated run history. Each run shows its scheduled/started/completed status, total assignments, planned messages, and confirmed sends. The run detail uses the pinned schedule version for per-message names and zero-assignment rows; assigned lead details are paginated and filtered through the Core Contact visibility policy. Delivery states remain live after the run completes.
+
 ## Still intentionally deferred
 
 This runtime batch does not add:
@@ -579,9 +581,7 @@ This runtime batch does not add:
 ```text
 cross-strategy Campaign-family arbitration
 contact-import allocation floor/exclusion authoring
-Campaign allocation run/history workspace UI
 manual run/preview controls
-new recurring-allocation test files
 ```
 
-Those belong to the UI/surface and dedicated test phases.
+Those remain future integration and operator-control work.
