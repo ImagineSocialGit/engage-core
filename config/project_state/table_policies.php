@@ -83,6 +83,23 @@ return [
         'reason' => 'Project State does not transfer Webinar schedule-change notification state. Export must fail rather than silently omit active or historical schedule-change state.',
     ],
 
+    'campaign_message_chain_appends' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Legacy Project State does not transfer Campaign append history. Export must fail when active-enrollment continuation depends on this history.',
+    ],
+    'campaign_prior_message_receipts' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Legacy Project State does not transfer prior Campaign message evidence. Export must fail rather than risk sending a previously received message.',
+    ],
+    'relationship_definitions' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Legacy Project State does not transfer Relationship definitions. Export must fail rather than silently omit configured relationship types.',
+    ],
+    'relationship_stage_definitions' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Legacy Project State does not transfer Relationship stage definitions. Export must fail rather than silently omit configured stages.',
+    ],
+
     'dashboard_acknowledgements' => [
         'mode' => 'resettable',
         'reason' => 'Per-user dashboard acknowledgement state intentionally resets.',

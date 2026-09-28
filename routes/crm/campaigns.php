@@ -90,6 +90,9 @@ Route::middleware('module:campaigns')
         Route::patch('/{campaign}/schedule', [CampaignController::class, 'updateSchedule'])
             ->name('schedule.update');
 
+        Route::post('/{campaign}/completed-append', [CampaignController::class, 'startCompletedAppend'])
+            ->name('completed-append.start');
+
         Route::patch('/{campaign}/send-pattern', [CampaignController::class, 'updateSendPattern'])
             ->name('send-pattern.update');
 

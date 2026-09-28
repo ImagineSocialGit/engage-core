@@ -46,6 +46,8 @@ use App\Modules\Messaging\Services\ContactShow\ContactScheduledMessagesVisibilit
 use App\Modules\Messaging\Services\Dashboard\MessagingDeliveryIssuesDashboardPanelProvider;
 use App\Modules\Messaging\Services\Email\EmailProviderManager;
 use App\Modules\Messaging\Services\MessageChainExecutionContextResolver;
+use App\Modules\Messaging\Services\MessageChainContinuationRegistry;
+use App\Modules\Messaging\Services\MessageChainStepBypassRegistry;
 use App\Modules\Messaging\Services\MessageMediaAuthoringService;
 use App\Modules\Messaging\Services\MessageAttachmentRegistry;
 use App\Support\ModuleIntegrations\Messaging\Contracts\MessageAttachmentSource;
@@ -159,6 +161,18 @@ class MessagingModuleServiceProvider extends ServiceProvider
         $this->app->singleton(MessageRecipientGateRegistry::class, function ($app) {
             return new MessageRecipientGateRegistry(
                 gates: $app->tagged('messaging.message_recipient_gates'),
+            );
+        });
+
+        $this->app->singleton(MessageChainStepBypassRegistry::class, function ($app) {
+            return new MessageChainStepBypassRegistry(
+                bypasses: $app->tagged('messaging.message_chain_step_bypasses'),
+            );
+        });
+
+        $this->app->singleton(MessageChainContinuationRegistry::class, function ($app) {
+            return new MessageChainContinuationRegistry(
+                providers: $app->tagged('messaging.message_chain_continuations'),
             );
         });
 

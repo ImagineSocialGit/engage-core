@@ -51,6 +51,7 @@ class EnrollContactInCampaignAction
         ?string $entryKey = null,
         bool $eagerProcess = true,
         Carbon|string|null $initialActionAt = null,
+        ?string $startStepKey = null,
     ): CampaignEnrollment {
         if ($exitConditions !== null && $exitConditions !== []) {
             throw new InvalidArgumentException(
@@ -70,6 +71,7 @@ class EnrollContactInCampaignAction
             $entryKey,
             $eagerProcess,
             $initialActionAt,
+            $startStepKey,
         ): CampaignEnrollment {
             $candidate = $this->resolveCampaign($campaignKey);
 
@@ -149,6 +151,7 @@ class EnrollContactInCampaignAction
                 surface: self::SURFACE,
                 eagerProcess: $eagerProcess,
                 initialActionAt: $initialActionAt,
+                startStepKey: $startStepKey,
             );
 
             $enrollment->forceFill([

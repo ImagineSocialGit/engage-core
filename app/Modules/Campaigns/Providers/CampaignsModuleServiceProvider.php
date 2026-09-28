@@ -24,6 +24,9 @@ use App\Modules\Campaigns\Jobs\ReconcileAutomaticCampaignEligibilityJob;
 use App\Modules\Campaigns\Listeners\ReconcileCampaignEligibilityFromAutomationEvent;
 use App\Modules\Campaigns\Listeners\ReconcileCampaignEligibilityFromContactFilterFactsChanged;
 use App\Modules\Campaigns\Messaging\AnnualTouchReusableMessageTemplateAuthoringContributor;
+use App\Modules\Campaigns\Messaging\CampaignAppendContinuationProvider;
+use App\Modules\Campaigns\Messaging\CampaignPriorReceiptRecipientGate;
+use App\Modules\Campaigns\Messaging\CampaignPriorReceiptStepBypass;
 use App\Modules\Campaigns\Services\CampaignMessageChainExecutionContextProvider;
 use App\Modules\Campaigns\Services\CampaignSendPatternConstraintProvider;
 use App\Modules\Campaigns\Services\ContactShow\ContactCampaignsVisibilityDataProvider;
@@ -60,6 +63,9 @@ class CampaignsModuleServiceProvider extends ServiceProvider
         $this->app->tag(CampaignTokenSourceProvider::class, 'token.source_providers');
         $this->app->tag(CampaignTokenContextProvider::class, 'token.context_providers');
         $this->app->tag(CampaignMessageChainExecutionContextProvider::class, 'messaging.message_chain_execution_context_providers');
+        $this->app->tag(CampaignPriorReceiptStepBypass::class, 'messaging.message_chain_step_bypasses');
+        $this->app->tag(CampaignAppendContinuationProvider::class, 'messaging.message_chain_continuations');
+        $this->app->tag(CampaignPriorReceiptRecipientGate::class, 'messaging.message_recipient_gates');
         $this->app->tag(
             CampaignSendPatternConstraintProvider::class,
             ScheduledMessageSendAtConstraintProvider::TAG,

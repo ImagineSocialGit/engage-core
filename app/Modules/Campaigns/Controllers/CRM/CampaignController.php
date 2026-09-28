@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Modules\Campaigns\Actions\ActivateCampaignAction;
 use App\Modules\Campaigns\Actions\CreateCampaignAction;
+use App\Modules\Campaigns\Actions\CreateCampaignScheduleMessageAction;
 use App\Modules\Campaigns\Actions\DeactivateCampaignAction;
 use App\Modules\Campaigns\Actions\PublishCampaignMessageChainVersionAction;
+use App\Modules\Campaigns\Actions\StartCompletedCampaignAppendAction;
 use App\Modules\Campaigns\Actions\UpdateCampaignEligibilityAction;
 use App\Modules\Campaigns\Actions\UpdateCampaignSendPatternAction;
 use App\Modules\Campaigns\Models\Campaign;
@@ -25,6 +27,7 @@ use App\Modules\Campaigns\Services\CampaignSendPatternService;
 use App\Modules\Campaigns\Services\CampaignWorkspacePresenter;
 use App\Modules\Messaging\Actions\PublishMessageTemplatePresetOverrideAction;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
+use App\Modules\Messaging\Models\MessageChainVersion;
 use App\Modules\Messaging\Models\MessageChainStepVariant;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Services\MessageMediaAuthoringService;
@@ -190,6 +193,7 @@ class CampaignController extends Controller
         CampaignEligibilityAuthoringService $eligibilityAuthoring,
         CampaignMessageReviewPresenter $messageReviewPresenter,
         CampaignScheduleAuthoringPresenter $schedulePresenter,
+        StartCompletedCampaignAppendAction $completedAppend,
     ): View {
         $scheduleAuthoring = $schedulePresenter->forCampaign($campaign);
 
@@ -206,7 +210,24 @@ class CampaignController extends Controller
             ),
             'scheduleAuthoring' => $scheduleAuthoring,
             'initialPanel' => $this->initialPanel($request),
+            'completedAppend' => $completedAppend->prompt($campaign),
         ]);
+    }
+
+    public function startCompletedAppend(
+        Request $request,
+        Campaign $campaign,
+        StartCompletedCampaignAppendAction $completedAppend,
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'append_id' => ['required', 'integer', 'min:1'],
+        ]);
+        $count = $completedAppend->start($campaign, (int) $validated['append_id']);
+
+        return redirect()->route('crm.campaigns.edit', [
+            'campaign' => $campaign,
+            'panel' => 'review',
+        ])->with('status', $count.' completed contacts queued for eligibility checks and the appended message.');
     }
 
     public function updateSendPattern(
@@ -228,22 +249,80 @@ class CampaignController extends Controller
         UpdateCampaignScheduleRequest $request,
         Campaign $campaign,
         PublishCampaignMessageChainVersionAction $publishCampaignVersion,
+        CreateCampaignScheduleMessageAction $createScheduleMessage,
+        MessageMediaAuthoringService $mediaAuthoring,
     ): RedirectResponse {
         $actor = $request->user();
-        $published = $publishCampaignVersion->replaceSchedule(
-            campaign: $campaign,
-            expectedVersionId: $request->expectedVersionId(),
-            submittedSteps: $request->scheduleSteps(),
-            newStep: $request->newStep(),
-            createdBy: $actor instanceof User ? $actor : null,
-        );
+        $newStep = $request->newStep();
+        $payload = $request->creatingTemplate()
+            ? $request->newTemplatePayload()
+            : [];
+
+        try {
+            if ($request->creatingTemplate() && $request->newTemplateChannel() === 'email') {
+                $payload = $mediaAuthoring->apply(
+                    payload: $payload,
+                    submitted: $request->hasMessageMediaSubmission(),
+                    upload: $request->messageMediaUpload(),
+                    assetUuid: $request->messageMediaAssetUuid(),
+                    posterAssetUuid: $request->messageMediaPosterAssetUuid(),
+                    title: $request->messageMediaTitle(),
+                    uploadedBy: $actor,
+                    displaySize: $request->messageMediaSize(),
+                    attachmentValues: $request->messageAttachmentValues(),
+                    attachmentUpload: $request->messageAttachmentUpload(),
+                    attachmentUploadSource: $request->messageAttachmentUploadSource(),
+                );
+            }
+
+            $published = DB::transaction(function () use (
+                $request,
+                $campaign,
+                $publishCampaignVersion,
+                $createScheduleMessage,
+                $actor,
+                $newStep,
+                $payload,
+            ): MessageChainVersion {
+                if ($request->creatingTemplate()) {
+                    $version = MessageChainVersion::query()
+                        ->whereKey($request->expectedVersionId())
+                        ->where('message_chain_id', $campaign->message_chain_id)
+                        ->firstOrFail();
+                    $preset = $createScheduleMessage->handle(
+                        campaign: $campaign,
+                        currentVersion: $version,
+                        name: $request->newTemplateName(),
+                        channel: $request->newTemplateChannel(),
+                        payload: $payload,
+                        createdBy: $actor instanceof User ? $actor : null,
+                    );
+                    $newStep['message_template_preset_id'] = $preset->getKey();
+                }
+
+                return $publishCampaignVersion->replaceSchedule(
+                    campaign: $campaign,
+                    expectedVersionId: $request->expectedVersionId(),
+                    submittedSteps: $request->scheduleSteps(),
+                    newStep: $newStep,
+                    extendInProgress: $request->extendInProgress(),
+                    createdBy: $actor instanceof User ? $actor : null,
+                );
+            }, 3);
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'new_step.template' => $exception->getMessage(),
+            ]);
+        }
 
         return redirect()
             ->route('crm.campaigns.edit', [
                 'campaign' => $campaign,
                 'panel' => 'schedule',
             ])
-            ->with('status', 'Campaign schedule version '.$published->version.' published for future enrollments.');
+            ->with('status', $request->extendInProgress()
+                ? 'Campaign schedule version '.$published->version.' published. Current participants will receive the appended message after their existing schedule finishes.'
+                : 'Campaign schedule version '.$published->version.' published for future enrollments.');
     }
 
     public function updateMessage(

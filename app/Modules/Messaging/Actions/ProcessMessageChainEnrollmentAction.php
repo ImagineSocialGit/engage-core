@@ -13,6 +13,8 @@ use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Services\ConditionChecker;
 use App\Modules\Messaging\Services\MessageChainExecutionContextResolver;
+use App\Modules\Messaging\Services\MessageChainContinuationRegistry;
+use App\Modules\Messaging\Services\MessageChainStepBypassRegistry;
 use App\Modules\Messaging\Services\MessageChainTimingResolver;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\MessagePlanningGate;
@@ -34,6 +36,8 @@ class ProcessMessageChainEnrollmentAction
         private readonly MessageRecipientPayloadResolver $recipientPayloadResolver,
         private readonly MessageChannelAvailability $messageChannelAvailability,
         private readonly MessagePlanningGate $planningGate,
+        private readonly MessageChainStepBypassRegistry $stepBypasses,
+        private readonly MessageChainContinuationRegistry $continuations,
         private readonly ScheduleMessageAction $scheduleMessage,
         private readonly AttachScheduledMessageComponentsAction $attachComponents,
     ) {}
@@ -233,6 +237,15 @@ class ProcessMessageChainEnrollmentAction
         }
 
         $existingWave = $this->waveMessages($enrollment, $step);
+
+        if ($existingWave->isEmpty()
+            && $this->stepBypasses->reason($enrollment, $step) !== null) {
+            return $this->advance(
+                enrollment: $enrollment,
+                context: $context,
+                baseAt: now(),
+            );
+        }
 
         if ($existingWave->isNotEmpty()) {
             $this->attachToMessages(
@@ -794,9 +807,13 @@ class ProcessMessageChainEnrollmentAction
             );
 
             if (! $nextStep instanceof MessageChainStep) {
-                $this->complete($enrollment);
+                $nextStep = $this->continuations->nextStep($enrollment, $currentStep);
 
-                return ['enrollment' => $enrollment, 'dispatch' => false];
+                if (! $nextStep instanceof MessageChainStep) {
+                    $this->complete($enrollment);
+
+                    return ['enrollment' => $enrollment, 'dispatch' => false];
+                }
             }
 
             $nextActionAt = $this->timingResolver->resolve(
@@ -810,16 +827,25 @@ class ProcessMessageChainEnrollmentAction
                 step: $nextStep,
                 scheduledAt: $nextActionAt,
             )) {
+                if ((int) $enrollment->message_chain_version_id
+                    !== (int) $nextStep->message_chain_version_id) {
+                    $enrollment->forceFill([
+                        'message_chain_version_id' => $nextStep->message_chain_version_id,
+                    ])->save();
+                    $enrollment->setRelation('messageChainVersion', $nextStep->messageChainVersion);
+                }
                 $currentStep = $nextStep;
 
                 continue;
             }
 
             $enrollment->forceFill([
+                'message_chain_version_id' => $nextStep->message_chain_version_id,
                 'current_message_chain_step_id' => $nextStep->getKey(),
                 'next_action_at' => $nextActionAt,
             ])->save();
             $enrollment->setRelation('currentMessageChainStep', $nextStep);
+            $enrollment->setRelation('messageChainVersion', $nextStep->messageChainVersion);
 
             return ['enrollment' => $enrollment, 'dispatch' => true];
         }

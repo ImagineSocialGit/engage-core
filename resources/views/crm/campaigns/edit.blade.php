@@ -36,6 +36,7 @@
     $scheduleHasErrors = $failedCampaignEditor === 'schedule' && collect($errors->keys())->contains(
         fn (string $key): bool => $key === 'message_chain_version_id'
             || $key === 'steps'
+            || $key === 'extend_in_progress'
             || str_starts_with($key, 'steps.')
             || str_starts_with($key, 'new_step.'),
     );
@@ -90,6 +91,22 @@
             <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-900">
                 {{ session('error') }}
             </div>
+        @endif
+
+        @if($completedAppend !== null)
+            <section class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 sm:px-6">
+                <h2 class="text-base font-semibold text-amber-950">Continue completed contacts at the new message?</h2>
+                <p class="mt-2 text-sm leading-6 text-amber-900">
+                    {{ number_format($completedAppend['count']) }} {{ \Illuminate\Support\Str::plural('contact', $completedAppend['count']) }} completed the previous schedule. Start currently eligible contacts at the appended message. Previous messages will not replay. Contacts without permission to receive this message, contacts in another active Campaign in this family, and contacts who have since left this Campaign will be skipped. The appended message follows its configured timing.
+                </p>
+                <form method="POST" action="{{ route('crm.campaigns.completed-append.start', $campaign) }}" class="mt-4" onsubmit="return confirm('Start eligible completed contacts at the appended message?');">
+                    @csrf
+                    <input type="hidden" name="append_id" value="{{ $completedAppend['append_id'] }}">
+                    <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full bg-amber-900 px-5 text-sm font-bold text-white hover:bg-amber-950">
+                        Start eligible completed contacts
+                    </button>
+                </form>
+            </section>
         @endif
 
         <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -165,6 +182,15 @@
                     >
                         {{ $scheduleEditable ? 'Review and edit schedule' : 'View current schedule' }}
                     </button>
+                    @if($scheduleEditable)
+                        <button
+                            type="button"
+                            x-on:click="openModal('schedule'); $dispatch('campaign-add-step')"
+                            class="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-4 text-sm font-bold text-white transition hover:bg-slate-800 sm:ml-2 sm:w-auto"
+                        >
+                            Add a message
+                        </button>
+                    @endif
                 </section>
 
                 <section class="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
@@ -484,10 +510,13 @@
                     index: 0,
                     count: @js(count($scheduleSteps)),
                     addStep: @js((bool) old('new_step.add', false)),
+                    templateMode: @js(old('new_step.template_mode', 'create')),
+                    templateChannel: @js(old('new_step.template.channel', 'email')),
                     navigate(delta) {
                         if (this.count > 1) this.index = (this.index + delta + this.count) % this.count;
                     },
                 }"
+                x-on:campaign-add-step.window="addStep = true; templateMode = 'create'; $nextTick(() => $refs.newMessage?.scrollIntoView({ block: 'start' }))"
                 class="max-h-[calc(100vh-2rem)] w-full max-w-4xl overflow-y-auto rounded-3xl bg-white shadow-2xl"
             >
                 <header class="sticky top-0 z-30 flex flex-col gap-4 border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:flex-row sm:items-start sm:justify-between sm:px-6">
@@ -503,6 +532,7 @@
                     <form
                         method="POST"
                         action="{{ route('crm.campaigns.schedule.update', $campaign) }}"
+                        enctype="multipart/form-data"
                         data-campaign-schedule-form
                     >
                         @csrf
@@ -603,15 +633,80 @@
                                 </div>
                             </div>
 
-                            <section class="rounded-3xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                            <section x-ref="newMessage" class="rounded-3xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
                                 <label class="flex items-center gap-3 text-sm font-bold text-slate-900">
                                     <input type="checkbox" name="new_step[add]" value="1" x-model="addStep" class="rounded border-slate-300 text-rose-700 focus:ring-rose-600">
                                     Add another scheduled message
                                 </label>
 
                                 <div x-show="addStep" x-cloak class="mt-4 grid gap-4 sm:grid-cols-2">
-                                    <label class="block sm:col-span-2">
-                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Published message</span>
+                                    <fieldset class="sm:col-span-2">
+                                        <legend class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Message</legend>
+                                        <div class="mt-2 flex flex-wrap gap-4">
+                                            <label class="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                                <input type="radio" name="new_step[template_mode]" value="create" x-model="templateMode" class="border-slate-300 text-rose-700 focus:ring-rose-600">
+                                                Write a new message
+                                            </label>
+                                            <label class="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                                <input type="radio" name="new_step[template_mode]" value="existing" x-model="templateMode" class="border-slate-300 text-rose-700 focus:ring-rose-600">
+                                                Choose a saved message
+                                            </label>
+                                        </div>
+                                    </fieldset>
+
+                                    <div x-show="templateMode === 'create'" x-cloak class="space-y-4 sm:col-span-2">
+                                        <label class="block">
+                                            <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Message template name</span>
+                                            <input name="new_step[template][name]" value="{{ old('new_step.template.name') }}" maxlength="191" placeholder="For example: Realtor follow-up 3" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
+                                        </label>
+                                        @error('new_step.template')<p class="text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                                        @error('new_step.template.name')<p class="text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+
+                                        <fieldset>
+                                            <legend class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Channel</legend>
+                                            <div class="mt-2 flex gap-4">
+                                                <label class="flex items-center gap-2 text-sm font-semibold text-slate-900"><input type="radio" name="new_step[template][channel]" value="email" x-model="templateChannel" class="border-slate-300 text-rose-700 focus:ring-rose-600"> Email</label>
+                                                <label class="flex items-center gap-2 text-sm font-semibold text-slate-900"><input type="radio" name="new_step[template][channel]" value="sms" x-model="templateChannel" class="border-slate-300 text-rose-700 focus:ring-rose-600"> SMS</label>
+                                            </div>
+                                        </fieldset>
+
+                                        <div x-show="templateChannel === 'email'" x-cloak class="space-y-4">
+                                            <x-ui.message-editor
+                                                :subject="[
+                                                    'id' => 'campaign-appended-subject',
+                                                    'name' => 'new_step[template][subject]',
+                                                    'value' => old('new_step.template.subject'),
+                                                    'label' => 'Email subject',
+                                                    'maxlength' => 255,
+                                                ]"
+                                                :body="[
+                                                    'id' => 'campaign-appended-body',
+                                                    'name' => 'new_step[template][body]',
+                                                    'value' => old('new_step.template.body'),
+                                                    'label' => 'Email body',
+                                                    'maxlength' => 10000,
+                                                    'rows' => 9,
+                                                ]"
+                                            />
+                                            <x-messaging.message-media-authoring :failed="$scheduleHasErrors" />
+                                        </div>
+
+                                        <div x-show="templateChannel === 'sms'" x-cloak>
+                                            <x-ui.message-editor
+                                                :sms="[
+                                                    'id' => 'campaign-appended-sms',
+                                                    'name' => 'new_step[template][message]',
+                                                    'value' => old('new_step.template.message'),
+                                                    'label' => 'SMS message',
+                                                    'maxlength' => 1600,
+                                                    'rows' => 7,
+                                                ]"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <label x-show="templateMode === 'existing'" x-cloak class="block sm:col-span-2">
+                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Saved message</span>
                                         <select name="new_step[message_template_preset_id]" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
                                             <option value="">Choose a message</option>
                                             @foreach($scheduleMessageOptions as $option)
@@ -651,10 +746,17 @@
                                     </div>
                                 </div>
                             </section>
+                            <section x-show="addStep" x-cloak class="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5">
+                                <label class="flex items-start gap-3 text-sm font-semibold text-slate-900">
+                                    <input type="checkbox" name="extend_in_progress" value="1" @checked(old('extend_in_progress')) class="mt-0.5 rounded border-slate-300 text-rose-700 focus:ring-rose-600">
+                                    <span>Include contacts already in this Campaign<br><span class="font-normal text-slate-600">Available when you only append a final message. Each active participant keeps their current schedule and receives the new message after finishing it. Completed participants are not restarted.</span></span>
+                                </label>
+                                @error('extend_in_progress')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                            </section>
                         </div>
 
                         <footer class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                            <p class="text-xs leading-5 text-slate-500">Saving publishes a new immutable schedule for future enrollments. Current participants keep their existing version.</p>
+                            <p class="text-xs leading-5 text-slate-500">Saving publishes a new immutable schedule. Current participants stay on their existing version unless you choose to include them in a final appended message.</p>
                             <div class="flex flex-col gap-2 sm:flex-row">
                                 <button type="button" x-on:click="activeModal = 'messages'" @disabled($messageReviewCount < 1) class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Review message copy</button>
                                 <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800">Publish schedule changes</button>

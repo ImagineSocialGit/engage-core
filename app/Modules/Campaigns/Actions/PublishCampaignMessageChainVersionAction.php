@@ -4,6 +4,7 @@ namespace App\Modules\Campaigns\Actions;
 
 use App\Models\User;
 use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Campaigns\Models\CampaignMessageChainAppend;
 use App\Modules\Messaging\Actions\PublishMessageChainVersionAction;
 use App\Modules\Messaging\Models\MessageChain;
 use App\Modules\Messaging\Models\MessageChainStep;
@@ -34,6 +35,7 @@ final class PublishCampaignMessageChainVersionAction
         array $submittedSteps,
         ?array $newStep = null,
         ?User $createdBy = null,
+        bool $extendInProgress = false,
     ): MessageChainVersion {
         return DB::transaction(function () use (
             $campaign,
@@ -41,6 +43,7 @@ final class PublishCampaignMessageChainVersionAction
             $submittedSteps,
             $newStep,
             $createdBy,
+            $extendInProgress,
         ): MessageChainVersion {
             [$lockedCampaign, $chain, $version] = $this->lockedContext(
                 campaign: $campaign,
@@ -81,6 +84,7 @@ final class PublishCampaignMessageChainVersionAction
             if ($newStep !== null) {
                 $steps[] = $this->newStepDefinition(
                     currentSteps: $currentSteps,
+                    chain: $chain,
                     input: $newStep,
                 );
             }
@@ -104,13 +108,29 @@ final class PublishCampaignMessageChainVersionAction
             }
             unset($step);
 
-            return $this->publish(
+            if ($extendInProgress) {
+                $this->assertPureAppend($currentSteps, $steps, $newStep);
+            }
+
+            $published = $this->publish(
                 campaign: $lockedCampaign,
                 chain: $chain,
                 previousVersion: $version,
                 steps: $steps,
                 createdBy: $createdBy,
             );
+
+            if ($extendInProgress) {
+                CampaignMessageChainAppend::query()->create([
+                    'campaign_id' => $lockedCampaign->getKey(),
+                    'from_message_chain_version_id' => $version->getKey(),
+                    'to_message_chain_version_id' => $published->getKey(),
+                    'appended_step_key' => $steps[array_key_last($steps)]['key'],
+                    'created_by' => $createdBy?->getKey(),
+                ]);
+            }
+
+            return $published;
         }, 3);
     }
 
@@ -329,7 +349,7 @@ final class PublishCampaignMessageChainVersionAction
      * @param array<string, mixed> $input
      * @return array<string, mixed>
      */
-    private function newStepDefinition(array $currentSteps, array $input): array
+    private function newStepDefinition(array $currentSteps, MessageChain $chain, array $input): array
     {
         $preset = MessageTemplatePreset::query()
             ->active()
@@ -368,7 +388,7 @@ final class PublishCampaignMessageChainVersionAction
             ];
 
         return [
-            'key' => $this->nextStepKey($currentSteps),
+            'key' => $this->nextStepKey($currentSteps, $chain),
             'name' => $this->nullableString($input['name'] ?? null) ?? $preset->name,
             'sort_order' => 0,
             '_position' => (int) ($input['position'] ?? (count($currentSteps) + 1)),
@@ -548,10 +568,49 @@ final class PublishCampaignMessageChainVersionAction
         return $seconds;
     }
 
-    /** @param array<int, array<string, mixed>> $steps */
-    private function nextStepKey(array $steps): string
+    /**
+     * @param array<int, array<string, mixed>> $currentSteps
+     * @param array<int, array<string, mixed>> $steps
+     * @param array<string, mixed>|null $newStep
+     */
+    private function assertPureAppend(array $currentSteps, array $steps, ?array $newStep): void
     {
-        $keys = array_values(array_filter(array_column($steps, 'key'), 'is_string'));
+        $unchanged = count($steps) === count($currentSteps) + 1
+            && $newStep !== null
+            && (int) ($newStep['position'] ?? count($steps)) === count($steps);
+
+        foreach ($currentSteps as $index => $original) {
+            $updated = $steps[$index] ?? null;
+
+            if (! is_array($updated)) {
+                $unchanged = false;
+                break;
+            }
+
+            unset($original['sort_order'], $updated['sort_order']);
+
+            if ($original !== $updated) {
+                $unchanged = false;
+                break;
+            }
+        }
+
+        if (! $unchanged) {
+            throw ValidationException::withMessages([
+                'extend_in_progress' => 'To include current participants, only add one final message. Keep every existing message, order, and timing unchanged.',
+            ]);
+        }
+    }
+
+    /** @param array<int, array<string, mixed>> $steps */
+    private function nextStepKey(array $steps, MessageChain $chain): string
+    {
+        $keys = MessageChainStep::query()
+            ->whereHas('messageChainVersion', fn ($query) => $query
+                ->where('message_chain_id', $chain->getKey()))
+            ->pluck('key')
+            ->merge(array_filter(array_column($steps, 'key'), 'is_string'))
+            ->all();
         $number = 1;
 
         while (in_array('step_'.$number, $keys, true)) {
