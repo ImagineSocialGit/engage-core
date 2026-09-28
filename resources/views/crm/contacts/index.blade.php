@@ -249,7 +249,7 @@
                                 name="{{ $filter['key'] }}"
                                 x-on:change="$el.form.submit()"
                             >
-                                <option value="">Any {{ str($filter['label'])->lower() }}</option>
+                                <option value="">{{ $filter['key'] === 'relationship' ? 'Select relationship' : 'Any '.str($filter['label'])->lower() }}</option>
 
                                 @foreach($filter['options'] as $option)
                                     <option
@@ -298,7 +298,7 @@
                                     name="{{ $filter['key'] }}"
                                     x-on:change="$el.form.submit()"
                                 >
-                                    <option value="">Any {{ str($filter['label'])->lower() }}</option>
+                                    <option value="">{{ $filter['key'] === 'relationship' ? 'Select relationship' : 'Any '.str($filter['label'])->lower() }}</option>
 
                                     @foreach($filter['options'] as $option)
                                         <option
@@ -343,7 +343,7 @@
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h3 class="text-lg font-semibold tracking-tight text-slate-950 capitalize">
-                            {{ $contactFilters['has_filters'] ? 'Matching '.$leadPlural : 'All '.$leadPlural }}
+                            {{ $contactFilters['has_filters'] ? 'Matching '.$leadPlural : str($leadPlural)->title() }}
                         </h3>
 
                         <p class="mt-1 text-sm text-slate-500">
@@ -450,7 +450,7 @@
                             </p>
 
                             <p class="mt-1 text-sm text-slate-500">
-                                Change a search or filter, or clear everything to see all {{ $leadPlural }}.
+                                Try another search or filter.
                             </p>
 
                             <div class="mt-4">
@@ -458,6 +458,10 @@
                                     Clear filters
                                 </x-ui.button>
                             </div>
+                        @elseif($totalContacts > 0)
+                            <p class="text-sm font-medium text-slate-900">
+                                Search or apply a filter to find {{ $leadPlural }}.
+                            </p>
                         @else
                             <p class="text-sm font-medium text-slate-900 capitalize">
                                 No {{ $leadPlural }} yet.

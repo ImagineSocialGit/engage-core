@@ -13,6 +13,38 @@ class ContactIndexFilterTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_contacts_index_starts_empty_until_a_search_or_filter_is_applied(): void
+    {
+        $user = User::factory()->create();
+        $contact = Contact::factory()->create([
+            'name' => 'Avery Morgan',
+            'email' => 'avery@example.test',
+            'source' => 'Referral',
+        ]);
+
+        $initial = $this->actingAs($user)->get(route('crm.contacts.index'));
+
+        $initial->assertOk();
+        $this->assertSame(0, $initial->viewData('contacts')->total());
+        $this->assertSame(1, $initial->viewData('totalContacts'));
+        $this->assertFalse($initial->viewData('contactFilters')['has_filters']);
+
+        $searched = $this->get(route('crm.contacts.index', ['search' => 'avery@example.test']));
+
+        $searched->assertOk();
+        $this->assertEquals([$contact->id], $searched->viewData('contacts')->pluck('id')->all());
+
+        $filtered = $this->get(route('crm.contacts.index', ['source' => 'Referral']));
+
+        $filtered->assertOk();
+        $this->assertEquals([$contact->id], $filtered->viewData('contacts')->pluck('id')->all());
+
+        $invalid = $this->get(route('crm.contacts.index', ['source' => 'Missing source']));
+
+        $invalid->assertOk();
+        $this->assertSame(0, $invalid->viewData('contacts')->total());
+    }
+
     public function test_search_and_registry_criteria_combine_on_the_contacts_index(): void
     {
         $user = User::factory()->create();

@@ -31,6 +31,7 @@ use App\Modules\Core\Support\Contacts\ContactShowDataRegistry;
 use App\Support\Modules\ModuleManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -49,20 +50,27 @@ class ContactController extends Controller
         ContactResultActionRegistry $contactResultActions,
     ): View {
         $contactFilters = $contactIndexFilters->state($request->query());
-        $contactsQuery = $contactVisibility->apply(
-            $contactIndexFilters->query($contactFilters),
-            $request->user(),
-        );
+        if ($contactFilters['has_filters']) {
+            $contactsQuery = $contactVisibility->apply(
+                $contactIndexFilters->query($contactFilters),
+                $request->user(),
+            );
 
-        if (module_enabled('workflow')) {
-            $contactsQuery->with('workflowProfile.contactStatus');
+            if (module_enabled('workflow')) {
+                $contactsQuery->with('workflowProfile.contactStatus');
+            }
+
+            $contacts = $contactsQuery
+                ->reorder()
+                ->latest()
+                ->paginate(20)
+                ->withQueryString();
+        } else {
+            $contacts = new LengthAwarePaginator([], 0, 20, [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]);
         }
-
-        $contacts = $contactsQuery
-            ->reorder()
-            ->latest()
-            ->paginate(20)
-            ->withQueryString();
 
         $totalContacts = $contactVisibility
             ->apply(Contact::query(), $request->user())
