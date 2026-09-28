@@ -347,7 +347,7 @@
                         @error('allocation_settings.recipient_cooldown_days')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
                     </label>
                 </div>
-                <p x-show="strategy === 'recurring_allocation'" x-cloak class="mt-3 text-xs leading-5 text-slate-500">Recurring allocation currently uses manual enrollment and does not support Campaign-family arbitration. Message waits are configured in Schedule and run cumulatively from the start of each allocation run.</p>
+                <p x-show="strategy === 'recurring_allocation'" x-cloak class="mt-3 text-xs leading-5 text-slate-500">Recurring allocation currently uses manual enrollment and does not support Campaign-family arbitration. Each message’s offset in Schedule sets its own earliest send time from the start of the run. <a href="{{ route('crm.campaigns.show', $campaign) }}#campaign-email-delivery-pacing" class="font-semibold underline">Email delivery pacing</a> can defer marketing emails later; it does not change who is allocated or when the next run starts.</p>
                 @error('execution_strategy')<p class="mt-3 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
                 @error('allocation_settings')<p class="mt-3 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
                 <div class="mt-4 flex justify-end"><button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800">Save delivery style</button></div>
@@ -585,7 +585,7 @@
                     <div>
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-rose-700">Current schedule</p>
                         <h2 class="mt-1 text-xl font-semibold text-slate-950">{{ $campaign->name }}</h2>
-                        <p class="mt-1 text-sm text-slate-600">{{ $campaign->usesRecurringAllocation() ? 'Order messages and set cumulative waits inside each allocation run. Message copy stays in the Messages carousel.' : 'Order and timing only. Message copy stays in the Messages carousel.' }}</p>
+                        <p class="mt-1 text-sm text-slate-600">{{ $campaign->usesRecurringAllocation() ? 'Each message goes to a different group of leads in the same run. Priority only decides which message gets leads first when the pool is limited. Set an independent send offset for each message; email pacing may defer delivery. Message copy stays in the Messages carousel.' : 'Order and timing only. Message copy stays in the Messages carousel.' }}</p>
                     </div>
                     <button type="button" x-on:click="closeModal()" class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">Close</button>
                 </header>
@@ -611,12 +611,16 @@
 
                             <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
                                 <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
-                                    <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Published schedule v{{ $scheduleAuthoring['version'] }}</span>
-                                    <span class="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200"><span x-text="index + 1"></span> of {{ count($scheduleSteps) }}</span>
+                                    <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Independent allocations' : 'Published schedule' }} v{{ $scheduleAuthoring['version'] }}</span>
+                                    @if($campaign->usesRecurringAllocation())
+                                        <span class="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">{{ count($scheduleSteps) }} {{ \Illuminate\Support\Str::plural('message', count($scheduleSteps)) }}</span>
+                                    @else
+                                        <span class="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200"><span x-text="index + 1"></span> of {{ count($scheduleSteps) }}</span>
+                                    @endif
                                 </div>
 
-                                <div class="relative px-12 py-5 sm:px-20 sm:py-8">
-                                    @if(count($scheduleSteps) > 1)
+                                <div class="{{ $campaign->usesRecurringAllocation() ? 'space-y-4 p-4 sm:p-6' : 'relative px-12 py-5 sm:px-20 sm:py-8' }}">
+                                    @if($campaign->usesSequentialExecution() && count($scheduleSteps) > 1)
                                         <button type="button" aria-label="Previous schedule step" x-on:click="navigate(-1)" class="absolute inset-y-5 left-0 flex w-11 items-center justify-center text-3xl text-slate-400 hover:bg-slate-100 hover:text-slate-950 sm:inset-y-8 sm:w-16">‹</button>
                                         <button type="button" aria-label="Next schedule step" x-on:click="navigate(1)" class="absolute inset-y-5 right-0 flex w-11 items-center justify-center text-3xl text-slate-400 hover:bg-slate-100 hover:text-slate-950 sm:inset-y-8 sm:w-16">›</button>
                                     @endif
@@ -626,8 +630,10 @@
                                             $submittedTimingType = old('steps.'.$scheduleIndex.'.timing_type', $step['timing_type']);
                                         @endphp
                                         <article
-                                            x-show="index === {{ $scheduleIndex }}"
-                                            x-cloak
+                                            @if($campaign->usesSequentialExecution())
+                                                x-show="index === {{ $scheduleIndex }}"
+                                                x-cloak
+                                            @endif
                                             x-data="{ timingType: @js($submittedTimingType) }"
                                             data-campaign-schedule-step="{{ $step['step_number'] }}"
                                             class="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
@@ -649,17 +655,17 @@
                                                 </div>
                                                 <label class="flex items-center gap-2 text-xs font-bold text-red-700">
                                                     <input type="checkbox" name="steps[{{ $scheduleIndex }}][remove]" value="1" @checked(old('steps.'.$scheduleIndex.'.remove')) class="rounded border-slate-300 text-red-600 focus:ring-red-600">
-                                                    Remove step
+                                                    {{ $campaign->usesRecurringAllocation() ? 'Remove message' : 'Remove step' }}
                                                 </label>
                                             </div>
 
                                             <div class="mt-5 grid gap-4 sm:grid-cols-[1fr_7rem]">
                                                 <label class="block">
-                                                    <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Step name</span>
+                                                    <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Message name' : 'Step name' }}</span>
                                                     <input name="steps[{{ $scheduleIndex }}][name]" value="{{ old('steps.'.$scheduleIndex.'.name', $step['name']) }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 text-sm font-semibold text-slate-900">
                                                 </label>
                                                 <label class="block">
-                                                    <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Position</span>
+                                                    <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Allocation priority' : 'Position' }}</span>
                                                     <input type="number" min="1" name="steps[{{ $scheduleIndex }}][position]" value="{{ old('steps.'.$scheduleIndex.'.position', $step['position']) }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 text-sm font-semibold text-slate-900">
                                                 </label>
                                             </div>
@@ -667,14 +673,14 @@
                                             @if($step['timing_editable'])
                                                 <div class="mt-4 grid gap-4 sm:grid-cols-3">
                                                     <label class="block">
-                                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Timing</span>
+                                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Earliest send' : 'Timing' }}</span>
                                                         <select name="steps[{{ $scheduleIndex }}][timing_type]" x-model="timingType" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 text-sm font-semibold text-slate-900">
-                                                            <option value="immediate">Immediately</option>
-                                                            <option value="delay">Wait</option>
+                                                            <option value="immediate">{{ $campaign->usesRecurringAllocation() ? 'At run start' : 'Immediately' }}</option>
+                                                            <option value="delay">{{ $campaign->usesRecurringAllocation() ? 'After run starts' : 'Wait' }}</option>
                                                         </select>
                                                     </label>
                                                     <label x-show="timingType === 'delay'" class="block">
-                                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Wait</span>
+                                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Offset' : 'Wait' }}</span>
                                                         <input type="number" min="0" name="steps[{{ $scheduleIndex }}][delay_value]" value="{{ old('steps.'.$scheduleIndex.'.delay_value', $step['delay_value']) }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 text-sm font-semibold text-slate-900">
                                                     </label>
                                                     <label x-show="timingType === 'delay'" class="block">
@@ -698,7 +704,7 @@
                             <section x-ref="newMessage" class="rounded-3xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
                                 <label class="flex items-center gap-3 text-sm font-bold text-slate-900">
                                     <input type="checkbox" name="new_step[add]" value="1" x-model="addStep" class="rounded border-slate-300 text-rose-700 focus:ring-rose-600">
-                                    Add another scheduled message
+                                    {{ $campaign->usesRecurringAllocation() ? 'Add another allocation message' : 'Add another scheduled message' }}
                                 </label>
 
                                 <div x-show="addStep" x-cloak class="mt-4 grid gap-4 sm:grid-cols-2">
@@ -778,24 +784,24 @@
                                         @error('new_step.message_template_preset_id')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
                                     </label>
                                     <label class="block">
-                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Step name</span>
+                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Message name' : 'Step name' }}</span>
                                         <input name="new_step[name]" value="{{ old('new_step.name') }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
                                     </label>
                                     <label class="block">
-                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Position</span>
+                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Allocation priority' : 'Position' }}</span>
                                         <input type="number" min="1" name="new_step[position]" value="{{ old('new_step.position', count($scheduleSteps) + 1) }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
                                     </label>
                                     <label class="block">
-                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Timing</span>
+                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Earliest send' : 'Timing' }}</span>
                                         <select name="new_step[timing_type]" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
-                                            <option value="delay" @selected(old('new_step.timing_type', 'delay') === 'delay')>Wait</option>
-                                            <option value="immediate" @selected(old('new_step.timing_type') === 'immediate')>Immediately</option>
+                                            <option value="delay" @selected(old('new_step.timing_type', $campaign->usesRecurringAllocation() ? 'immediate' : 'delay') === 'delay')>{{ $campaign->usesRecurringAllocation() ? 'After run starts' : 'Wait' }}</option>
+                                            <option value="immediate" @selected(old('new_step.timing_type', $campaign->usesRecurringAllocation() ? 'immediate' : 'delay') === 'immediate')>{{ $campaign->usesRecurringAllocation() ? 'At run start' : 'Immediately' }}</option>
                                         </select>
                                     </label>
                                     <div class="grid grid-cols-2 gap-3">
                                         <label class="block">
-                                            <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Wait</span>
-                                            <input type="number" min="0" name="new_step[delay_value]" value="{{ old('new_step.delay_value', 1) }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
+                                            <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Offset' : 'Wait' }}</span>
+                                            <input type="number" min="0" name="new_step[delay_value]" value="{{ old('new_step.delay_value', $campaign->usesRecurringAllocation() ? 0 : 1) }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
                                         </label>
                                         <label class="block">
                                             <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Unit</span>

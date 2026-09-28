@@ -57,6 +57,7 @@ final class CampaignScheduleAuthoringPresenter
     private function step(Campaign $campaign, MessageChainStep $step, int $position): array
     {
         $channels = $step->variants
+            ->filter(fn ($variant): bool => (bool) $variant->is_active)
             ->pluck('channel')
             ->filter(fn (mixed $channel): bool => is_string($channel) && trim($channel) !== '')
             ->map(fn (string $channel): string => strtolower(trim($channel)))
@@ -86,6 +87,11 @@ final class CampaignScheduleAuthoringPresenter
             'delay_value' => $delayValue,
             'delay_unit' => $delayUnit,
             'channels' => $channels,
+            'has_marketing_email' => $step->is_active && $step->variants->contains(
+                fn ($variant): bool => (bool) $variant->is_active
+                    && strtolower((string) $variant->channel) === 'email'
+                    && strtolower((string) $variant->purpose) === 'marketing',
+            ),
             'message_count' => $step->variants->where('is_active', true)->count(),
         ];
     }
@@ -121,16 +127,14 @@ final class CampaignScheduleAuthoringPresenter
 
         return match ($step->timing_type) {
             MessageChainStep::TIMING_IMMEDIATE => $allocation
-                ? ($position === 0
-                    ? 'At the start of each allocation run'
-                    : 'At the same run time as the previous message')
+                ? 'At the start of each allocation run'
                 : ($position === 0
                     ? 'Immediately after the Campaign starts'
                     : 'Immediately after the previous step finishes'),
             MessageChainStep::TIMING_DELAY => $this->durationLabel(
                 max(0, (int) $step->offset_seconds),
             ).' after '.($allocation
-                ? ($position === 0 ? 'the allocation run starts' : 'the previous allocation message')
+                ? 'the allocation run starts'
                 : ($position === 0 ? 'the Campaign starts' : 'the previous step finishes')),
             MessageChainStep::TIMING_ANCHORED => $this->anchoredLabel($step),
             MessageChainStep::TIMING_NEXT_DAY_AT => sprintf(

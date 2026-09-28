@@ -121,7 +121,7 @@
                     <div>
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Recurring allocation</p>
                         <h2 class="mt-2 text-lg font-semibold text-slate-950">Allocate each message to a different eligible group</h2>
-                        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Each run reserves distinct leads across the active messages. Message waits are cumulative from the start of that run; the recipient cooldown controls when a successfully contacted lead can be selected again for another message.</p>
+                        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Each run reserves distinct leads across active messages. Each message's offset from run start sets its own earliest send time. The cooldown controls when a successfully contacted lead can be selected again. <a href="#campaign-email-delivery-pacing" class="font-semibold underline">Email delivery pacing</a> may defer marketing emails later.</p>
                     </div>
                     <a href="{{ route('crm.campaigns.edit', ['campaign' => $campaign, 'panel' => 'start']) }}" class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">Edit allocation settings</a>
                 </div>
@@ -168,13 +168,13 @@
             </div>
         </section>
 
-        <section class="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-7">
+        <section id="campaign-email-delivery-pacing" class="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-7">
             <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                    <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Send pattern</p>
-                    <h2 class="mt-2 text-xl font-semibold text-slate-950">Control campaign email pacing</h2>
+                    <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Email delivery pacing</p>
+                    <h2 class="mt-2 text-xl font-semibold text-slate-950">Schedule marketing email delivery</h2>
                     <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                        Keep the normal due times, or spread marketing emails across selected days and hours with a daily limit.
+                        Message timing sets the earliest send time. Spread Campaign marketing emails across allowed days and hours with a daily limit, or use their due times. This setting does not change allocation cadence, recipients, or SMS timing.
                     </p>
                 </div>
 
@@ -182,6 +182,12 @@
                     {{ $sendPattern['mode_label'] }}
                 </div>
             </div>
+
+            @if($campaign->usesRecurringAllocation() && $sendPattern['mode'] === 'spread' && $workspace['marketing_email_step_count'] * $allocationSettings['allocation_size_per_message'] > $sendPattern['daily_limit'])
+                <div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+                    A run can plan up to {{ number_format($workspace['marketing_email_step_count'] * $allocationSettings['allocation_size_per_message']) }} marketing emails across {{ number_format($workspace['marketing_email_step_count']) }} active email {{ \Illuminate\Support\Str::plural('message', $workspace['marketing_email_step_count']) }}. The daily Campaign limit is {{ number_format($sendPattern['daily_limit']) }}. If more than that become due on one allowed day, the rest move to later allowed slots. Message offsets, other Campaign sends, and recipient eligibility affect the actual schedule. A later allocation run can begin while earlier emails are still pending.
+                </div>
+            @endif
 
             <form method="POST" action="{{ route('crm.campaigns.send-pattern.update', $campaign) }}" class="mt-6 space-y-5">
                 @csrf
@@ -199,7 +205,7 @@
                             >
                             <span>
                                 <span class="block text-sm font-semibold text-slate-950">Send as due</span>
-                                <span class="mt-1 block text-xs leading-5 text-slate-600">Use each Campaign step’s normal timing with no Campaign-level daily cap.</span>
+                                <span class="mt-1 block text-xs leading-5 text-slate-600">Use each message’s due time with no Campaign-level daily email limit.</span>
                             </span>
                         </span>
                     </label>
@@ -215,7 +221,7 @@
                             >
                             <span>
                                 <span class="block text-sm font-semibold text-slate-950">Spread throughout the day</span>
-                                <span class="mt-1 block text-xs leading-5 text-slate-600">Defer Campaign marketing emails into an allowed window and stop planning new sends after the daily limit is filled.</span>
+                                <span class="mt-1 block text-xs leading-5 text-slate-600">Place Campaign marketing emails in allowed windows. Overflow moves to later allowed days; each message's configured timing remains its earliest send time.</span>
                             </span>
                         </span>
                     </label>
@@ -297,7 +303,7 @@
                         type="submit"
                         class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800"
                     >
-                        Save send pattern
+                        Save email pacing
                     </button>
                 </div>
             </form>

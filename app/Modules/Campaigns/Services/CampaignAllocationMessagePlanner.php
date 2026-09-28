@@ -384,7 +384,6 @@ final class CampaignAllocationMessagePlanner
                 ? Carbon::parse($run->scheduled_for)->utc()
                 : now()->utc());
 
-        $offsetSeconds = 0;
         $orderedSteps = $version->steps
             ->filter(fn (MessageChainStep $step): bool => (bool) $step->is_active)
             ->sort(function (MessageChainStep $left, MessageChainStep $right): int {
@@ -394,19 +393,23 @@ final class CampaignAllocationMessagePlanner
             ->values();
 
         foreach ($orderedSteps as $step) {
-            if ($step->timing_type === MessageChainStep::TIMING_DELAY) {
-                $offsetSeconds += max(0, (int) $step->offset_seconds);
-            } elseif ($step->timing_type !== MessageChainStep::TIMING_IMMEDIATE) {
-                throw new RuntimeException(sprintf(
-                    'Recurring allocation message [%s] uses unsupported timing [%s].',
-                    (string) $step->key,
-                    (string) $step->timing_type,
-                ));
+            if ((int) $step->getKey() !== (int) $targetStep->getKey()) {
+                continue;
             }
 
-            if ((int) $step->getKey() === (int) $targetStep->getKey()) {
-                return $base->copy()->addSeconds($offsetSeconds);
+            if ($step->timing_type === MessageChainStep::TIMING_IMMEDIATE) {
+                return $base->copy();
             }
+
+            if ($step->timing_type === MessageChainStep::TIMING_DELAY) {
+                return $base->copy()->addSeconds(max(0, (int) $step->offset_seconds));
+            }
+
+            throw new RuntimeException(sprintf(
+                'Recurring allocation message [%s] uses unsupported timing [%s].',
+                (string) $step->key,
+                (string) $step->timing_type,
+            ));
         }
 
         throw new RuntimeException(sprintf(

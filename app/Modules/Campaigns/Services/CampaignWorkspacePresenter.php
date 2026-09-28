@@ -26,6 +26,7 @@ class CampaignWorkspacePresenter
      *     pending_message_count: int,
      *     message_step_count: int,
      *     message_count: int,
+     *     marketing_email_step_count: int,
      *     channels: array<int, string>,
      *     message_chain_version_id: int|null,
      *     message_chain_version: int|null,
@@ -55,12 +56,16 @@ class CampaignWorkspacePresenter
                 ->all();
             $messageStepCount = count($scheduleSteps);
             $messageCount = (int) collect($scheduleSteps)->sum('message_count');
+            $marketingEmailStepCount = collect($scheduleSteps)
+                ->filter(fn (array $step): bool => (bool) ($step['has_marketing_email'] ?? false))
+                ->count();
 
             return [
                 'active_enrollment_count' => $this->activeEnrollmentCount($campaign),
                 'pending_message_count' => $this->pendingScheduledMessageCount($campaign),
                 'message_step_count' => $messageStepCount,
                 'message_count' => $messageCount,
+                'marketing_email_step_count' => $marketingEmailStepCount,
                 'channels' => $channels,
                 'message_chain_version_id' => $schedule['message_chain_version_id'],
                 'message_chain_version' => $schedule['version'],
@@ -105,12 +110,19 @@ class CampaignWorkspacePresenter
 
         $messageStepCount = $steps->count();
         $messageCount = $variants->count();
+        $marketingEmailStepCount = $steps->filter(
+            fn (CampaignStep $step): bool => $step->variants->contains(
+                fn (CampaignStepVariant $variant): bool => strtolower((string) $variant->channel) === 'email'
+                    && strtolower((string) $variant->purpose) === 'marketing',
+            ),
+        )->count();
 
         return [
             'active_enrollment_count' => $this->activeEnrollmentCount($campaign),
             'pending_message_count' => $this->pendingScheduledMessageCount($campaign),
             'message_step_count' => $messageStepCount,
             'message_count' => $messageCount,
+            'marketing_email_step_count' => $marketingEmailStepCount,
             'channels' => $channels,
             'message_chain_version_id' => null,
             'message_chain_version' => null,

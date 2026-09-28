@@ -62,21 +62,31 @@ allocation_size_per_message
     allocation run.
 
 recipient_cooldown_days
-    Minimum time after an allocation reservation or dated prior receipt before a
-    Contact can be allocated another message from this Campaign.
+    Minimum time after a successful allocation send or dated prior receipt
+    before a Contact can be allocated another message from this Campaign.
 ```
 
-An allocation assignment starts cooldown at `assigned_at`. This is deliberate:
-allocation is a reservation, and a Contact with a pending/sending allocation
-message is also excluded from new allocation regardless of cooldown. A dated
-external prior receipt participates in cooldown. An undated prior receipt still
-excludes that exact message but does not invent a Campaign-wide cooldown date.
+Successful allocation delivery starts cooldown at `sent_at`. A Contact with a
+pending/sending allocation message is separately excluded from new allocation.
+A dated external prior receipt participates in cooldown. An undated prior receipt
+still excludes that exact message but does not invent a Campaign-wide cooldown date.
 
 Allocation size is not a daily/provider send limit. Campaign send-pattern pacing
 remains the authority for marketing-email scheduling. In `spread` mode, the
 existing Campaign daily limit and delivery window count sequential Campaign
 messages and recurring-allocation messages together for the same Campaign.
-Recurring allocation does not introduce a competing limiter.
+Recurring allocation does not introduce a competing limiter. The daily limit
+applies only in `spread` mode and only to Campaign marketing email; `as_due`
+has no Campaign-level daily email limit. Each message's offset from run start sets its own earliest send
+time, and pacing may defer marketing email to a later permitted slot. Allocation
+runs can start while emails from an earlier run remain pending.
+
+The Campaign workspace estimates maximum per-run marketing-email volume as
+active schedule steps with a marketing-email variant multiplied by leads per
+message. This is an upper bound: actual variant selection, recipient eligibility,
+waits, and other Campaign sends affect the resulting schedule. When this upper
+bound exceeds the configured daily limit in `spread` mode, the workspace warns
+that emails due on the same permitted day may roll into later days.
 
 Recurring allocation currently requires:
 
@@ -553,7 +563,7 @@ leads per message per run
 recipient cooldown in days
 ```
 
-Schedule timing remains a Messaging MessageChain concern. Recurring allocation supports active `immediate` and `delay` steps. Waits may use seconds, minutes, hours, or days and are cumulative from the start of each allocation run. For example, an immediate first message, a two-day wait, and then a three-day wait are due at run start, run start +2 days, and run start +5 days. Each message is still allocated to a different eligible Contact from the shared run pool.
+Schedule timing remains a Messaging MessageChain concern. Recurring allocation supports active `immediate` and `delay` steps. Each step's delay is an independent offset from the start of its allocation run, in seconds, minutes, hours, or days. For example, offsets of zero, two days, and three days are due at run start, run start +2 days, and run start +3 days. The steps allocate distinct Contacts from the same shared pool; priority order controls selection when the pool is limited, not progression through messages. A zero offset is the default for a new allocation message. Existing dev allocation schedules created under cumulative timing should be reviewed and republished with the intended offsets; already-planned ScheduledMessages keep their send times.
 
 Existing allocation assignments remain pinned to the immutable MessageChainVersion they were created from. Publishing schedule changes affects future allocation runs; it does not rewrite already-created assignments. Sequential-only `extend_in_progress` append behavior is not available for recurring allocation.
 
