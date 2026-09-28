@@ -23,6 +23,7 @@ final class CommerceOrderSyncService
 {
     public function __construct(
         private readonly CommerceProviderRoleResolver $roles,
+        private readonly CommerceOrderCustomerReconciler $customers,
     ) {}
 
     public function sync(
@@ -82,7 +83,27 @@ final class CommerceOrderSyncService
                 ? (string) $order->status
                 : null;
 
+            $commerceCustomerId = $order->exists
+                ? $order->commerce_customer_id
+                : null;
+            $contactId = $order->exists
+                ? $order->contact_id
+                : null;
+
+            if ($snapshot->customer !== null) {
+                $customer = $this->customers->reconcile(
+                    providerKey: $providerKey,
+                    snapshot: $snapshot->customer,
+                    orderedAt: $snapshot->orderedAt,
+                );
+
+                $commerceCustomerId = $customer->commerceCustomerId;
+                $contactId = $customer->contactId;
+            }
+
             $order->fill([
+                'commerce_customer_id' => $commerceCustomerId,
+                'contact_id' => $contactId,
                 'order_number' => $this->nullableString($snapshot->orderNumber),
                 'order_name' => $this->nullableString($snapshot->orderName),
                 'status' => trim($snapshot->status),

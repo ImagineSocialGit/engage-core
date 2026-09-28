@@ -30,7 +30,7 @@ class CommerceCustomerFactory extends Factory
             'total_spent_cents' => 2500,
             'source' => 'provider',
             'provider' => 'provider-a',
-            'external_id' => 'customer-1001',
+            'external_id' => 'customer-'.fake()->unique()->numberBetween(1000, 999999),
             'external_url' => null,
             'raw_payload' => null,
             'meta' => null,

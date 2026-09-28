@@ -14,6 +14,7 @@ use App\Modules\Commerce\Models\CommerceProduct;
 use App\Modules\Commerce\Models\CommerceProductProviderMapping;
 use App\Modules\Commerce\Models\CommerceProductVariant;
 use App\Modules\Commerce\Models\CommerceProductVariantProviderMapping;
+use App\Modules\Commerce\Services\CommerceOrderCustomerReconciler;
 use App\Modules\Commerce\Services\CommerceOrderSyncService;
 use App\Modules\Commerce\Services\CommerceProviderRegistry;
 use App\Modules\Commerce\Services\CommerceProviderRoleResolver;
@@ -314,7 +315,10 @@ class CommerceOrderSyncTest extends TestCase
             ]),
         );
 
-        return new CommerceOrderSyncService($resolver);
+        return new CommerceOrderSyncService(
+            roles: $resolver,
+            customers: app(CommerceOrderCustomerReconciler::class),
+        );
     }
 
     /**

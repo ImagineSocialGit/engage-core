@@ -31,6 +31,7 @@ final readonly class CommerceOrderSnapshotData
         public ?string $externalUrl,
         public array $items,
         public array $meta = [],
+        public ?CommerceOrderCustomerSnapshotData $customer = null,
     ) {
         if (trim($this->externalId) === '') {
             throw new InvalidArgumentException(

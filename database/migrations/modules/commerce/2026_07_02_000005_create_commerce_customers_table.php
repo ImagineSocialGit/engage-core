@@ -43,7 +43,7 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->index(['contact_id', 'status'], 'commerce_customers_contact_status_index');
-            $table->index(['provider', 'external_id'], 'commerce_customers_provider_external_index');
+            $table->unique(['provider', 'external_id'], 'commerce_customers_provider_external_unique');
             $table->index(['status', 'last_ordered_at'], 'commerce_customers_status_last_ordered_index');
         });
     }
