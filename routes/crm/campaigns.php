@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Campaigns\Controllers\CRM\CampaignAnnualTouchController;
+use App\Modules\Campaigns\Controllers\CRM\CampaignAudienceController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignMessageTemplateController;
 use App\Modules\Campaigns\Access\CampaignsAccessCapabilityContributor;
@@ -80,6 +81,9 @@ Route::middleware('module:campaigns')
 
         Route::get('/{campaign}/edit', [CampaignController::class, 'edit'])
             ->name('edit');
+
+        Route::get('/{campaign}/audience', [CampaignAudienceController::class, 'index'])
+            ->name('audience.index');
 
         Route::post('/{campaign}/eligibility/preview', [CampaignController::class, 'previewEligibility'])
             ->name('eligibility.preview');

@@ -38,6 +38,14 @@
             </div>
         @endif
 
+        @if(data_get($campaign->meta, 'audience_completion.notified_at'))
+            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-950">
+                <p class="font-bold">The current audience has finished this Campaign.</p>
+                <p class="mt-1">{{ number_format((int) data_get($campaign->meta, 'audience_completion.completed_count', 0)) }} leads completed their messages. New eligible leads can still join this Campaign.</p>
+                <a href="{{ route('crm.campaigns.audience.index', $campaign) }}" class="mt-2 inline-block font-semibold underline">Review audience progress</a>
+            </div>
+        @endif
+
         <section class="min-w-0 rounded-3xl border border-rose-200 bg-white/95 p-4 shadow-sm sm:p-8">
             <div class="flex min-w-0 flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div class="min-w-0">
@@ -120,6 +128,22 @@
             <div class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div class="text-2xl font-bold text-slate-950">{{ $workspace['message_count'] }}</div>
                 <div class="mt-1 break-words text-sm font-semibold text-slate-600">Messages</div>
+            </div>
+        </section>
+
+        <section class="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-7">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-semibold text-slate-950">Audience and progress</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-600">For leads you can view: {{ number_format($audienceSummary['matching']) }} currently match the start rules, {{ number_format($audienceSummary['not_started']) }} match but have never enrolled, and {{ number_format($audienceSummary['enrolled']) }} have enrolled.</p>
+                    <p class="mt-2 text-xs text-slate-500">Filter matches do not include message permission checks. Manual Campaigns without start rules have no filter matches; their enrollments still appear in progress.</p>
+                </div>
+                <a href="{{ route('crm.campaigns.audience.index', $campaign) }}" class="inline-flex min-h-11 items-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white hover:bg-slate-800">View audience and progress</a>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-700">
+                @foreach(['active', 'paused', 'completed', 'exited', 'cancelled'] as $status)
+                    <a href="{{ route('crm.campaigns.audience.index', ['campaign' => $campaign, 'status' => $status]) }}" class="rounded-full bg-slate-100 px-3 py-2 hover:bg-slate-200">{{ \Illuminate\Support\Str::headline($status) }} {{ number_format($audienceSummary['statuses'][$status]) }}</a>
+                @endforeach
             </div>
         </section>
 

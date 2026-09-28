@@ -19,6 +19,7 @@ use App\Modules\Campaigns\ConfigContracts\CampaignPresetDefinitionConfigContract
 use App\Modules\Campaigns\Console\Commands\DeactivateCampaignCommand;
 use App\Modules\Campaigns\Console\Commands\SyncCampaignPresetsCommand;
 use App\Modules\Campaigns\Jobs\ProcessDueCampaignTouchDatesJob;
+use App\Modules\Campaigns\Jobs\CheckCampaignAudienceCompletionJob;
 use App\Modules\Campaigns\Jobs\EmitDueAnnualTouchAutomationEventsJob;
 use App\Modules\Campaigns\Jobs\ReconcileAutomaticCampaignEligibilityJob;
 use App\Modules\Campaigns\Listeners\ReconcileCampaignEligibilityFromAutomationEvent;
@@ -122,6 +123,11 @@ class CampaignsModuleServiceProvider extends ServiceProvider
 
                 $schedule
                     ->job(new ReconcileAutomaticCampaignEligibilityJob())
+                    ->everyFifteenMinutes()
+                    ->withoutOverlapping();
+
+                $schedule
+                    ->job(new CheckCampaignAudienceCompletionJob())
                     ->everyFifteenMinutes()
                     ->withoutOverlapping();
             },

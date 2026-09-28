@@ -9,6 +9,8 @@ use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Campaigns\Models\CampaignStepVariant;
 use App\Modules\Campaigns\Services\CampaignWorkspacePresenter;
+use App\Modules\Campaigns\Services\CampaignAudienceProgressService;
+use App\Modules\Core\Access\Models\UserAccessProfile;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\MessageChain;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
@@ -163,6 +165,110 @@ class CampaignWorkspaceControllerTest extends TestCase
             ->assertRedirect(route('crm.campaigns.show', $campaign));
 
         $this->assertSame(Campaign::STATUS_INACTIVE, $campaign->refresh()->status);
+    }
+
+    public function test_audience_counts_latest_progress_and_current_matches_without_replaying_history(): void
+    {
+        $this->enableCampaigns();
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->create([
+            'eligibility_filter' => ['source' => ['referral']],
+        ]);
+        [, $version] = $this->attachPublishedChain($campaign);
+        $participant = Contact::factory()->create(['source' => 'referral']);
+        $neverEnrolled = Contact::factory()->create(['source' => 'referral']);
+        $other = Contact::factory()->create(['source' => 'website']);
+
+        $this->recordEnrollment($campaign, $version, $participant, MessageChainEnrollment::STATUS_COMPLETED);
+        $this->recordEnrollment($campaign, $version, $participant, MessageChainEnrollment::STATUS_ACTIVE);
+        $this->recordEnrollment($campaign, $version, $other, MessageChainEnrollment::STATUS_CANCELLED);
+        CampaignEnrollment::query()->where('contact_id', $other->getKey())->firstOrFail()
+            ->forceFill(['meta' => ['lifecycle' => ['last_cancellation' => [
+                'reason' => 'campaign_family_superseded',
+            ]]]])->save();
+
+        $service = app(CampaignAudienceProgressService::class);
+        $summary = $service->summary($campaign, $user);
+        $this->assertSame(2, $summary['matching']);
+        $this->assertSame(1, $summary['not_started']);
+        $this->assertSame(2, $summary['enrolled']);
+        $this->assertSame(1, $summary['statuses'][MessageChainEnrollment::STATUS_ACTIVE]);
+        $this->assertSame(1, $summary['statuses'][MessageChainEnrollment::STATUS_CANCELLED]);
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+        $response = $this->actingAs($user)
+            ->get(route('crm.campaigns.audience.index', [
+                'campaign' => $campaign,
+                'status' => MessageChainEnrollment::STATUS_ACTIVE,
+            ]))
+            ->assertOk();
+        $participants = $response->viewData('rows');
+        $this->assertSame(1, $participants->total());
+        $this->assertSame($participant->getKey(), $participants->items()[0]['contact']->getKey());
+
+        $cancelled = $service->participants($campaign, $user, MessageChainEnrollment::STATUS_CANCELLED);
+        $this->assertSame('campaign_family_superseded', $cancelled->items()[0]['reason']);
+
+        $matches = $service->matches($campaign, $user);
+        $this->assertSame(2, $matches->total());
+        $this->assertEqualsCanonicalizing(
+            [$participant->getKey(), $neverEnrolled->getKey()],
+            array_map(fn (array $row): int => (int) $row['contact']->getKey(), $matches->items()),
+        );
+    }
+
+    public function test_audience_respects_lead_visibility_in_counts_and_lists(): void
+    {
+        $this->enableCampaigns();
+        $user = User::factory()->create();
+        UserAccessProfile::query()->create([
+            'user_id' => $user->getKey(),
+            'role_key' => 'member',
+            'is_active' => true,
+        ]);
+        $campaign = Campaign::factory()->create([
+            'eligibility_filter' => ['source' => ['referral']],
+        ]);
+        [, $version] = $this->attachPublishedChain($campaign);
+        $visible = Contact::factory()->create([
+            'source' => 'referral',
+            'assigned_user_id' => $user->getKey(),
+        ]);
+        $hidden = Contact::factory()->create(['source' => 'referral']);
+        $this->recordEnrollment($campaign, $version, $visible, MessageChainEnrollment::STATUS_ACTIVE);
+        $this->recordEnrollment($campaign, $version, $hidden, MessageChainEnrollment::STATUS_ACTIVE);
+
+        $service = app(CampaignAudienceProgressService::class);
+        $summary = $service->summary($campaign, $user);
+        $this->assertSame(1, $summary['matching']);
+        $this->assertSame(1, $summary['enrolled']);
+        $this->assertSame(1, $service->participants($campaign, $user)->total());
+        $this->assertSame(1, $service->matches($campaign, $user)->total());
+    }
+
+    private function recordEnrollment(
+        Campaign $campaign,
+        MessageChainVersion $version,
+        Contact $contact,
+        string $status,
+    ): void {
+        $chainEnrollment = MessageChainEnrollment::query()->create([
+            'message_chain_version_id' => $version->getKey(),
+            'recipient_type' => $contact->getMorphClass(),
+            'recipient_id' => $contact->getKey(),
+            'origin_type' => $campaign->getMorphClass(),
+            'origin_id' => $campaign->getKey(),
+            'surface' => 'campaigns',
+            'status' => $status,
+            'started_at' => now(),
+        ]);
+        CampaignEnrollment::query()->create([
+            'contact_id' => $contact->getKey(),
+            'campaign_id' => $campaign->getKey(),
+            'campaign_key' => $campaign->key,
+            'message_chain_enrollment_id' => $chainEnrollment->getKey(),
+            'started_at' => now(),
+        ]);
     }
 
     /** @return array{0: MessageChain, 1: MessageChainVersion} */

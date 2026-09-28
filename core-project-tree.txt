@@ -127,7 +127,9 @@
 │   │   │   │   ├── ApplyAutomaticCampaignEligibilityAction.php
 │   │   │   │   ├── CancelCampaignEnrollmentAction.php
 │   │   │   │   ├── CancelCampaignFamilyEnrollmentsAction.php
+│   │   │   │   ├── CheckCampaignAudienceCompletionAction.php
 │   │   │   │   ├── CreateCampaignAction.php
+│   │   │   │   ├── CreateCampaignScheduleMessageAction.php
 │   │   │   │   ├── DeactivateCampaignAction.php
 │   │   │   │   ├── EnrollContactInCampaignAction.php
 │   │   │   │   ├── EvaluateCampaignEligibilityAction.php
@@ -138,8 +140,10 @@
 │   │   │   │   ├── ReconcileAutomaticCampaignEligibilityAction.php
 │   │   │   │   ├── ReconcileCampaignEligibilityAction.php
 │   │   │   │   ├── ReconcileContactCampaignEligibilityAction.php
+│   │   │   │   ├── RecordPriorCampaignMessageReceiptAction.php
 │   │   │   │   ├── ResumeCampaignEnrollmentAction.php
 │   │   │   │   ├── ScheduleCampaignImportBatchInitialMessagesAction.php
+│   │   │   │   ├── StartCompletedCampaignAppendAction.php
 │   │   │   │   ├── SyncCampaignPresetsAction.php
 │   │   │   │   ├── UpdateCampaignEligibilityAction.php
 │   │   │   │   └── UpdateCampaignSendPatternAction.php
@@ -165,9 +169,11 @@
 │   │   │   ├── Contacts
 │   │   │   │   └── CampaignContactResultActionContributor.php
 │   │   │   ├── Contracts
+│   │   │   │   └── CampaignAudienceCompletionNotifier.php
 │   │   │   ├── Controllers
 │   │   │   │   └── CRM
 │   │   │   │       ├── CampaignAnnualTouchController.php
+│   │   │   │       ├── CampaignAudienceController.php
 │   │   │   │       ├── CampaignController.php
 │   │   │   │       ├── CampaignMessageTemplateController.php
 │   │   │   │       ├── CampaignSimulatorController.php
@@ -193,10 +199,13 @@
 │   │   │   │   └── CampaignUnavailableForEnrollmentException.php
 │   │   │   ├── Import
 │   │   │   │   ├── CampaignEnrollmentContactImportPostProcessor.php
-│   │   │   │   └── CampaignLaunchTimingContactImportPostProcessor.php
+│   │   │   │   ├── CampaignLaunchTimingContactImportPostProcessor.php
+│   │   │   │   └── CampaignPriorMessageReceiptContactImportPostProcessor.php
 │   │   │   ├── Jobs
+│   │   │   │   ├── CheckCampaignAudienceCompletionJob.php
 │   │   │   │   ├── EmitDueAnnualTouchAutomationEventsJob.php
 │   │   │   │   ├── EnrollContactResultCampaignChunkJob.php
+│   │   │   │   ├── ProcessCompletedCampaignAppendChunkJob.php
 │   │   │   │   ├── ProcessDueCampaignTouchDatesJob.php
 │   │   │   │   ├── ReconcileAutomaticCampaignEligibilityJob.php
 │   │   │   │   └── ReconcileContactCampaignEligibilityJob.php
@@ -206,11 +215,16 @@
 │   │   │   ├── MessageTemplates
 │   │   │   │   └── CampaignMessageTemplateDefinitionContributor.php
 │   │   │   ├── Messaging
-│   │   │   │   └── AnnualTouchReusableMessageTemplateAuthoringContributor.php
+│   │   │   │   ├── AnnualTouchReusableMessageTemplateAuthoringContributor.php
+│   │   │   │   ├── CampaignAppendContinuationProvider.php
+│   │   │   │   ├── CampaignPriorReceiptRecipientGate.php
+│   │   │   │   └── CampaignPriorReceiptStepBypass.php
 │   │   │   ├── Models
 │   │   │   │   ├── CampaignEligibilityState.php
 │   │   │   │   ├── CampaignEnrollment.php
+│   │   │   │   ├── CampaignMessageChainAppend.php
 │   │   │   │   ├── Campaign.php
+│   │   │   │   ├── CampaignPriorMessageReceipt.php
 │   │   │   │   ├── CampaignStep.php
 │   │   │   │   ├── CampaignStepVariant.php
 │   │   │   │   ├── CampaignTouchDate.php
@@ -230,6 +244,7 @@
 │   │   │   │   └── UpdateCampaignStepMessageTemplateRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── CampaignAnnualTouchAudienceService.php
+│   │   │   │   ├── CampaignAudienceProgressService.php
 │   │   │   │   ├── CampaignCreationGuide.php
 │   │   │   │   ├── CampaignEligibilityAuthoringService.php
 │   │   │   │   ├── CampaignEligibilityDependencyResolver.php
@@ -248,9 +263,10 @@
 │   │   │   │   ├── CampaignWorkspacePresenter.php
 │   │   │   │   ├── ContactShow
 │   │   │   │   │   └── ContactCampaignsVisibilityDataProvider.php
-│   │   │   │   └── ProcessHighway
-│   │   │   │       ├── CampaignReplyProfileResolver.php
-│   │   │   │       └── CampaignsProcessHighwayContributor.php
+│   │   │   │   ├── ProcessHighway
+│   │   │   │   │   ├── CampaignReplyProfileResolver.php
+│   │   │   │   │   └── CampaignsProcessHighwayContributor.php
+│   │   │   │   └── UnavailableCampaignAudienceCompletionNotifier.php
 │   │   │   ├── Support
 │   │   │   ├── TokenContracts
 │   │   │   │   ├── CampaignAnnualTouchComputedTokenValueProvider.php
@@ -1019,7 +1035,9 @@
 │   │   │   │   │   ├── EmailMessage.php
 │   │   │   │   │   ├── EmailProvider.php
 │   │   │   │   │   └── ThreadedEmailMessage.php
+│   │   │   │   ├── MessageChainContinuationProvider.php
 │   │   │   │   ├── MessageChainExecutionContextProvider.php
+│   │   │   │   ├── MessageChainStepBypass.php
 │   │   │   │   ├── MessageRecipientGate.php
 │   │   │   │   ├── MessageRecipientPayloadProvider.php
 │   │   │   │   ├── MessageTemplateDefinitionContributor.php
@@ -1176,8 +1194,10 @@
 │   │   │   │   │   └── EmailProviderManager.php
 │   │   │   │   ├── MessageAttachmentAuthoringService.php
 │   │   │   │   ├── MessageAttachmentRegistry.php
+│   │   │   │   ├── MessageChainContinuationRegistry.php
 │   │   │   │   ├── MessageChainExecutionContextResolver.php
 │   │   │   │   ├── MessageChainPresentationService.php
+│   │   │   │   ├── MessageChainStepBypassRegistry.php
 │   │   │   │   ├── MessageChainTimingResolver.php
 │   │   │   │   ├── MessageChainVersionCarouselPresenter.php
 │   │   │   │   ├── MessageChannelAvailability.php
@@ -1309,7 +1329,8 @@
 │   │   │   │   └── RelationshipsAutomationCapabilityContributor.php
 │   │   │   ├── Controllers
 │   │   │   │   └── CRM
-│   │   │   │       └── ContactRelationshipController.php
+│   │   │   │       ├── ContactRelationshipController.php
+│   │   │   │       └── RelationshipDefinitionController.php
 │   │   │   ├── Data
 │   │   │   │   ├── Automation
 │   │   │   │   │   └── ChangeRelationshipStageAutomationDefinition.php
@@ -1320,7 +1341,9 @@
 │   │   │   │       ├── RelationshipStageImportTreatmentTarget.php
 │   │   │   │       └── RelationshipTypeImportTreatmentTarget.php
 │   │   │   ├── Models
-│   │   │   │   └── ContactRelationship.php
+│   │   │   │   ├── ContactRelationship.php
+│   │   │   │   ├── RelationshipDefinition.php
+│   │   │   │   └── RelationshipStageDefinition.php
 │   │   │   ├── Observers
 │   │   │   │   └── ContactRelationshipEligibilityFactObserver.php
 │   │   │   ├── Providers
@@ -2039,6 +2062,8 @@
 │   │   │   │   │   └── InboundMessageTaskLinkPresenter.php
 │   │   │   │   └── UnavailableInboundEmailRouteAutomationWorkspace.php
 │   │   │   ├── InternalNotifications
+│   │   │   │   ├── Campaigns
+│   │   │   │   │   └── InternalNotificationCampaignAudienceCompletionNotifier.php
 │   │   │   │   ├── InboundMessaging
 │   │   │   │   │   ├── InboundMessageNotificationRecipientResolver.php
 │   │   │   │   │   └── ScheduleInboundMessageInternalNotification.php
@@ -2471,7 +2496,9 @@
 │   │   │   │   ├── 2026_08_23_203900_add_campaign_eligibility_foundation.php
 │   │   │   │   ├── 2026_08_25_220000_decouple_campaign_touch_programs_from_campaigns.php
 │   │   │   │   ├── 2026_08_27_213000_add_audience_filter_to_campaign_touch_programs_table.php
-│   │   │   │   └── 2026_09_22_130000_add_send_pattern_to_campaigns_table.php
+│   │   │   │   ├── 2026_09_22_130000_add_send_pattern_to_campaigns_table.php
+│   │   │   │   ├── 2026_09_28_050000_create_campaign_prior_message_receipts_table.php
+│   │   │   │   └── 2026_09_28_060000_create_campaign_message_chain_appends_table.php
 │   │   │   ├── commerce
 │   │   │   │   ├── 2026_07_02_000005_create_commerce_customers_table.php
 │   │   │   │   ├── 2026_07_02_000006_create_commerce_products_table.php
@@ -2565,7 +2592,8 @@
 │   │   │   │   ├── 2026_04_15_195872_create_portal_invitations_table.php
 │   │   │   │   └── 2026_04_15_195873_create_portal_access_grants_table.php
 │   │   │   ├── relationships
-│   │   │   │   └── 2026_08_19_175000_create_contact_relationships_table.php
+│   │   │   │   ├── 2026_08_19_175000_create_contact_relationships_table.php
+│   │   │   │   └── 2026_09_28_040000_create_relationship_definitions_tables.php
 │   │   │   ├── reporting
 │   │   │   │   ├── 2026_08_15_063500_create_reporting_foundation_tables.php
 │   │   │   │   └── 2026_09_22_120000_create_reporting_scheduled_report_subscriptions.php
@@ -2931,6 +2959,7 @@
 │       │   ├── campaigns
 │       │   │   ├── annual-touches
 │       │   │   │   └── index.blade.php
+│       │   │   ├── audience.blade.php
 │       │   │   ├── create.blade.php
 │       │   │   ├── edit.blade.php
 │       │   │   ├── index.blade.php
@@ -3015,6 +3044,8 @@
 │       │   │   └── _segment-exits.blade.php
 │       │   ├── project-state
 │       │   │   └── index.blade.php
+│       │   ├── relationships
+│       │   │   └── definitions.blade.php
 │       │   ├── reporting
 │       │   │   ├── imports
 │       │   │   │   ├── create.blade.php
@@ -3214,6 +3245,8 @@
 │   │   │   ├── CampaignAnnualTouchAudienceServiceTest.php
 │   │   │   ├── CampaignAnnualTouchAuthoringTest.php
 │   │   │   ├── CampaignAnnualTouchRuntimeTest.php
+│   │   │   ├── CampaignAppendContinuationTest.php
+│   │   │   ├── CampaignAudienceCompletionTest.php
 │   │   │   ├── CampaignAutomaticEligibilityImportLaunchTest.php
 │   │   │   ├── CampaignCreationTest.php
 │   │   │   ├── CampaignEligibilityAuthoringTest.php
@@ -3235,6 +3268,9 @@
 │   │   │   ├── CampaignMessageReplyHandlingTest.php
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
 │   │   │   ├── CampaignMessageTemplateDefinitionContributorTest.php
+│   │   │   ├── CampaignPriorMessageImportTest.php
+│   │   │   ├── CampaignPriorMessageReceiptTest.php
+│   │   │   ├── CampaignPriorMessageSkipTest.php
 │   │   │   ├── CampaignProcessHighwayContributorTest.php
 │   │   │   ├── CampaignSendPatternTest.php
 │   │   │   ├── CampaignSetupActionabilityTest.php
@@ -3675,6 +3711,7 @@
 │   │   │   ├── ContactRelationshipImportHandlerTest.php
 │   │   │   ├── ContactRelationshipWorkspaceTest.php
 │   │   │   ├── RelationshipContactFilterCriterionTest.php
+│   │   │   ├── RelationshipDefinitionAuthoringTest.php
 │   │   │   ├── RelationshipEligibilityFactOutboxTest.php
 │   │   │   ├── RelationshipImportTreatmentTest.php
 │   │   │   ├── RelationshipLocationAreaBridgeTest.php
@@ -3901,4 +3938,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-878 directories, 3024 files
+880 directories, 3059 files

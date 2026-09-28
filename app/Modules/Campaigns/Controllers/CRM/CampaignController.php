@@ -20,6 +20,7 @@ use App\Modules\Campaigns\Requests\UpdateCampaignMessageReplyHandlingRequest;
 use App\Modules\Campaigns\Requests\UpdateCampaignScheduleRequest;
 use App\Modules\Campaigns\Requests\UpdateCampaignSendPatternRequest;
 use App\Modules\Campaigns\Services\CampaignCreationGuide;
+use App\Modules\Campaigns\Services\CampaignAudienceProgressService;
 use App\Modules\Campaigns\Services\CampaignEligibilityAuthoringService;
 use App\Modules\Campaigns\Services\CampaignMessageReviewPresenter;
 use App\Modules\Campaigns\Services\CampaignScheduleAuthoringPresenter;
@@ -174,15 +175,18 @@ class CampaignController extends Controller
     }
 
     public function show(
+        Request $request,
         Campaign $campaign,
         CampaignWorkspacePresenter $workspacePresenter,
         CampaignSendPatternService $sendPatterns,
+        CampaignAudienceProgressService $audienceProgress,
     ): View {
         return view('crm.campaigns.show', [
             'campaign' => $campaign,
             'workspace' => $workspacePresenter->forCampaign($campaign),
             'sendPattern' => $sendPatterns->forCampaign($campaign),
             'sendPatternTimezones' => timezone_identifiers_list(),
+            'audienceSummary' => $audienceProgress->summary($campaign, $request->user()),
         ]);
     }
 

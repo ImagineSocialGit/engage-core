@@ -11,6 +11,8 @@ use App\Modules\Core\Data\Contacts\ContactImportField;
 use App\Modules\Campaigns\Import\CampaignEnrollmentContactImportPostProcessor;
 use App\Modules\Campaigns\Import\CampaignLaunchTimingContactImportPostProcessor;
 use App\Modules\Campaigns\Import\CampaignPriorMessageReceiptContactImportPostProcessor;
+use App\Modules\Campaigns\Contracts\CampaignAudienceCompletionNotifier;
+use App\Modules\Campaigns\Services\UnavailableCampaignAudienceCompletionNotifier;
 use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Messaging\Import\MarketingPermissionContactImportPostProcessor;
@@ -43,6 +45,7 @@ use App\Support\ModuleIntegrations\Scheduling\Messaging\SchedulingAppointmentTem
 use App\Support\ModuleIntegrations\Scheduling\Messaging\SchedulingDestinationVerificationRecipientGate;
 use App\Support\ModuleIntegrations\InternalNotifications\InboundMessaging\ScheduleInboundMessageInternalNotification;
 use App\Support\ModuleIntegrations\InternalNotifications\Tasks\InternalNotificationTaskScheduler;
+use App\Support\ModuleIntegrations\InternalNotifications\Campaigns\InternalNotificationCampaignAudienceCompletionNotifier;
 use App\Support\ModuleIntegrations\InternalNotifications\Tasks\OnlyActiveTeamMemberTaskAssignmentStrategyResolver;
 use App\Support\ModuleIntegrations\InternalNotifications\Tasks\TeamMemberTaskAssignedRecipientResolver;
 use App\Support\ModuleIntegrations\InternalNotifications\Tasks\TeamMemberTaskAssigneeOptionProvider;
@@ -329,6 +332,14 @@ class AppServiceProvider extends ServiceProvider
         ], 'setup.validation_contributors');
 
         $enabledModules = $this->app->make(ModuleManager::class)->enabledKeysWithDependencies();
+
+        $this->app->bind(
+            CampaignAudienceCompletionNotifier::class,
+            in_array('campaigns', $enabledModules, true)
+                && in_array('internal_notifications', $enabledModules, true)
+                ? InternalNotificationCampaignAudienceCompletionNotifier::class
+                : UnavailableCampaignAudienceCompletionNotifier::class,
+        );
 
         if (in_array('scheduling', $enabledModules, true)
             && in_array('messaging', $enabledModules, true)

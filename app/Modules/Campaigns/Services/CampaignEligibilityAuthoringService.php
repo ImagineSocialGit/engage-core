@@ -3,6 +3,7 @@
 namespace App\Modules\Campaigns\Services;
 
 use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Core\Services\Contacts\ContactFilterResolver;
 use App\Modules\Core\Support\Contacts\ContactFilterCriterionRegistry;
@@ -152,10 +153,25 @@ final class CampaignEligibilityAuthoringService
      */
     public function matchingCount(array $criteria): int
     {
+        return $this->queryForCriteria($criteria)->count();
+    }
+
+    /** @return Builder<Contact> */
+    public function matchingQuery(Campaign $campaign): Builder
+    {
+        return $this->queryForCriteria($this->storedCriteria($campaign));
+    }
+
+    /**
+     * @param array<string, array<int, string>> $criteria
+     * @return Builder<Contact>
+     */
+    private function queryForCriteria(array $criteria): Builder
+    {
         $runtimeCriteria = $this->runtimeCriteria($criteria);
 
         if ($runtimeCriteria === null || $runtimeCriteria === []) {
-            return 0;
+            return Contact::query()->whereRaw('1 = 0');
         }
 
         try {
@@ -163,10 +179,9 @@ final class CampaignEligibilityAuthoringService
                 ->query([
                     'type' => 'criteria',
                     'criteria' => $runtimeCriteria,
-                ])
-                ->count();
+                ]);
         } catch (InvalidArgumentException) {
-            return 0;
+            return Contact::query()->whereRaw('1 = 0');
         }
     }
 

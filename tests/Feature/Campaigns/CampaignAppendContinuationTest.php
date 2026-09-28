@@ -6,6 +6,7 @@ use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
 use App\Modules\Campaigns\Actions\PublishCampaignMessageChainVersionAction;
 use App\Modules\Campaigns\Actions\RecordPriorCampaignMessageReceiptAction;
+use App\Modules\Campaigns\Actions\ReconcileContactCampaignEligibilityAction;
 use App\Modules\Campaigns\Actions\StartCompletedCampaignAppendAction;
 use App\Modules\Campaigns\Jobs\ProcessCompletedCampaignAppendChunkJob;
 use App\Modules\Campaigns\Models\Campaign;
@@ -13,6 +14,9 @@ use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Models\CampaignMessageChainAppend;
 use App\Modules\Campaigns\Models\CampaignPriorMessageReceipt;
 use App\Modules\Core\Models\Contact;
+use App\Modules\InboundMessaging\Actions\RecordInboundMessageAction;
+use App\Modules\InboundMessaging\Models\InboundMessage;
+use App\Modules\Relationships\Models\ContactRelationship;
 use App\Modules\Messaging\Actions\ProcessMessageChainEnrollmentAction;
 use App\Modules\Messaging\Actions\PublishMessageChainVersionAction;
 use App\Modules\Messaging\Actions\PublishMessageTemplateVersionAction;
@@ -121,6 +125,136 @@ class CampaignAppendContinuationTest extends TestCase
 
         $this->assertSame(MessageChainEnrollment::STATUS_COMPLETED, $enrollment->fresh()->status);
         $this->assertSame(1, $enrollment->scheduledMessages()->count());
+        $this->travelBack();
+    }
+
+    public function test_realtor_reply_and_stage_change_keep_the_active_append_running(): void
+    {
+        config()->set('modules.enabled', ['campaigns', 'messaging', 'relationships', 'inbound_messaging']);
+        config()->set('relationships.types', [
+            'realtor' => [
+                'singular' => 'Realtor',
+                'plural' => 'Realtors',
+                'visible' => true,
+                'sort_order' => 10,
+                'stages' => [
+                    'cold' => ['label' => 'Cold', 'sort_order' => 10, 'active' => true],
+                    'follow_up' => ['label' => 'Follow Up', 'sort_order' => 20, 'active' => true],
+                    'partner' => ['label' => 'Partner', 'sort_order' => 30, 'active' => true],
+                ],
+            ],
+        ]);
+        [$campaign, $version, $preset] = $this->campaign();
+        $campaign->forceFill([
+            'enrollment_mode' => Campaign::ENROLLMENT_MODE_AUTOMATIC,
+            'ineligible_behavior' => Campaign::INELIGIBLE_CONTINUE,
+            'eligibility_filter' => ['relationship' => ['realtor:cold']],
+        ])->save();
+        $runtime = $this->enrollment($campaign, $version);
+        $contact = $runtime->recipient;
+        $relationship = ContactRelationship::query()->create([
+            'contact_id' => $contact->getKey(),
+            'relationship_key' => 'realtor',
+            'stage_key' => 'cold',
+            'is_active' => true,
+            'started_at' => now(),
+        ]);
+
+        $processor = app(ProcessMessageChainEnrollmentAction::class);
+        $processor->handle($runtime);
+        $firstMessage = $runtime->scheduledMessages()->firstOrFail();
+        $this->append($campaign, $version, $preset, true);
+
+        app(RecordInboundMessageAction::class)->handle([
+            'channel' => 'email',
+            'provider' => 'test',
+            'provider_event_id' => 'realtor-reply-'.$runtime->getKey(),
+            'classification' => InboundMessage::CLASSIFICATION_NORMAL_REPLY,
+            'body' => 'Yes, please tell me more about a class.',
+            'reply_intent_key' => 'high_intent',
+            'correlated_scheduled_message_id' => $firstMessage->getKey(),
+            'received_at' => now(),
+        ], $contact);
+        $relationship->forceFill(['stage_key' => 'follow_up'])->save();
+        app(ReconcileContactCampaignEligibilityAction::class)->handle($contact);
+
+        $this->assertSame(MessageChainEnrollment::STATUS_ACTIVE, $runtime->fresh()->status);
+
+        $firstMessage->forceFill(['status' => ScheduledMessage::STATUS_SENT])->save();
+        $processor->handleTerminal($firstMessage);
+        $this->assertSame('step_2', $runtime->fresh()->currentMessageChainStep?->key);
+
+        $relationship->forceFill(['stage_key' => 'partner'])->save();
+        app(ReconcileContactCampaignEligibilityAction::class)->handle($contact);
+        $this->assertSame(MessageChainEnrollment::STATUS_ACTIVE, $runtime->fresh()->status);
+
+        $this->travelTo($runtime->fresh()->next_action_at->copy()->addSecond());
+        $processor->handle($runtime);
+        $this->assertSame('step_2', $runtime->latestScheduledMessage()->firstOrFail()
+            ->messageChainStepVariant->messageChainStep->key);
+        $this->travelBack();
+    }
+
+    public function test_three_prior_message_groups_reach_only_messages_they_still_need_after_append(): void
+    {
+        [$campaign, $version, $preset] = $this->campaign();
+        $processor = app(ProcessMessageChainEnrollmentAction::class);
+        $receivedFirst = $this->enrollment($campaign, $version);
+        $receivedSecond = $this->enrollment($campaign, $version);
+        $receivedNeither = $this->enrollment($campaign, $version);
+
+        app(RecordPriorCampaignMessageReceiptAction::class)->handle(
+            $receivedFirst->recipient,
+            $campaign,
+            'step_1',
+            CampaignPriorMessageReceipt::SOURCE_OPERATOR_ATTESTATION,
+            attestedBy: User::factory()->create(),
+        );
+        $processor->handle($receivedFirst);
+        $this->assertSame(MessageChainEnrollment::STATUS_COMPLETED, $receivedFirst->fresh()->status);
+
+        $processor->handle($receivedSecond);
+        $processor->handle($receivedNeither);
+        $secondGroupFirstMessage = $receivedSecond->scheduledMessages()->firstOrFail();
+        $newGroupFirstMessage = $receivedNeither->scheduledMessages()->firstOrFail();
+        $this->append($campaign, $version, $preset, true);
+
+        app(RecordPriorCampaignMessageReceiptAction::class)->handle(
+            $receivedSecond->recipient,
+            $campaign,
+            'step_2',
+            CampaignPriorMessageReceipt::SOURCE_OPERATOR_ATTESTATION,
+            attestedBy: User::factory()->create(),
+        );
+
+        $append = CampaignMessageChainAppend::query()->firstOrFail();
+        app(StartCompletedCampaignAppendAction::class)->processChunk((int) $append->getKey(), 0);
+        $firstGroupNext = CampaignEnrollment::query()
+            ->where('contact_id', $receivedFirst->recipient_id)
+            ->orderByDesc('id')
+            ->firstOrFail()->messageChainEnrollment;
+        $this->assertNotSame($receivedFirst->getKey(), $firstGroupNext->getKey());
+        $this->assertSame('step_2', $firstGroupNext->currentMessageChainStep?->key);
+        $this->assertSame(0, $receivedFirst->scheduledMessages()->count());
+
+        $secondGroupFirstMessage->forceFill(['status' => ScheduledMessage::STATUS_SENT])->save();
+        $processor->handleTerminal($secondGroupFirstMessage);
+        $this->travelTo($receivedSecond->fresh()->next_action_at->copy()->addSecond());
+        $processor->handle($receivedSecond);
+        $this->assertSame(MessageChainEnrollment::STATUS_COMPLETED, $receivedSecond->fresh()->status);
+        $this->assertSame(1, $receivedSecond->scheduledMessages()->count());
+        $this->travelBack();
+
+        $newGroupFirstMessage->forceFill(['status' => ScheduledMessage::STATUS_SENT])->save();
+        $processor->handleTerminal($newGroupFirstMessage);
+        $this->assertSame('step_2', $receivedNeither->fresh()->currentMessageChainStep?->key);
+        $this->assertSame(1, $receivedNeither->scheduledMessages()->count());
+
+        $due = $receivedNeither->fresh()->next_action_at;
+        $this->travelTo($due->copy()->addSecond());
+        $processor->handle($receivedNeither);
+        $this->assertSame('step_2', $receivedNeither->latestScheduledMessage()->firstOrFail()
+            ->messageChainStepVariant->messageChainStep->key);
         $this->travelBack();
     }
 
