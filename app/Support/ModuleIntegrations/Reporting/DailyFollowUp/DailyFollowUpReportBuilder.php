@@ -2,6 +2,7 @@
 
 namespace App\Support\ModuleIntegrations\Reporting\DailyFollowUp;
 
+use BackedEnum;
 use App\Modules\Core\Models\Contact;
 use App\Modules\InboundMessaging\Models\InboundMessage;
 use App\Modules\Scheduling\Models\Appointment;
@@ -39,13 +40,13 @@ final class DailyFollowUpReportBuilder
 
         $sections = array_values(array_filter([
             ($parameters['include_replies'] ?? true)
-                ? $this->newReplies($limit)
+                ? $this->repliesNeedingAttention($timezone, $limit)
                 : null,
             $this->newLeads($parameters, $localNow, $limit),
-            ($parameters['include_tasks'] ?? true)
+            ($parameters['include_tasks'] ?? false)
                 ? $this->dueTasks($localNow, $timezone, $limit)
                 : null,
-            ($parameters['include_appointments'] ?? true)
+            ($parameters['include_appointments'] ?? false)
                 ? $this->todayAppointments($timezone, $limit)
                 : null,
             $this->incompleteApplications($parameters, $timezone, $limit),
@@ -63,7 +64,10 @@ final class DailyFollowUpReportBuilder
         ];
     }
 
-    private function newReplies(int $limit): ?array
+    private function repliesNeedingAttention(
+        string $timezone,
+        int $limit,
+    ): ?array
     {
         if (! $this->moduleReady('inbound_messaging', ['inbound_messages'])) {
             return null;
@@ -72,6 +76,7 @@ final class DailyFollowUpReportBuilder
         $query = InboundMessage::query()
             ->with(['sender', 'relatedContact'])
             ->where('classification', InboundMessage::CLASSIFICATION_NORMAL_REPLY)
+            ->whereNull('inbound_email_route_key')
             ->whereIn('inbox_status', [
                 InboundMessage::INBOX_STATUS_NEW,
                 InboundMessage::INBOX_STATUS_REVIEWED,
@@ -86,7 +91,7 @@ final class DailyFollowUpReportBuilder
                 ->orderByDesc('id')
                 ->limit($limit)
                 ->get()
-                ->map(function (InboundMessage $message): array {
+                ->map(function (InboundMessage $message) use ($timezone): array {
                     $contact = $message->sender instanceof Contact
                         ? $message->sender
                         : ($message->relatedContact instanceof Contact
@@ -96,9 +101,9 @@ final class DailyFollowUpReportBuilder
                     return [
                         'title' => $this->contactLabel($contact)
                             ?? ($message->from_value ?: 'Unmatched inbound reply'),
-                        'detail' => Str::limit(
-                            trim((string) ($message->body ?: 'No message body')),
-                            180,
+                        'detail' => $this->replyDetail(
+                            $message,
+                            $timezone,
                         ),
                         'url' => route(
                             'crm.inbound-messaging.inbox.show',
@@ -108,6 +113,36 @@ final class DailyFollowUpReportBuilder
                 })
                 ->all(),
         );
+    }
+
+    private function replyDetail(
+        InboundMessage $message,
+        string $timezone,
+    ): string {
+        $channel = $message->channel instanceof BackedEnum
+            ? (string) $message->channel->value
+            : trim((string) $message->channel);
+        $status = match ($message->inbox_status) {
+            InboundMessage::INBOX_STATUS_REVIEWED => 'In progress',
+            default => 'Needs review',
+        };
+        $body = trim((string) (
+            $message->body
+                ?: $message->subject
+                ?: 'No message body'
+        ));
+
+        return implode(' · ', array_filter([
+            $channel !== '' ? Str::upper($channel) : null,
+            $status,
+            $message->received_at
+                ? 'Received '.$this->dateTimeLabel(
+                    $message->received_at,
+                    $timezone,
+                )
+                : null,
+            Str::limit($body, 180),
+        ]));
     }
 
     private function newLeads(

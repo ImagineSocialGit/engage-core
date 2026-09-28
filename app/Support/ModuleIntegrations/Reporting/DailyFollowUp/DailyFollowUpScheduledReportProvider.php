@@ -39,8 +39,8 @@ final class DailyFollowUpScheduledReportProvider implements ScheduledReportProvi
     {
         return [
             'include_replies' => true,
-            'include_tasks' => true,
-            'include_appointments' => true,
+            'include_tasks' => false,
+            'include_appointments' => false,
             'new_lead_status_keys' => [],
             'incomplete_application_status_keys' => [],
             'next_action_status_keys' => [],

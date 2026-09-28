@@ -3,20 +3,29 @@
         <div class="text-sm font-semibold text-slate-900">Include in this report</div>
         <div class="mt-3 flex flex-wrap gap-4">
             @foreach([
-                'include_replies' => 'Replies needing attention',
-                'include_tasks' => 'Overdue and due-today tasks',
-                'include_appointments' => 'Appointments today',
-            ] as $key => $label)
+                'include_replies' => [
+                    'label' => 'Replies needing attention',
+                    'default' => true,
+                ],
+                'include_tasks' => [
+                    'label' => 'Overdue and due-today tasks',
+                    'default' => false,
+                ],
+                'include_appointments' => [
+                    'label' => 'Appointments today',
+                    'default' => false,
+                ],
+            ] as $key => $option)
                 <label class="inline-flex items-center gap-2 text-sm text-slate-700">
                     <input type="hidden" name="parameters[{{ $key }}]" value="0">
                     <input
                         type="checkbox"
                         name="parameters[{{ $key }}]"
                         value="1"
-                        @checked((bool) ($parameters[$key] ?? true))
+                        @checked((bool) ($parameters[$key] ?? $option['default']))
                         class="rounded border-slate-300"
                     >
-                    {{ $label }}
+                    {{ $option['label'] }}
                 </label>
             @endforeach
         </div>
