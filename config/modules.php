@@ -803,6 +803,14 @@ return [
             'ui' => [
                 'tone' => 'cyan',
             ],
+            'settings' => [
+                'key' => 'definitions',
+                'category' => 'business_operations',
+                'label' => 'Relationships',
+                'description' => 'Manage relationship types and their stages.',
+                'route' => 'crm.relationships.definitions.index',
+                'priority' => 20,
+            ],
             'depends_on' => ['core'],
             'providers' => [
                 RelationshipsModuleServiceProvider::class,

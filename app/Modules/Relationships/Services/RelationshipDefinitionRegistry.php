@@ -2,6 +2,9 @@
 
 namespace App\Modules\Relationships\Services;
 
+use App\Modules\Relationships\Models\RelationshipDefinition;
+use App\Modules\Relationships\Models\RelationshipStageDefinition;
+use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
 class RelationshipDefinitionRegistry
@@ -75,6 +78,48 @@ class RelationshipDefinitionRegistry
                     stages: $definition['stages'] ?? [],
                 ),
             ];
+        }
+
+        if (Schema::hasTable('relationship_definitions')
+            && Schema::hasTable('relationship_stage_definitions')) {
+            foreach (RelationshipDefinition::query()->get() as $stored) {
+                $key = $stored->key;
+                $definitions[$key] = [
+                    'key' => $key,
+                    'singular' => $stored->singular,
+                    'plural' => $stored->plural,
+                    'visible' => $stored->visible,
+                    'sort_order' => $stored->sort_order,
+                    'stages' => $definitions[$key]['stages'] ?? [],
+                ];
+            }
+
+            foreach (RelationshipStageDefinition::query()->get() as $stored) {
+                $key = $stored->relationship_key;
+
+                if (! isset($definitions[$key])) {
+                    continue;
+                }
+
+                $definitions[$key]['stages'][$stored->key] = [
+                    'key' => $stored->key,
+                    'label' => $stored->label,
+                    'sort_order' => $stored->sort_order,
+                    'active' => $stored->active,
+                ];
+            }
+
+            foreach ($definitions as &$definition) {
+                uasort(
+                    $definition['stages'],
+                    static fn (array $left, array $right): int => [
+                        $left['sort_order'], $left['key'],
+                    ] <=> [
+                        $right['sort_order'], $right['key'],
+                    ],
+                );
+            }
+            unset($definition);
         }
 
         uasort(
