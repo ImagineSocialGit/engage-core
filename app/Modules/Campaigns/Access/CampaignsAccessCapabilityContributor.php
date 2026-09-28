@@ -14,8 +14,8 @@ final class CampaignsAccessCapabilityContributor implements AccessCapabilityCont
         return [
             new AccessCapabilityDefinition(
                 key: self::ENROLL_CONTACT_RESULTS,
-                label: 'Enroll Contact results in Campaigns',
-                description: 'Enroll a visible Contact result set in an active Campaign.',
+                label: 'Manage Campaign participation for Contact results',
+                description: 'Enroll, restart, or manage message exclusions for a visible Contact result set.',
             ),
         ];
     }

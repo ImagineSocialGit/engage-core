@@ -4,7 +4,8 @@ namespace Tests\Feature\Campaigns;
 
 use App\Models\User;
 use App\Modules\Campaigns\Access\CampaignsAccessCapabilityContributor;
-use App\Modules\Campaigns\Jobs\EnrollContactResultCampaignChunkJob;
+use App\Modules\Campaigns\Data\CampaignContactResultOperation;
+use App\Modules\Campaigns\Jobs\ProcessCampaignContactResultOperationChunkJob;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Core\Access\Models\UserAccessProfile;
 use App\Modules\Core\Models\Contact;
@@ -56,9 +57,10 @@ class ContactResultCampaignEnrollmentTest extends TestCase
             ]));
 
         Queue::assertPushed(
-            EnrollContactResultCampaignChunkJob::class,
-            fn (EnrollContactResultCampaignChunkJob $job): bool => $job->campaignKey === $campaign->key
+            ProcessCampaignContactResultOperationChunkJob::class,
+            fn (ProcessCampaignContactResultOperationChunkJob $job): bool => $job->campaignKey === $campaign->key
                 && $job->contactIds === [$visible->getKey()]
+                && $job->operation === CampaignContactResultOperation::ENROLL
                 && $job->actorUserId === $manager->getKey(),
         );
     }

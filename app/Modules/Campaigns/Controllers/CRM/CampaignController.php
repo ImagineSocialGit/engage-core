@@ -256,7 +256,7 @@ class CampaignController extends Controller
                 'campaign' => $campaign,
                 'panel' => 'start',
             ])
-            ->with('status', 'Campaign delivery style updated.');
+            ->with('status', 'Campaign allocation settings updated.');
     }
 
     public function startCompletedAppend(

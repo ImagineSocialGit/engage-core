@@ -305,32 +305,17 @@
                 </button>
             </div>
 
-            <form
-                method="POST"
-                action="{{ route('crm.campaigns.execution.update', $campaign) }}"
-                class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5"
-                x-data="{ strategy: @js(old('execution_strategy', $campaign->execution_strategy)) }"
-            >
-                @csrf
-                @method('PATCH')
-                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div class="max-w-2xl">
-                        <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Delivery style</p>
-                        <p class="mt-1 text-sm leading-6 text-slate-600">Sequence moves each lead through the messages. Recurring allocation assigns each message to a different group of eligible leads on each run.</p>
-                    </div>
-                    <div class="grid gap-2 sm:grid-cols-2 lg:w-[32rem]">
-                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
-                            <input type="radio" name="execution_strategy" value="sequence" x-model="strategy" class="mt-1 size-4 border-slate-300 text-slate-950 focus:ring-slate-500">
-                            <span><span class="block text-sm font-bold text-slate-950">Sequence</span><span class="mt-1 block text-xs text-slate-500">One lead progresses through every message.</span></span>
-                        </label>
-                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
-                            <input type="radio" name="execution_strategy" value="recurring_allocation" x-model="strategy" class="mt-1 size-4 border-slate-300 text-slate-950 focus:ring-slate-500">
-                            <span><span class="block text-sm font-bold text-slate-950">Recurring allocation</span><span class="mt-1 block text-xs text-slate-500">Different eligible leads receive each message in a run.</span></span>
-                        </label>
-                    </div>
-                </div>
+            <section class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Campaign type</p>
+                <p class="mt-1 text-sm font-bold text-slate-950">{{ $campaign->usesRecurringAllocation() ? 'Recurring allocation' : 'Sequence' }}</p>
+                <p class="mt-1 text-xs leading-5 text-slate-600">Campaign type is chosen when the Campaign is created and cannot be changed later.</p>
 
-                <div x-show="strategy === 'recurring_allocation'" x-cloak class="mt-4 grid gap-3 sm:grid-cols-3">
+                @if($campaign->usesRecurringAllocation())
+                <form method="POST" action="{{ route('crm.campaigns.execution.update', $campaign) }}" class="mt-4">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="execution_strategy" value="{{ $campaign->execution_strategy }}">
+                    <div class="grid gap-3 sm:grid-cols-3">
                     <label class="block">
                         <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Run every</span>
                         <div class="mt-2 flex items-center gap-2"><input type="number" min="1" max="3650" name="allocation_settings[run_every_days]" value="{{ old('allocation_settings.run_every_days', $allocationSettings['run_every_days']) }}" class="min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900"><span class="text-sm text-slate-600">days</span></div>
@@ -346,12 +331,14 @@
                         <div class="mt-2 flex items-center gap-2"><input type="number" min="0" max="3650" name="allocation_settings[recipient_cooldown_days]" value="{{ old('allocation_settings.recipient_cooldown_days', $allocationSettings['recipient_cooldown_days']) }}" class="min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900"><span class="text-sm text-slate-600">days</span></div>
                         @error('allocation_settings.recipient_cooldown_days')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
                     </label>
-                </div>
-                <p x-show="strategy === 'recurring_allocation'" x-cloak class="mt-3 text-xs leading-5 text-slate-500">Recurring allocation currently uses manual enrollment and does not support Campaign-family arbitration. Each message’s offset in Schedule sets its own earliest send time from the start of the run. <a href="{{ route('crm.campaigns.show', $campaign) }}#campaign-email-delivery-pacing" class="font-semibold underline">Email delivery pacing</a> can defer marketing emails later; it does not change who is allocated or when the next run starts.</p>
+                    </div>
+                    <p class="mt-3 text-xs leading-5 text-slate-500">Recurring allocation currently uses manual enrollment and does not support Campaign-family arbitration. Each message’s offset in Schedule sets its own earliest send time from the start of the run. <a href="{{ route('crm.campaigns.show', $campaign) }}#campaign-email-delivery-pacing" class="font-semibold underline">Email delivery pacing</a> can defer marketing emails later; it does not change who is allocated or when the next run starts.</p>
+                    @error('allocation_settings')<p class="mt-3 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                    <div class="mt-4 flex justify-end"><button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800">Save allocation settings</button></div>
+                </form>
+                @endif
                 @error('execution_strategy')<p class="mt-3 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
-                @error('allocation_settings')<p class="mt-3 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
-                <div class="mt-4 flex justify-end"><button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800">Save delivery style</button></div>
-            </form>
+            </section>
 
             <form
                 method="POST"

@@ -5,6 +5,7 @@ namespace Tests\Feature\Campaigns;
 use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
 use App\Modules\Campaigns\Actions\CreateCampaignAction;
+use App\Modules\Campaigns\Actions\UpdateCampaignAllocationSettingsAction;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Campaigns\Models\CampaignStepVariant;
@@ -18,6 +19,7 @@ use App\Support\ModuleIntegrations\Messaging\Contracts\MessageMediaLibrary;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class CampaignCreationTest extends TestCase
@@ -333,6 +335,49 @@ class CampaignCreationTest extends TestCase
 
         $this->assertInstanceOf(Campaign::class, $listed);
         $this->assertSame(1, (int) $listed->message_steps_count);
+    }
+
+    public function test_campaign_execution_strategy_is_fixed_while_allocation_settings_remain_editable(): void
+    {
+        $sequence = Campaign::factory()->create([
+            'execution_strategy' => Campaign::EXECUTION_STRATEGY_SEQUENCE,
+        ]);
+        $allocation = Campaign::factory()->create([
+            'execution_strategy' => Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION,
+        ]);
+        $update = app(UpdateCampaignAllocationSettingsAction::class);
+        $rejected = 0;
+
+        foreach ([
+            [$sequence, Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION],
+            [$allocation, Campaign::EXECUTION_STRATEGY_SEQUENCE],
+        ] as [$campaign, $requestedStrategy]) {
+            try {
+                $update->handle(
+                    campaign: $campaign,
+                    executionStrategy: $requestedStrategy,
+                );
+            } catch (ValidationException) {
+                $rejected++;
+            }
+        }
+
+        $this->assertSame(2, $rejected);
+        $this->assertSame(Campaign::EXECUTION_STRATEGY_SEQUENCE, $sequence->fresh()->execution_strategy);
+        $this->assertSame(Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION, $allocation->fresh()->execution_strategy);
+
+        $updated = $update->handle(
+            campaign: $allocation,
+            executionStrategy: Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION,
+            allocationSettings: [
+                'run_every_days' => 7,
+                'allocation_size_per_message' => 50,
+                'recipient_cooldown_days' => 14,
+            ],
+        );
+
+        $this->assertSame(7, $updated->allocation_settings['run_every_days']);
+        $this->assertSame(Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION, $updated->execution_strategy);
     }
 
     private function enableCampaigns(): void

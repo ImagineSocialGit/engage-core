@@ -101,11 +101,11 @@ CampaignEnrollment / MessageChainEnrollment state. Automatic allocation
 enrollment and cross-strategy family arbitration require explicit later
 integration.
 
-Changing execution strategy remains guarded. A Campaign cannot switch from
-sequence to recurring allocation while sequential enrollments are open, and it
-cannot switch back to sequence while allocation participation or a
-scheduled/running allocation run remains open. Historical terminal
-enrollment/assignment evidence remains intact.
+Execution strategy is chosen at Campaign creation and is immutable afterward.
+The Campaign editor exposes allocation settings only for allocation Campaigns;
+the update action rejects a submitted strategy that differs from the stored
+strategy. Create a new Campaign to use a different execution model. Historical
+enrollment and allocation evidence stays with its original Campaign.
 
 ## Allocation enrollment
 
@@ -527,10 +527,14 @@ Removing an exclusion restores future eligibility only when no prior assignment
 already makes that message historical. It does not resurrect a terminal skipped
 ScheduledMessage or erase assignment history.
 
-The current simple CRM `Enroll in campaign` result action still uses its legacy
-job class, but that job now delegates to this shared operation processor. This
-means the existing simple bulk-enroll surface works for both execution
-strategies before the richer operator UI is added.
+The CRM Contact-result Campaign action uses this shared queue for all five
+operations. Its Campaign picker exposes only active Campaigns and current active
+published messages; the server validates the operation against the Campaign
+strategy and message before queuing. The queued job checks operator capability,
+Contact visibility, and active message membership again before applying work.
+The simple enrollment operation remains available to both strategies. The
+legacy simple-enrollment job remains a compatibility entry point for callers
+outside this CRM action.
 
 ## Production worker rollout
 
@@ -553,7 +557,7 @@ Do not use `php artisan horizon:terminate` for this deployment flow.
 
 ## Campaign Builder parity
 
-Recurring allocation uses the same Campaign Setup authoring model as sequential Campaigns. Operators choose the execution strategy in Start, then use the existing Schedule and Messages editors to add, remove, reorder, and edit message copy.
+Recurring allocation uses the same Campaign Setup authoring model as sequential Campaigns. Operators choose the execution strategy at creation, then use the existing Schedule and Messages editors to add, remove, reorder, and edit message copy.
 
 The allocation-specific Start controls are:
 
@@ -579,7 +583,6 @@ This runtime batch does not add:
 automatic eligibility enrollment for recurring allocation
 cross-strategy Campaign-family arbitration
 contact-import allocation floor/exclusion authoring
-rich Contact-result operation controls
 Campaign allocation run/history workspace UI
 manual run/preview controls
 new recurring-allocation test files
