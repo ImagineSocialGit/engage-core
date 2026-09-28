@@ -4,6 +4,7 @@ namespace App\Modules\Campaigns\Import;
 
 use App\Modules\Campaigns\Actions\ApplyAutomaticCampaignEligibilityAction;
 use App\Modules\Campaigns\Actions\ScheduleCampaignImportBatchInitialMessagesAction;
+use App\Modules\Campaigns\Jobs\ReconcileImportedAllocationCampaignJob;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Services\CampaignEligibilityReconciliationPlanner;
@@ -145,8 +146,7 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
         }
 
         return [
-            'campaign_key' => $lockedCampaignKey
-                ?? ($options[0]['value'] ?? null),
+            'campaign_key' => $lockedCampaignKey,
             'first_message_at' => $configured['first_message_at'] ?? null,
             'launch_mode' => $configured !== null
                 ? self::LAUNCH_SCHEDULED
@@ -203,7 +203,7 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
                 'type' => 'select',
                 'required' => true,
                 'full_width' => true,
-                'description' => 'Only Contacts who satisfy the selected Campaign’s saved eligibility rules will enroll. Event-only Flow Routes still wait for their real event.',
+                'description' => 'Automatic Campaigns enroll eligible leads; selecting a manual allocation Campaign enrolls imported leads explicitly. Event-only Flow Routes still wait for their real event.',
                 'options' => [
                     [
                         'value' => self::LAUNCH_NONE,
@@ -223,12 +223,16 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
                 'key' => 'campaign_key',
                 'label' => 'Campaign',
                 'type' => 'select',
-                'required' => true,
+                'required' => false,
                 'full_width' => true,
                 'description' => $config['campaign_locked']
                     ? 'This Campaign was selected by the detected import profile.'
-                    : 'Available Campaigns are active, automatic, have saved eligibility rules, and have a published message journey.',
-                'options' => $config['campaign_options'],
+                    : 'Choose a Campaign only when starting one after import. Allocation Campaigns use their normal run cadence.',
+                'options' => $config['campaign_locked']
+                    ? $config['campaign_options']
+                    : array_merge([
+                        ['value' => '', 'label' => 'Choose a Campaign'],
+                    ], $config['campaign_options']),
             ],
             [
                 'key' => 'first_message_at',
@@ -308,6 +312,30 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
             ]);
         }
 
+        $campaign = Campaign::query()->where('key', $campaignKey)->first();
+
+        if (($campaign === null && $config['campaign_key'] === null)
+            || ($campaign instanceof Campaign
+                && (! $campaign->isActive()
+                    || ($campaign->usesRecurringAllocation()
+                        ? ((is_string($campaign->family_key) && trim($campaign->family_key) !== '')
+                            || ($campaign->usesAutomaticEnrollment() && ! $campaign->hasEligibilityCriteria()))
+                        : (! $campaign->usesAutomaticEnrollment()
+                            || ! $campaign->hasEligibilityCriteria()))))
+        ) {
+            throw ValidationException::withMessages([
+                "post_import_inputs.{$this->key()}.campaign_key" => 'Choose an available Campaign.',
+            ]);
+        }
+
+        if ($campaign?->usesRecurringAllocation()
+            && $launchMode === self::LAUNCH_SCHEDULED
+        ) {
+            throw ValidationException::withMessages([
+                "post_import_inputs.{$this->key()}.launch_mode" => 'Allocation Campaigns use their normal run cadence after import. Choose start after import.',
+            ]);
+        }
+
         if ($launchMode === self::LAUNCH_NOW) {
             return [
                 'campaign_key' => $campaignKey,
@@ -357,6 +385,15 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
         array $config,
     ): ContactImportPostProcessResult {
         $config = $this->requiredRuntimeConfig($config);
+
+        $campaign = Campaign::query()->where('key', $config['campaign_key'])->first();
+
+        if ($campaign?->usesRecurringAllocation()) {
+            return ContactImportPostProcessResult::applied(
+                meta: ['campaign_key' => $config['campaign_key']],
+                message: 'Allocation eligibility will be reconciled when the import batch finishes.',
+            );
+        }
 
         $this->prepareAutomaticEnrollment(
             context: $context,
@@ -453,6 +490,12 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
     ): ContactImportPostProcessResult {
         $config = $this->requiredRuntimeConfig($config);
 
+        $campaign = Campaign::query()->where('key', $config['campaign_key'])->first();
+
+        if ($campaign?->usesRecurringAllocation()) {
+            return $this->finalizeAllocation($batch, $campaign);
+        }
+
         $result = $this->scheduleBatch->handle(
             batch: $batch,
             campaignKey: $config['campaign_key'],
@@ -473,6 +516,32 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
                 'Initial Campaign timing was applied to %d new enrollment(s).',
                 $result['enrollment_count'],
             ),
+        );
+    }
+
+    private function finalizeAllocation(
+        ContactImportBatch $batch,
+        Campaign $campaign,
+    ): ContactImportPostProcessResult {
+        if (! $campaign->isActive()) {
+            return ContactImportPostProcessResult::blocked(
+                reasonCode: 'campaign_launch_unavailable',
+                message: 'The selected allocation Campaign is no longer active.',
+                meta: ['campaign_key' => $campaign->key],
+            );
+        }
+
+        ReconcileImportedAllocationCampaignJob::dispatch(
+            batchId: (int) $batch->getKey(),
+            campaignId: (int) $campaign->getKey(),
+        )->afterCommit();
+
+        return ContactImportPostProcessResult::applied(
+            meta: [
+                'campaign_key' => $campaign->key,
+                'reconciliation' => 'queued',
+            ],
+            message: 'Allocation eligibility will be reconciled after import; normal run cadence applies.',
         );
     }
 
@@ -537,15 +606,29 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
     {
         return Campaign::query()
             ->active()
-            ->where('enrollment_mode', Campaign::ENROLLMENT_MODE_AUTOMATIC)
+            ->where(function ($query): void {
+                $query->where(function ($query): void {
+                    $query->where('execution_strategy', Campaign::EXECUTION_STRATEGY_SEQUENCE)
+                        ->where('enrollment_mode', Campaign::ENROLLMENT_MODE_AUTOMATIC);
+                })
+                    ->orWhere(function ($query): void {
+                        $query->where('execution_strategy', Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION)
+                            ->where(function ($query): void {
+                                $query->whereNull('family_key')->orWhere('family_key', '');
+                            });
+                    });
+            })
             ->whereNotNull('message_chain_id')
             ->whereHas('messageChain', fn ($query) => $query
                 ->active()
                 ->whereNotNull('current_version_id'))
             ->orderBy('name')
             ->orderBy('key')
-            ->get(['key', 'name', 'eligibility_filter'])
-            ->filter(fn (Campaign $campaign): bool => $campaign->hasEligibilityCriteria())
+            ->get(['key', 'name', 'eligibility_filter', 'execution_strategy', 'enrollment_mode'])
+            ->filter(fn (Campaign $campaign): bool =>
+                $campaign->enrollment_mode === Campaign::ENROLLMENT_MODE_MANUAL
+                || $campaign->hasEligibilityCriteria()
+            )
             ->map(fn (Campaign $campaign): array => [
                 'value' => (string) $campaign->key,
                 'label' => $this->campaignOptionLabel($campaign),
@@ -570,6 +653,9 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
             ->implode('; ');
 
         return trim((string) $campaign->name)
+            .($campaign->usesRecurringAllocation()
+                ? ' — recurring allocation'.($campaign->usesAutomaticEnrollment() ? '' : ', enroll imported leads')
+                : '')
             .($criteria !== '' ? ' — eligible when '.$criteria : '');
     }
 

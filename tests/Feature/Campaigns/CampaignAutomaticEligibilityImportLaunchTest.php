@@ -3,7 +3,13 @@
 namespace Tests\Feature\Campaigns;
 
 use App\Modules\Campaigns\Import\CampaignLaunchTimingContactImportPostProcessor;
+use App\Modules\Campaigns\Actions\ScheduleDueCampaignAllocationRunsAction;
+use App\Modules\Campaigns\Actions\EnrollContactInCampaignAllocationAction;
+use App\Modules\Campaigns\Actions\ApplyAutomaticCampaignEligibilityAction;
+use App\Modules\Campaigns\Jobs\ReconcileImportedAllocationCampaignJob;
 use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Campaigns\Models\CampaignAllocationEnrollment;
+use App\Modules\Campaigns\Models\CampaignAllocationRun;
 use App\Modules\Core\Data\Contacts\ContactImportContext;
 use App\Modules\Core\Data\Contacts\ContactImportPostProcessResult;
 use App\Modules\Core\Models\Contact;
@@ -119,7 +125,91 @@ class CampaignAutomaticEligibilityImportLaunchTest extends TestCase
         );
     }
 
-    private function automaticCampaign(string $key): Campaign
+    public function test_allocation_eligibility_reconciles_after_import_and_first_run_uses_normal_cadence(): void
+    {
+        Queue::fake();
+        Carbon::setTestNow('2026-08-24 14:00:00 UTC');
+        $campaign = $this->automaticCampaign(
+            'allocation_import',
+            Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION,
+        );
+        $batch = ContactImportBatch::factory()->create([
+            'status' => ContactImportBatch::STATUS_PROCESSING,
+            'imported_at' => now()->subMinute(),
+        ]);
+        $contact = Contact::factory()->create(['contact_import_batch_id' => $batch->getKey()]);
+        ContactTag::withoutEvents(fn () => ContactTag::query()->create([
+            'contact_id' => $contact->getKey(),
+            'tag' => 'Launch',
+        ]));
+        $occurrence = ContactImportOccurrence::query()->create([
+            'contact_import_batch_id' => $batch->getKey(),
+            'contact_id' => $contact->getKey(),
+            'row_number' => 2,
+            'outcome' => ContactImportOccurrence::OUTCOME_CREATED,
+            'identity_type' => 'email',
+            'identity_value' => $contact->email,
+            'row_fingerprint' => hash('sha256', $contact->email),
+            'meta' => [],
+        ]);
+        $context = new ContactImportContext(
+            contact: $contact,
+            batch: $batch,
+            occurrence: $occurrence,
+            row: ['Email' => $contact->email],
+            mapping: ['email' => 'Email'],
+            profileKey: null,
+        );
+        $processor = app(CampaignLaunchTimingContactImportPostProcessor::class);
+        $config = $processor->withSubmittedInputs(
+            config: ['campaign_key' => $campaign->key],
+            submitted: ['launch_mode' => 'now'],
+        );
+
+        $this->assertSame(ContactImportPostProcessResult::STATE_APPLIED, $processor->handle($context, $config)->state);
+        $this->assertSame(0, CampaignAllocationEnrollment::query()->count());
+        $this->assertSame(ContactImportPostProcessResult::STATE_APPLIED, $processor->finalizeBatch($batch, $config)->state);
+
+        $batch->forceFill([
+            'status' => ContactImportBatch::STATUS_COMPLETED,
+            'meta' => ['post_import_config' => ['campaign_launch_timing' => $config]],
+        ])->save();
+        (new ReconcileImportedAllocationCampaignJob((int) $batch->getKey(), (int) $campaign->getKey()))
+            ->handle(
+                app(ApplyAutomaticCampaignEligibilityAction::class),
+                app(EnrollContactInCampaignAllocationAction::class),
+            );
+
+        $this->assertSame(1, CampaignAllocationEnrollment::query()
+            ->where('campaign_id', $campaign->getKey())
+            ->where('contact_id', $contact->getKey())
+            ->where('status', CampaignAllocationEnrollment::STATUS_ACTIVE)
+            ->count());
+        $this->assertSame(0, CampaignAllocationRun::query()->count());
+        $this->assertSame(1, app(ScheduleDueCampaignAllocationRunsAction::class)->handle());
+
+        $manual = $this->automaticCampaign(
+            'manual_allocation_import',
+            Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION,
+            Campaign::ENROLLMENT_MODE_MANUAL,
+        );
+        $batch->forceFill(['meta' => [
+            'post_import_config' => ['campaign_launch_timing' => ['campaign_key' => $manual->key]],
+        ]])->save();
+        $job = new ReconcileImportedAllocationCampaignJob((int) $batch->getKey(), (int) $manual->getKey());
+        $job->handle(app(ApplyAutomaticCampaignEligibilityAction::class), app(EnrollContactInCampaignAllocationAction::class));
+        $job->handle(app(ApplyAutomaticCampaignEligibilityAction::class), app(EnrollContactInCampaignAllocationAction::class));
+        $this->assertSame(1, CampaignAllocationEnrollment::query()
+            ->where('campaign_id', $manual->getKey())
+            ->where('contact_id', $contact->getKey())
+            ->count());
+    }
+
+    private function automaticCampaign(
+        string $key,
+        string $strategy = Campaign::EXECUTION_STRATEGY_SEQUENCE,
+        string $enrollmentMode = Campaign::ENROLLMENT_MODE_AUTOMATIC,
+    ): Campaign
     {
         $template = MessageTemplate::query()->create([
             'key' => "fixture.{$key}.email",
@@ -184,10 +274,13 @@ class CampaignAutomaticEligibilityImportLaunchTest extends TestCase
             'key' => $key,
             'name' => "{$key} campaign",
             'message_chain_id' => $chain->getKey(),
-            'family_key' => 'consumer_nurture',
+            'family_key' => $strategy === Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION
+                ? null
+                : 'consumer_nurture',
+            'execution_strategy' => $strategy,
             'priority' => 10,
             'eligibility_filter' => ['tag' => ['Launch']],
-            'enrollment_mode' => Campaign::ENROLLMENT_MODE_AUTOMATIC,
+            'enrollment_mode' => $enrollmentMode,
             'reentry_policy' => Campaign::REENTRY_NEVER,
             'ineligible_behavior' => Campaign::INELIGIBLE_CANCEL,
             'channel' => 'email',

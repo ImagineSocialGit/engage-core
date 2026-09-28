@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Messaging\Models\MessageChain;
+use App\Modules\Messaging\Models\MessageChainStep;
 use App\Modules\Messaging\Models\MessageChainVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -126,6 +127,7 @@ class CampaignLaunchTimingContactImportControllerTest extends TestCase
                 && $fields->has('launch_mode')
                 && $fields->has('first_message_at')
                 && is_array($campaignField)
+                && ($campaignField['required'] ?? null) === false
                 && collect($campaignField['options'] ?? [])->contains(
                     fn (array $option): bool => ($option['value'] ?? null) === $campaign->key
                         && str_contains((string) ($option['label'] ?? ''), 'Status: Prospect Nurture')
@@ -144,7 +146,6 @@ class CampaignLaunchTimingContactImportControllerTest extends TestCase
                 'post_import_inputs' => [
                     'campaign_launch_timing' => [
                         'launch_mode' => 'none',
-                        'campaign_key' => $campaign->key,
                     ],
                 ],
             ],
@@ -157,6 +158,77 @@ class CampaignLaunchTimingContactImportControllerTest extends TestCase
             'campaign_launch_timing',
             data_get($batch->meta, 'post_import_config', []),
         );
+    }
+
+    public function test_allocation_campaign_can_be_selected_for_normal_cadence_after_import(): void
+    {
+        $campaign = $this->readyAutomaticCampaign(
+            key: 'allocation_import',
+            name: 'Allocation Import',
+            eligibility: ['tag' => ['ready']],
+            strategy: Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION,
+        );
+        $manual = $this->readyAutomaticCampaign(
+            key: 'manual_allocation_import',
+            name: 'Manual Allocation Import',
+            eligibility: [],
+            strategy: Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION,
+            enrollmentMode: Campaign::ENROLLMENT_MODE_MANUAL,
+        );
+        $user = User::factory()->create();
+        $preview = $this->actingAs($user)->post(
+            route('crm.contacts.import.preview'),
+            ['csv' => UploadedFile::fake()->createWithContent(
+                'allocation-import.csv',
+                "Email\nperson@example.test\n",
+            )],
+        );
+
+        $preview->assertOk()->assertViewHas('postImportInputs', function (array $inputs) use ($campaign, $manual): bool {
+            $launch = collect($inputs)->firstWhere('key', 'campaign_launch_timing');
+            $campaignField = collect($launch['inputs'] ?? [])->firstWhere('key', 'campaign_key');
+
+            $options = collect($campaignField['options'] ?? []);
+
+            return $options->contains(fn (array $option): bool => ($option['value'] ?? null) === $campaign->key)
+                && $options->contains(fn (array $option): bool => ($option['value'] ?? null) === $manual->key);
+        });
+
+        $this->actingAs($user)->post(
+            route('crm.contacts.import.process'),
+            [
+                'csv_path' => $preview->viewData('csvPath'),
+                'mapping' => ['email' => 'Email'],
+                'treatments' => [],
+                'post_import_inputs' => [
+                    'campaign_launch_timing' => [
+                        'launch_mode' => 'scheduled',
+                        'campaign_key' => $campaign->key,
+                        'first_message_at' => '2026-10-01T10:00',
+                    ],
+                ],
+            ],
+        )->assertSessionHasErrors(['post_import_inputs.campaign_launch_timing.launch_mode']);
+
+        Queue::fake();
+        $response = $this->actingAs($user)->post(
+            route('crm.contacts.import.process'),
+            [
+                'csv_path' => $preview->viewData('csvPath'),
+                'mapping' => ['email' => 'Email'],
+                'treatments' => [],
+                'post_import_inputs' => [
+                    'campaign_launch_timing' => [
+                        'launch_mode' => 'now',
+                        'campaign_key' => $campaign->key,
+                    ],
+                ],
+            ],
+        );
+
+        $batch = ContactImportBatch::query()->latest('id')->firstOrFail();
+        $response->assertRedirect(route('crm.contacts.import-batches.show', $batch));
+        $this->assertSame($campaign->key, data_get($batch->meta, 'post_import_config.campaign_launch_timing.campaign_key'));
     }
 
     public function test_operator_can_start_a_discovered_campaign_when_the_import_completes(): void
@@ -208,6 +280,8 @@ class CampaignLaunchTimingContactImportControllerTest extends TestCase
         string $key,
         string $name,
         array $eligibility,
+        string $strategy = Campaign::EXECUTION_STRATEGY_SEQUENCE,
+        string $enrollmentMode = Campaign::ENROLLMENT_MODE_AUTOMATIC,
     ): Campaign {
         $chain = MessageChain::query()->create([
             'key' => $key,
@@ -221,8 +295,20 @@ class CampaignLaunchTimingContactImportControllerTest extends TestCase
             'version' => 1,
             'exit_conditions' => [],
             'content_hash' => hash('sha256', $key),
-            'published_at' => now(),
+            'published_at' => null,
         ]);
+        MessageChainStep::query()->create([
+            'message_chain_version_id' => $version->getKey(),
+            'key' => 'first',
+            'name' => 'First message',
+            'sort_order' => 1,
+            'timing_type' => MessageChainStep::TIMING_IMMEDIATE,
+            'variant_strategy' => MessageChainStep::VARIANT_STRATEGY_FIRST_AVAILABLE,
+            'advance_policy' => MessageChainStep::ADVANCE_ALL_TERMINAL,
+            'conditions' => [],
+            'is_active' => true,
+        ]);
+        $version->forceFill(['published_at' => now()])->save();
         $chain->forceFill([
             'current_version_id' => $version->getKey(),
         ])->save();
@@ -231,9 +317,10 @@ class CampaignLaunchTimingContactImportControllerTest extends TestCase
             'key' => $key,
             'name' => $name,
             'message_chain_id' => $chain->getKey(),
-            'enrollment_mode' => Campaign::ENROLLMENT_MODE_AUTOMATIC,
+            'enrollment_mode' => $enrollmentMode,
             'eligibility_filter' => $eligibility,
             'status' => Campaign::STATUS_ACTIVE,
+            'execution_strategy' => $strategy,
         ]);
     }
 }

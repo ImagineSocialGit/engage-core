@@ -228,7 +228,8 @@
 │   │   │   │   ├── ProcessDueCampaignAllocationsJob.php
 │   │   │   │   ├── ProcessDueCampaignTouchDatesJob.php
 │   │   │   │   ├── ReconcileAutomaticCampaignEligibilityJob.php
-│   │   │   │   └── ReconcileContactCampaignEligibilityJob.php
+│   │   │   │   ├── ReconcileContactCampaignEligibilityJob.php
+│   │   │   │   └── ReconcileImportedAllocationCampaignJob.php
 │   │   │   ├── Listeners
 │   │   │   │   ├── ReconcileCampaignAllocationAssignmentFromScheduledMessageTerminal.php
 │   │   │   │   ├── ReconcileCampaignEligibilityFromAutomationEvent.php
@@ -3335,6 +3336,7 @@
 │   │   │   ├── CampaignMessageReplyHandlingTest.php
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
 │   │   │   ├── CampaignMessageTemplateDefinitionContributorTest.php
+│   │   │   ├── CampaignPacingOverrideSafetyTest.php
 │   │   │   ├── CampaignPriorMessageImportTest.php
 │   │   │   ├── CampaignPriorMessageReceiptTest.php
 │   │   │   ├── CampaignPriorMessageSkipTest.php
@@ -4010,4 +4012,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-883 directories, 3128 files
+883 directories, 3130 files

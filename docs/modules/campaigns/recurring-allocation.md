@@ -110,6 +110,16 @@ a new eligibility cycle may create a new membership. Pause is unavailable for
 automatic allocation because allocation membership has no paused state.
 Campaign-family arbitration remains unsupported for allocation.
 
+Contact import's optional Campaign start control lists active allocation
+Campaigns with published messages. Automatic allocation Campaigns need saved
+eligibility; selecting a manual allocation Campaign explicitly enrolls the
+imported leads. Import only does not require a Campaign. When an allocation
+Campaign is selected to start after import, imported leads are processed in
+bounded background chunks after the whole Contact batch completes. Automatic
+eligibility and reentry policy remain authoritative for automatic Campaigns;
+the normal allocation scheduler determines the first run in both modes. The
+sequential-only first-message date/time does not apply to allocation Campaigns.
+
 Execution strategy is chosen at Campaign creation and is immutable afterward.
 The Campaign editor exposes allocation settings only for allocation Campaigns;
 the update action rejects a submitted strategy that differs from the stored
