@@ -301,6 +301,7 @@
 │   │   │   │   ├── CommerceCatalogProvider.php
 │   │   │   │   ├── CommerceCheckoutProvider.php
 │   │   │   │   ├── CommerceFulfillmentProvider.php
+│   │   │   │   ├── CommerceInventoryAdjustmentProvider.php
 │   │   │   │   ├── CommerceInventoryProvider.php
 │   │   │   │   ├── CommerceOrderProvider.php
 │   │   │   │   ├── CommercePaymentProvider.php
@@ -317,7 +318,10 @@
 │   │   │   │   ├── CommerceCatalogVariantData.php
 │   │   │   │   ├── CommerceCheckoutRequest.php
 │   │   │   │   ├── CommerceCheckoutResult.php
+│   │   │   │   ├── CommerceInventoryAdjustmentRequest.php
+│   │   │   │   ├── CommerceInventoryAdjustmentResult.php
 │   │   │   │   ├── CommerceInventoryEffectData.php
+│   │   │   │   ├── CommerceInventoryOrchestrationResult.php
 │   │   │   │   ├── CommerceOfferPublicationState.php
 │   │   │   │   ├── CommerceOrderCustomerResolution.php
 │   │   │   │   ├── CommerceOrderCustomerSnapshotData.php
@@ -353,6 +357,7 @@
 │   │   │   ├── Services
 │   │   │   │   ├── CommerceCatalogSyncService.php
 │   │   │   │   ├── CommerceCheckoutService.php
+│   │   │   │   ├── CommerceInventoryEffectOrchestrator.php
 │   │   │   │   ├── CommerceInventoryEffectRecorder.php
 │   │   │   │   ├── CommerceOfferPublicationEvaluator.php
 │   │   │   │   ├── CommerceOrderCustomerReconciler.php
@@ -3340,6 +3345,7 @@
 │   │   ├── Commerce
 │   │   │   ├── CommerceCatalogSyncTest.php
 │   │   │   ├── CommerceFoundationTest.php
+│   │   │   ├── CommerceInventoryOrchestrationTest.php
 │   │   │   ├── CommerceOrderCustomerReconciliationTest.php
 │   │   │   ├── CommerceOrderSyncTest.php
 │   │   │   └── CommerceStorefrontFoundationTest.php
@@ -3978,4 +3984,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-882 directories, 3097 files
+882 directories, 3103 files

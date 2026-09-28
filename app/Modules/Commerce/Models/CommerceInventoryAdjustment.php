@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class CommerceInventoryAdjustment extends Model
 {
     public const STATUS_PENDING = 'pending';
+    public const STATUS_PROCESSING = 'processing';
     public const STATUS_SUCCEEDED = 'succeeded';
     public const STATUS_FAILED = 'failed';
 
@@ -19,7 +20,9 @@ class CommerceInventoryAdjustment extends Model
         'status',
         'idempotency_key',
         'external_id',
+        'attempts',
         'requested_at',
+        'claimed_at',
         'completed_at',
         'failure_reason',
         'meta',
@@ -31,7 +34,9 @@ class CommerceInventoryAdjustment extends Model
             'commerce_inventory_effect_id' => 'integer',
             'commerce_product_variant_provider_mapping_id' => 'integer',
             'quantity_delta' => 'decimal:4',
+            'attempts' => 'integer',
             'requested_at' => 'datetime',
+            'claimed_at' => 'datetime',
             'completed_at' => 'datetime',
             'meta' => 'array',
         ];

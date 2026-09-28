@@ -46,7 +46,9 @@ return new class extends Migration
             $table->string('status', 80)->default('pending')->index();
             $table->string('idempotency_key', 191)->unique();
             $table->string('external_id')->nullable()->index();
+            $table->unsignedInteger('attempts')->default(0);
             $table->timestamp('requested_at')->nullable()->index();
+            $table->timestamp('claimed_at')->nullable()->index();
             $table->timestamp('completed_at')->nullable()->index();
             $table->text('failure_reason')->nullable();
             $table->json('meta')->nullable();
