@@ -163,8 +163,10 @@
                 @if(filled($sizeModel)) x-model="{{ $sizeModel }}" @endif
                 class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900"
             >
-                @foreach(['small' => 'Small', 'medium' => 'Medium', 'large' => 'Large', 'full' => 'Full width'] as $size => $label)
-                    <option value="{{ $size }}" @selected(! filled($sizeModel) && $selectedSize === $size)>{{ $label }}</option>
+                @foreach(($presentation['display_size_options'] ?? []) as $size => $option)
+                    <option value="{{ $size }}" @selected(! filled($sizeModel) && $selectedSize === $size)>
+                        {{ $option['label'] ?? $size }}
+                    </option>
                 @endforeach
             </select>
             <p class="mt-2 text-xs leading-5 text-slate-500">Applies to images and video cards in email. Other files keep their regular link.</p>

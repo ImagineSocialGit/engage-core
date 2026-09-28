@@ -22,16 +22,59 @@ final class MessageMediaPayload
 
     public const TRACKING_KEY = 'media_primary';
 
-    public const DISPLAY_SIZES = ['small', 'medium', 'large', 'full'];
+    /**
+     * Authoritative email-media display-size catalog.
+     *
+     * Add or change display sizes here only. Validation, authoring options,
+     * config contracts, and email rendering all derive from this catalog.
+     *
+     * @var array<string, array{label: string, width: int}>
+     */
+    private const DISPLAY_SIZE_OPTIONS = [
+        'thumbnail' => [
+            'label' => 'Thumbnail',
+            'width' => 96,
+        ],
+        'extra_small' => [
+            'label' => 'Extra small',
+            'width' => 160,
+        ],
+        'small' => [
+            'label' => 'Small',
+            'width' => 240,
+        ],
+        'medium' => [
+            'label' => 'Medium',
+            'width' => 360,
+        ],
+        'large' => [
+            'label' => 'Large',
+            'width' => 480,
+        ],
+        'full' => [
+            'label' => 'Full width',
+            'width' => 576,
+        ],
+    ];
+
+    /** @return array<int, string> */
+    public static function displaySizes(): array
+    {
+        return array_keys(self::DISPLAY_SIZE_OPTIONS);
+    }
+
+    /** @return array<string, array{label: string, width: int}> */
+    public static function displaySizeOptions(): array
+    {
+        return self::DISPLAY_SIZE_OPTIONS;
+    }
 
     public static function displayWidth(mixed $size): int
     {
-        return match ($size) {
-            'small' => 240,
-            'medium' => 360,
-            'large' => 480,
-            default => 576,
-        };
+        $size = is_string($size) ? trim($size) : '';
+
+        return self::DISPLAY_SIZE_OPTIONS[$size]['width']
+            ?? self::DISPLAY_SIZE_OPTIONS['full']['width'];
     }
 
     /**
@@ -148,10 +191,10 @@ final class MessageMediaPayload
 
         if (array_key_exists('display_size', $value)) {
             if (! is_string($value['display_size'])
-                || ! in_array($value['display_size'], self::DISPLAY_SIZES, true)) {
+                || ! in_array($value['display_size'], self::displaySizes(), true)) {
                 $errors[] = [
                     'path' => 'display_size',
-                    'message' => 'Media display_size must be small, medium, large, or full.',
+                    'message' => 'Media display_size must use a supported media size.',
                 ];
             } elseif (! in_array($kind, [self::KIND_IMAGE, self::KIND_VIDEO], true)) {
                 $errors[] = [

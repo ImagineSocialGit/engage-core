@@ -66,10 +66,20 @@ class MessageMediaPayloadValidationTest extends TestCase
 
     public function test_display_size_is_limited_to_visual_media_and_known_presets(): void
     {
-        $media = $this->media();
-        $media['display_size'] = 'small';
-        $this->assertSame([], MessageMediaPayload::validationErrors($media));
+        $options = MessageMediaPayload::displaySizeOptions();
 
+        $this->assertArrayHasKey('thumbnail', $options);
+        $this->assertArrayHasKey('extra_small', $options);
+
+        foreach (MessageMediaPayload::displaySizes() as $displaySize) {
+            $media = $this->media();
+            $media['display_size'] = $displaySize;
+
+            $this->assertSame([], MessageMediaPayload::validationErrors($media));
+            $this->assertSame($options[$displaySize]['width'], MessageMediaPayload::displayWidth($displaySize));
+        }
+
+        $media = $this->media();
         $media['display_size'] = '9999px';
         $this->assertNotSame([], MessageMediaPayload::validationErrors($media));
 

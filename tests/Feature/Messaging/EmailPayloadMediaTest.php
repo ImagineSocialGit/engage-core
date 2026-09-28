@@ -10,22 +10,31 @@ class EmailPayloadMediaTest extends TestCase
 {
     public function test_video_poster_size_is_a_message_choice_with_a_responsive_email_limit(): void
     {
-        $media = $this->videoMedia();
-        $media['display_size'] = 'small';
-        $payload = EmailPayload::fromArray([
-            'to' => 'fan@example.test',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'artist_updates',
-            'message_type' => 'welcome',
-            'subject' => 'Welcome',
-            'body' => '{media}',
-            'media' => $media,
-        ]);
+        foreach (MessageMediaPayload::displaySizes() as $displaySize) {
+            $media = $this->videoMedia();
+            $media['display_size'] = $displaySize;
+            $payload = EmailPayload::fromArray([
+                'to' => 'fan@example.test',
+                'channel' => 'email',
+                'purpose' => 'marketing',
+                'scope' => 'artist_updates',
+                'message_type' => 'welcome',
+                'subject' => 'Welcome',
+                'body' => '{media}',
+                'media' => $media,
+            ]);
 
-        $this->assertStringContainsString('width="240"', $payload->html());
-        $this->assertStringContainsString('max-width:100%', $payload->html());
-        $this->assertSame(576, MessageMediaPayload::displayWidth(null));
+            $this->assertStringContainsString(
+                'width="'.MessageMediaPayload::displayWidth($displaySize).'"',
+                $payload->html(),
+            );
+            $this->assertStringContainsString('max-width:100%', $payload->html());
+        }
+
+        $this->assertSame(
+            MessageMediaPayload::displayWidth('full'),
+            MessageMediaPayload::displayWidth(null),
+        );
     }
 
     public function test_video_media_renders_progressive_embed_with_fallback_and_plain_text_link(): void

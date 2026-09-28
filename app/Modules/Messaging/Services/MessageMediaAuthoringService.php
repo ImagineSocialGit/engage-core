@@ -27,6 +27,8 @@ final class MessageMediaAuthoringService
      */
     public function presentation(array $currentSnapshots = []): array
     {
+        $displaySizeOptions = MessageMediaPayload::displaySizeOptions();
+
         if (! $this->available()) {
             return [
                 'available' => false,
@@ -34,6 +36,7 @@ final class MessageMediaAuthoringService
                 'image_assets' => [],
                 'asset_uuids' => [],
                 'image_asset_uuids' => [],
+                'display_size_options' => $displaySizeOptions,
                 'library_url' => null,
                 'authoring_upload_url' => null,
             ];
@@ -117,6 +120,7 @@ final class MessageMediaAuthoringService
                 static fn (array $asset): string => (string) $asset['uuid'],
                 $imageAssets,
             )),
+            'display_size_options' => $displaySizeOptions,
             'library_url' => Route::has('crm.media.index')
                 ? route('crm.media.index')
                 : null,
@@ -138,7 +142,11 @@ final class MessageMediaAuthoringService
             $key('media_asset_uuid') => ['nullable', 'uuid'],
             $key('media_poster_asset_uuid') => ['nullable', 'uuid'],
             $key('media_title') => ['nullable', 'string', 'max:255'],
-            $key('media_size') => ['nullable', 'string', 'in:small,medium,large,full'],
+            $key('media_size') => [
+                'nullable',
+                'string',
+                'in:'.implode(',', MessageMediaPayload::displaySizes()),
+            ],
             $key('media_upload') => [
                 'nullable',
                 'file',
@@ -256,7 +264,7 @@ final class MessageMediaAuthoringService
         $displaySize = is_string($displaySize) && trim($displaySize) !== ''
             ? trim($displaySize)
             : null;
-        if ($displaySize !== null && ! in_array($displaySize, MessageMediaPayload::DISPLAY_SIZES, true)) {
+        if ($displaySize !== null && ! in_array($displaySize, MessageMediaPayload::displaySizes(), true)) {
             throw new InvalidArgumentException('Choose a supported media size.');
         }
 

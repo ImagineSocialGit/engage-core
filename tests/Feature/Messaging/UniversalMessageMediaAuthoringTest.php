@@ -3,6 +3,7 @@
 namespace Tests\Feature\Messaging;
 
 use App\Modules\Messaging\Services\MessageMediaAuthoringService;
+use App\Modules\Messaging\Support\MessageMediaPayload;
 use App\Support\ModuleIntegrations\Messaging\Contracts\MessageMediaLibrary;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
@@ -71,6 +72,10 @@ class UniversalMessageMediaAuthoringTest extends TestCase
         $presentation = $service->presentation([$current]);
 
         $this->assertTrue($presentation['available']);
+        $this->assertSame(
+            MessageMediaPayload::displaySizeOptions(),
+            $presentation['display_size_options'],
+        );
         $this->assertContains($current['asset_uuid'], $presentation['asset_uuids']);
         $this->assertContains($current['poster_asset_uuid'], $presentation['image_asset_uuids']);
 
@@ -179,12 +184,12 @@ class UniversalMessageMediaAuthoringTest extends TestCase
 
         $this->assertNull($service->resolve(submitted: true));
 
-        $large = $service->resolve(
+        $extraSmall = $service->resolve(
             submitted: true,
             assetUuid: '44444444-4444-4444-8444-444444444444',
-            displaySize: 'large',
+            displaySize: 'extra_small',
         );
-        $this->assertSame('large', $large['display_size']);
+        $this->assertSame('extra_small', $extraSmall['display_size']);
     }
 
     public function test_every_email_authoring_surface_reaches_the_shared_media_authoring_contract(): void
@@ -220,6 +225,19 @@ class UniversalMessageMediaAuthoringTest extends TestCase
             $this->assertIsString($source);
             $this->assertStringContainsString('<x-messaging.message-editor-carousel', $source, $path);
         }
+
+        $mediaEditor = file_get_contents(
+            base_path('resources/views/components/ui/message-media-editor.blade.php'),
+        );
+        $this->assertIsString($mediaEditor);
+        $this->assertStringContainsString(
+            "\$presentation['display_size_options']",
+            $mediaEditor,
+        );
+        $this->assertStringNotContainsString(
+            "['small' => 'Small', 'medium' => 'Medium'",
+            $mediaEditor,
+        );
 
         $schedulingView = file_get_contents(
             base_path('resources/views/crm/scheduling/communications.blade.php'),
