@@ -77,7 +77,7 @@ final class CampaignEligibilityAuthoringService
             ],
             'ineligible_behaviors' => [
                 Campaign::INELIGIBLE_CONTINUE => 'Keep the campaign running',
-                Campaign::INELIGIBLE_PAUSE => 'Pause the campaign',
+                ...($campaign->usesRecurringAllocation() ? [] : [Campaign::INELIGIBLE_PAUSE => 'Pause the campaign']),
                 Campaign::INELIGIBLE_CANCEL => 'Stop the campaign',
             ],
         ];

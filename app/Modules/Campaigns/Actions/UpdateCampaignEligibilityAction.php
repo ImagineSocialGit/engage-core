@@ -17,12 +17,12 @@ final class UpdateCampaignEligibilityAction
         string $reentryPolicy,
         string $ineligibleBehavior,
     ): Campaign {
-        if (
-            $campaign->execution_strategy === Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION
+        if ($campaign->usesRecurringAllocation()
             && $enrollmentMode === Campaign::ENROLLMENT_MODE_AUTOMATIC
+            && $ineligibleBehavior === Campaign::INELIGIBLE_PAUSE
         ) {
             throw ValidationException::withMessages([
-                'enrollment_mode' => 'Recurring allocation Campaigns currently require manual enrollment.',
+                'ineligible_behavior' => 'Recurring allocation can keep membership active or cancel it when eligibility ends.',
             ]);
         }
 

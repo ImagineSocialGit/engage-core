@@ -332,7 +332,7 @@
                         @error('allocation_settings.recipient_cooldown_days')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
                     </label>
                     </div>
-                    <p class="mt-3 text-xs leading-5 text-slate-500">Recurring allocation currently uses manual enrollment and does not support Campaign-family arbitration. Each message’s offset in Schedule sets its own earliest send time from the start of the run. <a href="{{ route('crm.campaigns.show', $campaign) }}#campaign-email-delivery-pacing" class="font-semibold underline">Email delivery pacing</a> can defer marketing emails later; it does not change who is allocated or when the next run starts.</p>
+                    <p class="mt-3 text-xs leading-5 text-slate-500">Recurring allocation supports manual and automatic eligibility enrollment and does not support Campaign-family arbitration. Each message’s offset in Schedule sets its own earliest send time from the start of the run. <a href="{{ route('crm.campaigns.show', $campaign) }}#campaign-email-delivery-pacing" class="font-semibold underline">Email delivery pacing</a> can defer marketing emails later; it does not change who is allocated or when the next run starts.</p>
                     @error('allocation_settings')<p class="mt-3 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
                     <div class="mt-4 flex justify-end"><button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800">Save allocation settings</button></div>
                 </form>
@@ -384,13 +384,10 @@
                 @method('PATCH')
 
                 @if($campaign->usesRecurringAllocation())
-                    <input type="hidden" name="enrollment_mode" value="manual">
-                    <input type="hidden" name="reentry_policy" value="{{ $campaign->reentry_policy }}">
-                    <input type="hidden" name="ineligible_behavior" value="{{ $campaign->ineligible_behavior }}">
                     <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                        These start rules define who is eligible for allocation. Eligibility is rechecked before a lead can be selected for a run; allocation membership itself is added explicitly.
+                        Automatic enrollment adds matching Contacts to allocation membership. Manual enrollment keeps membership operator controlled. Every run rechecks eligibility before choosing a Contact; if eligibility ends, you can keep membership active or cancel it. Re-entry after cancellation requires a new eligibility cycle when enabled.
                     </div>
-                @else
+                @endif
                 <div class="grid gap-4 lg:grid-cols-3">
                     <label class="block rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Enrollment</span>
@@ -422,8 +419,6 @@
                         @error('ineligible_behavior')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
                     </label>
                 </div>
-
-                @endif
 
                 <div class="grid gap-4 lg:grid-cols-2">
                     @foreach($eligibility['criteria'] as $criterion)

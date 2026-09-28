@@ -137,13 +137,6 @@ final class EnrollContactInCampaignAllocationAction
             ));
         }
 
-        if ($campaign->usesAutomaticEnrollment()) {
-            throw new InvalidArgumentException(sprintf(
-                'Campaign [%s] must use manual enrollment for recurring allocation.',
-                (string) $campaign->key,
-            ));
-        }
-
         if (is_string($campaign->family_key) && trim($campaign->family_key) !== '') {
             throw new InvalidArgumentException(sprintf(
                 'Campaign [%s] cannot use recurring allocation until Campaign-family arbitration supports allocation participation.',

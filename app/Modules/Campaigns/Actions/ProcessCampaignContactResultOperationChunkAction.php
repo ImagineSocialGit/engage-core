@@ -60,10 +60,8 @@ final class ProcessCampaignContactResultOperationChunkAction
         }
 
         if ($campaign->usesRecurringAllocation()
-            && (
-                $campaign->usesAutomaticEnrollment()
-                || (is_string($campaign->family_key) && trim($campaign->family_key) !== '')
-            )
+            && is_string($campaign->family_key)
+            && trim($campaign->family_key) !== ''
         ) {
             return;
         }

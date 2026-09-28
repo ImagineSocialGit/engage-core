@@ -28,7 +28,6 @@ final class ScheduleDueCampaignAllocationRunsAction
                 'execution_strategy',
                 Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION,
             )
-            ->where('enrollment_mode', Campaign::ENROLLMENT_MODE_MANUAL)
             ->where(function ($query): void {
                 $query
                     ->whereNull('family_key')
@@ -136,7 +135,6 @@ final class ScheduleDueCampaignAllocationRunsAction
     {
         if (! $campaign->isActive()
             || ! $campaign->usesRecurringAllocation()
-            || $campaign->enrollment_mode !== Campaign::ENROLLMENT_MODE_MANUAL
         ) {
             return false;
         }

@@ -3,6 +3,7 @@
 namespace App\Modules\Campaigns\Data;
 
 use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Campaigns\Models\CampaignAllocationEnrollment;
 
 final class CampaignEligibilityLifecycleResult
 {
@@ -27,5 +28,6 @@ final class CampaignEligibilityLifecycleResult
         public readonly ?CampaignEligibilityEvaluationResult $evaluation = null,
         public readonly ?CampaignEnrollment $enrollment = null,
         public readonly array $meta = [],
+        public readonly ?CampaignAllocationEnrollment $allocationEnrollment = null,
     ) {}
 }

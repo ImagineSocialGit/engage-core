@@ -62,12 +62,6 @@ final class ReenrollContactInCampaignAllocationAction
                 );
             }
 
-            if ($campaign->usesAutomaticEnrollment()) {
-                throw new InvalidArgumentException(
-                    "Recurring-allocation Campaign [{$campaignKey}] must use manual enrollment.",
-                );
-            }
-
             if (is_string($campaign->family_key) && trim($campaign->family_key) !== '') {
                 throw new InvalidArgumentException(
                     "Recurring-allocation Campaign [{$campaignKey}] cannot use Campaign-family arbitration yet.",

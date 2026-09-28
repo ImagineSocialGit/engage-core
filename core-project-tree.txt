@@ -124,6 +124,7 @@
 │   │   │   │   └── CampaignsAccessCapabilityContributor.php
 │   │   │   ├── Actions
 │   │   │   │   ├── ActivateCampaignAction.php
+│   │   │   │   ├── ApplyAutomaticCampaignAllocationEligibilityAction.php
 │   │   │   │   ├── ApplyAutomaticCampaignEligibilityAction.php
 │   │   │   │   ├── ApplyCampaignContactResultOperationAction.php
 │   │   │   │   ├── CancelCampaignAllocationEnrollmentAction.php
@@ -3996,4 +3997,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-882 directories, 3115 files
+882 directories, 3116 files

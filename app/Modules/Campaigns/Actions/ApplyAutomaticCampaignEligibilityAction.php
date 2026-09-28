@@ -20,6 +20,7 @@ final class ApplyAutomaticCampaignEligibilityAction
 
     public function __construct(
         private readonly EvaluateCampaignEligibilityAction $evaluateEligibility,
+        private readonly ApplyAutomaticCampaignAllocationEligibilityAction $applyAllocation,
         private readonly EnrollContactInCampaignAction $enrollContactInCampaign,
         private readonly PauseCampaignEnrollmentAction $pauseCampaignEnrollment,
         private readonly ResumeCampaignEnrollmentAction $resumeCampaignEnrollment,
@@ -49,6 +50,10 @@ final class ApplyAutomaticCampaignEligibilityAction
             return new CampaignEligibilityLifecycleResult(
                 action: CampaignEligibilityLifecycleResult::SKIPPED_INVALID_CONFIGURATION,
             );
+        }
+
+        if ($campaign->usesRecurringAllocation()) {
+            return $this->applyAllocation->handle($campaign, $contact, $at);
         }
 
         return DB::transaction(function () use (

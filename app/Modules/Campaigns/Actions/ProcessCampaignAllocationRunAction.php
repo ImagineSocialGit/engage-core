@@ -501,7 +501,6 @@ final class ProcessCampaignAllocationRunAction
     {
         if (! $campaign->isActive()
             || ! $campaign->usesRecurringAllocation()
-            || $campaign->enrollment_mode !== Campaign::ENROLLMENT_MODE_MANUAL
         ) {
             return false;
         }

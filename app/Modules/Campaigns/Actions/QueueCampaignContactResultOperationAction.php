@@ -123,14 +123,6 @@ final class QueueCampaignContactResultOperationAction
         }
 
         if ($campaign->usesRecurringAllocation()
-            && $campaign->usesAutomaticEnrollment()
-        ) {
-            throw new InvalidArgumentException(
-                'Recurring-allocation Campaigns must use manual enrollment.',
-            );
-        }
-
-        if ($campaign->usesRecurringAllocation()
             && is_string($campaign->family_key)
             && trim($campaign->family_key) !== ''
         ) {

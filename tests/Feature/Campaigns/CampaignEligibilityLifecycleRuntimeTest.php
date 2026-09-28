@@ -3,6 +3,8 @@
 namespace Tests\Feature\Campaigns;
 
 use App\Modules\Campaigns\Actions\ApplyAutomaticCampaignEligibilityAction;
+use App\Modules\Campaigns\Actions\EnrollContactInCampaignAllocationAction;
+use App\Modules\Campaigns\Actions\UpdateCampaignEligibilityAction;
 use App\Modules\Campaigns\Actions\CancelCampaignEnrollmentAction;
 use App\Modules\Campaigns\Actions\EnrollContactInCampaignAction;
 use App\Modules\Campaigns\Actions\PauseCampaignEnrollmentAction;
@@ -10,6 +12,7 @@ use App\Modules\Campaigns\Actions\ReconcileCampaignEligibilityAction;
 use App\Modules\Campaigns\Data\CampaignEligibilityLifecycleResult;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Campaigns\Models\CampaignAllocationEnrollment;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactTag;
 use App\Modules\Messaging\Actions\PublishMessageChainVersionAction;
@@ -21,6 +24,7 @@ use App\Modules\Messaging\Models\MessageTemplateVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class CampaignEligibilityLifecycleRuntimeTest extends TestCase
@@ -308,6 +312,93 @@ class CampaignEligibilityLifecycleRuntimeTest extends TestCase
      * @param array<string, array<int, string>>|null $eligibilityFilter
      * @return array{0: Campaign, 1: MessageChain}
      */
+    public function test_automatic_allocation_reconciliation_creates_one_membership_and_never_creates_a_sequence_enrollment(): void
+    {
+        Queue::fake();
+        [$campaign] = $this->automaticCampaignWithChain('allocation_auto_once');
+        $campaign->forceFill([
+            'execution_strategy' => Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION,
+        ])->save();
+        $contact = $this->taggedContact('VIP');
+
+        $first = app(ApplyAutomaticCampaignEligibilityAction::class)->handle($campaign, $contact);
+        $second = app(ApplyAutomaticCampaignEligibilityAction::class)->handle($campaign, $contact);
+
+        $this->assertSame(CampaignEligibilityLifecycleResult::ENROLLED, $first->action);
+        $this->assertSame(CampaignEligibilityLifecycleResult::EXISTING_OPEN_ENROLLMENT, $second->action);
+        $this->assertSame($first->allocationEnrollment?->getKey(), $second->allocationEnrollment?->getKey());
+        $this->assertSame(1, CampaignAllocationEnrollment::query()->where('campaign_id', $campaign->getKey())->count());
+        $this->assertDatabaseCount('campaign_enrollments', 0);
+    }
+
+    public function test_automatic_allocation_cancels_on_ineligibility_and_reenters_once_on_a_new_cycle(): void
+    {
+        Queue::fake();
+        [$campaign] = $this->automaticCampaignWithChain(
+            'allocation_auto_reentry',
+            ineligibleBehavior: Campaign::INELIGIBLE_CANCEL,
+            reentryPolicy: Campaign::REENTRY_WHEN_ELIGIBLE_AGAIN,
+        );
+        $campaign->forceFill([
+            'execution_strategy' => Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION,
+        ])->save();
+        $contact = $this->taggedContact('VIP');
+
+        $first = app(ApplyAutomaticCampaignEligibilityAction::class)->handle($campaign, $contact);
+        $this->removeTag($contact, 'VIP');
+        $cancelled = app(ApplyAutomaticCampaignEligibilityAction::class)->handle($campaign, $contact);
+        $this->addTag($contact, 'VIP');
+        $second = app(ApplyAutomaticCampaignEligibilityAction::class)->handle($campaign, $contact);
+        $again = app(ApplyAutomaticCampaignEligibilityAction::class)->handle($campaign, $contact);
+
+        $this->assertSame(CampaignEligibilityLifecycleResult::CANCELLED, $cancelled->action);
+        $this->assertSame(CampaignAllocationEnrollment::STATUS_CANCELLED, $first->allocationEnrollment?->refresh()->status);
+        $this->assertSame(CampaignEligibilityLifecycleResult::ENROLLED, $second->action);
+        $this->assertSame(2, $second->evaluation?->eligibilityCycle);
+        $this->assertSame(CampaignEligibilityLifecycleResult::EXISTING_OPEN_ENROLLMENT, $again->action);
+        $this->assertSame(2, CampaignAllocationEnrollment::query()->where('campaign_id', $campaign->getKey())->count());
+    }
+
+    public function test_automatic_allocation_keeps_membership_when_configured_to_continue_and_uses_existing_manual_membership(): void
+    {
+        Queue::fake();
+        [$campaign] = $this->automaticCampaignWithChain(
+            'allocation_auto_continue',
+            ineligibleBehavior: Campaign::INELIGIBLE_CONTINUE,
+        );
+        $campaign->forceFill([
+            'execution_strategy' => Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION,
+        ])->save();
+        $contact = $this->taggedContact('VIP');
+        $manual = app(EnrollContactInCampaignAllocationAction::class)->handle($contact, (string) $campaign->key);
+
+        $existing = app(ApplyAutomaticCampaignEligibilityAction::class)->handle($campaign, $contact);
+        $this->removeTag($contact, 'VIP');
+        $continued = app(ApplyAutomaticCampaignEligibilityAction::class)->handle($campaign, $contact);
+
+        $this->assertSame(CampaignEligibilityLifecycleResult::EXISTING_OPEN_ENROLLMENT, $existing->action);
+        $this->assertSame(CampaignEligibilityLifecycleResult::CONTINUED, $continued->action);
+        $this->assertSame($manual->getKey(), $continued->allocationEnrollment?->getKey());
+        $this->assertSame(CampaignAllocationEnrollment::STATUS_ACTIVE, $manual->refresh()->status);
+    }
+
+    public function test_automatic_allocation_rejects_pause_configuration(): void
+    {
+        [$campaign] = $this->automaticCampaignWithChain('allocation_auto_pause');
+        $campaign->forceFill([
+            'execution_strategy' => Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION,
+        ])->save();
+
+        $this->expectException(ValidationException::class);
+        app(UpdateCampaignEligibilityAction::class)->handle(
+            campaign: $campaign,
+            criteria: ['tag' => ['VIP']],
+            enrollmentMode: Campaign::ENROLLMENT_MODE_AUTOMATIC,
+            reentryPolicy: Campaign::REENTRY_NEVER,
+            ineligibleBehavior: Campaign::INELIGIBLE_PAUSE,
+        );
+    }
+
     private function automaticCampaignWithChain(
         string $key,
         string $ineligibleBehavior = Campaign::INELIGIBLE_CANCEL,

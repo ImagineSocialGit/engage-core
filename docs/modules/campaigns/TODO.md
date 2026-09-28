@@ -10,8 +10,8 @@ Work these in order. Keep Campaigns independent from FlowRoutes, Webinars, Forms
 - [x] Add allocation enrollment/cancellation/re-enrollment actions, including stable entry-key idempotency and an inclusive `start_message_step_key` floor.
 - [x] Add deliberate sequential re-enrollment from a selected active current message without changing ordinary enrollment arbitration.
 - [x] Add reversible per-Contact allocation message exclusions without misrepresenting them as prior receipts.
-- [x] Fail closed on unsupported recurring-allocation lifecycle combinations: automatic enrollment, Campaign-family arbitration, strategy switches with open participants/runs, and legacy sequential enrollment calls against allocation Campaigns.
-- [ ] Add automatic eligibility enrollment for recurring allocation after its lifecycle can target allocation participation rather than sequential MessageChain enrollment.
+- [x] Fail closed on unsupported recurring-allocation lifecycle combinations: Campaign-family arbitration, execution-strategy switches, and legacy sequential enrollment calls against allocation Campaigns.
+- [x] Add automatic eligibility enrollment for recurring allocation through allocation membership and per-cycle re-entry, with keep/cancel behavior when eligibility ends.
 - [ ] Add cross-strategy Campaign-family arbitration before recurring-allocation Campaigns may use `family_key`.
 - [x] Add idempotent allocation-run scheduling/processing with one shared candidate pool and transactional distinct-Contact assignment.
 - [x] Reuse existing prior-message receipts for allocation message exclusion and dated cooldown evidence.

@@ -88,18 +88,15 @@ waits, and other Campaign sends affect the resulting schedule. When this upper
 bound exceeds the configured daily limit in `spread` mode, the workspace warns
 that emails due on the same permitted day may roll into later days.
 
-Recurring allocation currently requires:
-
-```text
-enrollment_mode = manual
-family_key = null
-```
-
-That remains deliberate fail-closed behavior. Existing automatic eligibility
-lifecycle and Campaign-family priority arbitration operate on sequential
-CampaignEnrollment / MessageChainEnrollment state. Automatic allocation
-enrollment and cross-strategy family arbitration require explicit later
-integration.
+Recurring allocation supports manual or automatic eligibility enrollment and requires
+`family_key = null`. Automatic reconciliation creates allocation membership
+when a Contact first becomes eligible, using a stable per-cycle entry key. An
+active membership is retained while eligible; when eligibility ends, the
+configured behavior either retains membership (run selection still rechecks
+eligibility) or cancels it and skips pending messages. If re-entry is enabled,
+a new eligibility cycle may create a new membership. Pause is unavailable for
+automatic allocation because allocation membership has no paused state.
+Campaign-family arbitration remains unsupported for allocation.
 
 Execution strategy is chosen at Campaign creation and is immutable afterward.
 The Campaign editor exposes allocation settings only for allocation Campaigns;
@@ -246,7 +243,7 @@ be assigned:
 
 ```text
 Campaign is active and recurring_allocation
-Campaign uses manual enrollment and no family_key
+Campaign uses manual or automatic enrollment and no family_key
 allocation enrollment is active
 current Campaign eligibility criteria still pass when criteria are configured
 message is active in the run's pinned published MessageChainVersion
@@ -580,7 +577,6 @@ The workspace, Campaign index, and audience/progress read models are execution-s
 This runtime batch does not add:
 
 ```text
-automatic eligibility enrollment for recurring allocation
 cross-strategy Campaign-family arbitration
 contact-import allocation floor/exclusion authoring
 Campaign allocation run/history workspace UI
