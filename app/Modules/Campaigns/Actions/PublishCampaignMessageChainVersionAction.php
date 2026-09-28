@@ -108,7 +108,15 @@ final class PublishCampaignMessageChainVersionAction
             }
             unset($step);
 
-            if ($extendInProgress) {
+            if ($lockedCampaign->usesRecurringAllocation()) {
+                if ($extendInProgress) {
+                    throw ValidationException::withMessages([
+                        'extend_in_progress' => 'Recurring allocation does not extend current participants through sequential append behavior.',
+                    ]);
+                }
+
+                $this->assertAllocationTimingIsSupported($steps);
+            } elseif ($extendInProgress) {
                 $this->assertPureAppend($currentSteps, $steps, $newStep);
             }
 
@@ -543,6 +551,32 @@ final class PublishCampaignMessageChainVersionAction
         ])->save();
 
         return $published;
+    }
+
+    /** @param array<int, array<string, mixed>> $steps */
+    private function assertAllocationTimingIsSupported(array $steps): void
+    {
+        foreach ($steps as $step) {
+            if (! filter_var($step['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN)) {
+                continue;
+            }
+
+            $timingType = $step['timing_type'] ?? null;
+
+            if (in_array($timingType, [
+                MessageChainStep::TIMING_IMMEDIATE,
+                MessageChainStep::TIMING_DELAY,
+            ], true)) {
+                continue;
+            }
+
+            throw ValidationException::withMessages([
+                'steps' => sprintf(
+                    'Recurring allocation supports immediate and wait timing only. Message [%s] uses unsupported timing.',
+                    (string) ($step['name'] ?? $step['key'] ?? 'unknown'),
+                ),
+            ]);
+        }
     }
 
     /** @param array<string, mixed> $input */

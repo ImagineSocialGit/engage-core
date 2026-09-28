@@ -113,8 +113,9 @@ final class CampaignAllocationCandidateSelector
         $enrollmentTable = (new CampaignAllocationEnrollment())->getTable();
 
         $lastAssignments = CampaignAllocationAssignment::query()
-            ->selectRaw('contact_id, MAX(assigned_at) AS last_assignment_at')
+            ->selectRaw('contact_id, MAX(sent_at) AS last_sent_at')
             ->where('campaign_id', $campaignId)
+            ->whereNotNull('sent_at')
             ->groupBy('contact_id');
 
         $lastReceipts = CampaignPriorMessageReceipt::query()
@@ -127,12 +128,12 @@ final class CampaignAllocationCandidateSelector
             ->select($enrollmentTable.'.*')
             ->selectRaw(
                 'CASE
-                    WHEN allocation_history.last_assignment_at IS NULL
+                    WHEN allocation_history.last_sent_at IS NULL
                         THEN prior_receipt_history.last_receipt_at
                     WHEN prior_receipt_history.last_receipt_at IS NULL
-                        THEN allocation_history.last_assignment_at
-                    WHEN allocation_history.last_assignment_at >= prior_receipt_history.last_receipt_at
-                        THEN allocation_history.last_assignment_at
+                        THEN allocation_history.last_sent_at
+                    WHEN allocation_history.last_sent_at >= prior_receipt_history.last_receipt_at
+                        THEN allocation_history.last_sent_at
                     ELSE prior_receipt_history.last_receipt_at
                 END AS last_allocation_activity_at',
             )
@@ -307,9 +308,9 @@ final class CampaignAllocationCandidateSelector
             $query
                 ->where(function (Builder $query) use ($cutoff): void {
                     $query
-                        ->whereNull('allocation_history.last_assignment_at')
+                        ->whereNull('allocation_history.last_sent_at')
                         ->orWhere(
-                            'allocation_history.last_assignment_at',
+                            'allocation_history.last_sent_at',
                             '<=',
                             $cutoff,
                         );
@@ -327,7 +328,7 @@ final class CampaignAllocationCandidateSelector
 
         return $query
             ->orderByRaw(
-                'CASE WHEN allocation_history.last_assignment_at IS NULL
+                'CASE WHEN allocation_history.last_sent_at IS NULL
                     AND prior_receipt_history.last_receipt_at IS NULL
                     THEN 0 ELSE 1 END',
             )

@@ -3,6 +3,7 @@
 namespace App\Modules\Campaigns\Services;
 
 use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Campaigns\Models\CampaignAllocationEnrollment;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Campaigns\Models\CampaignStepVariant;
@@ -263,6 +264,13 @@ class CampaignWorkspacePresenter
 
     private function activeEnrollmentCount(Campaign $campaign): int
     {
+        if ($campaign->usesRecurringAllocation()) {
+            return CampaignAllocationEnrollment::query()
+                ->where('campaign_id', $campaign->getKey())
+                ->where('status', CampaignAllocationEnrollment::STATUS_ACTIVE)
+                ->count();
+        }
+
         return CampaignEnrollment::query()
             ->where('campaign_id', $campaign->getKey())
             ->whereHas(

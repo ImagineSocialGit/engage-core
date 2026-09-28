@@ -2,6 +2,7 @@
 
 namespace App\Modules\Campaigns\Requests;
 
+use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Services\CampaignCreationGuide;
 use App\Modules\Messaging\Requests\Concerns\InteractsWithMessageMediaAuthoring;
 use Illuminate\Foundation\Http\FormRequest;
@@ -16,6 +17,15 @@ final class StoreCampaignRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if (! $this->filled('execution_strategy')) {
+            $this->merge([
+                'execution_strategy' => Campaign::EXECUTION_STRATEGY_SEQUENCE,
+            ]);
+        }
+    }
+
     /** @return array<string, mixed> */
     public function rules(): array
     {
@@ -27,6 +37,7 @@ final class StoreCampaignRequest extends FormRequest
             ],
             'name' => ['required', 'string', 'max:191'],
             'description' => ['nullable', 'string', 'max:4000'],
+            'execution_strategy' => ['required', 'string', Rule::in(Campaign::EXECUTION_STRATEGIES)],
             'channel' => ['required', Rule::in(['email', 'sms'])],
             'subject' => ['nullable', 'required_if:channel,email', 'string', 'max:255'],
             'body' => ['nullable', 'required_if:channel,email', 'string', 'max:10000'],
@@ -53,6 +64,12 @@ final class StoreCampaignRequest extends FormRequest
         }
 
         return trim($description);
+    }
+
+
+    public function executionStrategy(): string
+    {
+        return strtolower(trim((string) $this->validated('execution_strategy')));
     }
 
     public function channel(): string

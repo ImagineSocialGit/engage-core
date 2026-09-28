@@ -46,7 +46,7 @@ final class CampaignScheduleAuthoringPresenter
             'steps' => $version->steps
                 ->values()
                 ->map(fn (MessageChainStep $step, int $position): array =>
-                    $this->step($step, $position)
+                    $this->step($campaign, $step, $position)
                 )
                 ->all(),
             'message_options' => $this->messageOptions(),
@@ -54,7 +54,7 @@ final class CampaignScheduleAuthoringPresenter
     }
 
     /** @return array<string, mixed> */
-    private function step(MessageChainStep $step, int $position): array
+    private function step(Campaign $campaign, MessageChainStep $step, int $position): array
     {
         $channels = $step->variants
             ->pluck('channel')
@@ -78,7 +78,7 @@ final class CampaignScheduleAuthoringPresenter
             'name' => trim((string) $step->name) !== ''
                 ? (string) $step->name
                 : 'Message '.($position + 1),
-            'timing' => $this->timingLabel($step, $position),
+            'timing' => $this->timingLabel($campaign, $step, $position),
             'timing_type' => $editableTiming
                 ? (string) $step->timing_type
                 : 'preserve',
@@ -115,17 +115,23 @@ final class CampaignScheduleAuthoringPresenter
             ->all();
     }
 
-    private function timingLabel(MessageChainStep $step, int $position): string
+    private function timingLabel(Campaign $campaign, MessageChainStep $step, int $position): string
     {
+        $allocation = $campaign->usesRecurringAllocation();
+
         return match ($step->timing_type) {
-            MessageChainStep::TIMING_IMMEDIATE => $position === 0
-                ? 'Immediately after the Campaign starts'
-                : 'Immediately after the previous step finishes',
+            MessageChainStep::TIMING_IMMEDIATE => $allocation
+                ? ($position === 0
+                    ? 'At the start of each allocation run'
+                    : 'At the same run time as the previous message')
+                : ($position === 0
+                    ? 'Immediately after the Campaign starts'
+                    : 'Immediately after the previous step finishes'),
             MessageChainStep::TIMING_DELAY => $this->durationLabel(
                 max(0, (int) $step->offset_seconds),
-            ).' after '.($position === 0
-                ? 'the Campaign starts'
-                : 'the previous step finishes'),
+            ).' after '.($allocation
+                ? ($position === 0 ? 'the allocation run starts' : 'the previous allocation message')
+                : ($position === 0 ? 'the Campaign starts' : 'the previous step finishes')),
             MessageChainStep::TIMING_ANCHORED => $this->anchoredLabel($step),
             MessageChainStep::TIMING_NEXT_DAY_AT => sprintf(
                 '%s day(s) after %s at %s',

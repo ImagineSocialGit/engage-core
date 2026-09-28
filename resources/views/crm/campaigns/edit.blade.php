@@ -30,7 +30,11 @@
             'enrollment_mode',
             'reentry_policy',
             'ineligible_behavior',
-        ], true) || str_starts_with($key, 'eligibility_criteria'),
+            'execution_strategy',
+            'allocation_settings',
+        ], true)
+            || str_starts_with($key, 'allocation_settings.')
+            || str_starts_with($key, 'eligibility_criteria'),
     );
     $failedCampaignEditor = old('campaign_editor');
     $scheduleHasErrors = $failedCampaignEditor === 'schedule' && collect($errors->keys())->contains(
@@ -303,6 +307,54 @@
 
             <form
                 method="POST"
+                action="{{ route('crm.campaigns.execution.update', $campaign) }}"
+                class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5"
+                x-data="{ strategy: @js(old('execution_strategy', $campaign->execution_strategy)) }"
+            >
+                @csrf
+                @method('PATCH')
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="max-w-2xl">
+                        <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Delivery style</p>
+                        <p class="mt-1 text-sm leading-6 text-slate-600">Sequence moves each lead through the messages. Recurring allocation assigns each message to a different group of eligible leads on each run.</p>
+                    </div>
+                    <div class="grid gap-2 sm:grid-cols-2 lg:w-[32rem]">
+                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                            <input type="radio" name="execution_strategy" value="sequence" x-model="strategy" class="mt-1 size-4 border-slate-300 text-slate-950 focus:ring-slate-500">
+                            <span><span class="block text-sm font-bold text-slate-950">Sequence</span><span class="mt-1 block text-xs text-slate-500">One lead progresses through every message.</span></span>
+                        </label>
+                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                            <input type="radio" name="execution_strategy" value="recurring_allocation" x-model="strategy" class="mt-1 size-4 border-slate-300 text-slate-950 focus:ring-slate-500">
+                            <span><span class="block text-sm font-bold text-slate-950">Recurring allocation</span><span class="mt-1 block text-xs text-slate-500">Different eligible leads receive each message in a run.</span></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div x-show="strategy === 'recurring_allocation'" x-cloak class="mt-4 grid gap-3 sm:grid-cols-3">
+                    <label class="block">
+                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Run every</span>
+                        <div class="mt-2 flex items-center gap-2"><input type="number" min="1" max="3650" name="allocation_settings[run_every_days]" value="{{ old('allocation_settings.run_every_days', $allocationSettings['run_every_days']) }}" class="min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900"><span class="text-sm text-slate-600">days</span></div>
+                        @error('allocation_settings.run_every_days')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                    </label>
+                    <label class="block">
+                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Leads per message</span>
+                        <input type="number" min="1" max="100000" name="allocation_settings[allocation_size_per_message]" value="{{ old('allocation_settings.allocation_size_per_message', $allocationSettings['allocation_size_per_message']) }}" class="mt-2 min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
+                        @error('allocation_settings.allocation_size_per_message')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                    </label>
+                    <label class="block">
+                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Recipient cooldown</span>
+                        <div class="mt-2 flex items-center gap-2"><input type="number" min="0" max="3650" name="allocation_settings[recipient_cooldown_days]" value="{{ old('allocation_settings.recipient_cooldown_days', $allocationSettings['recipient_cooldown_days']) }}" class="min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900"><span class="text-sm text-slate-600">days</span></div>
+                        @error('allocation_settings.recipient_cooldown_days')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                    </label>
+                </div>
+                <p x-show="strategy === 'recurring_allocation'" x-cloak class="mt-3 text-xs leading-5 text-slate-500">Recurring allocation currently uses manual enrollment and does not support Campaign-family arbitration. Message waits are configured in Schedule and run cumulatively from the start of each allocation run.</p>
+                @error('execution_strategy')<p class="mt-3 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                @error('allocation_settings')<p class="mt-3 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                <div class="mt-4 flex justify-end"><button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800">Save delivery style</button></div>
+            </form>
+
+            <form
+                method="POST"
                 action="{{ route('crm.campaigns.eligibility.update', $campaign) }}"
                 x-data="{
                     matchingCount: @js((int) ($eligibility['matching_count'] ?? 0)),
@@ -344,6 +396,14 @@
                 @csrf
                 @method('PATCH')
 
+                @if($campaign->usesRecurringAllocation())
+                    <input type="hidden" name="enrollment_mode" value="manual">
+                    <input type="hidden" name="reentry_policy" value="{{ $campaign->reentry_policy }}">
+                    <input type="hidden" name="ineligible_behavior" value="{{ $campaign->ineligible_behavior }}">
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                        These start rules define who is eligible for allocation. Eligibility is rechecked before a lead can be selected for a run; allocation membership itself is added explicitly.
+                    </div>
+                @else
                 <div class="grid gap-4 lg:grid-cols-3">
                     <label class="block rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Enrollment</span>
@@ -375,6 +435,8 @@
                         @error('ineligible_behavior')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
                     </label>
                 </div>
+
+                @endif
 
                 <div class="grid gap-4 lg:grid-cols-2">
                     @foreach($eligibility['criteria'] as $criterion)
@@ -523,7 +585,7 @@
                     <div>
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-rose-700">Current schedule</p>
                         <h2 class="mt-1 text-xl font-semibold text-slate-950">{{ $campaign->name }}</h2>
-                        <p class="mt-1 text-sm text-slate-600">Order and timing only. Message copy stays in the Messages carousel.</p>
+                        <p class="mt-1 text-sm text-slate-600">{{ $campaign->usesRecurringAllocation() ? 'Order messages and set cumulative waits inside each allocation run. Message copy stays in the Messages carousel.' : 'Order and timing only. Message copy stays in the Messages carousel.' }}</p>
                     </div>
                     <button type="button" x-on:click="closeModal()" class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">Close</button>
                 </header>
@@ -738,7 +800,7 @@
                                         <label class="block">
                                             <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Unit</span>
                                             <select name="new_step[delay_unit]" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
-                                                @foreach(['minutes' => 'Minutes', 'hours' => 'Hours', 'days' => 'Days'] as $value => $label)
+                                                @foreach(['seconds' => 'Seconds', 'minutes' => 'Minutes', 'hours' => 'Hours', 'days' => 'Days'] as $value => $label)
                                                     <option value="{{ $value }}" @selected(old('new_step.delay_unit', 'days') === $value)>{{ $label }}</option>
                                                 @endforeach
                                             </select>
@@ -746,17 +808,19 @@
                                     </div>
                                 </div>
                             </section>
-                            <section x-show="addStep" x-cloak class="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5">
-                                <label class="flex items-start gap-3 text-sm font-semibold text-slate-900">
-                                    <input type="checkbox" name="extend_in_progress" value="1" @checked(old('extend_in_progress')) class="mt-0.5 rounded border-slate-300 text-rose-700 focus:ring-rose-600">
-                                    <span>Include contacts already in this Campaign<br><span class="font-normal text-slate-600">Available when you only append a final message. Each active participant keeps their current schedule and receives the new message after finishing it. Completed participants are not restarted.</span></span>
-                                </label>
-                                @error('extend_in_progress')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
-                            </section>
+                            @if($campaign->usesSequentialExecution())
+                                <section x-show="addStep" x-cloak class="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5">
+                                    <label class="flex items-start gap-3 text-sm font-semibold text-slate-900">
+                                        <input type="checkbox" name="extend_in_progress" value="1" @checked(old('extend_in_progress')) class="mt-0.5 rounded border-slate-300 text-rose-700 focus:ring-rose-600">
+                                        <span>Include contacts already in this Campaign<br><span class="font-normal text-slate-600">Available when you only append a final message. Each active participant keeps their current schedule and receives the new message after finishing it. Completed participants are not restarted.</span></span>
+                                    </label>
+                                    @error('extend_in_progress')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                                </section>
+                            @endif
                         </div>
 
                         <footer class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                            <p class="text-xs leading-5 text-slate-500">Saving publishes a new immutable schedule. Current participants stay on their existing version unless you choose to include them in a final appended message.</p>
+                            <p class="text-xs leading-5 text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Saving publishes a new immutable schedule. Existing allocation assignments keep their pinned version; future runs use the new schedule.' : 'Saving publishes a new immutable schedule. Current participants stay on their existing version unless you choose to include them in a final appended message.' }}</p>
                             <div class="flex flex-col gap-2 sm:flex-row">
                                 <button type="button" x-on:click="activeModal = 'messages'" @disabled($messageReviewCount < 1) class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Review message copy</button>
                                 <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800">Publish schedule changes</button>

@@ -541,6 +541,26 @@ run validation / smoke checks
 
 Do not use `php artisan horizon:terminate` for this deployment flow.
 
+## Campaign Builder parity
+
+Recurring allocation uses the same Campaign Setup authoring model as sequential Campaigns. Operators choose the execution strategy in Start, then use the existing Schedule and Messages editors to add, remove, reorder, and edit message copy.
+
+The allocation-specific Start controls are:
+
+```text
+run every N days
+leads per message per run
+recipient cooldown in days
+```
+
+Schedule timing remains a Messaging MessageChain concern. Recurring allocation supports active `immediate` and `delay` steps. Waits may use seconds, minutes, hours, or days and are cumulative from the start of each allocation run. For example, an immediate first message, a two-day wait, and then a three-day wait are due at run start, run start +2 days, and run start +5 days. Each message is still allocated to a different eligible Contact from the shared run pool.
+
+Existing allocation assignments remain pinned to the immutable MessageChainVersion they were created from. Publishing schedule changes affects future allocation runs; it does not rewrite already-created assignments. Sequential-only `extend_in_progress` append behavior is not available for recurring allocation.
+
+Allocation candidate cooldown and fairness use known successful assignment `sent_at` timestamps plus dated prior-message receipts. Merely assigning a message does not invent successful-contact cooldown evidence. Pending/sending allocation messages remain separately protected from overlapping selection.
+
+The workspace, Campaign index, and audience/progress read models are execution-strategy aware so active allocation participation is not reported as zero sequential enrollments.
+
 ## Still intentionally deferred
 
 This runtime batch does not add:
@@ -549,7 +569,6 @@ This runtime batch does not add:
 automatic eligibility enrollment for recurring allocation
 cross-strategy Campaign-family arbitration
 contact-import allocation floor/exclusion authoring
-CRM execution-strategy/allocation settings
 rich Contact-result operation controls
 Campaign allocation run/history workspace UI
 manual run/preview controls

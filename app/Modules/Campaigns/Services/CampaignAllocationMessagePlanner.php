@@ -9,6 +9,7 @@ use App\Modules\Campaigns\Models\CampaignAllocationRun;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\ScheduleMessageAction;
 use App\Modules\Messaging\Models\MessageChainStep;
+use App\Modules\Messaging\Models\MessageChainVersion;
 use App\Modules\Messaging\Models\MessageChainStepVariant;
 use App\Modules\Messaging\Models\MessageTemplateVersion;
 use App\Modules\Messaging\Models\ScheduledMessage;
@@ -178,7 +179,7 @@ final class CampaignAllocationMessagePlanner
                         run: $run,
                     ),
                 ],
-                sendAt: $this->requestedSendAt($run),
+                sendAt: $this->requestedSendAt($run, $version, $step),
                 context: $assignment,
                 behaviorOwner: $assignment,
                 dedupeKey: 'campaign_allocation_assignment:'.(int) $assignment->getKey(),
@@ -372,15 +373,46 @@ final class CampaignAllocationMessagePlanner
         return $tokens;
     }
 
-    private function requestedSendAt(CampaignAllocationRun $run): Carbon
-    {
-        $scheduledFor = $run->scheduled_for
-            ? Carbon::parse($run->scheduled_for)->utc()
-            : now()->utc();
+    private function requestedSendAt(
+        CampaignAllocationRun $run,
+        MessageChainVersion $version,
+        MessageChainStep $targetStep,
+    ): Carbon {
+        $base = $run->started_at
+            ? Carbon::parse($run->started_at)->utc()
+            : ($run->scheduled_for
+                ? Carbon::parse($run->scheduled_for)->utc()
+                : now()->utc());
 
-        return $scheduledFor->isFuture()
-            ? $scheduledFor
-            : now()->utc();
+        $offsetSeconds = 0;
+        $orderedSteps = $version->steps
+            ->filter(fn (MessageChainStep $step): bool => (bool) $step->is_active)
+            ->sort(function (MessageChainStep $left, MessageChainStep $right): int {
+                return ((int) $left->sort_order <=> (int) $right->sort_order)
+                    ?: ((int) $left->getKey() <=> (int) $right->getKey());
+            })
+            ->values();
+
+        foreach ($orderedSteps as $step) {
+            if ($step->timing_type === MessageChainStep::TIMING_DELAY) {
+                $offsetSeconds += max(0, (int) $step->offset_seconds);
+            } elseif ($step->timing_type !== MessageChainStep::TIMING_IMMEDIATE) {
+                throw new RuntimeException(sprintf(
+                    'Recurring allocation message [%s] uses unsupported timing [%s].',
+                    (string) $step->key,
+                    (string) $step->timing_type,
+                ));
+            }
+
+            if ((int) $step->getKey() === (int) $targetStep->getKey()) {
+                return $base->copy()->addSeconds($offsetSeconds);
+            }
+        }
+
+        throw new RuntimeException(sprintf(
+            'Recurring allocation message [%s] is not part of the pinned allocation schedule.',
+            (string) $targetStep->key,
+        ));
     }
 
     private function payloadClass(string $channel): string

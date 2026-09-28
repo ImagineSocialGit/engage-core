@@ -122,6 +122,9 @@
                                 <span class="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset {{ $statusClass }}">
                                     {{ $statusLabel }}
                                 </span>
+                                <span class="inline-flex shrink-0 items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700 ring-1 ring-inset ring-slate-200">
+                                    {{ $campaign->usesRecurringAllocation() ? 'Recurring allocation' : 'Sequence' }}
+                                </span>
                             </div>
 
                             @if($campaign->description)
@@ -132,7 +135,7 @@
 
                             <div class="mt-4 flex min-w-0 flex-col gap-2 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-2">
                                 <span class="break-words"><strong class="font-semibold text-slate-950">{{ $campaign->message_steps_count }}</strong> message {{ \Illuminate\Support\Str::plural('step', $campaign->message_steps_count) }}</span>
-                                <span class="break-words"><strong class="font-semibold text-slate-950">{{ $campaign->open_enrollments_count }}</strong> current {{ \Illuminate\Support\Str::plural('participant', $campaign->open_enrollments_count) }}</span>
+                                <span class="break-words"><strong class="font-semibold text-slate-950">{{ $campaign->current_participants_count }}</strong> current {{ \Illuminate\Support\Str::plural('participant', $campaign->current_participants_count) }}</span>
                             </div>
                         </div>
 

@@ -10,15 +10,18 @@ use App\Modules\Campaigns\Actions\CreateCampaignScheduleMessageAction;
 use App\Modules\Campaigns\Actions\DeactivateCampaignAction;
 use App\Modules\Campaigns\Actions\PublishCampaignMessageChainVersionAction;
 use App\Modules\Campaigns\Actions\StartCompletedCampaignAppendAction;
+use App\Modules\Campaigns\Actions\UpdateCampaignAllocationSettingsAction;
 use App\Modules\Campaigns\Actions\UpdateCampaignEligibilityAction;
 use App\Modules\Campaigns\Actions\UpdateCampaignSendPatternAction;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Requests\CampaignEligibilityAuthoringRequest;
 use App\Modules\Campaigns\Requests\StoreCampaignRequest;
+use App\Modules\Campaigns\Requests\UpdateCampaignExecutionStrategyRequest;
 use App\Modules\Campaigns\Requests\UpdateCampaignMessageRequest;
 use App\Modules\Campaigns\Requests\UpdateCampaignMessageReplyHandlingRequest;
 use App\Modules\Campaigns\Requests\UpdateCampaignScheduleRequest;
 use App\Modules\Campaigns\Requests\UpdateCampaignSendPatternRequest;
+use App\Modules\Campaigns\Services\CampaignAllocationSettingsService;
 use App\Modules\Campaigns\Services\CampaignCreationGuide;
 use App\Modules\Campaigns\Services\CampaignAudienceProgressService;
 use App\Modules\Campaigns\Services\CampaignEligibilityAuthoringService;
@@ -65,6 +68,8 @@ class CampaignController extends Controller
                         MessageChainEnrollment::STATUS_PAUSED,
                     ]),
                 ),
+                'allocationEnrollments as active_allocation_enrollments_count' => fn ($query) => $query
+                    ->where('status', \App\Modules\Campaigns\Models\CampaignAllocationEnrollment::STATUS_ACTIVE),
             ])
             ->orderBy('name')
             ->get();
@@ -81,6 +86,12 @@ class CampaignController extends Controller
                 : $campaign->steps->count();
 
             $campaign->setAttribute('message_steps_count', $messageStepCount);
+            $campaign->setAttribute(
+                'current_participants_count',
+                $campaign->usesRecurringAllocation()
+                    ? (int) $campaign->active_allocation_enrollments_count
+                    : (int) $campaign->open_enrollments_count,
+            );
         });
 
         return view('crm.campaigns.index', [
@@ -153,6 +164,7 @@ class CampaignController extends Controller
                 channel: $request->channel(),
                 firstMessagePayload: $payload,
                 creationOption: $creationOption,
+                executionStrategy: $request->executionStrategy(),
                 createdBy: $request->user() instanceof User
                     ? $request->user()
                     : null,
@@ -180,6 +192,7 @@ class CampaignController extends Controller
         CampaignWorkspacePresenter $workspacePresenter,
         CampaignSendPatternService $sendPatterns,
         CampaignAudienceProgressService $audienceProgress,
+        CampaignAllocationSettingsService $allocationSettings,
     ): View {
         return view('crm.campaigns.show', [
             'campaign' => $campaign,
@@ -187,6 +200,9 @@ class CampaignController extends Controller
             'sendPattern' => $sendPatterns->forCampaign($campaign),
             'sendPatternTimezones' => timezone_identifiers_list(),
             'audienceSummary' => $audienceProgress->summary($campaign, $request->user()),
+            'allocationSettings' => $campaign->usesRecurringAllocation()
+                ? $allocationSettings->forCampaign($campaign)
+                : null,
         ]);
     }
 
@@ -198,6 +214,7 @@ class CampaignController extends Controller
         CampaignMessageReviewPresenter $messageReviewPresenter,
         CampaignScheduleAuthoringPresenter $schedulePresenter,
         StartCompletedCampaignAppendAction $completedAppend,
+        CampaignAllocationSettingsService $allocationSettings,
     ): View {
         $scheduleAuthoring = $schedulePresenter->forCampaign($campaign);
 
@@ -214,8 +231,32 @@ class CampaignController extends Controller
             ),
             'scheduleAuthoring' => $scheduleAuthoring,
             'initialPanel' => $this->initialPanel($request),
-            'completedAppend' => $completedAppend->prompt($campaign),
+            'completedAppend' => $campaign->usesSequentialExecution()
+                ? $completedAppend->prompt($campaign)
+                : null,
+            'allocationSettings' => $campaign->usesRecurringAllocation()
+                ? $allocationSettings->forCampaign($campaign)
+                : $allocationSettings->normalize([]),
         ]);
+    }
+
+    public function updateExecutionStrategy(
+        UpdateCampaignExecutionStrategyRequest $request,
+        Campaign $campaign,
+        UpdateCampaignAllocationSettingsAction $updateAllocationSettings,
+    ): RedirectResponse {
+        $updateAllocationSettings->handle(
+            campaign: $campaign,
+            executionStrategy: $request->executionStrategy(),
+            allocationSettings: $request->allocationSettings(),
+        );
+
+        return redirect()
+            ->route('crm.campaigns.edit', [
+                'campaign' => $campaign,
+                'panel' => 'start',
+            ])
+            ->with('status', 'Campaign delivery style updated.');
     }
 
     public function startCompletedAppend(
@@ -326,7 +367,9 @@ class CampaignController extends Controller
             ])
             ->with('status', $request->extendInProgress()
                 ? 'Campaign schedule version '.$published->version.' published. Current participants will receive the appended message after their existing schedule finishes.'
-                : 'Campaign schedule version '.$published->version.' published for future enrollments.');
+                : ($campaign->usesRecurringAllocation()
+                    ? 'Campaign schedule version '.$published->version.' published for future allocation runs.'
+                    : 'Campaign schedule version '.$published->version.' published for future enrollments.'));
     }
 
     public function updateMessage(

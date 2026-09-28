@@ -8,6 +8,7 @@ use App\Modules\Campaigns\Models\CampaignAllocationRun;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Services\CampaignAllocationSettingsService;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
+use App\Modules\Messaging\Models\MessageChainStep;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -69,6 +70,8 @@ final class UpdateCampaignAllocationSettingsAction
         string $executionStrategy,
     ): void {
         if ($executionStrategy === Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION) {
+            $this->assertAllocationScheduleIsSupported($campaign);
+
             if ($campaign->usesAutomaticEnrollment()) {
                 throw ValidationException::withMessages([
                     'execution_strategy' => 'Recurring allocation currently requires manual Campaign enrollment.',
@@ -98,6 +101,35 @@ final class UpdateCampaignAllocationSettingsAction
         ) {
             throw ValidationException::withMessages([
                 'execution_strategy' => 'End current recurring-allocation participation and runs before switching to sequence.',
+            ]);
+        }
+    }
+
+    private function assertAllocationScheduleIsSupported(Campaign $campaign): void
+    {
+        $campaign->loadMissing('messageChain.currentVersion.steps');
+        $version = $campaign->messageChain?->currentVersion;
+
+        if ($version === null || ! $version->isPublished()) {
+            throw ValidationException::withMessages([
+                'execution_strategy' => 'Recurring allocation requires a published Campaign message schedule.',
+            ]);
+        }
+
+        $unsupported = $version->steps
+            ->filter(fn (MessageChainStep $step): bool => (bool) $step->is_active)
+            ->first(fn (MessageChainStep $step): bool => ! in_array(
+                $step->timing_type,
+                [MessageChainStep::TIMING_IMMEDIATE, MessageChainStep::TIMING_DELAY],
+                true,
+            ));
+
+        if ($unsupported instanceof MessageChainStep) {
+            throw ValidationException::withMessages([
+                'execution_strategy' => sprintf(
+                    'Recurring allocation supports immediate and wait timing only. Update message [%s] before switching strategies.',
+                    (string) ($unsupported->name ?: $unsupported->key),
+                ),
             ]);
         }
     }

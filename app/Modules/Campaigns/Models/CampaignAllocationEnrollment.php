@@ -6,6 +6,7 @@ use App\Modules\Core\Models\Contact;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 final class CampaignAllocationEnrollment extends Model
@@ -69,6 +70,11 @@ final class CampaignAllocationEnrollment extends Model
     public function assignments(): HasMany
     {
         return $this->hasMany(CampaignAllocationAssignment::class);
+    }
+
+    public function latestAssignment(): HasOne
+    {
+        return $this->hasOne(CampaignAllocationAssignment::class)->latestOfMany();
     }
 
     public function isActive(): bool

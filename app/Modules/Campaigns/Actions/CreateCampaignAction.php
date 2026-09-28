@@ -5,6 +5,7 @@ namespace App\Modules\Campaigns\Actions;
 use App\Models\User;
 use App\Modules\Campaigns\Data\CampaignCreationOption;
 use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Campaigns\Services\CampaignAllocationSettingsService;
 use App\Modules\Messaging\Actions\CreateReusableMessageTemplateAction;
 use App\Modules\Messaging\Actions\PublishMessageChainVersionAction;
 use App\Modules\Messaging\Data\ReusableMessageTemplateAuthoringContext;
@@ -30,6 +31,7 @@ final class CreateCampaignAction
     public function __construct(
         private readonly CreateReusableMessageTemplateAction $createReusableMessageTemplate,
         private readonly PublishMessageChainVersionAction $publishMessageChainVersion,
+        private readonly CampaignAllocationSettingsService $allocationSettings,
     ) {}
 
     /**
@@ -41,6 +43,7 @@ final class CreateCampaignAction
         string $channel,
         array $firstMessagePayload,
         CampaignCreationOption $creationOption,
+        string $executionStrategy = Campaign::EXECUTION_STRATEGY_SEQUENCE,
         ?User $createdBy = null,
     ): Campaign {
         $name = trim($name);
@@ -48,6 +51,7 @@ final class CreateCampaignAction
             ? trim($description)
             : null;
         $channel = strtolower(trim($channel));
+        $executionStrategy = strtolower(trim($executionStrategy));
 
         if ($name === '') {
             throw new InvalidArgumentException('Campaign name is required.');
@@ -57,12 +61,22 @@ final class CreateCampaignAction
             throw new InvalidArgumentException("Campaign first-message channel [{$channel}] is not supported.");
         }
 
+        if (! in_array($executionStrategy, Campaign::EXECUTION_STRATEGIES, true)) {
+            throw new InvalidArgumentException("Campaign execution strategy [{$executionStrategy}] is not supported.");
+        }
+
+        $allocationSettings = $executionStrategy === Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION
+            ? $this->allocationSettings->forPersistence([])
+            : null;
+
         return DB::transaction(function () use (
             $name,
             $description,
             $channel,
             $firstMessagePayload,
             $creationOption,
+            $executionStrategy,
+            $allocationSettings,
             $createdBy,
         ): Campaign {
             $now = now();
@@ -71,6 +85,8 @@ final class CreateCampaignAction
                 'name' => $name,
                 'description' => $description,
                 'message_chain_id' => null,
+                'execution_strategy' => $executionStrategy,
+                'allocation_settings' => $allocationSettings,
                 'family_key' => null,
                 'priority' => 0,
                 'eligibility_filter' => [],

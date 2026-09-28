@@ -56,6 +56,9 @@
                         <span class="inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-bold ring-1 ring-inset {{ $statusClass }}">
                             {{ $statusLabel }}
                         </span>
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 ring-1 ring-inset ring-slate-200">
+                            {{ $campaign->usesRecurringAllocation() ? 'Recurring allocation' : 'Sequence' }}
+                        </span>
                     </div>
 
                     @if($campaign->description)
@@ -112,6 +115,24 @@
             </div>
         </section>
 
+        @if($campaign->usesRecurringAllocation() && is_array($allocationSettings))
+            <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Recurring allocation</p>
+                        <h2 class="mt-2 text-lg font-semibold text-slate-950">Allocate each message to a different eligible group</h2>
+                        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Each run reserves distinct leads across the active messages. Message waits are cumulative from the start of that run; the recipient cooldown controls when a successfully contacted lead can be selected again for another message.</p>
+                    </div>
+                    <a href="{{ route('crm.campaigns.edit', ['campaign' => $campaign, 'panel' => 'start']) }}" class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">Edit allocation settings</a>
+                </div>
+                <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                    <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><div class="text-xl font-bold text-slate-950">{{ number_format($allocationSettings['run_every_days']) }} days</div><div class="mt-1 text-sm text-slate-600">Run cadence</div></div>
+                    <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><div class="text-xl font-bold text-slate-950">{{ number_format($allocationSettings['allocation_size_per_message']) }}</div><div class="mt-1 text-sm text-slate-600">Leads per message per run</div></div>
+                    <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><div class="text-xl font-bold text-slate-950">{{ number_format($allocationSettings['recipient_cooldown_days']) }} days</div><div class="mt-1 text-sm text-slate-600">Recipient cooldown</div></div>
+                </div>
+            </section>
+        @endif
+
         <section class="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div class="text-2xl font-bold text-slate-950">{{ $workspace['active_enrollment_count'] }}</div>
@@ -136,7 +157,7 @@
                 <div>
                     <h2 class="text-xl font-semibold text-slate-950">Audience and progress</h2>
                     <p class="mt-2 text-sm leading-6 text-slate-600">For leads you can view: {{ number_format($audienceSummary['matching']) }} currently match the start rules, {{ number_format($audienceSummary['not_started']) }} match but have never enrolled, and {{ number_format($audienceSummary['enrolled']) }} have enrolled.</p>
-                    <p class="mt-2 text-xs text-slate-500">Filter matches do not include message permission checks. Manual Campaigns without start rules have no filter matches; their enrollments still appear in progress.</p>
+                    <p class="mt-2 text-xs text-slate-500">Filter matches do not include message permission checks. Manual Campaigns without start rules have no filter matches; current participation still appears in progress.</p>
                 </div>
                 <a href="{{ route('crm.campaigns.audience.index', $campaign) }}" class="inline-flex min-h-11 items-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white hover:bg-slate-800">View audience and progress</a>
             </div>

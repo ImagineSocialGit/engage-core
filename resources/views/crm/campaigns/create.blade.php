@@ -1,7 +1,7 @@
 <x-layouts.crm
     title="Create Campaign"
     heading="Create Campaign"
-    subheading="Start with the job this campaign needs to do. Engage will create an inactive campaign with one real message and drop you into the existing setup builder."
+    subheading="Start with the job this campaign needs to do. The system will create an inactive campaign with one real message and drop you into the setup builder."
     module="campaigns"
 >
     <div class="min-w-0 space-y-6" data-campaign-creation>
@@ -64,7 +64,7 @@
                             action="{{ route('crm.campaigns.store') }}"
                             enctype="multipart/form-data"
                             class="space-y-5"
-                            x-data="{ channel: @js(old('channel', 'email')) }"
+                            x-data="{ channel: @js(old('channel', 'email')), executionStrategy: @js(old('execution_strategy', 'sequence')) }"
                         >
                             @csrf
                             <input type="hidden" name="creation_intent" value="{{ $selectedOption->key }}">
@@ -92,6 +92,39 @@
                                     class="block w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-0"
                                 >{{ old('description') }}</textarea>
                             </div>
+
+                            <fieldset class="space-y-2">
+                                <legend class="text-sm font-extrabold text-slate-800">Delivery style</legend>
+                                <div class="grid gap-2 lg:grid-cols-2">
+                                    <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+                                        <input
+                                            type="radio"
+                                            name="execution_strategy"
+                                            value="sequence"
+                                            x-model="executionStrategy"
+                                            class="mt-1 size-4 border-slate-300 text-slate-950 focus:ring-slate-500"
+                                        >
+                                        <span>
+                                            <span class="block text-sm font-extrabold text-slate-950">Sequence</span>
+                                            <span class="mt-1 block text-xs leading-5 text-slate-500">Each enrolled lead moves through the messages in order, including the waits between them.</span>
+                                        </span>
+                                    </label>
+                                    <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+                                        <input
+                                            type="radio"
+                                            name="execution_strategy"
+                                            value="recurring_allocation"
+                                            x-model="executionStrategy"
+                                            class="mt-1 size-4 border-slate-300 text-slate-950 focus:ring-slate-500"
+                                        >
+                                        <span>
+                                            <span class="block text-sm font-extrabold text-slate-950">Recurring allocation</span>
+                                            <span class="mt-1 block text-xs leading-5 text-slate-500">Each run assigns every active message to a different set of eligible leads. Message waits control when those assigned messages send within the run.</span>
+                                        </span>
+                                    </label>
+                                </div>
+                                @error('execution_strategy')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                            </fieldset>
 
                             <fieldset class="space-y-2">
                                 <legend class="text-sm font-extrabold text-slate-800">First message channel</legend>
@@ -165,7 +198,7 @@
                             <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
                                 <div class="font-extrabold">Safe starting state</div>
                                 <p class="mt-1 leading-6">
-                                    Engage creates the campaign as Off, uses manual entry, and creates one immediate first-message step. After creation, use the existing Start and Schedule editors to change audience rules or timing before activation.
+                                    The campaign is created as Off with manual entry and one immediate first-message step. After creation, use Start and Schedule to change audience rules, allocation settings, messages, or timing before activation.
                                 </p>
                             </div>
 

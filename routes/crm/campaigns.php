@@ -91,6 +91,9 @@ Route::middleware('module:campaigns')
         Route::patch('/{campaign}/eligibility', [CampaignController::class, 'updateEligibility'])
             ->name('eligibility.update');
 
+        Route::patch('/{campaign}/execution', [CampaignController::class, 'updateExecutionStrategy'])
+            ->name('execution.update');
+
         Route::patch('/{campaign}/schedule', [CampaignController::class, 'updateSchedule'])
             ->name('schedule.update');
 
