@@ -81,6 +81,18 @@ has no Campaign-level daily email limit. Each message's offset from run start se
 time, and pacing may defer marketing email to a later permitted slot. Allocation
 runs can start while emails from an earlier run remain pending.
 
+A one-time operator override may bring a chosen number of ready pending Campaign
+marketing emails into the remaining allowed window today, spacing them through
+that remaining time. It applies to both sequence and allocation contexts. It
+does not change the saved daily pattern, schedule new messages, touch held or
+individually rescheduled messages, or bypass Messaging's send-time gates. New
+messages persist the original requested time so a future pacing decision can
+be distinguished from the message's earliest permitted time. For preexisting
+rows without that metadata, allocation uses the pinned run's message offset;
+sequence only admits an immediate step. Each changed message records a Messaging
+operational reschedule event and the Campaign stores the last override request
+identity for double-submit idempotency.
+
 The Campaign workspace estimates maximum per-run marketing-email volume as
 active schedule steps with a marketing-email variant multiplied by leads per
 message. This is an upper bound: actual variant selection, recipient eligibility,

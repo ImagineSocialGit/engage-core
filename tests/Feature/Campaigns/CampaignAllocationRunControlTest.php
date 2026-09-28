@@ -85,6 +85,29 @@ class CampaignAllocationRunControlTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_automatic_runs_do_not_overlap_manual_runs_or_bypass_the_manual_cadence_anchor(): void
+    {
+        Queue::fake();
+        [$campaign] = $this->campaignWithParticipant();
+        $scheduler = app(ScheduleDueCampaignAllocationRunsAction::class);
+        $manual = $scheduler->scheduleNow(
+            $campaign,
+            User::factory()->create(),
+            (string) Str::uuid(),
+        );
+
+        $scheduler->handle();
+        $this->assertSame(1, CampaignAllocationRun::query()->where('campaign_id', $campaign->getKey())->count());
+
+        $manual->forceFill([
+            'status' => CampaignAllocationRun::STATUS_COMPLETED,
+            'completed_at' => now(),
+        ])->save();
+        $this->assertSame(0, $scheduler->handle(now()->addDays(13)));
+        $this->assertSame(1, $scheduler->handle(now()->addDays(14)));
+        $this->assertSame(2, CampaignAllocationRun::query()->where('campaign_id', $campaign->getKey())->count());
+    }
+
     /** @return array{0: Campaign, 1: Contact} */
     private function campaignWithParticipant(): array
     {

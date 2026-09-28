@@ -212,6 +212,10 @@
                 </div>
             @endif
 
+            @if($sendPattern['mode'] === 'spread')
+                <a href="{{ route('crm.campaigns.pacing-override.preview', $campaign) }}" class="mt-5 inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-bold text-slate-900 hover:bg-slate-50">Use today’s remaining window</a>
+            @endif
+
             <form method="POST" action="{{ route('crm.campaigns.send-pattern.update', $campaign) }}" class="mt-6 space-y-5">
                 @csrf
                 @method('PATCH')

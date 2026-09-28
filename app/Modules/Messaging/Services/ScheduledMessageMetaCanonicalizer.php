@@ -42,6 +42,7 @@ class ScheduledMessageMetaCanonicalizer
         'surface',
         'notification_type',
         'campaign_key',
+        'planning_requested_at',
         'campaign_step_variant_key',
         'campaign_step_variant_source_version',
         'campaign_variant_strategy',

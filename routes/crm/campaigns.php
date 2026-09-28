@@ -3,6 +3,7 @@
 use App\Modules\Campaigns\Controllers\CRM\CampaignAnnualTouchController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignAudienceController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignController;
+use App\Modules\Campaigns\Controllers\CRM\CampaignPacingOverrideController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignAllocationHistoryController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignAllocationRunControlController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignMessageTemplateController;
@@ -114,6 +115,12 @@ Route::middleware('module:campaigns')
 
         Route::post('/{campaign}/completed-append', [CampaignController::class, 'startCompletedAppend'])
             ->name('completed-append.start');
+
+        Route::get('/{campaign}/pacing-override', [CampaignPacingOverrideController::class, 'preview'])
+            ->name('pacing-override.preview');
+
+        Route::post('/{campaign}/pacing-override', [CampaignPacingOverrideController::class, 'store'])
+            ->name('pacing-override.store');
 
         Route::patch('/{campaign}/send-pattern', [CampaignController::class, 'updateSendPattern'])
             ->name('send-pattern.update');

@@ -191,6 +191,7 @@
 │   │   │   │       ├── CampaignAudienceController.php
 │   │   │   │       ├── CampaignController.php
 │   │   │   │       ├── CampaignMessageTemplateController.php
+│   │   │   │       ├── CampaignPacingOverrideController.php
 │   │   │   │       ├── CampaignSimulatorController.php
 │   │   │   │       └── ContactResultCampaignController.php
 │   │   │   ├── Data
@@ -288,6 +289,7 @@
 │   │   │   │   ├── CampaignMessageDefinitionResolver.php
 │   │   │   │   ├── CampaignMessageReviewPresenter.php
 │   │   │   │   ├── CampaignMessageStepResolver.php
+│   │   │   │   ├── CampaignPacingOverrideService.php
 │   │   │   │   ├── CampaignScheduleAuthoringPresenter.php
 │   │   │   │   ├── CampaignSendPatternConstraintProvider.php
 │   │   │   │   ├── CampaignSendPatternService.php
@@ -3027,6 +3029,7 @@
 │       │   │   ├── index.blade.php
 │       │   │   ├── message-templates
 │       │   │   │   └── index.blade.php
+│       │   │   ├── pacing-override.blade.php
 │       │   │   ├── partials
 │       │   │   │   └── contact-result-action.blade.php
 │       │   │   ├── show.blade.php
@@ -4007,4 +4010,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-883 directories, 3125 files
+883 directories, 3128 files

@@ -2,6 +2,8 @@
 
 namespace App\Modules\Messaging\Actions;
 
+use App\Modules\Campaigns\Models\CampaignAllocationAssignment;
+use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Messaging\Data\ScheduledMessagePlanningContext;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
@@ -121,6 +123,13 @@ class ScheduleMessageAction
             );
         }
 
+        if ($channel === MessageChannel::Email->value
+            && $purpose === MessagePurpose::Marketing->value
+            && ($context instanceof CampaignEnrollment
+                || $context instanceof CampaignAllocationAssignment)
+        ) {
+            $meta['planning_requested_at'] = $sendAt->toISOString();
+        }
         $meta = $this->metaCanonicalizer->forPersistence($meta);
 
         return DB::transaction(function () use (
