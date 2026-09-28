@@ -2,14 +2,15 @@
 
 namespace App\Support\ModuleIntegrations\Reporting\DailyFollowUp;
 
-use BackedEnum;
 use App\Modules\Core\Models\Contact;
+use App\Modules\InboundMessaging\Data\ReplySemanticAssessment;
 use App\Modules\InboundMessaging\Models\InboundMessage;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Services\Dashboard\SchedulingDashboardAppointments;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Models\TaskLink;
 use App\Support\Modules\ModuleManager;
+use BackedEnum;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -82,10 +83,35 @@ final class DailyFollowUpReportBuilder
                 InboundMessage::INBOX_STATUS_REVIEWED,
             ]);
 
+        $count = (clone $query)->count();
+
+        if ($this->replySemanticAssessmentAvailable()) {
+            $query->orderByRaw(
+                <<<'SQL'
+CASE
+    WHEN reply_semantic_category = ? THEN 0
+    WHEN reply_semantic_category = ? THEN 1
+    WHEN reply_semantic_category IS NULL THEN 1
+    WHEN reply_semantic_category = ? THEN 2
+    WHEN reply_semantic_category = ? THEN 3
+    WHEN reply_semantic_category = ? THEN 4
+    ELSE 1
+END
+SQL,
+                [
+                    ReplySemanticAssessment::CATEGORY_HIGH_INTENT,
+                    ReplySemanticAssessment::CATEGORY_NEEDS_REVIEW,
+                    ReplySemanticAssessment::CATEGORY_POSITIVE_DEFERRED,
+                    ReplySemanticAssessment::CATEGORY_NEGATIVE,
+                    ReplySemanticAssessment::CATEGORY_ROUTINE,
+                ],
+            );
+        }
+
         return $this->section(
             key: 'new_replies',
             label: 'Replies needing attention',
-            count: (clone $query)->count(),
+            count: $count,
             items: $query
                 ->orderByDesc('received_at')
                 ->orderByDesc('id')
@@ -97,10 +123,14 @@ final class DailyFollowUpReportBuilder
                         : ($message->relatedContact instanceof Contact
                             ? $message->relatedContact
                             : null);
+                    $contactLabel = $this->contactLabel($contact)
+                        ?? ($message->from_value ?: 'Unmatched inbound reply');
+                    $semanticCategory = $this->replySemanticCategory($message);
 
                     return [
-                        'title' => $this->contactLabel($contact)
-                            ?? ($message->from_value ?: 'Unmatched inbound reply'),
+                        'title' => $this->replySemanticLabel($semanticCategory)
+                            .' — '.$contactLabel,
+                        'semantic_category' => $semanticCategory,
                         'detail' => $this->replyDetail(
                             $message,
                             $timezone,
@@ -113,6 +143,39 @@ final class DailyFollowUpReportBuilder
                 })
                 ->all(),
         );
+    }
+
+    private function replySemanticAssessmentAvailable(): bool
+    {
+        return Schema::hasColumn(
+            'inbound_messages',
+            'reply_semantic_category',
+        );
+    }
+
+    private function replySemanticCategory(InboundMessage $message): string
+    {
+        return match ($message->reply_semantic_category) {
+            ReplySemanticAssessment::CATEGORY_HIGH_INTENT,
+            ReplySemanticAssessment::CATEGORY_POSITIVE_DEFERRED,
+            ReplySemanticAssessment::CATEGORY_NEGATIVE,
+            ReplySemanticAssessment::CATEGORY_ROUTINE,
+            ReplySemanticAssessment::CATEGORY_NEEDS_REVIEW =>
+                (string) $message->reply_semantic_category,
+            default => ReplySemanticAssessment::CATEGORY_NEEDS_REVIEW,
+        };
+    }
+
+    private function replySemanticLabel(string $category): string
+    {
+        return match ($category) {
+            ReplySemanticAssessment::CATEGORY_HIGH_INTENT => 'High intent',
+            ReplySemanticAssessment::CATEGORY_POSITIVE_DEFERRED =>
+                'Positive — later',
+            ReplySemanticAssessment::CATEGORY_NEGATIVE => 'Negative',
+            ReplySemanticAssessment::CATEGORY_ROUTINE => 'Routine',
+            default => 'Needs assessment',
+        };
     }
 
     private function replyDetail(
