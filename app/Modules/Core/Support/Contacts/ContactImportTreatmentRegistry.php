@@ -214,6 +214,92 @@ final class ContactImportTreatmentRegistry
     }
 
     /**
+     * Values chosen for blank cells in mapped CSV columns. These are persisted
+     * with the import's field defaults, so nonblank mapped values win and
+     * queued chunks use the same decision as the preview.
+     *
+     * @param array<string, mixed> $submitted
+     * @param array<string, string> $mapping
+     * @param array<int, string> $headers
+     * @return array<string, string>
+     */
+    public function mappedBlankDefaults(
+        array $submitted,
+        array $mapping,
+        array $headers,
+        ?array $allowedTargetKeys = null,
+    ): array {
+        $available = $this->availableTargetsFor($allowedTargetKeys);
+        $defaults = [];
+
+        foreach ($submitted as $targetKey => $selection) {
+            if (! is_array($selection) || ! array_key_exists('blank_default', $selection)) {
+                continue;
+            }
+
+            $submittedValue = $selection['blank_default'];
+
+            if ($submittedValue === null || $submittedValue === '') {
+                continue;
+            }
+
+            if (! is_string($targetKey)
+                || ! isset($available[$targetKey])
+                || ! is_string($submittedValue)
+            ) {
+                throw ValidationException::withMessages([
+                    'treatments' => 'Invalid import default for blank CSV values.',
+                ]);
+            }
+
+            $target = $available[$targetKey];
+            $fieldKey = $target->definition()->mappedFieldKey;
+            $column = is_string($fieldKey) ? ($mapping[$fieldKey] ?? null) : null;
+
+            if (($selection['mode'] ?? 'none') !== 'none'
+                || ! is_string($fieldKey)
+                || ! is_string($column)
+                || ! in_array($column, $headers, true)
+            ) {
+                throw ValidationException::withMessages([
+                    "treatments.{$targetKey}.blank_default" => 'Map this field to a CSV column and leave its treatment unchanged before choosing a default for blank values.',
+                ]);
+            }
+
+            $values = $target->normalizeValues([$submittedValue]);
+            $overrides = $target->fieldOverrides($values);
+            $value = $overrides[$fieldKey] ?? null;
+
+            if (count($values) !== 1 || ! is_string($value) || trim($value) === '') {
+                throw ValidationException::withMessages([
+                    "treatments.{$targetKey}.blank_default" => 'Choose a valid default for blank CSV values.',
+                ]);
+            }
+
+            foreach ($overrides as $overrideField => $overrideValue) {
+                if (! in_array($overrideField, $this->imports->fieldKeys(), true)
+                    || ! is_string($overrideValue)
+                    || trim($overrideValue) === ''
+                ) {
+                    throw ValidationException::withMessages([
+                        "treatments.{$targetKey}.blank_default" => 'Invalid import field default.',
+                    ]);
+                }
+
+                if (isset($defaults[$overrideField]) && $defaults[$overrideField] !== $overrideValue) {
+                    throw ValidationException::withMessages([
+                        "treatments.{$targetKey}.blank_default" => 'The selected defaults disagree about the same import field.',
+                    ]);
+                }
+
+                $defaults[$overrideField] = $overrideValue;
+            }
+        }
+
+        return $defaults;
+    }
+
+    /**
      * Resolve any operator intent that must become durable before queued work begins.
      *
      * @param array<string, ContactImportTreatmentSelection> $selections

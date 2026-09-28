@@ -11,6 +11,7 @@
             showAdvancedFields: false,
             primaryImportFieldKeys: @js($primaryImportFieldKeys),
             columnProfiles: @js($columnProfiles),
+            mappingSelections: @js($selectedMapping),
             isPrimaryField(fieldKey) {
                 return this.primaryImportFieldKeys.includes(fieldKey);
             },
@@ -182,6 +183,7 @@
                                     <select
                                         id="mapping_{{ $field->key }}"
                                         name="mapping[{{ $field->key }}]"
+                                        x-model="mappingSelections[@js($field->key)]"
                                         @required($field->required)
                                         class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                     >
@@ -238,10 +240,14 @@
                                             class="rounded-xl border border-slate-200 p-4"
                                             x-data="{
                                                 targetKey: @js($treatment->key),
+                                                mappedFieldKey: @js($treatment->mappedFieldKey),
                                                 mode: @js(old("treatments.{$treatment->key}.mode", $treatmentDefaults[$treatment->key]['mode'] ?? 'none')),
                                                 sourceColumn: @js(old("treatments.{$treatment->key}.source_column", $treatmentDefaults[$treatment->key]['source_column'] ?? '')),
                                                 previousValueMap: @js(old("treatments.{$treatment->key}.value_map", [])),
                                                 defaultUseSourceValue: @js($treatment->defaultSourceValue),
+                                                mappedColumn() {
+                                                    return this.mappedFieldKey ? (this.mappingSelections[this.mappedFieldKey] || '') : '';
+                                                },
                                                 previousEntry(item) {
                                                     const entry = this.previousValueMap?.[item.token];
                                                     return entry && typeof entry === 'object' ? entry : null;
@@ -294,6 +300,57 @@
                                                     </p>
                                                 @enderror
                                             </div>
+
+                                            @if ($treatment->mappedFieldKey)
+                                                <div x-show="mode === 'none'" class="mt-4 space-y-3">
+                                                    <p class="text-xs text-slate-600" x-show="mappedColumn()">
+                                                        Mapped CSV column: <strong class="text-slate-900" x-text="mappedColumn()"></strong>.
+                                                        Nonblank values from that column are used as mapped.
+                                                    </p>
+
+                                                    <p class="text-xs text-slate-600" x-show="! mappedColumn()">
+                                                        No CSV column is mapped. Choose a fixed treatment to apply a value to every row.
+                                                    </p>
+
+                                                    <div
+                                                        x-show="mappedColumn() && blankCount(mappedColumn()) > 0"
+                                                        class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3"
+                                                    >
+                                                        <p class="text-xs font-medium text-amber-950">
+                                                            <span x-text="valuesFor(mappedColumn()).length === 0 ? 'All' : 'Some'"></span>
+                                                            rows have an empty value in this column
+                                                            (<span x-text="blankCount(mappedColumn())"></span> blank).
+                                                            Choose a default for blank values, or leave blank to keep existing values unchanged.
+                                                        </p>
+
+                                                        <x-ui.form.label for="treatment_blank_default_{{ $treatment->key }}" class="mt-3 block">
+                                                            Default for blank values
+                                                        </x-ui.form.label>
+
+                                                        <select
+                                                            id="treatment_blank_default_{{ $treatment->key }}"
+                                                            name="treatments[{{ $treatment->key }}][blank_default]"
+                                                            x-bind:disabled="mode !== 'none' || ! mappedColumn() || blankCount(mappedColumn()) === 0"
+                                                            class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                                        >
+                                                            <option value="">Leave blank values unchanged</option>
+
+                                                            @foreach ($treatment->options as $option)
+                                                                <option
+                                                                    value="{{ $option['value'] }}"
+                                                                    @selected(old("treatments.{$treatment->key}.blank_default") === $option['value'])
+                                                                >
+                                                                    {{ $option['label'] }}
+                                                                </option>
+                                                            @endforeach
+                                                        </select>
+
+                                                        @error("treatments.{$treatment->key}.blank_default")
+                                                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                                        @enderror
+                                                    </div>
+                                                </div>
+                                            @endif
 
                                             <div x-show="mode === 'fixed'" x-cloak class="mt-4">
                                                 <x-ui.form.label>

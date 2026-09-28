@@ -21,5 +21,6 @@ final readonly class ContactImportTreatmentDefinition
         public ?string $sourceValueOptionDescription = null,
         public bool $defaultSourceValue = false,
         public ?string $unmappedOptionLabel = null,
+        public ?string $mappedFieldKey = null,
     ) {}
 }

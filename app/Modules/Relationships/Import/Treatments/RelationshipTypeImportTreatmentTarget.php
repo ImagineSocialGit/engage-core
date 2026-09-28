@@ -34,6 +34,7 @@ final class RelationshipTypeImportTreatmentTarget implements ContactImportTreatm
                 ->values()
                 ->all(),
             sort: 10,
+            mappedFieldKey: 'relationship_key',
         );
     }
 

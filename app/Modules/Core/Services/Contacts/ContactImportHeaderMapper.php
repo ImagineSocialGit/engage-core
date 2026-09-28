@@ -94,6 +94,13 @@ final class ContactImportHeaderMapper
             'customer status',
             'client status',
         ],
+        'relationship_key' => [
+            'relationship key',
+            'relationship type',
+        ],
+        'relationship_stage' => [
+            'relationship stage',
+        ],
     ];
 
     public function __construct(

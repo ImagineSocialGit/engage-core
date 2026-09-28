@@ -647,6 +647,10 @@ class ContactController extends Controller
             headers: $headers->all(),
             preferred: $profileSuggestedMapping,
         );
+        $selectedMapping = array_replace(
+            $suggestedMapping,
+            is_array($request->old('mapping')) ? $request->old('mapping') : [],
+        );
         $operatorPostImportConfig = $importMode === self::IMPORT_MODE_ADD
             ? $postProcessorRegistry->operatorInputConfig(
                 $importProfile?->postImport ?? [],
@@ -776,6 +780,7 @@ class ContactController extends Controller
             'treatmentDefaults' => $treatmentDefaults,
             'importProfile' => $importProfile,
             'suggestedMapping' => $suggestedMapping,
+            'selectedMapping' => $selectedMapping,
             'postImportSummaries' => $postImportSummaries,
             'postImportInputs' => $postImportInputs,
             'importMode' => $importMode,
@@ -923,10 +928,20 @@ class ContactController extends Controller
             ->only($allowedMappingFields)
             ->toArray();
 
+        $submittedTreatments = is_array($validated['treatments'] ?? null)
+            ? $validated['treatments']
+            : [];
+
+        $mappedBlankDefaults = $treatmentRegistry->mappedBlankDefaults(
+            submitted: $submittedTreatments,
+            mapping: $mapping,
+            headers: $headers,
+            allowedTargetKeys: $importProfile?->treatmentTargets,
+        );
+        $profileDefaults = array_replace($profileDefaults, $mappedBlankDefaults);
+
         $treatmentSelections = $treatmentRegistry->normalizeSubmitted(
-            submitted: is_array($validated['treatments'] ?? null)
-                ? $validated['treatments']
-                : [],
+            submitted: $submittedTreatments,
             headers: $headers,
             allowedTargetKeys: $importProfile?->treatmentTargets,
         );
@@ -947,6 +962,7 @@ class ContactController extends Controller
             $mapping,
             $importProfile,
             $profileDefaults,
+            $mappedBlankDefaults,
             $treatmentRegistry,
             $treatmentSelections,
             $postImportConfig,
@@ -986,6 +1002,7 @@ class ContactController extends Controller
                     'headers' => $headers,
                     'profile_key' => $importProfile?->key,
                     'profile_defaults' => $profileDefaults,
+                    'mapped_blank_defaults' => $mappedBlankDefaults,
                     'treatment_selections' => $treatmentRegistry->selectionsMeta(
                         $treatmentSelections,
                     ),

@@ -30,6 +30,7 @@ final class RelationshipStageImportTreatmentTarget implements ContactImportTreat
             description: 'Choose a relationship-specific stage. Each destination also establishes the matching relationship type for that row.',
             options: $this->stageOptions(),
             sort: 20,
+            mappedFieldKey: 'relationship_stage',
         );
     }
 
