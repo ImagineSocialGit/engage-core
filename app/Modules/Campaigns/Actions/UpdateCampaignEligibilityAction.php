@@ -18,6 +18,15 @@ final class UpdateCampaignEligibilityAction
         string $ineligibleBehavior,
     ): Campaign {
         if (
+            $campaign->execution_strategy === Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION
+            && $enrollmentMode === Campaign::ENROLLMENT_MODE_AUTOMATIC
+        ) {
+            throw ValidationException::withMessages([
+                'enrollment_mode' => 'Recurring allocation Campaigns currently require manual enrollment.',
+            ]);
+        }
+
+        if (
             $enrollmentMode === Campaign::ENROLLMENT_MODE_AUTOMATIC
             && $criteria === []
         ) {

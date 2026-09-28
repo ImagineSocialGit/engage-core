@@ -3,6 +3,7 @@
 namespace App\Modules\Campaigns\Actions;
 
 use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Campaigns\Models\CampaignAllocationEnrollment;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Messaging\Models\MessageChain;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
@@ -19,6 +20,7 @@ class DeactivateCampaignAction
 
     public function __construct(
         private readonly CancelCampaignEnrollmentAction $cancelCampaignEnrollment,
+        private readonly CancelCampaignAllocationEnrollmentAction $cancelCampaignAllocationEnrollment,
     ) {}
 
     /**
@@ -81,6 +83,13 @@ class DeactivateCampaignAction
                 ->orderBy('id')
                 ->get();
 
+            $allocationEnrollments = CampaignAllocationEnrollment::query()
+                ->where('campaign_id', $lockedCampaign->getKey())
+                ->where('status', CampaignAllocationEnrollment::STATUS_ACTIVE)
+                ->lockForUpdate()
+                ->orderBy('id')
+                ->get();
+
             $scheduledMessagesSkipped = 0;
 
             foreach ($enrollments as $enrollment) {
@@ -100,13 +109,32 @@ class DeactivateCampaignAction
                 );
             }
 
+            foreach ($allocationEnrollments as $allocationEnrollment) {
+                $cancelled = $this->cancelCampaignAllocationEnrollment->cancelEnrollment(
+                    enrollment: $allocationEnrollment,
+                    source: $actor,
+                    reason: self::REASON,
+                    skipPendingMessages: true,
+                    meta: array_replace_recursive([
+                        'lifecycle_source' => $source,
+                    ], $meta),
+                );
+
+                $scheduledMessagesSkipped += (int) data_get(
+                    $cancelled->meta,
+                    'lifecycle.last_cancellation.skipped_pending_messages',
+                    0,
+                );
+            }
+
             return [
                 'campaign_id' => (int) $lockedCampaign->getKey(),
                 'campaign_key' => (string) $lockedCampaign->key,
                 'previous_status' => $previousStatus,
                 'current_status' => (string) $lockedCampaign->status,
                 'status_changed' => $statusChanged,
-                'enrollments_cancelled' => $enrollments->count(),
+                'enrollments_cancelled' => $enrollments->count()
+                    + $allocationEnrollments->count(),
                 'scheduled_messages_skipped' => $scheduledMessagesSkipped,
             ];
         }, 3);

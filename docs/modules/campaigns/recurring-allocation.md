@@ -36,7 +36,7 @@ Existing Campaigns are migrated to `sequence`, so this foundation does not
 change existing runtime behavior.
 
 Recurring allocation settings are stored in `campaigns.allocation_settings`.
-The runtime authoring contract will normalize these keys:
+The Campaign-owned allocation settings service now normalizes these keys and the configuration action changes execution strategy atomically:
 
 ```text
 run_every_days
@@ -64,6 +64,26 @@ pacing remains the separate authority for when allocated marketing email may be
 scheduled. `Spread throughout the day` can defer allocated messages across later
 allowed days when daily capacity is exhausted; `Send as due` does not gain a new
 Campaign daily cap merely because recurring allocation is enabled.
+
+The lifecycle foundation currently permits recurring allocation only when:
+
+```text
+enrollment_mode = manual
+family_key = null
+```
+
+That is deliberate fail-closed behavior. Existing automatic eligibility lifecycle
+and Campaign-family priority arbitration operate on sequential
+`CampaignEnrollment` / `MessageChainEnrollment` state. Recurring allocation must
+not silently bypass those contracts. Automatic allocation enrollment and
+cross-strategy family arbitration require an explicit later integration before
+those configurations are accepted.
+
+Changing execution strategy is also guarded. A Campaign cannot switch from
+sequence to recurring allocation while sequential enrollments are open, and it
+cannot switch back to sequence while allocation participation or a scheduled/running
+allocation run remains open. Historical terminal enrollment/assignment evidence is
+left intact.
 
 ## Allocation enrollment
 
@@ -98,8 +118,7 @@ not allocation candidates for that enrollment. Those earlier messages are not
 recorded as sent or previously received merely because the floor starts later.
 
 Re-enrollment creates a new allocation enrollment history row rather than
-rewriting historical assignments. The actions batch owns active-enrollment
-replacement/cancellation and idempotency rules.
+rewriting historical assignments. The lifecycle actions now own active-enrollment replacement/cancellation and stable entry-key idempotency. Ordinary allocation enrollment returns an existing active enrollment rather than mutating its floor; changing the floor requires the explicit re-enrollment action.
 
 ## Allocation runs
 
@@ -123,8 +142,7 @@ failed
 cancelled
 ```
 
-The runtime batch will create and process these rows transactionally. This
-schema batch does not schedule or execute runs.
+The run scheduler/processor remains a later runtime batch. Lifecycle actions in the current batch do not create runs or ScheduledMessages, so recurring sends remain inert until the allocator batch lands.
 
 ## Allocation assignments
 
@@ -253,7 +271,7 @@ Allocation must not weaken those Messaging gates.
 
 ## Re-enrollment semantics
 
-The operator-facing bulk action will support both execution strategies.
+The underlying re-enrollment actions now support both execution strategies. The operator-facing bulk surface will call these actions in a later UI/runtime-operations batch.
 
 Sequential Campaign:
 
@@ -264,9 +282,7 @@ re-enroll starting at message C
     MessageChainEnrollment starts at active step C.
 ```
 
-The existing Campaign/Messaging enrollment seam already supports a
-`startStepKey`; the later actions batch will expose a deliberate re-enrollment
-path rather than changing ordinary enrollment arbitration.
+The existing Campaign/Messaging enrollment seam already supports a `startStepKey`; the new deliberate sequential re-enrollment action cancels any open enrollment through the existing Campaign/Messaging lifecycle path and then creates a new enrollment pinned to the selected active current step. A stable entry key makes retries idempotent without changing ordinary enrollment arbitration. The ordinary sequential enrollment seam now rejects recurring-allocation Campaigns, so legacy import/contact-result/automation callers cannot accidentally create fake sequential progression after a Campaign changes strategy.
 
 Recurring allocation Campaign:
 
@@ -276,13 +292,56 @@ re-enroll starting at message C
     allocation enrollment with start_message_step_key = C.
 ```
 
-Historical allocation assignments, prior receipts, and explicit exclusions are
-preserved. Re-enrollment changes the participation floor; it is not a history
-reset.
+Historical allocation assignments, prior receipts, and explicit exclusions are preserved. The new allocation re-enrollment action cancels current active allocation enrollment state, skips any pending assignment-context messages when they exist, and creates a fresh enrollment at the selected active current step. Re-enrollment changes the participation floor; it is not a history reset.
 
-## Schema in this foundation batch
+## Lifecycle/configuration actions now available
 
-This foundation adds:
+The Campaign runtime now has explicit non-UI seams for:
+
+```text
+UpdateCampaignAllocationSettingsAction
+    choose sequence vs recurring_allocation and normalize allocation settings
+
+EnrollContactInCampaignAllocationAction
+    create idempotent active allocation participation with an optional inclusive
+    start-message floor
+
+CancelCampaignAllocationEnrollmentAction
+    cancel allocation participation and, when allocation ScheduledMessages exist,
+    skip pending messages through Messaging rather than mutating them directly
+
+ReenrollContactInCampaignAllocationAction
+    replace current active allocation participation with a new floor while
+    preserving assignment/receipt/exclusion history
+
+ReenrollContactInCampaignAction
+    deliberately replace an open sequential enrollment and start the new
+    MessageChainEnrollment at a selected active current message
+
+ExcludeContactFromCampaignAllocationMessageAction
+    record an explicit per-Contact message exclusion without claiming prior
+    delivery
+
+RemoveContactCampaignAllocationMessageExclusionAction
+    reverse an explicit allocation exclusion without changing receipt or
+    assignment history
+```
+
+All start-message and exclusion operations resolve against the Campaign's current published MessageChainVersion and require an active message-step key. Stable entry keys are required for explicit re-enrollment so queued/operator retries cannot create repeated replacement cycles.
+
+The allocation settings runtime defaults remain the agreed working defaults:
+
+```text
+run_every_days = 14
+allocation_size_per_message = 50
+recipient_cooldown_days = 14
+```
+
+A zero-day recipient cooldown is valid when explicitly authored. Allocation size remains separate from Campaign send-pattern capacity.
+
+## Foundation delivered so far
+
+The schema foundation adds:
 
 ```text
 campaigns.execution_strategy
@@ -295,16 +354,20 @@ campaign_allocation_message_exclusions
 
 and the corresponding Campaign-owned Eloquent models/relationships.
 
+The lifecycle/configuration batch adds the Campaign-owned settings, message-step resolution, enrollment/cancellation/re-enrollment, reversible explicit exclusion actions, execution-strategy transition guards, and deactivation cleanup described above. Campaign deactivation now cancels active allocation participation in addition to sequential Campaign enrollments.
+
 It deliberately does not yet add:
 
 ```text
 allocation scheduler/jobs
-allocation candidate selection
-allocation transaction/locking logic
+allocation candidate selection and shared-pool assignment
+allocation-run transaction/locking logic
 ScheduledMessage planning for assignments
 send-pattern bridge generalization
 sent/cooldown reconciliation listeners
-bulk enroll/re-enroll/exclude actions
+automatic eligibility enrollment for recurring allocation
+cross-strategy Campaign-family arbitration
+bulk Contact-result orchestration around the lifecycle actions
 import enrollment-floor/exclusion authoring
 CRM allocation settings
 Campaign workspace surfaces

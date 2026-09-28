@@ -8,12 +8,14 @@ class CampaignUnavailableForEnrollmentException extends InvalidArgumentException
 {
     public const REASON_MISSING = 'campaign_missing';
     public const REASON_INACTIVE = 'campaign_inactive';
+    public const REASON_EXECUTION_STRATEGY = 'campaign_execution_strategy';
     public const REASON_FAMILY_BLOCKED = 'campaign_family_blocked';
 
     public function __construct(
         public readonly string $campaignKey,
         public readonly string $reason,
         public readonly ?string $campaignStatus = null,
+        public readonly ?string $executionStrategy = null,
         public readonly ?string $familyKey = null,
         public readonly ?int $campaignPriority = null,
         public readonly ?string $blockingCampaignKey = null,
@@ -23,6 +25,11 @@ class CampaignUnavailableForEnrollmentException extends InvalidArgumentException
         parent::__construct(match ($reason) {
             self::REASON_MISSING => "Campaign [{$campaignKey}] was not found.",
             self::REASON_INACTIVE => "Campaign [{$campaignKey}] is not active.",
+            self::REASON_EXECUTION_STRATEGY => sprintf(
+                'Campaign [%s] uses execution strategy [%s] and cannot use sequential enrollment.',
+                $campaignKey,
+                $executionStrategy,
+            ),
             self::REASON_FAMILY_BLOCKED => sprintf(
                 'Campaign [%s] cannot enroll because family [%s] already has open Campaign [%s] at priority [%d], which is not lower than candidate priority [%d].',
                 $campaignKey,
@@ -49,6 +56,17 @@ class CampaignUnavailableForEnrollmentException extends InvalidArgumentException
             campaignKey: $campaignKey,
             reason: self::REASON_INACTIVE,
             campaignStatus: $campaignStatus,
+        );
+    }
+
+    public static function executionStrategy(
+        string $campaignKey,
+        string $executionStrategy,
+    ): self {
+        return new self(
+            campaignKey: $campaignKey,
+            reason: self::REASON_EXECUTION_STRATEGY,
+            executionStrategy: $executionStrategy,
         );
     }
 

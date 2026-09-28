@@ -87,6 +87,13 @@ class EnrollContactInCampaignAction
                 }
             }
 
+            if ($candidate->execution_strategy !== Campaign::EXECUTION_STRATEGY_SEQUENCE) {
+                throw CampaignUnavailableForEnrollmentException::executionStrategy(
+                    campaignKey: $candidate->key,
+                    executionStrategy: (string) $candidate->execution_strategy,
+                );
+            }
+
             if (! $candidate->isActive()) {
                 throw CampaignUnavailableForEnrollmentException::inactive(
                     campaignKey: $candidate->key,

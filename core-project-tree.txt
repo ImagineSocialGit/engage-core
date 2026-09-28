@@ -125,6 +125,7 @@
 │   │   │   ├── Actions
 │   │   │   │   ├── ActivateCampaignAction.php
 │   │   │   │   ├── ApplyAutomaticCampaignEligibilityAction.php
+│   │   │   │   ├── CancelCampaignAllocationEnrollmentAction.php
 │   │   │   │   ├── CancelCampaignEnrollmentAction.php
 │   │   │   │   ├── CancelCampaignFamilyEnrollmentsAction.php
 │   │   │   │   ├── CheckCampaignAudienceCompletionAction.php
@@ -132,7 +133,9 @@
 │   │   │   │   ├── CreateCampaignScheduleMessageAction.php
 │   │   │   │   ├── DeactivateCampaignAction.php
 │   │   │   │   ├── EnrollContactInCampaignAction.php
+│   │   │   │   ├── EnrollContactInCampaignAllocationAction.php
 │   │   │   │   ├── EvaluateCampaignEligibilityAction.php
+│   │   │   │   ├── ExcludeContactFromCampaignAllocationMessageAction.php
 │   │   │   │   ├── PauseCampaignEnrollmentAction.php
 │   │   │   │   ├── PauseCampaignFamilyEnrollmentsAction.php
 │   │   │   │   ├── ProcessDueCampaignTouchDatesAction.php
@@ -141,10 +144,14 @@
 │   │   │   │   ├── ReconcileCampaignEligibilityAction.php
 │   │   │   │   ├── ReconcileContactCampaignEligibilityAction.php
 │   │   │   │   ├── RecordPriorCampaignMessageReceiptAction.php
+│   │   │   │   ├── ReenrollContactInCampaignAction.php
+│   │   │   │   ├── ReenrollContactInCampaignAllocationAction.php
+│   │   │   │   ├── RemoveContactCampaignAllocationMessageExclusionAction.php
 │   │   │   │   ├── ResumeCampaignEnrollmentAction.php
 │   │   │   │   ├── ScheduleCampaignImportBatchInitialMessagesAction.php
 │   │   │   │   ├── StartCompletedCampaignAppendAction.php
 │   │   │   │   ├── SyncCampaignPresetsAction.php
+│   │   │   │   ├── UpdateCampaignAllocationSettingsAction.php
 │   │   │   │   ├── UpdateCampaignEligibilityAction.php
 │   │   │   │   └── UpdateCampaignSendPatternAction.php
 │   │   │   ├── Automation
@@ -247,6 +254,7 @@
 │   │   │   │   ├── UpdateCampaignSendPatternRequest.php
 │   │   │   │   └── UpdateCampaignStepMessageTemplateRequest.php
 │   │   │   ├── Services
+│   │   │   │   ├── CampaignAllocationSettingsService.php
 │   │   │   │   ├── CampaignAnnualTouchAudienceService.php
 │   │   │   │   ├── CampaignAudienceProgressService.php
 │   │   │   │   ├── CampaignCreationGuide.php
@@ -260,6 +268,7 @@
 │   │   │   │   ├── CampaignMessageChainExecutionContextProvider.php
 │   │   │   │   ├── CampaignMessageDefinitionResolver.php
 │   │   │   │   ├── CampaignMessageReviewPresenter.php
+│   │   │   │   ├── CampaignMessageStepResolver.php
 │   │   │   │   ├── CampaignScheduleAuthoringPresenter.php
 │   │   │   │   ├── CampaignSendPatternConstraintProvider.php
 │   │   │   │   ├── CampaignSendPatternService.php
@@ -3957,4 +3966,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-882 directories, 3076 files
+882 directories, 3085 files

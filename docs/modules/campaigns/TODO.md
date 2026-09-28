@@ -6,13 +6,17 @@ Work these in order. Keep Campaigns independent from FlowRoutes, Webinars, Forms
 
 - [x] Establish the append-only recurring-allocation schema without changing existing sequential Campaign behavior.
 - [x] Separate allocation enrollment, run, assignment, and explicit per-Contact message-exclusion state from sequential MessageChainEnrollment progression.
-- [ ] Add recurring-allocation configuration normalization/authoring for cadence, per-message allocation size, and recipient cooldown.
-- [ ] Add allocation enrollment/re-enrollment actions, including an inclusive `start_message_step_key` floor.
-- [ ] Add explicit per-Contact allocation message exclusions without misrepresenting them as prior receipts.
+- [x] Add recurring-allocation configuration normalization/actions for cadence, per-message allocation size, and recipient cooldown; UI authoring remains later.
+- [x] Add allocation enrollment/cancellation/re-enrollment actions, including stable entry-key idempotency and an inclusive `start_message_step_key` floor.
+- [x] Add deliberate sequential re-enrollment from a selected active current message without changing ordinary enrollment arbitration.
+- [x] Add reversible per-Contact allocation message exclusions without misrepresenting them as prior receipts.
+- [x] Fail closed on unsupported recurring-allocation lifecycle combinations: automatic enrollment, Campaign-family arbitration, strategy switches with open participants/runs, and legacy sequential enrollment calls against allocation Campaigns.
+- [ ] Add automatic eligibility enrollment for recurring allocation after its lifecycle can target allocation participation rather than sequential MessageChain enrollment.
+- [ ] Add cross-strategy Campaign-family arbitration before recurring-allocation Campaigns may use `family_key`.
 - [ ] Add idempotent allocation-run scheduling/processing with one shared candidate pool and transactional distinct-Contact assignment.
 - [ ] Reuse existing prior-message receipts for allocation message exclusion and dated cooldown evidence.
 - [ ] Generalize Campaign send-pattern pacing so allocation ScheduledMessages reuse the existing Campaign daily email capacity instead of introducing a second limiter.
-- [ ] Add bulk Contact-result actions for normal enrollment, re-enrollment from a selected message, and allocation-only message exclusions.
+- [ ] Add bulk Contact-result orchestration for normal enrollment, sequential/allocation re-enrollment from a selected message, and allocation-only message exclusions; the underlying lifecycle actions now exist.
 - [ ] Add basic Campaign Setup/workspace surfaces for execution strategy and allocation settings.
 - [ ] Add focused runtime, concurrency/idempotency, boundary, and surface tests after behavior is implemented; do not assert evolving UI copy.
 
