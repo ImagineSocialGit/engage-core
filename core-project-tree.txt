@@ -543,10 +543,19 @@
 │   │   │   │   └── DocumentAttachmentLibrary.php
 │   │   │   └── Support
 │   │   ├── Events
+│   │   │   ├── Actions
+│   │   │   │   ├── CancelEventAction.php
+│   │   │   │   ├── CompleteEventAction.php
+│   │   │   │   ├── CreateEventAction.php
+│   │   │   │   ├── PostponeEventAction.php
+│   │   │   │   ├── PromoteEventAction.php
+│   │   │   │   ├── RecordEventAttendanceAction.php
+│   │   │   │   └── RescheduleEventAction.php
 │   │   │   ├── Contracts
 │   │   │   │   ├── EventDefinitionContributor.php
 │   │   │   │   └── EventReadinessContributor.php
 │   │   │   ├── Data
+│   │   │   │   ├── EventActionContext.php
 │   │   │   │   ├── EventDefinitionContribution.php
 │   │   │   │   ├── EventGateDecision.php
 │   │   │   │   ├── EventReadinessFinding.php
@@ -555,6 +564,8 @@
 │   │   │   │   ├── EventAttendanceMode.php
 │   │   │   │   ├── EventAttendanceStatus.php
 │   │   │   │   └── EventStatus.php
+│   │   │   ├── Exceptions
+│   │   │   │   └── EventActionBlockedException.php
 │   │   │   ├── Models
 │   │   │   │   ├── EventAttendance.php
 │   │   │   │   ├── EventExternalReference.php
@@ -566,6 +577,7 @@
 │   │   │   │   └── CoreEventReadinessContributor.php
 │   │   │   └── Services
 │   │   │       ├── EventAnnouncementGate.php
+│   │   │       ├── EventAutomationSignalRecorder.php
 │   │   │       ├── EventDefinitionRegistry.php
 │   │   │       ├── EventDuplicateDetector.php
 │   │   │       ├── EventPromotionGate.php
@@ -3394,6 +3406,7 @@
 │   │   │   └── HandleInboundEmailWebhookActionTest.php
 │   │   ├── Events
 │   │   │   ├── EventDefinitionRegistryTest.php
+│   │   │   ├── EventLifecycleAndAttendanceActionTest.php
 │   │   │   ├── EventReadinessAndPromotionTest.php
 │   │   │   └── EventsFoundationTest.php
 │   │   ├── FlowRoutes
@@ -3938,4 +3951,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-880 directories, 3059 files
+882 directories, 3070 files

@@ -819,7 +819,7 @@ Do not include Music, Bandsintown, Commerce, Experiences, FlowRoutes, Messaging,
 
 ## Implementation status
 
-Current repository status after the readiness and promotion foundation:
+Current repository status after the lifecycle and attendance action foundation:
 
 ```text
 Events module directory: present
@@ -829,13 +829,15 @@ Events models/factories: present for all four owned tables
 Events readiness registry and universal core readiness contributor: present
 Events announcement gate and authoritative promotion gate: present
 Events duplicate similarity detector: present
+Events-owned draft creation and lifecycle actions: present
+Events attendance reconciliation action: present
+Neutral automation signals: event.created, event.upcoming, event.postponed, event.rescheduled, event.cancelled, event.completed, event.attendance_recorded
+Scheduled announcement/completion reconciliation: not present
 Legacy Project State policy: all four Events tables explicitly classified must_be_empty; no Events transfer section is required for rollout
 Events CRM routes/navigation: not present
-Events lifecycle and attendance write actions: not present
-Events automation/scheduled reconciliation: not present
 Events setup validation: not present
 ```
 
-The next implementation work should follow the approved order above: lifecycle and attendance actions plus neutral automation events, scheduled reconciliation, setup validation, and CRM administration before optional consumers are added.
+The next implementation work should follow the approved order above: scheduled Event reconciliation, setup validation, and CRM administration before optional consumers are added.
 
 This document remains the canonical architecture reference. Exact file manifests still require a fresh dependency cone for every consumer module touched by a later integration batch.
