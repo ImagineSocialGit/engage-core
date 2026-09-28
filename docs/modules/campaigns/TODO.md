@@ -17,7 +17,7 @@ Work these in order. Keep Campaigns independent from FlowRoutes, Webinars, Forms
 - [x] Reuse existing prior-message receipts for allocation message exclusion and dated cooldown evidence.
 - [x] Generalize Campaign send-pattern pacing so allocation ScheduledMessages reuse the existing Campaign daily email capacity instead of introducing a second limiter.
 - [x] Add allocation send-time enrollment/exclusion/prior-receipt gates plus ScheduledMessage terminal reconciliation back to assignment delivery evidence.
-- [ ] Add bulk Contact-result orchestration for normal enrollment, sequential/allocation re-enrollment from a selected message, and allocation-only message exclusions; the underlying lifecycle actions now exist.
+- [x] Add bulk Contact-result orchestration for normal enrollment, sequential/allocation re-enrollment from a selected message, allocation-only message exclusions/removal, and atomic allocation enrollment with a selected message excluded.
 - [ ] Add basic Campaign Setup/workspace surfaces for execution strategy and allocation settings.
 - [ ] Add focused runtime, concurrency/idempotency, boundary, and surface tests after behavior is implemented; do not assert evolving UI copy.
 

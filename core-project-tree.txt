@@ -125,6 +125,7 @@
 │   │   │   ├── Actions
 │   │   │   │   ├── ActivateCampaignAction.php
 │   │   │   │   ├── ApplyAutomaticCampaignEligibilityAction.php
+│   │   │   │   ├── ApplyCampaignContactResultOperationAction.php
 │   │   │   │   ├── CancelCampaignAllocationEnrollmentAction.php
 │   │   │   │   ├── CancelCampaignEnrollmentAction.php
 │   │   │   │   ├── CancelCampaignFamilyEnrollmentsAction.php
@@ -139,8 +140,10 @@
 │   │   │   │   ├── PauseCampaignEnrollmentAction.php
 │   │   │   │   ├── PauseCampaignFamilyEnrollmentsAction.php
 │   │   │   │   ├── ProcessCampaignAllocationRunAction.php
+│   │   │   │   ├── ProcessCampaignContactResultOperationChunkAction.php
 │   │   │   │   ├── ProcessDueCampaignTouchDatesAction.php
 │   │   │   │   ├── PublishCampaignMessageChainVersionAction.php
+│   │   │   │   ├── QueueCampaignContactResultOperationAction.php
 │   │   │   │   ├── ReconcileAutomaticCampaignEligibilityAction.php
 │   │   │   │   ├── ReconcileCampaignEligibilityAction.php
 │   │   │   │   ├── ReconcileContactCampaignEligibilityAction.php
@@ -195,6 +198,7 @@
 │   │   │   │   │   ├── PauseCampaignAutomationDefinition.php
 │   │   │   │   │   ├── PauseCampaignFamilyAutomationDefinition.php
 │   │   │   │   │   └── ResumeCampaignAutomationDefinition.php
+│   │   │   │   ├── CampaignContactResultOperation.php
 │   │   │   │   ├── CampaignCreationOption.php
 │   │   │   │   ├── CampaignEligibilityEvaluationResult.php
 │   │   │   │   ├── CampaignEligibilityLifecycleResult.php
@@ -215,6 +219,7 @@
 │   │   │   │   ├── EmitDueAnnualTouchAutomationEventsJob.php
 │   │   │   │   ├── EnrollContactResultCampaignChunkJob.php
 │   │   │   │   ├── ProcessCampaignAllocationRunJob.php
+│   │   │   │   ├── ProcessCampaignContactResultOperationChunkJob.php
 │   │   │   │   ├── ProcessCompletedCampaignAppendChunkJob.php
 │   │   │   │   ├── ProcessDueCampaignAllocationsJob.php
 │   │   │   │   ├── ProcessDueCampaignTouchDatesJob.php
@@ -3984,4 +3989,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-882 directories, 3103 files
+882 directories, 3108 files

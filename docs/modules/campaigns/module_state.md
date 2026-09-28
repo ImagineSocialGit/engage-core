@@ -24,9 +24,13 @@ recurring_allocation
     Campaigns periodically allocates distinct eligible Contacts to individual messages without creating per-Contact MessageChain progression.
 ```
 
-Existing rows default to `sequence`. The recurring-allocation schema is deliberately inert until the allocation actions/jobs are added. Campaigns owns allocation enrollment, cadence, assignments, per-Contact allocation floors, and explicit message exclusions; Messaging remains authoritative for immutable message definitions, ScheduledMessage planning/delivery, consent, suppression, and provider/runtime gates.
+Existing rows default to `sequence`. The recurring-allocation runtime is now implemented: Campaigns owns allocation enrollment, cadence, durable runs/assignments, per-Contact allocation floors, explicit message exclusions, deterministic shared-pool candidate selection, and operator result-set orchestration; Messaging remains authoritative for immutable message definitions, ScheduledMessage planning/delivery, consent, suppression, and provider/runtime gates.
 
-Allocation configuration lives in `campaigns.allocation_settings` with the planned normalized keys `run_every_days`, `allocation_size_per_message`, and `recipient_cooldown_days`. Allocation quota remains separate from the existing Campaign send-pattern daily email pacing.
+Allocation configuration lives in `campaigns.allocation_settings` with normalized keys `run_every_days`, `allocation_size_per_message`, and `recipient_cooldown_days`. Allocation quota remains separate from the existing Campaign send-pattern daily email pacing, and allocation ScheduledMessages reuse that existing Campaign pacing constraint.
+
+The shared queued Contact-result operation pipeline supports ordinary enrollment across both execution strategies, sequential/allocation re-enrollment from a selected active current message, allocation exclusions/removal, and atomic allocation enrollment with a selected message already excluded. The richer CRM controls remain a surface-layer follow-up.
+
+Production deployments must restart long-lived queue workers after pulling code and running Campaigns migrations (`php artisan queue:restart` followed by the client Supervisor Horizon restart) before relying on recurring-allocation jobs. Normal local development does not require that restart step.
 
 See `docs/modules/campaigns/recurring-allocation.md`.
 

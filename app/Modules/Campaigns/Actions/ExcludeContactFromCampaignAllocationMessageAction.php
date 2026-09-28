@@ -4,17 +4,22 @@ namespace App\Modules\Campaigns\Actions;
 
 use App\Models\User;
 use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Campaigns\Models\CampaignAllocationAssignment;
 use App\Modules\Campaigns\Models\CampaignAllocationMessageExclusion;
 use App\Modules\Campaigns\Services\CampaignMessageStepResolver;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Actions\SkipScheduledMessagesAction;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 final class ExcludeContactFromCampaignAllocationMessageAction
 {
+    public const PENDING_MESSAGE_SKIP_REASON = 'campaign_allocation_message_excluded';
+
     public function __construct(
         private readonly CampaignMessageStepResolver $messageSteps,
+        private readonly SkipScheduledMessagesAction $skipScheduledMessages,
     ) {}
 
     public function handle(
@@ -58,7 +63,7 @@ final class ExcludeContactFromCampaignAllocationMessageAction
 
             $this->messageSteps->activeStep($campaign, $messageStepKey);
 
-            return CampaignAllocationMessageExclusion::query()->updateOrCreate(
+            $exclusion = CampaignAllocationMessageExclusion::query()->updateOrCreate(
                 [
                     'contact_id' => $contact->getKey(),
                     'campaign_id' => $campaign->getKey(),
@@ -71,6 +76,24 @@ final class ExcludeContactFromCampaignAllocationMessageAction
                     'reason' => $this->reason($reason),
                 ],
             );
+
+            $assignments = CampaignAllocationAssignment::query()
+                ->where('contact_id', $contact->getKey())
+                ->where('campaign_id', $campaign->getKey())
+                ->where('message_step_key', $messageStepKey)
+                ->whereNotNull('scheduled_message_id')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($assignments as $assignment) {
+                $this->skipScheduledMessages->forContext(
+                    context: $assignment,
+                    reason: self::PENDING_MESSAGE_SKIP_REASON,
+                );
+            }
+
+            return $exclusion->refresh();
         }, 3);
     }
 

@@ -465,6 +465,82 @@ ProcessDueCampaignAllocationsJob
 ProcessCampaignAllocationRunJob
 ```
 
+## Bulk Contact-result operations
+
+Campaigns has one shared queued operation pipeline for operator-selected Contact
+result sets.
+
+Supported operation identities are:
+
+```text
+enroll
+reenroll_from_message
+exclude_allocation_message
+remove_allocation_message_exclusion
+enroll_with_allocation_message_exclusion
+```
+
+`enroll` chooses the correct lifecycle seam from the Campaign execution
+strategy. Sequential Campaigns use ordinary Campaign enrollment; recurring
+allocation Campaigns create allocation participation without fabricating a
+MessageChainEnrollment.
+
+`reenroll_from_message` also chooses by execution strategy. Sequential
+Campaigns terminate open sequential enrollment and create a fresh enrollment
+starting at the selected current message. Recurring allocation Campaigns
+terminate active allocation participation and create a fresh allocation
+enrollment whose selected message is the inclusive floor.
+
+Allocation message exclusion operations remain allocation-only. The combined
+`enroll_with_allocation_message_exclusion` operation records the exclusion
+inside the same database transaction before allocation enrollment becomes
+visible, so the scheduler cannot allocate that disabled message in between the
+two operator intents.
+
+Each operator submission receives one stable operation id. That id becomes the
+stable entry identity used by sequential/allocation enrollment and
+re-enrollment, making chunk retries idempotent. Chunk jobs re-check the actor's
+Campaign Contact-result capability and Contact visibility before applying any
+mutation.
+
+One domain-invalid Contact does not poison the rest of a chunk. Expected
+Campaign lifecycle/configuration rejections are logged and skipped; unexpected
+runtime/database failures still fail the job and use normal queue retry
+behavior.
+
+Recording an allocation message exclusion immediately skips any still-pending
+ScheduledMessage already planned from a matching allocation assignment. The
+send-time exclusion gate remains the final safety net for races where planning
+and exclusion happen concurrently.
+
+Removing an exclusion restores future eligibility only when no prior assignment
+already makes that message historical. It does not resurrect a terminal skipped
+ScheduledMessage or erase assignment history.
+
+The current simple CRM `Enroll in campaign` result action still uses its legacy
+job class, but that job now delegates to this shared operation processor. This
+means the existing simple bulk-enroll surface works for both execution
+strategies before the richer operator UI is added.
+
+## Production worker rollout
+
+Normal local development does not require a queue/Horizon restart after applying
+these source batches.
+
+Production rollout of recurring-allocation runtime changes must restart the
+long-lived workers after code pull and Campaigns migrations, before relying on
+the new scheduler/jobs:
+
+```text
+git pull / deploy application code
+run module migrations
+php artisan queue:restart
+sudo supervisorctl restart <client>-horizon
+run validation / smoke checks
+```
+
+Do not use `php artisan horizon:terminate` for this deployment flow.
+
 ## Still intentionally deferred
 
 This runtime batch does not add:
@@ -472,9 +548,9 @@ This runtime batch does not add:
 ```text
 automatic eligibility enrollment for recurring allocation
 cross-strategy Campaign-family arbitration
-bulk Contact-result orchestration for allocation/re-enrollment/exclusions
 contact-import allocation floor/exclusion authoring
 CRM execution-strategy/allocation settings
+rich Contact-result operation controls
 Campaign allocation run/history workspace UI
 manual run/preview controls
 new recurring-allocation test files
