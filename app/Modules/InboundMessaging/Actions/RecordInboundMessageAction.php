@@ -4,6 +4,8 @@ namespace App\Modules\InboundMessaging\Actions;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\InboundMessaging\Actions\Email\RecordInboundEmailRouteAutomationEventAction;
+use App\Modules\InboundMessaging\Contracts\ReplySemanticAssessmentProvider;
+use App\Modules\InboundMessaging\Data\ReplySemanticAssessment;
 use App\Modules\InboundMessaging\Models\InboundMessage;
 use App\Support\AutomationEvents\Data\AutomationEventData;
 use App\Support\AutomationEvents\Services\AutomationEventOutbox;
@@ -23,6 +25,7 @@ class RecordInboundMessageAction
     public function __construct(
         private readonly AutomationEventOutbox $automationEventOutbox,
         private readonly RecordInboundEmailRouteAutomationEventAction $recordInboundEmailRouteAutomationEvent,
+        private readonly ReplySemanticAssessmentProvider $replySemanticAssessmentProvider,
     ) {}
 
     /**
@@ -75,6 +78,10 @@ class RecordInboundMessageAction
         $inboxSettledAt = $requiresInboxReview
             ? null
             : ($data['received_at'] ?? now());
+        $semanticAssessment = $this->semanticAssessment($data);
+        $semanticAssessedAt = $semanticAssessment instanceof ReplySemanticAssessment
+            ? now()
+            : null;
 
         $inboundMessage = new InboundMessage([
             'webhook_inbox_receipt_id' => $this->webhookInboxReceiptId($identity),
@@ -100,6 +107,16 @@ class RecordInboundMessageAction
             'correlated_scheduled_message_id' =>
                 $data['correlated_scheduled_message_id'] ?? null,
             'reply_intent_key' => $data['reply_intent_key'] ?? null,
+            'reply_semantic_category' => $semanticAssessment?->category,
+            'reply_semantic_interest' => $semanticAssessment?->interest,
+            'reply_semantic_readiness' => $semanticAssessment?->readiness,
+            'reply_semantic_requested_action' =>
+                $semanticAssessment?->requestedAction,
+            'reply_semantic_constraint' => $semanticAssessment?->constraint,
+            'reply_semantic_confidence' => $semanticAssessment?->confidence,
+            'reply_semantic_source' => $semanticAssessment?->source,
+            'reply_semantic_rule_key' => $semanticAssessment?->ruleKey,
+            'reply_semantic_assessed_at' => $semanticAssessedAt,
             'reply_correlation_method' =>
                 $data['reply_correlation_method'] ?? null,
             'inbound_email_route_key' =>
@@ -311,6 +328,25 @@ class RecordInboundMessageAction
         return $value !== '' ? $value : null;
     }
 
+    /** @param array<string, mixed> $data */
+    private function semanticAssessment(array $data): ?ReplySemanticAssessment
+    {
+        if (($data['classification'] ?? null)
+            !== InboundMessage::CLASSIFICATION_NORMAL_REPLY
+            || $this->nullableString(
+                $data['inbound_email_route_key'] ?? null,
+            ) !== null
+        ) {
+            return null;
+        }
+
+        $body = is_string($data['body'] ?? null)
+            ? (string) $data['body']
+            : '';
+
+        return $this->replySemanticAssessmentProvider->assess($body);
+    }
+
     private function recordNormalReplyAutomationEvent(
         InboundMessage $inboundMessage,
         ?Model $sender,
@@ -339,6 +375,20 @@ class RecordInboundMessageAction
                         'reply_profile_key' =>
                             $inboundMessage->correlatedScheduledMessage?->replyProfileKey(),
                         'reply_intent_key' => $inboundMessage->reply_intent_key,
+                        'semantic_assessment' => [
+                            'category' => $inboundMessage->reply_semantic_category,
+                            'interest' => $inboundMessage->reply_semantic_interest,
+                            'readiness' => $inboundMessage->reply_semantic_readiness,
+                            'requested_action' =>
+                                $inboundMessage->reply_semantic_requested_action,
+                            'constraint' =>
+                                $inboundMessage->reply_semantic_constraint,
+                            'confidence' =>
+                                $inboundMessage->reply_semantic_confidence,
+                            'source' => $inboundMessage->reply_semantic_source,
+                            'rule_key' =>
+                                $inboundMessage->reply_semantic_rule_key,
+                        ],
                         'correlation_method' =>
                             $inboundMessage->reply_correlation_method,
                         'inbound_email_route_key' =>

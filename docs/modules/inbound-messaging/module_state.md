@@ -173,6 +173,16 @@ Profile keys are immutable. A referenced profile cannot be disabled or removed, 
 
 The neutral `inbound_message.normal_reply` event exposes compact correlation/profile/intent identity for optional automation consumers. InternalNotifications remains free to notify a human even when no automation route exists. Domain-specific labels, tags, statuses, tasks, acknowledgements, and other consequences remain configuration/owning-module behavior rather than InboundMessaging features.
 
+## Semantic reply assessment
+
+Semantic reply assessment is separate from profile-owned `reply_intent_key`. The deterministic profile classifier answers whether a reply matched one client's configured vocabulary. Semantic assessment records a conservative cross-client interpretation of the reply itself so Reporting and later automation may prioritize attention without hiding unresolved replies.
+
+The default `ReplySemanticAssessmentProvider` is deterministic and local. It recognizes only a small set of strong phrases for current high intent, positive-but-deferred interest, explicit negative intent, and routine acknowledgements. Anything it cannot classify confidently is persisted as `needs_review`; ambiguity is never converted into a guessed high-intent or negative outcome.
+
+The stored assessment dimensions are category, interest, readiness, requested action, constraint, confidence, source, matched rule key, and assessment time. Named/routed inbound-email intake and non-`normal_reply` classifications are not semantically assessed because they are not ordinary human replies.
+
+The provider contract deliberately leaves room for a later GPT-backed or composite provider. A future model-backed escalation should operate on `needs_review` cases rather than replacing the deterministic first pass, and it must remain additive to Inbox visibility. Semantic category must never decide whether an unresolved normal reply appears in the Inbox or Daily Follow-Up report.
+
 ## Responsibility
 
 InboundMessaging owns:
@@ -189,7 +199,8 @@ InboundMessaging owns:
 - semantic inbound-email route persistence/resolution and neutral `inbound_email.route_received` automation events;
 - optional deterministic route-owned Contact extraction before contact-aware route automation;
 - durable inbound Inbox triage and related-Contact association;
-- reply-profile, reply-intent, and reply-rule persistence and authoring.
+- reply-profile, reply-intent, and reply-rule persistence and authoring;
+- provider-neutral semantic reply assessment evidence for ordinary human replies.
 
 InboundMessaging may depend on:
 
@@ -264,6 +275,17 @@ body nullable
 classification
 purpose nullable
 scope nullable
+reply_intent_key nullable
+reply_semantic_category nullable
+reply_semantic_interest nullable
+reply_semantic_readiness nullable
+reply_semantic_requested_action nullable
+reply_semantic_constraint nullable
+reply_semantic_confidence nullable
+reply_semantic_source nullable
+reply_semantic_rule_key nullable
+reply_semantic_assessed_at nullable
+reply_correlation_method nullable
 inbound_email_route_key nullable
 inbound_email_route_source nullable
 inbound_email_route_context nullable

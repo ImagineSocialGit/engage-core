@@ -53,6 +53,15 @@ class InboundMessage extends Model
         'correlated_scheduled_message_id',
         'automated_response_scheduled_message_id',
         'reply_intent_key',
+        'reply_semantic_category',
+        'reply_semantic_interest',
+        'reply_semantic_readiness',
+        'reply_semantic_requested_action',
+        'reply_semantic_constraint',
+        'reply_semantic_confidence',
+        'reply_semantic_source',
+        'reply_semantic_rule_key',
+        'reply_semantic_assessed_at',
         'reply_correlation_method',
         'inbound_email_route_key',
         'inbound_email_route_source',
@@ -84,6 +93,7 @@ class InboundMessage extends Model
             'reviewed_at' => 'datetime',
             'completed_at' => 'datetime',
             'automated_handled_at' => 'datetime',
+            'reply_semantic_assessed_at' => 'datetime',
             'contact_extraction_attempted_at' => 'datetime',
         ];
     }

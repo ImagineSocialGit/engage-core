@@ -8,6 +8,7 @@ use App\Modules\InboundMessaging\Automation\InboundReplyAutomationTriggerAuthori
 use App\Modules\InboundMessaging\Automation\MarkInboundMessageAutoRespondedActionHandler;
 use App\Modules\InboundMessaging\Capabilities\InboundMessagingAutomationCapabilityContributor;
 use App\Modules\InboundMessaging\Console\Commands\SyncInboundReplyProfilesCommand;
+use App\Modules\InboundMessaging\Contracts\ReplySemanticAssessmentProvider;
 use App\Modules\InboundMessaging\Deployment\InboundMessagingDeploymentPlanContributor;
 use App\Modules\InboundMessaging\Events\InboundMessageReceived;
 use App\Modules\InboundMessaging\Listeners\ConsumeRoutedInboundMessage;
@@ -16,6 +17,7 @@ use App\Modules\InboundMessaging\Services\ContactShow\ContactConversationShowDat
 use App\Modules\InboundMessaging\Services\Dashboard\LeadRepliesDashboardPanelProvider;
 use App\Modules\InboundMessaging\Services\Email\EmailWebhookHandlerResolver;
 use App\Modules\InboundMessaging\Services\Email\RoutedInboundMessageConsumerRegistry;
+use App\Modules\InboundMessaging\Services\Reply\DeterministicReplySemanticAssessmentProvider;
 use App\Modules\InboundMessaging\Services\ReplyProfiles\InboundReplyProfilePresentationProvider;
 use App\Modules\InboundMessaging\Services\Sms\SmsWebhookHandlerResolver;
 use App\Modules\InboundMessaging\Validation\InboundMessagingSetupValidationContributor;
@@ -52,6 +54,11 @@ class InboundMessagingModuleServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(EmailWebhookHandlerResolver::class);
+
+        $this->app->bind(
+            ReplySemanticAssessmentProvider::class,
+            DeterministicReplySemanticAssessmentProvider::class,
+        );
 
         $this->app->singleton(
             RoutedInboundMessageConsumerRegistry::class,
