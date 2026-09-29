@@ -25,6 +25,7 @@ final class CommerceOrderSyncService
         private readonly CommerceProviderRoleResolver $roles,
         private readonly CommerceOrderCustomerReconciler $customers,
         private readonly CommerceOrderInventoryEffectProducer $inventoryEffects,
+        private readonly CommercePurchaseConfirmationService $purchaseConfirmations,
     ) {}
 
     public function sync(
@@ -191,6 +192,11 @@ final class CommerceOrderSyncService
 
         $this->inventoryEffects->reconcileAuthoritativeEffects(
             $inventoryEffectIds,
+        );
+
+        $this->purchaseConfirmations->confirm(
+            commerceOrderId: $result->commerceOrderId,
+            occurredAt: $request->occurredAt ?? $snapshot->orderedAt,
         );
 
         return $result;

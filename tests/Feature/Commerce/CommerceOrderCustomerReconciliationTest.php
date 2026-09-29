@@ -14,6 +14,7 @@ use App\Modules\Commerce\Services\CommerceInventoryEffectRecorder;
 use App\Modules\Commerce\Services\CommerceOrderCustomerReconciler;
 use App\Modules\Commerce\Services\CommerceOrderInventoryEffectProducer;
 use App\Modules\Commerce\Services\CommerceOrderSyncService;
+use App\Modules\Commerce\Services\CommercePurchaseConfirmationService;
 use App\Modules\Commerce\Services\CommerceProviderRegistry;
 use App\Modules\Commerce\Services\CommerceProviderRoleResolver;
 use App\Modules\Commerce\Services\CommerceProviderVariantReferenceResolver;
@@ -244,6 +245,7 @@ class CommerceOrderCustomerReconciliationTest extends TestCase
                     references: new CommerceProviderVariantReferenceResolver(),
                 ),
             ),
+            purchaseConfirmations: app(CommercePurchaseConfirmationService::class),
         );
     }
 

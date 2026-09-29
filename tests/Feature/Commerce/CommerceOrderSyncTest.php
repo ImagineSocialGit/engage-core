@@ -23,9 +23,11 @@ use App\Modules\Commerce\Services\CommerceInventoryEffectRecorder;
 use App\Modules\Commerce\Services\CommerceOrderCustomerReconciler;
 use App\Modules\Commerce\Services\CommerceOrderInventoryEffectProducer;
 use App\Modules\Commerce\Services\CommerceOrderSyncService;
+use App\Modules\Commerce\Services\CommercePurchaseConfirmationService;
 use App\Modules\Commerce\Services\CommerceProviderRegistry;
 use App\Modules\Commerce\Services\CommerceProviderRoleResolver;
 use App\Modules\Commerce\Services\CommerceProviderVariantReferenceResolver;
+use App\Support\AutomationEvents\Models\AutomationEventOutboxEvent;
 use DateTimeImmutable;
 use Illuminate\Config\Repository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -121,12 +123,31 @@ class CommerceOrderSyncTest extends TestCase
         $this->assertSame((int) $mappedVariant->getKey(), (int) $item->commerce_product_variant_id);
         $this->assertSame('SAME-SKU', $item->sku);
 
-        $event = $order->events()->firstOrFail();
+        $event = $order->events()
+            ->where('event', CommerceOrderEvent::EVENT_CREATED)
+            ->firstOrFail();
 
         $this->assertSame(CommerceOrderEvent::EVENT_CREATED, $event->event);
         $this->assertSame('delivery-1', $event->external_id);
         $this->assertSame('orders/create', $event->meta['provider_event_type']);
         $this->assertNull($event->payload);
+
+        $purchase = $order->events()
+            ->where('event', CommerceOrderEvent::EVENT_PURCHASE_CONFIRMED)
+            ->firstOrFail();
+
+        $this->assertSame('commerce', $purchase->source);
+        $this->assertSame('order-provider', $purchase->provider);
+        $this->assertSame(
+            (int) $order->getKey(),
+            $purchase->payload['commerce_order_id'] ?? null,
+        );
+        $this->assertSame(
+            1,
+            AutomationEventOutboxEvent::query()
+                ->where('event_key', CommercePurchaseConfirmationService::AUTOMATION_EVENT_KEY)
+                ->count(),
+        );
 
         $this->assertSame(['order-500'], $provider->requests);
     }
@@ -168,7 +189,8 @@ class CommerceOrderSyncTest extends TestCase
 
         $this->assertSame(1, CommerceOrder::query()->count());
         $this->assertSame(1, CommerceOrderItem::query()->count());
-        $this->assertSame(1, CommerceOrderEvent::query()->count());
+        $this->assertSame(2, CommerceOrderEvent::query()->count());
+        $this->assertSame(1, AutomationEventOutboxEvent::query()->count());
     }
 
     public function test_later_snapshot_changes_existing_order_and_item_without_replacing_identity(): void
@@ -543,6 +565,7 @@ class CommerceOrderSyncTest extends TestCase
                     references: new CommerceProviderVariantReferenceResolver(),
                 ),
             ),
+            purchaseConfirmations: app(CommercePurchaseConfirmationService::class),
         );
     }
 

@@ -26,6 +26,7 @@ class CommerceOrderEvent extends Model
     public const EVENT_REFUNDED = 'refunded';
     public const EVENT_FULFILLED = 'fulfilled';
     public const EVENT_SYNCED = 'synced';
+    public const EVENT_PURCHASE_CONFIRMED = 'purchase_confirmed';
 
     protected $fillable = [
         'commerce_order_id',
