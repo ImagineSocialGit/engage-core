@@ -2,8 +2,7 @@
 
 namespace App\Modules\Messaging\Actions;
 
-use App\Modules\Campaigns\Models\CampaignAllocationAssignment;
-use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Messaging\Contracts\RecordsOriginalRequestedSendAt;
 use App\Modules\Messaging\Data\ScheduledMessagePlanningContext;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
@@ -17,6 +16,7 @@ use App\Modules\Messaging\Services\ScheduledMessageMetaCanonicalizer;
 use App\Modules\Messaging\Services\ScheduledMessageSendAtConstraintResolver;
 use App\Modules\Messaging\Services\ScheduledMessagePayloadCanonicalizer;
 use App\Support\Queues\QueueContract;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +39,7 @@ class ScheduleMessageAction
         string $messageType,
         string $payloadClass,
         array $payload,
-        Carbon|string|null $sendAt = null,
+        DateTimeInterface|string|null $sendAt = null,
         ?Model $context = null,
         ?Model $behaviorOwner = null,
         ?string $dedupeKey = null,
@@ -69,7 +69,9 @@ class ScheduleMessageAction
             $behaviorOwner = $messageChainEnrollment;
         }
 
-        $sourceSendAt = $sendAt ? Carbon::parse($sendAt) : now();
+        $sourceSendAt = $sendAt instanceof DateTimeInterface
+            ? Carbon::instance($sendAt)
+            : ($sendAt !== null ? Carbon::parse($sendAt) : now());
         $sendAt = $sourceSendAt->copy()->utc();
 
         $meta ??= [];
@@ -125,10 +127,9 @@ class ScheduleMessageAction
 
         if ($channel === MessageChannel::Email->value
             && $purpose === MessagePurpose::Marketing->value
-            && ($context instanceof CampaignEnrollment
-                || $context instanceof CampaignAllocationAssignment)
+            && $context instanceof RecordsOriginalRequestedSendAt
         ) {
-            $meta['planning_requested_at'] = $sendAt->toISOString();
+            $meta['planning_requested_at'] = $sourceSendAt->toISOString();
         }
         $meta = $this->metaCanonicalizer->forPersistence($meta);
 

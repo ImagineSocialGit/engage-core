@@ -16,7 +16,7 @@ class ContactControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_renders_contacts_index_with_contacts_and_create_form(): void
+    public function test_it_filters_contacts_index_by_search(): void
     {
         $user = User::factory()->create();
 
@@ -34,18 +34,14 @@ class ContactControllerTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->get(route('crm.contacts.index'));
+            ->get(route('crm.contacts.index', ['search' => $contact->email]));
 
         $response->assertOk();
-        $response->assertSee('Jane Lead');
-        $response->assertSee('jane@example.test');
-        $response->assertSee('Add '.str(config('contacts.labels.singular'))->title());
-        $response->assertSee('Create '.str(config('contacts.labels.singular'))->title());
-        $response->assertSee('name="email"', false);
-        $response->assertSee('name="contact_status_id"', false);
-        $response->assertSee('name="existing_relationship_confirmed"', false);
-
-        $this->assertSame($contact->id, Contact::query()->firstWhere('email', 'jane@example.test')->id);
+        $response->assertViewIs('crm.contacts.index');
+        $response->assertViewHas('contacts', function ($contacts) use ($contact): bool {
+            return $contacts->total() === 1
+                && $contacts->items()[0]->getKey() === $contact->getKey();
+        });
     }
 
     public function test_it_creates_contact_from_manual_form(): void

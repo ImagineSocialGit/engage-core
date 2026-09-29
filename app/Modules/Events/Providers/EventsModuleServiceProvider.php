@@ -2,9 +2,11 @@
 
 namespace App\Modules\Events\Providers;
 
+use App\Modules\Events\Jobs\ReconcileDueEventsJob;
 use App\Modules\Events\Readiness\CoreEventReadinessContributor;
 use App\Modules\Events\Services\EventDefinitionRegistry;
 use App\Modules\Events\Services\EventReadinessRegistry;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider;
 
 class EventsModuleServiceProvider extends ServiceProvider
@@ -42,6 +44,14 @@ class EventsModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Runtime routes, jobs, and UI are added only by later Events batches.
+        $this->callAfterResolving(
+            Schedule::class,
+            function (Schedule $schedule): void {
+                $schedule
+                    ->job(new ReconcileDueEventsJob())
+                    ->everyMinute()
+                    ->withoutOverlapping();
+            },
+        );
     }
 }

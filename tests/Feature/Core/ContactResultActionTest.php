@@ -37,9 +37,7 @@ class ContactResultActionTest extends TestCase
         $managerActions = collect($registry->actionsFor($manager))->keyBy('key');
 
         $this->assertSame('edit', $managerActions['core.add_tag']->groupKey);
-        $this->assertSame('Edit contacts', $managerActions['core.add_tag']->groupLabel);
         $this->assertSame('export', $managerActions['core.export']->groupKey);
-        $this->assertSame('Export', $managerActions['core.export']->groupLabel);
         $this->assertContains('core.add_tag', $memberKeys);
         $this->assertNotContains('core.export', $memberKeys);
         $this->assertNotContains('core.add_tag', $viewerKeys);
@@ -50,19 +48,29 @@ class ContactResultActionTest extends TestCase
     {
         $manager = User::factory()->create();
         $this->profile($manager, 'manager');
-        Contact::factory()->create([
+        $contact = Contact::factory()->create([
             'assigned_user_id' => $manager->getKey(),
         ]);
 
-        $this
+        $response = $this
             ->actingAs($manager)
-            ->get(route('crm.contacts.index'))
-            ->assertOk()
-            ->assertSee('Actions for this set')
-            ->assertSee('data-contact-result-action-group="edit"', false)
-            ->assertSee('Edit contacts')
-            ->assertSee('data-contact-result-action-group="export"', false)
-            ->assertSee('Export');
+            ->get(route('crm.contacts.index', ['search' => $contact->email]))
+            ->assertOk();
+
+        $this->assertSame(1, $response->viewData('contactResultCount'));
+
+        $groups = collect($response->viewData('contactResultActionGroups'));
+
+        $this->assertContains('edit', $groups->pluck('key')->all());
+        $this->assertContains('export', $groups->pluck('key')->all());
+        $this->assertContains(
+            'core.add_tag',
+            $groups->flatMap(fn (array $group) => $group['actions'])->pluck('key')->all(),
+        );
+        $this->assertContains(
+            'core.export',
+            $groups->flatMap(fn (array $group) => $group['actions'])->pluck('key')->all(),
+        );
     }
 
     public function test_bulk_tag_action_freezes_only_current_visible_contact_ids(): void

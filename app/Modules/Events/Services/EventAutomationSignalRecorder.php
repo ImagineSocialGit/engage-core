@@ -7,6 +7,7 @@ use App\Modules\Events\Enums\EventStatus;
 use App\Modules\Events\Models\Event;
 use App\Modules\Events\Models\EventAttendance;
 use App\Support\AutomationEvents\Data\AutomationEventData;
+use App\Support\AutomationEvents\Models\AutomationEventOutboxEvent;
 use App\Support\AutomationEvents\Services\AutomationEventOutbox;
 
 final class EventAutomationSignalRecorder
@@ -69,6 +70,58 @@ final class EventAutomationSignalRecorder
         );
     }
 
+    public function recordAnnouncementReached(
+        Event $event,
+        EventActionContext $context,
+    ): bool {
+        $outboxEvent = $this->outbox->record(
+            AutomationEventData::forSubject(
+                eventKey: self::ANNOUNCEMENT_REACHED,
+                subject: $event,
+                occurredAt: $context->occurredAtValue(),
+                payload: [
+                    'event_id' => (int) $event->getKey(),
+                    'status' => $event->status->value,
+                    'starts_at' => $event->starts_at?->toISOString(),
+                    'ends_at' => $event->ends_at?->toISOString(),
+                    'timezone' => $event->timezone,
+                    'announcement_at' => $event->announcement_at?->toISOString(),
+                ],
+                meta: $this->meta($context),
+            ),
+            idempotencyKey: $this->announcementReachedIdempotencyKey($event),
+        );
+
+        return $outboxEvent->wasRecentlyCreated;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public function recordedAnnouncementEventIds(): array
+    {
+        $subjectType = (new Event())->getMorphClass();
+
+        return AutomationEventOutboxEvent::query()
+            ->where('event_key', self::ANNOUNCEMENT_REACHED)
+            ->where('subject_type', $subjectType)
+            ->whereNotNull('subject_id')
+            ->pluck('subject_id')
+            ->map(static function (mixed $subjectId): ?int {
+                $value = is_int($subjectId)
+                    ? (string) $subjectId
+                    : (is_string($subjectId) ? trim($subjectId) : '');
+
+                return $value !== '' && ctype_digit($value)
+                    ? (int) $value
+                    : null;
+            })
+            ->filter(static fn (?int $eventId): bool => $eventId !== null)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function recordAttendance(
         EventAttendance $attendance,
         EventActionContext $context,
@@ -114,6 +167,11 @@ final class EventAutomationSignalRecorder
             ],
             meta: $this->meta($context),
         ));
+    }
+
+    private function announcementReachedIdempotencyKey(Event $event): string
+    {
+        return 'events:event:'.(int) $event->getKey().':announcement_reached';
     }
 
     /**

@@ -3,12 +3,13 @@
 namespace App\Modules\Campaigns\Models;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Contracts\RecordsOriginalRequestedSendAt;
 use App\Modules\Messaging\Models\MessageChainVersion;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-final class CampaignAllocationAssignment extends Model
+final class CampaignAllocationAssignment extends Model implements RecordsOriginalRequestedSendAt
 {
     protected $fillable = [
         'campaign_id',

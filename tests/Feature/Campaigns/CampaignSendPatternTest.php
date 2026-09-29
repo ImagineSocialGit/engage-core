@@ -6,8 +6,10 @@ use App\Modules\Campaigns\Actions\UpdateCampaignSendPatternAction;
 use App\Modules\Campaigns\Services\CampaignPacingOverrideService;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Campaigns\Models\CampaignAllocationAssignment;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\ScheduleMessageAction;
+use App\Modules\Messaging\Contracts\RecordsOriginalRequestedSendAt;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use Carbon\Carbon;
@@ -38,6 +40,11 @@ class CampaignSendPatternTest extends TestCase
         ]);
 
         $messages = collect();
+        $requestedAt = Carbon::parse(
+            '2026-09-23 09:00:00',
+            'America/Chicago',
+        );
+        $requestedAtIso = $requestedAt->toISOString();
 
         foreach (range(1, 3) as $index) {
             $contact = Contact::factory()->create();
@@ -64,10 +71,7 @@ class CampaignSendPatternTest extends TestCase
                         'subject' => 'Campaign',
                         'body' => 'Campaign message.',
                     ],
-                    sendAt: Carbon::parse(
-                        '2026-09-23 09:00:00',
-                        'America/Chicago',
-                    ),
+                    sendAt: $requestedAt->copy(),
                     context: $enrollment,
                     dedupeKey: 'send-pattern-message-'.$index,
                     queue: 'emails',
@@ -89,6 +93,13 @@ class CampaignSendPatternTest extends TestCase
             '2026-09-23 09:30:00',
             '2026-09-24 09:00:00',
         ], $local);
+
+        foreach ($messages as $message) {
+            $this->assertSame(
+                $requestedAtIso,
+                $message->meta['planning_requested_at'] ?? null,
+            );
+        }
     }
 
     public function test_send_pattern_does_not_delay_transactional_email_or_sms(): void
@@ -136,6 +147,13 @@ class CampaignSendPatternTest extends TestCase
         );
 
         $this->assertTrue($transactional->send_at->equalTo($requested));
+        $this->assertArrayNotHasKey('planning_requested_at', $transactional->meta ?? []);
+    }
+
+    public function test_both_campaign_contexts_opt_into_original_requested_time_recording(): void
+    {
+        $this->assertInstanceOf(RecordsOriginalRequestedSendAt::class, new CampaignEnrollment);
+        $this->assertInstanceOf(RecordsOriginalRequestedSendAt::class, new CampaignAllocationAssignment);
     }
 
     public function test_one_time_override_spaces_ready_pending_emails_in_remaining_window_without_changing_pattern(): void

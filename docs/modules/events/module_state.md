@@ -1,6 +1,6 @@
 # Events Module
 
-Events is a universal module with an approved architecture. Its definition registry, persistence foundation, readiness registry, announcement/promotion gates, and duplicate detector are implemented; operational lifecycle, attendance-writing, automation, scheduled reconciliation, setup validation, and CRM administration remain to be completed.
+Events is a universal module with an approved architecture. Its definition registry, persistence foundation, readiness registry, announcement/promotion gates, duplicate detector, lifecycle actions, attendance reconciliation, neutral automation signals, and scheduled reconciliation are implemented; setup validation and CRM administration remain to be completed.
 
 Events is a thin catalog and reconciliation capability for concrete events that are operated, produced, ticketed, hosted, or streamed outside Engage Core.
 
@@ -688,14 +688,16 @@ Attendance signal
 
 ## Automatic reconciliation job
 
-A scheduled reconciliation job may:
+Scheduled reconciliation runs every minute through the Events module provider. It:
 
 ```text
-emit event.announcement_reached once when the embargo lifts
-complete upcoming Events only when a non-null ends_at has passed
+emits event.announcement_reached once when the embargo lifts
+completes upcoming Events only when a non-null ends_at has passed
 ```
 
-The job must be idempotent and must not infer completion from `starts_at` when `ends_at` is absent.
+Completion is reconciled before announcement emission so an Event whose end time has already passed cannot briefly become newly promotable from a late announcement signal. Automatic completion reuses the authoritative Events lifecycle action rather than updating status directly. Announcement emission uses the durable shared Automation Event outbox as its one-time marker and does not add a duplicate `announcement_reached_at` field to the Event record.
+
+The reconciler is idempotent and never infers completion from `starts_at` when `ends_at` is absent.
 
 ## Optional-module boundaries
 
@@ -819,7 +821,7 @@ Do not include Music, Bandsintown, Commerce, Experiences, FlowRoutes, Messaging,
 
 ## Implementation status
 
-Current repository status after the lifecycle and attendance action foundation:
+Current repository status after scheduled Event reconciliation:
 
 ```text
 Events module directory: present
@@ -831,13 +833,13 @@ Events announcement gate and authoritative promotion gate: present
 Events duplicate similarity detector: present
 Events-owned draft creation and lifecycle actions: present
 Events attendance reconciliation action: present
-Neutral automation signals: event.created, event.upcoming, event.postponed, event.rescheduled, event.cancelled, event.completed, event.attendance_recorded
-Scheduled announcement/completion reconciliation: not present
+Neutral automation signals: event.created, event.upcoming, event.announcement_reached, event.postponed, event.rescheduled, event.cancelled, event.completed, event.attendance_recorded
+Scheduled announcement/completion reconciliation: present; runs every minute and reuses the shared outbox/lifecycle actions
 Legacy Project State policy: all four Events tables explicitly classified must_be_empty; no Events transfer section is required for rollout
 Events CRM routes/navigation: not present
 Events setup validation: not present
 ```
 
-The next implementation work should follow the approved order above: scheduled Event reconciliation, setup validation, and CRM administration before optional consumers are added.
+The next implementation work should follow the approved order above: setup validation and CRM administration before optional consumers are added.
 
 This document remains the canonical architecture reference. Exact file manifests still require a fresh dependency cone for every consumer module touched by a later integration batch.

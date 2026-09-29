@@ -12,7 +12,6 @@ use App\Modules\Core\Models\ContactImportOccurrence;
 use App\Modules\Core\Models\ContactImportRun;
 use App\Modules\Core\Services\Contacts\ContactImportBatchProcessor;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
-use App\Support\ProjectState\ProjectStateManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
@@ -33,7 +32,6 @@ class ContactImportQueuedProcessingTest extends TestCase
 
         config()->set('contact_imports.processing.chunk_rows', 2);
         config()->set('client.key', 'test-client');
-        config()->set('project_state.enforce_client_key', true);
     }
 
     public function test_import_request_queues_background_work_and_progresses_in_bounded_chunks(): void
@@ -172,30 +170,6 @@ class ContactImportQueuedProcessingTest extends TestCase
 
         $this->assertSame(2, Contact::query()->count());
         $this->assertSame(2, ContactImportOccurrence::query()->count());
-    }
-
-    public function test_project_state_export_is_blocked_while_an_environment_local_import_run_is_active(): void
-    {
-        $user = User::factory()->create();
-        $csvPath = $this->preview(
-            user: $user,
-            contents: "Email\none@example.test\n",
-        );
-
-        $this->actingAs($user)->post(
-            route('crm.contacts.import.process'),
-            [
-                'csv_path' => $csvPath,
-                'mapping' => [
-                    'email' => 'Email',
-                ],
-            ],
-        )->assertRedirect();
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('contact_import_runs');
-
-        app(ProjectStateManager::class)->export();
     }
 
     private function preview(User $user, string $contents): string

@@ -3,13 +3,14 @@
 namespace App\Modules\Campaigns\Models;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Contracts\RecordsOriginalRequestedSendAt;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
-class CampaignEnrollment extends Model
+class CampaignEnrollment extends Model implements RecordsOriginalRequestedSendAt
 {
     use HasFactory;
 

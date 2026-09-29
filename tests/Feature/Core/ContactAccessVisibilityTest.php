@@ -28,10 +28,17 @@ class ContactAccessVisibilityTest extends TestCase
         ]);
 
         $this->actingAs($member)
-            ->get(route('crm.contacts.index'))
+            ->get(route('crm.contacts.index', ['search' => $visible->email]))
             ->assertOk()
-            ->assertSee($visible->email)
-            ->assertDontSee($hidden->email);
+            ->assertViewHas('contacts', function ($contacts) use ($visible): bool {
+                return $contacts->total() === 1
+                    && $contacts->items()[0]->getKey() === $visible->getKey();
+            });
+
+        $this->actingAs($member)
+            ->get(route('crm.contacts.index', ['search' => $hidden->email]))
+            ->assertOk()
+            ->assertViewHas('contacts', fn ($contacts): bool => $contacts->total() === 0);
 
         $this->actingAs($member)
             ->getJson(route('crm.contacts.lookup', [
