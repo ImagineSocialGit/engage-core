@@ -5,6 +5,15 @@
     module="commerce"
 >
     <div class="space-y-6" data-commerce-workspace>
+        <div class="flex justify-end">
+            <a
+                href="{{ route('crm.commerce.orders.index') }}"
+                class="inline-flex items-center rounded-xl px-4 py-2 text-sm font-semibold ring-1 transition {{ module_tone('commerce', 'badge') }} hover:brightness-95"
+                data-commerce-orders-link
+            >
+                View orders
+            </a>
+        </div>
         <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <x-ui.card>
                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Products</p>

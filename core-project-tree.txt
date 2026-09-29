@@ -327,6 +327,7 @@
 │   │   │   ├── Controllers
 │   │   │   │   └── CRM
 │   │   │   │       ├── CommerceController.php
+│   │   │   │       ├── CommerceOrderController.php
 │   │   │   │       └── CommerceProductController.php
 │   │   │   ├── Data
 │   │   │   │   ├── CommerceCatalogPage.php
@@ -383,6 +384,7 @@
 │   │   │   │   ├── CommerceOfferPublicationEvaluator.php
 │   │   │   │   ├── CommerceOrderCustomerReconciler.php
 │   │   │   │   ├── CommerceOrderInventoryEffectProducer.php
+│   │   │   │   ├── CommerceOrderReadService.php
 │   │   │   │   ├── CommerceOrderSyncService.php
 │   │   │   │   ├── CommerceProviderRegistry.php
 │   │   │   │   ├── CommerceProviderRoleResolver.php
@@ -3055,6 +3057,9 @@
 │       │   │       └── show.blade.php
 │       │   ├── commerce
 │       │   │   ├── index.blade.php
+│       │   │   ├── orders
+│       │   │   │   ├── index.blade.php
+│       │   │   │   └── show.blade.php
 │       │   │   └── products
 │       │   │       └── show.blade.php
 │       │   ├── contacts
@@ -3395,6 +3400,7 @@
 │   │   │   ├── CommerceInventoryOrchestrationTest.php
 │   │   │   ├── CommerceOrderCustomerReconciliationTest.php
 │   │   │   ├── CommerceOrderSyncTest.php
+│   │   │   ├── CommerceOrderWorkspaceTest.php
 │   │   │   ├── CommercePurchaseConfirmationTest.php
 │   │   │   ├── CommerceSetupValidationTest.php
 │   │   │   ├── CommerceStorefrontFoundationTest.php
@@ -4004,4 +4010,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-887 directories, 3118 files
+888 directories, 3123 files
