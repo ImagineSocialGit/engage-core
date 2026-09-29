@@ -2,13 +2,9 @@
     $selectedCriteria = is_array($eligibility['selected'] ?? null)
         ? $eligibility['selected']
         : [];
-    $selectedCriterionCount = collect($selectedCriteria)
-        ->sum(fn (mixed $values): int => is_array($values) ? count($values) : 0);
-    $startSummary = $campaign->usesAutomaticEnrollment()
-        ? ($selectedCriterionCount > 0
-            ? 'Leads are added automatically when they match '.$selectedCriterionCount.' selected audience '.\Illuminate\Support\Str::plural('rule', $selectedCriterionCount)
-            : 'Automatic entry needs at least one audience rule')
-        : 'Leads are added only when you choose them';
+    $excludedCriteria = is_array($eligibility['excluded'] ?? null)
+        ? $eligibility['excluded']
+        : [];
     $messagePresentation = is_array($messageReview['presentation'] ?? null)
         ? $messageReview['presentation']
         : [];
@@ -25,16 +21,21 @@
         ? array_values($scheduleAuthoring['message_options'])
         : [];
     $messageChainVersionId = (int) ($messageReview['message_chain_version_id'] ?? 0);
-    $startHasErrors = collect($errors->keys())->contains(
+    $audienceHasErrors = collect($errors->keys())->contains(
         fn (string $key): bool => in_array($key, [
             'enrollment_mode',
             'reentry_policy',
             'ineligible_behavior',
+        ], true)
+            || str_starts_with($key, 'eligibility_criteria')
+            || str_starts_with($key, 'eligibility_exclusions'),
+    );
+    $outreachHasErrors = collect($errors->keys())->contains(
+        fn (string $key): bool => in_array($key, [
             'execution_strategy',
             'allocation_settings',
         ], true)
-            || str_starts_with($key, 'allocation_settings.')
-            || str_starts_with($key, 'eligibility_criteria'),
+            || str_starts_with($key, 'allocation_settings.'),
     );
     $failedCampaignEditor = old('campaign_editor');
     $scheduleHasErrors = $failedCampaignEditor === 'schedule' && collect($errors->keys())->contains(
@@ -49,6 +50,17 @@
             || str_starts_with($key, 'payload.')
             || $key === '_editing_message_id',
     );
+    $initialModal = $scheduleHasErrors
+        ? 'schedule'
+        : ($messageHasErrors
+            ? 'messages'
+            : ($audienceHasErrors
+                ? 'audience'
+                : ($outreachHasErrors
+                    ? 'outreach'
+                    : (in_array($initialPanel, ['audience', 'outreach', 'schedule', 'messages'], true)
+                        ? $initialPanel
+                        : null))));
     $messageReturnPath = route('crm.campaigns.edit', [
         'campaign' => $campaign,
         'panel' => 'messages',
@@ -69,12 +81,7 @@
         class="min-w-0 space-y-6"
         data-campaign-setup
         x-data="{
-            activeModal: @js($scheduleHasErrors ? 'schedule' : ($messageHasErrors ? 'messages' : (in_array($initialPanel, ['schedule', 'messages'], true) ? $initialPanel : null))),
-            startOpen: @js($initialPanel === 'start' || $startHasErrors),
-            openStart() {
-                this.startOpen = true;
-                this.$nextTick(() => document.getElementById('campaign-start-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-            },
+            activeModal: @js($initialModal),
             openModal(panel) {
                 this.activeModal = panel;
             },
@@ -82,7 +89,6 @@
                 this.activeModal = null;
             },
         }"
-        x-init="if (@js($initialPanel) === 'review') { $nextTick(() => document.getElementById('campaign-review')?.scrollIntoView({ block: 'start' })) }"
         x-on:keydown.escape.window="closeModal()"
     >
         @if(session('status'))
@@ -113,62 +119,40 @@
             </section>
         @endif
 
-        <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
             <a href="{{ route('crm.campaigns.show', $campaign) }}" class="break-words text-sm font-semibold text-slate-600 hover:text-slate-950">
                 &larr; Back to campaign
             </a>
-
-            <button
-                type="button"
-                data-campaign-panel-open="messages"
-                x-on:click="openModal('messages')"
-                @disabled($messageReviewCount < 1)
-                class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-            >
-                Review messages
-            </button>
         </div>
 
         <x-campaigns.builder-shell :stages="$workspace['builder_stages']" mode="edit">
             <div class="grid min-w-0 gap-4 lg:grid-cols-2">
                 <section class="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-                    <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div class="min-w-0">
-                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">1 · Who gets it</p>
-                            <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">Choose the leads for this campaign</h3>
-                        </div>
-                        <span class="w-fit shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">Editable</span>
-                    </div>
-                    <p class="mt-3 break-words text-sm leading-6 text-slate-600">{{ $startSummary }}</p>
+                    <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Who gets it</p>
+                    <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">{{ $eligibility['summary'] }}</h3>
                     <div class="mt-4 flex flex-wrap gap-2 text-xs font-bold text-slate-600">
                         <span class="rounded-full bg-slate-100 px-3 py-1">
                             {{ $campaign->usesAutomaticEnrollment() ? 'Added automatically' : 'Added manually' }}
                         </span>
                         <span class="rounded-full bg-slate-100 px-3 py-1">
-                            {{ number_format((int) ($eligibility['matching_count'] ?? 0)) }} matching now
+                            {{ number_format((int) ($eligibility['matching_count'] ?? 0)) }} {{ \Illuminate\Support\Str::plural('lead', (int) ($eligibility['matching_count'] ?? 0)) }} matching now
                         </span>
                     </div>
                     <button
                         type="button"
-                        data-campaign-panel-open="start"
-                        x-on:click="openStart()"
+                        data-campaign-panel-open="audience"
+                        x-on:click="openModal('audience')"
                         class="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 sm:w-auto"
                     >
-                        Edit who gets it
+                        Edit audience
                     </button>
                 </section>
 
                 <section class="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-                    <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div class="min-w-0">
-                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">2 · What they receive</p>
-                            <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">Review the messages</h3>
-                        </div>
-                        <span class="w-fit shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">Editable</span>
-                    </div>
-                    <p class="mt-3 break-words text-sm leading-6 text-slate-600">
-                        {{ $messageReviewCount }} {{ \Illuminate\Support\Str::plural('message', $messageReviewCount) }} ready to review in this campaign.
-                    </p>
+                    <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Messages</p>
+                    <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">
+                        {{ $messageReviewCount }} total {{ \Illuminate\Support\Str::plural('message', $messageReviewCount) }}
+                    </h3>
                     @if($workspace['channels'] !== [])
                         <div class="mt-4 flex min-w-0 flex-wrap gap-2">
                             @foreach($workspace['channels'] as $channel)
@@ -185,7 +169,7 @@
                         @disabled($messageReviewCount < 1)
                         class="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-4 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                     >
-                        Review messages
+                        Review now
                     </button>
                     @if($messageReviewCount < 1 && (int) $workspace['message_count'] > 0)
                         <a
@@ -198,41 +182,39 @@
                 </section>
 
                 <section class="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-                    <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div class="min-w-0">
-                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">3 · When it happens</p>
-                            <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">Set the message timing</h3>
-                        </div>
-                        <span class="w-fit shrink-0 rounded-full px-3 py-1 text-xs font-bold {{ $scheduleEditable ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600' }}">{{ $scheduleEditable ? 'Editable' : 'View' }}</span>
-                    </div>
-                    <p class="mt-3 break-words text-sm leading-6 text-slate-600">
-                        {{ $workspace['message_step_count'] }} active {{ \Illuminate\Support\Str::plural('message', $workspace['message_step_count']) }} {{ $campaign->usesRecurringAllocation() ? 'each have their own timing.' : 'make up the follow-up series.' }}
-                    </p>
-                    <button
-                        type="button"
-                        data-campaign-panel-open="schedule"
-                        x-on:click="openModal('schedule')"
-                        class="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 sm:w-auto"
-                    >
-                        {{ $scheduleEditable ? 'Review and edit timing' : 'View timing' }}
-                    </button>
-                    @if($scheduleEditable)
+                    @if($campaign->usesRecurringAllocation())
+                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Outreach plan</p>
+                        <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">{{ $outreachPlan['summary'] }}</h3>
                         <button
                             type="button"
-                            x-on:click="openModal('schedule'); $dispatch('campaign-add-step')"
-                            class="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-4 text-sm font-bold text-white transition hover:bg-slate-800 sm:ml-2 sm:w-auto"
+                            data-campaign-panel-open="outreach"
+                            x-on:click="openModal('outreach')"
+                            class="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 sm:w-auto"
                         >
-                            Add a message
+                            Edit outreach plan
+                        </button>
+                    @else
+                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Follow-up timing</p>
+                        <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">
+                            {{ $workspace['message_step_count'] }}-message follow-up series
+                        </h3>
+                        <button
+                            type="button"
+                            data-campaign-panel-open="schedule"
+                            x-on:click="openModal('schedule')"
+                            class="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 sm:w-auto"
+                        >
+                            {{ $scheduleEditable ? 'Edit timing' : 'View timing' }}
                         </button>
                     @endif
                 </section>
 
                 <section id="campaign-review" class="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-                    <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div class="min-w-0">
-                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">4 · Review & turn on</p>
-                            <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">{{ $campaign->isActive() ? 'This campaign is running' : 'Ready when you are' }}</h3>
-                        </div>
+                    <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Campaign on/off</p>
+                    <div class="mt-2 flex items-start justify-between gap-3">
+                        <h3 class="break-words text-lg font-semibold text-slate-950">
+                            {{ $campaign->isActive() ? 'Campaign is on' : 'Campaign is off' }}
+                        </h3>
                         <span class="w-fit shrink-0 rounded-full px-3 py-1 text-xs font-bold {{ $campaign->isActive() ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600' }}">
                             {{ $campaign->isActive() ? 'On' : 'Off' }}
                         </span>
@@ -251,7 +233,7 @@
                                 data-campaign-lifecycle-action="activate"
                                 class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-emerald-700 px-5 text-sm font-bold text-white transition hover:bg-emerald-800 sm:w-auto"
                             >
-                                Turn on campaign
+                                Turn campaign on
                             </button>
                         </form>
                     @elseif($campaign->status === \App\Modules\Campaigns\Models\Campaign::STATUS_ACTIVE)
@@ -269,7 +251,7 @@
                                 data-campaign-lifecycle-action="deactivate"
                                 class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-red-700 px-5 text-sm font-bold text-white transition hover:bg-red-800 sm:w-auto"
                             >
-                                Turn off campaign
+                                Turn campaign off
                             </button>
                         </form>
                     @endif
@@ -277,218 +259,373 @@
             </div>
         </x-campaigns.builder-shell>
 
-        <section
-            id="campaign-start-editor"
-            data-campaign-start-editor
-            x-show="startOpen"
+        <div
+            x-show="activeModal === 'audience'"
             x-cloak
-            class="scroll-mt-6 rounded-3xl border border-rose-200 bg-white p-4 shadow-sm sm:p-6"
+            x-on:click.self="closeModal()"
+            data-campaign-panel-modal="audience"
+            class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 px-3 py-4 sm:px-6"
         >
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <p class="text-xs font-bold uppercase tracking-[0.16em] text-rose-700">Who gets this campaign</p>
-                    <h2 class="mt-2 text-xl font-semibold text-slate-950">Choose the leads this campaign should include</h2>
-                    <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                        Choose the lead groups that belong here. If you use more than one kind of rule, a lead must match each kind. Choosing several values inside one rule means any of those values can match.
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    x-on:click="startOpen = false"
-                    class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            <div role="dialog" aria-modal="true" aria-label="Campaign audience" class="max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
+                <header class="sticky top-0 z-30 flex flex-col gap-4 border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:flex-row sm:items-start sm:justify-between sm:px-6">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-rose-700">Campaign audience</p>
+                        <h2 class="mt-1 text-xl font-semibold text-slate-950">Who should get this campaign?</h2>
+                    </div>
+                    <button type="button" x-on:click="closeModal()" class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">Close</button>
+                </header>
+
+                <form
+                    method="POST"
+                    action="{{ route('crm.campaigns.eligibility.update', $campaign) }}"
+                    x-data="{
+                        matchingCount: @js((int) ($eligibility['matching_count'] ?? 0)),
+                        previewing: false,
+                        previewError: '',
+                        activeRule: null,
+                        chooser: null,
+                        showAdvanced: false,
+                        openRule(scope, key) {
+                            this.activeRule = scope + ':' + key;
+                            this.chooser = null;
+                        },
+                        async preview() {
+                            this.previewing = true;
+                            this.previewError = '';
+                            const data = new FormData(this.$refs.form);
+                            data.delete('_method');
+
+                            try {
+                                const response = await fetch(@js(route('crm.campaigns.eligibility.preview', $campaign)), {
+                                    method: 'POST',
+                                    body: data,
+                                    headers: {
+                                        'Accept': 'application/json',
+                                        'X-Requested-With': 'XMLHttpRequest',
+                                    },
+                                });
+                                const payload = await response.json();
+
+                                if (! response.ok) {
+                                    throw new Error(payload.message || 'Unable to preview matching leads.');
+                                }
+
+                                this.matchingCount = payload.matching_count || 0;
+                            } catch (error) {
+                                this.previewError = error.message || 'Unable to preview matching leads.';
+                            } finally {
+                                this.previewing = false;
+                            }
+                        },
+                    }"
+                    x-ref="form"
+                    data-campaign-eligibility-form
                 >
-                    Close
-                </button>
-            </div>
-
-            <section class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
-                <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">How this campaign works</p>
-                <p class="mt-1 text-sm font-bold text-slate-950">{{ $campaign->usesRecurringAllocation() ? 'Ongoing outreach' : 'Follow-up series' }}</p>
-                <p class="mt-1 text-xs leading-5 text-slate-600">This choice is set when the campaign is created so its sending behavior stays predictable.</p>
-
-                @if($campaign->usesRecurringAllocation())
-                <form method="POST" action="{{ route('crm.campaigns.execution.update', $campaign) }}" class="mt-4">
                     @csrf
                     @method('PATCH')
-                    <input type="hidden" name="execution_strategy" value="{{ $campaign->execution_strategy }}">
-                    <div class="grid gap-3 sm:grid-cols-3">
-                    <label class="block">
-                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Choose new leads every</span>
-                        <div class="mt-2 flex items-center gap-2"><input type="number" min="1" max="3650" name="allocation_settings[run_every_days]" value="{{ old('allocation_settings.run_every_days', $allocationSettings['run_every_days']) }}" class="min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900"><span class="text-sm text-slate-600">days</span></div>
-                        @error('allocation_settings.run_every_days')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
-                    </label>
-                    <label class="block">
-                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Leads per message</span>
-                        <input type="number" min="1" max="100000" name="allocation_settings[allocation_size_per_message]" value="{{ old('allocation_settings.allocation_size_per_message', $allocationSettings['allocation_size_per_message']) }}" class="mt-2 min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
-                        @error('allocation_settings.allocation_size_per_message')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
-                    </label>
-                    <label class="block">
-                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Wait before choosing the same lead again</span>
-                        <div class="mt-2 flex items-center gap-2"><input type="number" min="0" max="3650" name="allocation_settings[recipient_cooldown_days]" value="{{ old('allocation_settings.recipient_cooldown_days', $allocationSettings['recipient_cooldown_days']) }}" class="min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900"><span class="text-sm text-slate-600">days</span></div>
-                        @error('allocation_settings.recipient_cooldown_days')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
-                    </label>
-                    </div>
-                    <p class="mt-3 text-xs leading-5 text-slate-500">Each outreach round chooses a different eligible group for every active message. The timing for each message starts from the beginning of that outreach round. <a href="{{ route('crm.campaigns.show', $campaign) }}#campaign-email-delivery-pacing" class="font-semibold underline">Email delivery</a> can spread emails out later without changing who was chosen.</p>
-                    @error('allocation_settings')<p class="mt-3 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
-                    <div class="mt-4 flex justify-end"><button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800">Save outreach settings</button></div>
-                </form>
-                @endif
-                @error('execution_strategy')<p class="mt-3 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
-            </section>
 
-            <form
-                method="POST"
-                action="{{ route('crm.campaigns.eligibility.update', $campaign) }}"
-                x-data="{
-                    matchingCount: @js((int) ($eligibility['matching_count'] ?? 0)),
-                    previewing: false,
-                    previewError: '',
-                    async preview() {
-                        this.previewing = true;
-                        this.previewError = '';
-                        const data = new FormData(this.$refs.form);
-                        data.delete('_method');
+                    <div class="space-y-6 p-4 sm:p-6">
+                        <div class="grid gap-4 lg:grid-cols-3">
+                            <label class="block rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">How leads are added</span>
+                                <select name="enrollment_mode" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
+                                    @foreach($eligibility['enrollment_modes'] as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('enrollment_mode', $campaign->enrollment_mode) === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                @error('enrollment_mode')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                            </label>
 
-                        try {
-                            const response = await fetch(@js(route('crm.campaigns.eligibility.preview', $campaign)), {
-                                method: 'POST',
-                                body: data,
-                                headers: {
-                                    'Accept': 'application/json',
-                                    'X-Requested-With': 'XMLHttpRequest',
-                                },
-                            });
-                            const payload = await response.json();
+                            <label class="block rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Can a lead come back?</span>
+                                <select name="reentry_policy" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
+                                    @foreach($eligibility['reentry_policies'] as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('reentry_policy', $campaign->reentry_policy) === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                @error('reentry_policy')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                            </label>
 
-                            if (! response.ok) {
-                                throw new Error(payload.message || 'Unable to preview matching leads.');
-                            }
+                            <label class="block rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">If a lead stops matching</span>
+                                <select name="ineligible_behavior" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
+                                    @foreach($eligibility['ineligible_behaviors'] as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('ineligible_behavior', $campaign->ineligible_behavior) === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                @error('ineligible_behavior')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                            </label>
+                        </div>
 
-                            this.matchingCount = payload.matching_count || 0;
-                        } catch (error) {
-                            this.previewError = error.message || 'Unable to preview matching leads.';
-                        } finally {
-                            this.previewing = false;
-                        }
-                    },
-                }"
-                x-ref="form"
-                data-campaign-eligibility-form
-                class="mt-6 space-y-6"
-            >
-                @csrf
-                @method('PATCH')
-
-                @if($campaign->usesRecurringAllocation())
-                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                        Automatic entry adds matching leads for future outreach. Manual entry includes only leads you choose. Before each outreach round, the campaign checks these rules again.
-                    </div>
-                @endif
-                <div class="grid gap-4 lg:grid-cols-3">
-                    <label class="block rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">How leads are added</span>
-                        <select name="enrollment_mode" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
-                            @foreach($eligibility['enrollment_modes'] as $value => $label)
-                                <option value="{{ $value }}" @selected(old('enrollment_mode', $campaign->enrollment_mode) === $value)>{{ $label }}</option>
-                            @endforeach
-                        </select>
-                        @error('enrollment_mode')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
-                    </label>
-
-                    <label class="block rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Can a lead come back?</span>
-                        <select name="reentry_policy" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
-                            @foreach($eligibility['reentry_policies'] as $value => $label)
-                                <option value="{{ $value }}" @selected(old('reentry_policy', $campaign->reentry_policy) === $value)>{{ $label }}</option>
-                            @endforeach
-                        </select>
-                        @error('reentry_policy')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
-                    </label>
-
-                    <label class="block rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">If a lead stops matching</span>
-                        <select name="ineligible_behavior" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
-                            @foreach($eligibility['ineligible_behaviors'] as $value => $label)
-                                <option value="{{ $value }}" @selected(old('ineligible_behavior', $campaign->ineligible_behavior) === $value)>{{ $label }}</option>
-                            @endforeach
-                        </select>
-                        @error('ineligible_behavior')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
-                    </label>
-                </div>
-
-                <div class="grid gap-4 lg:grid-cols-2">
-                    @foreach($eligibility['criteria'] as $criterion)
-                        @php
-                            $criterionKey = (string) $criterion['key'];
-                            $selectedValues = old(
-                                'eligibility_criteria.'.$criterionKey,
-                                $selectedCriteria[$criterionKey] ?? [],
-                            );
-                            $selectedValues = is_array($selectedValues) ? $selectedValues : [];
-                        @endphp
-                        <fieldset class="rounded-2xl border border-slate-200 bg-white p-4">
-                            <legend class="px-1 text-sm font-bold text-slate-950">{{ $criterion['label'] }}</legend>
-                            @if(filled($criterion['help'] ?? null))
-                                <p class="mt-1 text-xs leading-5 text-slate-500">{{ $criterion['help'] }}</p>
-                            @endif
-                            <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                                @forelse($criterion['options'] as $option)
-                                    <label class="flex min-h-11 items-start gap-3 rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 hover:bg-slate-50">
-                                        <input
-                                            type="checkbox"
-                                            name="eligibility_criteria[{{ $criterionKey }}][]"
-                                            value="{{ $option['value'] }}"
-                                            @checked(in_array($option['value'], $selectedValues, true))
-                                            class="mt-0.5 rounded border-slate-300 text-rose-700 focus:ring-rose-600"
-                                        >
-                                        <span>{{ $option['label'] }}</span>
-                                    </label>
-                                @empty
-                                    <p class="text-sm text-slate-500">No available values.</p>
-                                @endforelse
+                        <section class="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h3 class="text-base font-semibold text-slate-950">Included leads</h3>
+                                    <p class="mt-1 text-sm text-slate-600">A lead must match every filter type you add here.</p>
+                                </div>
+                                <button type="button" x-on:click="chooser = chooser === 'include' ? null : 'include'; activeRule = null" class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:bg-slate-50">+ Add a filter</button>
                             </div>
-                            @error('eligibility_criteria.'.$criterionKey)<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
-                        </fieldset>
-                    @endforeach
+
+                            <div class="mt-4 space-y-2">
+                                @forelse($eligibility['criteria'] as $criterion)
+                                    @if(($criterion['selected_labels'] ?? []) !== [])
+                                        <button type="button" x-on:click="openRule('include', @js($criterion['key']))" class="flex w-full items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left hover:bg-slate-100">
+                                            <span>
+                                                <span class="block text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $criterion['label'] }}</span>
+                                                <span class="mt-1 block text-sm font-semibold text-slate-900">{{ implode(', ', $criterion['selected_labels']) }}</span>
+                                            </span>
+                                            <span class="text-sm font-bold text-slate-600">Edit</span>
+                                        </button>
+                                    @endif
+                                @empty
+                                @endforelse
+
+                                @if($selectedCriteria === [])
+                                    <p class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-600">No filters selected yet.</p>
+                                @endif
+                            </div>
+
+                            <div x-show="chooser === 'include'" x-cloak class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <p class="text-sm font-bold text-slate-950">What do you want to filter by?</p>
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    @foreach($eligibility['criteria'] as $criterion)
+                                        @if(! ($criterion['advanced'] ?? false))
+                                            <button type="button" x-on:click="openRule('include', @js($criterion['key']))" class="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100">{{ $criterion['label'] }}</button>
+                                        @endif
+                                    @endforeach
+                                </div>
+                                <button type="button" x-on:click="showAdvanced = ! showAdvanced" class="mt-4 text-sm font-semibold text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-950">Advanced filters</button>
+                                <div x-show="showAdvanced" x-cloak class="mt-3 flex flex-wrap gap-2">
+                                    @foreach($eligibility['criteria'] as $criterion)
+                                        @if($criterion['advanced'] ?? false)
+                                            <button type="button" x-on:click="openRule('include', @js($criterion['key']))" class="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100">{{ $criterion['label'] }}</button>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            @foreach($eligibility['criteria'] as $criterion)
+                                @php
+                                    $criterionKey = (string) $criterion['key'];
+                                    $selectedValues = old(
+                                        'eligibility_criteria.'.$criterionKey,
+                                        $selectedCriteria[$criterionKey] ?? [],
+                                    );
+                                    $selectedValues = is_array($selectedValues) ? $selectedValues : [];
+                                @endphp
+                                <fieldset x-show="activeRule === @js('include:'.$criterionKey)" x-cloak class="mt-4 rounded-2xl border border-rose-200 bg-rose-50/40 p-4">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <legend class="text-sm font-bold text-slate-950">{{ $criterion['label'] }}</legend>
+                                        <button type="button" x-on:click="activeRule = null" class="text-sm font-semibold text-slate-600">Done</button>
+                                    </div>
+                                    <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                                        @forelse($criterion['options'] as $option)
+                                            <label class="flex min-h-11 items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 hover:bg-slate-50">
+                                                <input type="checkbox" name="eligibility_criteria[{{ $criterionKey }}][]" value="{{ $option['value'] }}" @checked(in_array($option['value'], $selectedValues, true)) class="mt-0.5 rounded border-slate-300 text-rose-700 focus:ring-rose-600">
+                                                <span>{{ $option['label'] }}</span>
+                                            </label>
+                                        @empty
+                                            <p class="text-sm text-slate-500">No available values.</p>
+                                        @endforelse
+                                    </div>
+                                    @error('eligibility_criteria.'.$criterionKey)<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                                </fieldset>
+                            @endforeach
+                        </section>
+
+                        <section class="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h3 class="text-base font-semibold text-slate-950">Excluded leads</h3>
+                                    <p class="mt-1 text-sm text-slate-600">Anyone matching an exclusion stays out, even if they match the included filters.</p>
+                                </div>
+                                <button type="button" x-on:click="chooser = chooser === 'exclude' ? null : 'exclude'; activeRule = null" class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:bg-slate-50">+ Add an exclusion</button>
+                            </div>
+
+                            <div class="mt-4 space-y-2">
+                                @foreach($eligibility['criteria'] as $criterion)
+                                    @if(($criterion['excluded_labels'] ?? []) !== [])
+                                        <button type="button" x-on:click="openRule('exclude', @js($criterion['key']))" class="flex w-full items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left hover:bg-slate-100">
+                                            <span>
+                                                <span class="block text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $criterion['label'] }}</span>
+                                                <span class="mt-1 block text-sm font-semibold text-slate-900">{{ implode(', ', $criterion['excluded_labels']) }}</span>
+                                            </span>
+                                            <span class="text-sm font-bold text-slate-600">Edit</span>
+                                        </button>
+                                    @endif
+                                @endforeach
+
+                                @if($excludedCriteria === [])
+                                    <p class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-600">No exclusions.</p>
+                                @endif
+                            </div>
+
+                            <div x-show="chooser === 'exclude'" x-cloak class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <p class="text-sm font-bold text-slate-950">Who should stay out?</p>
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    @foreach($eligibility['criteria'] as $criterion)
+                                        @if(! ($criterion['advanced'] ?? false))
+                                            <button type="button" x-on:click="openRule('exclude', @js($criterion['key']))" class="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100">{{ $criterion['label'] }}</button>
+                                        @endif
+                                    @endforeach
+                                </div>
+                                <button type="button" x-on:click="showAdvanced = ! showAdvanced" class="mt-4 text-sm font-semibold text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-950">Advanced filters</button>
+                                <div x-show="showAdvanced" x-cloak class="mt-3 flex flex-wrap gap-2">
+                                    @foreach($eligibility['criteria'] as $criterion)
+                                        @if($criterion['advanced'] ?? false)
+                                            <button type="button" x-on:click="openRule('exclude', @js($criterion['key']))" class="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100">{{ $criterion['label'] }}</button>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            @foreach($eligibility['criteria'] as $criterion)
+                                @php
+                                    $criterionKey = (string) $criterion['key'];
+                                    $excludedValues = old(
+                                        'eligibility_exclusions.'.$criterionKey,
+                                        $excludedCriteria[$criterionKey] ?? [],
+                                    );
+                                    $excludedValues = is_array($excludedValues) ? $excludedValues : [];
+                                @endphp
+                                <fieldset x-show="activeRule === @js('exclude:'.$criterionKey)" x-cloak class="mt-4 rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <legend class="text-sm font-bold text-slate-950">Exclude by {{ strtolower($criterion['label']) }}</legend>
+                                        <button type="button" x-on:click="activeRule = null" class="text-sm font-semibold text-slate-600">Done</button>
+                                    </div>
+                                    <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                                        @forelse($criterion['options'] as $option)
+                                            <label class="flex min-h-11 items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 hover:bg-slate-50">
+                                                <input type="checkbox" name="eligibility_exclusions[{{ $criterionKey }}][]" value="{{ $option['value'] }}" @checked(in_array($option['value'], $excludedValues, true)) class="mt-0.5 rounded border-slate-300 text-amber-700 focus:ring-amber-600">
+                                                <span>{{ $option['label'] }}</span>
+                                            </label>
+                                        @empty
+                                            <p class="text-sm text-slate-500">No available values.</p>
+                                        @endforelse
+                                    </div>
+                                    @error('eligibility_exclusions.'.$criterionKey)<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                                </fieldset>
+                            @endforeach
+                        </section>
+
+                        @if(($eligibility['unavailable_criteria'] ?? []) !== [] || ($eligibility['unavailable_exclusions'] ?? []) !== [])
+                            <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                                Some saved audience rules come from features that are not available here right now. They will stay in place when you save.
+                            </div>
+                        @endif
+
+                        @error('eligibility_criteria')
+                            <p class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{{ $message }}</p>
+                        @enderror
+                        @error('eligibility_exclusions')
+                            <p class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <footer class="sticky bottom-0 flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-950"><span x-text="Number(matchingCount).toLocaleString()"></span> matching leads now</p>
+                            <p x-show="previewError" x-text="previewError" class="mt-1 text-xs font-semibold text-red-600"></p>
+                        </div>
+                        <div class="flex flex-col gap-2 sm:flex-row">
+                            <button type="button" x-on:click="preview()" x-bind:disabled="previewing" class="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+                                <span x-show="!previewing">Preview matching leads</span>
+                                <span x-show="previewing">Checking…</span>
+                            </button>
+                            <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-bold text-white hover:bg-slate-800">Save audience</button>
+                        </div>
+                    </footer>
+                </form>
+            </div>
+        </div>
+
+        @if($campaign->usesRecurringAllocation())
+            <div
+                x-show="activeModal === 'outreach'"
+                x-cloak
+                x-on:click.self="closeModal()"
+                data-campaign-panel-modal="outreach"
+                class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 px-3 py-4 sm:px-6"
+            >
+                <div role="dialog" aria-modal="true" aria-label="Campaign outreach plan" class="max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
+                    <header class="flex flex-col gap-4 border-b border-slate-200 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-rose-700">Outreach plan</p>
+                            <h2 class="mt-1 text-xl font-semibold text-slate-950">How often should this campaign choose leads?</h2>
+                        </div>
+                        <button type="button" x-on:click="closeModal()" class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">Close</button>
+                    </header>
+
+                    <form
+                        method="POST"
+                        action="{{ route('crm.campaigns.execution.update', $campaign) }}"
+                        x-data="{
+                            runEvery: @js((int) $outreachPlan['run_every_days']),
+                            perMessage: @js((int) $outreachPlan['allocation_size_per_message']),
+                            cooldown: @js((int) $outreachPlan['recipient_cooldown_days']),
+                            example() {
+                                const runDays = Number(this.runEvery) || 0;
+                                const perMessage = Number(this.perMessage) || 0;
+                                const cooldown = Number(this.cooldown) || 0;
+                                const runUnit = runDays === 1 ? 'day' : 'days';
+                                const leadUnit = perMessage === 1 ? 'lead' : 'leads';
+                                const repeat = cooldown === 0
+                                    ? 'A lead can be chosen again in the next round.'
+                                    : `After a lead is chosen, the campaign waits at least ${cooldown} ${cooldown === 1 ? 'day' : 'days'} before choosing that same lead again.`;
+                                return `Every ${runDays} ${runUnit}, this campaign starts a new round of outreach. Each message can choose up to ${perMessage} eligible ${leadUnit}. ${repeat}`;
+                            },
+                        }"
+                    >
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="execution_strategy" value="{{ $campaign->execution_strategy }}">
+
+                        <div class="space-y-6 p-4 sm:p-6">
+                            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-semibold leading-6 text-emerald-950" x-text="example()"></div>
+
+                            <div class="space-y-3">
+                                <label class="block rounded-2xl border border-slate-200 bg-white p-4">
+                                    <span class="text-sm font-bold text-slate-950">Start a new outreach round every</span>
+                                    <div class="mt-3 flex items-center gap-2">
+                                        <input x-model.number="runEvery" type="number" min="1" max="3650" name="allocation_settings[run_every_days]" value="{{ old('allocation_settings.run_every_days', $outreachPlan['run_every_days']) }}" class="min-h-11 w-32 rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
+                                        <span class="text-sm text-slate-600">days</span>
+                                    </div>
+                                    @error('allocation_settings.run_every_days')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                                </label>
+
+                                <label class="block rounded-2xl border border-slate-200 bg-white p-4">
+                                    <span class="text-sm font-bold text-slate-950">Choose up to this many leads for each message</span>
+                                    <input x-model.number="perMessage" type="number" min="1" max="100000" name="allocation_settings[allocation_size_per_message]" value="{{ old('allocation_settings.allocation_size_per_message', $outreachPlan['allocation_size_per_message']) }}" class="mt-3 min-h-11 w-32 rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
+                                    @error('allocation_settings.allocation_size_per_message')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                                </label>
+
+                                <label class="block rounded-2xl border border-slate-200 bg-white p-4">
+                                    <span class="text-sm font-bold text-slate-950">Wait this long before choosing the same lead again</span>
+                                    <div class="mt-3 flex items-center gap-2">
+                                        <input x-model.number="cooldown" type="number" min="0" max="3650" name="allocation_settings[recipient_cooldown_days]" value="{{ old('allocation_settings.recipient_cooldown_days', $outreachPlan['recipient_cooldown_days']) }}" class="min-h-11 w-32 rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
+                                        <span class="text-sm text-slate-600">days</span>
+                                    </div>
+                                    @error('allocation_settings.recipient_cooldown_days')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                                </label>
+                            </div>
+
+                            @error('allocation_settings')<p class="text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+                            @error('execution_strategy')<p class="text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
+
+                            <section class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <h3 class="text-sm font-bold text-slate-950">Message timing</h3>
+                                <p class="mt-1 text-sm leading-6 text-slate-600">Your {{ $workspace['message_step_count'] }} {{ \Illuminate\Support\Str::plural('message', $workspace['message_step_count']) }} can each send at a different time after an outreach round starts.</p>
+                                <button type="button" x-on:click="activeModal = 'schedule'" class="mt-3 inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:bg-slate-100">Review message timing</button>
+                            </section>
+                        </div>
+
+                        <footer class="flex justify-end border-t border-slate-200 bg-slate-50 px-4 py-4 sm:px-6">
+                            <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-bold text-white hover:bg-slate-800">Save outreach plan</button>
+                        </footer>
+                    </form>
                 </div>
-
-                @if(($eligibility['unavailable_criteria'] ?? []) !== [])
-                    <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                        Some saved audience rules come from features that are not available here right now. They will stay in place when you save.
-                    </div>
-                @endif
-
-                @error('eligibility_criteria')
-                    <p class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{{ $message }}</p>
-                @enderror
-
-                <div class="flex flex-col gap-4 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <p class="text-sm font-semibold text-slate-950">
-                            <span x-text="Number(matchingCount).toLocaleString()"></span> matching leads now
-                        </p>
-                        <p x-show="previewError" x-text="previewError" class="mt-1 text-xs font-semibold text-red-600"></p>
-                    </div>
-                    <div class="flex flex-col gap-2 sm:flex-row">
-                        <button
-                            type="button"
-                            x-on:click="preview()"
-                            x-bind:disabled="previewing"
-                            class="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                        >
-                            <span x-show="!previewing">Preview matching leads</span>
-                            <span x-show="previewing">Checking…</span>
-                        </button>
-                        <button
-                            type="submit"
-                            class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-bold text-white hover:bg-slate-800"
-                        >
-                            Save who gets it
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </section>
+            </div>
+        @endif
 
         <div
             x-show="activeModal === 'messages'"

@@ -28,6 +28,55 @@ final class CampaignAllocationSettingsService
     }
 
     /**
+     * @return array{
+     *     summary: string,
+     *     example: string,
+     *     run_every_days: int,
+     *     allocation_size_per_message: int,
+     *     recipient_cooldown_days: int
+     * }
+     */
+    public function presentation(Campaign $campaign): array
+    {
+        $settings = $this->forCampaign($campaign);
+        $runEvery = $settings['run_every_days'];
+        $perMessage = $settings['allocation_size_per_message'];
+        $cooldown = $settings['recipient_cooldown_days'];
+
+        $summary = sprintf(
+            'Every %d %s · Up to %d %s per message · %s',
+            $runEvery,
+            $runEvery === 1 ? 'day' : 'days',
+            $perMessage,
+            $perMessage === 1 ? 'lead' : 'leads',
+            $cooldown === 0
+                ? 'No repeat wait'
+                : $cooldown.'-day repeat wait',
+        );
+
+        $example = sprintf(
+            'Every %d %s, this campaign starts a new round of outreach. Each message can choose up to %d eligible %s.%s',
+            $runEvery,
+            $runEvery === 1 ? 'day' : 'days',
+            $perMessage,
+            $perMessage === 1 ? 'lead' : 'leads',
+            $cooldown === 0
+                ? ' A lead can be chosen again in the next round.'
+                : sprintf(
+                    ' After a lead is chosen, the campaign waits at least %d %s before choosing that same lead again.',
+                    $cooldown,
+                    $cooldown === 1 ? 'day' : 'days',
+                ),
+        );
+
+        return [
+            'summary' => $summary,
+            'example' => $example,
+            ...$settings,
+        ];
+    }
+
+    /**
      * Tolerant runtime normalization for already-persisted settings.
      *
      * @param array<string, mixed> $settings

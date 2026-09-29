@@ -16,9 +16,16 @@ final class CampaignEligibilityEvaluator
 
     public function eligible(Campaign $campaign, Contact $contact): bool
     {
-        $criteria = $this->runtimeCriteria($campaign);
+        $criteria = $this->runtimeCriteria($campaign->eligibilityCriteria());
+        $exclusions = $this->runtimeCriteria($campaign->eligibilityExclusions());
 
         if ($criteria === null || $criteria === []) {
+            return false;
+        }
+
+        // Exclusions fail closed. If an installed module can no longer resolve
+        // a saved exclusion, outreach must stop rather than silently include it.
+        if ($exclusions === null) {
             return false;
         }
 
@@ -27,12 +34,11 @@ final class CampaignEligibilityEvaluator
                 ->query([
                     'type' => 'criteria',
                     'criteria' => $criteria,
+                    'exclude_criteria' => $exclusions,
                 ])
                 ->whereKey($contact->getKey())
                 ->exists();
         } catch (InvalidArgumentException) {
-            // Eligibility must fail closed when a configured criterion is not
-            // currently contributed by the installed/enabled module set.
             return false;
         }
     }
@@ -42,19 +48,12 @@ final class CampaignEligibilityEvaluator
      * Workflow status criterion predates this contract and consumes DB IDs, so
      * Campaigns translates stable ContactStatus keys at the Core boundary.
      *
+     * @param array<string, array<int, string>> $criteria
      * @return array<string, array<int, string>>|null
      */
-    private function runtimeCriteria(Campaign $campaign): ?array
+    private function runtimeCriteria(array $criteria): ?array
     {
-        $criteria = is_array($campaign->eligibility_filter)
-            ? $campaign->eligibility_filter
-            : [];
-
-        if ($criteria === []) {
-            return [];
-        }
-
-        if (! array_key_exists('status', $criteria)) {
+        if ($criteria === [] || ! array_key_exists('status', $criteria)) {
             return $criteria;
         }
 

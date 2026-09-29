@@ -22,6 +22,11 @@ final class CampaignEligibilityAuthoringService
         'webinar_outcome',
     ];
 
+    private const ADVANCED_KEYS = [
+        'source',
+        'subsource',
+    ];
+
     public function __construct(
         private readonly ContactFilterCriterionRegistry $criteria,
         private readonly ContactFilterResolver $resolver,
@@ -29,15 +34,13 @@ final class CampaignEligibilityAuthoringService
 
     /**
      * @return array{
-     *     criteria: array<int, array{
-     *         key: string,
-     *         label: string,
-     *         help: string|null,
-     *         options: array<int, array{value: string, label: string}>
-     *     }>,
+     *     criteria: array<int, array<string, mixed>>,
      *     selected: array<string, array<int, string>>,
+     *     excluded: array<string, array<int, string>>,
      *     unavailable_criteria: array<int, array{key: string, values: array<int, string>}>,
+     *     unavailable_exclusions: array<int, array{key: string, values: array<int, string>}>,
      *     matching_count: int,
+     *     summary: string,
      *     enrollment_modes: array<string, string>,
      *     reentry_policies: array<string, string>,
      *     ineligible_behaviors: array<string, string>
@@ -45,28 +48,24 @@ final class CampaignEligibilityAuthoringService
      */
     public function forCampaign(Campaign $campaign): array
     {
-        $selected = $this->storedCriteria($campaign);
-        $definitions = $this->definitions($selected);
+        $selected = $campaign->eligibilityCriteria();
+        $excluded = $campaign->eligibilityExclusions();
+        $definitions = $this->definitions($selected, $excluded);
         $visibleKeys = array_column($definitions, 'key');
 
-        $unavailableCriteria = [];
-
-        foreach ($selected as $key => $values) {
-            if (in_array($key, $visibleKeys, true)) {
-                continue;
-            }
-
-            $unavailableCriteria[] = [
-                'key' => $key,
-                'values' => $values,
-            ];
-        }
-
         return [
-            'criteria' => $definitions,
+            'criteria' => $this->decorateDefinitions($definitions, $selected, $excluded),
             'selected' => $selected,
-            'unavailable_criteria' => $unavailableCriteria,
-            'matching_count' => $this->matchingCount($selected),
+            'excluded' => $excluded,
+            'unavailable_criteria' => $this->unavailableCriteria($selected, $visibleKeys),
+            'unavailable_exclusions' => $this->unavailableCriteria($excluded, $visibleKeys),
+            'matching_count' => $this->matchingCount($this->composeFilter($selected, $excluded)),
+            'summary' => $this->audienceSummary(
+                definitions: $definitions,
+                selected: $selected,
+                excluded: $excluded,
+                automatic: $campaign->usesAutomaticEnrollment(),
+            ),
             'enrollment_modes' => [
                 Campaign::ENROLLMENT_MODE_MANUAL => 'Only when I add them',
                 Campaign::ENROLLMENT_MODE_AUTOMATIC => 'Automatically when they match',
@@ -84,17 +83,21 @@ final class CampaignEligibilityAuthoringService
     }
 
     /**
-     * Normalize the operator-editable portion of the eligibility filter while
-     * preserving any existing criterion contributed by a module that is not
-     * currently available in this authoring surface.
+     * Normalize the operator-editable include/exclude filter while preserving
+     * saved criteria contributed by modules that are not currently available.
      *
      * @param array<string, mixed> $input
-     * @return array<string, array<int, string>>
+     * @param array<string, mixed> $exclusions
+     * @return array<string, mixed>
      */
-    public function normalizeForCampaign(Campaign $campaign, array $input): array
-    {
-        $existing = $this->storedCriteria($campaign);
-        $definitions = $this->definitions($existing);
+    public function normalizeForCampaign(
+        Campaign $campaign,
+        array $input,
+        array $exclusions = [],
+    ): array {
+        $existing = $campaign->eligibilityCriteria();
+        $existingExclusions = $campaign->eligibilityExclusions();
+        $definitions = $this->definitions($existing, $existingExclusions);
 
         $definitionMap = [];
 
@@ -102,84 +105,64 @@ final class CampaignEligibilityAuthoringService
             $definitionMap[$definition['key']] = $definition;
         }
 
-        $unsupportedKeys = array_values(array_diff(
-            array_keys($input),
-            array_keys($definitionMap),
-        ));
+        $normalized = $this->normalizeDimension(
+            field: 'eligibility_criteria',
+            input: $input,
+            existing: $existing,
+            definitionMap: $definitionMap,
+        );
+        $normalizedExclusions = $this->normalizeDimension(
+            field: 'eligibility_exclusions',
+            input: $exclusions,
+            existing: $existingExclusions,
+            definitionMap: $definitionMap,
+        );
 
-        if ($unsupportedKeys !== []) {
-            sort($unsupportedKeys);
-
-            throw ValidationException::withMessages([
-                'eligibility_criteria' => 'Unsupported eligibility condition(s): '.implode(', ', $unsupportedKeys).'.',
-            ]);
-        }
-
-        $normalized = [];
-
-        foreach ($definitionMap as $key => $definition) {
-            if (! array_key_exists($key, $input)) {
-                continue;
-            }
-
-            $values = $this->stringValues($input[$key]);
-            $allowedValues = array_column($definition['options'], 'value');
-            $invalidValues = array_values(array_diff($values, $allowedValues));
-
-            if ($invalidValues !== []) {
-                throw ValidationException::withMessages([
-                    "eligibility_criteria.{$key}" => 'One or more selected values are not available for this condition.',
-                ]);
-            }
-
-            if ($values !== []) {
-                $normalized[$key] = $values;
-            }
-        }
-
-        foreach ($existing as $key => $values) {
-            if (array_key_exists($key, $definitionMap)) {
-                continue;
-            }
-
-            $normalized[$key] = $values;
-        }
-
-        return $normalized;
+        return $this->composeFilter($normalized, $normalizedExclusions);
     }
 
-    /**
-     * @param array<string, array<int, string>> $criteria
-     */
-    public function matchingCount(array $criteria): int
+    /** @param array<string, mixed> $filter */
+    public function matchingCount(array $filter): int
     {
-        return $this->queryForCriteria($criteria)->count();
+        return $this->queryForFilter($filter)->count();
     }
 
     /** @return Builder<Contact> */
     public function matchingQuery(Campaign $campaign): Builder
     {
-        return $this->queryForCriteria($this->storedCriteria($campaign));
+        return $this->queryForFilter(
+            is_array($campaign->eligibility_filter)
+                ? $campaign->eligibility_filter
+                : [],
+        );
     }
 
     /**
-     * @param array<string, array<int, string>> $criteria
+     * @param array<string, mixed> $filter
      * @return Builder<Contact>
      */
-    private function queryForCriteria(array $criteria): Builder
+    private function queryForFilter(array $filter): Builder
     {
+        [$criteria, $exclusions] = $this->splitFilter($filter);
         $runtimeCriteria = $this->runtimeCriteria($criteria);
+        $runtimeExclusions = $this->runtimeCriteria($exclusions);
 
         if ($runtimeCriteria === null || $runtimeCriteria === []) {
             return Contact::query()->whereRaw('1 = 0');
         }
 
+        // An unavailable/invalid exclusion must fail closed so a lead that was
+        // intentionally excluded is never silently allowed back into outreach.
+        if ($runtimeExclusions === null) {
+            return Contact::query()->whereRaw('1 = 0');
+        }
+
         try {
-            return $this->resolver
-                ->query([
-                    'type' => 'criteria',
-                    'criteria' => $runtimeCriteria,
-                ]);
+            return $this->resolver->query([
+                'type' => 'criteria',
+                'criteria' => $runtimeCriteria,
+                'exclude_criteria' => $runtimeExclusions,
+            ]);
         } catch (InvalidArgumentException) {
             return Contact::query()->whereRaw('1 = 0');
         }
@@ -187,6 +170,7 @@ final class CampaignEligibilityAuthoringService
 
     /**
      * @param array<string, array<int, string>> $selected
+     * @param array<string, array<int, string>> $excluded
      * @return array<int, array{
      *     key: string,
      *     label: string,
@@ -194,7 +178,7 @@ final class CampaignEligibilityAuthoringService
      *     options: array<int, array{value: string, label: string}>
      * }>
      */
-    private function definitions(array $selected): array
+    private function definitions(array $selected, array $excluded): array
     {
         $definitions = [];
 
@@ -205,10 +189,15 @@ final class CampaignEligibilityAuthoringService
                 continue;
             }
 
+            $savedValues = array_values(array_unique([
+                ...($selected[$key] ?? []),
+                ...($excluded[$key] ?? []),
+            ]));
+
             if ($key === 'status') {
                 $definitions[] = $this->statusDefinition(
                     definition: $definition,
-                    selected: $selected['status'] ?? [],
+                    selected: $savedValues,
                 );
 
                 continue;
@@ -216,7 +205,10 @@ final class CampaignEligibilityAuthoringService
 
             $definitions[] = [
                 'key' => $key,
-                'label' => (string) ($definition['label'] ?? $key),
+                'label' => $this->criterionLabel(
+                    key: $key,
+                    fallback: (string) ($definition['label'] ?? $key),
+                ),
                 'help' => is_string($definition['help'] ?? null)
                     ? $definition['help']
                     : null,
@@ -224,12 +216,46 @@ final class CampaignEligibilityAuthoringService
                     options: is_array($definition['options'] ?? null)
                         ? $definition['options']
                         : [],
-                    selected: $selected[$key] ?? [],
+                    selected: $savedValues,
                 ),
             ];
         }
 
         return $definitions;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $definitions
+     * @param array<string, array<int, string>> $selected
+     * @param array<string, array<int, string>> $excluded
+     * @return array<int, array<string, mixed>>
+     */
+    private function decorateDefinitions(
+        array $definitions,
+        array $selected,
+        array $excluded,
+    ): array {
+        return array_map(function (array $definition) use ($selected, $excluded): array {
+            $key = (string) $definition['key'];
+            $options = collect($definition['options'] ?? [])->keyBy('value');
+            $selectedValues = $selected[$key] ?? [];
+            $excludedValues = $excluded[$key] ?? [];
+
+            return [
+                ...$definition,
+                'advanced' => in_array($key, self::ADVANCED_KEYS, true),
+                'selected_values' => $selectedValues,
+                'selected_labels' => array_values(array_map(
+                    fn (string $value): string => (string) ($options[$value]['label'] ?? $value),
+                    $selectedValues,
+                )),
+                'excluded_values' => $excludedValues,
+                'excluded_labels' => array_values(array_map(
+                    fn (string $value): string => (string) ($options[$value]['label'] ?? $value),
+                    $excludedValues,
+                )),
+            ];
+        }, $definitions);
     }
 
     /**
@@ -264,7 +290,10 @@ final class CampaignEligibilityAuthoringService
 
         return [
             'key' => 'status',
-            'label' => (string) ($definition['label'] ?? 'Status'),
+            'label' => $this->criterionLabel(
+                key: 'status',
+                fallback: (string) ($definition['label'] ?? 'Status'),
+            ),
             'help' => is_string($definition['help'] ?? null)
                 ? $definition['help']
                 : null,
@@ -279,9 +308,6 @@ final class CampaignEligibilityAuthoringService
     }
 
     /**
-     * Preserve stale selected values as visible choices so the operator can
-     * explicitly remove them instead of silently losing configuration.
-     *
      * @param array<int, mixed> $options
      * @param array<int, string> $selected
      * @return array<int, array{value: string, label: string}>
@@ -326,17 +352,104 @@ final class CampaignEligibilityAuthoringService
     }
 
     /**
+     * @param array<string, mixed> $input
+     * @param array<string, array<int, string>> $existing
+     * @param array<string, array<string, mixed>> $definitionMap
      * @return array<string, array<int, string>>
      */
-    private function storedCriteria(Campaign $campaign): array
-    {
-        if (! is_array($campaign->eligibility_filter)) {
-            return [];
+    private function normalizeDimension(
+        string $field,
+        array $input,
+        array $existing,
+        array $definitionMap,
+    ): array {
+        $unsupportedKeys = array_values(array_diff(
+            array_keys($input),
+            array_keys($definitionMap),
+        ));
+
+        if ($unsupportedKeys !== []) {
+            sort($unsupportedKeys);
+
+            throw ValidationException::withMessages([
+                $field => 'Unsupported audience condition(s): '.implode(', ', $unsupportedKeys).'.',
+            ]);
         }
 
-        $criteria = [];
+        $normalized = [];
 
-        foreach ($campaign->eligibility_filter as $key => $values) {
+        foreach ($definitionMap as $key => $definition) {
+            if (! array_key_exists($key, $input)) {
+                continue;
+            }
+
+            $values = $this->stringValues($input[$key]);
+            $allowedValues = array_column($definition['options'], 'value');
+            $invalidValues = array_values(array_diff($values, $allowedValues));
+
+            if ($invalidValues !== []) {
+                throw ValidationException::withMessages([
+                    "{$field}.{$key}" => 'One or more selected values are not available for this condition.',
+                ]);
+            }
+
+            if ($values !== []) {
+                $normalized[$key] = $values;
+            }
+        }
+
+        foreach ($existing as $key => $values) {
+            if (array_key_exists($key, $definitionMap)) {
+                continue;
+            }
+
+            $normalized[$key] = $values;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, array<int, string>> $criteria
+     * @param array<string, array<int, string>> $exclusions
+     * @return array<string, mixed>
+     */
+    private function composeFilter(array $criteria, array $exclusions): array
+    {
+        return $exclusions === []
+            ? $criteria
+            : [
+                ...$criteria,
+                Campaign::ELIGIBILITY_EXCLUSIONS_KEY => $exclusions,
+            ];
+    }
+
+    /**
+     * @param array<string, mixed> $filter
+     * @return array{0: array<string, array<int, string>>, 1: array<string, array<int, string>>}
+     */
+    private function splitFilter(array $filter): array
+    {
+        $exclusions = $filter[Campaign::ELIGIBILITY_EXCLUSIONS_KEY] ?? [];
+        unset($filter[Campaign::ELIGIBILITY_EXCLUSIONS_KEY]);
+
+        return [
+            $this->normalizedStoredCriteria($filter),
+            is_array($exclusions)
+                ? $this->normalizedStoredCriteria($exclusions)
+                : [],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $criteria
+     * @return array<string, array<int, string>>
+     */
+    private function normalizedStoredCriteria(array $criteria): array
+    {
+        $normalized = [];
+
+        foreach ($criteria as $key => $values) {
             if (! is_string($key) || trim($key) === '') {
                 continue;
             }
@@ -344,11 +457,11 @@ final class CampaignEligibilityAuthoringService
             $normalizedValues = $this->stringValues($values);
 
             if ($normalizedValues !== []) {
-                $criteria[trim($key)] = $normalizedValues;
+                $normalized[trim($key)] = $normalizedValues;
             }
         }
 
-        return $criteria;
+        return $normalized;
     }
 
     /**
@@ -388,6 +501,119 @@ final class CampaignEligibilityAuthoringService
         );
 
         return $criteria;
+    }
+
+    /**
+     * @param array<string, array<int, string>> $criteria
+     * @param array<int, string> $visibleKeys
+     * @return array<int, array{key: string, values: array<int, string>}>
+     */
+    private function unavailableCriteria(array $criteria, array $visibleKeys): array
+    {
+        $unavailable = [];
+
+        foreach ($criteria as $key => $values) {
+            if (in_array($key, $visibleKeys, true)) {
+                continue;
+            }
+
+            $unavailable[] = [
+                'key' => $key,
+                'values' => $values,
+            ];
+        }
+
+        return $unavailable;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $definitions
+     * @param array<string, array<int, string>> $selected
+     * @param array<string, array<int, string>> $excluded
+     */
+    private function audienceSummary(
+        array $definitions,
+        array $selected,
+        array $excluded,
+        bool $automatic,
+    ): string {
+        if (! $automatic) {
+            return 'Only leads you add manually';
+        }
+
+        $include = $this->conditionSummary($definitions, $selected);
+
+        if ($include === '') {
+            return 'Audience rules need attention';
+        }
+
+        $summary = 'Leads where '.$include;
+        $exclude = $this->conditionSummary($definitions, $excluded);
+
+        if ($exclude !== '') {
+            $summary .= ', except leads where '.$exclude;
+        }
+
+        return $summary;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $definitions
+     * @param array<string, array<int, string>> $selection
+     */
+    private function conditionSummary(array $definitions, array $selection): string
+    {
+        $definitionMap = collect($definitions)->keyBy('key');
+        $parts = [];
+
+        foreach ($selection as $key => $values) {
+            $definition = $definitionMap->get($key);
+
+            if (! is_array($definition)) {
+                continue;
+            }
+
+            $options = collect($definition['options'] ?? [])->keyBy('value');
+            $labels = array_values(array_map(
+                fn (string $value): string => (string) ($options[$value]['label'] ?? $value),
+                $values,
+            ));
+
+            if ($labels === []) {
+                continue;
+            }
+
+            $parts[] = $this->criterionPhrase($key, $labels);
+        }
+
+        return implode(' and ', $parts);
+    }
+
+    /** @param array<int, string> $labels */
+    private function criterionPhrase(string $key, array $labels): string
+    {
+        $values = implode(' or ', $labels);
+
+        return match ($key) {
+            'status' => 'status is '.$values,
+            'relationship' => 'relationship is '.$values,
+            'tag' => 'tagged '.$values,
+            'webinar_outcome' => 'webinar outcome is '.$values,
+            'source' => 'original source is '.$values,
+            'subsource' => 'source detail is '.$values,
+            default => $this->criterionLabel($key, $key).' is '.$values,
+        };
+    }
+
+    private function criterionLabel(string $key, string $fallback): string
+    {
+        return match ($key) {
+            'source' => 'Original source',
+            'subsource' => 'Source detail',
+            'tag' => 'Tags',
+            'webinar_outcome' => 'Webinar outcome',
+            default => $fallback,
+        };
     }
 
     /** @return array<int, string> */

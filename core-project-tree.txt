@@ -327,6 +327,7 @@
 │   │   │   ├── Controllers
 │   │   │   │   └── CRM
 │   │   │   │       ├── CommerceController.php
+│   │   │   │       ├── CommerceOperatorController.php
 │   │   │   │       ├── CommerceOrderController.php
 │   │   │   │       └── CommerceProductController.php
 │   │   │   ├── Data
@@ -383,6 +384,8 @@
 │   │   │   │   ├── CommerceInventoryEffectOrchestrator.php
 │   │   │   │   ├── CommerceInventoryEffectRecorder.php
 │   │   │   │   ├── CommerceOfferPublicationEvaluator.php
+│   │   │   │   ├── CommerceOperatorAccessService.php
+│   │   │   │   ├── CommerceOperatorActionService.php
 │   │   │   │   ├── CommerceOrderCustomerReconciler.php
 │   │   │   │   ├── CommerceOrderInventoryEffectProducer.php
 │   │   │   │   ├── CommerceOrderReadService.php
@@ -611,10 +614,14 @@
 │   │   │   │   ├── PromoteEventAction.php
 │   │   │   │   ├── ReconcileDueEventsAction.php
 │   │   │   │   ├── RecordEventAttendanceAction.php
-│   │   │   │   └── RescheduleEventAction.php
+│   │   │   │   ├── RescheduleEventAction.php
+│   │   │   │   └── UpdateDraftEventAction.php
 │   │   │   ├── Contracts
 │   │   │   │   ├── EventDefinitionContributor.php
 │   │   │   │   └── EventReadinessContributor.php
+│   │   │   ├── Controllers
+│   │   │   │   └── CRM
+│   │   │   │       └── EventController.php
 │   │   │   ├── Data
 │   │   │   │   ├── EventActionContext.php
 │   │   │   │   ├── EventDefinitionContribution.php
@@ -638,6 +645,8 @@
 │   │   │   │   └── EventsModuleServiceProvider.php
 │   │   │   ├── Readiness
 │   │   │   │   └── CoreEventReadinessContributor.php
+│   │   │   ├── Requests
+│   │   │   │   └── SaveEventRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── EventAnnouncementGate.php
 │   │   │   │   ├── EventAutomationSignalRecorder.php
@@ -3091,6 +3100,13 @@
 │       │   ├── dashboard-tasks-print.blade.php
 │       │   ├── documents
 │       │   │   └── index.blade.php
+│       │   ├── events
+│       │   │   ├── create.blade.php
+│       │   │   ├── edit.blade.php
+│       │   │   ├── index.blade.php
+│       │   │   ├── partials
+│       │   │   │   └── form.blade.php
+│       │   │   └── show.blade.php
 │       │   ├── flow-routes
 │       │   │   ├── bindings
 │       │   │   │   └── index.blade.php
@@ -3251,6 +3267,7 @@
 │   │   ├── commerce.php
 │   │   ├── core.php
 │   │   ├── documents.php
+│   │   ├── events.php
 │   │   ├── flow-routes.php
 │   │   ├── forms.php
 │   │   ├── inbound-messaging.php
@@ -3405,7 +3422,9 @@
 │   │   │   ├── CommerceContactPurchaseHistoryTest.php
 │   │   │   ├── CommerceFoundationTest.php
 │   │   │   ├── CommerceInventoryOrchestrationTest.php
+│   │   │   ├── CommerceOperatorWorkspaceTest.php
 │   │   │   ├── CommerceOrderCustomerReconciliationTest.php
+│   │   │   ├── CommerceOrderSyncJsonReplayTest.php
 │   │   │   ├── CommerceOrderSyncTest.php
 │   │   │   ├── CommerceOrderWorkspaceTest.php
 │   │   │   ├── CommercePurchaseConfirmationTest.php
@@ -3506,7 +3525,8 @@
 │   │   │   ├── EventReadinessAndPromotionTest.php
 │   │   │   ├── EventScheduledReconciliationTest.php
 │   │   │   ├── EventsFoundationTest.php
-│   │   │   └── EventsSetupValidationContributorTest.php
+│   │   │   ├── EventsSetupValidationContributorTest.php
+│   │   │   └── EventWorkspaceControllerTest.php
 │   │   ├── FlowRoutes
 │   │   │   ├── AutomationEventReceiptTest.php
 │   │   │   ├── AutomationEventWorkflowContextTest.php
@@ -4018,4 +4038,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-890 directories, 3129 files
+895 directories, 3144 files

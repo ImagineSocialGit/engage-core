@@ -49,6 +49,8 @@ class CampaignController extends Controller
 {
     private const EDIT_PANELS = [
         'start',
+        'audience',
+        'outreach',
         'schedule',
         'messages',
         'review',
@@ -242,6 +244,9 @@ class CampaignController extends Controller
             'allocationSettings' => $campaign->usesRecurringAllocation()
                 ? $allocationSettings->forCampaign($campaign)
                 : $allocationSettings->normalize([]),
+            'outreachPlan' => $campaign->usesRecurringAllocation()
+                ? $allocationSettings->presentation($campaign)
+                : null,
         ]);
     }
 
@@ -259,9 +264,9 @@ class CampaignController extends Controller
         return redirect()
             ->route('crm.campaigns.edit', [
                 'campaign' => $campaign,
-                'panel' => 'start',
+                'panel' => 'outreach',
             ])
-            ->with('status', 'Campaign allocation settings updated.');
+            ->with('status', 'Outreach plan updated.');
     }
 
     public function startCompletedAppend(
@@ -456,13 +461,14 @@ class CampaignController extends Controller
         Campaign $campaign,
         CampaignEligibilityAuthoringService $eligibilityAuthoring,
     ): JsonResponse {
-        $criteria = $eligibilityAuthoring->normalizeForCampaign(
+        $filter = $eligibilityAuthoring->normalizeForCampaign(
             campaign: $campaign,
             input: $request->eligibilityCriteria(),
+            exclusions: $request->eligibilityExclusions(),
         );
 
         return response()->json([
-            'matching_count' => $eligibilityAuthoring->matchingCount($criteria),
+            'matching_count' => $eligibilityAuthoring->matchingCount($filter),
         ]);
     }
 
@@ -472,14 +478,15 @@ class CampaignController extends Controller
         CampaignEligibilityAuthoringService $eligibilityAuthoring,
         UpdateCampaignEligibilityAction $updateEligibility,
     ): RedirectResponse {
-        $criteria = $eligibilityAuthoring->normalizeForCampaign(
+        $filter = $eligibilityAuthoring->normalizeForCampaign(
             campaign: $campaign,
             input: $request->eligibilityCriteria(),
+            exclusions: $request->eligibilityExclusions(),
         );
 
         $updateEligibility->handle(
             campaign: $campaign,
-            criteria: $criteria,
+            filter: $filter,
             enrollmentMode: $request->enrollmentMode(),
             reentryPolicy: $request->reentryPolicy(),
             ineligibleBehavior: $request->ineligibleBehavior(),
@@ -488,8 +495,8 @@ class CampaignController extends Controller
         return redirect()
             ->route('crm.campaigns.edit', $campaign)
             ->with([
-                'status' => 'Campaign Start settings saved.',
-                'campaign_panel' => 'start',
+                'status' => 'Campaign audience updated.',
+                'campaign_panel' => 'audience',
             ]);
     }
 
@@ -545,9 +552,11 @@ class CampaignController extends Controller
             $panel = $request->session()->get('campaign_panel');
         }
 
-        return is_string($panel) && in_array($panel, self::EDIT_PANELS, true)
-            ? $panel
-            : null;
+        if (! is_string($panel) || ! in_array($panel, self::EDIT_PANELS, true)) {
+            return null;
+        }
+
+        return $panel === 'start' ? 'audience' : $panel;
     }
 
     private function initialMessageId(Request $request): ?string

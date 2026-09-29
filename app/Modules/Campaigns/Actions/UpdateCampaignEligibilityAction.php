@@ -8,11 +8,11 @@ use Illuminate\Validation\ValidationException;
 final class UpdateCampaignEligibilityAction
 {
     /**
-     * @param array<string, array<int, string>> $criteria
+     * @param array<string, mixed> $filter
      */
     public function handle(
         Campaign $campaign,
-        array $criteria,
+        array $filter,
         string $enrollmentMode,
         string $reentryPolicy,
         string $ineligibleBehavior,
@@ -26,6 +26,11 @@ final class UpdateCampaignEligibilityAction
             ]);
         }
 
+        $criteria = collect($filter)
+            ->except(Campaign::ELIGIBILITY_EXCLUSIONS_KEY)
+            ->filter(fn (mixed $values): bool => is_array($values) && $values !== [])
+            ->all();
+
         if (
             $enrollmentMode === Campaign::ENROLLMENT_MODE_AUTOMATIC
             && $criteria === []
@@ -36,7 +41,7 @@ final class UpdateCampaignEligibilityAction
         }
 
         $campaign->forceFill([
-            'eligibility_filter' => $criteria,
+            'eligibility_filter' => $filter,
             'enrollment_mode' => $enrollmentMode,
             'reentry_policy' => $reentryPolicy,
             'ineligible_behavior' => $ineligibleBehavior,

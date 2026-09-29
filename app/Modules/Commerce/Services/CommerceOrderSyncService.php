@@ -15,8 +15,10 @@ use App\Modules\Commerce\Models\CommerceProduct;
 use App\Modules\Commerce\Models\CommerceProductProviderMapping;
 use App\Modules\Commerce\Models\CommerceProductVariant;
 use App\Modules\Commerce\Models\CommerceProductVariantProviderMapping;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use JsonException;
 use RuntimeException;
 
 final class CommerceOrderSyncService
@@ -132,9 +134,18 @@ final class CommerceOrderSyncService
                 'meta' => $snapshot->meta !== [] ? $snapshot->meta : null,
             ]);
 
+            if (! $orderCreated) {
+                $this->syncEquivalentJsonOriginals(
+                    model: $order,
+                    attributes: ['raw_payload', 'meta'],
+                );
+            }
+
             $orderChanged = ! $orderCreated && $order->isDirty();
 
-            $order->save();
+            if ($orderCreated || $orderChanged) {
+                $order->save();
+            }
 
             $itemsCreated = 0;
             $itemsChanged = 0;
@@ -262,9 +273,18 @@ final class CommerceOrderSyncService
             'meta' => $data->meta !== [] ? $data->meta : null,
         ]);
 
+        if (! $created) {
+            $this->syncEquivalentJsonOriginals(
+                model: $item,
+                attributes: ['options', 'raw_payload', 'meta'],
+            );
+        }
+
         $changed = ! $created && $item->isDirty();
 
-        $item->save();
+        if ($created || $changed) {
+            $item->save();
+        }
 
         return match (true) {
             $created => 'created',
@@ -420,6 +440,86 @@ final class CommerceOrderSyncService
         ]);
 
         return true;
+    }
+
+    /**
+     * Ignore representation-only differences in JSON-backed attributes.
+     *
+     * MySQL may reorder object keys when storing JSON. Eloquent's raw dirty
+     * comparison can therefore report a change when the decoded JSON value is
+     * identical. Associative-object key order is not meaningful, while list
+     * order remains significant.
+     *
+     * @param array<int, string> $attributes
+     */
+    private function syncEquivalentJsonOriginals(
+        Model $model,
+        array $attributes,
+    ): void {
+        foreach ($attributes as $attribute) {
+            if (! $model->isDirty($attribute)) {
+                continue;
+            }
+
+            if (! $this->jsonValuesEquivalent(
+                original: $model->getRawOriginal($attribute),
+                current: $model->getAttribute($attribute),
+            )) {
+                continue;
+            }
+
+            $model->syncOriginalAttribute($attribute);
+        }
+    }
+
+    private function jsonValuesEquivalent(
+        mixed $original,
+        mixed $current,
+    ): bool {
+        try {
+            return $this->decodeAndNormalizeJsonValue($original)
+                === $this->decodeAndNormalizeJsonValue($current);
+        } catch (JsonException) {
+            return false;
+        }
+    }
+
+    /**
+     * @throws JsonException
+     */
+    private function decodeAndNormalizeJsonValue(mixed $value): mixed
+    {
+        if (is_string($value)) {
+            $value = json_decode(
+                $value,
+                associative: true,
+                flags: JSON_THROW_ON_ERROR,
+            );
+        }
+
+        return $this->normalizeDecodedJsonValue($value);
+    }
+
+    private function normalizeDecodedJsonValue(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        if (array_is_list($value)) {
+            return array_map(
+                fn (mixed $item): mixed => $this->normalizeDecodedJsonValue($item),
+                $value,
+            );
+        }
+
+        ksort($value, SORT_STRING);
+
+        foreach ($value as $key => $item) {
+            $value[$key] = $this->normalizeDecodedJsonValue($item);
+        }
+
+        return $value;
     }
 
     private function nullableString(?string $value): ?string

@@ -76,6 +76,60 @@ class CampaignEligibilityFoundationTest extends TestCase
         $this->assertSame(0, $ineligible->eligibilityCycle);
     }
 
+    public function test_exclusion_rules_remove_otherwise_matching_contacts(): void
+    {
+        $included = Contact::factory()->create(['source' => 'Website']);
+        $excluded = Contact::factory()->create(['source' => 'Website']);
+
+        ContactTag::query()->create([
+            'contact_id' => $excluded->getKey(),
+            'tag' => 'Do Not Contact',
+        ]);
+
+        $campaign = Campaign::factory()->create([
+            'eligibility_filter' => [
+                'source' => ['Website'],
+                Campaign::ELIGIBILITY_EXCLUSIONS_KEY => [
+                    'tag' => ['Do Not Contact'],
+                ],
+            ],
+            'enrollment_mode' => Campaign::ENROLLMENT_MODE_AUTOMATIC,
+        ]);
+
+        $includedResult = app(EvaluateCampaignEligibilityAction::class)->handle(
+            $campaign,
+            $included,
+        );
+        $excludedResult = app(EvaluateCampaignEligibilityAction::class)->handle(
+            $campaign,
+            $excluded,
+        );
+
+        $this->assertTrue($includedResult->currentEligible);
+        $this->assertFalse($excludedResult->currentEligible);
+    }
+
+    public function test_unknown_exclusion_criterion_fails_closed(): void
+    {
+        $contact = Contact::factory()->create(['source' => 'Website']);
+        $campaign = Campaign::factory()->create([
+            'eligibility_filter' => [
+                'source' => ['Website'],
+                Campaign::ELIGIBILITY_EXCLUSIONS_KEY => [
+                    'not_currently_contributed' => ['blocked'],
+                ],
+            ],
+            'enrollment_mode' => Campaign::ENROLLMENT_MODE_AUTOMATIC,
+        ]);
+
+        $result = app(EvaluateCampaignEligibilityAction::class)->handle(
+            $campaign,
+            $contact,
+        );
+
+        $this->assertFalse($result->currentEligible);
+    }
+
     public function test_state_tracks_false_true_false_true_cycles_without_enrolling_campaign(): void
     {
         $contact = Contact::factory()->create();

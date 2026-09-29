@@ -42,6 +42,17 @@ final class CampaignEligibilityAuthoringRequest extends FormRequest
                 'string',
                 'max:255',
             ],
+            'eligibility_exclusions' => [
+                'nullable',
+                'array',
+            ],
+            'eligibility_exclusions.*' => [
+                'array',
+            ],
+            'eligibility_exclusions.*.*' => [
+                'string',
+                'max:255',
+            ],
         ];
     }
 
@@ -49,6 +60,14 @@ final class CampaignEligibilityAuthoringRequest extends FormRequest
     public function eligibilityCriteria(): array
     {
         $criteria = $this->input('eligibility_criteria', []);
+
+        return is_array($criteria) ? $criteria : [];
+    }
+
+    /** @return array<string, mixed> */
+    public function eligibilityExclusions(): array
+    {
+        $criteria = $this->input('eligibility_exclusions', []);
 
         return is_array($criteria) ? $criteria : [];
     }

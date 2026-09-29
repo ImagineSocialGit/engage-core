@@ -463,6 +463,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
                 'eligibility_filter' => is_array($campaign->eligibility_filter)
                     ? $campaign->eligibility_filter
                     : [],
+                'eligibility_exclusions' => $campaign->eligibilityExclusions(),
                 'eligibility_conditions' => $conditions,
                 'active_enrollment_count' => (int) ($workspace['active_enrollment_count'] ?? 0),
                 'pending_message_count' => (int) ($workspace['pending_message_count'] ?? 0),
@@ -506,9 +507,7 @@ final class CampaignsProcessHighwayContributor implements ProcessHighwayContribu
      */
     private function conditions(Campaign $campaign, array $statusNames): array
     {
-        $filter = is_array($campaign->eligibility_filter)
-            ? $campaign->eligibility_filter
-            : [];
+        $filter = $campaign->eligibilityCriteria();
         $conditions = [];
 
         foreach ($filter as $key => $values) {

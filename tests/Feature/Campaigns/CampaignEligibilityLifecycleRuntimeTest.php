@@ -392,7 +392,7 @@ class CampaignEligibilityLifecycleRuntimeTest extends TestCase
         $this->expectException(ValidationException::class);
         app(UpdateCampaignEligibilityAction::class)->handle(
             campaign: $campaign,
-            criteria: ['tag' => ['VIP']],
+            filter: ['tag' => ['VIP']],
             enrollmentMode: Campaign::ENROLLMENT_MODE_AUTOMATIC,
             reentryPolicy: Campaign::REENTRY_NEVER,
             ineligibleBehavior: Campaign::INELIGIBLE_PAUSE,

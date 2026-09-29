@@ -84,6 +84,44 @@ class CampaignEligibilityFactReevaluationTest extends TestCase
         $this->assertSame(0, AutomationEventConsumerReceipt::query()->count());
     }
 
+    public function test_fact_change_for_an_exclusion_criterion_targets_the_campaign(): void
+    {
+        Queue::fake();
+
+        $campaign = $this->automaticCampaignWithChain(
+            key: 'tag_exclusion_dependent',
+            eligibilityFilter: [
+                'source' => ['crm'],
+                Campaign::ELIGIBILITY_EXCLUSIONS_KEY => [
+                    'tag' => ['Do Not Contact'],
+                ],
+            ],
+        );
+        $contact = Contact::withoutEvents(fn () => Contact::factory()->create([
+            'source' => 'crm',
+        ]));
+
+        $event = new ContactFilterFactsChanged(
+            contactId: (int) $contact->getKey(),
+            criterionKeys: ['tag'],
+            source: 'test.synthetic',
+            changes: [
+                'added' => ['Do Not Contact'],
+            ],
+        );
+
+        app(ReconcileCampaignEligibilityFromContactFilterFactsChanged::class)->handle($event);
+
+        Queue::assertPushed(
+            ReconcileContactCampaignEligibilityJob::class,
+            fn (ReconcileContactCampaignEligibilityJob $job): bool =>
+                $job->contactId === (int) $contact->getKey()
+                && $job->criterionKeys === ['tag'],
+        );
+
+        $this->assertSame('tag_exclusion_dependent', $campaign->key);
+    }
+
     public function test_fact_event_queues_nothing_when_no_automatic_campaign_depends_on_changed_criterion(): void
     {
         Queue::fake();
@@ -174,7 +212,7 @@ class CampaignEligibilityFactReevaluationTest extends TestCase
         ]);
     }
 
-    /** @param array<string, array<int, string>> $eligibilityFilter */
+    /** @param array<string, mixed> $eligibilityFilter */
     private function automaticCampaignWithChain(
         string $key,
         array $eligibilityFilter,

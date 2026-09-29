@@ -24,16 +24,10 @@ final class CampaignEligibilityDependencyResolver
             ->where('enrollment_mode', Campaign::ENROLLMENT_MODE_AUTOMATIC)
             ->orderBy('id')
             ->get()
-            ->filter(function (Campaign $campaign) use ($criterionKeys): bool {
-                $eligibility = is_array($campaign->eligibility_filter)
-                    ? $campaign->eligibility_filter
-                    : [];
-
-                return array_intersect(
-                    $criterionKeys,
-                    array_keys($eligibility),
-                ) !== [];
-            })
+            ->filter(fn (Campaign $campaign): bool => array_intersect(
+                $criterionKeys,
+                $campaign->eligibilityDependencyKeys(),
+            ) !== [])
             ->values();
     }
 

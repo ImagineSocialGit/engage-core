@@ -639,8 +639,18 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
 
     private function campaignOptionLabel(Campaign $campaign): string
     {
-        $criteria = collect($campaign->eligibility_filter ?? [])
-            ->filter(fn (mixed $values): bool => is_array($values) && $values !== [])
+        $criteria = collect($campaign->eligibilityCriteria())
+            ->map(function (array $values, mixed $key): string {
+                $labels = collect($values)
+                    ->filter(fn (mixed $value): bool => is_string($value) || is_numeric($value))
+                    ->map(fn (mixed $value): string => Str::headline((string) $value))
+                    ->implode(', ');
+
+                return Str::headline((string) $key).': '.$labels;
+            })
+            ->filter()
+            ->implode('; ');
+        $exclusions = collect($campaign->eligibilityExclusions())
             ->map(function (array $values, mixed $key): string {
                 $labels = collect($values)
                     ->filter(fn (mixed $value): bool => is_string($value) || is_numeric($value))
@@ -656,7 +666,8 @@ final class CampaignLaunchTimingContactImportPostProcessor implements
             .($campaign->usesRecurringAllocation()
                 ? ' — recurring allocation'.($campaign->usesAutomaticEnrollment() ? '' : ', enroll imported leads')
                 : '')
-            .($criteria !== '' ? ' — eligible when '.$criteria : '');
+            .($criteria !== '' ? ' — eligible when '.$criteria : '')
+            .($exclusions !== '' ? ' — excluding '.$exclusions : '');
     }
 
     /**

@@ -47,10 +47,12 @@ class CampaignSetupActionabilityTest extends TestCase
             ->assertViewIs('crm.campaigns.edit')
             ->assertViewHas('initialPanel', 'messages')
             ->assertSee('data-campaign-setup', false)
-            ->assertSee('data-campaign-panel-open="start"', false)
+            ->assertSee('data-campaign-panel-open="audience"', false)
             ->assertSee('data-campaign-panel-open="schedule"', false)
             ->assertSee('data-campaign-panel-open="messages"', false)
-            ->assertSee('data-campaign-start-editor', false)
+            ->assertSee('data-campaign-panel-modal="audience"', false)
+            ->assertDontSee('data-campaign-start-editor', false)
+            ->assertDontSee('data-campaign-builder-stage=', false)
             ->assertSee('data-campaign-eligibility-form', false)
             ->assertSee('data-campaign-panel-modal="schedule"', false)
             ->assertSee('data-campaign-panel-modal="messages"', false)
@@ -76,6 +78,32 @@ class CampaignSetupActionabilityTest extends TestCase
         ], false);
 
         $response->assertSee('name="return_to" value="'.$returnTo.'"', false);
+    }
+
+
+    public function test_recurring_campaign_exposes_a_separate_outreach_plan_modal(): void
+    {
+        $user = User::factory()->create();
+        [$campaign] = $this->campaignWithSelectedMessage();
+        $campaign->forceFill([
+            'execution_strategy' => Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION,
+            'allocation_settings' => [
+                'run_every_days' => 14,
+                'allocation_size_per_message' => 50,
+                'recipient_cooldown_days' => 14,
+            ],
+        ])->save();
+
+        $this->actingAs($user)
+            ->get(route('crm.campaigns.edit', [
+                'campaign' => $campaign,
+                'panel' => 'outreach',
+            ]))
+            ->assertOk()
+            ->assertViewHas('initialPanel', 'outreach')
+            ->assertSee('data-campaign-panel-open="outreach"', false)
+            ->assertSee('data-campaign-panel-modal="outreach"', false)
+            ->assertSee(route('crm.campaigns.execution.update', $campaign), false);
     }
 
     public function test_unknown_panel_does_not_open_an_authoring_context(): void

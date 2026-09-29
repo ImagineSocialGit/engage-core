@@ -137,6 +137,85 @@ class CampaignEligibilityAuthoringTest extends TestCase
             ]);
     }
 
+    public function test_preview_subtracts_contacts_matching_exclusion_rules(): void
+    {
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->create([
+            'enrollment_mode' => Campaign::ENROLLMENT_MODE_MANUAL,
+            'eligibility_filter' => [],
+        ]);
+
+        $included = Contact::withoutEvents(fn () => Contact::factory()->create([
+            'source' => 'Database',
+        ]));
+        $excluded = Contact::withoutEvents(fn () => Contact::factory()->create([
+            'source' => 'Database',
+        ]));
+
+        ContactTag::withoutEvents(fn () => ContactTag::query()->create([
+            'contact_id' => $excluded->getKey(),
+            'tag' => 'Do Not Contact',
+        ]));
+
+        $this->actingAs($user)
+            ->postJson(route('crm.campaigns.eligibility.preview', $campaign), [
+                'enrollment_mode' => Campaign::ENROLLMENT_MODE_AUTOMATIC,
+                'reentry_policy' => Campaign::REENTRY_NEVER,
+                'ineligible_behavior' => Campaign::INELIGIBLE_CANCEL,
+                'eligibility_criteria' => [
+                    'source' => ['Database'],
+                ],
+                'eligibility_exclusions' => [
+                    'tag' => ['Do Not Contact'],
+                ],
+            ])
+            ->assertOk()
+            ->assertJson([
+                'matching_count' => 1,
+            ]);
+
+        $this->assertNotSame($included->getKey(), $excluded->getKey());
+    }
+
+    public function test_update_persists_audience_exclusions_inside_the_campaign_filter(): void
+    {
+        $user = User::factory()->create();
+
+        $contact = Contact::withoutEvents(fn () => Contact::factory()->create([
+            'source' => 'Database',
+        ]));
+        ContactTag::withoutEvents(fn () => ContactTag::query()->create([
+            'contact_id' => $contact->getKey(),
+            'tag' => 'Do Not Contact',
+        ]));
+
+        $campaign = Campaign::factory()->create([
+            'enrollment_mode' => Campaign::ENROLLMENT_MODE_MANUAL,
+            'eligibility_filter' => [],
+        ]);
+
+        $this->actingAs($user)
+            ->patch(route('crm.campaigns.eligibility.update', $campaign), [
+                'enrollment_mode' => Campaign::ENROLLMENT_MODE_AUTOMATIC,
+                'reentry_policy' => Campaign::REENTRY_NEVER,
+                'ineligible_behavior' => Campaign::INELIGIBLE_CANCEL,
+                'eligibility_criteria' => [
+                    'source' => ['Database'],
+                ],
+                'eligibility_exclusions' => [
+                    'tag' => ['Do Not Contact'],
+                ],
+            ])
+            ->assertRedirect(route('crm.campaigns.edit', $campaign));
+
+        $this->assertEquals([
+            'source' => ['Database'],
+            Campaign::ELIGIBILITY_EXCLUSIONS_KEY => [
+                'tag' => ['Do Not Contact'],
+            ],
+        ], $campaign->refresh()->eligibility_filter);
+    }
+
     public function test_update_persists_eligibility_policy_and_marks_campaign_customized(): void
     {
         $user = User::factory()->create();
@@ -238,4 +317,37 @@ class CampaignEligibilityAuthoringTest extends TestCase
             'future_module_fact' => ['qualified'],
         ], $campaign->refresh()->eligibility_filter);
     }
+    public function test_existing_unavailable_exclusion_is_preserved_when_editing_available_audience_rules(): void
+    {
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->create([
+            'enrollment_mode' => Campaign::ENROLLMENT_MODE_MANUAL,
+            'eligibility_filter' => [
+                'source' => ['Database'],
+                Campaign::ELIGIBILITY_EXCLUSIONS_KEY => [
+                    'future_module_fact' => ['blocked'],
+                ],
+            ],
+        ]);
+
+        $this->actingAs($user)
+            ->patch(route('crm.campaigns.eligibility.update', $campaign), [
+                'enrollment_mode' => Campaign::ENROLLMENT_MODE_AUTOMATIC,
+                'reentry_policy' => Campaign::REENTRY_NEVER,
+                'ineligible_behavior' => Campaign::INELIGIBLE_CANCEL,
+                'eligibility_criteria' => [
+                    'source' => ['Database'],
+                ],
+                'eligibility_exclusions' => [],
+            ])
+            ->assertRedirect(route('crm.campaigns.edit', $campaign));
+
+        $this->assertEquals([
+            'source' => ['Database'],
+            Campaign::ELIGIBILITY_EXCLUSIONS_KEY => [
+                'future_module_fact' => ['blocked'],
+            ],
+        ], $campaign->refresh()->eligibility_filter);
+    }
+
 }

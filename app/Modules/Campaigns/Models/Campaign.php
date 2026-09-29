@@ -30,6 +30,8 @@ class Campaign extends Model
         self::EXECUTION_STRATEGY_RECURRING_ALLOCATION,
     ];
 
+    public const ELIGIBILITY_EXCLUSIONS_KEY = '_exclude';
+
     public const ENROLLMENT_MODE_MANUAL = 'manual';
     public const ENROLLMENT_MODE_AUTOMATIC = 'automatic';
     public const ENROLLMENT_MODES = [
@@ -140,10 +142,55 @@ class Campaign extends Model
         return $this->hasMany(CampaignAllocationMessageExclusion::class);
     }
 
+    /** @return array<string, array<int, string>> */
+    public function eligibilityCriteria(): array
+    {
+        if (! is_array($this->eligibility_filter)) {
+            return [];
+        }
+
+        return collect($this->eligibility_filter)
+            ->except(self::ELIGIBILITY_EXCLUSIONS_KEY)
+            ->filter(fn (mixed $values, mixed $key): bool =>
+                is_string($key) && trim($key) !== '' && is_array($values) && $values !== []
+            )
+            ->map(fn (array $values): array => array_values($values))
+            ->all();
+    }
+
+    /** @return array<string, array<int, string>> */
+    public function eligibilityExclusions(): array
+    {
+        if (! is_array($this->eligibility_filter)) {
+            return [];
+        }
+
+        $exclusions = $this->eligibility_filter[self::ELIGIBILITY_EXCLUSIONS_KEY] ?? [];
+
+        if (! is_array($exclusions)) {
+            return [];
+        }
+
+        return collect($exclusions)
+            ->filter(fn (mixed $values, mixed $key): bool =>
+                is_string($key) && trim($key) !== '' && is_array($values) && $values !== []
+            )
+            ->map(fn (array $values): array => array_values($values))
+            ->all();
+    }
+
+    /** @return array<int, string> */
+    public function eligibilityDependencyKeys(): array
+    {
+        return array_values(array_unique([
+            ...array_keys($this->eligibilityCriteria()),
+            ...array_keys($this->eligibilityExclusions()),
+        ]));
+    }
+
     public function hasEligibilityCriteria(): bool
     {
-        return is_array($this->eligibility_filter)
-            && $this->eligibility_filter !== [];
+        return $this->eligibilityCriteria() !== [];
     }
 
     public function usesAutomaticEnrollment(): bool
