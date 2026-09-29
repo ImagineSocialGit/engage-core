@@ -4,6 +4,7 @@ namespace App\Modules\Commerce\Providers;
 
 use App\Modules\Commerce\Services\CommerceProviderRegistry;
 use App\Modules\Commerce\Services\CommerceProviderRoleResolver;
+use App\Modules\Commerce\Validation\CommerceSetupValidationContributor;
 use Illuminate\Support\ServiceProvider;
 
 class CommerceModuleServiceProvider extends ServiceProvider
@@ -17,6 +18,12 @@ class CommerceModuleServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(CommerceProviderRoleResolver::class);
+        $this->app->singleton(CommerceSetupValidationContributor::class);
+
+        $this->app->tag(
+            CommerceSetupValidationContributor::class,
+            'setup.validation_contributors',
+        );
     }
 
     public function boot(): void
