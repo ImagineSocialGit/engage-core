@@ -1,6 +1,6 @@
 # Events Module
 
-Events is a universal module with an approved architecture. Its definition registry, persistence foundation, readiness registry, announcement/promotion gates, duplicate detector, lifecycle actions, attendance reconciliation, neutral automation signals, and scheduled reconciliation are implemented; setup validation and CRM administration remain to be completed.
+Events is a universal module with an approved architecture. Its definition registry, persistence foundation, readiness registry, announcement/promotion gates, duplicate detector, lifecycle actions, attendance reconciliation, neutral automation signals, scheduled reconciliation, and setup validation are implemented; CRM administration remains to be completed.
 
 Events is a thin catalog and reconciliation capability for concrete events that are operated, produced, ticketed, hosted, or streamed outside Engage Core.
 
@@ -699,6 +699,29 @@ Completion is reconciled before announcement emission so an Event whose end time
 
 The reconciler is idempotent and never infers completion from `starts_at` when `ends_at` is absent.
 
+## Setup validation
+
+Events contributes `EventsSetupValidationContributor` through the shared `setup.validation_contributors` seam. Validation is read-only and uses the same Events registries and readiness services as runtime behavior rather than maintaining a parallel configuration model.
+
+The contributor validates:
+
+```text
+Event definition registry resolution
+Event readiness registry resolution
+presence of the universal core readiness capability
+presence of the livestream external-reference type required by virtual readiness
+presence of at least one active attendance source
+registered type/provider/reference/stakeholder/attendance keys used by live durable rows
+valid universal Event and attendance enum values in persisted rows
+core readiness for Events already marked upcoming
+external references with at least one identity value
+primary external references that belong to the same Event and remain active
+```
+
+Draft incompleteness is not a setup error merely because the draft is not ready to become upcoming. Intentional duplicate Events are not setup errors because duplicate confirmation is an explicit authoring decision. Unknown/future announcement timing is not a setup error because embargo is a valid Event state.
+
+The validator does not mutate Event state, persist validation history, add schema, or import optional modules. Global migration/setup contributors continue to own module-installation and dependency validation.
+
 ## Optional-module boundaries
 
 ### FlowRoutes
@@ -821,7 +844,7 @@ Do not include Music, Bandsintown, Commerce, Experiences, FlowRoutes, Messaging,
 
 ## Implementation status
 
-Current repository status after scheduled Event reconciliation:
+Current repository status after Events setup validation:
 
 ```text
 Events module directory: present
@@ -837,9 +860,9 @@ Neutral automation signals: event.created, event.upcoming, event.announcement_re
 Scheduled announcement/completion reconciliation: present; runs every minute and reuses the shared outbox/lifecycle actions
 Legacy Project State policy: all four Events tables explicitly classified must_be_empty; no Events transfer section is required for rollout
 Events CRM routes/navigation: not present
-Events setup validation: not present
+Events setup validation: present; validates registry/readiness wiring and live durable Event contract drift without mutating state
 ```
 
-The next implementation work should follow the approved order above: setup validation and CRM administration before optional consumers are added.
+The next implementation work should follow the approved order above: CRM Event administration before optional consumers are added.
 
 This document remains the canonical architecture reference. Exact file manifests still require a fresh dependency cone for every consumer module touched by a later integration batch.

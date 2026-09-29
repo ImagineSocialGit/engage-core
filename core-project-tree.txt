@@ -635,13 +635,15 @@
 │   │   │   │   └── EventsModuleServiceProvider.php
 │   │   │   ├── Readiness
 │   │   │   │   └── CoreEventReadinessContributor.php
-│   │   │   └── Services
-│   │   │       ├── EventAnnouncementGate.php
-│   │   │       ├── EventAutomationSignalRecorder.php
-│   │   │       ├── EventDefinitionRegistry.php
-│   │   │       ├── EventDuplicateDetector.php
-│   │   │       ├── EventPromotionGate.php
-│   │   │       └── EventReadinessRegistry.php
+│   │   │   ├── Services
+│   │   │   │   ├── EventAnnouncementGate.php
+│   │   │   │   ├── EventAutomationSignalRecorder.php
+│   │   │   │   ├── EventDefinitionRegistry.php
+│   │   │   │   ├── EventDuplicateDetector.php
+│   │   │   │   ├── EventPromotionGate.php
+│   │   │   │   └── EventReadinessRegistry.php
+│   │   │   └── Validation
+│   │   │       └── EventsSetupValidationContributor.php
 │   │   ├── FlowRoutes
 │   │   │   ├── Actions
 │   │   │   │   ├── AdvanceContactFlowRouteProgressAction.php
@@ -3498,7 +3500,8 @@
 │   │   │   ├── EventLifecycleAndAttendanceActionTest.php
 │   │   │   ├── EventReadinessAndPromotionTest.php
 │   │   │   ├── EventScheduledReconciliationTest.php
-│   │   │   └── EventsFoundationTest.php
+│   │   │   ├── EventsFoundationTest.php
+│   │   │   └── EventsSetupValidationContributorTest.php
 │   │   ├── FlowRoutes
 │   │   │   ├── AutomationEventReceiptTest.php
 │   │   │   ├── AutomationEventWorkflowContextTest.php
@@ -4010,4 +4013,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-888 directories, 3123 files
+889 directories, 3125 files
