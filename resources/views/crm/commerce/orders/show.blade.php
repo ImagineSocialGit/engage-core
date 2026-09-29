@@ -10,6 +10,18 @@
             <a href="{{ route('crm.commerce.index') }}" class="text-sm font-semibold text-slate-600 hover:text-slate-950">Catalog</a>
         </div>
 
+        @if(session('commerce_action_success'))
+            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900" data-commerce-action-success>
+                {{ session('commerce_action_success') }}
+            </div>
+        @endif
+
+        @if(session('commerce_action_error'))
+            <div class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900" data-commerce-action-error>
+                {{ session('commerce_action_error') }}
+            </div>
+        @endif
+
         <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
                 <div>
@@ -32,11 +44,22 @@
                         @endif
                     </p>
 
-                    @if($detail['order']->external_url)
-                        <a href="{{ $detail['order']->external_url }}" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex text-sm font-semibold text-slate-700 underline underline-offset-4">
-                            Open provider order
-                        </a>
-                    @endif
+                    <div class="mt-3 flex flex-wrap items-center gap-3">
+                        @if($detail['order']->external_url)
+                            <a href="{{ $detail['order']->external_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex text-sm font-semibold text-slate-700 underline underline-offset-4">
+                                Open provider order
+                            </a>
+                        @endif
+
+                        @if($canOperate && $detail['order']->external_id)
+                            <form method="POST" action="{{ route('crm.commerce.orders.refresh', $detail['order']) }}">
+                                @csrf
+                                <button type="submit" class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50" data-commerce-order-refresh>
+                                    Refresh from provider
+                                </button>
+                            </form>
+                        @endif
+                    </div>
                 </div>
 
                 <dl class="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3 xl:grid-cols-5">

@@ -9,6 +9,36 @@
             <a href="{{ route('crm.commerce.index') }}" class="text-sm font-semibold text-slate-600 hover:text-slate-950">← Commerce</a>
         </div>
 
+        @if(session('commerce_action_error'))
+            <div class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900" data-commerce-action-error>
+                {{ session('commerce_action_error') }}
+            </div>
+        @endif
+
+        @if(session('commerce_inventory_read'))
+            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4" data-commerce-inventory-read>
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Authoritative inventory check</p>
+                        <p class="mt-1 font-semibold text-emerald-950">
+                            Variant #{{ session('commerce_inventory_read.variant_id') }} · {{ session('commerce_inventory_read.provider_key') }}
+                        </p>
+                        <p class="mt-1 text-sm text-emerald-900">
+                            @if(session('commerce_inventory_read.tracked'))
+                                {{ number_format((int) session('commerce_inventory_read.available_quantity')) }} available
+                            @else
+                                Inventory is not tracked for this provider item.
+                            @endif
+                        </p>
+                    </div>
+                    <div class="text-xs text-emerald-800 sm:text-right">
+                        <p>Item {{ session('commerce_inventory_read.external_inventory_item_id') }}</p>
+                        <p class="mt-1">Location {{ session('commerce_inventory_read.external_location_id') }}</p>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
                 <div>
@@ -76,17 +106,28 @@
                             </p>
                         </div>
 
-                        @if(isset($detail['latest_inventory_effects'][$variant->getKey()]))
-                            <div class="rounded-2xl px-4 py-3 ring-1 {{ module_tone('commerce', 'item') }}" data-commerce-inventory-effect>
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Latest inventory evidence</p>
-                                <p class="mt-1 text-sm font-semibold text-slate-950">
-                                    {{ $detail['latest_inventory_effects'][$variant->getKey()]->quantity_delta }} · {{ $detail['latest_inventory_effects'][$variant->getKey()]->status }}
-                                </p>
-                                <p class="mt-1 text-xs text-slate-500">
-                                    {{ $detail['latest_inventory_effects'][$variant->getKey()]->authority_mode->value }}
-                                </p>
-                            </div>
-                        @endif
+                        <div class="flex flex-col items-start gap-3 lg:items-end">
+                            @if(isset($detail['latest_inventory_effects'][$variant->getKey()]))
+                                <div class="rounded-2xl px-4 py-3 ring-1 {{ module_tone('commerce', 'item') }}" data-commerce-inventory-effect>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Latest local inventory evidence</p>
+                                    <p class="mt-1 text-sm font-semibold text-slate-950">
+                                        {{ $detail['latest_inventory_effects'][$variant->getKey()]->quantity_delta }} · {{ $detail['latest_inventory_effects'][$variant->getKey()]->status }}
+                                    </p>
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        {{ $detail['latest_inventory_effects'][$variant->getKey()]->authority_mode->value }}
+                                    </p>
+                                </div>
+                            @endif
+
+                            @if($canOperate && $detail['inventory_provider_key'])
+                                <form method="POST" action="{{ route('crm.commerce.products.variants.inventory', [$detail['product'], $variant]) }}">
+                                    @csrf
+                                    <button type="submit" class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50" data-commerce-inventory-check="{{ $variant->getKey() }}">
+                                        Check authoritative inventory
+                                    </button>
+                                </form>
+                            @endif
+                        </div>
                     </div>
 
                     <div class="mt-5 border-t border-slate-100 pt-5">

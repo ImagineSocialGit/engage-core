@@ -13,6 +13,7 @@ use App\Modules\Core\Models\Contact;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 final class CommerceOrderReadService
@@ -23,11 +24,45 @@ final class CommerceOrderReadService
         private readonly CommercePurchaseConfirmationReader $confirmations,
     ) {}
 
+    /** @param array<string, mixed> $input */
+    public function filters(array $input): array
+    {
+        $search = trim((string) ($input['q'] ?? ''));
+        $financialStatus = trim((string) ($input['financial_status'] ?? ''));
+        $fulfillmentStatus = trim((string) ($input['fulfillment_status'] ?? ''));
+        $provider = trim((string) ($input['provider'] ?? ''));
+        $confirmation = trim((string) ($input['confirmation'] ?? ''));
+
+        return [
+            'q' => $search !== '' ? Str::limit($search, 120, '') : null,
+            'financial_status' => in_array($financialStatus, [
+                CommerceOrder::FINANCIAL_STATUS_PENDING,
+                CommerceOrder::FINANCIAL_STATUS_AUTHORIZED,
+                CommerceOrder::FINANCIAL_STATUS_PAID,
+                CommerceOrder::FINANCIAL_STATUS_PARTIALLY_REFUNDED,
+                CommerceOrder::FINANCIAL_STATUS_REFUNDED,
+                CommerceOrder::FINANCIAL_STATUS_VOIDED,
+            ], true) ? $financialStatus : null,
+            'fulfillment_status' => in_array($fulfillmentStatus, [
+                CommerceOrder::FULFILLMENT_STATUS_UNFULFILLED,
+                CommerceOrder::FULFILLMENT_STATUS_PARTIAL,
+                CommerceOrder::FULFILLMENT_STATUS_FULFILLED,
+                CommerceOrder::FULFILLMENT_STATUS_RESTOCKED,
+            ], true) ? $fulfillmentStatus : null,
+            'provider' => $provider !== '' ? Str::limit($provider, 120, '') : null,
+            'confirmation' => in_array($confirmation, ['confirmed', 'unconfirmed'], true)
+                ? $confirmation
+                : null,
+        ];
+    }
+
+    /** @param array<string, mixed> $filters */
     public function orders(
         User $user,
+        array $filters = [],
         int $perPage = 30,
     ): LengthAwarePaginator {
-        return $this->visibleOrdersQuery($user)
+        return $this->filteredOrdersQuery($user, $filters)
             ->with(['contact', 'commerceCustomer'])
             ->withCount([
                 'items',
@@ -41,12 +76,10 @@ final class CommerceOrderReadService
             ->withQueryString();
     }
 
-    /**
-     * @return array<string, int>
-     */
-    public function summary(User $user): array
+    /** @param array<string, mixed> $filters @return array<string, int> */
+    public function summary(User $user, array $filters = []): array
     {
-        $base = $this->visibleOrdersQuery($user);
+        $base = $this->filteredOrdersQuery($user, $filters);
 
         return [
             'total' => (clone $base)->count(),
@@ -64,6 +97,35 @@ final class CommerceOrderReadService
                     ->where('event', CommerceOrderEvent::EVENT_PURCHASE_CONFIRMED)
                     ->where('source', 'commerce'))
                 ->count(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function filterOptions(User $user): array
+    {
+        return [
+            'providers' => $this->visibleOrdersQuery($user)
+                ->whereNotNull('provider')
+                ->where('provider', '!=', '')
+                ->distinct()
+                ->orderBy('provider')
+                ->pluck('provider')
+                ->values()
+                ->all(),
+            'financial_statuses' => [
+                CommerceOrder::FINANCIAL_STATUS_PENDING,
+                CommerceOrder::FINANCIAL_STATUS_AUTHORIZED,
+                CommerceOrder::FINANCIAL_STATUS_PAID,
+                CommerceOrder::FINANCIAL_STATUS_PARTIALLY_REFUNDED,
+                CommerceOrder::FINANCIAL_STATUS_REFUNDED,
+                CommerceOrder::FINANCIAL_STATUS_VOIDED,
+            ],
+            'fulfillment_statuses' => [
+                CommerceOrder::FULFILLMENT_STATUS_UNFULFILLED,
+                CommerceOrder::FULFILLMENT_STATUS_PARTIAL,
+                CommerceOrder::FULFILLMENT_STATUS_FULFILLED,
+                CommerceOrder::FULFILLMENT_STATUS_RESTOCKED,
+            ],
         ];
     }
 
@@ -92,9 +154,7 @@ final class CommerceOrderReadService
             && $this->access->allows($user, 'contacts.view_all');
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function detail(
         User $user,
         CommerceOrder $order,
@@ -134,6 +194,56 @@ final class CommerceOrderReadService
         ];
     }
 
+    /** @param array<string, mixed> $filters */
+    private function filteredOrdersQuery(User $user, array $filters): Builder
+    {
+        $filters = $this->filters($filters);
+        $query = $this->visibleOrdersQuery($user);
+
+        if ($filters['q'] !== null) {
+            $search = $filters['q'];
+            $query->where(function (Builder $searchQuery) use ($search): void {
+                $searchQuery
+                    ->where('order_name', 'like', "%{$search}%")
+                    ->orWhere('order_number', 'like', "%{$search}%")
+                    ->orWhere('external_id', 'like', "%{$search}%")
+                    ->orWhereHas('contact', static fn (Builder $contactQuery) => $contactQuery
+                        ->where('name', 'like', "%{$search}%")
+                        ->orWhere('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%"))
+                    ->orWhereHas('commerceCustomer', static fn (Builder $customerQuery) => $customerQuery
+                        ->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('external_id', 'like', "%{$search}%"));
+            });
+        }
+
+        if ($filters['financial_status'] !== null) {
+            $query->where('financial_status', $filters['financial_status']);
+        }
+
+        if ($filters['fulfillment_status'] !== null) {
+            $query->where('fulfillment_status', $filters['fulfillment_status']);
+        }
+
+        if ($filters['provider'] !== null) {
+            $query->where('provider', $filters['provider']);
+        }
+
+        if ($filters['confirmation'] === 'confirmed') {
+            $query->whereHas('events', static fn (Builder $eventQuery) => $eventQuery
+                ->where('event', CommerceOrderEvent::EVENT_PURCHASE_CONFIRMED)
+                ->where('source', 'commerce'));
+        } elseif ($filters['confirmation'] === 'unconfirmed') {
+            $query->whereDoesntHave('events', static fn (Builder $eventQuery) => $eventQuery
+                ->where('event', CommerceOrderEvent::EVENT_PURCHASE_CONFIRMED)
+                ->where('source', 'commerce'));
+        }
+
+        return $query;
+    }
+
     private function visibleOrdersQuery(User $user): Builder
     {
         $visibleContactIds = $this->contactVisibility
@@ -159,9 +269,7 @@ final class CommerceOrderReadService
             });
     }
 
-    /**
-     * @return array{state:string,event:?CommerceOrderEvent,confirmation:?CommercePurchaseConfirmation,error:?string}
-     */
+    /** @return array{state:string,event:?CommerceOrderEvent,confirmation:?CommercePurchaseConfirmation,error:?string} */
     private function purchaseConfirmation(CommerceOrder $order): array
     {
         $event = $order->events
@@ -195,9 +303,7 @@ final class CommerceOrderReadService
         }
     }
 
-    /**
-     * @return Collection<int, CommerceInventoryEffect>
-     */
+    /** @return Collection<int, CommerceInventoryEffect> */
     private function inventoryEffects(CommerceOrder $order): Collection
     {
         $itemIds = $order->items

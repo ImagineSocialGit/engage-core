@@ -5,6 +5,7 @@ namespace App\Modules\Commerce\Controllers\CRM;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Modules\Commerce\Models\CommerceOrder;
+use App\Modules\Commerce\Services\CommerceOperatorAccessService;
 use App\Modules\Commerce\Services\CommerceOrderReadService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -16,14 +17,17 @@ final class CommerceOrderController extends Controller
         CommerceOrderReadService $orders,
     ): View {
         $user = $request->user();
-
         abort_unless($user instanceof User, 403);
+
+        $filters = $orders->filters($request->query());
 
         return view('crm.commerce.orders.index', [
             'title' => 'Commerce Orders',
             'heading' => 'Orders',
-            'orders' => $orders->orders($user),
-            'summary' => $orders->summary($user),
+            'orders' => $orders->orders($user, $filters),
+            'summary' => $orders->summary($user, $filters),
+            'filters' => $filters,
+            'filterOptions' => $orders->filterOptions($user),
         ]);
     }
 
@@ -31,9 +35,9 @@ final class CommerceOrderController extends Controller
         Request $request,
         CommerceOrder $commerceOrder,
         CommerceOrderReadService $orders,
+        CommerceOperatorAccessService $operatorAccess,
     ): View {
         $user = $request->user();
-
         abort_unless($user instanceof User, 403);
         abort_unless($orders->canView($user, $commerceOrder), 404);
 
@@ -45,6 +49,7 @@ final class CommerceOrderController extends Controller
                 ?: $commerceOrder->order_number
                 ?: 'Order #'.$commerceOrder->getKey(),
             'detail' => $orders->detail($user, $commerceOrder),
+            'canOperate' => $operatorAccess->canOperate($user),
         ]);
     }
 }
