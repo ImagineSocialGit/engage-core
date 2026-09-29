@@ -15,6 +15,7 @@ Route::middleware([
     require __DIR__.'/crm/documents.php';
     require __DIR__.'/crm/commerce.php';
     require __DIR__.'/crm/relationships.php';
+    require __DIR__.'/crm/events.php';
     require __DIR__.'/crm/webinars.php';
     require __DIR__.'/crm/campaigns.php';
     require __DIR__.'/crm/messaging.php';
