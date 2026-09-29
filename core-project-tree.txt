@@ -379,6 +379,7 @@
 │   │   │   │   ├── CommerceCatalogReadService.php
 │   │   │   │   ├── CommerceCatalogSyncService.php
 │   │   │   │   ├── CommerceCheckoutService.php
+│   │   │   │   ├── CommerceContactPurchaseHistoryReadService.php
 │   │   │   │   ├── CommerceInventoryEffectOrchestrator.php
 │   │   │   │   ├── CommerceInventoryEffectRecorder.php
 │   │   │   │   ├── CommerceOfferPublicationEvaluator.php
@@ -392,7 +393,9 @@
 │   │   │   │   ├── CommercePurchaseConfirmationReader.php
 │   │   │   │   ├── CommercePurchaseConfirmationService.php
 │   │   │   │   ├── CommerceStorefrontStateResolver.php
-│   │   │   │   └── CommerceStorefrontViewResolver.php
+│   │   │   │   ├── CommerceStorefrontViewResolver.php
+│   │   │   │   └── ContactPanels
+│   │   │   │       └── CommercePurchaseHistoryContactPanelProvider.php
 │   │   │   ├── Support
 │   │   │   └── Validation
 │   │   │       └── CommerceSetupValidationContributor.php
@@ -3073,6 +3076,7 @@
 │       │   │   ├── index.blade.php
 │       │   │   ├── panels
 │       │   │   │   ├── assignment.blade.php
+│       │   │   │   ├── commerce-purchase-history.blade.php
 │       │   │   │   ├── messaging-delivery-issues.blade.php
 │       │   │   │   ├── messaging-direct-message.blade.php
 │       │   │   │   └── webinar-history.blade.php
@@ -3398,6 +3402,7 @@
 │   │   │   └── ProjectStateClientEnvironmentContractTest.php
 │   │   ├── Commerce
 │   │   │   ├── CommerceCatalogSyncTest.php
+│   │   │   ├── CommerceContactPurchaseHistoryTest.php
 │   │   │   ├── CommerceFoundationTest.php
 │   │   │   ├── CommerceInventoryOrchestrationTest.php
 │   │   │   ├── CommerceOrderCustomerReconciliationTest.php
@@ -4013,4 +4018,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-889 directories, 3125 files
+890 directories, 3129 files

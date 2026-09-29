@@ -69,10 +69,20 @@ final class CommerceOrderReadService
 
     public function canView(User $user, CommerceOrder $order): bool
     {
-        if ($order->contact_id !== null) {
+        $contactId = $order->contact_id;
+
+        if ($contactId === null) {
+            $customer = $order->relationLoaded('commerceCustomer')
+                ? $order->commerceCustomer
+                : $order->commerceCustomer()->first();
+            $contactId = $customer?->contact_id;
+        }
+
+        if ($contactId !== null) {
             $contact = $order->relationLoaded('contact')
-                ? $order->contact
-                : Contact::query()->find($order->contact_id);
+                && (int) $order->contact_id === (int) $contactId
+                    ? $order->contact
+                    : Contact::query()->find($contactId);
 
             return $contact instanceof Contact
                 && $this->contactVisibility->canView($user, $contact);
@@ -134,7 +144,14 @@ final class CommerceOrderReadService
 
         return CommerceOrder::query()
             ->where(function (Builder $query) use ($visibleContactIds, $mayViewUnlinked): void {
-                $query->whereIn('contact_id', $visibleContactIds);
+                $query
+                    ->whereIn('contact_id', clone $visibleContactIds)
+                    ->orWhere(function (Builder $fallback) use ($visibleContactIds): void {
+                        $fallback
+                            ->whereNull('contact_id')
+                            ->whereHas('commerceCustomer', static fn (Builder $customerQuery) => $customerQuery
+                                ->whereIn('contact_id', clone $visibleContactIds));
+                    });
 
                 if ($mayViewUnlinked) {
                     $query->orWhereNull('contact_id');

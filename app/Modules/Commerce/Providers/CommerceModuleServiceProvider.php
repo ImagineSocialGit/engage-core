@@ -4,7 +4,9 @@ namespace App\Modules\Commerce\Providers;
 
 use App\Modules\Commerce\Services\CommerceProviderRegistry;
 use App\Modules\Commerce\Services\CommerceProviderRoleResolver;
+use App\Modules\Commerce\Services\ContactPanels\CommercePurchaseHistoryContactPanelProvider;
 use App\Modules\Commerce\Validation\CommerceSetupValidationContributor;
+use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use Illuminate\Support\ServiceProvider;
 
 class CommerceModuleServiceProvider extends ServiceProvider
@@ -26,8 +28,11 @@ class CommerceModuleServiceProvider extends ServiceProvider
         );
     }
 
-    public function boot(): void
+    public function boot(ContactPanelRegistry $contactPanels): void
     {
-        //
+        $contactPanels->register(
+            CommercePurchaseHistoryContactPanelProvider::class,
+            'commerce',
+        );
     }
 }

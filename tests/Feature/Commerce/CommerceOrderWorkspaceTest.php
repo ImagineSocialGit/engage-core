@@ -75,6 +75,55 @@ class CommerceOrderWorkspaceTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_customer_linked_legacy_order_inherits_contact_visibility(): void
+    {
+        $member = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $this->profile($member, 'member');
+
+        $visibleContact = Contact::factory()->create([
+            'assigned_user_id' => $member->getKey(),
+        ]);
+        $hiddenContact = Contact::factory()->create([
+            'assigned_user_id' => $otherUser->getKey(),
+        ]);
+        $visibleCustomer = CommerceCustomer::factory()->create([
+            'contact_id' => $visibleContact->getKey(),
+        ]);
+        $hiddenCustomer = CommerceCustomer::factory()->create([
+            'contact_id' => $hiddenContact->getKey(),
+        ]);
+        $visibleLegacyOrder = CommerceOrder::factory()->create([
+            'commerce_customer_id' => $visibleCustomer->getKey(),
+            'contact_id' => null,
+            'external_id' => 'visible-legacy-order',
+        ]);
+        $hiddenLegacyOrder = CommerceOrder::factory()->create([
+            'commerce_customer_id' => $hiddenCustomer->getKey(),
+            'contact_id' => null,
+            'external_id' => 'hidden-legacy-order',
+        ]);
+
+        $orders = $this->actingAs($member)
+            ->get(route('crm.commerce.orders.index'))
+            ->assertOk()
+            ->viewData('orders');
+
+        $this->assertSame(1, $orders->total());
+        $this->assertSame(
+            (int) $visibleLegacyOrder->getKey(),
+            (int) $orders->first()->getKey(),
+        );
+
+        $this->actingAs($member)
+            ->get(route('crm.commerce.orders.show', $visibleLegacyOrder))
+            ->assertOk();
+
+        $this->actingAs($member)
+            ->get(route('crm.commerce.orders.show', $hiddenLegacyOrder))
+            ->assertNotFound();
+    }
+
     public function test_order_detail_exposes_purchase_confirmation_inventory_and_lifecycle_evidence(): void
     {
         $owner = User::factory()->create();
