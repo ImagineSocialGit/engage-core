@@ -15,10 +15,8 @@ use App\Modules\Commerce\Models\CommerceProduct;
 use App\Modules\Commerce\Models\CommerceProductProviderMapping;
 use App\Modules\Commerce\Models\CommerceProductVariant;
 use App\Modules\Commerce\Models\CommerceProductVariantProviderMapping;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
-use JsonException;
 use RuntimeException;
 
 final class CommerceOrderSyncService
@@ -26,6 +24,8 @@ final class CommerceOrderSyncService
     public function __construct(
         private readonly CommerceProviderRoleResolver $roles,
         private readonly CommerceOrderCustomerReconciler $customers,
+        private readonly CommerceOrderInventoryEffectProducer $inventoryEffects,
+        private readonly CommercePurchaseConfirmationService $purchaseConfirmations,
     ) {}
 
     public function sync(
@@ -62,10 +62,13 @@ final class CommerceOrderSyncService
             );
         }
 
-        return DB::transaction(function () use (
+        $inventoryEffectIds = [];
+
+        $result = DB::transaction(function () use (
             $providerKey,
             $request,
             $snapshot,
+            &$inventoryEffectIds,
         ): CommerceOrderSyncResult {
             $order = CommerceOrder::withTrashed()
                 ->where('provider', $providerKey)
@@ -129,15 +132,9 @@ final class CommerceOrderSyncService
                 'meta' => $snapshot->meta !== [] ? $snapshot->meta : null,
             ]);
 
-            $orderChanged = ! $orderCreated
-                && $this->hasMeaningfulChanges(
-                    $order,
-                    ['raw_payload', 'meta'],
-                );
+            $orderChanged = ! $orderCreated && $order->isDirty();
 
-            if ($orderCreated || $orderChanged) {
-                $order->save();
-            }
+            $order->save();
 
             $itemsCreated = 0;
             $itemsChanged = 0;
@@ -171,6 +168,14 @@ final class CommerceOrderSyncService
                 request: $request,
             );
 
+            $inventoryEffectIds = $this->inventoryEffects
+                ->recordAuthoritativeConsumption(
+                    order: $order,
+                    ordersProviderKey: $providerKey,
+                    inventoryScope: $request->scope,
+                    occurredAt: $request->occurredAt,
+                );
+
             return new CommerceOrderSyncResult(
                 providerKey: $providerKey,
                 commerceOrderId: (int) $order->getKey(),
@@ -184,6 +189,17 @@ final class CommerceOrderSyncService
                 eventCreated: $eventCreated,
             );
         });
+
+        $this->inventoryEffects->reconcileAuthoritativeEffects(
+            $inventoryEffectIds,
+        );
+
+        $this->purchaseConfirmations->confirm(
+            commerceOrderId: $result->commerceOrderId,
+            occurredAt: $request->occurredAt ?? $snapshot->orderedAt,
+        );
+
+        return $result;
     }
 
     /**
@@ -246,15 +262,9 @@ final class CommerceOrderSyncService
             'meta' => $data->meta !== [] ? $data->meta : null,
         ]);
 
-        $changed = ! $created
-            && $this->hasMeaningfulChanges(
-                $item,
-                ['options', 'raw_payload', 'meta'],
-            );
+        $changed = ! $created && $item->isDirty();
 
-        if ($created || $changed) {
-            $item->save();
-        }
+        $item->save();
 
         return match (true) {
             $created => 'created',
@@ -410,82 +420,6 @@ final class CommerceOrderSyncService
         ]);
 
         return true;
-    }
-
-    /**
-     * @param array<int, string> $jsonAttributes
-     */
-    private function hasMeaningfulChanges(
-        Model $model,
-        array $jsonAttributes,
-    ): bool {
-        $dirty = $model->getDirty();
-
-        foreach ($jsonAttributes as $attribute) {
-            if (! array_key_exists($attribute, $dirty)) {
-                continue;
-            }
-
-            if ($this->jsonAttributeIsEquivalent($model, $attribute)) {
-                unset($dirty[$attribute]);
-            }
-        }
-
-        return $dirty !== [];
-    }
-
-    private function jsonAttributeIsEquivalent(
-        Model $model,
-        string $attribute,
-    ): bool {
-        return $this->normalizeJsonValue(
-            $model->getAttribute($attribute),
-        ) === $this->normalizeJsonValue(
-            $this->decodeJsonValue($model->getRawOriginal($attribute)),
-        );
-    }
-
-    private function decodeJsonValue(mixed $value): mixed
-    {
-        if ($value === null || is_array($value)) {
-            return $value;
-        }
-
-        if (! is_string($value)) {
-            return $value;
-        }
-
-        try {
-            return json_decode(
-                $value,
-                associative: true,
-                flags: JSON_THROW_ON_ERROR,
-            );
-        } catch (JsonException) {
-            return $value;
-        }
-    }
-
-    private function normalizeJsonValue(mixed $value): mixed
-    {
-        if (! is_array($value)) {
-            return $value;
-        }
-
-        if (array_is_list($value)) {
-            return array_map(
-                fn (mixed $item): mixed => $this->normalizeJsonValue($item),
-                $value,
-            );
-        }
-
-        ksort($value, SORT_STRING);
-
-        foreach ($value as $key => $item) {
-            $value[$key] = $this->normalizeJsonValue($item);
-        }
-
-        return $value;
     }
 
     private function nullableString(?string $value): ?string
