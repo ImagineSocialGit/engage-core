@@ -317,6 +317,7 @@
 │   │   │   │   ├── CommerceFulfillmentProvider.php
 │   │   │   │   ├── CommerceInventoryAdjustmentProvider.php
 │   │   │   │   ├── CommerceInventoryProvider.php
+│   │   │   │   ├── CommerceInventoryReadProvider.php
 │   │   │   │   ├── CommerceOrderProvider.php
 │   │   │   │   ├── CommercePaymentProvider.php
 │   │   │   │   ├── CommercePointOfSaleProvider.php
@@ -336,6 +337,7 @@
 │   │   │   │   ├── CommerceInventoryAdjustmentResult.php
 │   │   │   │   ├── CommerceInventoryEffectData.php
 │   │   │   │   ├── CommerceInventoryOrchestrationResult.php
+│   │   │   │   ├── CommerceInventoryState.php
 │   │   │   │   ├── CommerceOfferPublicationState.php
 │   │   │   │   ├── CommerceOrderCustomerResolution.php
 │   │   │   │   ├── CommerceOrderCustomerSnapshotData.php
@@ -4012,4 +4014,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-883 directories, 3130 files
+883 directories, 3132 files
