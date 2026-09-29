@@ -781,6 +781,12 @@ return [
             'ui' => [
                 'tone' => 'emerald',
             ],
+            'nav' => [
+                'label' => 'Commerce',
+                'description' => 'Review products, variants, provider mappings, and purchase operations.',
+                'route' => 'crm.commerce.index',
+                'priority' => 50,
+            ],
             'depends_on' => ['core'],
             'providers' => [
                 CommerceModuleServiceProvider::class,

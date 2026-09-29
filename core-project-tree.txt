@@ -325,6 +325,9 @@
 │   │   │   │   ├── CommercePromotionProvider.php
 │   │   │   │   └── CommerceProvider.php
 │   │   │   ├── Controllers
+│   │   │   │   └── CRM
+│   │   │   │       ├── CommerceController.php
+│   │   │   │       └── CommerceProductController.php
 │   │   │   ├── Data
 │   │   │   │   ├── CommerceCatalogPage.php
 │   │   │   │   ├── CommerceCatalogPageRequest.php
@@ -349,6 +352,7 @@
 │   │   │   │   ├── CommercePromotionState.php
 │   │   │   │   ├── CommerceProviderReferenceData.php
 │   │   │   │   ├── CommerceProviderVariantReference.php
+│   │   │   │   ├── CommercePurchaseConfirmation.php
 │   │   │   │   └── CommerceStorefrontState.php
 │   │   │   ├── Enums
 │   │   │   │   ├── CommerceInventoryAuthorityMode.php
@@ -371,6 +375,7 @@
 │   │   │   │   └── CommerceModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
+│   │   │   │   ├── CommerceCatalogReadService.php
 │   │   │   │   ├── CommerceCatalogSyncService.php
 │   │   │   │   ├── CommerceCheckoutService.php
 │   │   │   │   ├── CommerceInventoryEffectOrchestrator.php
@@ -382,9 +387,13 @@
 │   │   │   │   ├── CommerceProviderRegistry.php
 │   │   │   │   ├── CommerceProviderRoleResolver.php
 │   │   │   │   ├── CommerceProviderVariantReferenceResolver.php
+│   │   │   │   ├── CommercePurchaseConfirmationReader.php
+│   │   │   │   ├── CommercePurchaseConfirmationService.php
 │   │   │   │   ├── CommerceStorefrontStateResolver.php
 │   │   │   │   └── CommerceStorefrontViewResolver.php
-│   │   │   └── Support
+│   │   │   ├── Support
+│   │   │   └── Validation
+│   │   │       └── CommerceSetupValidationContributor.php
 │   │   ├── Core
 │   │   │   ├── Access
 │   │   │   │   ├── Actions
@@ -3044,6 +3053,10 @@
 │       │   │   └── simulator
 │       │   │       ├── index.blade.php
 │       │   │       └── show.blade.php
+│       │   ├── commerce
+│       │   │   ├── index.blade.php
+│       │   │   └── products
+│       │   │       └── show.blade.php
 │       │   ├── contacts
 │       │   │   ├── import-batches
 │       │   │   │   ├── index.blade.php
@@ -3224,6 +3237,7 @@
 │   ├── crm
 │   │   ├── broadcasts.php
 │   │   ├── campaigns.php
+│   │   ├── commerce.php
 │   │   ├── core.php
 │   │   ├── documents.php
 │   │   ├── flow-routes.php
@@ -3381,7 +3395,10 @@
 │   │   │   ├── CommerceInventoryOrchestrationTest.php
 │   │   │   ├── CommerceOrderCustomerReconciliationTest.php
 │   │   │   ├── CommerceOrderSyncTest.php
-│   │   │   └── CommerceStorefrontFoundationTest.php
+│   │   │   ├── CommercePurchaseConfirmationTest.php
+│   │   │   ├── CommerceSetupValidationTest.php
+│   │   │   ├── CommerceStorefrontFoundationTest.php
+│   │   │   └── CommerceWorkspaceTest.php
 │   │   ├── ConfigContracts
 │   │   │   ├── ComposedPresetConfigContractTargetProviderTest.php
 │   │   │   ├── ConfigContractRegistryTest.php
@@ -3987,4 +4004,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-883 directories, 3105 files
+887 directories, 3118 files
