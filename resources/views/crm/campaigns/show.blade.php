@@ -17,6 +17,10 @@
             \App\Modules\Campaigns\Models\Campaign::STATUS_INACTIVE => 'bg-slate-100 text-slate-700 ring-slate-200',
             default => 'bg-amber-100 text-amber-900 ring-amber-200',
         };
+
+        $campaignStyleLabel = $campaign->usesRecurringAllocation()
+            ? 'Ongoing outreach'
+            : 'Follow-up series';
     @endphp
 
     <div class="min-w-0 space-y-6">
@@ -57,7 +61,7 @@
                             {{ $statusLabel }}
                         </span>
                         <span class="inline-flex shrink-0 items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 ring-1 ring-inset ring-slate-200">
-                            {{ $campaign->usesRecurringAllocation() ? 'Recurring allocation' : 'Sequence' }}
+                            {{ $campaignStyleLabel }}
                         </span>
                     </div>
 
@@ -80,7 +84,7 @@
                         href="{{ route('crm.campaigns.edit', $campaign) }}"
                         class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-bold text-slate-800 transition hover:bg-slate-50 sm:w-auto"
                     >
-                        Review setup
+                        Edit campaign
                     </a>
 
                     @if($campaign->status === \App\Modules\Campaigns\Models\Campaign::STATUS_ACTIVE)
@@ -88,7 +92,7 @@
                             method="POST"
                             action="{{ route('crm.campaigns.deactivate', $campaign) }}"
                             class="w-full sm:w-auto"
-                            onsubmit="return confirm('Turn this Campaign off? Current open enrollments will be cancelled and pending Campaign messages will be skipped.');"
+                            onsubmit="return confirm('Turn this campaign off? Current journeys will stop and pending campaign messages will be skipped.');"
                         >
                             @csrf
                             @method('PATCH')
@@ -119,16 +123,40 @@
             <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
-                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Recurring allocation</p>
-                        <h2 class="mt-2 text-lg font-semibold text-slate-950">Allocate each message to a different eligible group</h2>
-                        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Each run reserves distinct leads across active messages. Each message's offset from run start sets its own earliest send time. The cooldown controls when a successfully contacted lead can be selected again. <a href="#campaign-email-delivery-pacing" class="font-semibold underline">Email delivery pacing</a> may defer marketing emails later.</p>
+                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">How it works</p>
+                        <h2 class="mt-2 text-lg font-semibold text-slate-950">Steady outreach to fresh eligible leads</h2>
+                        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                            On each outreach round, every active message gets a different group of eligible leads. A lead can be chosen again only after the waiting period below.
+                        </p>
                     </div>
-                    <a href="{{ route('crm.campaigns.edit', ['campaign' => $campaign, 'panel' => 'start']) }}" class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">Edit allocation settings</a>
+                    <a href="{{ route('crm.campaigns.edit', ['campaign' => $campaign, 'panel' => 'start']) }}" class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">Change outreach settings</a>
                 </div>
                 <div class="mt-5 grid gap-3 sm:grid-cols-3">
-                    <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><div class="text-xl font-bold text-slate-950">{{ number_format($allocationSettings['run_every_days']) }} days</div><div class="mt-1 text-sm text-slate-600">Run cadence</div></div>
-                    <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><div class="text-xl font-bold text-slate-950">{{ number_format($allocationSettings['allocation_size_per_message']) }}</div><div class="mt-1 text-sm text-slate-600">Leads per message per run</div></div>
-                    <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><div class="text-xl font-bold text-slate-950">{{ number_format($allocationSettings['recipient_cooldown_days']) }} days</div><div class="mt-1 text-sm text-slate-600">Recipient cooldown</div></div>
+                    <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                        <div class="text-xl font-bold text-slate-950">Every {{ number_format($allocationSettings['run_every_days']) }} {{ \Illuminate\Support\Str::plural('day', $allocationSettings['run_every_days']) }}</div>
+                        <div class="mt-1 text-sm text-slate-600">Choose a new group of leads</div>
+                    </div>
+                    <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                        <div class="text-xl font-bold text-slate-950">{{ number_format($allocationSettings['allocation_size_per_message']) }}</div>
+                        <div class="mt-1 text-sm text-slate-600">Leads for each message</div>
+                    </div>
+                    <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                        <div class="text-xl font-bold text-slate-950">{{ number_format($allocationSettings['recipient_cooldown_days']) }} {{ \Illuminate\Support\Str::plural('day', $allocationSettings['recipient_cooldown_days']) }}</div>
+                        <div class="mt-1 text-sm text-slate-600">Before the same lead can be chosen again</div>
+                    </div>
+                </div>
+            </section>
+        @else
+            <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">How it works</p>
+                        <h2 class="mt-2 text-lg font-semibold text-slate-950">A lead moves through the messages in order</h2>
+                        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                            Each lead starts at the beginning and follows {{ number_format($workspace['message_step_count']) }} {{ \Illuminate\Support\Str::plural('message', $workspace['message_step_count']) }} in order, using the timing you set between them.
+                        </p>
+                    </div>
+                    <a href="{{ route('crm.campaigns.edit', ['campaign' => $campaign, 'panel' => 'schedule']) }}" class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">Review message timing</a>
                 </div>
             </section>
         @endif
@@ -137,29 +165,29 @@
             <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h2 class="text-lg font-semibold text-slate-950">Allocation runs</h2>
-                        <p class="mt-1 text-sm text-slate-600">Assignments are planned per run. Delivery may continue afterward.</p>
+                        <h2 class="text-lg font-semibold text-slate-950">Recent outreach</h2>
+                        <p class="mt-1 text-sm text-slate-600">See who was selected recently or preview the next group before it starts.</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
-                        <a href="{{ route('crm.campaigns.runs.preview', $campaign) }}" class="inline-flex min-h-10 items-center rounded-full bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800">Preview next run</a>
-                        <a href="{{ route('crm.campaigns.runs.index', $campaign) }}" class="text-sm font-semibold text-slate-900 underline">All runs</a>
+                        <a href="{{ route('crm.campaigns.runs.preview', $campaign) }}" class="inline-flex min-h-10 items-center rounded-full bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800">Preview next outreach</a>
+                        <a href="{{ route('crm.campaigns.runs.index', $campaign) }}" class="text-sm font-semibold text-slate-900 underline">Outreach history</a>
                     </div>
                 </div>
                 @forelse($recentAllocationRuns as $run)
                     <a href="{{ route('crm.campaigns.runs.show', ['campaign' => $campaign, 'run' => $run]) }}" class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 px-4 py-3 hover:bg-slate-50">
-                        <span class="font-semibold text-slate-950">{{ $run->scheduled_for?->format('M j, Y g:i A') ?? 'Run #'.$run->getKey() }}</span>
-                        <span class="text-sm text-slate-600">{{ \Illuminate\Support\Str::headline($run->status) }} · {{ number_format($run->assignments_count) }} assigned · {{ number_format($run->sent_messages_count) }} sent</span>
+                        <span class="font-semibold text-slate-950">{{ $run->scheduled_for?->format('M j, Y g:i A') ?? 'Outreach #'.$run->getKey() }}</span>
+                        <span class="text-sm text-slate-600">{{ \Illuminate\Support\Str::headline($run->status) }} · {{ number_format($run->assignments_count) }} leads selected · {{ number_format($run->sent_messages_count) }} sent</span>
                     </a>
                 @empty
-                    <p class="mt-4 text-sm text-slate-600">No allocation runs yet.</p>
+                    <p class="mt-4 text-sm text-slate-600">No outreach has run yet.</p>
                 @endforelse
             </section>
         @endif
 
-        <section class="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section class="grid min-w-0 gap-3 sm:grid-cols-3">
             <div class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div class="text-2xl font-bold text-slate-950">{{ $workspace['active_enrollment_count'] }}</div>
-                <div class="mt-1 break-words text-sm font-semibold text-slate-600">Current participants</div>
+                <div class="mt-1 break-words text-sm font-semibold text-slate-600">Active leads</div>
             </div>
             <div class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div class="text-2xl font-bold text-slate-950">{{ $workspace['pending_message_count'] }}</div>
@@ -167,22 +195,18 @@
             </div>
             <div class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div class="text-2xl font-bold text-slate-950">{{ $workspace['message_step_count'] }}</div>
-                <div class="mt-1 break-words text-sm font-semibold text-slate-600">Message steps</div>
-            </div>
-            <div class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                <div class="text-2xl font-bold text-slate-950">{{ $workspace['message_count'] }}</div>
-                <div class="mt-1 break-words text-sm font-semibold text-slate-600">Messages</div>
+                <div class="mt-1 break-words text-sm font-semibold text-slate-600">Messages in this campaign</div>
             </div>
         </section>
 
         <section class="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-7">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h2 class="text-xl font-semibold text-slate-950">Audience and progress</h2>
-                    <p class="mt-2 text-sm leading-6 text-slate-600">For leads you can view: {{ number_format($audienceSummary['matching']) }} currently match the start rules, {{ number_format($audienceSummary['not_started']) }} match but have never enrolled, and {{ number_format($audienceSummary['enrolled']) }} have enrolled.</p>
-                    <p class="mt-2 text-xs text-slate-500">Filter matches do not include message permission checks. Manual Campaigns without start rules have no filter matches; current participation still appears in progress.</p>
+                    <h2 class="text-xl font-semibold text-slate-950">Leads in this campaign</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-600">{{ number_format($audienceSummary['matching']) }} leads match the current audience rules. {{ number_format($audienceSummary['not_started']) }} match but have not started, and {{ number_format($audienceSummary['enrolled']) }} have been in the campaign.</p>
+                    <p class="mt-2 text-xs text-slate-500">Permission and delivery checks happen separately when a message is prepared to send.</p>
                 </div>
-                <a href="{{ route('crm.campaigns.audience.index', $campaign) }}" class="inline-flex min-h-11 items-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white hover:bg-slate-800">View audience and progress</a>
+                <a href="{{ route('crm.campaigns.audience.index', $campaign) }}" class="inline-flex min-h-11 items-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white hover:bg-slate-800">View leads and progress</a>
             </div>
             <div class="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-700">
                 @foreach(['active', 'paused', 'completed', 'exited', 'cancelled'] as $status)
@@ -191,29 +215,28 @@
             </div>
         </section>
 
-        <section id="campaign-email-delivery-pacing" class="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-7">
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                    <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Email delivery pacing</p>
-                    <h2 class="mt-2 text-xl font-semibold text-slate-950">Schedule marketing email delivery</h2>
-                    <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                        Message timing sets the earliest send time. Spread Campaign marketing emails across allowed days and hours with a daily limit, or use their due times. This setting does not change allocation cadence, recipients, or SMS timing.
-                    </p>
+        <details id="campaign-email-delivery-pacing" class="min-w-0 rounded-3xl border border-slate-200 bg-white shadow-sm" @if($errors->any()) open @endif>
+            <summary class="cursor-pointer list-none p-4 sm:p-7">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Email delivery</p>
+                        <h2 class="mt-2 text-xl font-semibold text-slate-950">{{ $sendPattern['mode_label'] }}</h2>
+                        <p class="mt-2 text-sm leading-6 text-slate-600">Open to change sending days, hours, or the daily email limit.</p>
+                    </div>
+                    <span class="text-sm font-bold text-slate-700">Change settings</span>
                 </div>
+            </summary>
 
-                <div class="rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200">
-                    {{ $sendPattern['mode_label'] }}
-                </div>
-            </div>
+            <div class="border-t border-slate-200 p-4 sm:p-7">
 
             @if($campaign->usesRecurringAllocation() && $sendPattern['mode'] === 'spread' && $workspace['marketing_email_step_count'] * $allocationSettings['allocation_size_per_message'] > $sendPattern['daily_limit'])
                 <div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
-                    A run can plan up to {{ number_format($workspace['marketing_email_step_count'] * $allocationSettings['allocation_size_per_message']) }} marketing emails across {{ number_format($workspace['marketing_email_step_count']) }} active email {{ \Illuminate\Support\Str::plural('message', $workspace['marketing_email_step_count']) }}. The daily Campaign limit is {{ number_format($sendPattern['daily_limit']) }}. If more than that become due on one allowed day, the rest move to later allowed slots. Message offsets, other Campaign sends, and recipient eligibility affect the actual schedule. A later allocation run can begin while earlier emails are still pending.
+                    One outreach round can make up to {{ number_format($workspace['marketing_email_step_count'] * $allocationSettings['allocation_size_per_message']) }} marketing emails across {{ number_format($workspace['marketing_email_step_count']) }} active email {{ \Illuminate\Support\Str::plural('message', $workspace['marketing_email_step_count']) }}. This campaign is set to send up to {{ number_format($sendPattern['daily_limit']) }}. If more emails are ready on the same day, the rest move to the next allowed sending time.
                 </div>
             @endif
 
             @if($sendPattern['mode'] === 'spread')
-                <a href="{{ route('crm.campaigns.pacing-override.preview', $campaign) }}" class="mt-5 inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-bold text-slate-900 hover:bg-slate-50">Use today’s remaining window</a>
+                <a href="{{ route('crm.campaigns.pacing-override.preview', $campaign) }}" class="mt-5 inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-bold text-slate-900 hover:bg-slate-50">Send more today</a>
             @endif
 
             <form method="POST" action="{{ route('crm.campaigns.send-pattern.update', $campaign) }}" class="mt-6 space-y-5">
@@ -232,7 +255,7 @@
                             >
                             <span>
                                 <span class="block text-sm font-semibold text-slate-950">Send as due</span>
-                                <span class="mt-1 block text-xs leading-5 text-slate-600">Use each message’s due time with no Campaign-level daily email limit.</span>
+                                <span class="mt-1 block text-xs leading-5 text-slate-600">Send each email as soon as its campaign timing allows, without a daily campaign limit.</span>
                             </span>
                         </span>
                     </label>
@@ -248,7 +271,7 @@
                             >
                             <span>
                                 <span class="block text-sm font-semibold text-slate-950">Spread throughout the day</span>
-                                <span class="mt-1 block text-xs leading-5 text-slate-600">Place Campaign marketing emails in allowed windows. Overflow moves to later allowed days; each message's configured timing remains its earliest send time.</span>
+                                <span class="mt-1 block text-xs leading-5 text-slate-600">Spread campaign emails across the days and hours you choose. If one day fills up, the rest move to the next allowed time.</span>
                             </span>
                         </span>
                     </label>
@@ -324,40 +347,22 @@
 
                 <div class="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
                     <p class="max-w-3xl text-xs leading-5 text-slate-500">
-                        Changes affect Campaign marketing emails planned after you save. Messages that are already scheduled keep their current send times.
+                        Changes affect emails scheduled after you save. Emails already scheduled keep their current send times.
                     </p>
                     <button
                         type="submit"
                         class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800"
                     >
-                        Save email pacing
+                        Save email delivery
                     </button>
                 </div>
             </form>
-        </section>
-
-        <section class="min-w-0 rounded-3xl border border-rose-200 bg-white/95 p-4 shadow-sm sm:p-8">
-            <div class="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div class="min-w-0">
-                    <p class="text-xs font-bold uppercase tracking-[0.16em] text-rose-700">Campaign setup</p>
-                    <h2 class="mt-2 break-words text-xl font-semibold tracking-tight text-slate-950">Review the campaign from start through activation</h2>
-                    <p class="mt-2 max-w-3xl break-words text-sm leading-6 text-slate-600">
-                        The setup workspace uses the same structure for reviewing an existing campaign and, later, for creating one from a copy or from scratch.
-                    </p>
-                </div>
-
-                <a
-                    href="{{ route('crm.campaigns.edit', $campaign) }}"
-                    class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white transition hover:bg-slate-800 sm:w-auto"
-                >
-                    Open setup
-                </a>
             </div>
-        </section>
+        </details>
 
         @if($campaign->status === \App\Modules\Campaigns\Models\Campaign::STATUS_ACTIVE)
             <section class="break-words rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950 sm:p-5">
-                Turning this campaign off is an operational stop: current open enrollments are cancelled and pending Campaign messages are skipped. Turning it back on later allows future enrollments but does not restart cancelled journeys.
+                Turning this campaign off stops the current journeys and skips pending campaign messages. Turning it back on later allows new leads to start, but it does not restart journeys that were stopped.
             </section>
         @endif
     </div>

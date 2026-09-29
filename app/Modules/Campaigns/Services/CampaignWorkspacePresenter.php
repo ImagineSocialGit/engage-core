@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 
 class CampaignWorkspacePresenter
 {
-    public const BUILDER_STAGE_KEYS = ['start', 'schedule', 'messages', 'review'];
+    public const BUILDER_STAGE_KEYS = ['start', 'messages', 'schedule', 'review'];
 
     public function __construct(
         private readonly CampaignScheduleAuthoringPresenter $schedulePresenter,
@@ -257,14 +257,14 @@ class CampaignWorkspacePresenter
                 'editable' => true,
             ],
             [
-                'key' => 'schedule',
-                'state' => $messageStepCount > 0 ? 'configured' : 'empty',
-                'editable' => $scheduleEditable,
-            ],
-            [
                 'key' => 'messages',
                 'state' => $messageCount > 0 ? 'configured' : 'empty',
                 'editable' => true,
+            ],
+            [
+                'key' => 'schedule',
+                'state' => $messageStepCount > 0 ? 'configured' : 'empty',
+                'editable' => $scheduleEditable,
             ],
             [
                 'key' => 'review',

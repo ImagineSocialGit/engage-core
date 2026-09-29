@@ -31,7 +31,7 @@ final class CampaignCreationGuide
             new CampaignCreationOption(
                 key: 'custom',
                 label: 'Something else',
-                description: 'Start a general-purpose follow-up sequence and shape the audience, timing, and messages yourself.',
+                description: 'Start with a blank campaign and shape the audience, messages, and timing yourself.',
                 namePlaceholder: 'Custom campaign',
             ),
         ];
@@ -59,8 +59,8 @@ final class CampaignCreationGuide
     {
         return [
             ['key' => 'start', 'state' => 'configured', 'editable' => false],
-            ['key' => 'schedule', 'state' => 'configured', 'editable' => false],
             ['key' => 'messages', 'state' => 'configured', 'editable' => true],
+            ['key' => 'schedule', 'state' => 'configured', 'editable' => false],
             ['key' => 'review', 'state' => 'inactive', 'editable' => false],
         ];
     }

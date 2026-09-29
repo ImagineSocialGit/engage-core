@@ -1,7 +1,7 @@
 <x-layouts.crm
     title="Campaigns"
     heading="Campaigns"
-    subheading="Review your ongoing follow-up and nurture campaigns."
+    subheading="See what is running, what is off, and where leads are in each campaign."
     module="campaigns"
 >
     <div class="min-w-0 space-y-6">
@@ -28,13 +28,13 @@
             <div class="flex min-w-0 flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                 <div class="min-w-0">
                     <p class="text-xs font-bold uppercase tracking-[0.16em] text-rose-700">
-                        Campaign workspace
+                        Your campaigns
                     </p>
                     <h2 class="mt-2 break-words text-2xl font-semibold tracking-tight text-slate-950">
-                        See what is running and what needs attention
+                        See what is running and open the campaign you want to work on
                     </h2>
                     <p class="mt-3 max-w-3xl break-words text-sm leading-6 text-slate-600">
-                        Open a campaign to review its setup, current participants, message schedule, and live status.
+                        Each campaign shows its status, style, message count, and how many leads are currently active.
                     </p>
                 </div>
 
@@ -69,14 +69,14 @@
 
         <section class="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
             <div class="min-w-0">
-                <div class="text-sm font-bold text-rose-950">Recurring annual touch-base dates</div>
-                <p class="mt-1 break-words text-sm text-rose-800">Set birthday and fixed annual Email/SMS touches for a Contact Status audience, repeating for a defined number of years.</p>
+                <div class="text-sm font-bold text-rose-950">Birthday & annual check-ins</div>
+                <p class="mt-1 break-words text-sm text-rose-800">Set simple recurring birthday or annual Email/SMS messages for a group of leads.</p>
             </div>
             <a
                 href="{{ route('crm.campaigns.annual-touches.index') }}"
                 class="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-rose-900 px-5 text-sm font-bold text-white hover:bg-rose-800 sm:mt-0 sm:w-auto"
             >
-                Annual touch-base dates
+                Manage annual check-ins
             </a>
         </section>
 
@@ -123,7 +123,7 @@
                                     {{ $statusLabel }}
                                 </span>
                                 <span class="inline-flex shrink-0 items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700 ring-1 ring-inset ring-slate-200">
-                                    {{ $campaign->usesRecurringAllocation() ? 'Recurring allocation' : 'Sequence' }}
+                                    {{ $campaign->usesRecurringAllocation() ? 'Ongoing outreach' : 'Follow-up series' }}
                                 </span>
                             </div>
 
@@ -135,7 +135,7 @@
 
                             <div class="mt-4 flex min-w-0 flex-col gap-2 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-2">
                                 <span class="break-words"><strong class="font-semibold text-slate-950">{{ $campaign->message_steps_count }}</strong> message {{ \Illuminate\Support\Str::plural('step', $campaign->message_steps_count) }}</span>
-                                <span class="break-words"><strong class="font-semibold text-slate-950">{{ $campaign->current_participants_count }}</strong> current {{ \Illuminate\Support\Str::plural('participant', $campaign->current_participants_count) }}</span>
+                                <span class="break-words"><strong class="font-semibold text-slate-950">{{ $campaign->current_participants_count }}</strong> active {{ \Illuminate\Support\Str::plural('lead', $campaign->current_participants_count) }}</span>
                             </div>
                         </div>
 

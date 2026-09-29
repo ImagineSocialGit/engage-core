@@ -68,17 +68,17 @@ final class CampaignEligibilityAuthoringService
             'unavailable_criteria' => $unavailableCriteria,
             'matching_count' => $this->matchingCount($selected),
             'enrollment_modes' => [
-                Campaign::ENROLLMENT_MODE_MANUAL => 'Manual only',
-                Campaign::ENROLLMENT_MODE_AUTOMATIC => 'Automatic when eligible',
+                Campaign::ENROLLMENT_MODE_MANUAL => 'Only when I add them',
+                Campaign::ENROLLMENT_MODE_AUTOMATIC => 'Automatically when they match',
             ],
             'reentry_policies' => [
-                Campaign::REENTRY_NEVER => 'Never',
-                Campaign::REENTRY_WHEN_ELIGIBLE_AGAIN => 'When they become eligible again',
+                Campaign::REENTRY_NEVER => 'No',
+                Campaign::REENTRY_WHEN_ELIGIBLE_AGAIN => 'Yes, when they match again',
             ],
             'ineligible_behaviors' => [
-                Campaign::INELIGIBLE_CONTINUE => 'Keep the campaign running',
-                ...($campaign->usesRecurringAllocation() ? [] : [Campaign::INELIGIBLE_PAUSE => 'Pause the campaign']),
-                Campaign::INELIGIBLE_CANCEL => 'Stop the campaign',
+                Campaign::INELIGIBLE_CONTINUE => 'Keep them in the campaign',
+                ...($campaign->usesRecurringAllocation() ? [] : [Campaign::INELIGIBLE_PAUSE => 'Pause their campaign']),
+                Campaign::INELIGIBLE_CANCEL => 'Remove them from the campaign',
             ],
         ];
     }

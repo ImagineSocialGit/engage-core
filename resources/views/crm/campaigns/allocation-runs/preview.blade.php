@@ -1,6 +1,6 @@
 <x-layouts.crm
-    :title="$campaign->name.' · Preview allocation run'"
-    heading="Preview allocation run"
+    :title="$campaign->name.' · Preview next outreach'"
+    heading="Preview next outreach"
     :subheading="$campaign->name"
     module="campaigns"
 >
@@ -8,8 +8,8 @@
         <a href="{{ route('crm.campaigns.show', $campaign) }}" class="inline-block text-sm font-semibold text-slate-600 hover:text-slate-950">&larr; Campaign</a>
 
         <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-7">
-            <h2 class="text-xl font-semibold text-slate-950">Next run</h2>
-            <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">This read-only preview checks current allocation membership, eligibility, prior messages, exclusions, and cooldown. It reserves no leads. The run selects again when it processes, and message delivery gates may reduce the final counts.</p>
+            <h2 class="text-xl font-semibold text-slate-950">Who would be selected right now?</h2>
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">This is a preview only. It checks the leads currently in this campaign, the audience rules, prior messages, exclusions, and the waiting period. It does not reserve anyone. The campaign checks again when outreach actually starts, so the final counts can change.</p>
 
             @if($errors->any())
                 <p class="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">{{ $errors->first() }}</p>
@@ -26,7 +26,7 @@
                             <p class="font-semibold text-slate-950">{{ $message['name'] }}</p>
                             <p class="mt-2 text-sm text-slate-700">
                                 {{ $message['capped'] ? 'At least ' : '' }}{{ number_format($message['potential']) }} potential {{ \Illuminate\Support\Str::plural('lead', $message['potential']) }}
-                                · up to {{ number_format($preview['quota']) }} per run
+                                · up to {{ number_format($preview['quota']) }} will be selected
                             </p>
                         </div>
                     @endforeach
@@ -37,9 +37,9 @@
                 <form method="POST" action="{{ route('crm.campaigns.runs.store', $campaign) }}" class="mt-6">
                     @csrf
                     <input type="hidden" name="request_key" value="{{ $requestKey }}">
-                    <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800">Start run now</button>
+                    <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800">Start outreach now</button>
                 </form>
-                <p class="mt-3 text-xs text-slate-500">Starting now bypasses the normal cadence. The next scheduled run will use this run as its new cadence anchor.</p>
+                <p class="mt-3 text-xs text-slate-500">Starting now resets the outreach schedule. The next automatic outreach will be timed from this one.</p>
             @endif
         </section>
     </div>

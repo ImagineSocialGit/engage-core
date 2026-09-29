@@ -1,7 +1,7 @@
 <x-layouts.crm
     title="Create Campaign"
     heading="Create Campaign"
-    subheading="Start with the job this campaign needs to do. The system will create an inactive campaign with one real message and drop you into the setup builder."
+    subheading="Choose what you want the campaign to do, write the first message, and finish the details before anything sends."
     module="campaigns"
 >
     <div class="min-w-0 space-y-6" data-campaign-creation>
@@ -27,10 +27,10 @@
         <div class="grid min-w-0 gap-6 xl:grid-cols-[minmax(18rem,0.42fr)_minmax(0,1fr)] xl:items-start">
             <x-ui.card class="space-y-4">
                 <div>
-                    <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">1 · Choose the job</p>
-                    <h2 class="mt-1 text-lg font-extrabold text-slate-950">What is this campaign for?</h2>
+                    <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">1 · Choose the goal</p>
+                    <h2 class="mt-1 text-lg font-extrabold text-slate-950">What are you trying to accomplish?</h2>
                     <p class="mt-1 text-sm leading-6 text-slate-600">
-                        This choice records the campaign's authoring intent. Delivery purpose, scope, queue, and runtime ownership stay server-controlled.
+                        Pick the closest fit. You can still change the audience, messages, and timing afterward.
                     </p>
                 </div>
 
@@ -52,10 +52,10 @@
                 <x-campaigns.builder-shell :stages="$builderStages" mode="create" class="min-w-0">
                     <x-ui.card class="space-y-5">
                         <div>
-                            <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">2 · Start the campaign</p>
+                            <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">2 · Build the campaign</p>
                             <h2 class="mt-1 break-words text-xl font-extrabold text-slate-950">{{ $selectedOption->label }}</h2>
                             <p class="mt-2 text-sm leading-6 text-slate-600">
-                                Give it a name and write the first message. The campaign starts inactive and with manual entry, so nothing sends until you finish setup and turn it on.
+                                Give it a name, choose how it should work, and write the first message. Nothing sends until you finish setup and turn it on.
                             </p>
                         </div>
 
@@ -94,7 +94,7 @@
                             </div>
 
                             <fieldset class="space-y-2">
-                                <legend class="text-sm font-extrabold text-slate-800">Delivery style</legend>
+                                <legend class="text-sm font-extrabold text-slate-800">How should this campaign work?</legend>
                                 <div class="grid gap-2 lg:grid-cols-2">
                                     <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4">
                                         <input
@@ -105,8 +105,8 @@
                                             class="mt-1 size-4 border-slate-300 text-slate-950 focus:ring-slate-500"
                                         >
                                         <span>
-                                            <span class="block text-sm font-extrabold text-slate-950">Sequence</span>
-                                            <span class="mt-1 block text-xs leading-5 text-slate-500">Each enrolled lead moves through the messages in order, including the waits between them.</span>
+                                            <span class="block text-sm font-extrabold text-slate-950">Follow-up series</span>
+                                            <span class="mt-1 block text-xs leading-5 text-slate-500">Each lead receives the messages in order over time. Use this for a normal nurture or follow-up journey.</span>
                                         </span>
                                     </label>
                                     <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4">
@@ -118,8 +118,8 @@
                                             class="mt-1 size-4 border-slate-300 text-slate-950 focus:ring-slate-500"
                                         >
                                         <span>
-                                            <span class="block text-sm font-extrabold text-slate-950">Recurring allocation</span>
-                                            <span class="mt-1 block text-xs leading-5 text-slate-500">Each run assigns every active message to a different set of eligible leads. Message waits control when those assigned messages send within the run.</span>
+                                            <span class="block text-sm font-extrabold text-slate-950">Ongoing outreach</span>
+                                            <span class="mt-1 block text-xs leading-5 text-slate-500">On a repeating schedule, choose fresh eligible leads for each message. Use this when you want steady outreach from a larger lead pool.</span>
                                         </span>
                                     </label>
                                 </div>
@@ -140,7 +140,7 @@
                                         >
                                         <span>
                                             <span class="block text-sm font-extrabold text-slate-950">Email</span>
-                                            <span class="mt-0.5 block text-xs text-slate-500">Supports subject, body, Media, and dynamic fields.</span>
+                                            <span class="mt-0.5 block text-xs text-slate-500">Write a subject and email body, with optional images, files, and personalization.</span>
                                         </span>
                                     </label>
 
@@ -154,7 +154,7 @@
                                         >
                                         <span>
                                             <span class="block text-sm font-extrabold text-slate-950">SMS</span>
-                                            <span class="mt-0.5 block text-xs text-slate-500">Starts with a text message and remains marketing-gated.</span>
+                                            <span class="mt-0.5 block text-xs text-slate-500">Start with a text message. Normal SMS permission rules still apply.</span>
                                         </span>
                                     </label>
                                 </div>
@@ -196,9 +196,9 @@
                             </div>
 
                             <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-                                <div class="font-extrabold">Safe starting state</div>
+                                <div class="font-extrabold">Nothing sends yet</div>
                                 <p class="mt-1 leading-6">
-                                    The campaign is created as Off with manual entry and one immediate first-message step. After creation, use Start and Schedule to change audience rules, allocation settings, messages, or timing before activation.
+                                    The new campaign starts Off. After you create it, finish who gets it, review the messages, set the timing, and turn it on only when you are ready.
                                 </p>
                             </div>
 
@@ -216,26 +216,26 @@
                     </x-ui.card>
 
                     @if($availableFields !== [])
-                        <x-ui.card class="space-y-4">
-                            <div>
-                                <h2 class="text-base font-extrabold text-slate-950">Available dynamic fields</h2>
-                                <p class="mt-1 text-sm text-slate-600">
-                                    These are the real Campaign dispatch fields available to the first message and later Campaign messages.
+                        <x-ui.card>
+                            <details>
+                                <summary class="cursor-pointer text-sm font-extrabold text-slate-950">Personalization fields</summary>
+                                <p class="mt-2 text-sm leading-6 text-slate-600">
+                                    Use these only when you want the message to automatically insert lead or campaign information.
                                 </p>
-                            </div>
 
-                            <div class="space-y-4">
-                                @foreach($availableFields as $group)
-                                    <div>
-                                        <h3 class="text-xs font-extrabold uppercase tracking-wide text-slate-500">{{ $group['label'] }}</h3>
-                                        <div class="mt-2 flex flex-wrap gap-2">
-                                            @foreach($group['fields'] as $field)
-                                                <code class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-800" title="{{ $field['description'] }}">{{ $field['syntax'] }}</code>
-                                            @endforeach
+                                <div class="mt-4 space-y-4">
+                                    @foreach($availableFields as $group)
+                                        <div>
+                                            <h3 class="text-xs font-extrabold uppercase tracking-wide text-slate-500">{{ $group['label'] }}</h3>
+                                            <div class="mt-2 flex flex-wrap gap-2">
+                                                @foreach($group['fields'] as $field)
+                                                    <code class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-800" title="{{ $field['description'] }}">{{ $field['syntax'] }}</code>
+                                                @endforeach
+                                            </div>
                                         </div>
-                                    </div>
-                                @endforeach
-                            </div>
+                                    @endforeach
+                                </div>
+                            </details>
                         </x-ui.card>
                     @endif
                 </x-campaigns.builder-shell>

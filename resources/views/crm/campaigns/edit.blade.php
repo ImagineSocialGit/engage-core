@@ -6,9 +6,9 @@
         ->sum(fn (mixed $values): int => is_array($values) ? count($values) : 0);
     $startSummary = $campaign->usesAutomaticEnrollment()
         ? ($selectedCriterionCount > 0
-            ? $selectedCriterionCount.' selected eligibility '.\Illuminate\Support\Str::plural('value', $selectedCriterionCount)
-            : 'Automatic enrollment needs at least one condition')
-        : 'Contacts enter only through an explicit enrollment action';
+            ? 'Leads are added automatically when they match '.$selectedCriterionCount.' selected audience '.\Illuminate\Support\Str::plural('rule', $selectedCriterionCount)
+            : 'Automatic entry needs at least one audience rule')
+        : 'Leads are added only when you choose them';
     $messagePresentation = is_array($messageReview['presentation'] ?? null)
         ? $messageReview['presentation']
         : [];
@@ -61,7 +61,7 @@
 
 <x-layouts.crm
     :title="$campaign->name.' setup'"
-    heading="Campaign setup"
+    heading="Edit Campaign"
     :subheading="$campaign->name"
     module="campaigns"
 >
@@ -99,15 +99,15 @@
 
         @if($completedAppend !== null)
             <section class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 sm:px-6">
-                <h2 class="text-base font-semibold text-amber-950">Continue completed contacts at the new message?</h2>
+                <h2 class="text-base font-semibold text-amber-950">Continue completed leads at the new message?</h2>
                 <p class="mt-2 text-sm leading-6 text-amber-900">
-                    {{ number_format($completedAppend['count']) }} {{ \Illuminate\Support\Str::plural('contact', $completedAppend['count']) }} completed the previous schedule. Start currently eligible contacts at the appended message. Previous messages will not replay. Contacts without permission to receive this message, contacts in another active Campaign in this family, and contacts who have since left this Campaign will be skipped. The appended message follows its configured timing.
+                    {{ number_format($completedAppend['count']) }} {{ \Illuminate\Support\Str::plural('lead', $completedAppend['count']) }} finished the previous series. Start leads who still qualify at the new message. Earlier messages will not repeat, and leads who cannot receive the message or no longer belong in this campaign will be skipped.
                 </p>
-                <form method="POST" action="{{ route('crm.campaigns.completed-append.start', $campaign) }}" class="mt-4" onsubmit="return confirm('Start eligible completed contacts at the appended message?');">
+                <form method="POST" action="{{ route('crm.campaigns.completed-append.start', $campaign) }}" class="mt-4" onsubmit="return confirm('Start qualifying completed leads at the new message?');">
                     @csrf
                     <input type="hidden" name="append_id" value="{{ $completedAppend['append_id'] }}">
                     <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full bg-amber-900 px-5 text-sm font-bold text-white hover:bg-amber-950">
-                        Start eligible completed contacts
+                        Start qualifying completed leads
                     </button>
                 </form>
             </section>
@@ -115,7 +115,7 @@
 
         <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <a href="{{ route('crm.campaigns.show', $campaign) }}" class="break-words text-sm font-semibold text-slate-600 hover:text-slate-950">
-                &larr; Campaign overview
+                &larr; Back to campaign
             </a>
 
             <button
@@ -134,15 +134,15 @@
                 <section class="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
                     <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div class="min-w-0">
-                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">1 · Start</p>
-                            <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">What makes this campaign start?</h3>
+                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">1 · Who gets it</p>
+                            <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">Choose the leads for this campaign</h3>
                         </div>
                         <span class="w-fit shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">Editable</span>
                     </div>
                     <p class="mt-3 break-words text-sm leading-6 text-slate-600">{{ $startSummary }}</p>
                     <div class="mt-4 flex flex-wrap gap-2 text-xs font-bold text-slate-600">
                         <span class="rounded-full bg-slate-100 px-3 py-1">
-                            {{ $campaign->usesAutomaticEnrollment() ? 'Automatic' : 'Manual' }}
+                            {{ $campaign->usesAutomaticEnrollment() ? 'Added automatically' : 'Added manually' }}
                         </span>
                         <span class="rounded-full bg-slate-100 px-3 py-1">
                             {{ number_format((int) ($eligibility['matching_count'] ?? 0)) }} matching now
@@ -154,20 +154,20 @@
                         x-on:click="openStart()"
                         class="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 sm:w-auto"
                     >
-                        Edit start settings
+                        Edit who gets it
                     </button>
                 </section>
 
                 <section class="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
                     <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div class="min-w-0">
-                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">2 · Schedule</p>
-                            <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">Current schedule</h3>
+                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">2 · What they receive</p>
+                            <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">Review the messages</h3>
                         </div>
-                        <span class="w-fit shrink-0 rounded-full px-3 py-1 text-xs font-bold {{ $scheduleEditable ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600' }}">{{ $scheduleEditable ? 'Editable' : 'View' }}</span>
+                        <span class="w-fit shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">Editable</span>
                     </div>
                     <p class="mt-3 break-words text-sm leading-6 text-slate-600">
-                        {{ $workspace['message_step_count'] }} active message {{ \Illuminate\Support\Str::plural('step', $workspace['message_step_count']) }} currently define the campaign timeline.
+                        {{ $messageReviewCount }} {{ \Illuminate\Support\Str::plural('message', $messageReviewCount) }} ready to review in this campaign.
                     </p>
                     @if($workspace['channels'] !== [])
                         <div class="mt-4 flex min-w-0 flex-wrap gap-2">
@@ -178,36 +178,6 @@
                             @endforeach
                         </div>
                     @endif
-                    <button
-                        type="button"
-                        data-campaign-panel-open="schedule"
-                        x-on:click="openModal('schedule')"
-                        class="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 sm:w-auto"
-                    >
-                        {{ $scheduleEditable ? 'Review and edit schedule' : 'View current schedule' }}
-                    </button>
-                    @if($scheduleEditable)
-                        <button
-                            type="button"
-                            x-on:click="openModal('schedule'); $dispatch('campaign-add-step')"
-                            class="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-4 text-sm font-bold text-white transition hover:bg-slate-800 sm:ml-2 sm:w-auto"
-                        >
-                            Add a message
-                        </button>
-                    @endif
-                </section>
-
-                <section class="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-                    <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div class="min-w-0">
-                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">3 · Messages</p>
-                            <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">Review the messages</h3>
-                        </div>
-                        <span class="w-fit shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">Editable</span>
-                    </div>
-                    <p class="mt-3 break-words text-sm leading-6 text-slate-600">
-                        {{ $messageReviewCount }} selected {{ \Illuminate\Support\Str::plural('message', $messageReviewCount) }} can be reviewed and edited without leaving Campaign Setup.
-                    </p>
                     <button
                         type="button"
                         data-campaign-panel-open="messages"
@@ -227,18 +197,48 @@
                     @endif
                 </section>
 
+                <section class="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+                    <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">3 · When it happens</p>
+                            <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">Set the message timing</h3>
+                        </div>
+                        <span class="w-fit shrink-0 rounded-full px-3 py-1 text-xs font-bold {{ $scheduleEditable ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600' }}">{{ $scheduleEditable ? 'Editable' : 'View' }}</span>
+                    </div>
+                    <p class="mt-3 break-words text-sm leading-6 text-slate-600">
+                        {{ $workspace['message_step_count'] }} active {{ \Illuminate\Support\Str::plural('message', $workspace['message_step_count']) }} {{ $campaign->usesRecurringAllocation() ? 'each have their own timing.' : 'make up the follow-up series.' }}
+                    </p>
+                    <button
+                        type="button"
+                        data-campaign-panel-open="schedule"
+                        x-on:click="openModal('schedule')"
+                        class="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 sm:w-auto"
+                    >
+                        {{ $scheduleEditable ? 'Review and edit timing' : 'View timing' }}
+                    </button>
+                    @if($scheduleEditable)
+                        <button
+                            type="button"
+                            x-on:click="openModal('schedule'); $dispatch('campaign-add-step')"
+                            class="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-950 px-4 text-sm font-bold text-white transition hover:bg-slate-800 sm:ml-2 sm:w-auto"
+                        >
+                            Add a message
+                        </button>
+                    @endif
+                </section>
+
                 <section id="campaign-review" class="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
                     <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div class="min-w-0">
-                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">4 · Review</p>
-                            <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">Confirm before going live</h3>
+                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">4 · Review & turn on</p>
+                            <h3 class="mt-2 break-words text-lg font-semibold text-slate-950">{{ $campaign->isActive() ? 'This campaign is running' : 'Ready when you are' }}</h3>
                         </div>
                         <span class="w-fit shrink-0 rounded-full px-3 py-1 text-xs font-bold {{ $campaign->isActive() ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600' }}">
-                            {{ $campaign->isActive() ? 'Active' : 'Off' }}
+                            {{ $campaign->isActive() ? 'On' : 'Off' }}
                         </span>
                     </div>
                     <p class="mt-3 break-words text-sm leading-6 text-slate-600">
-                        {{ $workspace['active_enrollment_count'] }} current {{ \Illuminate\Support\Str::plural('participant', $workspace['active_enrollment_count']) }} · {{ $workspace['pending_message_count'] }} pending {{ \Illuminate\Support\Str::plural('message', $workspace['pending_message_count']) }}
+                        {{ $workspace['active_enrollment_count'] }} active {{ \Illuminate\Support\Str::plural('lead', $workspace['active_enrollment_count']) }} · {{ $workspace['pending_message_count'] }} {{ \Illuminate\Support\Str::plural('message', $workspace['pending_message_count']) }} waiting to send
                     </p>
 
                     @if($campaign->status === \App\Modules\Campaigns\Models\Campaign::STATUS_INACTIVE)
@@ -251,7 +251,7 @@
                                 data-campaign-lifecycle-action="activate"
                                 class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-emerald-700 px-5 text-sm font-bold text-white transition hover:bg-emerald-800 sm:w-auto"
                             >
-                                Activate campaign
+                                Turn on campaign
                             </button>
                         </form>
                     @elseif($campaign->status === \App\Modules\Campaigns\Models\Campaign::STATUS_ACTIVE)
@@ -259,7 +259,7 @@
                             method="POST"
                             action="{{ route('crm.campaigns.deactivate', $campaign) }}"
                             class="mt-5"
-                            onsubmit="return confirm('Turn off this Campaign, cancel active enrollments, and skip pending Campaign messages?');"
+                            onsubmit="return confirm('Turn off this campaign, stop current journeys, and skip pending campaign messages?');"
                         >
                             @csrf
                             @method('PATCH')
@@ -267,15 +267,11 @@
                             <button
                                 type="submit"
                                 data-campaign-lifecycle-action="deactivate"
-                                class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-red-200 bg-white px-5 text-sm font-bold text-red-700 transition hover:bg-red-50 sm:w-auto"
+                                class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-red-700 px-5 text-sm font-bold text-white transition hover:bg-red-800 sm:w-auto"
                             >
                                 Turn off campaign
                             </button>
                         </form>
-                    @else
-                        <p class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
-                            Archived Campaigns cannot be activated from this screen.
-                        </p>
                     @endif
                 </section>
             </div>
@@ -290,10 +286,10 @@
         >
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                    <p class="text-xs font-bold uppercase tracking-[0.16em] text-rose-700">Campaign Start</p>
-                    <h2 class="mt-2 text-xl font-semibold text-slate-950">Choose who becomes eligible</h2>
+                    <p class="text-xs font-bold uppercase tracking-[0.16em] text-rose-700">Who gets this campaign</p>
+                    <h2 class="mt-2 text-xl font-semibold text-slate-950">Choose the leads this campaign should include</h2>
                     <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                        Different condition types must all match. Multiple selected values inside one condition type match any selected value.
+                        Choose the lead groups that belong here. If you use more than one kind of rule, a lead must match each kind. Choosing several values inside one rule means any of those values can match.
                     </p>
                 </div>
                 <button
@@ -306,9 +302,9 @@
             </div>
 
             <section class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
-                <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Campaign type</p>
-                <p class="mt-1 text-sm font-bold text-slate-950">{{ $campaign->usesRecurringAllocation() ? 'Recurring allocation' : 'Sequence' }}</p>
-                <p class="mt-1 text-xs leading-5 text-slate-600">Campaign type is chosen when the Campaign is created and cannot be changed later.</p>
+                <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">How this campaign works</p>
+                <p class="mt-1 text-sm font-bold text-slate-950">{{ $campaign->usesRecurringAllocation() ? 'Ongoing outreach' : 'Follow-up series' }}</p>
+                <p class="mt-1 text-xs leading-5 text-slate-600">This choice is set when the campaign is created so its sending behavior stays predictable.</p>
 
                 @if($campaign->usesRecurringAllocation())
                 <form method="POST" action="{{ route('crm.campaigns.execution.update', $campaign) }}" class="mt-4">
@@ -317,7 +313,7 @@
                     <input type="hidden" name="execution_strategy" value="{{ $campaign->execution_strategy }}">
                     <div class="grid gap-3 sm:grid-cols-3">
                     <label class="block">
-                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Run every</span>
+                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Choose new leads every</span>
                         <div class="mt-2 flex items-center gap-2"><input type="number" min="1" max="3650" name="allocation_settings[run_every_days]" value="{{ old('allocation_settings.run_every_days', $allocationSettings['run_every_days']) }}" class="min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900"><span class="text-sm text-slate-600">days</span></div>
                         @error('allocation_settings.run_every_days')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
                     </label>
@@ -327,14 +323,14 @@
                         @error('allocation_settings.allocation_size_per_message')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
                     </label>
                     <label class="block">
-                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Recipient cooldown</span>
+                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Wait before choosing the same lead again</span>
                         <div class="mt-2 flex items-center gap-2"><input type="number" min="0" max="3650" name="allocation_settings[recipient_cooldown_days]" value="{{ old('allocation_settings.recipient_cooldown_days', $allocationSettings['recipient_cooldown_days']) }}" class="min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900"><span class="text-sm text-slate-600">days</span></div>
                         @error('allocation_settings.recipient_cooldown_days')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
                     </label>
                     </div>
-                    <p class="mt-3 text-xs leading-5 text-slate-500">Recurring allocation supports manual and automatic eligibility enrollment and does not support Campaign-family arbitration. Each message’s offset in Schedule sets its own earliest send time from the start of the run. <a href="{{ route('crm.campaigns.show', $campaign) }}#campaign-email-delivery-pacing" class="font-semibold underline">Email delivery pacing</a> can defer marketing emails later; it does not change who is allocated or when the next run starts.</p>
+                    <p class="mt-3 text-xs leading-5 text-slate-500">Each outreach round chooses a different eligible group for every active message. The timing for each message starts from the beginning of that outreach round. <a href="{{ route('crm.campaigns.show', $campaign) }}#campaign-email-delivery-pacing" class="font-semibold underline">Email delivery</a> can spread emails out later without changing who was chosen.</p>
                     @error('allocation_settings')<p class="mt-3 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
-                    <div class="mt-4 flex justify-end"><button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800">Save allocation settings</button></div>
+                    <div class="mt-4 flex justify-end"><button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800">Save outreach settings</button></div>
                 </form>
                 @endif
                 @error('execution_strategy')<p class="mt-3 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
@@ -365,12 +361,12 @@
                             const payload = await response.json();
 
                             if (! response.ok) {
-                                throw new Error(payload.message || 'Unable to preview eligibility.');
+                                throw new Error(payload.message || 'Unable to preview matching leads.');
                             }
 
                             this.matchingCount = payload.matching_count || 0;
                         } catch (error) {
-                            this.previewError = error.message || 'Unable to preview eligibility.';
+                            this.previewError = error.message || 'Unable to preview matching leads.';
                         } finally {
                             this.previewing = false;
                         }
@@ -385,12 +381,12 @@
 
                 @if($campaign->usesRecurringAllocation())
                     <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                        Automatic enrollment adds matching Contacts to allocation membership. Manual enrollment keeps membership operator controlled. Every run rechecks eligibility before choosing a Contact; if eligibility ends, you can keep membership active or cancel it. Re-entry after cancellation requires a new eligibility cycle when enabled.
+                        Automatic entry adds matching leads for future outreach. Manual entry includes only leads you choose. Before each outreach round, the campaign checks these rules again.
                     </div>
                 @endif
                 <div class="grid gap-4 lg:grid-cols-3">
                     <label class="block rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Enrollment</span>
+                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">How leads are added</span>
                         <select name="enrollment_mode" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
                             @foreach($eligibility['enrollment_modes'] as $value => $label)
                                 <option value="{{ $value }}" @selected(old('enrollment_mode', $campaign->enrollment_mode) === $value)>{{ $label }}</option>
@@ -400,7 +396,7 @@
                     </label>
 
                     <label class="block rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Re-entry</span>
+                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Can a lead come back?</span>
                         <select name="reentry_policy" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
                             @foreach($eligibility['reentry_policies'] as $value => $label)
                                 <option value="{{ $value }}" @selected(old('reentry_policy', $campaign->reentry_policy) === $value)>{{ $label }}</option>
@@ -410,7 +406,7 @@
                     </label>
 
                     <label class="block rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">If eligibility ends</span>
+                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">If a lead stops matching</span>
                         <select name="ineligible_behavior" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
                             @foreach($eligibility['ineligible_behaviors'] as $value => $label)
                                 <option value="{{ $value }}" @selected(old('ineligible_behavior', $campaign->ineligible_behavior) === $value)>{{ $label }}</option>
@@ -458,7 +454,7 @@
 
                 @if(($eligibility['unavailable_criteria'] ?? []) !== [])
                     <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                        Some saved conditions are owned by features that are not currently available here. They will be preserved when these settings are saved.
+                        Some saved audience rules come from features that are not available here right now. They will stay in place when you save.
                     </div>
                 @endif
 
@@ -469,7 +465,7 @@
                 <div class="flex flex-col gap-4 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <p class="text-sm font-semibold text-slate-950">
-                            <span x-text="Number(matchingCount).toLocaleString()"></span> matching contacts now
+                            <span x-text="Number(matchingCount).toLocaleString()"></span> matching leads now
                         </p>
                         <p x-show="previewError" x-text="previewError" class="mt-1 text-xs font-semibold text-red-600"></p>
                     </div>
@@ -480,14 +476,14 @@
                             x-bind:disabled="previewing"
                             class="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                         >
-                            <span x-show="!previewing">Preview audience</span>
+                            <span x-show="!previewing">Preview matching leads</span>
                             <span x-show="previewing">Checking…</span>
                         </button>
                         <button
                             type="submit"
                             class="inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-bold text-white hover:bg-slate-800"
                         >
-                            Save start settings
+                            Save who gets it
                         </button>
                     </div>
                 </div>
@@ -527,7 +523,7 @@
 
                 <footer class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <p class="text-xs leading-5 text-slate-500">
-                        Saving publishes a new immutable message version. Existing scheduled messages remain pinned to the version they already use.
+                        Changes apply to future messages. Anything already scheduled keeps the copy it already has.
                     </p>
                     <a
                         href="{{ route('crm.campaigns.message-templates.index', ['campaign' => $campaign->getKey()]) }}"
@@ -565,9 +561,9 @@
             >
                 <header class="sticky top-0 z-30 flex flex-col gap-4 border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:flex-row sm:items-start sm:justify-between sm:px-6">
                     <div>
-                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-rose-700">Current schedule</p>
+                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-rose-700">Message timing</p>
                         <h2 class="mt-1 text-xl font-semibold text-slate-950">{{ $campaign->name }}</h2>
-                        <p class="mt-1 text-sm text-slate-600">{{ $campaign->usesRecurringAllocation() ? 'Each message goes to a different group of leads in the same run. Priority only decides which message gets leads first when the pool is limited. Set an independent send offset for each message; email pacing may defer delivery. Message copy stays in the Messages carousel.' : 'Order and timing only. Message copy stays in the Messages carousel.' }}</p>
+                        <p class="mt-1 text-sm text-slate-600">{{ $campaign->usesRecurringAllocation() ? 'These messages work independently. Each outreach round chooses a different group of leads for every message. Set when each message may start sending after the outreach begins; email delivery settings may spread those emails out later.' : 'Set the order and wait between messages. Edit the actual message copy from What they receive.' }}</p>
                     </div>
                     <button type="button" x-on:click="closeModal()" class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">Close</button>
                 </header>
@@ -593,7 +589,7 @@
 
                             <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
                                 <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
-                                    <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Independent allocations' : 'Published schedule' }} v{{ $scheduleAuthoring['version'] }}</span>
+                                    <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Message timing</span>
                                     @if($campaign->usesRecurringAllocation())
                                         <span class="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">{{ count($scheduleSteps) }} {{ \Illuminate\Support\Str::plural('message', count($scheduleSteps)) }}</span>
                                     @else
@@ -637,17 +633,17 @@
                                                 </div>
                                                 <label class="flex items-center gap-2 text-xs font-bold text-red-700">
                                                     <input type="checkbox" name="steps[{{ $scheduleIndex }}][remove]" value="1" @checked(old('steps.'.$scheduleIndex.'.remove')) class="rounded border-slate-300 text-red-600 focus:ring-red-600">
-                                                    {{ $campaign->usesRecurringAllocation() ? 'Remove message' : 'Remove step' }}
+                                                    Remove message
                                                 </label>
                                             </div>
 
                                             <div class="mt-5 grid gap-4 sm:grid-cols-[1fr_7rem]">
                                                 <label class="block">
-                                                    <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Message name' : 'Step name' }}</span>
+                                                    <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Message name</span>
                                                     <input name="steps[{{ $scheduleIndex }}][name]" value="{{ old('steps.'.$scheduleIndex.'.name', $step['name']) }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 text-sm font-semibold text-slate-900">
                                                 </label>
                                                 <label class="block">
-                                                    <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Allocation priority' : 'Position' }}</span>
+                                                    <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Priority when leads are limited' : 'Order' }}</span>
                                                     <input type="number" min="1" name="steps[{{ $scheduleIndex }}][position]" value="{{ old('steps.'.$scheduleIndex.'.position', $step['position']) }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 text-sm font-semibold text-slate-900">
                                                 </label>
                                             </div>
@@ -655,14 +651,14 @@
                                             @if($step['timing_editable'])
                                                 <div class="mt-4 grid gap-4 sm:grid-cols-3">
                                                     <label class="block">
-                                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Earliest send' : 'Timing' }}</span>
+                                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'When it can send' : 'Timing' }}</span>
                                                         <select name="steps[{{ $scheduleIndex }}][timing_type]" x-model="timingType" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 text-sm font-semibold text-slate-900">
-                                                            <option value="immediate">{{ $campaign->usesRecurringAllocation() ? 'At run start' : 'Immediately' }}</option>
-                                                            <option value="delay">{{ $campaign->usesRecurringAllocation() ? 'After run starts' : 'Wait' }}</option>
+                                                            <option value="immediate">{{ $campaign->usesRecurringAllocation() ? 'When outreach begins' : 'Immediately' }}</option>
+                                                            <option value="delay">{{ $campaign->usesRecurringAllocation() ? 'After outreach begins' : 'Wait' }}</option>
                                                         </select>
                                                     </label>
                                                     <label x-show="timingType === 'delay'" class="block">
-                                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Offset' : 'Wait' }}</span>
+                                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Wait</span>
                                                         <input type="number" min="0" name="steps[{{ $scheduleIndex }}][delay_value]" value="{{ old('steps.'.$scheduleIndex.'.delay_value', $step['delay_value']) }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 text-sm font-semibold text-slate-900">
                                                     </label>
                                                     <label x-show="timingType === 'delay'" class="block">
@@ -686,7 +682,7 @@
                             <section x-ref="newMessage" class="rounded-3xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
                                 <label class="flex items-center gap-3 text-sm font-bold text-slate-900">
                                     <input type="checkbox" name="new_step[add]" value="1" x-model="addStep" class="rounded border-slate-300 text-rose-700 focus:ring-rose-600">
-                                    {{ $campaign->usesRecurringAllocation() ? 'Add another allocation message' : 'Add another scheduled message' }}
+                                    Add another message
                                 </label>
 
                                 <div x-show="addStep" x-cloak class="mt-4 grid gap-4 sm:grid-cols-2">
@@ -766,23 +762,23 @@
                                         @error('new_step.message_template_preset_id')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
                                     </label>
                                     <label class="block">
-                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Message name' : 'Step name' }}</span>
+                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Message name</span>
                                         <input name="new_step[name]" value="{{ old('new_step.name') }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
                                     </label>
                                     <label class="block">
-                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Allocation priority' : 'Position' }}</span>
+                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Priority when leads are limited' : 'Order' }}</span>
                                         <input type="number" min="1" name="new_step[position]" value="{{ old('new_step.position', count($scheduleSteps) + 1) }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
                                     </label>
                                     <label class="block">
-                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Earliest send' : 'Timing' }}</span>
+                                        <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'When it can send' : 'Timing' }}</span>
                                         <select name="new_step[timing_type]" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
-                                            <option value="delay" @selected(old('new_step.timing_type', $campaign->usesRecurringAllocation() ? 'immediate' : 'delay') === 'delay')>{{ $campaign->usesRecurringAllocation() ? 'After run starts' : 'Wait' }}</option>
-                                            <option value="immediate" @selected(old('new_step.timing_type', $campaign->usesRecurringAllocation() ? 'immediate' : 'delay') === 'immediate')>{{ $campaign->usesRecurringAllocation() ? 'At run start' : 'Immediately' }}</option>
+                                            <option value="delay" @selected(old('new_step.timing_type', $campaign->usesRecurringAllocation() ? 'immediate' : 'delay') === 'delay')>{{ $campaign->usesRecurringAllocation() ? 'After outreach begins' : 'Wait' }}</option>
+                                            <option value="immediate" @selected(old('new_step.timing_type', $campaign->usesRecurringAllocation() ? 'immediate' : 'delay') === 'immediate')>{{ $campaign->usesRecurringAllocation() ? 'When outreach begins' : 'Immediately' }}</option>
                                         </select>
                                     </label>
                                     <div class="grid grid-cols-2 gap-3">
                                         <label class="block">
-                                            <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Offset' : 'Wait' }}</span>
+                                            <span class="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Wait</span>
                                             <input type="number" min="0" name="new_step[delay_value]" value="{{ old('new_step.delay_value', $campaign->usesRecurringAllocation() ? 0 : 1) }}" class="mt-2 block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm font-semibold text-slate-900">
                                         </label>
                                         <label class="block">
@@ -800,7 +796,7 @@
                                 <section x-show="addStep" x-cloak class="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5">
                                     <label class="flex items-start gap-3 text-sm font-semibold text-slate-900">
                                         <input type="checkbox" name="extend_in_progress" value="1" @checked(old('extend_in_progress')) class="mt-0.5 rounded border-slate-300 text-rose-700 focus:ring-rose-600">
-                                        <span>Include contacts already in this Campaign<br><span class="font-normal text-slate-600">Available when you only append a final message. Each active participant keeps their current schedule and receives the new message after finishing it. Completed participants are not restarted.</span></span>
+                                        <span>Include leads already in this campaign<br><span class="font-normal text-slate-600">Use this only when adding one final message. Leads already in progress keep their current timing and receive the new message after they finish the existing series. Completed leads are not restarted.</span></span>
                                     </label>
                                     @error('extend_in_progress')<p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>@enderror
                                 </section>
@@ -808,10 +804,10 @@
                         </div>
 
                         <footer class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                            <p class="text-xs leading-5 text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Saving publishes a new immutable schedule. Existing allocation assignments keep their pinned version; future runs use the new schedule.' : 'Saving publishes a new immutable schedule. Current participants stay on their existing version unless you choose to include them in a final appended message.' }}</p>
+                            <p class="text-xs leading-5 text-slate-500">{{ $campaign->usesRecurringAllocation() ? 'Changes apply to future outreach. Leads and messages already scheduled keep the timing they already have.' : 'Changes apply to new journeys. Leads already in progress keep their current timing unless you explicitly add a final message for them.' }}</p>
                             <div class="flex flex-col gap-2 sm:flex-row">
                                 <button type="button" x-on:click="activeModal = 'messages'" @disabled($messageReviewCount < 1) class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Review message copy</button>
-                                <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800">Publish schedule changes</button>
+                                <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800">Save timing</button>
                             </div>
                         </footer>
                     </form>
@@ -832,7 +828,7 @@
                             </div>
                         @endif
                     </div>
-                    <footer class="border-t border-slate-200 bg-slate-50 px-4 py-4 text-xs leading-5 text-slate-500 sm:px-6">Publish a Messaging MessageChain for this Campaign before editing its schedule.</footer>
+                    <footer class="border-t border-slate-200 bg-slate-50 px-4 py-4 text-xs leading-5 text-slate-500 sm:px-6">Message timing is not editable yet for this campaign.</footer>
                 @endif
             </div>
         </div>

@@ -5,19 +5,27 @@
 
 @php
     $stageLabels = [
-        'start' => 'Start',
-        'schedule' => 'Schedule',
-        'messages' => 'Messages',
-        'review' => 'Review',
+        'start' => 'Who gets it',
+        'messages' => 'What they receive',
+        'schedule' => 'When it happens',
+        'review' => 'Review & turn on',
     ];
 
     $stateLabels = [
-        'not_managed' => 'Current start rules',
-        'configured' => 'Configured',
-        'empty' => 'Needs setup',
-        'active' => 'Active',
+        'not_managed' => 'Current audience rules',
+        'configured' => 'Ready',
+        'empty' => 'Needs attention',
+        'active' => 'On',
         'inactive' => 'Off',
     ];
+
+    $builderHeading = $mode === 'create'
+        ? 'Four simple decisions, then you are ready'
+        : 'Everything important in one place';
+
+    $builderDescription = $mode === 'create'
+        ? 'Choose who should get the campaign, what they should receive, when it should happen, and review everything before turning it on.'
+        : 'Review the audience, messages, and timing here. The technical delivery machinery stays out of the way.';
 @endphp
 
 <div {{ $attributes->merge(['class' => 'min-w-0 space-y-6']) }} data-campaign-builder-mode="{{ $mode }}">
@@ -27,10 +35,10 @@
                 Campaign setup
             </p>
             <h2 class="mt-2 break-words text-xl font-semibold tracking-tight text-slate-950">
-                Work through the same four parts every time
+                {{ $builderHeading }}
             </h2>
             <p class="mt-2 max-w-3xl break-words text-sm leading-6 text-slate-600">
-                This setup structure is shared by campaign editing and will also support copied and brand-new campaigns.
+                {{ $builderDescription }}
             </p>
         </div>
 
