@@ -2,11 +2,15 @@
 
 namespace Tests\Feature\Commerce;
 
+use App\Modules\Commerce\Contracts\CommerceInventoryProvider;
 use App\Modules\Commerce\Contracts\CommerceOrderProvider;
 use App\Modules\Commerce\Data\CommerceOrderItemSnapshotData;
 use App\Modules\Commerce\Data\CommerceOrderSnapshotData;
 use App\Modules\Commerce\Data\CommerceOrderSyncRequest;
+use App\Modules\Commerce\Enums\CommerceInventoryAuthorityMode;
 use App\Modules\Commerce\Enums\CommerceProviderRole;
+use App\Modules\Commerce\Models\CommerceInventoryAdjustment;
+use App\Modules\Commerce\Models\CommerceInventoryEffect;
 use App\Modules\Commerce\Models\CommerceOrder;
 use App\Modules\Commerce\Models\CommerceOrderEvent;
 use App\Modules\Commerce\Models\CommerceOrderItem;
@@ -14,10 +18,14 @@ use App\Modules\Commerce\Models\CommerceProduct;
 use App\Modules\Commerce\Models\CommerceProductProviderMapping;
 use App\Modules\Commerce\Models\CommerceProductVariant;
 use App\Modules\Commerce\Models\CommerceProductVariantProviderMapping;
+use App\Modules\Commerce\Services\CommerceInventoryEffectOrchestrator;
+use App\Modules\Commerce\Services\CommerceInventoryEffectRecorder;
 use App\Modules\Commerce\Services\CommerceOrderCustomerReconciler;
+use App\Modules\Commerce\Services\CommerceOrderInventoryEffectProducer;
 use App\Modules\Commerce\Services\CommerceOrderSyncService;
 use App\Modules\Commerce\Services\CommerceProviderRegistry;
 use App\Modules\Commerce\Services\CommerceProviderRoleResolver;
+use App\Modules\Commerce\Services\CommerceProviderVariantReferenceResolver;
 use DateTimeImmutable;
 use Illuminate\Config\Repository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -272,6 +280,199 @@ class CommerceOrderSyncTest extends TestCase
         );
     }
 
+    public function test_same_order_and_inventory_authority_records_one_reconciled_consumption_effect_without_outbound_adjustment(): void
+    {
+        $variant = $this->mappedVariant();
+
+        $provider = new OrderSyncFixtureProvider([
+            'order-500' => $this->snapshot(
+                name: '#500',
+                items: [
+                    $this->item(
+                        externalId: 'line-1',
+                        externalProductId: 'product-100',
+                        externalVariantId: 'variant-101',
+                        title: 'Tour Shirt',
+                        quantity: '2',
+                    ),
+                ],
+            ),
+        ]);
+
+        $service = $this->service(
+            provider: $provider,
+            inventoryProvider: $provider,
+        );
+        $request = new CommerceOrderSyncRequest(
+            externalOrderId: 'order-500',
+            event: CommerceOrderEvent::EVENT_CREATED,
+            providerEventId: 'delivery-1',
+            occurredAt: new DateTimeImmutable('2026-09-24T20:00:00Z'),
+        );
+
+        $service->sync($request);
+        $service->sync($request);
+
+        $this->assertSame(1, CommerceInventoryEffect::query()->count());
+        $this->assertSame(0, CommerceInventoryAdjustment::query()->count());
+
+        $effect = CommerceInventoryEffect::query()->firstOrFail();
+
+        $this->assertSame(
+            (int) $variant->getKey(),
+            (int) $effect->commerce_product_variant_id,
+        );
+        $this->assertSame('-2.0000', (string) $effect->quantity_delta);
+        $this->assertSame(
+            CommerceInventoryAuthorityMode::AuthorityAlreadyApplied,
+            $effect->authority_mode,
+        );
+        $this->assertSame(
+            CommerceInventoryEffect::STATUS_RECONCILED,
+            $effect->status,
+        );
+        $this->assertSame('commerce_order_item', $effect->source_type);
+        $this->assertSame(
+            'authoritative_order_consumption',
+            $effect->reason,
+        );
+        $this->assertSame('order-500', $effect->source_reference);
+        $this->assertSame(
+            '2.0000',
+            $effect->meta['consumed_through_quantity'] ?? null,
+        );
+    }
+
+    public function test_authoritative_order_consumption_uses_a_high_water_mark_without_inventing_restock_effects(): void
+    {
+        $this->mappedVariant();
+
+        $provider = new OrderSyncFixtureProvider([
+            'order-500' => $this->snapshot(
+                name: '#500',
+                items: [
+                    $this->item(
+                        externalId: 'line-1',
+                        externalProductId: 'product-100',
+                        externalVariantId: 'variant-101',
+                        quantity: '2',
+                    ),
+                ],
+            ),
+        ]);
+
+        $service = $this->service(
+            provider: $provider,
+            inventoryProvider: $provider,
+        );
+
+        $service->sync(new CommerceOrderSyncRequest('order-500'));
+
+        $provider->snapshots['order-500'] = $this->snapshot(
+            name: '#500',
+            items: [
+                $this->item(
+                    externalId: 'line-1',
+                    externalProductId: 'product-100',
+                    externalVariantId: 'variant-101',
+                    quantity: '4',
+                ),
+            ],
+        );
+
+        $service->sync(new CommerceOrderSyncRequest('order-500'));
+
+        $provider->snapshots['order-500'] = $this->snapshot(
+            name: '#500',
+            items: [
+                $this->item(
+                    externalId: 'line-1',
+                    externalProductId: 'product-100',
+                    externalVariantId: 'variant-101',
+                    quantity: '1',
+                ),
+            ],
+        );
+
+        $service->sync(new CommerceOrderSyncRequest('order-500'));
+
+        $provider->snapshots['order-500'] = $this->snapshot(
+            name: '#500',
+            items: [
+                $this->item(
+                    externalId: 'line-1',
+                    externalProductId: 'product-100',
+                    externalVariantId: 'variant-101',
+                    quantity: '3',
+                ),
+            ],
+        );
+
+        $service->sync(new CommerceOrderSyncRequest('order-500'));
+
+        $provider->snapshots['order-500'] = $this->snapshot(
+            name: '#500',
+            items: [
+                $this->item(
+                    externalId: 'line-1',
+                    externalProductId: 'product-100',
+                    externalVariantId: 'variant-101',
+                    quantity: '5',
+                ),
+            ],
+        );
+
+        $service->sync(new CommerceOrderSyncRequest('order-500'));
+
+        $this->assertSame(
+            ['-2.0000', '-2.0000', '-1.0000'],
+            CommerceInventoryEffect::query()
+                ->orderBy('id')
+                ->pluck('quantity_delta')
+                ->map(static fn (mixed $value): string => (string) $value)
+                ->all(),
+        );
+        $this->assertSame(
+            [
+                CommerceInventoryEffect::STATUS_RECONCILED,
+                CommerceInventoryEffect::STATUS_RECONCILED,
+                CommerceInventoryEffect::STATUS_RECONCILED,
+            ],
+            CommerceInventoryEffect::query()
+                ->orderBy('id')
+                ->pluck('status')
+                ->all(),
+        );
+        $this->assertSame(0, CommerceInventoryAdjustment::query()->count());
+    }
+
+    public function test_order_snapshot_does_not_invent_cross_provider_inventory_adjustments(): void
+    {
+        $this->mappedVariant();
+
+        $provider = new OrderSyncFixtureProvider([
+            'order-500' => $this->snapshot(
+                name: '#500',
+                items: [
+                    $this->item(
+                        externalId: 'line-1',
+                        externalProductId: 'product-100',
+                        externalVariantId: 'variant-101',
+                        quantity: '2',
+                    ),
+                ],
+            ),
+        ]);
+
+        $this->service(
+            provider: $provider,
+            inventoryProvider: new InventoryAuthorityFixtureProvider(),
+        )->sync(new CommerceOrderSyncRequest('order-500'));
+
+        $this->assertSame(0, CommerceInventoryEffect::query()->count());
+        $this->assertSame(0, CommerceInventoryAdjustment::query()->count());
+    }
+
     public function test_provider_event_identity_cannot_be_reused_for_a_different_order_event(): void
     {
         $provider = new OrderSyncFixtureProvider([
@@ -300,17 +501,33 @@ class CommerceOrderSyncTest extends TestCase
 
     private function service(
         CommerceOrderProvider $provider,
+        ?CommerceInventoryProvider $inventoryProvider = null,
     ): CommerceOrderSyncService {
+        $providers = [$provider];
+
+        if ($inventoryProvider !== null && $inventoryProvider !== $provider) {
+            $providers[] = $inventoryProvider;
+        }
+
+        $providerRoles = [
+            CommerceProviderRole::Orders->value => [
+                'default' => $provider->key(),
+                'scopes' => [],
+            ],
+        ];
+
+        if ($inventoryProvider !== null) {
+            $providerRoles[CommerceProviderRole::Inventory->value] = [
+                'default' => $inventoryProvider->key(),
+                'scopes' => [],
+            ];
+        }
+
         $resolver = new CommerceProviderRoleResolver(
-            providers: new CommerceProviderRegistry([$provider]),
+            providers: new CommerceProviderRegistry($providers),
             config: new Repository([
                 'commerce' => [
-                    'provider_roles' => [
-                        CommerceProviderRole::Orders->value => [
-                            'default' => $provider->key(),
-                            'scopes' => [],
-                        ],
-                    ],
+                    'provider_roles' => $providerRoles,
                 ],
             ]),
         );
@@ -318,7 +535,43 @@ class CommerceOrderSyncTest extends TestCase
         return new CommerceOrderSyncService(
             roles: $resolver,
             customers: app(CommerceOrderCustomerReconciler::class),
+            inventoryEffects: new CommerceOrderInventoryEffectProducer(
+                roles: $resolver,
+                recorder: app(CommerceInventoryEffectRecorder::class),
+                orchestrator: new CommerceInventoryEffectOrchestrator(
+                    roles: $resolver,
+                    references: new CommerceProviderVariantReferenceResolver(),
+                ),
+            ),
         );
+    }
+
+    private function mappedVariant(): CommerceProductVariant
+    {
+        $product = CommerceProduct::factory()->active()->create();
+        $variant = CommerceProductVariant::factory()
+            ->for($product, 'commerceProduct')
+            ->active()
+            ->create();
+
+        CommerceProductProviderMapping::query()->create([
+            'commerce_product_id' => $product->getKey(),
+            'provider_key' => 'order-provider',
+            'reference_type' => 'catalog_product',
+            'external_id' => 'product-100',
+            'status' => CommerceProductProviderMapping::STATUS_ACTIVE,
+        ]);
+
+        CommerceProductVariantProviderMapping::query()->create([
+            'commerce_product_variant_id' => $variant->getKey(),
+            'provider_key' => 'order-provider',
+            'reference_type' => 'product_variant',
+            'external_id' => 'variant-101',
+            'external_parent_id' => 'product-100',
+            'status' => CommerceProductVariantProviderMapping::STATUS_ACTIVE,
+        ]);
+
+        return $variant;
     }
 
     /**
@@ -361,6 +614,7 @@ class CommerceOrderSyncTest extends TestCase
         ?string $sku = null,
         ?string $title = null,
         int $totalCents = 5000,
+        string $quantity = '1',
     ): CommerceOrderItemSnapshotData {
         return new CommerceOrderItemSnapshotData(
             externalId: $externalId,
@@ -371,7 +625,7 @@ class CommerceOrderSyncTest extends TestCase
             title: $title,
             variantTitle: null,
             options: [],
-            quantity: '1',
+            quantity: $quantity,
             currency: 'USD',
             unitPriceCents: $totalCents,
             discountCents: 0,
@@ -382,7 +636,7 @@ class CommerceOrderSyncTest extends TestCase
     }
 }
 
-final class OrderSyncFixtureProvider implements CommerceOrderProvider
+final class OrderSyncFixtureProvider implements CommerceOrderProvider, CommerceInventoryProvider
 {
     /** @var array<int, string> */
     public array $requests = [];
@@ -414,5 +668,13 @@ final class OrderSyncFixtureProvider implements CommerceOrderProvider
         }
 
         return $snapshot;
+    }
+}
+
+final class InventoryAuthorityFixtureProvider implements CommerceInventoryProvider
+{
+    public function key(): string
+    {
+        return 'inventory-provider';
     }
 }

@@ -9,10 +9,14 @@ use App\Modules\Commerce\Data\CommerceOrderSyncRequest;
 use App\Modules\Commerce\Enums\CommerceProviderRole;
 use App\Modules\Commerce\Models\CommerceCustomer;
 use App\Modules\Commerce\Models\CommerceOrder;
+use App\Modules\Commerce\Services\CommerceInventoryEffectOrchestrator;
+use App\Modules\Commerce\Services\CommerceInventoryEffectRecorder;
 use App\Modules\Commerce\Services\CommerceOrderCustomerReconciler;
+use App\Modules\Commerce\Services\CommerceOrderInventoryEffectProducer;
 use App\Modules\Commerce\Services\CommerceOrderSyncService;
 use App\Modules\Commerce\Services\CommerceProviderRegistry;
 use App\Modules\Commerce\Services\CommerceProviderRoleResolver;
+use App\Modules\Commerce\Services\CommerceProviderVariantReferenceResolver;
 use App\Modules\Core\Models\Contact;
 use DateTimeImmutable;
 use Illuminate\Config\Repository;
@@ -232,6 +236,14 @@ class CommerceOrderCustomerReconciliationTest extends TestCase
         return new CommerceOrderSyncService(
             roles: $resolver,
             customers: app(CommerceOrderCustomerReconciler::class),
+            inventoryEffects: new CommerceOrderInventoryEffectProducer(
+                roles: $resolver,
+                recorder: app(CommerceInventoryEffectRecorder::class),
+                orchestrator: new CommerceInventoryEffectOrchestrator(
+                    roles: $resolver,
+                    references: new CommerceProviderVariantReferenceResolver(),
+                ),
+            ),
         );
     }
 

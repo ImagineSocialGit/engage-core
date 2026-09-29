@@ -24,6 +24,7 @@ final class CommerceOrderSyncService
     public function __construct(
         private readonly CommerceProviderRoleResolver $roles,
         private readonly CommerceOrderCustomerReconciler $customers,
+        private readonly CommerceOrderInventoryEffectProducer $inventoryEffects,
     ) {}
 
     public function sync(
@@ -60,10 +61,13 @@ final class CommerceOrderSyncService
             );
         }
 
-        return DB::transaction(function () use (
+        $inventoryEffectIds = [];
+
+        $result = DB::transaction(function () use (
             $providerKey,
             $request,
             $snapshot,
+            &$inventoryEffectIds,
         ): CommerceOrderSyncResult {
             $order = CommerceOrder::withTrashed()
                 ->where('provider', $providerKey)
@@ -163,6 +167,14 @@ final class CommerceOrderSyncService
                 request: $request,
             );
 
+            $inventoryEffectIds = $this->inventoryEffects
+                ->recordAuthoritativeConsumption(
+                    order: $order,
+                    ordersProviderKey: $providerKey,
+                    inventoryScope: $request->scope,
+                    occurredAt: $request->occurredAt,
+                );
+
             return new CommerceOrderSyncResult(
                 providerKey: $providerKey,
                 commerceOrderId: (int) $order->getKey(),
@@ -176,6 +188,12 @@ final class CommerceOrderSyncService
                 eventCreated: $eventCreated,
             );
         });
+
+        $this->inventoryEffects->reconcileAuthoritativeEffects(
+            $inventoryEffectIds,
+        );
+
+        return $result;
     }
 
     /**
