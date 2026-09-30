@@ -27,5 +27,6 @@ return [
         'webinars' => ['path' => 'database/migrations/modules/webinars'],
         'reporting' => ['path' => 'database/migrations/modules/reporting'],
         'mortgage' => ['path' => 'database/migrations/verticals/mortgage'],
+        'pet_services' => ['path' => 'database/migrations/verticals/pet-services'],
     ],
 ];
