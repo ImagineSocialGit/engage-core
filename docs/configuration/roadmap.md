@@ -8,10 +8,10 @@ The system should expose only capabilities registered by installed code and refu
 
 ## Completed foundation
 
-- Slam Dunk was used as temporary end-to-end vertical proof while the shared
-  config contracts and runtime seams were hardened; the client-specific golden
-  fixtures were later pruned once shared contract, setup-validation, and runtime
-  coverage became the durable authority.
+- A production-shaped client package was used as temporary end-to-end vertical
+  proof while the shared config contracts and runtime seams were hardened; the
+  client-specific golden fixtures were later pruned once shared contract,
+  setup-validation, and runtime coverage became the durable authority.
 - Semantic Campaign variant assignment resolution.
 - Shared config schema/contract registry.
 - Foundational module/package/status/task contracts.

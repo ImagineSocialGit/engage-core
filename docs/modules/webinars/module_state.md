@@ -495,32 +495,33 @@ A registration-submission grant is still recorded through Messaging's normal `Me
 
 A consent field that is disabled by config or unavailable operationally must not render and must be rejected when manually posted. The phone field becomes required only when an effective SMS consent field is selected.
 
-Current intended defaults:
+Consent-field presentation is a client decision, not a global Webinar
+requirement. Core may provide defaults, but selected-client and permitted
+series overrides may expose transactional email, transactional SMS, marketing
+email, marketing SMS, any subset of those controls, or no consent controls at
+all.
+
+Tests and setup validation must not require a client to display at least one
+transactional consent checkbox. Safety comes from the actual contract:
 
 ```text
-Core
-    transactional email field = true
-    transactional SMS field = true
-    transactional registration grants = []
-    marketing email = true
-    marketing SMS = true
+configured consent controls
+    intersect Messaging channel/surface availability
 
-Slam Dunk CRM
-    transactional email field = true
-    transactional SMS field = true
-    transactional registration grants = []
-    marketing email = false
-    marketing SMS = false
+registration_grants
+    may grant only eligible non-explicit-opt-in transactional channels
 
-Rob the Mortgage Coach
-    transactional email field = false
-    transactional SMS field = true
-    transactional registration grants = [email]
-    marketing email = false
-    marketing SMS = false
+required_channels
+    must be satisfied by an effective registration grant or a selected
+    available explicit consent control
+
+requires_explicit_opt_in
+    can never be bypassed by hiding the consent control
 ```
 
-These are current client decisions, not a rule that every client must share one consent layout.
+A client that hides every consent control may still register a Contact when its
+required transactional channel is validly covered by `registration_grants`, or
+when no channel is required by that client's registration policy.
 
 ### Shared registration foundation and series overrides
 
@@ -541,7 +542,7 @@ The shared client file should own reusable page and form defaults such as regist
 
 Topic-specific style files should normally return an empty array and inherit the shared registration style. Add a topic style override only when that series has a real visual exception.
 
-Slam Dunk is the current reference structure for this separation. Rob keeps Rob-specific shared reviews, identity, form copy, and presentation in the shared file while Homebuyer Game Plan and VA Homebuyer Game Plan keep their topic-specific content in their own series directories. Do not collapse those topic overrides back into the shared client file.
+No named client package is the canonical reference for this separation. Tests should prove the merge/inheritance contract with generic fixtures; client-specific shared content and series-specific content remain authoritative only in that client's own configuration.
 
 Tests should verify:
 
@@ -1011,27 +1012,49 @@ Registration recovery/post-event history remains preserved.
 
 ## Webinar workspace and message review UX
 
-The normal CRM surface is workspace-first. The top-level Webinar Workspace owns the primary operator hierarchy: current attention/recovery work is the main panel, while upcoming sessions are a compact side panel. Series creation, Zoom refresh, message-plan selection, and testing controls are secondary management tasks and stay below the normal operating surface.
+The normal CRM surface is workspace-first, outcome-first, and operation-first.
+A healthy Webinar workspace should show useful business activity rather than
+looking empty simply because nothing failed. Upcoming sessions and recent
+results are primary. Actionable exceptions are prominent only when the operator
+must make a decision or correct something; provider/recovery diagnostics remain
+secondary detail.
 
-Series setup must not visually group unrelated configuration merely because it lives on the same database row. `Zoom event type` is provider setup. `Message plan` selects the Webinar schedule profile and explains which confirmation/reminder/follow-up sequence runs and when. `Message content` is a separate action/state that opens the canonical Messaging-backed sequence editor and explains what those messages say. The CRM should use those business labels instead of the ambiguous standalone term `schedule`.
+Series creation, provider refresh, message-plan selection, testing controls, and
+other infrequent setup remain available without dominating routine work.
 
 The workspace should answer, in order:
 
 ```text
-What needs my attention?
+What happened or is already being handled?
 What is coming up next?
-Can I review the messages for that session?
-Where do I inspect event details or history?
-Where do I manage series/setup when I actually need to?
+What, if anything, requires me to act?
+Can I review the registration link and messages for the upcoming session?
+Where do I inspect history or manage setup when I actually need to?
 ```
 
-For each upcoming Webinar, operators should be able to review the effective published message sequence without leaving the workspace. Webinars resolves the effective series/profile MessageChain bindings, then consumes Messaging's generic chain presentation seam.
+Useful outcome summaries may include registrations, attendance, missed
+registrations, messages/follow-up completed, and other Webinar-owned facts whose
+semantics are trustworthy. Do not label a message `delivered` when the available
+fact proves only that it was scheduled or sent.
+
+Series setup must not visually group unrelated configuration merely because it
+lives on the same database row. `Zoom event type` is provider setup. `Message
+plan` selects the Webinar schedule profile and explains which
+confirmation/reminder/follow-up sequence runs and when. `Message content` is a
+separate action/state that opens the canonical Messaging-backed sequence editor
+and explains what those messages say. The CRM should use those business labels
+instead of the ambiguous standalone term `schedule`.
+
+For each upcoming Webinar, operators should be able to review the effective
+published message sequence without leaving the normal Webinar workflow.
+Webinars resolves the effective series/profile MessageChain bindings, then
+consumes Messaging's generic chain presentation seam.
 
 The Webinar review/edit pattern is:
 
 ```text
 Webinar Workspace
-    -> Upcoming session side panel
+    -> upcoming session summary
         -> View messages
             -> Email / SMS
             -> Published copy / Edit copy at the top
@@ -1043,15 +1066,31 @@ Webinar Workspace
             -> optional Message Templates or full-sequence link
 ```
 
-The side panel keeps event-details and registration-page quick access for the same upcoming occurrence. Deep registration recovery, occurrence replacement, and provider-history mechanics remain in the detailed event surface; the workspace summarizes only the decision the operator needs to make.
+The upcoming-session summary keeps event-details and registration-page quick
+access nearby. Deep registration recovery, occurrence replacement, provider
+history, and other diagnostics belong in detailed/advanced surfaces unless one
+of them currently requires operator action.
 
-The series message page uses the same canonical Messaging carousel/editor for both shared defaults and series-owned custom chains.
+The series message page uses the same canonical Messaging carousel/editor for
+both shared defaults and series-owned custom chains.
 
-Shared/profile-owned messages are editable through automatic copy-on-write. The first edit duplicates the effective MessageChains into series-owned bindings, maps the selected business step/variant into that copy, then publishes the changed series-specific MessageTemplateVersion and MessageChainVersion. The shared schedule-profile chain and other Webinar series are not changed. Once series-owned, later edits continue directly through the same immutable series-specific path.
+Shared/profile-owned messages are editable through automatic copy-on-write. The
+first edit duplicates the effective MessageChains into series-owned bindings,
+maps the selected business step/variant into that copy, then publishes the
+changed series-specific MessageTemplateVersion and MessageChainVersion. The
+shared schedule-profile chain and other Webinar series are not changed. Once
+series-owned, later edits continue directly through the same immutable
+series-specific path.
 
-Existing enrollments remain pinned to the MessageChainVersion they already started with. The modal can return to the same upcoming Webinar after a successful edit; validation failures reopen that Webinar context rather than dropping the operator into a disconnected editor.
+Existing enrollments remain pinned to the MessageChainVersion they already
+started with. The modal can return to the same upcoming Webinar after a
+successful edit; validation failures reopen that Webinar context rather than
+dropping the operator into a disconnected editor.
 
-This presentation must not add a second message-chain runtime, duplicate payload persistence, or mutable scheduled-message copy. The modal and carousel are derived from current immutable Messaging versions, and carousel/edit state remains transient UI state.
+This presentation must not add a second message-chain runtime, duplicate payload
+persistence, or mutable scheduled-message copy. The modal and carousel are
+derived from current immutable Messaging versions, and carousel/edit state
+remains transient UI state.
 
 ## CRM visibility
 

@@ -73,15 +73,15 @@ The launcher derives names from:
 Example production identity:
 
 ```text
-client repository    git@github.com:ImagineSocialGit/slam-dunk-crm.git
-root domain          slamdunkhomeloans.com
-client key           slam-dunk-crm
-runtime stem         slam_dunk_crm
-app path             /var/www/slamdunkhomeloans.com/engage-core
-Redis prefix         slam_dunk_crm_
-cache prefix         slam_dunk_crm_cache_
-Horizon prefix       slam_dunk_crm_horizon:
-Supervisor program   slamdunkhomeloans.com-horizon
+client repository    git@github.com:ExampleOrg/example-client.git
+root domain          example.com
+client key           example-client
+runtime stem         example_client
+app path             /var/www/example.com/engage-core
+Redis prefix         example_client_
+cache prefix         example_client_cache_
+Horizon prefix       example_client_horizon:
+Supervisor program   example.com-horizon
 ```
 
 Staging adds `_staging` to the runtime namespace while the staging root domain naturally keeps Supervisor/Nginx names distinct.

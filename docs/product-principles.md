@@ -11,9 +11,9 @@ producer contexts, sync-safe in a fresh database, and semantically reloadable. F
 may improve authoring, but they normalize to canonical fields and keys rather than creating new
 runtime concepts. Arbitrary metadata and sensitive provider values are not general token sources.
 
-Slam Dunk is the first golden vertical slice and regression target. Exact text snapshots are useful
-for deterministic output, but normalized semantic round-trip equality and runtime execution are
-the stronger guarantees.
+Production-shaped client configurations may be used temporarily as validation slices, but no named
+client is a durable product contract. Exact text snapshots can help during a focused transition;
+normalized semantic round-trip equality and runtime execution are the stronger guarantees.
 
 Engage Core is a dev-built operating system for small service businesses.
 
@@ -28,7 +28,7 @@ The developer/operator is responsible for turning repeatable admin, communicatio
 Use this question when deciding whether a feature, module capability, or UI surface should be client-facing:
 
 ```text
-Can the client realistically complete this task in Engage Core in 10-15 minutes total?
+Can the client realistically complete this task in Engage Core in roughly 5-10 minutes total?
 ```
 
 If yes, the task can be client-facing.

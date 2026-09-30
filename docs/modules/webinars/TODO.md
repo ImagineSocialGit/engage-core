@@ -51,13 +51,10 @@
 
 - [ ] Make post-event sequencing and recovery intent easier to inspect for operators without exposing provider/debug internals as the primary UX.
 
-## Rob production Webinar contact migration
+## CRM UX simplification
 
-Retain this only until the one-time migration is completed and verified.
-
-- [ ] Re-verify `ConsentDomainRegistry` and Webinar consent-domain behavior before touching real contacts.
-- [ ] Re-verify normal versus imported consent behavior: imported consent normalizes without `MessageConsentGranted` or opt-in acknowledgement sends.
-- [ ] Confirm Rob `presets:sync` and `setup:validate` are clean.
-- [ ] Finalize importer dry-run-by-default plus explicit `--apply` behavior and actionable malformed-phone/SMS-consent row output.
-- [ ] Prepare and inspect the exact 11-row CSV in dry-run before apply.
-- [ ] After apply, verify 11 Contacts, expected channel+purpose consent state, 11 Webinar registrations, no confirmations/opt-in sends, only future-valid reminders, and idempotent rerun with no duplicates.
+- [ ] Redesign the top-level Webinar workspace around upcoming activity and recent useful outcomes; surface exceptions prominently only when operator action is required.
+- [ ] Simplify Webinar Type Detail around the next session, registration link, registration/results summary, and messages; move provider/sync mechanics and infrequent setup behind secondary management/advanced surfaces.
+- [ ] Simplify Specific Session Detail around registrations, attendance, people, messages, and post-webinar follow-up; keep provider evidence and recovery mechanics secondary unless action is required.
+- [ ] Make post-webinar message-plan editing and preview a simple Webinar-owned workflow that continues to use the canonical Messaging carousel/editor and immutable copy-on-write runtime.
+- [ ] Keep success/outcome summaries semantically precise: distinguish scheduled, sent, delivered, attended, missed, and other facts rather than upgrading weaker evidence into stronger labels.

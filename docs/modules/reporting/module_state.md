@@ -967,7 +967,7 @@ question distribution excluding answer_text
 external measurement normalization and retained Project State round-trip
 ```
 
-Tests should use generic fixtures. Do not make Slam Dunk, Rob, or another client name/copy part of the Reporting domain contract.
+Tests should use generic fixtures. Named client identity, copy, domains, and rollout assumptions are not part of the Reporting domain contract.
 
 ## Project State
 

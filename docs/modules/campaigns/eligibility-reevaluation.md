@@ -76,8 +76,8 @@ Evaluator-only tests that intentionally mutate eligibility facts while directly 
 
 ## Not changed in Batch 2B
 
-- Slam Dunk Campaigns remain manually enrolled.
-- Existing Slam Dunk Campaign-routing/cleanup Flow Routes remain in place.
+- Existing client Campaigns are not automatically switched from manual enrollment.
+- Existing client-owned Campaign-routing/cleanup Flow Routes remain in place.
 - Campaign authoring UI is not changed.
 - Process Highway does not yet display Campaign eligibility.
 - Messaging now enforces consent at channel + purpose; Campaign scope remains operational/context identity and does not gate permission.
@@ -86,6 +86,6 @@ Evaluator-only tests that intentionally mutate eligibility facts while directly 
 
 1. Campaign authoring UI: eligibility builder, automatic/manual enrollment, re-entry, ineligible behavior, and audience preview.
 2. Process Highway integration: Campaign eligibility/enrollment/journey alongside Flow Routes.
-3. Slam Dunk migration: enable automatic eligibility and remove redundant lifecycle Campaign-routing routes while keeping real orchestration.
+3. Client cutovers: enable automatic eligibility where intended and remove redundant lifecycle Campaign-routing routes while keeping real orchestration.
 4. Preset/bootstrap hardening and portable stable-key Campaign JSON.
-5. Final acceptance and Slam Dunk go-live checks.
+5. Final acceptance against production-shaped client configurations.

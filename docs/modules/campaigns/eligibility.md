@@ -26,8 +26,8 @@ Campaigns stores eligibility as stable semantic criterion values:
 'eligibility' => [
     'mode' => 'automatic',
     'criteria' => [
-        'status' => ['prospect_nurture'],
-        'tag' => ['VA'],
+        'status' => ['active'],
+        'tag' => ['priority'],
     ],
     'reentry' => 'never',
     'when_ineligible' => 'cancel',

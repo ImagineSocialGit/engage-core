@@ -13,8 +13,8 @@ webinar_outcome
 with semantic values such as:
 
 ```text
-va-homebuyer-game-plan:attended
-va-homebuyer-game-plan:missed
+example-webinar-series:attended
+example-webinar-series:missed
 ```
 
 Campaigns can therefore target a durable webinar fact through the same `eligibility_filter` used for status, relationship, source, subsource, and tag criteria.
@@ -108,7 +108,7 @@ The 15-minute automatic Campaign reconciliation pass remains the correctness bac
 Campaign eligibility stores webinar series slugs, not database IDs:
 
 ```text
-va-homebuyer-game-plan:attended
+example-webinar-series:attended
 ```
 
 Normalization validates the semantic format without requiring the referenced series to exist at normalization time.
@@ -131,17 +131,17 @@ Process Highway recognizes the generic criterion key for presentation but does n
 
 ## Not changed in Batch 5A
 
-- No Slam Dunk Campaign is switched to automatic enrollment yet.
-- No Slam Dunk Flow Route is removed yet.
+- No client Campaign is switched to automatic enrollment by this module change.
+- No client-owned Flow Route is removed by this module change.
 - No Contact import launch policy changes yet.
 - No database migration is required.
 - Messaging consent/scope behavior is unchanged.
 
-The Slam Dunk config cutover and import launch bridge belong together in Batch 5B so launch timing cannot temporarily diverge from the client Campaign definitions.
+Any client config cutover and import launch bridge belong in client-owned rollout work so launch timing cannot temporarily diverge from that client's Campaign definitions.
 
 ## Remaining refactor roadmap
 
-1. Batch 5B — Slam Dunk Campaign eligibility cutover, import launch bridge, and redundant Flow Route removal.
+1. Client-specific Campaign eligibility cutovers, import launch bridges, and redundant Flow Route removal where applicable.
 2. Messaging scope/consent cleanup.
 3. Preset/bootstrap hardening and portable stable-key Campaign JSON.
-4. Final acceptance and Slam Dunk go-live.
+4. Final acceptance against production-shaped client configurations.

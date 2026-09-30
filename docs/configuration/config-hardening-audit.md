@@ -27,7 +27,7 @@ The audit reconciled these layers:
 
 1. Config authoring documentation and PHP templates.
 2. Default runtime configuration.
-3. The serious Slam Dunk client configuration.
+3. A production-shaped client configuration.
 4. Client loading and recursive merge behavior.
 5. Preset packages, contributors, composition, and ownership.
 6. Definition DTOs and normalization behavior.
@@ -55,8 +55,8 @@ These rules are part of the export target. An exporter must preview and validate
 
 ## Phase 1 — Frozen behavior
 
-Slam Dunk was used as the first temporary end-to-end vertical slice while the
-configuration-contract foundation was being established.
+A production-shaped client package was used as a temporary end-to-end vertical
+slice while the configuration-contract foundation was being established.
 
 At that hardening checkpoint, the client-specific coverage proved that:
 
@@ -74,7 +74,7 @@ At that hardening checkpoint, the client-specific coverage proved that:
 
 Those client-specific golden/config fixtures were deliberately temporary. After
 the shared config contracts, setup-validation paths, semantic resolvers, and
-generic runtime tests became authoritative, the permanent Slam Dunk/Rob golden
+generic runtime tests became authoritative, the permanent named-client golden
 test files were pruned rather than preserved as a parallel client-specific
 contract layer.
 

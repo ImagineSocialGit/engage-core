@@ -108,7 +108,7 @@ business highway
 
 Segments connect when they share an entry node, when one segment produces a non-contact-fact node used as another segment's entry, or when an `exits_to` edge explicitly targets another mechanism. Merely producing the same downstream status, tag, relationship stage, Campaign state, or other outcome does not connect otherwise unrelated processes.
 
-This directionality is essential. Cold Lead, Past Client, and Webinar reply Routes may all create an Engaged status, Hand Raiser tag, task, or Campaign-family outcome without becoming one giant highway. Shared downstream consequences remain visible beside the mechanism that causes them.
+This directionality is essential. Distinct nurture, past-client, relationship, and Webinar reply Routes may all create the same downstream status, tag, task, or Campaign-family outcome without becoming one giant highway. Shared downstream consequences remain visible beside the mechanism that causes them.
 
 Connections never cross lanes. A standard-contact status and a relationship-scoped use of that same status therefore remain separate highways.
 
@@ -192,14 +192,14 @@ Stable business facts and mechanism identities use shared semantic node keys.
 Examples:
 
 ```text
-workflow:status:prospect_nurture
-core:contact_tag:present:Old%20Lead
-relationships:relationship:realtor:stage:engaged_agent
-webinars:series:va-homebuyer-game-plan:outcome:attended
+workflow:status:active
+core:contact_tag:present:Priority
+relationships:relationship:partner:stage:engaged
+webinars:series:example-webinar-series:outcome:attended
 automation:event:inbound_message.normal_reply
-inbound_messaging:reply_profile:cold_lead_nurture
-campaigns:campaign:cold_lead_nurture
-flow_routes:route:cold_lead_high_intent_reply_routing
+inbound_messaging:reply_profile:follow_up
+campaigns:campaign:contact_nurture
+flow_routes:route:high_intent_reply_routing
 ```
 
 A contributor may publish a reference-only appearance of a semantic node it does not own. The composer merges compatible appearances, retains an authoritative definition when one exists, records every participating segment, and combines exact edit targets.
@@ -264,7 +264,7 @@ Campaign eligibility gateways and criteria are intentionally omitted from the Ca
 The Contact workspace may link to Process Highway with the contact's current Status:
 
 ```text
-/process-highway?status=past_contact
+/process-highway?status=active
 ```
 
 This is a read-only wayfinding hint, not an execution request. The controller carries the Status key into the audience filter and the Highway answers the same question the operator would answer manually:
@@ -510,12 +510,12 @@ Process Highway does not:
 
 The focused business-map contract proves:
 
-- Prospect – Nurture plus Old Lead converges into the cold-lead Campaign;
-- Past Client remains its own eligibility-driven Campaign process;
-- VA attended and missed durable outcomes enter their respective Campaigns and converge only where a shared reply mechanism is intentional;
+- multiple durable entry facts may converge into one eligibility-driven Campaign without becoming duplicate processes;
+- distinct lifecycle segments remain separate when their eligibility and business purpose differ;
+- Webinar attended and missed durable outcomes may enter different Campaigns and converge only where a shared reply mechanism is intentional;
 - scoped reply Routes attach after the Campaign message journey instead of appearing as generic top-level reply highways;
 - Campaign-only processes remain complete without a Flow Route;
-- Realtor reply orchestration stays in the Realtor relationship lane;
+- relationship-scoped reply orchestration stays in its relationship lane;
 - disabling optional process modules leaves the Highway surface available;
 - visible mechanisms retain their authoritative owner navigation.
 
@@ -524,6 +524,6 @@ The focused business-map contract proves:
 1. Reply Handling + Message Template authoring integration.
 2. Dev visual acceptance and bounded follow-up fixes after the full-site refresh.
 3. Preset/bootstrap hardening and portable stable-key Campaign JSON.
-4. Final acceptance and Slam Dunk go-live.
+4. Final acceptance against a production-shaped deployment.
 
 Messaging consent now uses channel + purpose as the hard permission boundary; scope remains compatibility/context/audit metadata.

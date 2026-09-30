@@ -346,9 +346,9 @@ Client keys should be clearly named and should not redefine core behavior.
 Good:
 
 ```text
-slam_dunk.va_buyer_follow_up
-slam_dunk.credit_review_requested
-rob_mortgage_coach.bridge_loan_follow_up
+example_client.homebuyer_follow_up
+example_client.credit_review_requested
+example_client.bridge_loan_follow_up
 ```
 
 Bad:
@@ -1143,10 +1143,10 @@ Core dependency behavior
     or when the SMS channel is unavailable for the current client/runtime configuration.
     Another contact's SMS state never satisfies this dependency.
 
-Slam Dunk webinar_attended_nurture
+Client override webinar_attended_nurture
     richer client-owned 9-step journey
 
-Effective Slam Dunk
+Effective client
     9 client-owned steps, not Core's generic step appended underneath
 ```
 

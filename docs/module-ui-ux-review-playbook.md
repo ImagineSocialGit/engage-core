@@ -177,10 +177,12 @@ Review the same module after realistic configuration exists.
 Record:
 
 ```text
-[ ] Does the landing page emphasize current work?
+[ ] Does the landing page emphasize useful outcomes and current/upcoming work?
+[ ] Does a healthy state look productive rather than empty because nothing failed?
 [ ] Is the common action obvious?
 [ ] Is the common action short?
-[ ] Are review/exception tasks easy to find?
+[ ] Are exceptions prominent when action is required without becoming the default information hierarchy?
+[ ] Are technical diagnostics kept out of the routine path unless they change the user's decision?
 [ ] Does advanced configuration stay out of the routine path?
 [ ] Does the user understand what the system already handled automatically?
 ```
@@ -331,7 +333,8 @@ public/external
 Then decide:
 
 ```text
-What belongs on the module landing page?
+Which useful outcomes/current activity belong on the module landing page?
+Which exceptions genuinely require client action?
 What belongs in guided first-time setup?
 What belongs in long-term maintenance screens?
 What belongs behind Advanced?

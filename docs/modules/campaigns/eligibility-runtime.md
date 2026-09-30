@@ -106,5 +106,5 @@ This batch deliberately does not yet:
 - schedule periodic reconciliation;
 - change Campaign authoring UI;
 - change Process Highway presentation;
-- remove Slam Dunk Flow Routes;
+- remove client-owned Flow Routes;
 - change Messaging consent/scope semantics.

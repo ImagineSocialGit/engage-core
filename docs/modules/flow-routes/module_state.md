@@ -707,7 +707,7 @@ The editor should apply the same consequence-first posture to other automatic ac
 `Decision` is a constrained business branch. It checks one supported fact, sends the matching path to a named later Point, and either sends the otherwise path to another later Point or ends the Route. Existing advanced preset Decisions remain visible in plain language and are preserved when their shape cannot be represented safely by the constrained editor.
 
 `Change Status` may include a current-status safety check. It reads as one action—for example,
-“Move the contact to Engaged only if its current status is Prospect – Nurture”—and safely skips
+“Move the contact to Engaged only if its current status is Prospect”—and safely skips
 the transition when a delayed event arrives after the contact has already moved. Do not model
 that stale-event guard as a separate Decision.
 

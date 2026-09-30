@@ -1368,27 +1368,46 @@ Broadcasts registers `broadcast_send` as one of those executable contexts. The c
 
 `CreateReusableMessageTemplateAction` and `ReusableMessageTemplateCatalog` preserve `token_fallbacks` along with subject/body/message copy. Reusable email payloads also preserve a bounded first-class `cta` (`tracking_key`, `label`, `url`) when one is present. This is required for Broadcast promotion/reuse: a saved personalized message must not lose either the missing-field behavior or primary CTA that made up the authored message. The reusable template's immutable version remains the canonical copy for the library item; loading it into a Broadcast creates a draft copy and does not mutate the saved template.
 
-### Client email presentation
+### Email presentation policy
 
-`EmailPayload` resolves its semantic Blade view through
-`App\Support\Clients\ViewResolver`. A committed
-`client/<client-key>/resources/views/email.blade.php` therefore owns that
-client's normal HTML email shell, while Core `resources/views/email.blade.php`
-remains the fallback.
+Messaging owns email-shell presentation independently from message-content
+ownership. `EmailPayload`, Webinar, Campaign, Broadcast, direct-message, and
+other customer-facing paths keep their existing immutable content/runtime
+contracts; presentation chooses only which HTML shell renders that content.
 
-Client email presentation is intentionally independent from message-content
-ownership. Webinar/Campaign/Broadcast/direct-message payloads continue to use
-their existing immutable Messaging content/runtime contracts; the client view
-only controls HTML presentation.
+The supported presentation modes are:
+
+```text
+client
+    resolve the semantic view through App\Support\Clients\ViewResolver so an
+    available client view override may provide the HTML shell
+
+standard
+    render the Core semantic email view directly and bypass client view
+    precedence
+```
+
+`EmailPresentationResolver` applies the mode for a `ScheduledMessage`. The
+default comes from `messaging.email.presentation.default`; optional
+`messaging.email.presentation.surfaces` entries may override that default by
+neutral runtime surface. Surface identity comes from bounded ScheduledMessage
+metadata when present and otherwise from the related MessageChainEnrollment
+surface.
+
+This keeps presentation policy provider- and feature-neutral. A consuming
+module identifies its existing surface; selected-client configuration may
+choose `client` or `standard` for that surface without Messaging importing the
+consuming module or the consuming module knowing client identity.
+
+Customer-facing email defaults to `client` presentation. Internal/team system
+notifications default to `standard` presentation and render the Core shell
+explicitly so a client-wide view override cannot accidentally brand internal
+operator mail.
 
 Client email overrides must preserve the EmailPayload presentation slots they
 intend to support, including CTA(s), `{media}`, secondary links, footer,
 transactional opt-out, and marketing unsubscribe. Media card generation remains
 owned by EmailPayload / the semantic `email-media-card` view.
-
-The Slam Dunk and Rob client packages currently provide client-wide `email`
-overrides. Those layouts use their existing generated client logo assets and
-client brand language without changing message-definition content.
 
 ## Completed refactor boundary and remaining work
 

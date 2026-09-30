@@ -23,6 +23,7 @@ Use this for repeatable platform-wide checks. It is not backlog.
 - Review changed files for stale terminology. Internal/runtime identifiers use `contact`; client-facing UI may use the configured business noun.
 - Confirm new public routes/controllers follow module directory conventions.
 - Update the owning module's state/TODO when useful; update global docs only for global rules.
+- Keep durable docs client-neutral. Do not encode a named client's current copy, domains, counts, rollout state, or implementation choices as platform/module truth; use generic placeholders/examples and keep client-specific truth in `client/<client-key>/` source or client-owned rollout tracking.
 - Keep `module-boundaries.md` limited to long-lived architectural decisions.
 - Delete completed disposable TODOs.
 

@@ -84,8 +84,8 @@ The existing Workflow `status` filter criterion consumes numeric ContactStatus I
 The authoring adapter therefore exposes:
 
 ```text
-prospect_nurture
-past_contact
+active
+inactive
 ```
 
 rather than installation-specific values such as:
@@ -134,8 +134,8 @@ This batch does not introduce a second customization system.
 
 ## Not changed in Batch 3
 
-- Slam Dunk client Campaign definitions remain unchanged.
-- Existing Slam Dunk Campaign-routing Flow Routes remain in place.
+- Existing client-specific Campaign definitions remain unchanged.
+- Existing client-owned Campaign-routing Flow Routes remain in place.
 - Process Highway is unchanged.
 - Messaging now enforces consent at channel + purpose; Campaign scope remains operational/context identity and does not gate permission.
 - Schedule authoring is still summarized from the current MessageChain journey.
@@ -145,7 +145,7 @@ This batch does not introduce a second customization system.
 ## Remaining refactor roadmap
 
 1. Process Highway integration: show Campaign eligibility/enrollment/journey alongside Flow Routes.
-2. Slam Dunk migration: convert appropriate Campaigns to automatic eligibility and remove redundant Campaign-routing/cleanup Flow Routes while preserving real orchestration.
+2. Client cutovers: convert appropriate Campaigns to automatic eligibility and remove redundant client-owned Campaign-routing/cleanup Flow Routes while preserving real orchestration.
 3. Messaging scope/consent cleanup: channel + purpose becomes the hard marketing-permission boundary.
 4. Preset/bootstrap hardening and portable stable-key Campaign JSON.
-5. Final acceptance and Slam Dunk go-live.
+5. Final acceptance against production-shaped client configurations.

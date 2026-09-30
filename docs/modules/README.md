@@ -1,4 +1,3 @@
-
 # Engage Core Module Docs
 
 Module-owned documentation lives under one directory per module:
@@ -11,6 +10,8 @@ docs/modules/<module>/TODO.md            # only while actionable backlog exists
 `module_state.md` is the durable module reference. It owns responsibility, dependency, schema, current committed behavior, public seams, Project State status, and durable deferred direction.
 
 `TODO.md` is disposable module-owned backlog. Delete completed items instead of turning it into release history. Do not create an empty TODO merely for symmetry.
+
+Module documentation must remain client-neutral. Describe reusable module behavior, ownership, seams, and generic configuration rules. Do not make a named client's current copy, domain, counts, rollout status, or configuration choices part of a module contract. Client-specific implementation truth belongs in `client/<client-key>/` source or client-owned rollout tracking; examples in durable module docs should use generic placeholders.
 
 Use `../module-boundaries.md` for platform-wide ownership/dependency rules, `../module-surfaces.md` for loud/silent product-surface rules, and `../TODO.md` only for backlog that genuinely has no single module owner.
 

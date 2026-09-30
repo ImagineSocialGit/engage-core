@@ -67,6 +67,45 @@ Where can I review details if I need them?
 
 Powerful capabilities should default to calm summaries, guided actions, and next-step prompts. The machinery underneath belongs in operator/developer setup, advanced details, or gated debug views.
 
+
+## Outcome-first dashboards and workspaces
+
+Client-facing dashboards and routine module workspaces should lead with evidence
+of useful work and business outcomes, not with the platform's own exception
+feed.
+
+Default information hierarchy:
+
+```text
+useful outcomes and work already completed
+current / upcoming business activity
+clear next actions
+exceptions that actually require the user's action
+technical diagnostics only in operator/advanced detail
+```
+
+A healthy day should look productive rather than empty simply because nothing
+failed. Examples of useful outcome evidence include registrations completed,
+messages successfully sent or delivered when delivery evidence exists, replies
+received, appointments booked, tasks completed, and automated follow-up
+performed.
+
+Do not manufacture positivity or hide material failures. An exception should
+interrupt the normal outcome-first hierarchy when the user must make a decision,
+correct data, retry/recover work, or otherwise act. Failures that require no
+client decision belong in diagnostic/operator detail rather than dominating the
+routine workspace.
+
+Use the strongest label the evidence actually supports. `Scheduled`, `sent`,
+`delivered`, `opened`, `replied`, `attended`, and `completed` are different
+facts. Do not present one as another merely to make a success metric look
+better.
+
+Developer/debug surfaces may remain exception-first because their job is to
+find weak spots. That diagnostic posture must not leak into the default client
+dashboard or routine module workspace.
+
+
 ## Avoid platform-cockpit UI
 
 Do not organize client-facing screens as a cockpit of every feature the platform can technically perform.

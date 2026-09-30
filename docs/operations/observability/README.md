@@ -157,18 +157,18 @@ may display unrelated environment values in its proposed diff. Do not run that h
 
 ### 3. Dry-run the server installer
 
-Example shape for Rob; replace `/REAL/APP/PATH` with the path verified above:
+Example shape; replace every placeholder/example value with the deployment values verified above:
 
 ```bash
 scripts/operations/install-observability.sh \
-  --client-key rob-the-mortgage-coach \
-  --app-path /REAL/APP/PATH \
-  --nginx-site /etc/nginx/sites-enabled/crm.robthemortgagecoach.com \
-  --access-log /var/log/nginx/robthemortgagecoach.com-access.log \
+  --client-key example-client \
+  --app-path /var/www/example.com/engage-core \
+  --nginx-site /etc/nginx/sites-enabled/crm.example.com \
+  --access-log /var/log/nginx/example.com-access.log \
   --php-version 8.3 \
   --php-pool-config /etc/php/8.3/fpm/pool.d/www.conf \
   --php-pool-name www \
-  --deploy-user slamdunkdeploy
+  --deploy-user deploy
 ```
 
 The dry run prints the proposed Nginx and PHP-FPM diffs and makes no changes.
@@ -177,14 +177,14 @@ The dry run prints the proposed Nginx and PHP-FPM diffs and makes no changes.
 
 ```bash
 sudo scripts/operations/install-observability.sh \
-  --client-key rob-the-mortgage-coach \
-  --app-path /REAL/APP/PATH \
-  --nginx-site /etc/nginx/sites-enabled/crm.robthemortgagecoach.com \
-  --access-log /var/log/nginx/robthemortgagecoach.com-access.log \
+  --client-key example-client \
+  --app-path /var/www/example.com/engage-core \
+  --nginx-site /etc/nginx/sites-enabled/crm.example.com \
+  --access-log /var/log/nginx/example.com-access.log \
   --php-version 8.3 \
   --php-pool-config /etc/php/8.3/fpm/pool.d/www.conf \
   --php-pool-name www \
-  --deploy-user slamdunkdeploy \
+  --deploy-user deploy \
   --apply
 ```
 
@@ -213,9 +213,9 @@ Run the verifier with `sudo`. It validates Nginx with `nginx -t`, and a non-root
 
 ```bash
 sudo scripts/operations/verify-observability.sh \
-  --app-path /REAL/APP/PATH \
-  --public-url https://webinar.robthemortgagecoach.com/homebuyer-game-plan \
-  --access-log /var/log/nginx/robthemortgagecoach.com-access.log \
+  --app-path /var/www/example.com/engage-core \
+  --public-url https://webinar.example.com/example-webinar \
+  --access-log /var/log/nginx/example.com-access.log \
   --php-version 8.3
 ```
 
@@ -258,7 +258,7 @@ Locate one request by response ID:
 REQUEST_ID='<value-from-response-or-user>'
 
 grep -F "\"request_id\":\"$REQUEST_ID\"" \
-  /var/log/nginx/robthemortgagecoach.com-access.log
+  /var/log/nginx/example.com-access.log
 
 grep -F "\"request_id\":\"$REQUEST_ID\"" \
   /REAL/APP/PATH/storage/logs/laravel.json-*.log
@@ -271,13 +271,13 @@ python3 - <<'PY'
 import json
 from pathlib import Path
 
-path = Path('/var/log/nginx/robthemortgagecoach.com-access.log')
+path = Path('/var/log/nginx/example.com-access.log')
 for line in path.read_text(errors='replace').splitlines()[-5000:]:
     try:
         row = json.loads(line)
     except json.JSONDecodeError:
         continue
-    if row.get('method') == 'POST' and 'homebuyer-game-plan' in row.get('path', ''):
+    if row.get('method') == 'POST' and 'example-webinar' in row.get('path', ''):
         print(row)
 PY
 ```
