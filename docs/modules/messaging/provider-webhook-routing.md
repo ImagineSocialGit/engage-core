@@ -1,3 +1,4 @@
+
 # Messaging Provider Webhook Routing
 
 ## Ownership rule
@@ -151,6 +152,7 @@ Messaging applies these durable consequences for provider feedback:
 
 - `email.opened` -> aggregate provider-reported open evidence correlated to the matching sent email by provider message ID;
 - `email.bounced` -> email suppression with reason `bounce`;
+  bounded bounce evidence (`type`, `subtype`, and `message` when supplied by Resend) is retained on suppression metadata so operator surfaces can explain the failure without reparsing raw webhook payloads;
 - `email.complained` -> email suppression with reason `complaint`;
 - `email.suppressed` -> email suppression with reason `provider`;
 - definitive invalid-address `email.failed` evidence -> email suppression with reason `invalid_destination`;

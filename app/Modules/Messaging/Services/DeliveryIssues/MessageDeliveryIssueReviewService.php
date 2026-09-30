@@ -121,6 +121,8 @@ final class MessageDeliveryIssueReviewService
      *     suppression: MessageSuppression,
      *     contacts: Collection<int, Contact>,
      *     reason_label: string,
+     *     action_guidance: string,
+     *     provider_detail: ?string,
      *     can_release: bool
      * }>
      */
@@ -144,7 +146,16 @@ final class MessageDeliveryIssueReviewService
                 return [
                     'suppression' => $suppression,
                     'contacts' => $matchingContacts,
-                    'reason_label' => $this->reasonLabel($suppression->reason),
+                    'contact' => $matchingContacts->first(),
+                    'reason_label' => $this->reasonLabelFor($suppression),
+                    'problem_label' => $suppression->channel === MessageChannel::Email->value
+                        ? 'Email could not be delivered'
+                        : 'Text message could not be delivered',
+                    'edit_field' => $suppression->channel === MessageChannel::Email->value
+                        ? 'email'
+                        : 'phone',
+                    'action_guidance' => $this->actionGuidanceFor($suppression),
+                    'provider_detail' => $this->providerDetailFor($suppression),
                     'can_release' => $this->canRelease($suppression),
                 ];
             })
@@ -196,14 +207,149 @@ final class MessageDeliveryIssueReviewService
     public function reasonLabel(?string $reason): string
     {
         return match ($reason) {
-            MessageSuppression::REASON_BOUNCE => 'Bounced',
-            MessageSuppression::REASON_COMPLAINT => 'Complaint',
-            MessageSuppression::REASON_MANUAL => 'Manually suppressed',
-            MessageSuppression::REASON_PROVIDER => 'Provider suppression',
-            MessageSuppression::REASON_INVALID_DESTINATION => 'Invalid destination',
-            MessageSuppression::REASON_REPEATED_FAILURE => 'Repeated delivery failure',
-            default => 'Delivery issue',
+            MessageSuppression::REASON_BOUNCE => 'The message could not be delivered.',
+            MessageSuppression::REASON_COMPLAINT => 'The recipient reported a message as unwanted.',
+            MessageSuppression::REASON_MANUAL => 'Messaging to this destination was stopped manually.',
+            MessageSuppression::REASON_PROVIDER => 'The email provider is currently blocking delivery.',
+            MessageSuppression::REASON_INVALID_DESTINATION => 'The email address does not appear to be valid.',
+            MessageSuppression::REASON_REPEATED_FAILURE => 'Messages to this destination have failed repeatedly.',
+            default => 'Messages cannot currently be delivered to this destination.',
         };
+    }
+
+    public function reasonLabelFor(MessageSuppression $suppression): string
+    {
+        if ($suppression->reason !== MessageSuppression::REASON_BOUNCE) {
+            return $this->reasonLabel($suppression->reason);
+        }
+
+        $text = $this->bounceSearchText($suppression);
+
+        foreach ([
+            'does not exist',
+            "doesn't exist",
+            'not exist',
+            'unknown user',
+            'unknown recipient',
+            'no such user',
+            'user unknown',
+            'recipient not found',
+            'mailbox not found',
+            'invalid recipient',
+            'invalid address',
+            'recipient address rejected',
+        ] as $signal) {
+            if (str_contains($text, $signal)) {
+                return 'The email address does not appear to exist.';
+            }
+        }
+
+        foreach ([
+            'mailbox full',
+            'mailbox is full',
+            'quota exceeded',
+            'over quota',
+            'storage full',
+        ] as $signal) {
+            if (str_contains($text, $signal)) {
+                return 'The recipient’s mailbox is full.';
+            }
+        }
+
+        foreach ([
+            'suppressed',
+            'suppression',
+            'previous bounce',
+            'previously bounced',
+            'recent history',
+        ] as $signal) {
+            if (str_contains($text, $signal)) {
+                return 'Delivery is blocked because this address has failed previously.';
+            }
+        }
+
+        foreach ([
+            'dns',
+            'domain not found',
+            'domain does not exist',
+            'no mx',
+            'mx record',
+            'could not resolve',
+        ] as $signal) {
+            if (str_contains($text, $signal)) {
+                return 'The recipient’s email domain cannot currently receive mail.';
+            }
+        }
+
+        foreach ([
+            'blocked',
+            'rejected',
+            'denied',
+            'policy',
+            'spam',
+        ] as $signal) {
+            if (str_contains($text, $signal)) {
+                return 'The recipient’s mail server rejected the message.';
+            }
+        }
+
+        return $this->reasonLabel($suppression->reason);
+    }
+
+    public function actionGuidanceFor(MessageSuppression $suppression): string
+    {
+        $text = $this->bounceSearchText($suppression);
+
+        if ($suppression->reason === MessageSuppression::REASON_BOUNCE) {
+            foreach ([
+                'does not exist',
+                "doesn't exist",
+                'not exist',
+                'unknown user',
+                'unknown recipient',
+                'no such user',
+                'user unknown',
+                'recipient not found',
+                'mailbox not found',
+                'invalid recipient',
+                'invalid address',
+                'recipient address rejected',
+            ] as $signal) {
+                if (str_contains($text, $signal)) {
+                    return 'Check the email address for a typo or replace it with a working address.';
+                }
+            }
+
+            if (str_contains($text, 'mailbox full') || str_contains($text, 'quota exceeded')) {
+                return 'The address may work again later. Use another contact method if the message is time-sensitive.';
+            }
+
+            if (str_contains($text, 'dns') || str_contains($text, 'domain not found') || str_contains($text, 'no mx')) {
+                return 'Check the email domain for a typo. If it is correct, use another contact method until the recipient fixes their email service.';
+            }
+        }
+
+        return $suppression->channel === MessageChannel::Email->value
+            ? 'Check the email address and correct it if it is wrong. Otherwise verify the address before allowing email again.'
+            : 'Check the phone number and correct it if it is wrong. Otherwise verify the number before allowing messages again.';
+    }
+
+    public function providerDetailFor(MessageSuppression $suppression): ?string
+    {
+        $message = data_get($suppression->meta, 'bounce.message');
+
+        return is_string($message) && trim($message) !== ''
+            ? trim($message)
+            : null;
+    }
+
+    private function bounceSearchText(MessageSuppression $suppression): string
+    {
+        return mb_strtolower(implode(' ', array_filter([
+            data_get($suppression->meta, 'bounce.type'),
+            data_get($suppression->meta, 'bounce.subtype'),
+            data_get($suppression->meta, 'bounce.message'),
+        ], static fn (mixed $value): bool => is_string($value) && trim($value) !== '')));
     }
 
     /**

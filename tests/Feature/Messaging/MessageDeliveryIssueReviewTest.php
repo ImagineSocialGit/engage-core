@@ -76,6 +76,44 @@ class MessageDeliveryIssueReviewTest extends TestCase
         ]);
     }
 
+    public function test_bounce_evidence_is_presented_as_actionable_delivery_context(): void
+    {
+        $contact = Contact::factory()->create([
+            'email' => 'missing@example.com',
+        ]);
+
+        $suppression = $this->suppression(
+            channel: MessageChannel::Email->value,
+            destination: 'missing@example.com',
+            reason: MessageSuppression::REASON_BOUNCE,
+        );
+
+        $suppression->forceFill([
+            'meta' => [
+                'bounce' => [
+                    'type' => 'Permanent',
+                    'subtype' => 'General',
+                    'message' => 'The recipient does not exist.',
+                ],
+            ],
+        ])->save();
+
+        $issue = app(MessageDeliveryIssueReviewService::class)
+            ->present(collect([$suppression->fresh()]))
+            ->first();
+
+        $this->assertSame($contact->getKey(), $issue['contact']->getKey());
+        $this->assertNotSame(
+            app(MessageDeliveryIssueReviewService::class)->reasonLabel(MessageSuppression::REASON_BOUNCE),
+            $issue['reason_label'],
+        );
+        $this->assertSame(
+            data_get($suppression->fresh()->meta, 'bounce.message'),
+            $issue['provider_detail'],
+        );
+        $this->assertNotSame('', trim($issue['action_guidance']));
+    }
+
     public function test_soft_deleted_contact_does_not_keep_suppression_in_review_queue(): void
     {
         $contact = Contact::factory()->create([
@@ -311,6 +349,29 @@ class MessageDeliveryIssueReviewTest extends TestCase
             route('crm.messaging.delivery-issues.index'),
             $panel['primary_action']['href'],
         );
+    }
+
+    public function test_review_queue_links_current_contact_destination_to_normal_contact_editing(): void
+    {
+        $user = User::factory()->create();
+        $contact = Contact::factory()->create([
+            'email' => 'bad@example.com',
+        ]);
+
+        $this->suppression(
+            channel: MessageChannel::Email->value,
+            destination: 'bad@example.com',
+            reason: MessageSuppression::REASON_BOUNCE,
+        );
+
+        $this
+            ->actingAs($user)
+            ->get(route('crm.messaging.delivery-issues.index'))
+            ->assertOk()
+            ->assertSee(
+                route('crm.contacts.show', $contact).'?contact_edit=email',
+                false,
+            );
     }
 
     public function test_delivery_issue_review_route_is_protected_by_messaging_module_middleware(): void

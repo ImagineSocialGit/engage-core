@@ -9,7 +9,7 @@
             activityTab: new URLSearchParams(window.location.search).get('activity_tab') || @js($defaultActivityTab),
             messageTab: new URLSearchParams(window.location.search).get('messages_tab') || 'messages',
             taskModalOpen: @js($errors->has('assigned_to_id') || $errors->has('assigned_to_type') || $errors->has('links') || $errors->has('title') || $errors->has('description') || $errors->has('due_at')),
-            contactEditField: @js(old('contact_edit_context')),
+            contactEditField: @js(old('contact_edit_context', request()->query('contact_edit'))),
             contactDetailsModalOpen: @js(old('contact_edit_context') === 'details'),
             contactTagAddOpen: @js(old('contact_tag_context') === 'add'),
             contactTagEditId: @js(old('contact_tag_context') === 'edit' ? (string) old('contact_tag_id') : null),

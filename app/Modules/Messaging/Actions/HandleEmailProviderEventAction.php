@@ -256,6 +256,27 @@ final class HandleEmailProviderEventAction
             'failure_reason' => $eventType === 'email.failed'
                 ? $this->nullableString(data_get($event, 'data.reason'))
                 : null,
+            'bounce' => $eventType === 'email.bounced'
+                ? $this->bounceEvidence($event)
+                : null,
+        ], static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);
+    }
+
+    /**
+     * Keep only the bounded provider evidence needed to explain a bounce.
+     *
+     * @param array<string, mixed> $event
+     * @return array<string, string>
+     */
+    private function bounceEvidence(array $event): array
+    {
+        return array_filter([
+            'type' => $this->nullableString(data_get($event, 'data.bounce.type')),
+            'subtype' => $this->nullableString(
+                data_get($event, 'data.bounce.subType')
+                    ?? data_get($event, 'data.bounce.subtype'),
+            ),
+            'message' => $this->nullableString(data_get($event, 'data.bounce.message')),
         ], static fn (mixed $value): bool => $value !== null && $value !== '');
     }
 

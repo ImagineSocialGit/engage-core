@@ -103,6 +103,11 @@ class MessageEventWebhookOwnershipTest extends TestCase
             'data' => [
                 'email_id' => 'email_bounce_1',
                 'to' => ['Person@Example.com'],
+                'bounce' => [
+                    'type' => 'Permanent',
+                    'subType' => 'General',
+                    'message' => 'The recipient does not exist.',
+                ],
             ],
         ], 'evt_bounce_message_events');
 
@@ -123,6 +128,16 @@ class MessageEventWebhookOwnershipTest extends TestCase
             'event_type' => 'email.bounced',
             'status' => 'completed',
         ]);
+        $suppression = MessageSuppression::query()
+            ->where('source_event_id', 'evt_bounce_message_events')
+            ->firstOrFail();
+
+        $this->assertSame('Permanent', data_get($suppression->meta, 'bounce.type'));
+        $this->assertSame('General', data_get($suppression->meta, 'bounce.subtype'));
+        $this->assertSame(
+            'The recipient does not exist.',
+            data_get($suppression->meta, 'bounce.message'),
+        );
     }
 
     public function test_resend_contact_updated_unsubscribe_revokes_marketing_email_permission(): void
