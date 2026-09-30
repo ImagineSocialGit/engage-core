@@ -152,6 +152,56 @@ class WebinarRegistrationConsentContentConfigTest extends TestCase
         );
     }
 
+    public function test_client_policy_may_disable_every_registration_consent_field(): void
+    {
+        Config::set('webinars.content', []);
+        Config::set('webinars.register.content', [
+            'registration' => [
+                'consents' => [
+                    'transactional' => [
+                        'email' => false,
+                        'sms' => false,
+                        'registration_grants' => [],
+                        'required_channels' => [],
+                    ],
+                    'marketing' => [
+                        'email' => false,
+                        'sms' => false,
+                    ],
+                ],
+                'consent_header' => [
+                    'enabled' => false,
+                ],
+                'fields' => [
+                    'first_name' => ['label' => 'First name'],
+                    'last_name' => ['label' => 'Last name'],
+                    'email' => ['label' => 'Email'],
+                    'phone' => ['label' => 'Phone'],
+                ],
+                'legal_links' => [
+                    'enabled' => false,
+                    'links' => [],
+                ],
+            ],
+        ]);
+        Config::set('webinars.register.no-consent-fields.content', []);
+
+        $resolved = app(WebinarRegisterPageConfig::class)->content(
+            page: 'register',
+            seriesSlug: 'no-consent-fields',
+        );
+
+        $this->assertRenderableRegistrationContract(
+            $resolved['registration'],
+            'client-controlled no-consent-fields contract',
+        );
+
+        $this->assertFalse(data_get($resolved, 'registration.consents.transactional.email'));
+        $this->assertFalse(data_get($resolved, 'registration.consents.transactional.sms'));
+        $this->assertFalse(data_get($resolved, 'registration.consents.marketing.email'));
+        $this->assertFalse(data_get($resolved, 'registration.consents.marketing.sms'));
+    }
+
     public function test_explicit_series_policy_can_allow_registration_copy_overrides(): void
     {
         Config::set('webinars.content', []);
@@ -250,12 +300,6 @@ class WebinarRegistrationConsentContentConfigTest extends TestCase
                 );
             }
         }
-
-        $this->assertTrue(
-            data_get($consents, 'transactional.email')
-                || data_get($consents, 'transactional.sms'),
-            "{$source}: at least one transactional consent field must be enabled.",
-        );
 
         if ($this->purposeEnabled($consents, 'transactional')) {
             $this->assertNonBlankString(

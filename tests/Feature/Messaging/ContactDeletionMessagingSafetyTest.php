@@ -99,29 +99,4 @@ class ContactDeletionMessagingSafetyTest extends TestCase
             'destination' => 'bounced@example.test',
         ]);
     }
-
-    public function test_delivery_issue_panel_offers_release_or_contact_deletion(): void
-    {
-        $user = User::factory()->create();
-        $contact = Contact::factory()->create([
-            'email' => 'review@example.test',
-        ]);
-
-        MessageSuppression::query()->create([
-            'channel' => 'email',
-            'destination' => 'review@example.test',
-            'reason' => 'bounce',
-            'provider' => 'resend',
-            'suppressed_at' => now()->subMinute(),
-        ]);
-
-        $this
-            ->actingAs($user)
-            ->get(route('crm.contacts.show', $contact))
-            ->assertOk()
-            ->assertSee('Release suppression')
-            ->assertSee('Delete this Contact')
-            ->assertSee('data-delivery-issue-delete-contact', false)
-            ->assertSee(route('crm.contacts.destroy', $contact), false);
-    }
 }

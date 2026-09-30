@@ -184,6 +184,7 @@ final class CampaignAllocationMessagePlanner
                 behaviorOwner: $assignment,
                 dedupeKey: 'campaign_allocation_assignment:'.(int) $assignment->getKey(),
                 meta: [
+                    'surface' => 'campaigns',
                     'campaign_key' => (string) $campaign->key,
                     'campaign_step_key' => (string) $step->key,
                     'campaign_allocation_run_id' => (int) $run->getKey(),

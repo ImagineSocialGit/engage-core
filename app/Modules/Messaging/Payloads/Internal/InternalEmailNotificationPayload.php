@@ -3,10 +3,11 @@
 namespace App\Modules\Messaging\Payloads\Internal;
 
 use App\Modules\Messaging\Contracts\Email\EmailMessage;
+use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Messaging\Services\Email\EmailViewRenderer;
 use App\Modules\Messaging\Services\MessageAttachmentRegistry;
 use App\Modules\Messaging\Support\MessageAttachmentReferences;
 use Illuminate\Mail\Mailable;
-use Illuminate\Support\Facades\View;
 use InvalidArgumentException;
 use Stringable;
 
@@ -154,15 +155,19 @@ class InternalEmailNotificationPayload implements EmailMessage
 
     private function html(): string
     {
-        return View::make('email', [
-            'subject' => $this->subject,
-            'headline' => $this->headline ?: $this->subject,
-            'preheader' => $this->preheader,
-            'body' => $this->body,
-            'details' => $this->details,
-            'cta' => $this->cta !== [] ? $this->cta : null,
-            'footer' => $this->footer ?: 'This is an internal notification from '.config('app.name').'.',
-        ])->render();
+        return app(EmailViewRenderer::class)->render(
+            view: 'email',
+            presentation: EmailPayload::PRESENTATION_STANDARD,
+            data: [
+                'subject' => $this->subject,
+                'headline' => $this->headline ?: $this->subject,
+                'preheader' => $this->preheader,
+                'body' => $this->body,
+                'details' => $this->details,
+                'cta' => $this->cta !== [] ? $this->cta : null,
+                'footer' => $this->footer ?: 'This is an internal notification from '.config('app.name').'.',
+            ],
+        );
     }
 
     private function fromAddress(): string

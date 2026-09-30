@@ -12,6 +12,7 @@ use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Modules\Messaging\Support\MessageMediaPayload;
 use App\Support\ModuleIntegrations\Messaging\Contracts\MessageMediaLibrary;
 use App\Modules\Messaging\Support\MessageAttachmentReferences;
+use App\Modules\Messaging\Services\Email\EmailViewRenderer;
 use App\Modules\Messaging\Services\MessageAttachmentRegistry;
 use App\Support\Clients\ViewResolver;
 use Illuminate\Mail\Mailable;
@@ -24,6 +25,10 @@ use Throwable;
 
 class EmailPayload implements EmailMessage, ThreadedEmailMessage
 {
+    public const PRESENTATION_CLIENT = 'client';
+
+    public const PRESENTATION_STANDARD = 'standard';
+
     private const DEFAULT_VIEW = 'email';
 
     public function __construct(
@@ -51,6 +56,7 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
         public readonly array $meta = [],
         public readonly ?string $inReplyTo = null,
         public readonly ?string $references = null,
+        public readonly string $presentation = self::PRESENTATION_CLIENT,
     ) {}
 
     public static function fromArray(array $payload): self
@@ -87,6 +93,8 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
             ),
 
             view: self::nullableString($payload['view'] ?? null),
+
+            presentation: self::presentation($payload['presentation'] ?? null),
 
             tokens: self::resolveTokens($payload),
 
@@ -223,9 +231,10 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
 
     public function html(): string
     {
-        $html = View::make(
-            ViewResolver::resolve($this->view()),
-            [
+        $html = app(EmailViewRenderer::class)->render(
+            view: $this->view(),
+            presentation: $this->presentation,
+            data: [
                 ...$this->tokens,
 
                 'subject' => $this->subject(),
@@ -256,8 +265,8 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
                 'unsubscribeUrl' => $this->marketingUnsubscribeUrl(),
 
                 'transactionalOptOutUrl' => $this->transactionalOptOutUrl(),
-            ]
-        )->render();
+            ],
+        );
 
         $mediaHtml = $this->mediaCardHtml();
         $html = str_replace('{media}', $mediaHtml, $html);
@@ -389,6 +398,7 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
             'subject' => $this->subject(),
             'text' => $this->text(),
             'view' => $this->view(),
+            'presentation' => $this->presentation,
             'cta' => $this->resolvedArray('cta', $this->cta),
             'ctas' => $this->resolvedListArray('ctas', $this->ctas),
             'secondary_link' => $this->resolvedArray('secondary_link', $this->secondaryLink),
@@ -883,6 +893,23 @@ class EmailPayload implements EmailMessage, ThreadedEmailMessage
     private static function nullableInt(mixed $value): ?int
     {
         return is_numeric($value) ? (int) $value : null;
+    }
+
+    private static function presentation(mixed $value): string
+    {
+        $presentation = self::nullableString($value)
+            ?? self::PRESENTATION_CLIENT;
+
+        if (! in_array($presentation, [
+            self::PRESENTATION_CLIENT,
+            self::PRESENTATION_STANDARD,
+        ], true)) {
+            throw new InvalidArgumentException(
+                "Unsupported email presentation [{$presentation}].",
+            );
+        }
+
+        return $presentation;
     }
 
     private static function nullableString(mixed $value): ?string

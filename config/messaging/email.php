@@ -19,6 +19,25 @@ return [
         'max_total_bytes' => (int) env('EMAIL_ATTACHMENT_MAX_TOTAL_BYTES', 15728640),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | HTML presentation
+    |--------------------------------------------------------------------------
+    |
+    | client   = allow the selected client's semantic email view override.
+    | standard = render the Core email view directly, bypassing client branding.
+    |
+    | Surface overrides are intentionally presentation-only. They do not change
+    | message content, consent, delivery, timing, or module ownership.
+    |
+    */
+    'presentation' => [
+        'default' => 'client',
+        'surfaces' => [
+            'internal_notifications' => 'standard',
+        ],
+    ],
+
     'inbound_domain' => env('INBOUND_EMAIL_DOMAIN'),
 
     'from' => [

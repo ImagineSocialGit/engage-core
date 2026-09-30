@@ -9,6 +9,7 @@ use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\MessageTemplateVersion;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Models\ScheduledMessageRenderContext;
+use App\Modules\Messaging\Services\Email\EmailPresentationResolver;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 use JsonException;
@@ -23,6 +24,7 @@ class ScheduledMessagePayloadResolver
         private readonly MessageTokenFallbackResolver $tokenFallbackResolver,
         private readonly ScheduledMessageContentEditor $contentEditor,
         private readonly CampaignEmailFooter $campaignEmailFooter,
+        private readonly EmailPresentationResolver $emailPresentationResolver,
     ) {}
 
     /**
@@ -35,6 +37,10 @@ class ScheduledMessagePayloadResolver
         $payloadData = $scheduledMessage->message_template_version_id === null
             ? $this->legacyPayloadData($scheduledMessage, $runtimePayloadOverlay)
             : $this->versionedPayloadData($scheduledMessage, $runtimePayloadOverlay);
+        $payloadData = $this->emailPresentationResolver->apply(
+            message: $scheduledMessage,
+            payload: $payloadData,
+        );
 
         return $this->instantiatePayload(
             scheduledMessage: $scheduledMessage,

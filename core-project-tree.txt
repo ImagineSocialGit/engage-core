@@ -1281,7 +1281,9 @@
 │   │   │   │   │   ├── EmailDomainHealthChecker.php
 │   │   │   │   │   ├── EmailHygieneService.php
 │   │   │   │   │   ├── EmailMessagingService.php
-│   │   │   │   │   └── EmailProviderManager.php
+│   │   │   │   │   ├── EmailPresentationResolver.php
+│   │   │   │   │   ├── EmailProviderManager.php
+│   │   │   │   │   └── EmailViewRenderer.php
 │   │   │   │   ├── MessageAttachmentAuthoringService.php
 │   │   │   │   ├── MessageAttachmentRegistry.php
 │   │   │   │   ├── MessageChainContinuationRegistry.php
@@ -3677,6 +3679,7 @@
 │   │   │   ├── EmailOpenEvidenceTest.php
 │   │   │   ├── EmailPayloadMediaTest.php
 │   │   │   ├── EmailPayloadTest.php
+│   │   │   ├── EmailPresentationPolicyTest.php
 │   │   │   ├── EmailReplyAddressGeneratorTest.php
 │   │   │   ├── FlowRouteReusableMessageTemplateAuthoringTest.php
 │   │   │   ├── GenericMessageAttachmentsTest.php
@@ -4038,4 +4041,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-895 directories, 3144 files
+895 directories, 3147 files
