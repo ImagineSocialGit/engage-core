@@ -704,13 +704,16 @@ Planned universal modules include:
 
 - `Events`
 
-Current vertical modules include:
+Current in-repository vertical modules include:
 
 - `Mortgage`
 
-Planned vertical modules include:
+Current installable vertical packages include:
 
 - `PetServices`
+
+Planned verticals include:
+
 - `Music`
 - `Experiences`
 
@@ -736,6 +739,8 @@ Zoom, or another existing adapter merely for directory symmetry.
 Adapters are not modules. The owning module keeps provider-neutral contracts, managers,
 resolvers, DTOs, domain state, and public outcomes. A provider package implements those
 seams and registers itself through the shared integration-registration/bootstrap layer.
+
+Vertical packages are different from provider-adapter packages. A vertical package may contribute a real module definition, module-owned migration scope, runtime module provider, and vertical-specific adapters through the selected-client package manifest. Installing the Composer package makes that module available; selected-client module configuration still decides whether it is enabled. Engage Core should not accumulate vertical-specific runtime classes merely so every checkout can potentially enable a vertical later.
 
 ## How to Add a Universal Module
 

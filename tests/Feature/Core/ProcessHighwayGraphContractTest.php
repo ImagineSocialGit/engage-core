@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Core;
 
+use App\Support\Clients\ClientPackageManifest;
+use App\Support\Clients\ClientPackageRuntime;
 use App\Support\ProcessHighway\Contracts\ProcessHighwayContributor;
 use App\Support\ProcessHighway\Data\ProcessHighwayAuthority;
 use App\Support\ProcessHighway\Data\ProcessHighwayContribution;
@@ -285,11 +287,127 @@ class ProcessHighwayGraphContractTest extends TestCase
         ]);
     }
 
+
+    public function test_package_contributed_module_can_own_process_highway_authority(): void
+    {
+        ClientPackageRuntime::replace(new ClientPackageManifest(
+            moduleDefinitions: [
+                'fixture_vertical' => [
+                    'name' => 'Fixture Vertical',
+                    'depends_on' => ['core'],
+                    'providers' => [],
+                ],
+            ],
+        ));
+
+        try {
+            $segmentKey = ProcessHighwaySemanticKey::campaign('package_vertical');
+            $target = ProcessHighwayEditTarget::link(
+                ownerKey: 'fixture_vertical',
+                label: 'Edit fixture vertical',
+                url: '/fixture-vertical/1',
+                resourceType: 'fixture_vertical_record',
+                resourceKey: '1',
+            );
+            $authority = new ProcessHighwayAuthority('fixture_vertical', [$target]);
+            $contribution = new ProcessHighwayContribution(
+                sourceKey: 'fixture_vertical',
+                key: $segmentKey,
+                name: 'Fixture Vertical',
+                description: 'Package-owned process.',
+                subjectKey: 'contacts',
+                lane: ProcessHighwayLane::standard(),
+                mechanismNodeKey: $segmentKey,
+                authority: $authority,
+                nodes: [
+                    new ProcessHighwayNode(
+                        key: $segmentKey,
+                        label: 'Fixture Vertical',
+                        role: ProcessHighwayNode::ROLE_PROCESS,
+                        authority: $authority,
+                    ),
+                ],
+                edges: [],
+                entryNodeKeys: [$segmentKey],
+                exitNodeKeys: [$segmentKey],
+            );
+
+            $graph = app(ProcessHighwayGraphComposer::class)->compose([
+                $this->contributor([$contribution]),
+            ]);
+
+            $this->assertSame(
+                'fixture_vertical',
+                $graph['nodes'][0]['authority']['owner_key'],
+            );
+        } finally {
+            ClientPackageRuntime::reset();
+        }
+    }
+
     /** @param array<int, ProcessHighwayContribution> $contributions */
     private function contributor(array $contributions): ProcessHighwayContributor
     {
         return new class($contributions) implements ProcessHighwayContributor {
-            /** @param array<int, ProcessHighwayContribution> $contributions */
+        
+    public function test_package_contributed_module_can_own_process_highway_authority(): void
+    {
+        ClientPackageRuntime::replace(new ClientPackageManifest(
+            moduleDefinitions: [
+                'fixture_vertical' => [
+                    'name' => 'Fixture Vertical',
+                    'depends_on' => ['core'],
+                    'providers' => [],
+                ],
+            ],
+        ));
+
+        try {
+            $segmentKey = ProcessHighwaySemanticKey::campaign('package_vertical');
+            $target = ProcessHighwayEditTarget::link(
+                ownerKey: 'fixture_vertical',
+                label: 'Edit fixture vertical',
+                url: '/fixture-vertical/1',
+                resourceType: 'fixture_vertical_record',
+                resourceKey: '1',
+            );
+            $authority = new ProcessHighwayAuthority('fixture_vertical', [$target]);
+            $contribution = new ProcessHighwayContribution(
+                sourceKey: 'fixture_vertical',
+                key: $segmentKey,
+                name: 'Fixture Vertical',
+                description: 'Package-owned process.',
+                subjectKey: 'contacts',
+                lane: ProcessHighwayLane::standard(),
+                mechanismNodeKey: $segmentKey,
+                authority: $authority,
+                nodes: [
+                    new ProcessHighwayNode(
+                        key: $segmentKey,
+                        label: 'Fixture Vertical',
+                        role: ProcessHighwayNode::ROLE_PROCESS,
+                        authority: $authority,
+                    ),
+                ],
+                edges: [],
+                entryNodeKeys: [$segmentKey],
+                exitNodeKeys: [$segmentKey],
+            );
+
+            $graph = app(ProcessHighwayGraphComposer::class)->compose([
+                $this->contributor([$contribution]),
+            ]);
+
+            $this->assertSame(
+                'fixture_vertical',
+                $graph['nodes'][0]['authority']['owner_key'],
+            );
+        } finally {
+            ClientPackageRuntime::reset();
+        }
+    }
+
+    /** @param array<int, ProcessHighwayContribution> $contributions */
             public function __construct(
                 private readonly array $contributions,
             ) {}

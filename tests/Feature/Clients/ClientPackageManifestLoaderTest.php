@@ -48,15 +48,22 @@ class ClientPackageManifestLoaderTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_manifest_loads_client_composer_autoloader_provider_and_environment_definitions(): void
+    public function test_manifest_loads_provider_environment_module_and_migration_contributions(): void
     {
         $clientDirectory = $this->clientDirectory();
+        $migrationDirectory = $clientDirectory
+            .'/vendor/imagine-social/fixture-vertical/database/migrations';
+
         mkdir($clientDirectory.'/config', 0777, true);
-        mkdir($clientDirectory.'/vendor', 0777, true);
+        mkdir($migrationDirectory, 0777, true);
 
         file_put_contents(
             $clientDirectory.'/vendor/autoload.php',
             "<?php\n\$GLOBALS['engage_client_package_autoload_loaded'] = true;\n",
+        );
+        file_put_contents(
+            $migrationDirectory.'/2099_01_01_000000_create_fixture_vertical_records.php',
+            "<?php\nreturn new class extends \\Illuminate\\Database\\Migrations\\Migration { public function up(): void {} public function down(): void {} };\n",
         );
 
         file_put_contents(
@@ -73,6 +80,20 @@ class ClientPackageManifestLoaderTest extends TestCase
                     'CLIENT_PACKAGE_FIXTURE_REGION' => [
                         'owner' => 'fixture-package',
                         'secret' => false,
+                    ],
+                ],
+                'modules' => [
+                    'fixture_vertical' => [
+                        'name' => 'Fixture Vertical',
+                        'depends_on' => ['core'],
+                        'providers' => [
+                            ClientPackageManifestLoaderFixtureProvider::class,
+                        ],
+                    ],
+                ],
+                'migrations' => [
+                    'fixture_vertical' => [
+                        'path' => 'vendor/imagine-social/fixture-vertical/database/migrations',
                     ],
                 ],
             ], true).';',
@@ -106,6 +127,23 @@ class ClientPackageManifestLoaderTest extends TestCase
         $this->assertFalse(
             $definitions['CLIENT_PACKAGE_FIXTURE_REGION']->secret,
         );
+
+        $this->assertSame(
+            [
+                'name' => 'Fixture Vertical',
+                'depends_on' => ['core'],
+                'providers' => [ClientPackageManifestLoaderFixtureProvider::class],
+                'preset_contributors' => [],
+                'message_template_definition_contributors' => [],
+            ],
+            $manifest->moduleDefinitions()['fixture_vertical'],
+        );
+        $this->assertSame(
+            [
+                'path' => 'client/acme/vendor/imagine-social/fixture-vertical/database/migrations',
+            ],
+            $manifest->migrationScopes()['fixture_vertical'],
+        );
     }
 
     public function test_manifest_rejects_provider_registration_without_installed_client_composer_dependencies(): void
@@ -125,9 +163,102 @@ class ClientPackageManifestLoaderTest extends TestCase
         $this->selectClient('acme');
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage(
-            'declares providers but Composer dependencies are not installed',
+        $this->expectExceptionMessage('Composer dependencies');
+
+        (new ClientPackageManifestLoader())->load($this->root);
+    }
+
+    public function test_manifest_rejects_always_on_package_modules(): void
+    {
+        $clientDirectory = $this->clientDirectory();
+        mkdir($clientDirectory.'/config', 0777, true);
+        mkdir($clientDirectory.'/vendor', 0777, true);
+        file_put_contents($clientDirectory.'/vendor/autoload.php', "<?php\n");
+
+        file_put_contents(
+            $clientDirectory.'/config/client_packages.php',
+            '<?php return '.var_export([
+                'modules' => [
+                    'fixture_vertical' => [
+                        'name' => 'Fixture Vertical',
+                        'always_on' => true,
+                        'depends_on' => ['core'],
+                        'providers' => [
+                            ClientPackageManifestLoaderFixtureProvider::class,
+                        ],
+                    ],
+                ],
+            ], true).';',
         );
+
+        $this->selectClient('acme');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('cannot be always_on');
+
+        (new ClientPackageManifestLoader())->load($this->root);
+    }
+
+    public function test_manifest_rejects_package_migration_for_undeclared_module(): void
+    {
+        $clientDirectory = $this->clientDirectory();
+        $migrationDirectory = $clientDirectory
+            .'/vendor/imagine-social/fixture-vertical/database/migrations';
+
+        mkdir($clientDirectory.'/config', 0777, true);
+        mkdir($migrationDirectory, 0777, true);
+        file_put_contents($clientDirectory.'/vendor/autoload.php', "<?php\n");
+
+        file_put_contents(
+            $clientDirectory.'/config/client_packages.php',
+            '<?php return '.var_export([
+                'migrations' => [
+                    'fixture_vertical' => [
+                        'path' => 'vendor/imagine-social/fixture-vertical/database/migrations',
+                    ],
+                ],
+            ], true).';',
+        );
+
+        $this->selectClient('acme');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('must belong to a module declared by the same package manifest');
+
+        (new ClientPackageManifestLoader())->load($this->root);
+    }
+
+    public function test_manifest_rejects_package_migration_path_traversal(): void
+    {
+        $clientDirectory = $this->clientDirectory();
+        mkdir($clientDirectory.'/config', 0777, true);
+        mkdir($clientDirectory.'/vendor', 0777, true);
+        file_put_contents($clientDirectory.'/vendor/autoload.php', "<?php\n");
+
+        file_put_contents(
+            $clientDirectory.'/config/client_packages.php',
+            '<?php return '.var_export([
+                'modules' => [
+                    'fixture_vertical' => [
+                        'name' => 'Fixture Vertical',
+                        'depends_on' => ['core'],
+                        'providers' => [
+                            ClientPackageManifestLoaderFixtureProvider::class,
+                        ],
+                    ],
+                ],
+                'migrations' => [
+                    'fixture_vertical' => [
+                        'path' => 'vendor/imagine-social/fixture-vertical/../outside/database/migrations',
+                    ],
+                ],
+            ], true).';',
+        );
+
+        $this->selectClient('acme');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('normalized package-relative directory');
 
         (new ClientPackageManifestLoader())->load($this->root);
     }

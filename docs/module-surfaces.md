@@ -283,7 +283,7 @@ This registry records the current product direction. Reclassification requires a
 | Relationships | universal | loud | Provide relationship-scoped Contact workspaces; normal daily lists must not mix materially different relationship populations. |
 | Events | universal | loud | Provide concrete Event catalog, readiness, lifecycle, and attendance workflows. |
 | Mortgage | vertical | loud | Provide mortgage-specific records, workflow meaning, and operations. |
-| PetServices | vertical | loud | Provide pet-service-specific records, workflows, and operations when implemented. |
+| PetServices | installable vertical package | loud | Provide pet-service-specific records, workflows, and operations only for clients that install and enable the package. |
 | Music | vertical | loud | Provide music-specific records, workflows, and operations when implemented. |
 | Experiences | vertical | loud | Provide post-purchase package management, participants, credentials, scanning, and fulfillment when implemented. |
 

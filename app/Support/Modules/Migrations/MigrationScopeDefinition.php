@@ -112,32 +112,40 @@ final readonly class MigrationScopeDefinition
 
         $path = trim($path);
 
-        if (! self::validPath($path)) {
+        $pathKind = self::pathKind($path);
+
+        if ($pathKind === null) {
             throw new InvalidArgumentException(
-                "Migration scope [{$key}] path must be a normalized repository-relative directory under database/migrations.",
+                "Migration scope [{$key}] path must be a normalized repository-relative directory under database/migrations or a selected-client package migration directory under client/{CLIENT_KEY}/vendor.",
             );
         }
 
-        $migrationsRoot = realpath(database_path('migrations'));
         $absolutePath = realpath(base_path($path));
 
-        if (! is_string($migrationsRoot)
-            || ! is_string($absolutePath)
-            || ! is_dir($absolutePath)
-        ) {
+        if (! is_string($absolutePath) || ! is_dir($absolutePath)) {
             throw new InvalidArgumentException(
                 "Migration scope [{$key}] directory [{$path}] does not exist.",
             );
         }
 
-        $rootPrefix = rtrim($migrationsRoot, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
+        if ($pathKind === 'repository') {
+            $migrationsRoot = realpath(database_path('migrations'));
 
-        if ($absolutePath !== $migrationsRoot
-            && ! str_starts_with($absolutePath, $rootPrefix)
-        ) {
-            throw new InvalidArgumentException(
-                "Migration scope [{$key}] path must resolve beneath database/migrations.",
-            );
+            if (! is_string($migrationsRoot)) {
+                throw new InvalidArgumentException(
+                    'Engage migration root [database/migrations] does not exist.',
+                );
+            }
+
+            $rootPrefix = rtrim($migrationsRoot, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
+
+            if ($absolutePath !== $migrationsRoot
+                && ! str_starts_with($absolutePath, $rootPrefix)
+            ) {
+                throw new InvalidArgumentException(
+                    "Migration scope [{$key}] path must resolve beneath database/migrations.",
+                );
+            }
         }
 
         $discovered = glob($absolutePath.DIRECTORY_SEPARATOR.'*.php');
@@ -189,7 +197,7 @@ final readonly class MigrationScopeDefinition
         );
     }
 
-    private static function validPath(string $path): bool
+    private static function pathKind(string $path): ?string
     {
         if ($path === ''
             || str_contains($path, '\\')
@@ -197,12 +205,23 @@ final readonly class MigrationScopeDefinition
             || str_contains($path, '//')
             || str_ends_with($path, '/')
         ) {
-            return false;
+            return null;
         }
 
-        return preg_match(
+        if (preg_match(
             '/^database\/migrations(?:\/[a-z0-9_-]+)+$/D',
             $path,
-        ) === 1;
+        ) === 1) {
+            return 'repository';
+        }
+
+        if (preg_match(
+            '/^client\/[a-z0-9][a-z0-9_-]*\/vendor\/[a-z0-9][a-z0-9_.-]*\/[a-z0-9][a-z0-9_.-]*\/database\/migrations(?:\/[a-z0-9_-]+)*$/D',
+            $path,
+        ) === 1) {
+            return 'client_package';
+        }
+
+        return null;
     }
 }

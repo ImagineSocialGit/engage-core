@@ -245,15 +245,15 @@ Vertical modules should not push domain-specific fields into Core contacts.
 
 ### Current vertical modules
 
-| Module | Surface | Responsibility |
-| --- | --- | --- |
-| Mortgage | Loud | Mortgage stages, contact mortgage profiles, mortgage-specific state, LOS/domain-specific behavior, and mortgage presets. |
+| Module | Distribution | Surface | Responsibility |
+| --- | --- | --- | --- |
+| Mortgage | Engage Core repository | Loud | Mortgage stages, contact mortgage profiles, mortgage-specific state, LOS/domain-specific behavior, and mortgage presets. |
+| PetServices | Installable selected-client Composer package | Loud | Pets/dogs, pet profiles, training goals, behavior notes, and pet-service-specific rules/workflows. Optional horizontal integrations remain package-owned and register through Core seams. |
 
 ### Planned vertical modules
 
 | Module | Surface | Responsibility | Universal modules it likely consumes |
 | --- | --- | --- | --- |
-| PetServices | Loud | Pets/dogs, pet profiles, training goals, training programs, behavior notes, and pet-service-specific rules/workflows. | Scheduling, Portal, Forms, Documents, Tasks, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Reporting. |
 | Music | Loud | Artist/show associations, music-specific fan/customer meaning, release/fan strategy, lineup/setlist/tour context, Bandsintown mapping, and music-specific segmentation/presets. | Events, Commerce, Experiences, Messaging, Campaigns, Broadcasts, FlowRoutes, Tasks, Location, Scheduling, Portal, Reporting. |
 | Experiences | Loud | Post-purchase special-access packages, entitlements, participants, benefits, management access, credentials, scanning, check-in, manifests, and Experience benefit fulfillment. | Core, Events, Commerce, plus optional Messaging, Tasks, FlowRoutes, InternalNotifications, Location, and Reporting. |
 

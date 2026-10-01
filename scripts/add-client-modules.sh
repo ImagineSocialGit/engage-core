@@ -3,7 +3,7 @@
 set -euo pipefail
 
 usage() {
-  cat <<'EOF'
+  cat <<'EOF_USAGE'
 Usage:
   ./scripts/add-client-modules.sh client-key module [module ...]
   ./scripts/add-client-modules.sh client-key --list
@@ -20,10 +20,12 @@ Options:
 
 Notes:
   - Core/always-on modules are never written to the client's enabled list.
+  - Installed selected-client package modules are included when client_packages.php
+    declares them and the selected client's Composer dependencies are installed.
   - Required provider dependencies are resolved by ModuleManager at runtime.
   - This command changes source config only. Runtime/provider readiness is checked
     later by the deployment plan and staging/production launcher.
-EOF
+EOF_USAGE
 }
 
 fail() {
@@ -90,6 +92,8 @@ CLIENT_DIR="$ROOT_DIR/client/$CLIENT_KEY"
 CLIENT_CONFIG="$CLIENT_DIR/config/client.php"
 MODULES_FILE="$CLIENT_DIR/config/modules.php"
 ROOT_MODULES_FILE="$ROOT_DIR/config/modules.php"
+CLIENT_PACKAGE_MANIFEST="$CLIENT_DIR/config/client_packages.php"
+CLIENT_PACKAGE_AUTOLOAD="$CLIENT_DIR/vendor/autoload.php"
 RESULT_FILE="$(mktemp)"
 
 cleanup() {
@@ -126,6 +130,10 @@ trap cleanup EXIT
 [[ -f "$MODULES_FILE" ]] || fail "Client modules config does not exist: $MODULES_FILE"
 [[ -f "$ROOT_MODULES_FILE" ]] || fail "Root module config does not exist: $ROOT_MODULES_FILE"
 
+if [[ -f "$CLIENT_PACKAGE_MANIFEST" && ! -f "$CLIENT_PACKAGE_AUTOLOAD" ]]; then
+  fail "Client package manifest exists but selected-client Composer dependencies are not installed: $CLIENT_PACKAGE_AUTOLOAD"
+fi
+
 if [[ "$LIST_ONLY" == false && "$DRY_RUN" == false ]]; then
   normalize_modules_source_permissions
 fi
@@ -136,6 +144,8 @@ $clientKey = (string) array_shift($argv);
 $rootModulesFile = (string) array_shift($argv);
 $clientConfigFile = (string) array_shift($argv);
 $modulesFile = (string) array_shift($argv);
+$clientPackageManifest = (string) array_shift($argv);
+$clientPackageAutoload = (string) array_shift($argv);
 $resultFile = (string) array_shift($argv);
 $dryRun = ((string) array_shift($argv)) === "1";
 $listOnly = ((string) array_shift($argv)) === "1";
@@ -160,6 +170,51 @@ $definitions = $rootConfig["modules"] ?? null;
 if (! is_array($definitions) || $definitions === []) {
     fwrite(STDERR, "Root module definitions are missing.\n");
     exit(1);
+}
+
+if (is_file($clientPackageManifest)) {
+    if (! is_file($clientPackageAutoload) || ! is_readable($clientPackageAutoload)) {
+        fwrite(
+            STDERR,
+            "Selected-client Composer dependencies must be installed before package modules can be edited.\n"
+        );
+        exit(1);
+    }
+
+    require_once $clientPackageAutoload;
+
+    $packageManifest = require $clientPackageManifest;
+
+    if (! is_array($packageManifest)) {
+        fwrite(STDERR, "Client package manifest must return an array.\n");
+        exit(1);
+    }
+
+    $packageDefinitions = $packageManifest["modules"] ?? [];
+
+    if (! is_array($packageDefinitions)) {
+        fwrite(STDERR, "Client package manifest modules must be an array.\n");
+        exit(1);
+    }
+
+    foreach ($packageDefinitions as $moduleKey => $definition) {
+        if (! is_string($moduleKey) || trim($moduleKey) === "" || ! is_array($definition)) {
+            fwrite(STDERR, "Client package manifest contains an invalid module definition.\n");
+            exit(1);
+        }
+
+        $moduleKey = trim($moduleKey);
+
+        if (array_key_exists($moduleKey, $definitions)) {
+            fwrite(
+                STDERR,
+                "Client package module conflicts with an Engage Core module key: {$moduleKey}\n"
+            );
+            exit(1);
+        }
+
+        $definitions[$moduleKey] = $definition;
+    }
 }
 
 $alwaysOn = [];
@@ -348,6 +403,8 @@ file_put_contents($resultFile, json_encode([
   "$ROOT_MODULES_FILE" \
   "$CLIENT_CONFIG" \
   "$MODULES_FILE" \
+  "$CLIENT_PACKAGE_MANIFEST" \
+  "$CLIENT_PACKAGE_AUTOLOAD" \
   "$RESULT_FILE" \
   "$([[ "$DRY_RUN" == true ]] && echo 1 || echo 0)" \
   "$([[ "$LIST_ONLY" == true ]] && echo 1 || echo 0)" \

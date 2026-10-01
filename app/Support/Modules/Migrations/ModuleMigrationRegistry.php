@@ -2,6 +2,7 @@
 
 namespace App\Support\Modules\Migrations;
 
+use App\Support\Clients\ClientPackageRuntime;
 use App\Support\Modules\ModuleManager;
 use InvalidArgumentException;
 
@@ -95,6 +96,26 @@ final class ModuleMigrationRegistry
                 'module_migrations.modules must be an array.',
             );
         }
+
+        $packageDefinitions = ClientPackageRuntime::manifest()->migrationScopes();
+        $collisions = array_values(array_intersect(
+            array_keys($moduleDefinitions),
+            array_keys($packageDefinitions),
+        ));
+
+        if ($collisions !== []) {
+            sort($collisions, SORT_STRING);
+
+            throw new InvalidArgumentException(sprintf(
+                'Selected client package migration scope(s) conflict with Engage Core migration scope key(s): [%s].',
+                implode(', ', $collisions),
+            ));
+        }
+
+        $moduleDefinitions = [
+            ...$moduleDefinitions,
+            ...$packageDefinitions,
+        ];
 
         $definitions = [
             'platform' => MigrationScopeDefinition::platform($platform),

@@ -2,7 +2,9 @@
 
 namespace App\Support\Modules;
 
+use App\Support\Clients\ClientPackageRuntime;
 use Illuminate\Support\Arr;
+use InvalidArgumentException;
 use Illuminate\Support\Facades\Route;
 
 class ModuleManager
@@ -74,8 +76,10 @@ class ModuleManager
      */
     public function dependencies(string $key): array
     {
+        $definition = $this->definitions()[$key] ?? [];
+
         return array_values(array_filter(
-            Arr::wrap(config("modules.modules.{$key}.depends_on", [])),
+            Arr::wrap(is_array($definition) ? ($definition['depends_on'] ?? []) : []),
             fn (mixed $dependency): bool => is_string($dependency) && $dependency !== '',
         ));
     }
@@ -90,9 +94,27 @@ class ModuleManager
      */
     public function definitions(): array
     {
-        $definitions = config('modules.modules', []);
+        $configured = config('modules.modules', []);
+        $configured = is_array($configured) ? $configured : [];
+        $package = ClientPackageRuntime::manifest()->moduleDefinitions();
+        $collisions = array_values(array_intersect(
+            array_keys($configured),
+            array_keys($package),
+        ));
 
-        return is_array($definitions) ? $definitions : [];
+        if ($collisions !== []) {
+            sort($collisions, SORT_STRING);
+
+            throw new InvalidArgumentException(sprintf(
+                'Selected client package module definition(s) conflict with Engage Core module key(s): [%s].',
+                implode(', ', $collisions),
+            ));
+        }
+
+        return [
+            ...$configured,
+            ...$package,
+        ];
     }
 
     /**
@@ -398,8 +420,10 @@ class ModuleManager
      */
     public function providers(string $key): array
     {
+        $definition = $this->definitions()[$key] ?? [];
+
         return array_values(array_filter(
-            Arr::wrap(config("modules.modules.{$key}.providers", [])),
+            Arr::wrap(is_array($definition) ? ($definition['providers'] ?? []) : []),
             fn (mixed $provider): bool => is_string($provider) && $provider !== '',
         ));
     }

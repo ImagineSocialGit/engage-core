@@ -11,8 +11,6 @@ docs/modules/<module>/TODO.md            # only while actionable backlog exists
 
 `TODO.md` is disposable module-owned backlog. Delete completed items instead of turning it into release history. Do not create an empty TODO merely for symmetry.
 
-Module documentation must remain client-neutral. Describe reusable module behavior, ownership, seams, and generic configuration rules. Do not make a named client's current copy, domain, counts, rollout status, or configuration choices part of a module contract. Client-specific implementation truth belongs in `client/<client-key>/` source or client-owned rollout tracking; examples in durable module docs should use generic placeholders.
-
 Use `../module-boundaries.md` for platform-wide ownership/dependency rules, `../module-surfaces.md` for loud/silent product-surface rules, and `../TODO.md` only for backlog that genuinely has no single module owner.
 
 ## Module index
@@ -40,9 +38,10 @@ Use `../module-boundaries.md` for platform-wide ownership/dependency rules, `../
 | Relationships | Universal; loud | `relationships/module_state.md` |
 | Events | Planned universal; loud | `events/module_state.md` |
 | Mortgage | Current vertical; loud | `mortgage/module_state.md` |
-| PetServices | Planned vertical; loud | `pet-services/module_state.md` |
 | Music | Planned vertical; loud | `music/module_state.md` |
 | Experiences | Planned vertical; loud | `experiences/module_state.md` |
+
+Installable vertical packages such as PetServices own their module documentation in the package repository. When installed for a selected client, they may contribute real module definitions and migration scopes through `client/{CLIENT_KEY}/config/client_packages.php`; they are intentionally absent from Engage Core when the package is not installed.
 
 Integrations/adapters are not modules and do not receive independent product surfaces by default.
 

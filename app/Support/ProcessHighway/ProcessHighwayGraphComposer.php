@@ -9,6 +9,7 @@ use App\Support\ProcessHighway\Data\ProcessHighwayEdge;
 use App\Support\ProcessHighway\Data\ProcessHighwayEditTarget;
 use App\Support\ProcessHighway\Data\ProcessHighwayLane;
 use App\Support\ProcessHighway\Data\ProcessHighwayNode;
+use App\Support\Modules\ModuleManager;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -17,6 +18,7 @@ final class ProcessHighwayGraphComposer
 {
     public function __construct(
         private readonly ProcessHighwayMapBuilder $mapBuilder,
+        private readonly ModuleManager $modules,
     ) {}
 
     /**
@@ -334,7 +336,7 @@ final class ProcessHighwayGraphComposer
             );
         }
 
-        if (! is_array(config("modules.modules.{$authority->ownerKey}"))) {
+        if (! $this->modules->known($authority->ownerKey)) {
             throw new InvalidArgumentException(sprintf(
                 'Process Highway %s owner module [%s] is not registered.',
                 $context,
@@ -377,7 +379,7 @@ final class ProcessHighwayGraphComposer
                 );
             }
 
-            if (! is_array(config("modules.modules.{$target->ownerKey}"))) {
+            if (! $this->modules->known($target->ownerKey)) {
                 throw new InvalidArgumentException(sprintf(
                     'Process Highway %s edit target owner module [%s] is not registered.',
                     $context,

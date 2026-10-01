@@ -36,8 +36,10 @@ return [
     | client/{client-key}/config/modules.php
     |
     | This is product/onboarding configuration, not a client-facing feature
-    | toggle system. Core owns installed module definitions. The selected client
-    | owns its explicit runtime-enabled module list in client config.
+    | toggle system. Core owns built-in module definitions; selected-client
+    | Composer packages may contribute additional installed module definitions.
+    | The selected client owns its explicit runtime-enabled module list in client
+    | config. Installing a package does not enable its contributed module.
     |
     | Core is always treated as enabled by ModuleManager.
     |
