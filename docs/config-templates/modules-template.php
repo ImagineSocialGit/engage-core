@@ -16,7 +16,6 @@ use App\Modules\Media\Providers\MediaModuleServiceProvider;
 use App\Modules\Messaging\Providers\MessagingModuleServiceProvider;
 use App\Modules\Mortgage\Providers\MortgageModuleServiceProvider;
 use App\Modules\Portal\Providers\PortalModuleServiceProvider;
-use App\Modules\PetServices\Providers\PetServicesModuleServiceProvider;
 use App\Modules\Relationships\Providers\RelationshipsModuleServiceProvider;
 use App\Modules\Reporting\Providers\ReportingModuleServiceProvider;
 use App\Modules\Scheduling\Providers\SchedulingModuleServiceProvider;
@@ -337,14 +336,6 @@ return [
             'depends_on' => ['relationships'],
             'providers' => [
                 MortgageModuleServiceProvider::class,
-            ],
-        ],
-
-        'pet_services' => [
-            'name' => 'Pet Services',
-            'depends_on' => ['core'],
-            'providers' => [
-                PetServicesModuleServiceProvider::class,
             ],
         ],
 
