@@ -13,6 +13,7 @@ use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Services\Availability\BookingOccupancyResolver;
 use App\Modules\Scheduling\Services\Availability\ResourceOccupancyResolver;
+use App\Modules\Scheduling\Services\BookableServiceBookingRuleGuard;
 use App\Modules\Scheduling\Services\SchedulingDurationResolver;
 use App\Modules\Scheduling\Services\SchedulingLocationSnapshotResolver;
 use Carbon\CarbonImmutable;
@@ -31,6 +32,7 @@ class CreateAppointmentAction
         private readonly TransitionAppointmentStatusAction $lifecycle,
         private readonly SchedulingLocationSnapshotResolver $locations,
         private readonly SchedulingDurationResolver $durations,
+        private readonly BookableServiceBookingRuleGuard $bookingRules,
     ) {}
 
     public function handle(AppointmentCreationData $data): Appointment
@@ -76,6 +78,11 @@ class CreateAppointmentAction
                     host: $host,
                 );
                 $evaluatedAt = CarbonImmutable::now('UTC');
+                $this->bookingRules->assertSatisfied(
+                    service: $service,
+                    booking: $data->booking,
+                    evaluatedAt: $evaluatedAt,
+                );
                 $endsAt = $this->durations->resolveEndsAt(
                     service: $service,
                     startsAt: $data->startsAt,

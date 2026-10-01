@@ -16,6 +16,7 @@ return new class extends Migration
             $table->text('description')->nullable();
 
             $table->string('status')->default('active')->index();
+            $table->string('booking_subject_key', 64)->default('generic')->index();
 
             $table->string('duration_mode')->default('fixed')->index();
             $table->unsignedInteger('duration_minutes');

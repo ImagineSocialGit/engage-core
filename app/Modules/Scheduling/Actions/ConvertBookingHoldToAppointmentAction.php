@@ -11,6 +11,7 @@ use App\Modules\Scheduling\Models\BookableSlotOffer;
 use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Services\Availability\ResourceOccupancyResolver;
+use App\Modules\Scheduling\Services\BookableServiceBookingRuleGuard;
 use Carbon\CarbonImmutable;
 use Closure;
 use DomainException;
@@ -24,6 +25,7 @@ class ConvertBookingHoldToAppointmentAction
         private readonly TransitionAppointmentStatusAction $lifecycle,
         private readonly ResourceOccupancyResolver $resourceOccupancy,
         private readonly ClaimSchedulingBookingOfferAction $claimBookingOffer,
+        private readonly BookableServiceBookingRuleGuard $bookingRules,
     ) {}
 
     public function handle(
@@ -130,6 +132,11 @@ class ConvertBookingHoldToAppointmentAction
             }
 
             $booking = $this->resolvedBookingData($booking);
+            $this->bookingRules->assertSatisfied(
+                service: $service,
+                booking: $booking,
+                evaluatedAt: $now,
+            );
 
             $status = $service->requires_confirmation
                 ? Appointment::STATUS_PENDING

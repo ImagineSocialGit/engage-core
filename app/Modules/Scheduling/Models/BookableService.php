@@ -18,6 +18,9 @@ class BookableService extends Model
     public const STATUS_INACTIVE = 'inactive';
     public const STATUS_ARCHIVED = 'archived';
 
+    public const BOOKING_SUBJECT_GENERIC = 'generic';
+    public const BOOKING_SUBJECT_CONTACT = 'contact';
+
     public const DURATION_MODE_FIXED = 'fixed';
     public const DURATION_MODE_RANGE = 'range';
 
@@ -74,6 +77,7 @@ class BookableService extends Model
 
     protected $attributes = [
         'status' => self::STATUS_ACTIVE,
+        'booking_subject_key' => self::BOOKING_SUBJECT_GENERIC,
         'duration_mode' => self::DURATION_MODE_FIXED,
         'slot_interval_minutes' => 15,
         'buffer_before_minutes' => 0,
@@ -95,6 +99,7 @@ class BookableService extends Model
         'name',
         'description',
         'status',
+        'booking_subject_key',
         'duration_mode',
         'duration_minutes',
         'minimum_duration_minutes',
@@ -126,6 +131,13 @@ class BookableService extends Model
     protected static function newFactory(): BookableServiceFactory
     {
         return BookableServiceFactory::new();
+    }
+
+    public function bookingSubjectKey(): string
+    {
+        $key = trim((string) $this->booking_subject_key);
+
+        return $key !== '' ? $key : self::BOOKING_SUBJECT_GENERIC;
     }
 
     public function usesFixedDuration(): bool
@@ -355,6 +367,19 @@ class BookableService extends Model
             'sort_order' => 'integer',
             'meta' => 'array',
         ];
+    }
+
+    public function prerequisites(): HasMany
+    {
+        return $this->hasMany(BookableServicePrerequisite::class);
+    }
+
+    public function prerequisiteForServices(): HasMany
+    {
+        return $this->hasMany(
+            BookableServicePrerequisite::class,
+            'prerequisite_bookable_service_id',
+        );
     }
 
     public function availabilityWindows(): HasMany

@@ -4,7 +4,10 @@ namespace App\Modules\Scheduling\Validation;
 
 use App\Models\User;
 use App\Modules\Core\Access\Services\UserAccessService;
+use App\Modules\Scheduling\Models\BookableService;
+use App\Modules\Scheduling\Models\BookableServicePrerequisite;
 use App\Modules\Scheduling\Models\SchedulingHost;
+use App\Modules\Scheduling\Services\BookingSubjectProviderRegistry;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 use Illuminate\Support\Facades\Schema;
@@ -17,8 +20,11 @@ final class SchedulingSetupValidationContributor implements SetupValidationContr
 
     private const STAFF_SOURCE = 'scheduling.staff';
 
+    private const BOOKING_RULES_SOURCE = 'scheduling.booking_rules';
+
     public function __construct(
         private readonly UserAccessService $access,
+        private readonly BookingSubjectProviderRegistry $bookingSubjects,
     ) {}
 
     /**
@@ -28,6 +34,7 @@ final class SchedulingSetupValidationContributor implements SetupValidationContr
     {
         yield from $this->publicBookingFindings();
         yield from $this->staffIdentityFindings();
+        yield from $this->bookingRuleFindings();
     }
 
     /** @return iterable<int, SetupValidationFinding> */
@@ -105,6 +112,128 @@ final class SchedulingSetupValidationContributor implements SetupValidationContr
                 );
             }
         }
+    }
+
+    /** @return iterable<int, SetupValidationFinding> */
+    private function bookingRuleFindings(): iterable
+    {
+        if (! Schema::hasTable('bookable_services')) {
+            return;
+        }
+
+        $services = BookableService::query()
+            ->where('status', BookableService::STATUS_ACTIVE)
+            ->orderBy('id')
+            ->get();
+
+        if ($services->isEmpty()) {
+            return;
+        }
+
+        $knownSubjectKeys = array_keys($this->bookingSubjects->all());
+
+        foreach ($services as $service) {
+            $subjectKey = $service->bookingSubjectKey();
+
+            if (! in_array($subjectKey, $knownSubjectKeys, true)) {
+                yield new SetupValidationFinding(
+                    severity: SetupValidationFinding::SEVERITY_ERROR,
+                    code: 'scheduling.booking_subject_provider_missing',
+                    message: 'An Appointment Type uses a booking subject that is unavailable. Enable or repair the module that provides that booking subject before accepting appointments.',
+                    source: self::BOOKING_RULES_SOURCE,
+                    path: 'bookable_services.'.$service->getKey().'.booking_subject_key',
+                    module: self::MODULE,
+                    context: [
+                        'bookable_service_id' => (int) $service->getKey(),
+                        'bookable_service_key' => (string) $service->key,
+                        'booking_subject_key' => $subjectKey,
+                    ],
+                );
+            }
+        }
+
+        if (! Schema::hasTable('bookable_service_prerequisites')) {
+            return;
+        }
+
+        foreach (BookableServicePrerequisite::query()
+            ->where('is_active', true)
+            ->with(['service', 'prerequisiteService'])
+            ->orderBy('id')
+            ->get() as $prerequisite
+        ) {
+            $service = $prerequisite->service;
+            $requiredService = $prerequisite->prerequisiteService;
+
+            if (! $service instanceof BookableService
+                || ! $requiredService instanceof BookableService
+                || $service->trashed()
+                || $service->status !== BookableService::STATUS_ACTIVE
+            ) {
+                continue;
+            }
+
+            if ((int) $service->getKey() === (int) $requiredService->getKey()) {
+                yield $this->bookingRuleFinding(
+                    prerequisite: $prerequisite,
+                    code: 'scheduling.prerequisite_self_reference',
+                    message: 'An Appointment Type cannot require itself as a prerequisite.',
+                );
+            }
+
+            if ($service->bookingSubjectKey() !== $requiredService->bookingSubjectKey()) {
+                yield $this->bookingRuleFinding(
+                    prerequisite: $prerequisite,
+                    code: 'scheduling.prerequisite_subject_mismatch',
+                    message: 'A prerequisite must use the same booking subject as the Appointment Type that requires it.',
+                    context: [
+                        'booking_subject_key' => $service->bookingSubjectKey(),
+                        'prerequisite_booking_subject_key' => $requiredService->bookingSubjectKey(),
+                    ],
+                );
+            }
+
+            if ((int) $prerequisite->required_completions < 1) {
+                yield $this->bookingRuleFinding(
+                    prerequisite: $prerequisite,
+                    code: 'scheduling.prerequisite_completion_count_invalid',
+                    message: 'A prerequisite must require at least one completed appointment.',
+                );
+            }
+
+            if ($prerequisite->valid_for_days !== null
+                && (int) $prerequisite->valid_for_days < 1
+            ) {
+                yield $this->bookingRuleFinding(
+                    prerequisite: $prerequisite,
+                    code: 'scheduling.prerequisite_validity_invalid',
+                    message: 'A prerequisite validity window must be at least one day when set.',
+                );
+            }
+        }
+    }
+
+    /** @param array<string, mixed> $context */
+    private function bookingRuleFinding(
+        BookableServicePrerequisite $prerequisite,
+        string $code,
+        string $message,
+        array $context = [],
+    ): SetupValidationFinding {
+        return new SetupValidationFinding(
+            severity: SetupValidationFinding::SEVERITY_ERROR,
+            code: $code,
+            message: $message,
+            source: self::BOOKING_RULES_SOURCE,
+            path: 'bookable_service_prerequisites.'.$prerequisite->getKey(),
+            module: self::MODULE,
+            context: [
+                'bookable_service_prerequisite_id' => (int) $prerequisite->getKey(),
+                'bookable_service_id' => (int) $prerequisite->bookable_service_id,
+                'prerequisite_bookable_service_id' => (int) $prerequisite->prerequisite_bookable_service_id,
+                ...$context,
+            ],
+        );
     }
 
     private function staffIdentityFinding(
