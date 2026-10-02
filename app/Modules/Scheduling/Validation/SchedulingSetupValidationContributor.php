@@ -7,10 +7,13 @@ use App\Modules\Core\Access\Services\UserAccessService;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookableServicePrerequisite;
 use App\Modules\Scheduling\Models\SchedulingHost;
+use App\Modules\Scheduling\Services\BookingSubjectEligibilityProviderRegistry;
 use App\Modules\Scheduling\Services\BookingSubjectProviderRegistry;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
+use LogicException;
 
 final class SchedulingSetupValidationContributor implements SetupValidationContributor
 {
@@ -25,6 +28,7 @@ final class SchedulingSetupValidationContributor implements SetupValidationContr
     public function __construct(
         private readonly UserAccessService $access,
         private readonly BookingSubjectProviderRegistry $bookingSubjects,
+        private readonly BookingSubjectEligibilityProviderRegistry $subjectEligibility,
     ) {}
 
     /**
@@ -147,6 +151,51 @@ final class SchedulingSetupValidationContributor implements SetupValidationContr
                         'bookable_service_id' => (int) $service->getKey(),
                         'bookable_service_key' => (string) $service->key,
                         'booking_subject_key' => $subjectKey,
+                    ],
+                );
+
+                continue;
+            }
+
+            $policy = $service->bookingSubjectPolicy();
+
+            if ($policy === []) {
+                continue;
+            }
+
+            if (! $this->subjectEligibility->has($subjectKey)) {
+                yield new SetupValidationFinding(
+                    severity: SetupValidationFinding::SEVERITY_ERROR,
+                    code: 'scheduling.booking_subject_eligibility_provider_missing',
+                    message: 'An Appointment Type has booking-subject eligibility rules, but the provider for those rules is unavailable.',
+                    source: self::BOOKING_RULES_SOURCE,
+                    path: 'bookable_services.'.$service->getKey().'.booking_subject_policy',
+                    module: self::MODULE,
+                    context: [
+                        'bookable_service_id' => (int) $service->getKey(),
+                        'bookable_service_key' => (string) $service->key,
+                        'booking_subject_key' => $subjectKey,
+                    ],
+                );
+
+                continue;
+            }
+
+            try {
+                $this->subjectEligibility->validatePolicy($service);
+            } catch (InvalidArgumentException|LogicException $exception) {
+                yield new SetupValidationFinding(
+                    severity: SetupValidationFinding::SEVERITY_ERROR,
+                    code: 'scheduling.booking_subject_policy_invalid',
+                    message: 'An Appointment Type has an invalid booking-subject eligibility policy.',
+                    source: self::BOOKING_RULES_SOURCE,
+                    path: 'bookable_services.'.$service->getKey().'.booking_subject_policy',
+                    module: self::MODULE,
+                    context: [
+                        'bookable_service_id' => (int) $service->getKey(),
+                        'bookable_service_key' => (string) $service->key,
+                        'booking_subject_key' => $subjectKey,
+                        'error' => $exception->getMessage(),
                     ],
                 );
             }

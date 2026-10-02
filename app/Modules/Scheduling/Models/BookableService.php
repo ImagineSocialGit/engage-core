@@ -100,6 +100,7 @@ class BookableService extends Model
         'description',
         'status',
         'booking_subject_key',
+        'booking_subject_policy',
         'duration_mode',
         'duration_minutes',
         'minimum_duration_minutes',
@@ -138,6 +139,14 @@ class BookableService extends Model
         $key = trim((string) $this->booking_subject_key);
 
         return $key !== '' ? $key : self::BOOKING_SUBJECT_GENERIC;
+    }
+
+    /** @return array<string, mixed> */
+    public function bookingSubjectPolicy(): array
+    {
+        return is_array($this->booking_subject_policy)
+            ? $this->booking_subject_policy
+            : [];
     }
 
     public function usesFixedDuration(): bool
@@ -350,6 +359,7 @@ class BookableService extends Model
     protected function casts(): array
     {
         return [
+            'booking_subject_policy' => 'array',
             'duration_minutes' => 'integer',
             'minimum_duration_minutes' => 'integer',
             'maximum_duration_minutes' => 'integer',

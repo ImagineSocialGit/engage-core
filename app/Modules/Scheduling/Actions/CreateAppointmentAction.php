@@ -78,11 +78,6 @@ class CreateAppointmentAction
                     host: $host,
                 );
                 $evaluatedAt = CarbonImmutable::now('UTC');
-                $this->bookingRules->assertSatisfied(
-                    service: $service,
-                    booking: $data->booking,
-                    evaluatedAt: $evaluatedAt,
-                );
                 $endsAt = $this->durations->resolveEndsAt(
                     service: $service,
                     startsAt: $data->startsAt,
@@ -93,6 +88,13 @@ class CreateAppointmentAction
                     service: $service,
                     startsAt: $data->startsAt,
                     endsAt: $endsAt,
+                );
+                $this->bookingRules->assertSatisfied(
+                    service: $service,
+                    booking: $data->booking,
+                    startsAt: $data->startsAt,
+                    endsAt: $endsAt,
+                    evaluatedAt: $evaluatedAt,
                 );
                 $search = new AvailabilitySearch(
                     service: $service,

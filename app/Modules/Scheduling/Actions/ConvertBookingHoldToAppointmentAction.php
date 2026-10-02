@@ -135,6 +135,8 @@ class ConvertBookingHoldToAppointmentAction
             $this->bookingRules->assertSatisfied(
                 service: $service,
                 booking: $booking,
+                startsAt: $hold->starts_at,
+                endsAt: $hold->ends_at,
                 evaluatedAt: $now,
             );
 
