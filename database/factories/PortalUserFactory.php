@@ -4,7 +4,6 @@ namespace Database\Factories;
 
 use App\Modules\Portal\Models\PortalUser;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
@@ -48,7 +47,14 @@ class PortalUserFactory extends Factory
     public function withPassword(string $password = 'password'): self
     {
         return $this->state([
-            'password' => Hash::make($password),
+            'password' => $password,
+        ]);
+    }
+
+    public function suspended(): self
+    {
+        return $this->state([
+            'status' => PortalUser::STATUS_SUSPENDED,
         ]);
     }
 

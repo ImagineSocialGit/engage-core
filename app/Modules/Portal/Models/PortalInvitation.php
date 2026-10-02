@@ -50,6 +50,10 @@ class PortalInvitation extends Model
         'meta',
     ];
 
+    protected $hidden = [
+        'token_hash',
+    ];
+
     protected function casts(): array
     {
         return [
