@@ -15,6 +15,7 @@ use App\Modules\Messaging\Models\MessageChain;
 use App\Modules\Messaging\Models\MessageChainStep;
 use App\Modules\Messaging\Models\MessageChainVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -83,6 +84,96 @@ class CampaignAllocationRunControlTest extends TestCase
                 'request_key' => (string) Str::uuid(),
             ])
             ->assertNotFound();
+    }
+
+    public function test_spread_allocation_runs_follow_the_campaign_window_start_in_its_timezone(): void
+    {
+        Queue::fake();
+        [$campaign] = $this->campaignWithParticipant();
+        $campaign->forceFill([
+            'allocation_settings' => [
+                'run_every_days' => 1,
+                'allocation_size_per_message' => 1,
+                'recipient_cooldown_days' => 0,
+            ],
+            'send_pattern' => [
+                'mode' => 'spread',
+                'daily_limit' => 100,
+                'days_of_week' => [1, 2, 3, 4, 5],
+                'window_start' => '08:00',
+                'window_end' => '17:00',
+                'timezone' => 'America/Denver',
+            ],
+        ])->save();
+        $previous = CampaignAllocationRun::query()->create([
+            'campaign_id' => $campaign->getKey(),
+            'run_key' => 'previous-spread-run',
+            'status' => CampaignAllocationRun::STATUS_COMPLETED,
+            'scheduled_for' => Carbon::parse('2026-10-01 17:41:03 UTC'),
+            'started_at' => Carbon::parse('2026-10-01 17:41:03 UTC'),
+            'completed_at' => Carbon::parse('2026-10-01 17:41:12 UTC'),
+            'meta' => [],
+        ]);
+        $scheduler = app(ScheduleDueCampaignAllocationRunsAction::class);
+
+        $this->assertSame(0, $scheduler->handle('2026-10-02 13:59:59 UTC'));
+        $this->assertSame(1, $scheduler->handle('2026-10-02 14:00:00 UTC'));
+
+        $next = CampaignAllocationRun::query()
+            ->where('campaign_id', $campaign->getKey())
+            ->where('id', '!=', $previous->getKey())
+            ->firstOrFail();
+
+        $this->assertSame(
+            '2026-10-02T14:00:00+00:00',
+            $next->scheduled_for?->toIso8601String(),
+        );
+        Queue::assertPushed(ProcessCampaignAllocationRunJob::class, 1);
+    }
+
+    public function test_spread_allocation_runs_skip_days_outside_the_send_pattern(): void
+    {
+        Queue::fake();
+        [$campaign] = $this->campaignWithParticipant();
+        $campaign->forceFill([
+            'allocation_settings' => [
+                'run_every_days' => 1,
+                'allocation_size_per_message' => 1,
+                'recipient_cooldown_days' => 0,
+            ],
+            'send_pattern' => [
+                'mode' => 'spread',
+                'daily_limit' => 100,
+                'days_of_week' => [1, 2, 3, 4, 5],
+                'window_start' => '08:00',
+                'window_end' => '17:00',
+                'timezone' => 'America/Denver',
+            ],
+        ])->save();
+        CampaignAllocationRun::query()->create([
+            'campaign_id' => $campaign->getKey(),
+            'run_key' => 'friday-spread-run',
+            'status' => CampaignAllocationRun::STATUS_COMPLETED,
+            'scheduled_for' => Carbon::parse('2026-10-02 14:00:00 UTC'),
+            'started_at' => Carbon::parse('2026-10-02 14:00:00 UTC'),
+            'completed_at' => Carbon::parse('2026-10-02 14:00:10 UTC'),
+            'meta' => [],
+        ]);
+        $scheduler = app(ScheduleDueCampaignAllocationRunsAction::class);
+
+        $this->assertSame(0, $scheduler->handle('2026-10-03 14:00:00 UTC'));
+        $this->assertSame(0, $scheduler->handle('2026-10-04 14:00:00 UTC'));
+        $this->assertSame(1, $scheduler->handle('2026-10-05 14:00:00 UTC'));
+
+        $next = CampaignAllocationRun::query()
+            ->where('campaign_id', $campaign->getKey())
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->assertSame(
+            '2026-10-05T14:00:00+00:00',
+            $next->scheduled_for?->toIso8601String(),
+        );
     }
 
     public function test_automatic_runs_do_not_overlap_manual_runs_or_bypass_the_manual_cadence_anchor(): void

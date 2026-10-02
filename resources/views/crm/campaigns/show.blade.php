@@ -175,7 +175,7 @@
                 </div>
                 @forelse($recentAllocationRuns as $run)
                     <a href="{{ route('crm.campaigns.runs.show', ['campaign' => $campaign, 'run' => $run]) }}" class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 px-4 py-3 hover:bg-slate-50">
-                        <span class="font-semibold text-slate-950">{{ $run->scheduled_for?->format('M j, Y g:i A') ?? 'Outreach #'.$run->getKey() }}</span>
+                        <span class="font-semibold text-slate-950">{{ $run->scheduled_for_label ?? 'Outreach #'.$run->getKey() }}</span>
                         <span class="text-sm text-slate-600">{{ \Illuminate\Support\Str::headline($run->status) }} · {{ number_format($run->assignments_count) }} leads selected · {{ number_format($run->sent_messages_count) }} sent</span>
                     </a>
                 @empty

@@ -13,7 +13,9 @@ use App\Modules\Core\Access\Models\UserAccessProfile;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\MessageChain;
 use App\Modules\Messaging\Models\MessageChainVersion;
+use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class CampaignAllocationHistoryTest extends TestCase
@@ -50,6 +52,51 @@ class CampaignAllocationHistoryTest extends TestCase
         $this->actingAs($user)
             ->get(route('crm.campaigns.runs.index', $sequence))
             ->assertNotFound();
+    }
+
+    public function test_history_presents_run_and_assignment_times_in_the_client_timezone(): void
+    {
+        config()->set('client.timezone', 'America/Denver');
+        config()->set('app.timezone', 'UTC');
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->create([
+            'execution_strategy' => Campaign::EXECUTION_STRATEGY_RECURRING_ALLOCATION,
+        ]);
+        $run = $this->runAllocation($campaign);
+        $run->forceFill([
+            'scheduled_for' => Carbon::parse('2026-10-01 17:41:03 UTC'),
+            'started_at' => Carbon::parse('2026-10-01 17:41:03 UTC'),
+            'completed_at' => Carbon::parse('2026-10-01 17:41:12 UTC'),
+        ])->save();
+        $contact = Contact::factory()->create();
+        $this->assignment($campaign, $run, $contact, 'first', true);
+        $assignment = CampaignAllocationAssignment::query()
+            ->where('campaign_allocation_run_id', $run->getKey())
+            ->firstOrFail();
+        $scheduledMessage = ScheduledMessage::factory()->forRecipient($contact)->create([
+            'send_at' => Carbon::parse('2026-10-02 14:00:00 UTC'),
+        ]);
+        $assignment->forceFill([
+            'scheduled_message_id' => $scheduledMessage->getKey(),
+            'sent_at' => Carbon::parse('2026-10-01 22:38:04 UTC'),
+        ])->save();
+        $history = app(CampaignAllocationHistoryService::class);
+
+        $presentedRun = $history->run($campaign, (int) $run->getKey());
+        $recentRun = $history->recent($campaign)->firstOrFail();
+        $paginatedRun = $history->runs($campaign)->items()[0];
+        $presentedAssignment = $history->assignments($run, $user)->items()[0];
+
+        $this->assertSame('Oct 1, 2026 11:41 AM', $presentedRun->scheduled_for_label);
+        $this->assertSame('Oct 1, 2026 11:41 AM', $presentedRun->started_at_label);
+        $this->assertSame('Oct 1, 2026 11:41 AM', $presentedRun->completed_at_label);
+        $this->assertSame('Oct 1, 2026 11:41 AM', $recentRun->scheduled_for_label);
+        $this->assertSame('Oct 1, 2026 11:41 AM', $paginatedRun->scheduled_for_label);
+        $this->assertSame('Oct 1, 2026 4:38 PM', $presentedAssignment->sent_at_label);
+        $this->assertSame(
+            'Oct 2, 2026 8:00 AM',
+            $presentedAssignment->scheduled_message_send_at_label,
+        );
     }
 
     public function test_run_counts_include_assignments_while_lead_rows_obey_contact_visibility(): void

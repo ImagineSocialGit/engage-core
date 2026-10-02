@@ -19,7 +19,7 @@
                     <a href="{{ route('crm.campaigns.runs.show', ['campaign' => $campaign, 'run' => $run]) }}" class="block rounded-2xl border border-slate-200 p-4 hover:bg-slate-50">
                         <div class="flex flex-wrap items-center justify-between gap-3">
                             <div>
-                                <p class="font-semibold text-slate-950">{{ $run->scheduled_for?->format('M j, Y g:i A') ?? 'Outreach #'.$run->getKey() }}</p>
+                                <p class="font-semibold text-slate-950">{{ $run->scheduled_for_label ?? 'Outreach #'.$run->getKey() }}</p>
                                 <p class="mt-1 text-xs text-slate-500">Outreach #{{ $run->getKey() }} · {{ \Illuminate\Support\Str::headline($run->status) }}</p>
                             </div>
                             <div class="flex flex-wrap gap-3 text-sm font-semibold text-slate-700">

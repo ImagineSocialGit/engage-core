@@ -15,9 +15,9 @@
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <h2 class="text-xl font-semibold text-slate-950">Outreach #{{ $run->getKey() }}</h2>
-                    <p class="mt-2 text-sm text-slate-600">Scheduled {{ $run->scheduled_for?->format('M j, Y g:i A') ?? '—' }} · {{ \Illuminate\Support\Str::headline($run->status) }}</p>
+                    <p class="mt-2 text-sm text-slate-600">Scheduled {{ $run->scheduled_for_label ?? '—' }} · {{ \Illuminate\Support\Str::headline($run->status) }}</p>
                     @if($run->started_at)
-                        <p class="mt-1 text-xs text-slate-500">Started {{ $run->started_at->format('M j, Y g:i A') }}@if($run->completed_at) · Finished {{ $run->completed_at->format('M j, Y g:i A') }}@endif</p>
+                        <p class="mt-1 text-xs text-slate-500">Started {{ $run->started_at_label }}@if($run->completed_at) · Finished {{ $run->completed_at_label }}@endif</p>
                     @endif
                 </div>
                 <div class="flex flex-wrap gap-3 text-sm font-semibold text-slate-700">
@@ -62,9 +62,9 @@
                         <div class="text-sm text-slate-700">
                             <p class="font-semibold">{{ $assignment->scheduledMessage ? \Illuminate\Support\Str::headline($assignment->scheduledMessage->status) : 'Waiting to schedule' }}</p>
                             @if($assignment->sent_at)
-                                <p class="mt-1 text-xs text-slate-500">Sent {{ $assignment->sent_at->format('M j, Y g:i A') }}</p>
+                                <p class="mt-1 text-xs text-slate-500">Sent {{ $assignment->sent_at_label }}</p>
                             @elseif($assignment->scheduledMessage?->send_at)
-                                <p class="mt-1 text-xs text-slate-500">Scheduled for {{ $assignment->scheduledMessage->send_at->format('M j, Y g:i A') }}</p>
+                                <p class="mt-1 text-xs text-slate-500">Scheduled for {{ $assignment->scheduled_message_send_at_label }}</p>
                             @endif
                         </div>
                     </div>

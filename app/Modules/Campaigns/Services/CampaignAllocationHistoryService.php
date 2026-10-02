@@ -23,18 +23,30 @@ final class CampaignAllocationHistoryService
     {
         return $this->runsQuery($campaign)
             ->limit($limit)
-            ->get();
+            ->get()
+            ->map(fn (CampaignAllocationRun $run) => $this->presentRun($run));
     }
 
     /** @return LengthAwarePaginator<CampaignAllocationRun> */
     public function runs(Campaign $campaign): LengthAwarePaginator
     {
-        return $this->runsQuery($campaign)->paginate(15)->withQueryString();
+        $runs = $this->runsQuery($campaign)
+            ->paginate(15)
+            ->withQueryString();
+
+        $runs->setCollection(
+            $runs->getCollection()
+                ->map(fn (CampaignAllocationRun $run) => $this->presentRun($run)),
+        );
+
+        return $runs;
     }
 
     public function run(Campaign $campaign, int $runId): CampaignAllocationRun
     {
-        return $this->runsQuery($campaign)->whereKey($runId)->firstOrFail();
+        return $this->presentRun(
+            $this->runsQuery($campaign)->whereKey($runId)->firstOrFail(),
+        );
     }
 
     /** @return Collection<int, array{key: string, name: string, assigned: int, planned: int, sent: int}> */
@@ -98,7 +110,7 @@ final class CampaignAllocationHistoryService
         User $user,
         ?string $messageStepKey = null,
     ): LengthAwarePaginator {
-        return CampaignAllocationAssignment::query()
+        $assignments = CampaignAllocationAssignment::query()
             ->where('campaign_allocation_run_id', $run->getKey())
             ->when($messageStepKey !== null, fn (Builder $query) => $query
                 ->where('message_step_key', $messageStepKey))
@@ -107,6 +119,56 @@ final class CampaignAllocationHistoryService
             ->orderBy('id')
             ->paginate(25)
             ->withQueryString();
+
+        $assignments->setCollection(
+            $assignments->getCollection()->map(
+                fn (CampaignAllocationAssignment $assignment) =>
+                    $this->presentAssignment($assignment),
+            ),
+        );
+
+        return $assignments;
+    }
+
+
+    private function presentRun(
+        CampaignAllocationRun $run,
+    ): CampaignAllocationRun {
+        $run->setAttribute(
+            'scheduled_for_label',
+            $this->date($run->scheduled_for),
+        );
+        $run->setAttribute(
+            'started_at_label',
+            $this->date($run->started_at),
+        );
+        $run->setAttribute(
+            'completed_at_label',
+            $this->date($run->completed_at),
+        );
+
+        return $run;
+    }
+
+    private function presentAssignment(
+        CampaignAllocationAssignment $assignment,
+    ): CampaignAllocationAssignment {
+        $assignment->setAttribute(
+            'sent_at_label',
+            $this->date($assignment->sent_at),
+        );
+        $assignment->setAttribute(
+            'scheduled_message_send_at_label',
+            $this->date($assignment->scheduledMessage?->send_at),
+        );
+
+        return $assignment;
+    }
+
+    private function date(mixed $date): ?string
+    {
+        return $date?->timezone(config('client.timezone', config('app.timezone', 'UTC')))
+            ->format('M j, Y g:i A');
     }
 
     /** @return Builder<CampaignAllocationRun> */

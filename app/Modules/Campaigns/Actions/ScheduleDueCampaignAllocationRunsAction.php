@@ -8,6 +8,7 @@ use App\Modules\Campaigns\Models\CampaignAllocationEnrollment;
 use App\Modules\Campaigns\Models\CampaignAllocationRun;
 use App\Modules\Campaigns\Services\CampaignAllocationSettingsService;
 use App\Modules\Campaigns\Services\CampaignMessageStepResolver;
+use App\Modules\Campaigns\Services\CampaignSendPatternService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -18,6 +19,7 @@ final class ScheduleDueCampaignAllocationRunsAction
     public function __construct(
         private readonly CampaignAllocationSettingsService $settings,
         private readonly CampaignMessageStepResolver $messageSteps,
+        private readonly CampaignSendPatternService $sendPatterns,
     ) {}
 
     public function handle(Carbon|string|null $at = null): int
@@ -149,11 +151,18 @@ final class ScheduleDueCampaignAllocationRunsAction
                         ? $latest : null;
                 }
 
-                if ($manualRequestKey === null
-                    && ! $this->cadenceElapsed($campaign, $latest, $at)
-                ) {
-                    return null;
-                }
+            }
+
+            $scheduledFor = $manualRequestKey !== null
+                ? $at->copy()
+                : $this->automaticScheduledFor(
+                    campaign: $campaign,
+                    latest: $latest,
+                    at: $at,
+                );
+
+            if (! $scheduledFor instanceof Carbon) {
+                return null;
             }
 
             $version = $this->messageSteps->currentVersion($campaign);
@@ -174,7 +183,7 @@ final class ScheduleDueCampaignAllocationRunsAction
                 [
                     'campaign_id' => $campaign->getKey(),
                     'status' => CampaignAllocationRun::STATUS_SCHEDULED,
-                    'scheduled_for' => $at,
+                    'scheduled_for' => $scheduledFor,
                     'started_at' => null,
                     'completed_at' => null,
                     'failed_at' => null,
@@ -210,6 +219,180 @@ final class ScheduleDueCampaignAllocationRunsAction
             ->exists();
     }
 
+    private function automaticScheduledFor(
+        Campaign $campaign,
+        ?CampaignAllocationRun $latest,
+        Carbon $at,
+    ): ?Carbon {
+        $pattern = $this->sendPatterns->forCampaign($campaign);
+
+        if ($pattern['mode'] !== CampaignSendPatternService::MODE_SPREAD) {
+            if (! $latest instanceof CampaignAllocationRun) {
+                return $at->copy();
+            }
+
+            return $this->cadenceElapsed($campaign, $latest, $at)
+                ? $at->copy()
+                : null;
+        }
+
+        $dueAt = $this->spreadScheduledFor(
+            campaign: $campaign,
+            latest: $latest instanceof CampaignAllocationRun
+                && $latest->status !== CampaignAllocationRun::STATUS_CANCELLED
+                    ? $latest
+                    : null,
+            at: $at,
+            pattern: $pattern,
+        );
+
+        return $dueAt->lte($at) ? $dueAt : null;
+    }
+
+    /**
+     * @param array{
+     *     mode: string,
+     *     mode_label: string,
+     *     daily_limit: int,
+     *     days_of_week: array<int, int>,
+     *     window_start: string,
+     *     window_end: string,
+     *     timezone: string
+     * } $pattern
+     */
+    private function spreadScheduledFor(
+        Campaign $campaign,
+        ?CampaignAllocationRun $latest,
+        Carbon $at,
+        array $pattern,
+    ): Carbon {
+        $timezone = $pattern['timezone'];
+        $localAt = $at->copy()->timezone($timezone);
+
+        if (! $latest instanceof CampaignAllocationRun) {
+            return $this->initialSpreadScheduledFor(
+                localAt: $localAt,
+                pattern: $pattern,
+            )->utc();
+        }
+
+        $anchor = $this->spreadCadenceAnchor($latest);
+
+        if (! $anchor instanceof Carbon) {
+            return $this->initialSpreadScheduledFor(
+                localAt: $localAt,
+                pattern: $pattern,
+            )->utc();
+        }
+
+        $days = $this->settings->forCampaign($campaign)['run_every_days'];
+        $targetDay = $anchor
+            ->copy()
+            ->timezone($timezone)
+            ->startOfDay()
+            ->addDays($days);
+
+        return $this->nextSpreadWindowStart(
+            day: $targetDay,
+            pattern: $pattern,
+        )->utc();
+    }
+
+    /**
+     * @param array{
+     *     mode: string,
+     *     mode_label: string,
+     *     daily_limit: int,
+     *     days_of_week: array<int, int>,
+     *     window_start: string,
+     *     window_end: string,
+     *     timezone: string
+     * } $pattern
+     */
+    private function initialSpreadScheduledFor(
+        Carbon $localAt,
+        array $pattern,
+    ): Carbon {
+        $day = $localAt->copy()->startOfDay();
+        $windowStart = $this->windowTime($day, $pattern['window_start']);
+        $windowEnd = $this->windowTime($day, $pattern['window_end']);
+        $allowedToday = in_array(
+            $day->dayOfWeekIso,
+            $pattern['days_of_week'],
+            true,
+        );
+
+        if ($allowedToday && $localAt->lt($windowStart)) {
+            return $windowStart;
+        }
+
+        if ($allowedToday && $localAt->lte($windowEnd)) {
+            return $localAt->copy();
+        }
+
+        return $this->nextSpreadWindowStart(
+            day: $day->addDay(),
+            pattern: $pattern,
+        );
+    }
+
+    /**
+     * @param array{
+     *     mode: string,
+     *     mode_label: string,
+     *     daily_limit: int,
+     *     days_of_week: array<int, int>,
+     *     window_start: string,
+     *     window_end: string,
+     *     timezone: string
+     * } $pattern
+     */
+    private function nextSpreadWindowStart(
+        Carbon $day,
+        array $pattern,
+    ): Carbon {
+        for ($offset = 0; $offset <= 370; $offset++) {
+            $candidateDay = $day->copy()->startOfDay()->addDays($offset);
+
+            if (! in_array(
+                $candidateDay->dayOfWeekIso,
+                $pattern['days_of_week'],
+                true,
+            )) {
+                continue;
+            }
+
+            return $this->windowTime(
+                $candidateDay,
+                $pattern['window_start'],
+            );
+        }
+
+        throw new \LogicException(
+            'Campaign send pattern has no allowed day within the next year.',
+        );
+    }
+
+    private function windowTime(Carbon $day, string $time): Carbon
+    {
+        [$hour, $minute] = array_map('intval', explode(':', $time));
+
+        return $day->copy()->setTime($hour, $minute);
+    }
+
+    private function spreadCadenceAnchor(
+        CampaignAllocationRun $latest,
+    ): ?Carbon {
+        $anchor = $latest->scheduled_for
+            ?? $latest->started_at
+            ?? $latest->completed_at
+            ?? $latest->failed_at;
+
+        return $anchor !== null
+            ? Carbon::parse($anchor)
+            : null;
+    }
+
     private function cadenceElapsed(
         Campaign $campaign,
         CampaignAllocationRun $latest,
@@ -219,20 +402,30 @@ final class ScheduleDueCampaignAllocationRunsAction
             return true;
         }
 
-        $anchor = $latest->completed_at
-            ?? $latest->failed_at
-            ?? $latest->started_at
-            ?? $latest->scheduled_for;
+        $anchor = $this->cadenceAnchor($latest);
 
-        if ($anchor === null) {
+        if (! $anchor instanceof Carbon) {
             return true;
         }
 
         $days = $this->settings->forCampaign($campaign)['run_every_days'];
 
-        return Carbon::parse($anchor)
+        return $anchor
+            ->copy()
             ->utc()
             ->addDays($days)
             ->lte($at);
+    }
+
+    private function cadenceAnchor(CampaignAllocationRun $latest): ?Carbon
+    {
+        $anchor = $latest->completed_at
+            ?? $latest->failed_at
+            ?? $latest->started_at
+            ?? $latest->scheduled_for;
+
+        return $anchor !== null
+            ? Carbon::parse($anchor)
+            : null;
     }
 }
