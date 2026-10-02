@@ -3,6 +3,7 @@
 namespace Tests\Feature\Webinars;
 
 use App\Modules\Webinars\Actions\SyncWebinarScheduleProfilesAction;
+use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
@@ -11,21 +12,34 @@ class CoreWebinarScheduleProfileExtractionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_core_schedule_profile_is_loaded_and_synced_from_the_dedicated_config_file(): void
+    public function test_core_schedule_profiles_include_a_selectable_standard_message_plan(): void
     {
         $root = require base_path('config/webinars.php');
         $profiles = require base_path('config/webinars/schedule_profiles.php');
+        $standard = $profiles[WebinarScheduleProfile::STANDARD_KEY] ?? null;
 
         $this->assertArrayNotHasKey('schedule_profiles', $root);
         $this->assertSame($profiles, config('webinars.schedule_profiles'));
-        $this->assertArrayHasKey('full_10_day', $profiles);
-        $this->assertTrue($profiles['full_10_day']['is_default']);
-        $this->assertTrue($profiles['full_10_day']['is_active']);
-        $this->assertCount(16, $profiles['full_10_day']['items']);
-        $this->assertSame(
-            'messaging.email.definitions.transactional.webinar.confirmations.0',
-            $profiles['full_10_day']['items'][0]['source_config_path'],
-        );
+        $this->assertIsArray($standard);
+        $this->assertTrue((bool) ($standard['is_active'] ?? false));
+        $this->assertSame('default', $standard['message_template_set_key'] ?? null);
+
+        $contexts = collect($standard['items'] ?? [])
+            ->where('is_active', true)
+            ->where('is_enabled', true)
+            ->pluck('context_key')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $this->assertEqualsCanonicalizing([
+            'confirmation',
+            'reminders',
+            'waitlist',
+            'post_attended',
+            'post_missed',
+        ], $contexts);
 
         Config::set(
             'webinars.message_areas',
@@ -34,19 +48,14 @@ class CoreWebinarScheduleProfileExtractionTest extends TestCase
         Config::set('webinars.schedule_profiles', $profiles);
 
         $result = app(SyncWebinarScheduleProfilesAction::class)->handle();
+        $expectedItemCount = collect($profiles)
+            ->sum(fn (array $profile): int => count($profile['items'] ?? []));
 
-        $this->assertSame(1, $result['profiles_created']);
-        $this->assertSame(16, $result['items_created']);
+        $this->assertSame(count($profiles), $result['profiles_created']);
+        $this->assertSame($expectedItemCount, $result['items_created']);
         $this->assertDatabaseHas('webinar_schedule_profiles', [
-            'key' => 'full_10_day',
-            'is_default' => true,
-            'is_active' => true,
-        ]);
-        $this->assertDatabaseCount('webinar_schedule_profile_items', 16);
-        $this->assertDatabaseHas('webinar_schedule_profile_items', [
-            'key' => 'email_confirmation_delay_15',
-            'context_key' => 'confirmation',
-            'is_enabled' => true,
+            'key' => WebinarScheduleProfile::STANDARD_KEY,
+            'message_template_set_key' => 'default',
             'is_active' => true,
         ]);
     }

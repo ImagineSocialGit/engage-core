@@ -198,7 +198,7 @@ class WebinarScheduleProfileTest extends TestCase
             ->patch('http://crm.'.config('app.root_domain').'/webinar-series/'.$series->getKey().'/schedule-profile', [
                 'webinar_schedule_profile_id' => $profile->getKey(),
             ])
-            ->assertRedirect(route('crm.webinar-series.index'));
+            ->assertRedirect(route('crm.webinar-series.show', $series).'#message-plan');
 
         $this->assertDatabaseHas('webinar_series', [
             'id' => $series->getKey(),

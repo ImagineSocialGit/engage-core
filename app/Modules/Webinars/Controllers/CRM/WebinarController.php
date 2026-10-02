@@ -481,6 +481,36 @@ class WebinarController extends Controller
                 ];
 
         $messageProfile = $scheduleProfileResolver->resolveForSeries($series);
+        $messagePlanProfiles = WebinarScheduleProfile::query()
+            ->active()
+            ->orderBy('name')
+            ->get()
+            ->sortBy(fn (WebinarScheduleProfile $profile): string => implode('|', [
+                $profile->key === WebinarScheduleProfile::STANDARD_KEY ? '0' : '1',
+                $profile->is_default ? '0' : '1',
+                strtolower((string) $profile->name),
+            ]))
+            ->values();
+        $defaultMessageProfile = $messagePlanProfiles
+            ->first(fn (WebinarScheduleProfile $profile): bool => $profile->is_default);
+        $messagePlanOptions = $messagePlanProfiles
+            ->map(fn (WebinarScheduleProfile $profile): array => [
+                'id' => (int) $profile->getKey(),
+                'name' => (string) $profile->name,
+                'is_standard' => $profile->key === WebinarScheduleProfile::STANDARD_KEY,
+                'is_default' => (bool) $profile->is_default,
+            ])
+            ->all();
+        $messagePlanState = [
+            'selected_profile_id' => $series->webinar_schedule_profile_id !== null
+                ? (int) $series->webinar_schedule_profile_id
+                : null,
+            'effective_profile_name' => $messageProfile?->name,
+            'effective_is_standard' => $messageProfile?->key === WebinarScheduleProfile::STANDARD_KEY,
+            'using_account_default' => $series->webinar_schedule_profile_id === null,
+            'default_profile_name' => $defaultMessageProfile?->name,
+            'has_custom_messages' => (bool) ($messageReview['has_series_owned_messages'] ?? false),
+        ];
         $timeChangeTemplates = app(WebinarTimeChangeTemplates::class);
 
         $paidAdTrackingPlatforms = function_exists('module_enabled')
@@ -532,6 +562,8 @@ class WebinarController extends Controller
             'suppressedOccurrences' => $series->occurrenceSuppressions,
             'messageReview' => $messageReview,
             'messageProfile' => $messageProfile,
+            'messagePlanOptions' => $messagePlanOptions,
+            'messagePlanState' => $messagePlanState,
             'canManageTimeChanges' => app(UserAccessService::class)->allows(request()->user(), 'contacts.view_all')
                 && app(UserAccessService::class)->allows(request()->user(), 'contacts.manage'),
             'timeChangeAutoSend' => $timeChangeTemplates->autoSend($series),
@@ -1004,7 +1036,7 @@ class WebinarController extends Controller
         ])->save();
 
         return redirect()
-            ->route('crm.webinar-series.index')
+            ->to(route('crm.webinar-series.show', $series).'#message-plan')
             ->with('success', 'Webinar message plan updated.');
     }
 

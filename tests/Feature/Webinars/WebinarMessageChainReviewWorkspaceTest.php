@@ -249,6 +249,43 @@ class WebinarMessageChainReviewWorkspaceTest extends TestCase
             ->assertSee('data-message-editor-form', false);
     }
 
+    public function test_webinar_type_detail_exposes_standard_message_plan_as_a_selectable_profile(): void
+    {
+        WebinarScheduleProfile::factory()->create([
+            'key' => WebinarScheduleProfile::STANDARD_KEY,
+            'name' => 'Standard Webinar Messages',
+            'message_template_set_key' => 'default',
+            'is_default' => false,
+            'is_active' => true,
+            'status' => WebinarScheduleProfile::STATUS_ACTIVE,
+        ]);
+        $defaultProfile = WebinarScheduleProfile::factory()->create([
+            'key' => 'account_default_fixture',
+            'name' => 'Account Default Fixture',
+            'is_default' => true,
+            'is_active' => true,
+            'status' => WebinarScheduleProfile::STATUS_ACTIVE,
+        ]);
+        $series = WebinarSeries::factory()->create([
+            'webinar_schedule_profile_id' => null,
+        ]);
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('crm.webinar-series.show', $series))
+            ->assertOk()
+            ->assertViewHas('messagePlanOptions', function (array $options): bool {
+                $standard = collect($options)->firstWhere('is_standard', true);
+
+                return is_array($standard)
+                    && ($standard['name'] ?? null) === 'Standard Webinar Messages';
+            })
+            ->assertViewHas('messagePlanState', function (array $state) use ($defaultProfile): bool {
+                return ($state['using_account_default'] ?? false) === true
+                    && ($state['default_profile_name'] ?? null) === $defaultProfile->name
+                    && ($state['has_custom_messages'] ?? true) === false;
+            });
+    }
+
     /**
      * @return array{0: WebinarScheduleProfile, 1: MessageChain}
      */

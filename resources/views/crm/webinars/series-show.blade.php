@@ -467,24 +467,86 @@
         </section>
 
         <section id="message-plan" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7" data-webinar-type-message-plan>
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Messages</p>
-                    <h2 class="mt-2 text-xl font-semibold text-slate-950">Message plan</h2>
-                    <p class="mt-1 text-sm text-slate-600">
-                        {{ $messageProfile?->name ?? 'No active message plan' }}
-                        · {{ (int) ($messageReview['message_count'] ?? 0) }} messages
-                    </p>
+            <div class="flex flex-col gap-5">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Messages</p>
+                        <h2 class="mt-2 text-xl font-semibold text-slate-950">Message plan</h2>
+                        <p class="mt-1 text-sm text-slate-600">
+                            {{ $messagePlanState['effective_profile_name'] ?? 'No active message plan' }}
+                            · {{ (int) ($messageReview['message_count'] ?? 0) }} messages
+                        </p>
+                        <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                            @if($messagePlanState['effective_is_standard'])
+                                <span class="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800">Standard Webinar Messages</span>
+                            @elseif($messagePlanState['using_account_default'])
+                                <span class="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Using account default</span>
+                            @else
+                                <span class="rounded-full bg-indigo-100 px-3 py-1 text-indigo-800">Selected for this webinar type</span>
+                            @endif
+
+                            @if($messagePlanState['has_custom_messages'])
+                                <span class="rounded-full bg-amber-100 px-3 py-1 text-amber-900">Customized message copy</span>
+                            @endif
+                        </div>
+                    </div>
+                    @if(function_exists('module_enabled') && module_enabled('messaging'))
+                        <button
+                            type="button"
+                            x-on:click="messageReviewOpen = true"
+                            class="text-sm font-semibold text-slate-700 underline"
+                            data-webinar-message-review-button
+                        >
+                            Review message content
+                        </button>
+                    @endif
                 </div>
-                @if(function_exists('module_enabled') && module_enabled('messaging'))
-                    <button
-                        type="button"
-                        x-on:click="messageReviewOpen = true"
-                        class="text-sm font-semibold text-slate-700 underline"
-                        data-webinar-message-review-button
-                    >
-                        Review message content
-                    </button>
+
+                @if($series->status === 'active')
+                    @if($messagePlanState['has_custom_messages'])
+                        <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+                            This webinar type owns customized message copy. Its shared plan cannot be switched here until that customization is removed from the full message workspace.
+                        </div>
+                    @else
+                        <form
+                            method="POST"
+                            action="{{ route('crm.webinar-series.schedule-profile.update', $series) }}"
+                            class="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                        >
+                            @csrf
+                            @method('PATCH')
+
+                            <label for="webinar-message-plan" class="block text-sm font-semibold text-slate-900">
+                                Messages for this webinar type
+                            </label>
+                            <p class="mt-1 text-sm leading-6 text-slate-600">
+                                Standard Webinar Messages uses the built-in Core confirmation, reminders, and attended/missed follow-ups. Choose a different plan only when this webinar type needs its own cadence or wording.
+                            </p>
+
+                            <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+                                <select
+                                    id="webinar-message-plan"
+                                    name="webinar_schedule_profile_id"
+                                    class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                >
+                                    <option value="" @selected($messagePlanState['selected_profile_id'] === null)>
+                                        Use account default{{ $messagePlanState['default_profile_name'] ? ' — '.$messagePlanState['default_profile_name'] : '' }}
+                                    </option>
+                                    @foreach($messagePlanOptions as $option)
+                                        <option
+                                            value="{{ $option['id'] }}"
+                                            @selected($messagePlanState['selected_profile_id'] === $option['id'])
+                                        >
+                                            {{ $option['name'] }}{{ $option['is_standard'] ? ' — Core standard' : ($option['is_default'] ? ' — account default' : '') }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
+                                    Save message plan
+                                </button>
+                            </div>
+                        </form>
+                    @endif
                 @endif
             </div>
         </section>

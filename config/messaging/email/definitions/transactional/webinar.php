@@ -26,7 +26,7 @@ Time: {webinar_start_time}
 
 {cta}
 
-We look forward to seeing you there.
+Looking forward to seeing you there!
 TEXT,
                     'cta' => [
                         'label' => 'Join Webinar',
@@ -136,7 +136,7 @@ TEXT,
                     'body' => <<<'TEXT'
 Hi {first_name},
 
-{webinar_title} is live now.
+{webinar_title} is live now!
 
 {cta}
 TEXT,
@@ -163,13 +163,12 @@ TEXT,
                     'body' => <<<'TEXT'
 Hi {first_name},
 
-Thanks for joining {webinar_title}.
+Thanks for joining {webinar_title}!
 
 You can watch the replay here:
 
 {cta}
 
-We hope the session was useful.
 TEXT,
                     'cta' => [
                         'label' => 'Watch Replay',
@@ -190,11 +189,11 @@ TEXT,
                 'payload_class' => EmailPayload::class,
                 'queue' => 'post_event',
                 'payload' => [
-                    'subject' => 'Sorry we missed you at {webinar_title}',
+                    'subject' => 'Sorry you missed the {webinar_title}',
                     'body' => <<<'TEXT'
 Hi {first_name},
 
-Sorry we missed you at {webinar_title}.
+Sorry that you missed {webinar_title}!
 
 You can watch the replay here:
 
