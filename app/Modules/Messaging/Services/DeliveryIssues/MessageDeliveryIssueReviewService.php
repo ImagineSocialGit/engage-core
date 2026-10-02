@@ -12,6 +12,20 @@ use Illuminate\Support\Facades\DB;
 
 final class MessageDeliveryIssueReviewService
 {
+    public const FILTER_CHANNELS = [
+        MessageChannel::Email->value => 'Email',
+        MessageChannel::Sms->value => 'Text messages',
+    ];
+
+    public const FILTER_REASONS = [
+        MessageSuppression::REASON_BOUNCE => 'Delivery failed',
+        MessageSuppression::REASON_INVALID_DESTINATION => 'Invalid destination',
+        MessageSuppression::REASON_PROVIDER => 'Provider blocked delivery',
+        MessageSuppression::REASON_REPEATED_FAILURE => 'Repeated failures',
+        MessageSuppression::REASON_COMPLAINT => 'Recipient complaint',
+        MessageSuppression::REASON_MANUAL => 'Stopped manually',
+    ];
+
     /**
      * Return active suppressions that still match at least one Contact's
      * current destination.
@@ -22,9 +36,11 @@ final class MessageDeliveryIssueReviewService
      *
      * @return Builder<MessageSuppression>
      */
-    public function query(): Builder
+    public function query(array $filters = []): Builder
     {
-        return MessageSuppression::query()
+        $filters = $this->normalizeFilters($filters);
+
+        $query = MessageSuppression::query()
             ->active()
             ->whereNull('meta->delivery_issue_review->dismissed_at')
             ->where(function (Builder $query): void {
@@ -61,6 +77,50 @@ final class MessageDeliveryIssueReviewService
             })
             ->latest('suppressed_at')
             ->latest('id');
+
+        if ($filters['channel'] !== null) {
+            $query->where('channel', $filters['channel']);
+        }
+
+        if ($filters['reason'] !== null) {
+            $query->where('reason', $filters['reason']);
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array{channel: ?string, reason: ?string}
+     */
+    public function normalizeFilters(array $filters): array
+    {
+        $channel = is_string($filters['channel'] ?? null)
+            ? trim((string) $filters['channel'])
+            : '';
+        $reason = is_string($filters['reason'] ?? null)
+            ? trim((string) $filters['reason'])
+            : '';
+
+        return [
+            'channel' => array_key_exists($channel, self::FILTER_CHANNELS)
+                ? $channel
+                : null,
+            'reason' => array_key_exists($reason, self::FILTER_REASONS)
+                ? $reason
+                : null,
+        ];
+    }
+
+    /**
+     * @return array{channels: array<string, string>, reasons: array<string, string>}
+     */
+    public function filterOptions(): array
+    {
+        return [
+            'channels' => self::FILTER_CHANNELS,
+            'reasons' => self::FILTER_REASONS,
+        ];
     }
 
     /**
@@ -108,11 +168,21 @@ final class MessageDeliveryIssueReviewService
 
     public function isCurrentIssue(MessageSuppression $suppression): bool
     {
-        if (! $suppression->isActive()) {
+        if (! $suppression->isActive() || $this->isDismissed($suppression)) {
             return false;
         }
 
         return $this->contactsFor($suppression)->isNotEmpty();
+    }
+
+    public function isCurrentIssueForContact(
+        MessageSuppression $suppression,
+        Contact $contact,
+    ): bool {
+        return $suppression->isActive()
+            && ! $this->isDismissed($suppression)
+            && ! $contact->trashed()
+            && $this->matches($contact, $suppression);
     }
 
     /**
@@ -123,6 +193,9 @@ final class MessageDeliveryIssueReviewService
      *     reason_label: string,
      *     action_guidance: string,
      *     provider_detail: ?string,
+     *     provider_label: ?string,
+     *     bounce_type_label: ?string,
+     *     suppressed_at_label: ?string,
      *     can_release: bool
      * }>
      */
@@ -156,6 +229,9 @@ final class MessageDeliveryIssueReviewService
                         : 'phone',
                     'action_guidance' => $this->actionGuidanceFor($suppression),
                     'provider_detail' => $this->providerDetailFor($suppression),
+                    'provider_label' => $this->providerLabelFor($suppression),
+                    'bounce_type_label' => $this->bounceTypeLabelFor($suppression),
+                    'suppressed_at_label' => $this->suppressedAtLabel($suppression),
                     'can_release' => $this->canRelease($suppression),
                 ];
             })
@@ -341,6 +417,50 @@ final class MessageDeliveryIssueReviewService
         return is_string($message) && trim($message) !== ''
             ? trim($message)
             : null;
+    }
+
+
+    public function providerLabelFor(MessageSuppression $suppression): ?string
+    {
+        $provider = $this->normalizeDestination($suppression->provider);
+
+        return match ($provider) {
+            MessageSuppression::PROVIDER_RESEND => 'Resend',
+            MessageSuppression::PROVIDER_TELNYX => 'Telnyx',
+            MessageSuppression::PROVIDER_TWILIO => 'Twilio',
+            null => null,
+            default => str($provider)->headline()->toString(),
+        };
+    }
+
+    public function bounceTypeLabelFor(MessageSuppression $suppression): ?string
+    {
+        if ($suppression->reason !== MessageSuppression::REASON_BOUNCE) {
+            return null;
+        }
+
+        $parts = collect([
+            data_get($suppression->meta, 'bounce.type'),
+            data_get($suppression->meta, 'bounce.subtype'),
+        ])
+            ->filter(fn (mixed $value): bool => is_string($value) && trim($value) !== '')
+            ->map(fn (mixed $value): string => str((string) $value)->headline()->toString())
+            ->unique()
+            ->values();
+
+        return $parts->isEmpty() ? null : $parts->implode(' · ');
+    }
+
+    private function suppressedAtLabel(MessageSuppression $suppression): ?string
+    {
+        if ($suppression->suppressed_at === null) {
+            return null;
+        }
+
+        return $suppression->suppressed_at
+            ->copy()
+            ->setTimezone(config('client.timezone', config('app.timezone', 'UTC')))
+            ->format('M j, Y g:i A T');
     }
 
     private function bounceSearchText(MessageSuppression $suppression): string

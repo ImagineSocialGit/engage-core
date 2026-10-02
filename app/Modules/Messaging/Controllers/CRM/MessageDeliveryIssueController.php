@@ -3,11 +3,13 @@
 namespace App\Modules\Messaging\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\MessageSuppression;
 use App\Modules\Messaging\Services\DeliveryIssues\MessageDeliveryIssueReviewService;
 use App\Modules\Messaging\Services\MessageSuppressionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -24,15 +26,24 @@ final class MessageDeliveryIssueController extends Controller
         Request $request,
         MessageDeliveryIssueReviewService $issues,
     ): View {
-        $suppressions = $issues->query()
+        $filters = $issues->normalizeFilters([
+            'channel' => $request->query('channel'),
+            'reason' => $request->query('reason'),
+        ]);
+        $suppressions = $issues->query($filters)
             ->paginate(50)
             ->withQueryString();
+        $total = $suppressions->total();
 
         return view('crm.messaging.delivery-issues.index', [
             'title' => 'Messaging Delivery Issues',
             'heading' => 'Messaging Delivery Issues',
             'suppressions' => $suppressions,
             'deliveryIssues' => $issues->present($suppressions->getCollection()),
+            'filters' => $filters,
+            'filterOptions' => $issues->filterOptions(),
+            'hasFilters' => $filters['channel'] !== null || $filters['reason'] !== null,
+            'resultSummary' => number_format($total).' current '.Str::plural('issue', $total),
         ]);
     }
 
@@ -122,6 +133,34 @@ final class MessageDeliveryIssueController extends Controller
             ->with(
                 'success',
                 'Delivery issue dismissed from review. The destination remains suppressed.',
+            );
+    }
+
+    public function removeContact(
+        Request $request,
+        MessageSuppression $messageSuppression,
+        Contact $contact,
+        MessageDeliveryIssueReviewService $issues,
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'return_to' => ['nullable', 'string', 'max:2048'],
+        ]);
+
+        if (! $issues->isCurrentIssueForContact(
+            suppression: $messageSuppression,
+            contact: $contact,
+        )) {
+            throw ValidationException::withMessages([
+                'delivery_issue' => 'This Contact no longer owns the current delivery issue.',
+            ]);
+        }
+
+        $contact->delete();
+
+        return redirect($this->safeReturnTo($validated['return_to'] ?? null))
+            ->with(
+                'success',
+                'Contact removed from active CRM. Delivery suppression history was preserved.',
             );
     }
 

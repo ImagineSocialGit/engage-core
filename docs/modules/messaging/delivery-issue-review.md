@@ -142,6 +142,25 @@ Dashboard
 
 The dashboard panel is immediate work and returns no panel when there are no current issues.
 
+## Review queue decision context
+
+The dedicated review queue may filter its own suppression review set by channel and normalized suppression reason. These filters are operator-review controls only; they do not become Contact audience criteria and do not alter suppression state.
+
+The primary card should surface bounded evidence already retained on the suppression when available:
+
+```text
+normalized reason / bounce classification
+destination
+provider
+bounded bounce type/subtype
+bounded provider message
+suppressed_at in the client timezone
+```
+
+Do not reparse raw webhook payloads in the CRM surface and do not invent a specific cause when the retained provider evidence does not support one.
+
+Common decisions belong at the top level: correct the current destination, or remove the current Contact when the record itself should no longer remain active. Suppression release and review-only dismissal remain secondary actions because they require more deliberate operator judgment.
+
 ## Audience boundary
 
 Do not register delivery-issue state as a generic `ContactFilterCriterion`.
@@ -166,7 +185,9 @@ A delivery issue has two distinct operator resolutions while the destination sti
 - keep the Contact and release an eligible suppression only after verification;
 - delete the Contact when the Contact itself is invalid or should no longer remain active.
 
-Contact deletion never releases or deletes `message_suppressions`. The suppression remains durable destination-level delivery evidence.
+Contact deletion never releases, dismisses, or deletes `message_suppressions`. The suppression remains durable destination-level delivery evidence. A later restored Contact using the same suppressed destination remains protected by the existing delivery gate.
+
+The delivery-issue removal action must first verify that the selected, non-deleted Contact still owns the active, undismissed suppression. It then uses the normal Contact soft-delete lifecycle rather than creating a Messaging-specific deletion model.
 
 Before Core soft-deletes a Contact, Messaging cancels active/paused MessageChain enrollments for that Contact and skips pending ScheduledMessages addressed to it with reason `contact_deleted`. Already-sending or terminal deliveries are not rewritten.
 

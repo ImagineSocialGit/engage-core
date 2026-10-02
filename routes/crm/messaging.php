@@ -52,6 +52,10 @@ Route::middleware('module:messaging')
 
         Route::post('/{messageSuppression}/dismiss', [MessageDeliveryIssueController::class, 'dismiss'])
             ->name('dismiss');
+
+        Route::delete('/{messageSuppression}/contacts/{contact}', [MessageDeliveryIssueController::class, 'removeContact'])
+            ->middleware('capability:contacts.manage')
+            ->name('contacts.destroy');
     });
 
 Route::middleware('module:messaging')

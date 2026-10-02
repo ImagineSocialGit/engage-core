@@ -374,6 +374,125 @@ class MessageDeliveryIssueReviewTest extends TestCase
             );
     }
 
+
+    public function test_review_queue_can_filter_by_channel_and_problem_reason(): void
+    {
+        Contact::factory()->create([
+            'email' => 'filter@example.com',
+            'phone' => '+15555550123',
+        ]);
+
+        $emailBounce = $this->suppression(
+            channel: MessageChannel::Email->value,
+            destination: 'filter@example.com',
+            reason: MessageSuppression::REASON_BOUNCE,
+        );
+        $smsProvider = $this->suppression(
+            channel: MessageChannel::Sms->value,
+            destination: '+15555550123',
+            reason: MessageSuppression::REASON_PROVIDER,
+        );
+
+        $issues = app(MessageDeliveryIssueReviewService::class);
+
+        $emailIds = $issues->query([
+            'channel' => MessageChannel::Email->value,
+        ])->pluck('id')->all();
+
+        $this->assertContains($emailBounce->getKey(), $emailIds);
+        $this->assertNotContains($smsProvider->getKey(), $emailIds);
+
+        $providerIds = $issues->query([
+            'reason' => MessageSuppression::REASON_PROVIDER,
+        ])->pluck('id')->all();
+
+        $this->assertContains($smsProvider->getKey(), $providerIds);
+        $this->assertNotContains($emailBounce->getKey(), $providerIds);
+
+        $this->assertSame(
+            ['channel' => null, 'reason' => null],
+            $issues->normalizeFilters([
+                'channel' => 'not-a-channel',
+                'reason' => 'not-a-reason',
+            ]),
+        );
+    }
+
+    public function test_operator_can_remove_contact_from_delivery_review_without_releasing_suppression(): void
+    {
+        $user = User::factory()->create();
+        $contact = Contact::factory()->create([
+            'email' => 'remove-from-review@example.com',
+        ]);
+        $suppression = $this->suppression(
+            channel: MessageChannel::Email->value,
+            destination: 'remove-from-review@example.com',
+            reason: MessageSuppression::REASON_BOUNCE,
+            provider: MessageSuppression::PROVIDER_RESEND,
+        );
+
+        $returnTo = route('crm.messaging.delivery-issues.index', [
+            'channel' => MessageChannel::Email->value,
+        ], false);
+
+        $this
+            ->actingAs($user)
+            ->delete(
+                route('crm.messaging.delivery-issues.contacts.destroy', [
+                    $suppression,
+                    $contact,
+                ]),
+                ['return_to' => $returnTo],
+            )
+            ->assertRedirect($returnTo);
+
+        $this->assertTrue(
+            Contact::withTrashed()->findOrFail($contact->getKey())->trashed(),
+        );
+        $this->assertNull($suppression->refresh()->released_at);
+        $this->assertDatabaseHas('message_suppressions', [
+            'id' => $suppression->getKey(),
+            'destination' => 'remove-from-review@example.com',
+            'released_at' => null,
+        ]);
+        $this->assertFalse(
+            app(MessageDeliveryIssueReviewService::class)
+                ->query()
+                ->whereKey($suppression->getKey())
+                ->exists(),
+        );
+    }
+
+    public function test_delivery_issue_remove_contact_rejects_a_contact_that_does_not_own_the_issue(): void
+    {
+        $user = User::factory()->create();
+        Contact::factory()->create([
+            'email' => 'issue-owner@example.com',
+        ]);
+        $otherContact = Contact::factory()->create([
+            'email' => 'other-contact@example.com',
+        ]);
+        $suppression = $this->suppression(
+            channel: MessageChannel::Email->value,
+            destination: 'issue-owner@example.com',
+            reason: MessageSuppression::REASON_BOUNCE,
+        );
+
+        $this
+            ->actingAs($user)
+            ->from(route('crm.messaging.delivery-issues.index'))
+            ->delete(route('crm.messaging.delivery-issues.contacts.destroy', [
+                $suppression,
+                $otherContact,
+            ]))
+            ->assertRedirect(route('crm.messaging.delivery-issues.index'))
+            ->assertSessionHasErrors('delivery_issue');
+
+        $this->assertFalse(
+            Contact::withTrashed()->findOrFail($otherContact->getKey())->trashed(),
+        );
+    }
+
     public function test_delivery_issue_review_route_is_protected_by_messaging_module_middleware(): void
     {
         $user = User::factory()->create();
