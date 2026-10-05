@@ -2187,6 +2187,7 @@
 │   │   │   ├── Documents
 │   │   │   │   ├── Contracts
 │   │   │   │   │   ├── DocumentAttachmentSource.php
+│   │   │   │   │   ├── DocumentEvidenceSource.php
 │   │   │   │   │   └── DocumentRequirementDefinitionContributor.php
 │   │   │   │   ├── Data
 │   │   │   │   │   └── DocumentRequirementDefinitionContribution.php
@@ -3621,6 +3622,7 @@
 │   │   │   ├── LaunchClientEnvironmentAuditScriptTest.php
 │   │   │   └── LaunchClientEnvironmentScriptTest.php
 │   │   ├── Documents
+│   │   │   ├── DocumentEvidenceSourceContractTest.php
 │   │   │   ├── DocumentRequestLifecycleActionTest.php
 │   │   │   ├── DocumentRequirementDefinitionSyncTest.php
 │   │   │   ├── DocumentsFoundationTest.php
@@ -4155,4 +4157,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-913 directories, 3243 files
+913 directories, 3245 files

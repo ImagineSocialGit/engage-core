@@ -3,8 +3,10 @@
 namespace App\Modules\Documents\Providers;
 
 use App\Modules\Documents\Services\DocumentAttachmentLibrary;
+use App\Modules\Documents\Services\DocumentEvidenceResolver;
 use App\Modules\Documents\Services\DocumentRequirementDefinitionRegistry;
 use App\Support\ModuleIntegrations\Documents\Contracts\DocumentAttachmentSource;
+use App\Support\ModuleIntegrations\Documents\Contracts\DocumentEvidenceSource;
 use App\Support\ModuleIntegrations\Documents\Contracts\DocumentRequirementDefinitionContributor;
 use App\Support\ModuleIntegrations\Messaging\Contracts\MessageAttachmentSource;
 use App\Support\ModuleIntegrations\Messaging\Documents\DocumentMessageAttachmentSource;
@@ -15,6 +17,7 @@ class DocumentsModuleServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(DocumentAttachmentSource::class, DocumentAttachmentLibrary::class);
+        $this->app->bind(DocumentEvidenceSource::class, DocumentEvidenceResolver::class);
         $this->app->singleton(
             DocumentRequirementDefinitionRegistry::class,
             fn ($app): DocumentRequirementDefinitionRegistry => new DocumentRequirementDefinitionRegistry(
@@ -26,6 +29,6 @@ class DocumentsModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Document files remain private; consuming modules use DocumentAttachmentSource.
+        // Document files remain private; consuming modules use public Documents contracts.
     }
 }
