@@ -53,6 +53,21 @@ $app = Application::configure(basePath: dirname(__DIR__))
                     require base_path('routes/forms.php');
                 });
 
+            $portalHost = parse_url(
+                (string) config('app.portal_url'),
+                PHP_URL_HOST,
+            );
+
+            $portalHost = is_string($portalHost) && $portalHost !== ''
+                ? $portalHost
+                : 'portal.'.$domain;
+
+            Route::middleware(['web'])
+                ->domain($portalHost)
+                ->group(function () {
+                    require base_path('routes/portal.php');
+                });
+
             $crmHost = parse_url(
                 (string) config('app.crm_url'),
                 PHP_URL_HOST,

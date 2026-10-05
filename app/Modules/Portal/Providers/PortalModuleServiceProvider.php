@@ -5,6 +5,9 @@ namespace App\Modules\Portal\Providers;
 use App\Modules\Portal\Auth\PortalUserProvider;
 use App\Modules\Portal\Models\PortalUser;
 use App\Modules\Portal\Services\PortalAuthContext;
+use App\Modules\Portal\Services\PortalDashboardPanelRegistry;
+use App\Modules\Portal\Services\PortalNavigationRegistry;
+use App\Modules\Portal\Services\PortalRouteRegistry;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 
@@ -38,6 +41,24 @@ class PortalModuleServiceProvider extends ServiceProvider
         ]);
 
         $this->app->singleton(PortalAuthContext::class);
+        $this->app->singleton(
+            PortalDashboardPanelRegistry::class,
+            fn ($app): PortalDashboardPanelRegistry => new PortalDashboardPanelRegistry(
+                $app->tagged(PortalDashboardPanelRegistry::TAG),
+            ),
+        );
+        $this->app->singleton(
+            PortalNavigationRegistry::class,
+            fn ($app): PortalNavigationRegistry => new PortalNavigationRegistry(
+                $app->tagged(PortalNavigationRegistry::TAG),
+            ),
+        );
+        $this->app->singleton(
+            PortalRouteRegistry::class,
+            fn ($app): PortalRouteRegistry => new PortalRouteRegistry(
+                $app->tagged(PortalRouteRegistry::TAG),
+            ),
+        );
     }
 
     public function boot(): void

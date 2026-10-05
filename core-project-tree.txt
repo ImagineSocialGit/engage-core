@@ -14,6 +14,7 @@
 │   │   │   ├── ModulesMigrateCommand.php
 │   │   │   ├── ModulesReconcileCommand.php
 │   │   │   ├── ModulesStatusCommand.php
+│   │   │   ├── ModulesUninstallCommand.php
 │   │   │   ├── SyncPresetsCommand.php
 │   │   │   └── ValidateSetupCommand.php
 │   │   └── Concerns
@@ -1396,9 +1397,32 @@
 │   │   │   └── Support
 │   │   ├── Portal
 │   │   │   ├── Actions
+│   │   │   │   ├── AcceptPortalInvitationAction.php
+│   │   │   │   ├── AuthenticatePortalUserAction.php
+│   │   │   │   ├── CreatePortalInvitationAction.php
+│   │   │   │   ├── CreatePortalUserAction.php
+│   │   │   │   ├── LinkPortalUserToContactAction.php
+│   │   │   │   └── MarkPortalInvitationSentAction.php
+│   │   │   ├── Auth
+│   │   │   │   └── PortalUserProvider.php
 │   │   │   ├── Contracts
+│   │   │   │   ├── PortalDashboardPanelProvider.php
+│   │   │   │   ├── PortalNavigationProvider.php
+│   │   │   │   └── PortalRouteContributor.php
 │   │   │   ├── Controllers
+│   │   │   │   └── Public
+│   │   │   │       ├── PortalAccountController.php
+│   │   │   │       ├── PortalHomeController.php
+│   │   │   │       ├── PortalInvitationAcceptanceController.php
+│   │   │   │       └── PortalSessionController.php
 │   │   │   ├── Data
+│   │   │   │   ├── PortalDashboardPanel.php
+│   │   │   │   ├── PortalInvitationToken.php
+│   │   │   │   └── PortalNavigationItem.php
+│   │   │   ├── Http
+│   │   │   │   └── Middleware
+│   │   │   │       ├── RequirePortalAuthentication.php
+│   │   │   │       └── RequireVerifiedPortalEmail.php
 │   │   │   ├── Models
 │   │   │   │   ├── PortalAccessGrant.php
 │   │   │   │   ├── PortalContactLink.php
@@ -1408,6 +1432,11 @@
 │   │   │   │   └── PortalModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
+│   │   │   │   ├── PortalAuthContext.php
+│   │   │   │   ├── PortalDashboardPanelRegistry.php
+│   │   │   │   ├── PortalNavigationRegistry.php
+│   │   │   │   ├── PortalPresentationResolver.php
+│   │   │   │   └── PortalRouteRegistry.php
 │   │   │   └── Support
 │   │   ├── Relationships
 │   │   │   ├── Actions
@@ -1539,6 +1568,8 @@
 │   │   │   ├── Contracts
 │   │   │   │   ├── BookingEligibilityProvider.php
 │   │   │   │   ├── BookingOfferRewardActionHandler.php
+│   │   │   │   ├── BookingSubjectEligibilityProvider.php
+│   │   │   │   ├── BookingSubjectProvider.php
 │   │   │   │   └── TravelTimeResolver.php
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
@@ -1558,8 +1589,11 @@
 │   │   │   │   ├── AppointmentRescheduleData.php
 │   │   │   │   ├── AvailabilityInterval.php
 │   │   │   │   ├── AvailabilitySearch.php
+│   │   │   │   ├── BookableServicePrerequisiteEvaluation.php
+│   │   │   │   ├── BookableServicePrerequisiteResult.php
 │   │   │   │   ├── BookableSlot.php
 │   │   │   │   ├── BookingEligibilityIdentity.php
+│   │   │   │   ├── BookingSubjectEligibilityContext.php
 │   │   │   │   ├── DestinationVerificationChallenge.php
 │   │   │   │   ├── DestinationVerificationProof.php
 │   │   │   │   ├── SchedulingLocationSnapshot.php
@@ -1582,6 +1616,7 @@
 │   │   │   │   ├── Appointment.php
 │   │   │   │   ├── BookableServiceHost.php
 │   │   │   │   ├── BookableService.php
+│   │   │   │   ├── BookableServicePrerequisite.php
 │   │   │   │   ├── BookableServiceResourceRequirement.php
 │   │   │   │   ├── BookableSlotOffer.php
 │   │   │   │   ├── BookingHold.php
@@ -1619,8 +1654,15 @@
 │   │   │   │   │   ├── ResourceOccupancyResolver.php
 │   │   │   │   │   ├── SchedulingTravelTimeResolver.php
 │   │   │   │   │   └── TravelFeasibilityResolver.php
+│   │   │   │   ├── BookableServiceBookingRuleGuard.php
+│   │   │   │   ├── BookableServicePrerequisiteEvaluator.php
 │   │   │   │   ├── BookingEligibilityProviderRegistry.php
 │   │   │   │   ├── BookingOfferRewardActionHandlerRegistry.php
+│   │   │   │   ├── BookingSubjectEligibilityProviderRegistry.php
+│   │   │   │   ├── BookingSubjectProviderRegistry.php
+│   │   │   │   ├── BookingSubjects
+│   │   │   │   │   ├── ContactBookingSubjectProvider.php
+│   │   │   │   │   └── GenericBookingSubjectProvider.php
 │   │   │   │   ├── Contacts
 │   │   │   │   │   └── Filters
 │   │   │   │   │       └── AppointmentStateContactFilterCriterion.php
@@ -2251,7 +2293,9 @@
 │   │   │   │   ├── ModuleMigrationPreflightResult.php
 │   │   │   │   ├── ModuleMigrationRegistry.php
 │   │   │   │   ├── ModuleMigrationStatusInspector.php
-│   │   │   │   └── ModuleMigrationStatus.php
+│   │   │   │   ├── ModuleMigrationStatus.php
+│   │   │   │   ├── ModuleUninstaller.php
+│   │   │   │   └── ModuleUninstallResult.php
 │   │   │   └── ModuleManager.php
 │   │   ├── Presets
 │   │   │   ├── ClientPresetContributor.php
@@ -2428,6 +2472,7 @@
 │   ├── messaging.php
 │   ├── module_migrations.php
 │   ├── modules.php
+│   ├── portal.php
 │   ├── presets
 │   │   └── modules
 │   │       ├── core
@@ -2684,7 +2729,8 @@
 │   │   │   │   ├── 2026_04_15_195870_create_portal_users_table.php
 │   │   │   │   ├── 2026_04_15_195871_create_portal_contact_links_table.php
 │   │   │   │   ├── 2026_04_15_195872_create_portal_invitations_table.php
-│   │   │   │   └── 2026_04_15_195873_create_portal_access_grants_table.php
+│   │   │   │   ├── 2026_04_15_195873_create_portal_access_grants_table.php
+│   │   │   │   └── 2026_10_02_190000_add_portal_authentication_contract.php
 │   │   │   ├── relationships
 │   │   │   │   ├── 2026_08_19_175000_create_contact_relationships_table.php
 │   │   │   │   └── 2026_09_28_040000_create_relationship_definitions_tables.php
@@ -2703,7 +2749,8 @@
 │   │   │   │   ├── 2026_07_21_180101_create_booking_holds_table.php
 │   │   │   │   ├── 2026_08_03_190000_create_scheduling_resource_occupancy_tables.php
 │   │   │   │   ├── 2026_08_27_161500_add_appointment_format_to_bookable_services_table.php
-│   │   │   │   └── 2026_09_16_140000_create_scheduling_booking_offers_tables.php
+│   │   │   │   ├── 2026_09_16_140000_create_scheduling_booking_offers_tables.php
+│   │   │   │   └── 2026_09_30_200000_create_bookable_service_prerequisites_table.php
 │   │   │   ├── tasks
 │   │   │   │   ├── 2026_04_15_203543_create_task_templates_table.php
 │   │   │   │   ├── 2026_04_15_203544_create_tasks_table.php
@@ -2860,6 +2907,8 @@
 │   │   ├── pet-services
 │   │   │   └── module_state.md
 │   │   ├── portal
+│   │   │   ├── authentication.md
+│   │   │   ├── customer-surface.md
 │   │   │   └── module_state.md
 │   │   ├── README.md
 │   │   ├── relationships
@@ -2869,6 +2918,7 @@
 │   │   │   └── TODO.md
 │   │   ├── scheduling
 │   │   │   ├── appointment-relative-flow-route-automation.md
+│   │   │   ├── booking-subjects-and-prerequisites.md
 │   │   │   ├── module_state.md
 │   │   │   └── TODO.md
 │   │   ├── tasks
@@ -2887,6 +2937,7 @@
 │   │   ├── deployment-runbook.md
 │   │   ├── deployment-safety-and-troubleshooting.md
 │   │   ├── launch-client-environment.example.conf
+│   │   ├── module-uninstall.md
 │   │   ├── observability
 │   │   │   └── README.md
 │   │   └── project-state-transfer-runbook.md
@@ -2985,6 +3036,7 @@
 │       │   │   ├── crm.blade.php
 │       │   │   ├── favicons.blade.php
 │       │   │   ├── messaging-public.blade.php
+│       │   │   ├── portal.blade.php
 │       │   │   ├── public.blade.php
 │       │   │   └── public-surface.blade.php
 │       │   ├── media
@@ -3241,6 +3293,14 @@
 │       │   ├── unsubscribe-confirm.blade.php
 │       │   ├── unsubscribe-confirmed.blade.php
 │       │   └── unsubscribe-invalid.blade.php
+│       ├── portal
+│       │   ├── account
+│       │   │   └── show.blade.php
+│       │   ├── auth
+│       │   │   └── login.blade.php
+│       │   ├── home.blade.php
+│       │   └── invitations
+│       │       └── accept.blade.php
 │       ├── scheduling
 │       │   └── public
 │       │       ├── index.blade.php
@@ -3284,6 +3344,7 @@
 │   ├── crm.php
 │   ├── forms.php
 │   ├── messaging.php
+│   ├── portal.php
 │   ├── scheduling.php
 │   ├── staging.php
 │   ├── webhooks.php
@@ -3414,6 +3475,7 @@
 │   │   │   ├── ClientEnvironmentLoaderTest.php
 │   │   │   ├── ClientEnvironmentUnreadableFileTest.php
 │   │   │   ├── ClientPackageManifestLoaderTest.php
+│   │   │   ├── ClientPackageModuleContributionTest.php
 │   │   │   ├── ClientPackageRuntimeTest.php
 │   │   │   ├── ClientViewOverrideTest.php
 │   │   │   ├── CreateClientScriptTest.php
@@ -3793,6 +3855,7 @@
 │   │   │   ├── ModuleMigrationRegistryTest.php
 │   │   │   ├── ModuleNavigationTest.php
 │   │   │   ├── ModuleRouteMiddlewareTest.php
+│   │   │   ├── ModulesUninstallCommandTest.php
 │   │   │   └── PlatformMigrationFoundationTest.php
 │   │   ├── Mortgage
 │   │   │   ├── MortgageAnnualTouchDateSourceTest.php
@@ -3803,6 +3866,8 @@
 │   │   │   ├── ObservabilityConfigurationContractTest.php
 │   │   │   └── RequestCorrelationTest.php
 │   │   ├── Portal
+│   │   │   ├── PortalAuthenticationFoundationTest.php
+│   │   │   ├── PortalCustomerSurfaceTest.php
 │   │   │   └── PortalFoundationTest.php
 │   │   ├── Presets
 │   │   │   ├── ModuleFirstPresetCompositionTest.php
@@ -3872,6 +3937,8 @@
 │   │   │   ├── SchedulingAvailabilityWindowFoundationTest.php
 │   │   │   ├── SchedulingAvailableStartRangeBuilderTest.php
 │   │   │   ├── SchedulingBookingOfferRuntimeTest.php
+│   │   │   ├── SchedulingBookingSubjectEligibilityTest.php
+│   │   │   ├── SchedulingBookingSubjectPrerequisiteTest.php
 │   │   │   ├── SchedulingConfigurationWorkspaceTest.php
 │   │   │   ├── SchedulingContactPanelTest.php
 │   │   │   ├── SchedulingDashboardPanelTest.php
@@ -4041,4 +4108,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-895 directories, 3147 files
+904 directories, 3205 files

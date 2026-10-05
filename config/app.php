@@ -5,6 +5,15 @@ $appUrl = trim((string) env('APP_URL', 'http://localhost'));
 $appScheme = parse_url($appUrl, PHP_URL_SCHEME);
 $appPort = parse_url($appUrl, PHP_URL_PORT);
 
+$defaultPortalUrl = sprintf(
+    '%s://portal.%s%s',
+    is_string($appScheme) && $appScheme !== ''
+        ? strtolower($appScheme)
+        : 'http',
+    $rootDomain !== '' ? $rootDomain : 'localhost',
+    is_int($appPort) ? ':'.$appPort : '',
+);
+
 $defaultWebinarUrl = sprintf(
     '%s://webinar.%s%s',
     is_string($appScheme) && $appScheme !== ''
@@ -69,8 +78,9 @@ return [
     'root_domain' => $rootDomain,
     'url' => $appUrl,
     'webinar_url' => env('WEBINAR_APP_URL', $defaultWebinarUrl),
+    'portal_url' => env('PORTAL_APP_URL', $defaultPortalUrl),
     'crm_url' => env('CRM_APP_URL'),
-    
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone
