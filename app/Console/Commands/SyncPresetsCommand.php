@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Modules\Campaigns\Actions\SyncCampaignPresetsAction;
 use App\Modules\Core\Actions\ContactStatuses\SyncContactStatusPresetsAction;
+use App\Modules\Documents\Actions\SyncDocumentRequirementDefinitionsAction;
 use App\Modules\FlowRoutes\Actions\SyncFlowRouteCapabilitiesAction;
 use App\Modules\FlowRoutes\Actions\SyncFlowRoutePresetsAction;
 use App\Modules\Forms\Actions\SyncFormPresetsAction;
@@ -35,6 +36,7 @@ class SyncPresetsCommand extends Command
     public function handle(
         SyncContactStatusPresetsAction $syncContactStatusPresets,
         SyncTaskPresetsAction $syncTaskPresets,
+        SyncDocumentRequirementDefinitionsAction $syncDocumentRequirements,
         SyncWebinarScheduleProfilesAction $syncWebinarScheduleProfiles,
         SyncMessageTemplatePresetsAction $syncMessageTemplatePresets,
         SyncInboundReplyProfilesAction $syncInboundReplyProfiles,
@@ -118,6 +120,15 @@ class SyncPresetsCommand extends Command
             } else {
                 $this->line('');
                 $this->warn('Forms: module disabled or no groups configured; skipped.');
+            }
+
+            if (in_array('documents', $runtimeModules, true)) {
+                $this->renderDocumentRequirementResult(
+                    $syncDocumentRequirements->handle(),
+                );
+            } else {
+                $this->line('');
+                $this->warn('Document requirements: module disabled; skipped.');
             }
 
             if (in_array('messaging', $runtimeModules, true)) {
@@ -347,6 +358,23 @@ class SyncPresetsCommand extends Command
                 ['Definitions unchanged', $result->definitionsUnchanged],
                 ['Versions published', $result->versionsPublished],
                 ['Versions reused', $result->versionsReused],
+            ],
+        );
+    }
+
+    private function renderDocumentRequirementResult(array $result): void
+    {
+        $this->line('');
+        $this->info('Document requirements');
+
+        $this->table(
+            ['Item', 'Count'],
+            [
+                ['Created', $result['created']],
+                ['Updated', $result['updated']],
+                ['Restored', $result['restored']],
+                ['Unchanged', $result['unchanged']],
+                ['Existing/manual preserved', $result['preserved']],
             ],
         );
     }

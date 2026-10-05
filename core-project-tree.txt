@@ -590,6 +590,9 @@
 │   │   │       └── PublicHumanVerificationSetupValidationContributor.php
 │   │   ├── Documents
 │   │   │   ├── Actions
+│   │   │   │   ├── CreateDocumentRequestAction.php
+│   │   │   │   ├── ReviewDocumentUploadAction.php
+│   │   │   │   └── SyncDocumentRequirementDefinitionsAction.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   │   └── CRM
@@ -605,7 +608,8 @@
 │   │   │   ├── Requests
 │   │   │   ├── Services
 │   │   │   │   ├── DocumentAttachmentLibrary.php
-│   │   │   │   └── DocumentEvidenceResolver.php
+│   │   │   │   ├── DocumentEvidenceResolver.php
+│   │   │   │   └── DocumentRequirementDefinitionRegistry.php
 │   │   │   └── Support
 │   │   ├── Events
 │   │   │   ├── Actions
@@ -2182,7 +2186,10 @@
 │   │   ├── ModuleIntegrations
 │   │   │   ├── Documents
 │   │   │   │   ├── Contracts
-│   │   │   │   │   └── DocumentAttachmentSource.php
+│   │   │   │   │   ├── DocumentAttachmentSource.php
+│   │   │   │   │   └── DocumentRequirementDefinitionContributor.php
+│   │   │   │   ├── Data
+│   │   │   │   │   └── DocumentRequirementDefinitionContribution.php
 │   │   │   │   ├── DocumentAttachment.php
 │   │   │   │   └── Portal
 │   │   │   │       ├── Contracts
@@ -3614,6 +3621,8 @@
 │   │   │   ├── LaunchClientEnvironmentAuditScriptTest.php
 │   │   │   └── LaunchClientEnvironmentScriptTest.php
 │   │   ├── Documents
+│   │   │   ├── DocumentRequestLifecycleActionTest.php
+│   │   │   ├── DocumentRequirementDefinitionSyncTest.php
 │   │   │   ├── DocumentsFoundationTest.php
 │   │   │   ├── GenericDocumentEvidenceTest.php
 │   │   │   ├── PortalDocumentSurfaceTest.php
@@ -4146,4 +4155,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-912 directories, 3235 files
+913 directories, 3243 files

@@ -265,22 +265,48 @@ Mortgage reads document checklist state through a Documents read service.
 Reporting reads document completion/review summaries through a Documents read service.
 ```
 
-## Public seams to add later
+## Current public definition and lifecycle seams
 
-The first foundation slice does not need full actions yet.
-
-Likely future public seams:
+Documents now exposes a small horizontal contribution/lifecycle surface:
 
 ```text
-CreateDocumentRequirementDefinitionAction
+DocumentRequirementDefinitionContributor
+DocumentRequirementDefinitionContribution
+DocumentRequirementDefinitionRegistry
+SyncDocumentRequirementDefinitionsAction
 CreateDocumentRequestAction
+ReviewDocumentUploadAction
+DocumentEvidenceResolver
+DocumentAttachmentLibrary
+```
+
+Vertical packages may contribute reusable requirement definitions through the app-level contributor contract without writing `document_requirement_definitions` directly.
+
+Contributed definitions are installed only when Documents sync runs. A managed row uses `source = contributor:{contributor_key}`. Later syncs may update only rows still owned by that contributor. A pre-existing row with the same key and another source is preserved so client/operator-owned definitions are not silently overwritten.
+
+`CreateDocumentRequestAction` owns generic request creation for a persisted subject and an active requirement key. `ReviewDocumentUploadAction` owns the first approval/rejection transition:
+
+```text
+approved upload
+    -> upload approved
+    -> request satisfied
+
+rejected upload
+    -> upload rejected
+    -> request replacement_requested
+```
+
+The actions record Documents-owned review history. They do not send messages, create Tasks, or interpret vertical compliance.
+
+`presets:sync` invokes contributed document-requirement sync when Documents is enabled. Requirement contribution is deliberately not a new `PresetDomain`: it does not need preset-package group selection yet, and enabled vertical packages may contribute harmless inactive-by-default requirement definitions directly.
+
+## Public seams still to add later
+
+Likely later public seams:
+
+```text
 CancelDocumentRequestAction
 ExpireDocumentRequestAction
-UploadDocumentAction
-AttachUploadedDocumentToRequestAction
-ReviewDocumentUploadAction
-ApproveDocumentUploadAction
-RejectDocumentUploadAction
 RequestDocumentReplacementAction
 WaiveDocumentRequestAction
 DocumentsReadService
@@ -295,7 +321,7 @@ DocumentStorageProvider
 DocumentTextExtractionProvider
 ```
 
-Public actions should exist before other modules directly create or mutate Documents records.
+Other modules should use public Documents actions/services/contracts rather than directly mutating Documents records.
 
 ## Requirement definitions vs requests
 

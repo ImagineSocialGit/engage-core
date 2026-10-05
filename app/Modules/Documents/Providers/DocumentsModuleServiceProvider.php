@@ -3,7 +3,9 @@
 namespace App\Modules\Documents\Providers;
 
 use App\Modules\Documents\Services\DocumentAttachmentLibrary;
+use App\Modules\Documents\Services\DocumentRequirementDefinitionRegistry;
 use App\Support\ModuleIntegrations\Documents\Contracts\DocumentAttachmentSource;
+use App\Support\ModuleIntegrations\Documents\Contracts\DocumentRequirementDefinitionContributor;
 use App\Support\ModuleIntegrations\Messaging\Contracts\MessageAttachmentSource;
 use App\Support\ModuleIntegrations\Messaging\Documents\DocumentMessageAttachmentSource;
 use Illuminate\Support\ServiceProvider;
@@ -13,6 +15,12 @@ class DocumentsModuleServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(DocumentAttachmentSource::class, DocumentAttachmentLibrary::class);
+        $this->app->singleton(
+            DocumentRequirementDefinitionRegistry::class,
+            fn ($app): DocumentRequirementDefinitionRegistry => new DocumentRequirementDefinitionRegistry(
+                $app->tagged(DocumentRequirementDefinitionContributor::TAG),
+            ),
+        );
         $this->app->tag(DocumentMessageAttachmentSource::class, MessageAttachmentSource::TAG);
     }
 
