@@ -3,6 +3,7 @@
 namespace App\Modules\Portal\Controllers\Public;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Portal\Contracts\PortalAccountNotificationTransport;
 use App\Modules\Portal\Services\PortalAuthContext;
 use App\Modules\Portal\Services\PortalDashboardPanelRegistry;
 use App\Modules\Portal\Services\PortalNavigationRegistry;
@@ -15,6 +16,7 @@ final class PortalHomeController extends Controller
         PortalAuthContext $context,
         PortalDashboardPanelRegistry $panels,
         PortalNavigationRegistry $navigation,
+        PortalAccountNotificationTransport $notifications,
         PortalPresentationResolver $presentation,
     ): View {
         $user = $context->requireUser();
@@ -23,6 +25,7 @@ final class PortalHomeController extends Controller
             'portalUser' => $user,
             'panels' => $panels->forUser($user),
             'navigation' => $navigation->forUser($user),
+            'emailVerificationAvailable' => $notifications->available(),
             'presentation' => $presentation->resolve('Account'),
         ]);
     }

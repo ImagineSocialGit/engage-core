@@ -8,7 +8,12 @@
                 </div>
 
                 @if(!$portalUser->hasVerifiedEmail())
-                    <span class="inline-flex w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">Email verification pending</span>
+                    <div class="flex flex-col items-start gap-2">
+                        <span class="inline-flex w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">Email verification pending</span>
+                        @if($emailVerificationAvailable)
+                            <a href="{{ route('portal.verification.notice') }}" class="text-sm font-semibold text-slate-700 hover:text-slate-950">Verify email</a>
+                        @endif
+                    </div>
                 @endif
             </div>
         </section>

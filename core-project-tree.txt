@@ -1401,19 +1401,23 @@
 │   │   │   │   ├── AuthenticatePortalUserAction.php
 │   │   │   │   ├── CreatePortalInvitationAction.php
 │   │   │   │   ├── CreatePortalUserAction.php
+│   │   │   │   ├── DeliverPortalInvitationAction.php
 │   │   │   │   ├── LinkPortalUserToContactAction.php
 │   │   │   │   └── MarkPortalInvitationSentAction.php
 │   │   │   ├── Auth
 │   │   │   │   └── PortalUserProvider.php
 │   │   │   ├── Contracts
+│   │   │   │   ├── PortalAccountNotificationTransport.php
 │   │   │   │   ├── PortalDashboardPanelProvider.php
 │   │   │   │   ├── PortalNavigationProvider.php
 │   │   │   │   └── PortalRouteContributor.php
 │   │   │   ├── Controllers
 │   │   │   │   └── Public
 │   │   │   │       ├── PortalAccountController.php
+│   │   │   │       ├── PortalEmailVerificationController.php
 │   │   │   │       ├── PortalHomeController.php
 │   │   │   │       ├── PortalInvitationAcceptanceController.php
+│   │   │   │       ├── PortalPasswordResetController.php
 │   │   │   │       └── PortalSessionController.php
 │   │   │   ├── Data
 │   │   │   │   ├── PortalDashboardPanel.php
@@ -1436,7 +1440,9 @@
 │   │   │   │   ├── PortalDashboardPanelRegistry.php
 │   │   │   │   ├── PortalNavigationRegistry.php
 │   │   │   │   ├── PortalPresentationResolver.php
-│   │   │   │   └── PortalRouteRegistry.php
+│   │   │   │   ├── PortalRouteRegistry.php
+│   │   │   │   ├── PortalSecretLinkCodec.php
+│   │   │   │   └── UnavailablePortalAccountNotificationTransport.php
 │   │   │   └── Support
 │   │   ├── Relationships
 │   │   │   ├── Actions
@@ -2230,6 +2236,12 @@
 │   │   │   │   ├── Tasks
 │   │   │   │   │   └── ScheduledMessageTaskLinkPresenter.php
 │   │   │   │   └── UnavailableMessageMediaLibrary.php
+│   │   │   ├── Portal
+│   │   │   │   └── Messaging
+│   │   │   │       ├── MarkPortalInvitationSentAfterScheduledMessageSent.php
+│   │   │   │       ├── MessagingPortalAccountNotificationTransport.php
+│   │   │   │       ├── PortalMessageRecipientPayloadProvider.php
+│   │   │   │       └── PortalMessagingRecipientGate.php
 │   │   │   ├── RelationshipLocationAreaBridge.php
 │   │   │   ├── RelationshipLocationAreaImportHandler.php
 │   │   │   ├── Reporting
@@ -2909,6 +2921,7 @@
 │   │   ├── portal
 │   │   │   ├── authentication.md
 │   │   │   ├── customer-surface.md
+│   │   │   ├── messaging-integration.md
 │   │   │   └── module_state.md
 │   │   ├── README.md
 │   │   ├── relationships
@@ -3297,7 +3310,10 @@
 │       │   ├── account
 │       │   │   └── show.blade.php
 │       │   ├── auth
-│       │   │   └── login.blade.php
+│       │   │   ├── forgot-password.blade.php
+│       │   │   ├── login.blade.php
+│       │   │   ├── reset-password.blade.php
+│       │   │   └── verify-email.blade.php
 │       │   ├── home.blade.php
 │       │   └── invitations
 │       │       └── accept.blade.php
@@ -3868,7 +3884,8 @@
 │   │   ├── Portal
 │   │   │   ├── PortalAuthenticationFoundationTest.php
 │   │   │   ├── PortalCustomerSurfaceTest.php
-│   │   │   └── PortalFoundationTest.php
+│   │   │   ├── PortalFoundationTest.php
+│   │   │   └── PortalMessagingIntegrationTest.php
 │   │   ├── Presets
 │   │   │   ├── ModuleFirstPresetCompositionTest.php
 │   │   │   └── PresetCompositionSyncCutoverTest.php
@@ -4108,4 +4125,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-904 directories, 3205 files
+906 directories, 3220 files

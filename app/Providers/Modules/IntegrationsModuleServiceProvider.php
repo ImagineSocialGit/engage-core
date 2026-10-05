@@ -5,6 +5,8 @@ namespace App\Providers\Modules;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use App\Modules\Messaging\Contracts\MessageTemplateDeletionReferenceContributor;
 use App\Modules\Messaging\Contracts\ReusableMessageTemplateAuthoringOptionContributor;
+use App\Modules\Messaging\Events\ScheduledMessageSent;
+use App\Modules\Portal\Contracts\PortalAccountNotificationTransport;
 use App\Support\ModuleIntegrations\InboundMessaging\Tasks\InboundMessageTaskLinkPresenter;
 use App\Support\ModuleIntegrations\Messaging\Broadcasts\BroadcastMessageTemplateDeletionReferenceContributor;
 use App\Support\ModuleIntegrations\Messaging\Campaigns\CampaignTouchMessageTemplateDeletionReferenceContributor;
@@ -12,6 +14,10 @@ use App\Support\ModuleIntegrations\Messaging\FlowRoutes\FlowRouteMessageTemplate
 use App\Support\ModuleIntegrations\Messaging\FlowRoutes\FlowRouteReusableMessageTemplateAuthoringContributor;
 use App\Support\ModuleIntegrations\Scheduling\Automation\AppointmentHostNotificationAutomationCapabilityContributor;
 use App\Support\ModuleIntegrations\Messaging\Tasks\ScheduledMessageTaskLinkPresenter;
+use App\Support\ModuleIntegrations\Portal\Messaging\MarkPortalInvitationSentAfterScheduledMessageSent;
+use App\Support\ModuleIntegrations\Portal\Messaging\MessagingPortalAccountNotificationTransport;
+use App\Support\ModuleIntegrations\Portal\Messaging\PortalMessageRecipientPayloadProvider;
+use App\Support\ModuleIntegrations\Portal\Messaging\PortalMessagingRecipientGate;
 use App\Support\ModuleIntegrations\Scheduling\Automation\AppointmentHostNotificationAutomationPointAuthoringContributor;
 use App\Support\ModuleIntegrations\Scheduling\Automation\AppointmentHostNotificationAutomationPointDefinitionContributor;
 use App\Support\ModuleIntegrations\Scheduling\Automation\AppointmentTaskAutomationCapabilityContributor;
@@ -71,6 +77,21 @@ class IntegrationsModuleServiceProvider extends ServiceProvider
             );
         }
 
+        if ($this->has($enabled, ['portal', 'messaging'])) {
+            $this->app->singleton(
+                PortalAccountNotificationTransport::class,
+                MessagingPortalAccountNotificationTransport::class,
+            );
+            $this->app->tag(
+                PortalMessagingRecipientGate::class,
+                'messaging.message_recipient_gates',
+            );
+            $this->app->tag(
+                PortalMessageRecipientPayloadProvider::class,
+                'messaging.message_recipient_payload_providers',
+            );
+        }
+
         if ($this->has($enabled, ['scheduling', 'core'])) {
             $this->app->tag(
                 ContactTagBookingOfferRewardActionHandler::class,
@@ -118,6 +139,13 @@ class IntegrationsModuleServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $enabled = $this->app->make(ModuleManager::class)->enabledKeysWithDependencies();
+
+        if ($this->has($enabled, ['portal', 'messaging'])) {
+            Event::listen(
+                ScheduledMessageSent::class,
+                MarkPortalInvitationSentAfterScheduledMessageSent::class,
+            );
+        }
 
         if ($this->has($enabled, ['scheduling'])
             && ! in_array('flow_routes', $enabled, true)

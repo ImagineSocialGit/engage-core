@@ -7,6 +7,7 @@ use App\Modules\Portal\Actions\AcceptPortalInvitationAction;
 use App\Modules\Portal\Actions\AuthenticatePortalUserAction;
 use App\Modules\Portal\Models\PortalInvitation;
 use App\Modules\Portal\Services\PortalPresentationResolver;
+use App\Modules\Portal\Services\PortalSecretLinkCodec;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,9 +17,19 @@ use InvalidArgumentException;
 
 final class PortalInvitationAcceptanceController extends Controller
 {
-    public function show(PortalInvitation $invitation, string $token, PortalPresentationResolver $presentation): View
-    {
+    public function show(
+        PortalInvitation $invitation,
+        string $token,
+        PortalSecretLinkCodec $codec,
+        PortalPresentationResolver $presentation,
+    ): View {
         abort_unless($this->available($invitation), 404);
+
+        try {
+            $codec->decode($token, PortalSecretLinkCodec::PURPOSE_INVITATION);
+        } catch (InvalidArgumentException) {
+            abort(404);
+        }
 
         return view('portal.invitations.accept', [
             'invitation' => $invitation,
@@ -32,6 +43,7 @@ final class PortalInvitationAcceptanceController extends Controller
         Request $request,
         PortalInvitation $invitation,
         string $token,
+        PortalSecretLinkCodec $codec,
         AcceptPortalInvitationAction $accept,
         AuthenticatePortalUserAction $authenticate,
     ): RedirectResponse {
@@ -50,9 +62,14 @@ final class PortalInvitationAcceptanceController extends Controller
         $data = $request->validate($rules);
 
         try {
+            $rawToken = $codec->decode(
+                $token,
+                PortalSecretLinkCodec::PURPOSE_INVITATION,
+            );
+
             $user = $accept->handle(
                 invitation: $invitation,
-                token: $token,
+                token: $rawToken,
                 name: (string) $data['name'],
                 password: (string) $data['password'],
                 email: filled($invitation->email) ? $invitation->email : (string) ($data['email'] ?? ''),

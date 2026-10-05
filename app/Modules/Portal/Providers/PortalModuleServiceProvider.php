@@ -3,11 +3,14 @@
 namespace App\Modules\Portal\Providers;
 
 use App\Modules\Portal\Auth\PortalUserProvider;
+use App\Modules\Portal\Contracts\PortalAccountNotificationTransport;
 use App\Modules\Portal\Models\PortalUser;
 use App\Modules\Portal\Services\PortalAuthContext;
 use App\Modules\Portal\Services\PortalDashboardPanelRegistry;
 use App\Modules\Portal\Services\PortalNavigationRegistry;
 use App\Modules\Portal\Services\PortalRouteRegistry;
+use App\Modules\Portal\Services\PortalSecretLinkCodec;
+use App\Modules\Portal\Services\UnavailablePortalAccountNotificationTransport;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 
@@ -41,6 +44,11 @@ class PortalModuleServiceProvider extends ServiceProvider
         ]);
 
         $this->app->singleton(PortalAuthContext::class);
+        $this->app->singleton(PortalSecretLinkCodec::class);
+        $this->app->singleton(
+            PortalAccountNotificationTransport::class,
+            UnavailablePortalAccountNotificationTransport::class,
+        );
         $this->app->singleton(
             PortalDashboardPanelRegistry::class,
             fn ($app): PortalDashboardPanelRegistry => new PortalDashboardPanelRegistry(

@@ -4,6 +4,7 @@ namespace App\Modules\Portal\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Portal\Actions\AuthenticatePortalUserAction;
+use App\Modules\Portal\Contracts\PortalAccountNotificationTransport;
 use App\Modules\Portal\Models\PortalUser;
 use App\Modules\Portal\Services\PortalPresentationResolver;
 use Illuminate\Contracts\Auth\Factory as AuthFactory;
@@ -16,13 +17,17 @@ use Illuminate\View\View;
 
 final class PortalSessionController extends Controller
 {
-    public function create(AuthFactory $auth, PortalPresentationResolver $presentation): View|RedirectResponse
-    {
+    public function create(
+        AuthFactory $auth,
+        PortalAccountNotificationTransport $notifications,
+        PortalPresentationResolver $presentation,
+    ): View|RedirectResponse {
         if ($auth->guard('portal')->user() instanceof PortalUser) {
             return redirect()->route('portal.home');
         }
 
         return view('portal.auth.login', [
+            'passwordResetAvailable' => $notifications->available(),
             'presentation' => $presentation->resolve('Sign in'),
         ]);
     }

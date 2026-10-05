@@ -2,6 +2,12 @@
     <div class="mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <h1 class="text-2xl font-bold tracking-tight text-slate-950">Sign in</h1>
 
+        @if(session('status'))
+            <div class="mt-5 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                {{ session('status') }}
+            </div>
+        @endif
+
         <form method="POST" action="{{ route('portal.login.store') }}" class="mt-6 space-y-5">
             @csrf
 
@@ -26,5 +32,11 @@
                 Sign in
             </button>
         </form>
+
+        @if($passwordResetAvailable)
+            <a href="{{ route('portal.password.request.form') }}" class="mt-5 inline-flex text-sm font-semibold text-slate-600 hover:text-slate-950">
+                Forgot your password?
+            </a>
+        @endif
     </div>
 </x-layouts.portal>
