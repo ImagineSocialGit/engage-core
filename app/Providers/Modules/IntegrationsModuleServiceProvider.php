@@ -13,6 +13,8 @@ use App\Support\ModuleIntegrations\Documents\Portal\DocumentsPortalNavigationPro
 use App\Support\ModuleIntegrations\Documents\Portal\DocumentsPortalRouteContributor;
 use App\Support\ModuleIntegrations\Documents\Portal\PortalContactDocumentSubjectProvider;
 use App\Support\ModuleIntegrations\Documents\Portal\PortalDocumentSubjectRegistry;
+use App\Modules\Forms\Contracts\HostedFormContextResolver;
+use App\Support\ModuleIntegrations\Forms\Events\EventHostedFormContextResolver;
 use App\Support\ModuleIntegrations\InboundMessaging\Tasks\InboundMessageTaskLinkPresenter;
 use App\Support\ModuleIntegrations\Messaging\Broadcasts\BroadcastMessageTemplateDeletionReferenceContributor;
 use App\Support\ModuleIntegrations\Messaging\Campaigns\CampaignTouchMessageTemplateDeletionReferenceContributor;
@@ -61,6 +63,13 @@ class IntegrationsModuleServiceProvider extends ServiceProvider
             CampaignTouchMessageTemplateDeletionReferenceContributor::class,
             FlowRouteMessageTemplateDeletionReferenceContributor::class,
         ], MessageTemplateDeletionReferenceContributor::TAG);
+
+        if ($this->has($enabled, ['forms', 'events'])) {
+            $this->app->tag(
+                EventHostedFormContextResolver::class,
+                HostedFormContextResolver::TAG,
+            );
+        }
 
         if ($this->has($enabled, ['flow_routes', 'messaging'])) {
             $this->app->tag(

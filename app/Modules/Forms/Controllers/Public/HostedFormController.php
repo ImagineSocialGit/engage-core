@@ -3,10 +3,12 @@
 namespace App\Modules\Forms\Controllers\Public;
 
 use App\Modules\Forms\Actions\CreateFormSubmissionAction;
+use App\Modules\Forms\Data\FormSubmissionContext;
 use App\Modules\Forms\Data\FormSubmissionInput;
 use App\Modules\Forms\Data\FormSubmissionVerification;
 use App\Modules\Forms\Data\PublishedForm;
 use App\Modules\Forms\Exceptions\FormSubmissionValidationException;
+use App\Modules\Forms\Services\HostedFormContextService;
 use App\Modules\Forms\Services\HostedFormPresenter;
 use App\Modules\Forms\Services\HostedFormRuntimeValidator;
 use App\Modules\Forms\Services\PublishedFormResolver;
@@ -24,6 +26,7 @@ final class HostedFormController
 
     public function __construct(
         private readonly PublishedFormResolver $forms,
+        private readonly HostedFormContextService $contexts,
         private readonly HostedFormPresenter $presenter,
         private readonly HostedFormRuntimeValidator $runtime,
         private readonly CreateFormSubmissionAction $submissions,
@@ -33,7 +36,13 @@ final class HostedFormController
     public function show(Request $request, string $formSlug): View
     {
         $form = $this->resolveHostedForm($formSlug);
+        $context = $this->resolveSignedContext($request);
         $presentation = $this->presenter->present($form);
+        $presentation = $this->withContextToken(
+            presentation: $presentation,
+            form: $form,
+            context: $context,
+        );
 
         return view('forms.show', [
             'title' => $form->name,
@@ -45,6 +54,7 @@ final class HostedFormController
     public function store(Request $request, string $formSlug): RedirectResponse
     {
         $form = $this->resolveHostedForm($formSlug);
+        $context = $this->resolvePostedContext($request, $form);
         $presentation = $this->presenter->present($form);
         $redirect = route('forms.public.show', [
             'formSlug' => $presentation['slug'],
@@ -73,6 +83,7 @@ final class HostedFormController
                 userAgent: $request->userAgent(),
                 verification: $this->verificationFromRequest($request),
                 publicOnly: true,
+                context: $context,
             ));
         } catch (FormSubmissionValidationException $exception) {
             return back()
@@ -89,6 +100,54 @@ final class HostedFormController
                 'public_surfaces.tracking.event',
                 self::PUBLIC_SURFACE_TRACKING_EVENT,
             );
+    }
+
+    private function resolveSignedContext(Request $request): ?FormSubmissionContext
+    {
+        try {
+            return $this->contexts->resolveSignedRequest($request);
+        } catch (DomainException) {
+            abort(404);
+        }
+    }
+
+    private function resolvePostedContext(
+        Request $request,
+        PublishedForm $form,
+    ): ?FormSubmissionContext {
+        try {
+            return $this->contexts->resolvePostedRequest(
+                request: $request,
+                formKey: $form->key,
+            );
+        } catch (DomainException) {
+            abort(404);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $presentation
+     * @return array<string, mixed>
+     */
+    private function withContextToken(
+        array $presentation,
+        PublishedForm $form,
+        ?FormSubmissionContext $context,
+    ): array {
+        if ($context === null) {
+            return $presentation;
+        }
+
+        $presentation['hidden_fields'][] = [
+            'key' => HostedFormContextService::POST_FIELD,
+            'type' => 'hidden',
+            'default' => $this->contexts->postToken(
+                formKey: $form->key,
+                context: $context,
+            ),
+        ];
+
+        return $presentation;
     }
 
     private function resolveHostedForm(string $formSlug): PublishedForm

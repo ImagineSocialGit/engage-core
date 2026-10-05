@@ -3,10 +3,12 @@
 namespace App\Modules\Forms\Providers;
 
 use App\Modules\Forms\Automation\FormSubmissionAutomationTriggerAuthoringContributor;
+use App\Modules\Forms\Contracts\HostedFormContextResolver;
 use App\Modules\Forms\ConfigContracts\FormDefinitionConfigContract;
 use App\Modules\Forms\ConfigContracts\FormDefinitionConfigContractTargetProvider;
 use App\Modules\Forms\Console\Commands\IssueExternalFormIntakeSecretCommand;
 use App\Modules\Forms\Deployment\FormsDeploymentPlanContributor;
+use App\Modules\Forms\Services\HostedFormContextRegistry;
 use App\Modules\Forms\Validation\FormsSetupValidationContributor;
 use Illuminate\Support\ServiceProvider;
 
@@ -14,6 +16,13 @@ class FormsModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->singleton(
+            HostedFormContextRegistry::class,
+            fn ($app): HostedFormContextRegistry => new HostedFormContextRegistry(
+                $app->tagged(HostedFormContextResolver::TAG),
+            ),
+        );
+
         $this->app->tag([
             FormSubmissionAutomationTriggerAuthoringContributor::class,
         ], 'automation.trigger_authoring_contributors');

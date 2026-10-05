@@ -34,6 +34,8 @@ final readonly class FormSubmissionInput
 
     public bool $publicOnly;
 
+    public ?FormSubmissionContext $context;
+
     /**
      * @param  array<string, mixed>  $values
      * @param  array<string, mixed>|null  $rawPayload
@@ -51,6 +53,7 @@ final readonly class FormSubmissionInput
         ?string $userAgent = null,
         ?FormSubmissionVerification $verification = null,
         bool $publicOnly = false,
+        ?FormSubmissionContext $context = null,
     ) {
         $formKey = trim($formKey);
 
@@ -97,6 +100,7 @@ final readonly class FormSubmissionInput
         $this->userAgent = $this->nullableString($userAgent, 'userAgent', 65535);
         $this->verification = $verification;
         $this->publicOnly = $publicOnly;
+        $this->context = $context;
     }
 
     public function hasExternalIdentity(): bool

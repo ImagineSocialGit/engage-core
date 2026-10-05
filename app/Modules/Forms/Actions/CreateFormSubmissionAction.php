@@ -117,10 +117,18 @@ final class CreateFormSubmissionAction
             $runtimeMeta['verification'] = $input->verification->evidence();
         }
 
+        $contextEvidence = $input->context?->evidence();
+
+        if ($contextEvidence !== null) {
+            $runtimeMeta['context'] = $contextEvidence;
+        }
+
         $submission = FormSubmission::query()->create([
             'form_definition_id' => $form->definitionId,
             'form_version_id' => $form->versionId,
             'contact_id' => $contact?->getKey(),
+            'subject_type' => $input->context?->subject->getMorphClass(),
+            'subject_id' => $input->context?->subjectId(),
             'status' => FormSubmission::STATUS_SUBMITTED,
             'review_status' => FormSubmission::REVIEW_STATUS_PENDING,
             'submitted_at' => now(),
@@ -167,6 +175,9 @@ final class CreateFormSubmissionAction
                         'status' => (string) $submission->status,
                         'source' => $submission->source,
                     ],
+                    ...($contextEvidence !== null
+                        ? ['context' => $contextEvidence]
+                        : []),
                 ],
                 meta: ['source_module' => 'forms'],
             ),
@@ -251,6 +262,12 @@ final class CreateFormSubmissionAction
             'values' => $this->canonicalize($input->values),
             'meta' => $this->canonicalize($input->meta),
         ];
+
+        if ($input->context !== null) {
+            $logicalRequest['context'] = $this->canonicalize(
+                $input->context->identity(),
+            );
+        }
 
         if ($input->verification !== null) {
             $logicalRequest['verification'] = $this->canonicalize(
