@@ -93,4 +93,47 @@ final class DocumentEvidenceSourceContractTest extends TestCase
             requireExpiration: true,
         ));
     }
+
+    public function test_evaluated_at_does_not_count_approval_that_happened_later(): void
+    {
+        $subject = Contact::factory()->create();
+        $requirement = DocumentRequirementDefinition::factory()->create([
+            'key' => 'historical_evidence_certificate',
+            'status' => DocumentRequirementDefinition::STATUS_ACTIVE,
+            'requires_review' => false,
+        ]);
+
+        $upload = app(DocumentAttachmentLibrary::class)->store(
+            file: UploadedFile::fake()->create(
+                'historical.pdf',
+                10,
+                'application/pdf',
+            ),
+            subject: $subject,
+            requirement: $requirement,
+            expiresAt: CarbonImmutable::parse('2027-12-31 23:59:59 UTC'),
+        );
+
+        $upload->forceFill([
+            'approved_at' => CarbonImmutable::parse('2026-10-10 12:00:00 UTC'),
+        ])->save();
+
+        $source = app(DocumentEvidenceSource::class);
+
+        $this->assertFalse($source->satisfies(
+            subject: $subject,
+            requirementKey: $requirement->key,
+            validThrough: CarbonImmutable::parse('2026-11-01 00:00:00 UTC'),
+            requireExpiration: true,
+            evaluatedAt: CarbonImmutable::parse('2026-10-09 23:59:59 UTC'),
+        ));
+
+        $this->assertTrue($source->satisfies(
+            subject: $subject,
+            requirementKey: $requirement->key,
+            validThrough: CarbonImmutable::parse('2026-11-01 00:00:00 UTC'),
+            requireExpiration: true,
+            evaluatedAt: CarbonImmutable::parse('2026-10-10 12:00:00 UTC'),
+        ));
+    }
 }

@@ -12,5 +12,6 @@ interface DocumentEvidenceSource
         string $requirementKey,
         ?CarbonInterface $validThrough = null,
         bool $requireExpiration = false,
+        ?CarbonInterface $evaluatedAt = null,
     ): bool;
 }

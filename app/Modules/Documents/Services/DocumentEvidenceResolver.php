@@ -18,6 +18,7 @@ final class DocumentEvidenceResolver implements DocumentEvidenceSource
         string $requirementKey,
         ?CarbonInterface $validThrough = null,
         bool $requireExpiration = false,
+        ?CarbonInterface $evaluatedAt = null,
     ): ?DocumentUpload {
         if (! $subject->exists || $subject->getKey() === null) {
             throw new InvalidArgumentException(
@@ -54,6 +55,14 @@ final class DocumentEvidenceResolver implements DocumentEvidenceSource
             $query->whereNotNull('expires_at');
         }
 
+        if ($evaluatedAt instanceof CarbonInterface) {
+            $evaluatedAt = CarbonImmutable::instance($evaluatedAt)->utc();
+
+            $query
+                ->whereNotNull('approved_at')
+                ->where('approved_at', '<=', $evaluatedAt);
+        }
+
         if ($validThrough instanceof CarbonInterface) {
             $validThrough = CarbonImmutable::instance($validThrough)->utc();
 
@@ -80,12 +89,14 @@ final class DocumentEvidenceResolver implements DocumentEvidenceSource
         string $requirementKey,
         ?CarbonInterface $validThrough = null,
         bool $requireExpiration = false,
+        ?CarbonInterface $evaluatedAt = null,
     ): bool {
         return $this->latestApproved(
             subject: $subject,
             requirementKey: $requirementKey,
             validThrough: $validThrough,
             requireExpiration: $requireExpiration,
+            evaluatedAt: $evaluatedAt,
         ) instanceof DocumentUpload;
     }
 }
