@@ -604,7 +604,8 @@
 │   │   │   │   └── DocumentsModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
-│   │   │   │   └── DocumentAttachmentLibrary.php
+│   │   │   │   ├── DocumentAttachmentLibrary.php
+│   │   │   │   └── DocumentEvidenceResolver.php
 │   │   │   └── Support
 │   │   ├── Events
 │   │   │   ├── Actions
@@ -2182,7 +2183,18 @@
 │   │   │   ├── Documents
 │   │   │   │   ├── Contracts
 │   │   │   │   │   └── DocumentAttachmentSource.php
-│   │   │   │   └── DocumentAttachment.php
+│   │   │   │   ├── DocumentAttachment.php
+│   │   │   │   └── Portal
+│   │   │   │       ├── Contracts
+│   │   │   │       │   └── PortalDocumentSubjectProvider.php
+│   │   │   │       ├── Data
+│   │   │   │       │   └── PortalDocumentSubject.php
+│   │   │   │       ├── DocumentsPortalNavigationProvider.php
+│   │   │   │       ├── DocumentsPortalRouteContributor.php
+│   │   │   │       ├── PortalContactDocumentSubjectProvider.php
+│   │   │   │       ├── PortalDocumentAccess.php
+│   │   │   │       ├── PortalDocumentController.php
+│   │   │   │       └── PortalDocumentSubjectRegistry.php
 │   │   │   ├── Forms
 │   │   │   │   ├── Contracts
 │   │   │   │   │   ├── FormSubmissionAutomationWorkspace.php
@@ -2881,7 +2893,9 @@
 │   │   │   ├── module_state.md
 │   │   │   └── TODO.md
 │   │   ├── documents
-│   │   │   └── module_state.md
+│   │   │   ├── generic-evidence.md
+│   │   │   ├── module_state.md
+│   │   │   └── portal-surface.md
 │   │   ├── events
 │   │   │   └── module_state.md
 │   │   ├── experiences
@@ -3314,6 +3328,9 @@
 │       │   │   ├── login.blade.php
 │       │   │   ├── reset-password.blade.php
 │       │   │   └── verify-email.blade.php
+│       │   ├── documents
+│       │   │   ├── index.blade.php
+│       │   │   └── request.blade.php
 │       │   ├── home.blade.php
 │       │   └── invitations
 │       │       └── accept.blade.php
@@ -3405,6 +3422,8 @@
 │   ├── resolve-client-starter-package.php
 │   ├── run-tests-to-dump.sh
 │   └── upload-images.sh
+├── src
+│   └── Integrations
 ├── tests
 │   ├── Feature
 │   │   ├── Auth
@@ -3596,6 +3615,8 @@
 │   │   │   └── LaunchClientEnvironmentScriptTest.php
 │   │   ├── Documents
 │   │   │   ├── DocumentsFoundationTest.php
+│   │   │   ├── GenericDocumentEvidenceTest.php
+│   │   │   ├── PortalDocumentSurfaceTest.php
 │   │   │   └── PrivateDocumentLibraryTest.php
 │   │   ├── Email
 │   │   │   └── HandleInboundEmailWebhookActionTest.php
@@ -4125,4 +4146,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-906 directories, 3220 files
+912 directories, 3235 files

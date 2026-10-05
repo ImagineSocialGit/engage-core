@@ -7,6 +7,12 @@ use App\Modules\Messaging\Contracts\MessageTemplateDeletionReferenceContributor;
 use App\Modules\Messaging\Contracts\ReusableMessageTemplateAuthoringOptionContributor;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Portal\Contracts\PortalAccountNotificationTransport;
+use App\Modules\Portal\Services\PortalNavigationRegistry;
+use App\Modules\Portal\Services\PortalRouteRegistry;
+use App\Support\ModuleIntegrations\Documents\Portal\DocumentsPortalNavigationProvider;
+use App\Support\ModuleIntegrations\Documents\Portal\DocumentsPortalRouteContributor;
+use App\Support\ModuleIntegrations\Documents\Portal\PortalContactDocumentSubjectProvider;
+use App\Support\ModuleIntegrations\Documents\Portal\PortalDocumentSubjectRegistry;
 use App\Support\ModuleIntegrations\InboundMessaging\Tasks\InboundMessageTaskLinkPresenter;
 use App\Support\ModuleIntegrations\Messaging\Broadcasts\BroadcastMessageTemplateDeletionReferenceContributor;
 use App\Support\ModuleIntegrations\Messaging\Campaigns\CampaignTouchMessageTemplateDeletionReferenceContributor;
@@ -89,6 +95,27 @@ class IntegrationsModuleServiceProvider extends ServiceProvider
             $this->app->tag(
                 PortalMessageRecipientPayloadProvider::class,
                 'messaging.message_recipient_payload_providers',
+            );
+        }
+
+        if ($this->has($enabled, ['documents', 'portal'])) {
+            $this->app->singleton(
+                PortalDocumentSubjectRegistry::class,
+                fn ($app): PortalDocumentSubjectRegistry => new PortalDocumentSubjectRegistry(
+                    $app->tagged(PortalDocumentSubjectRegistry::TAG),
+                ),
+            );
+            $this->app->tag(
+                PortalContactDocumentSubjectProvider::class,
+                PortalDocumentSubjectRegistry::TAG,
+            );
+            $this->app->tag(
+                DocumentsPortalNavigationProvider::class,
+                PortalNavigationRegistry::TAG,
+            );
+            $this->app->tag(
+                DocumentsPortalRouteContributor::class,
+                PortalRouteRegistry::TAG,
             );
         }
 
