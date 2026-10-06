@@ -23,7 +23,7 @@ final class EmailViewRenderer
                 $data,
             )->render(),
             EmailPayload::PRESENTATION_STANDARD => View::file(
-                $this->coreViewPath($view),
+                $this->standardViewPath(),
                 $data,
             )->render(),
             default => throw new InvalidArgumentException(
@@ -32,28 +32,13 @@ final class EmailViewRenderer
         };
     }
 
-    private function coreViewPath(string $view): string
+    private function standardViewPath(): string
     {
-        $view = trim($view);
-
-        if ($view === ''
-            || str_contains($view, '::')
-            || str_contains($view, '..')
-            || str_contains($view, '/')
-            || str_contains($view, '\\')
-        ) {
-            throw new InvalidArgumentException(
-                "Standard email presentation requires a Core semantic view name; [{$view}] is invalid.",
-            );
-        }
-
-        $path = resource_path(
-            'views/'.str_replace('.', DIRECTORY_SEPARATOR, $view).'.blade.php',
-        );
+        $path = resource_path('views/email-standard.blade.php');
 
         if (! is_file($path)) {
             throw new InvalidArgumentException(
-                "Standard email view [{$view}] does not exist in Core resources/views.",
+                'Standard email view [email-standard] does not exist in Core resources/views.',
             );
         }
 
