@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Modules;
 
+use App\Modules\Billing\Providers\BillingModuleServiceProvider;
 use App\Modules\Events\Providers\EventsModuleServiceProvider;
 use App\Support\Modules\ModuleManager;
 use FilesystemIterator;
@@ -43,6 +44,7 @@ class ModuleDependencyBoundaryTest extends TestCase
         $registered = array_keys(config('modules.modules', []));
 
         $this->assertContains('core', $registered);
+        $this->assertContains('billing', $registered);
         $this->assertContains('messaging', $registered);
         $this->assertContains('inbound_messaging', $registered);
         $this->assertContains('internal_notifications', $registered);
@@ -59,6 +61,43 @@ class ModuleDependencyBoundaryTest extends TestCase
         $this->assertContains('webinars', $registered);
         $this->assertContains('mortgage', $registered);
         $this->assertContains('reporting', $registered);
+    }
+
+    public function test_billing_module_depends_only_on_core_and_does_not_import_optional_feature_modules(): void
+    {
+        $definition = config('modules.modules.billing');
+
+        $this->assertIsArray($definition);
+        $this->assertSame(['core'], $definition['depends_on']);
+        $this->assertSame([
+            BillingModuleServiceProvider::class,
+        ], $definition['providers']);
+        $this->assertArrayNotHasKey('nav', $definition);
+
+        $this->assertModuleDoesNotImport('Billing', [
+            'Broadcasts',
+            'Campaigns',
+            'Commerce',
+            'Documents',
+            'Events',
+            'FlowRoutes',
+            'Forms',
+            'InboundMessaging',
+            'InternalNotifications',
+            'Location',
+            'Media',
+            'Messaging',
+            'Mortgage',
+            'Music',
+            'PetServices',
+            'Portal',
+            'Relationships',
+            'Reporting',
+            'Scheduling',
+            'Tasks',
+            'Webinars',
+            'Workflow',
+        ]);
     }
 
     public function test_events_module_depends_only_on_core_and_has_no_navigation_yet(): void

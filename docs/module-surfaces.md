@@ -278,6 +278,7 @@ This registry records the current product direction. Reclassification requires a
 | Forms | universal | loud | Provide form/submission workflows; complex form construction may remain developer/operator work. |
 | Documents | universal | loud | Provide request, upload, review, and checklist workflows; requirement design may remain developer/operator work. |
 | Media | universal | silent with narrow authority surface | Own reusable asset identity, storage, upload/archive management, and a shared Media Library; consuming modules own the workflows that select or publish those assets. |
+| Billing | universal | silent | Own provider-neutral prices, collection requirements, payment obligations, payment state, and collection-provider contracts while consuming modules own the customer/operator workflow. |
 | Commerce | universal | loud | Provide custom storefront/offers, purchase history, provider-backed checkout orchestration, and cross-provider inventory coordination while specialized payment, shipping/warehouse, POS, and deep store operations remain external. |
 | Location | universal | silent | Provide normalized location facts and supporting contracts through consuming modules; no standalone Location product by default. |
 | Relationships | universal | loud | Provide relationship-scoped Contact workspaces; normal daily lists must not mix materially different relationship populations. |

@@ -33,6 +33,7 @@ Use `../module-boundaries.md` for platform-wide ownership/dependency rules, `../
 | Forms | Universal; loud | `forms/module_state.md` |
 | Documents | Universal; loud | `documents/module_state.md` |
 | Media | Universal; silent with narrow asset-library authority surface | `media/module_state.md` |
+| Billing | Universal; silent | `billing/module_state.md` |
 | Commerce | Universal; loud | `commerce/module_state.md` |
 | Location | Universal; silent | `location/module_state.md` |
 | Relationships | Universal; loud | `relationships/module_state.md` |

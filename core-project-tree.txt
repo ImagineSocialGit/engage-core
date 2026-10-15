@@ -78,6 +78,25 @@
 │   │   ├── DashboardAcknowledgement.php
 │   │   └── User.php
 │   ├── Modules
+│   │   ├── Billing
+│   │   │   ├── Actions
+│   │   │   │   ├── CreateBillingPaymentRequestAction.php
+│   │   │   │   └── RecordBillingPaymentAction.php
+│   │   │   ├── Contracts
+│   │   │   │   └── BillingCollectionProvider.php
+│   │   │   ├── Data
+│   │   │   │   ├── BillingCollectionRequest.php
+│   │   │   │   └── BillingCollectionResult.php
+│   │   │   ├── Models
+│   │   │   │   ├── BillingCollectionRequirement.php
+│   │   │   │   ├── BillingPayment.php
+│   │   │   │   ├── BillingPaymentRequest.php
+│   │   │   │   └── BillingPrice.php
+│   │   │   ├── Providers
+│   │   │   │   └── BillingModuleServiceProvider.php
+│   │   │   └── Services
+│   │   │       ├── BillingCollectionAmountResolver.php
+│   │   │       └── BillingCollectionProviderRegistry.php
 │   │   ├── Broadcasts
 │   │   │   ├── Access
 │   │   │   │   └── BroadcastsAccessCapabilityContributor.php
@@ -795,6 +814,7 @@
 │   │   │   │   └── Commands
 │   │   │   │       └── IssueExternalFormIntakeSecretCommand.php
 │   │   │   ├── Contracts
+│   │   │   │   └── HostedFormContextResolver.php
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
 │   │   │   │   │   ├── FormsController.php
@@ -809,9 +829,11 @@
 │   │   │   │   ├── ExternalPublishedForm.php
 │   │   │   │   ├── FormPresetSyncResult.php
 │   │   │   │   ├── FormSubmissionConsentIntent.php
+│   │   │   │   ├── FormSubmissionContext.php
 │   │   │   │   ├── FormSubmissionInput.php
 │   │   │   │   ├── FormSubmissionResult.php
 │   │   │   │   ├── FormSubmissionVerification.php
+│   │   │   │   ├── HostedFormContextReference.php
 │   │   │   │   ├── NormalizedFormSubmission.php
 │   │   │   │   ├── NormalizedFormSubmissionValue.php
 │   │   │   │   └── PublishedForm.php
@@ -845,6 +867,8 @@
 │   │   │   │   ├── FormSubmissionValidator.php
 │   │   │   │   ├── FormSubmissionVerificationPolicy.php
 │   │   │   │   ├── FormVisibilityEvaluator.php
+│   │   │   │   ├── HostedFormContextRegistry.php
+│   │   │   │   ├── HostedFormContextService.php
 │   │   │   │   ├── HostedFormLayoutResolver.php
 │   │   │   │   ├── HostedFormPresenter.php
 │   │   │   │   ├── HostedFormRuntimeValidator.php
@@ -2207,6 +2231,8 @@
 │   │   │   │   ├── Contracts
 │   │   │   │   │   ├── FormSubmissionAutomationWorkspace.php
 │   │   │   │   │   └── FormSubmissionConsentHandler.php
+│   │   │   │   ├── Events
+│   │   │   │   │   └── EventHostedFormContextResolver.php
 │   │   │   │   ├── FlowRoutes
 │   │   │   │   │   └── FlowRoutesFormSubmissionAutomationWorkspace.php
 │   │   │   │   ├── FormSubmissionConsentBridge.php
@@ -2652,6 +2678,8 @@
 │   │   └── WebinarWaitlistSignupFactory.php
 │   ├── migrations
 │   │   ├── modules
+│   │   │   ├── billing
+│   │   │   │   └── 2026_10_05_230000_create_billing_foundation_tables.php
 │   │   │   ├── broadcasts
 │   │   │   │   ├── 2026_06_12_065258_create_broadcasts_table.php
 │   │   │   │   ├── 2026_06_12_065311_create_broadcast_recipients_table.php
@@ -2879,6 +2907,8 @@
 │   ├── modular-migrations.md
 │   ├── module-boundaries.md
 │   ├── modules
+│   │   ├── billing
+│   │   │   └── module_state.md
 │   │   ├── broadcasts
 │   │   │   ├── module_state.md
 │   │   │   └── TODO.md
@@ -3311,6 +3341,7 @@
 │       │       └── time-change-settings.blade.php
 │       ├── email.blade.php
 │       ├── email-media-card.blade.php
+│       ├── email-standard.blade.php
 │       ├── email-text.blade.php
 │       ├── forms
 │       │   └── show.blade.php
@@ -3441,6 +3472,8 @@
 │   │   │   ├── EvaluateAutomationOpportunityActionTest.php
 │   │   │   ├── RecordAutomationBehaviorOccurrenceActionTest.php
 │   │   │   └── RecordAutomationEventCorrelationEvidenceActionTest.php
+│   │   ├── Billing
+│   │   │   └── BillingFoundationTest.php
 │   │   ├── Broadcasts
 │   │   │   ├── BroadcastAttachmentsTest.php
 │   │   │   ├── BroadcastAudiencePreviewTest.php
@@ -3697,6 +3730,7 @@
 │   │   │   ├── FormSubmissionMessagingConsentBridgeTest.php
 │   │   │   ├── FormSubmissionVerificationTest.php
 │   │   │   ├── FormSubmissionWorkspaceTest.php
+│   │   │   ├── HostedFormContextTest.php
 │   │   │   ├── HostedFormRuntimeTest.php
 │   │   │   ├── IssueExternalFormIntakeSecretCommandTest.php
 │   │   │   └── PublishedFormRuntimeTest.php
@@ -3791,6 +3825,7 @@
 │   │   │   ├── EmailPayloadTest.php
 │   │   │   ├── EmailPresentationPolicyTest.php
 │   │   │   ├── EmailReplyAddressGeneratorTest.php
+│   │   │   ├── EmailViewRendererTest.php
 │   │   │   ├── FlowRouteReusableMessageTemplateAuthoringTest.php
 │   │   │   ├── GenericMessageAttachmentsTest.php
 │   │   │   ├── GrantMessageConsentActionTest.php
@@ -4157,4 +4192,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-913 directories, 3245 files
+924 directories, 3269 files

@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Billing\Providers\BillingModuleServiceProvider;
 use App\Modules\Broadcasts\Providers\BroadcastsModuleServiceProvider;
 use App\Modules\Campaigns\MessageTemplates\CampaignMessageTemplateDefinitionContributor;
 use App\Modules\Campaigns\Providers\CampaignsModuleServiceProvider;
@@ -773,6 +774,14 @@ return [
             'depends_on' => ['core'],
             'providers' => [
                 MediaModuleServiceProvider::class,
+            ],
+        ],
+
+        'billing' => [
+            'name' => 'Billing',
+            'depends_on' => ['core'],
+            'providers' => [
+                BillingModuleServiceProvider::class,
             ],
         ],
 

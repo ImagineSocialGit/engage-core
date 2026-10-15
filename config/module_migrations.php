@@ -7,6 +7,7 @@ return [
 
     'modules' => [
         'core' => ['path' => 'database/migrations/modules/core'],
+        'billing' => ['path' => 'database/migrations/modules/billing'],
         'relationships' => ['path' => 'database/migrations/modules/relationships'],
         'messaging' => ['path' => 'database/migrations/modules/messaging'],
         'inbound_messaging' => ['path' => 'database/migrations/modules/inbound_messaging'],
