@@ -648,7 +648,8 @@
 │   │   │   │   └── UpdateDraftEventAction.php
 │   │   │   ├── Contracts
 │   │   │   │   ├── EventDefinitionContributor.php
-│   │   │   │   └── EventReadinessContributor.php
+│   │   │   │   ├── EventReadinessContributor.php
+│   │   │   │   └── EventWorkspacePanelContributor.php
 │   │   │   ├── Controllers
 │   │   │   │   └── CRM
 │   │   │   │       └── EventController.php
@@ -657,7 +658,9 @@
 │   │   │   │   ├── EventDefinitionContribution.php
 │   │   │   │   ├── EventGateDecision.php
 │   │   │   │   ├── EventReadinessFinding.php
-│   │   │   │   └── EventReadinessResult.php
+│   │   │   │   ├── EventReadinessResult.php
+│   │   │   │   ├── EventWorkspaceAction.php
+│   │   │   │   └── EventWorkspacePanel.php
 │   │   │   ├── Enums
 │   │   │   │   ├── EventAttendanceMode.php
 │   │   │   │   ├── EventAttendanceStatus.php
@@ -687,7 +690,8 @@
 │   │   │   │   ├── EventDefinitionRegistry.php
 │   │   │   │   ├── EventDuplicateDetector.php
 │   │   │   │   ├── EventPromotionGate.php
-│   │   │   │   └── EventReadinessRegistry.php
+│   │   │   │   ├── EventReadinessRegistry.php
+│   │   │   │   └── EventWorkspacePanelRegistry.php
 │   │   │   └── Validation
 │   │   │       └── EventsSetupValidationContributor.php
 │   │   ├── FlowRoutes
@@ -3681,7 +3685,8 @@
 │   │   │   ├── EventScheduledReconciliationTest.php
 │   │   │   ├── EventsFoundationTest.php
 │   │   │   ├── EventsSetupValidationContributorTest.php
-│   │   │   └── EventWorkspaceControllerTest.php
+│   │   │   ├── EventWorkspaceControllerTest.php
+│   │   │   └── EventWorkspacePanelRegistryTest.php
 │   │   ├── FlowRoutes
 │   │   │   ├── AutomationEventReceiptTest.php
 │   │   │   ├── AutomationEventWorkflowContextTest.php
@@ -4202,4 +4207,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-924 directories, 3279 files
+924 directories, 3284 files

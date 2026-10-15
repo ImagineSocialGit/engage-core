@@ -40,6 +40,7 @@ use App\Modules\Events\Services\EventDefinitionRegistry;
 use App\Modules\Events\Services\EventDuplicateDetector;
 use App\Modules\Events\Services\EventPromotionGate;
 use App\Modules\Events\Services\EventReadinessRegistry;
+use App\Modules\Events\Services\EventWorkspacePanelRegistry;
 use DateTimeZone;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -55,6 +56,7 @@ final class EventController extends Controller
         private readonly EventDuplicateDetector $duplicates,
         private readonly EventAnnouncementGate $announcement,
         private readonly EventPromotionGate $promotion,
+        private readonly EventWorkspacePanelRegistry $workspacePanels,
     ) {}
 
     public function index(Request $request): View
@@ -213,6 +215,7 @@ final class EventController extends Controller
                 'timezone' => $event->timezone,
             ],
             'attendanceObservedAtLocal' => now($event->timezone)->format('Y-m-d\\TH:i'),
+            'workspacePanels' => $this->workspacePanels->panels($event),
         ]);
     }
 

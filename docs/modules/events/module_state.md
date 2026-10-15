@@ -868,9 +868,10 @@ Events CRM Draft -> Upcoming action: present and delegates to PromoteEventAction
 Events CRM advanced lifecycle controls: present; postpone/reschedule/cancel/complete delegate to the authoritative Events actions
 Events CRM external-reference, stakeholder, and attendance authoring: present; reference/stakeholder vocabularies remain registry-backed and attendance respects Core Contact visibility
 Events primary CRM navigation: present through the current central module-navigation definition
+Events CRM workspace extension seam: present; optional packages/modules may contribute bounded action panels without Events importing consumer classes
 Events setup validation: present; validates registry/readiness wiring and live durable Event contract drift without mutating state
 ```
 
-The next implementation work may add optional consumers through public Events seams. Public Event pages, provider publication, Commerce, Music, Experiences, Messaging, and other optional capabilities remain outside Events ownership.
+Optional consumers should attach through public Events seams such as the workspace-panel contributor contract rather than adding consumer-specific imports to Events. Public Event pages, provider publication, Commerce, Music, Experiences, Messaging, Signup Kit implementations, and other optional capabilities remain outside Events ownership.
 
 This document remains the canonical architecture reference. Exact file manifests still require a fresh dependency cone for every consumer module touched by a later integration batch.

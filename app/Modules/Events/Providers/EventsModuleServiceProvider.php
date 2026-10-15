@@ -2,10 +2,12 @@
 
 namespace App\Modules\Events\Providers;
 
+use App\Modules\Events\Contracts\EventWorkspacePanelContributor;
 use App\Modules\Events\Jobs\ReconcileDueEventsJob;
 use App\Modules\Events\Readiness\CoreEventReadinessContributor;
 use App\Modules\Events\Services\EventDefinitionRegistry;
 use App\Modules\Events\Services\EventReadinessRegistry;
+use App\Modules\Events\Services\EventWorkspacePanelRegistry;
 use App\Modules\Events\Validation\EventsSetupValidationContributor;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider;
@@ -39,6 +41,13 @@ class EventsModuleServiceProvider extends ServiceProvider
             EventReadinessRegistry::class,
             fn ($app): EventReadinessRegistry => new EventReadinessRegistry(
                 contributors: $app->tagged(EventReadinessRegistry::CONTRIBUTOR_TAG),
+            ),
+        );
+
+        $this->app->singleton(
+            EventWorkspacePanelRegistry::class,
+            fn ($app): EventWorkspacePanelRegistry => new EventWorkspacePanelRegistry(
+                contributors: $app->tagged(EventWorkspacePanelContributor::TAG),
             ),
         );
 

@@ -142,6 +142,41 @@
                     </x-ui.card>
                 @endif
 
+                @foreach ($workspacePanels as $workspacePanel)
+                    <x-ui.card class="space-y-4" data-event-workspace-panel="{{ $workspacePanel->key }}">
+                        <div>
+                            <h2 class="text-lg font-semibold text-slate-950">{{ $workspacePanel->title }}</h2>
+                            @if ($workspacePanel->description)
+                                <p class="mt-1 text-sm text-slate-600">{{ $workspacePanel->description }}</p>
+                            @endif
+                        </div>
+
+                        @if ($workspacePanel->actions !== [])
+                            <div class="flex flex-wrap gap-2">
+                                @foreach ($workspacePanel->actions as $workspaceAction)
+                                    @if ($workspaceAction->style === \App\Modules\Events\Data\EventWorkspaceAction::STYLE_PRIMARY)
+                                        <a
+                                            href="{{ $workspaceAction->url }}"
+                                            @if ($workspaceAction->newTab) target="_blank" rel="noopener noreferrer" @endif
+                                            class="inline-flex items-center justify-center rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+                                        >
+                                            {{ $workspaceAction->label }}
+                                        </a>
+                                    @else
+                                        <a
+                                            href="{{ $workspaceAction->url }}"
+                                            @if ($workspaceAction->newTab) target="_blank" rel="noopener noreferrer" @endif
+                                            class="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                                        >
+                                            {{ $workspaceAction->label }}
+                                        </a>
+                                    @endif
+                                @endforeach
+                            </div>
+                        @endif
+                    </x-ui.card>
+                @endforeach
+
                 <x-ui.card class="space-y-4">
                     <div>
                         <h2 class="text-lg font-semibold text-slate-950">Location</h2>
