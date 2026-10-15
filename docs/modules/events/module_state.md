@@ -1,6 +1,6 @@
 # Events Module
 
-Events is a universal module with an approved architecture. Its definition registry, persistence foundation, readiness registry, announcement/promotion gates, duplicate detector, lifecycle actions, attendance reconciliation, neutral automation signals, scheduled reconciliation, setup validation, and first CRM draft workspace are implemented. Advanced CRM lifecycle controls and authoring for references, stakeholders, and attendance remain to be completed.
+Events is a universal module with an approved architecture. Its definition registry, persistence foundation, readiness registry, announcement/promotion gates, duplicate detector, lifecycle actions, attendance reconciliation, neutral automation signals, scheduled reconciliation, setup validation, and complete CRM administration workspace are implemented.
 
 Events is a thin catalog and reconciliation capability for concrete events that are operated, produced, ticketed, hosted, or streamed outside Engage Core.
 
@@ -846,7 +846,7 @@ Do not include Music, Bandsintown, Commerce, Experiences, FlowRoutes, Messaging,
 
 ## Implementation status
 
-Current repository status after the first Events CRM administration slice:
+Current repository status after the complete Events CRM administration slice:
 
 ```text
 Events module directory: present
@@ -865,12 +865,12 @@ Events CRM catalog/show/create/edit routes: present behind module middleware
 Events CRM draft authoring: present; create and update delegate durable rules to Events-owned actions and preserve Draft lifecycle ownership
 Events CRM readiness/announcement/promotion visibility: present
 Events CRM Draft -> Upcoming action: present and delegates to PromoteEventAction
-Events CRM advanced lifecycle controls: not yet present
-Events CRM external-reference, stakeholder, and attendance authoring: not yet present
-Events primary CRM navigation: intentionally deferred until the current central module-navigation config can be changed from an exact fresh source file
+Events CRM advanced lifecycle controls: present; postpone/reschedule/cancel/complete delegate to the authoritative Events actions
+Events CRM external-reference, stakeholder, and attendance authoring: present; reference/stakeholder vocabularies remain registry-backed and attendance respects Core Contact visibility
+Events primary CRM navigation: present through the current central module-navigation definition
 Events setup validation: present; validates registry/readiness wiring and live durable Event contract drift without mutating state
 ```
 
-The next implementation work should complete CRM lifecycle/reference/stakeholder/attendance administration and primary navigation before optional consumers are added.
+The next implementation work may add optional consumers through public Events seams. Public Event pages, provider publication, Commerce, Music, Experiences, Messaging, and other optional capabilities remain outside Events ownership.
 
 This document remains the canonical architecture reference. Exact file manifests still require a fresh dependency cone for every consumer module touched by a later integration batch.

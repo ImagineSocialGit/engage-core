@@ -837,6 +837,12 @@ return [
             'ui' => [
                 'tone' => 'blue',
             ],
+            'nav' => [
+                'label' => 'Events',
+                'description' => 'Manage event occurrences, schedules, references, stakeholders, and attendance.',
+                'route' => 'crm.events.index',
+                'priority' => 45,
+            ],
             'depends_on' => ['core'],
             'providers' => [
                 EventsModuleServiceProvider::class,

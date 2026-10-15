@@ -635,11 +635,16 @@
 │   │   │   │   ├── CancelEventAction.php
 │   │   │   │   ├── CompleteEventAction.php
 │   │   │   │   ├── CreateEventAction.php
+│   │   │   │   ├── DeleteEventExternalReferenceAction.php
+│   │   │   │   ├── DeleteEventStakeholderAction.php
 │   │   │   │   ├── PostponeEventAction.php
 │   │   │   │   ├── PromoteEventAction.php
 │   │   │   │   ├── ReconcileDueEventsAction.php
 │   │   │   │   ├── RecordEventAttendanceAction.php
 │   │   │   │   ├── RescheduleEventAction.php
+│   │   │   │   ├── SaveEventExternalReferenceAction.php
+│   │   │   │   ├── SaveEventStakeholderAction.php
+│   │   │   │   ├── SetPrimaryEventExternalReferenceAction.php
 │   │   │   │   └── UpdateDraftEventAction.php
 │   │   │   ├── Contracts
 │   │   │   │   ├── EventDefinitionContributor.php
@@ -671,7 +676,11 @@
 │   │   │   ├── Readiness
 │   │   │   │   └── CoreEventReadinessContributor.php
 │   │   │   ├── Requests
-│   │   │   │   └── SaveEventRequest.php
+│   │   │   │   ├── RecordEventAttendanceRequest.php
+│   │   │   │   ├── RescheduleEventRequest.php
+│   │   │   │   ├── SaveEventExternalReferenceRequest.php
+│   │   │   │   ├── SaveEventRequest.php
+│   │   │   │   └── SaveEventStakeholderRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── EventAnnouncementGate.php
 │   │   │   │   ├── EventAutomationSignalRecorder.php
@@ -3224,6 +3233,7 @@
 │       │   │   ├── edit.blade.php
 │       │   │   ├── index.blade.php
 │       │   │   ├── partials
+│       │   │   │   ├── attendance-contact-picker.blade.php
 │       │   │   │   └── form.blade.php
 │       │   │   └── show.blade.php
 │       │   ├── flow-routes
@@ -4192,4 +4202,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-924 directories, 3269 files
+924 directories, 3279 files
