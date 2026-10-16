@@ -20,6 +20,16 @@ class TasksAutomationCapabilityContributor implements AutomationCapabilityContri
             description: 'Create a Task automatically from a DB-owned TaskTemplate.',
             requiredModules: ['tasks'],
             sourceVersion: '2026_07_phase_6c_3',
+            meta: [
+                'guided_surfaces' => [
+                    'forms.after_submission' => [
+                        'label' => 'Create follow-up task',
+                        'detail' => 'Create a template-backed Task for the Contact after this form is submitted.',
+                        'name_prefix' => 'Follow up after',
+                        'sort_order' => 30,
+                    ],
+                ],
+            ],
         );
     }
 }

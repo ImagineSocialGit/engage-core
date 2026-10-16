@@ -20,6 +20,16 @@ class MessagingAutomationCapabilityContributor implements AutomationCapabilityCo
             description: 'Start a conversation or reply automatically using a reusable message.',
             requiredModules: ['messaging'],
             sourceVersion: '2026_08_unified_message_authoring_v1',
+            meta: [
+                'guided_surfaces' => [
+                    'forms.after_submission' => [
+                        'label' => 'Send automatic message',
+                        'detail' => 'Send a reusable message automatically after this form is submitted.',
+                        'name_prefix' => 'Reply after',
+                        'sort_order' => 40,
+                    ],
+                ],
+            ],
         );
     }
 }

@@ -20,6 +20,16 @@ class CampaignsAutomationCapabilityContributor implements AutomationCapabilityCo
             description: 'Enroll a contact in a DB-owned Campaign.',
             requiredModules: ['campaigns'],
             sourceVersion: '2026_07_phase_6c_3',
+            meta: [
+                'guided_surfaces' => [
+                    'forms.after_submission' => [
+                        'label' => 'Enroll in campaign',
+                        'detail' => 'Start a selected Campaign after this form is submitted.',
+                        'name_prefix' => 'Enroll after',
+                        'sort_order' => 20,
+                    ],
+                ],
+            ],
         );
 
         yield new AutomationCapabilityDefinition(

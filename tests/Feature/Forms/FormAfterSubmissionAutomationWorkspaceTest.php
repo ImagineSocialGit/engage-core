@@ -5,6 +5,7 @@ namespace Tests\Feature\Forms;
 use App\Models\User;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\Forms\Automation\FormSubmissionAutomationTriggerAuthoringContributor;
+use App\Modules\Forms\Data\HostedFormContextReference;
 use App\Modules\Forms\Models\FormDefinition;
 use App\Modules\Forms\Models\FormVersion;
 use App\Modules\Forms\Providers\FormsModuleServiceProvider;
@@ -27,6 +28,7 @@ class FormAfterSubmissionAutomationWorkspaceTest extends TestCase
             'flow_routes',
             'tasks',
             'messaging',
+            'campaigns',
         ]);
         config()->set('forms.external_intake', [
             'enabled' => true,
@@ -51,8 +53,7 @@ class FormAfterSubmissionAutomationWorkspaceTest extends TestCase
         $this->app->forgetInstance(FormSubmissionAutomationWorkspace::class);
     }
 
-
-    public function test_flow_route_create_surface_accepts_generic_trigger_and_starter_prefill(): void
+    public function test_flow_route_create_accepts_form_trigger_and_starter_prefill(): void
     {
         $this->publishedForm('artist_updates');
         $user = User::factory()->create();
@@ -71,13 +72,104 @@ class FormAfterSubmissionAutomationWorkspaceTest extends TestCase
             'edit_route' => $route->getKey(),
             'add_capability' => 'messaging.send_message',
         ]));
-        $this->assertSame(FormSubmissionAutomationTriggerAuthoringContributor::EVENT_KEY, $route->trigger_key);
+        $this->assertSame(
+            FormSubmissionAutomationTriggerAuthoringContributor::EVENT_KEY,
+            $route->trigger_key,
+        );
         $this->assertSame(
             'artist_updates',
             data_get($route->meta, 'definition.entry_conditions.0.value'),
         );
+        $this->assertCount(
+            1,
+            data_get($route->meta, 'definition.entry_conditions', []),
+        );
     }
 
+    public function test_form_submission_trigger_can_be_scoped_to_one_hosted_context(): void
+    {
+        $this->publishedForm('artist_updates');
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->post(route('crm.flow-routes.store'), [
+            'name' => 'After Nashville signup',
+            'authoring_kind' => FlowRoute::AUTHORING_KIND_AUTOMATIC_BEHAVIOR,
+            'trigger_authoring_key' => FormSubmissionAutomationTriggerAuthoringContributor::KEY,
+            'form_key' => 'artist_updates',
+            'context_key' => 'event',
+            'context_reference' => '42',
+        ])->assertRedirect();
+
+        $route = FlowRoute::query()->sole();
+        $conditions = data_get($route->meta, 'definition.entry_conditions', []);
+
+        $this->assertCount(3, $conditions);
+        $this->assertSame(
+            FormSubmissionAutomationTriggerAuthoringContributor::FORM_KEY_EVENT_PATH,
+            $conditions[0]['path'],
+        );
+        $this->assertSame('artist_updates', $conditions[0]['value']);
+        $this->assertSame(
+            FormSubmissionAutomationTriggerAuthoringContributor::CONTEXT_KEY_EVENT_PATH,
+            $conditions[1]['path'],
+        );
+        $this->assertSame('event', $conditions[1]['value']);
+        $this->assertSame(
+            FormSubmissionAutomationTriggerAuthoringContributor::CONTEXT_REFERENCE_EVENT_PATH,
+            $conditions[2]['path'],
+        );
+        $this->assertSame('42', $conditions[2]['value']);
+    }
+
+    public function test_context_workspace_includes_global_and_matching_routes_but_not_other_contexts(): void
+    {
+        $this->publishedForm('artist_updates');
+
+        $global = $this->formRoute(
+            formKey: 'artist_updates',
+            name: 'Global',
+        );
+        $nashville = $this->formRoute(
+            formKey: 'artist_updates',
+            name: 'Nashville',
+            context: new HostedFormContextReference('event', 42),
+        );
+        $atlanta = $this->formRoute(
+            formKey: 'artist_updates',
+            name: 'Atlanta',
+            context: new HostedFormContextReference('event', 43),
+        );
+
+        $workspace = app(FormSubmissionAutomationWorkspace::class);
+
+        $result = $workspace->readForForm(
+            formKey: 'artist_updates',
+            formName: 'Artist Updates',
+            contactAvailable: false,
+            context: new HostedFormContextReference('event', 42),
+            contextLabel: 'Nashville Show',
+        );
+
+        $ids = collect($result['automations'])
+            ->pluck('id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->sort()
+            ->values()
+            ->all();
+
+        $expected = [
+            (int) $global->getKey(),
+            (int) $nashville->getKey(),
+        ];
+        sort($expected);
+
+        $this->assertSame($expected, $ids);
+        $this->assertNotContains(
+            (int) $atlanta->getKey(),
+            $ids,
+            true,
+        );
+    }
 
     private function publishedForm(string $key): FormDefinition
     {
@@ -119,8 +211,33 @@ class FormAfterSubmissionAutomationWorkspaceTest extends TestCase
         return $definition->refresh();
     }
 
-    private function formRoute(string $formKey, string $name): FlowRoute
-    {
+    private function formRoute(
+        string $formKey,
+        string $name,
+        ?HostedFormContextReference $context = null,
+    ): FlowRoute {
+        $conditions = [[
+            'source' => 'execution_meta',
+            'path' => FormSubmissionAutomationTriggerAuthoringContributor::FORM_KEY_EVENT_PATH,
+            'operator' => 'equals',
+            'value' => $formKey,
+        ]];
+
+        if ($context !== null) {
+            $conditions[] = [
+                'source' => 'execution_meta',
+                'path' => FormSubmissionAutomationTriggerAuthoringContributor::CONTEXT_KEY_EVENT_PATH,
+                'operator' => 'equals',
+                'value' => $context->key,
+            ];
+            $conditions[] = [
+                'source' => 'execution_meta',
+                'path' => FormSubmissionAutomationTriggerAuthoringContributor::CONTEXT_REFERENCE_EVENT_PATH,
+                'operator' => 'equals',
+                'value' => $context->reference,
+            ];
+        }
+
         return FlowRoute::factory()->create([
             'name' => $name,
             'trigger_type' => FlowRoute::TRIGGER_AUTOMATION_EVENT,
@@ -133,12 +250,7 @@ class FormAfterSubmissionAutomationWorkspaceTest extends TestCase
                     'trigger_authoring_key' => FormSubmissionAutomationTriggerAuthoringContributor::KEY,
                 ],
                 'definition' => [
-                    'entry_conditions' => [[
-                        'source' => 'execution_meta',
-                        'path' => FormSubmissionAutomationTriggerAuthoringContributor::FORM_KEY_EVENT_PATH,
-                        'operator' => 'equals',
-                        'value' => $formKey,
-                    ]],
+                    'entry_conditions' => $conditions,
                 ],
             ],
         ]);

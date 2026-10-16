@@ -20,6 +20,16 @@ class CoreAutomationCapabilityContributor implements AutomationCapabilityContrib
             description: 'Add a tag to the current Contact.',
             requiredModules: ['core'],
             sourceVersion: '2026_08_contact_tag_automation',
+            meta: [
+                'guided_surfaces' => [
+                    'forms.after_submission' => [
+                        'label' => 'Add a tag',
+                        'detail' => 'Add a reusable Contact tag after this form is submitted.',
+                        'name_prefix' => 'Tag after',
+                        'sort_order' => 10,
+                    ],
+                ],
+            ],
         );
 
         yield new AutomationCapabilityDefinition(

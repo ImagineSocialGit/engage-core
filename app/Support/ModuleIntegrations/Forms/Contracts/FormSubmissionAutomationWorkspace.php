@@ -2,6 +2,8 @@
 
 namespace App\Support\ModuleIntegrations\Forms\Contracts;
 
+use App\Modules\Forms\Data\HostedFormContextReference;
+
 interface FormSubmissionAutomationWorkspace
 {
     /**
@@ -21,7 +23,9 @@ interface FormSubmissionAutomationWorkspace
      *         kind: string,
      *         is_enabled: bool,
      *         step_count: int,
-     *         url: string
+     *         url: string,
+     *         scope: string,
+     *         scope_label: string
      *     }>
      * }
      */
@@ -29,5 +33,7 @@ interface FormSubmissionAutomationWorkspace
         string $formKey,
         string $formName,
         bool $contactAvailable,
+        ?HostedFormContextReference $context = null,
+        ?string $contextLabel = null,
     ): array;
 }
