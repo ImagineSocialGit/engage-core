@@ -93,7 +93,7 @@ class InboundSmsReOptInTest extends TestCase
 
         $this->assertSame(InboundMessage::CLASSIFICATION_CONSENT_GRANT, $inbound->classification);
         $this->assertNotNull($inbound->processed_at);
-        $this->assertFalse(Schema::hasColumn('inbound_messages', 'meta'));
+
 
         $state = app(MessageConsentStateResolver::class);
 

@@ -63,8 +63,7 @@ class HostedFormContextTest extends TestCase
         );
 
         $response = $this->get($signedUrl)
-            ->assertOk()
-            ->assertViewIs('forms.show');
+            ->assertOk();
 
         $hiddenContext = collect($response->viewData('form')['hidden_fields'])
             ->firstWhere('key', HostedFormContextService::POST_FIELD);

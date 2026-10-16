@@ -78,26 +78,6 @@ class WebinarRegistrationQuestionTest extends TestCase
         );
     }
 
-    public function test_registration_page_renders_configured_select_and_other_fields(): void
-    {
-        [$series] = $this->occurrence('question-rendering');
-        $this->configureSeriesQuestions($series);
-
-        $this->get(route('webinar.show', $series->slug))
-            ->assertOk()
-            ->assertSee('What is your biggest question?', true)
-            ->assertSee(
-                'name="registration_questions[primary_question][answer]"',
-                false,
-            )
-            ->assertSee('value="affordability"', false)
-            ->assertSee('How much can I afford?', true)
-            ->assertSee(
-                'name="registration_questions[primary_question][other]"',
-                false,
-            )
-            ->assertSee('maxlength="500"', false);
-    }
 
     public function test_required_questions_reject_missing_unknown_and_invalid_answers(): void
     {

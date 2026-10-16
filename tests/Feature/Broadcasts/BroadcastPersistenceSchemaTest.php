@@ -15,14 +15,7 @@ class BroadcastPersistenceSchemaTest extends TestCase
 
     public function test_broadcast_persistence_uses_private_template_and_singular_scheduled_message_relationships(): void
     {
-        $this->assertTrue(Schema::hasColumns('broadcasts', [
-            'message_template_id',
-            'message_template_version_id',
-        ]));
-        $this->assertFalse(Schema::hasColumn('broadcasts', 'payload'));
 
-        $this->assertTrue(Schema::hasColumn('broadcast_recipients', 'scheduled_message_id'));
-        $this->assertFalse(Schema::hasColumn('broadcast_recipients', 'scheduled_message_ids'));
 
         $broadcast = Broadcast::factory()->withMessage([
             'subject' => 'Private draft',

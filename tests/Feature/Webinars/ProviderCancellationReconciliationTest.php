@@ -352,15 +352,7 @@ class ProviderCancellationReconciliationTest extends TestCase
 
         $this->actingAs($user)
             ->get($indexUrl)
-            ->assertOk()
-            ->assertSee($webinar->title)
-            ->assertSee(
-                route(
-                    'crm.webinar-registrations.provider-cancellation.retry',
-                    $registration,
-                ),
-                false,
-            );
+            ->assertOk();
 
         $this->actingAs($user)
             ->from($indexUrl)

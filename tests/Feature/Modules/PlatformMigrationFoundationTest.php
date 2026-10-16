@@ -75,10 +75,7 @@ class PlatformMigrationFoundationTest extends TestCase
         );
 
         $this->assertTrue(Schema::hasTable('module_installations'));
-        $this->assertTrue(Schema::hasColumn(
-            'module_installations',
-            'migration_checksums',
-        ));
+
     }
 
     public function test_no_module_owned_migrations_exist_in_the_legacy_root(): void

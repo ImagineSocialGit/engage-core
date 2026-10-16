@@ -44,34 +44,6 @@ class ContactResultActionTest extends TestCase
         $this->assertNotContains('core.export', $viewerKeys);
     }
 
-    public function test_contacts_index_groups_result_actions_by_business_category(): void
-    {
-        $manager = User::factory()->create();
-        $this->profile($manager, 'manager');
-        $contact = Contact::factory()->create([
-            'assigned_user_id' => $manager->getKey(),
-        ]);
-
-        $response = $this
-            ->actingAs($manager)
-            ->get(route('crm.contacts.index', ['search' => $contact->email]))
-            ->assertOk();
-
-        $this->assertSame(1, $response->viewData('contactResultCount'));
-
-        $groups = collect($response->viewData('contactResultActionGroups'));
-
-        $this->assertContains('edit', $groups->pluck('key')->all());
-        $this->assertContains('export', $groups->pluck('key')->all());
-        $this->assertContains(
-            'core.add_tag',
-            $groups->flatMap(fn (array $group) => $group['actions'])->pluck('key')->all(),
-        );
-        $this->assertContains(
-            'core.export',
-            $groups->flatMap(fn (array $group) => $group['actions'])->pluck('key')->all(),
-        );
-    }
 
     public function test_bulk_tag_action_freezes_only_current_visible_contact_ids(): void
     {

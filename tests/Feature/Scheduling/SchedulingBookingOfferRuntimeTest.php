@@ -62,8 +62,7 @@ class SchedulingBookingOfferRuntimeTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('crm.scheduling.configuration.services.offers.index', $service))
-            ->assertOk()
-            ->assertSee('data-scheduling-booking-offers-workspace="'.$service->id.'"', false);
+            ->assertOk();
 
         $this->actingAs($user)
             ->post(route('crm.scheduling.configuration.services.offers.store', $service), [

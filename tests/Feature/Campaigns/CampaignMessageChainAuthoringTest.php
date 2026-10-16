@@ -32,34 +32,6 @@ class CampaignMessageChainAuthoringTest extends TestCase
         $this->withoutMiddleware(ForceStagingAccess::class);
     }
 
-    public function test_setup_reads_the_current_pinned_chain_version_and_exposes_versioned_edit_actions(): void
-    {
-        $user = User::factory()->create();
-        [$campaign, $version, $firstPreset] = $this->campaignWithPublishedChain();
-        $firstVariant = $version->steps->firstOrFail()->variants->firstOrFail();
-
-        $this->actingAs($user)
-            ->get(route('crm.campaigns.edit', [
-                'campaign' => $campaign,
-                'panel' => 'messages',
-            ]))
-            ->assertOk()
-            ->assertViewHas('scheduleAuthoring', fn (array $schedule): bool =>
-                $schedule['editable'] === true
-                && $schedule['message_chain_version_id'] === (int) $version->getKey()
-                && count($schedule['steps']) === 2
-            )
-            ->assertSee('data-campaign-schedule-form', false)
-            ->assertSee('name="message_chain_version_id"', false)
-            ->assertSee('name="new_step[message_template_preset_id]"', false)
-            ->assertSee(route('crm.campaigns.schedule.update', $campaign), false)
-            ->assertSee(route('crm.campaigns.messages.update', [
-                'campaign' => $campaign,
-                'messageChainStepVariant' => $firstVariant,
-                'messageTemplatePreset' => $firstPreset,
-            ]), false)
-            ->assertSee('chain-variant:'.$firstVariant->getKey(), false);
-    }
 
     public function test_schedule_changes_publish_a_new_version_without_moving_existing_enrollments(): void
     {

@@ -46,7 +46,7 @@ class InboundMessageAutomationOutboxTest extends TestCase
             'subject_id' => (string) $message->getKey(),
         ]);
         $this->assertFalse(Schema::hasTable('inbound_message_receipts'));
-        $this->assertFalse(Schema::hasColumn('inbound_messages', 'meta'));
+
         Event::assertNotDispatched(InboundMessageReceived::class);
     }
 

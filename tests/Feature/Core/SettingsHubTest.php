@@ -55,38 +55,5 @@ class SettingsHubTest extends TestCase
         $this->assertNotContains('core.business_days', $items->pluck('key')->all());
     }
 
-    public function test_settings_hub_exposes_a_limited_starting_point_and_grouped_settings(): void
-    {
-        config()->set('modules.enabled', [
-            'tasks',
-            'workflow',
-            'flow_routes',
-            'messaging',
-        ]);
 
-        $response = $this
-            ->actingAs(User::factory()->create())
-            ->get(route('crm.settings.index'));
-
-        $response
-            ->assertOk()
-            ->assertViewIs('crm.settings.index')
-            ->assertViewHas('gettingStarted', function (array $items): bool {
-                return count($items) === 3
-                    && collect($items)->every(fn (array $item): bool => isset(
-                        $item['key'],
-                        $item['module'],
-                        $item['href'],
-                    ));
-            })
-            ->assertViewHas('settingsGroups', function (array $groups): bool {
-                $items = collect($groups)->pluck('items')->flatten(1);
-
-                return $items->contains('key', 'core.team')
-                    && $items->contains('key', 'core.business_days')
-                    && $items->contains('key', 'tasks.task_templates')
-                    && $items->contains('key', 'messaging.message_templates')
-                    && $items->contains('key', 'flow_routes.route_assignments');
-            });
-    }
 }

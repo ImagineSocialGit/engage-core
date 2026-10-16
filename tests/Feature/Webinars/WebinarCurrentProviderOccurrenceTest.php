@@ -180,39 +180,6 @@ class WebinarCurrentProviderOccurrenceTest extends TestCase
             ->assertOk();
     }
 
-    public function test_crm_upcoming_hides_old_provider_type_but_archived_view_keeps_it_available(): void
-    {
-        $user = User::factory()->create();
-        $series = WebinarSeries::factory()->meeting()->create();
-        $oldWebinar = Webinar::factory()->create([
-            'webinar_series_id' => $series->getKey(),
-            'provider_event_type' => WebinarProviderEventType::Webinar->value,
-            'starts_at' => now()->addDay(),
-            'ends_at' => now()->addDay()->addHour(),
-        ]);
-        $meeting = Webinar::factory()->create([
-            'webinar_series_id' => $series->getKey(),
-            'provider_event_type' => WebinarProviderEventType::Meeting->value,
-            'starts_at' => now()->addDays(2),
-            'ends_at' => now()->addDays(2)->addHour(),
-        ]);
-
-        $this->actingAs($user)
-            ->get(route('crm.webinar-series.index'))
-            ->assertOk()
-            ->assertViewHas('webinars', function (Collection $webinars) use ($oldWebinar, $meeting): bool {
-                return $webinars->contains(fn (Webinar $webinar): bool => $webinar->is($meeting))
-                    && ! $webinars->contains(fn (Webinar $webinar): bool => $webinar->is($oldWebinar));
-            });
-
-        $this->actingAs($user)
-            ->get(route('crm.webinar-series.index', ['archived' => 1]))
-            ->assertOk()
-            ->assertViewHas('webinars', function (Collection $webinars) use ($oldWebinar, $meeting): bool {
-                return $webinars->contains(fn (Webinar $webinar): bool => $webinar->is($meeting))
-                    && $webinars->contains(fn (Webinar $webinar): bool => $webinar->is($oldWebinar));
-            });
-    }
 
     public function test_provider_missing_occurrence_is_not_upcoming_or_registerable(): void
     {

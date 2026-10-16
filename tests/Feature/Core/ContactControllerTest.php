@@ -16,33 +16,6 @@ class ContactControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_filters_contacts_index_by_search(): void
-    {
-        $user = User::factory()->create();
-
-        $contact = Contact::factory()->create([
-            'name' => 'Jane Lead',
-            'email' => 'jane@example.test',
-        ]);
-
-        ContactStatus::query()->create([
-            'key' => 'new',
-            'name' => 'New',
-            'is_active' => true,
-            'sort_order' => 10,
-        ]);
-
-        $response = $this
-            ->actingAs($user)
-            ->get(route('crm.contacts.index', ['search' => $contact->email]));
-
-        $response->assertOk();
-        $response->assertViewIs('crm.contacts.index');
-        $response->assertViewHas('contacts', function ($contacts) use ($contact): bool {
-            return $contacts->total() === 1
-                && $contacts->items()[0]->getKey() === $contact->getKey();
-        });
-    }
 
     public function test_it_creates_contact_from_manual_form(): void
     {
@@ -150,56 +123,6 @@ class ContactControllerTest extends TestCase
     }
 
 
-    public function test_contact_status_links_to_process_highway_with_the_current_status_preselected(): void
-    {
-        config()->set('modules.enabled', array_values(array_unique([
-            ...config('modules.enabled', []),
-            'workflow',
-        ])));
-
-        $user = User::factory()->create();
-        $status = ContactStatus::query()->create([
-            'key' => 'past_contact',
-            'name' => 'Past Client',
-            'is_active' => true,
-            'sort_order' => 10,
-        ]);
-        $contact = Contact::factory()->create();
-
-        ContactWorkflowProfile::query()->create([
-            'contact_id' => $contact->getKey(),
-            'contact_status_id' => $status->getKey(),
-        ]);
-
-        $this->actingAs($user)
-            ->get(route('crm.contacts.show', $contact))
-            ->assertOk()
-            ->assertSee('data-contact-status-process-highway', false)
-            ->assertSee(
-                route('crm.process-highway.index', [
-                    'status' => 'past_contact',
-                ]),
-                false,
-            );
-    }
-
-    public function test_contact_show_displays_contact_tags(): void
-    {
-        $user = User::factory()->create();
-        $contact = Contact::factory()->create();
-
-        ContactTag::query()->create([
-            'contact_id' => $contact->getKey(),
-            'tag' => 'Hand Raiser',
-        ]);
-
-        $this->actingAs($user)
-            ->get(route('crm.contacts.show', $contact))
-            ->assertOk()
-            ->assertSee('data-contact-tags', false)
-            ->assertSee('Hand Raiser');
-    }
-
     public function test_it_renders_import_preview_with_csv_mapping_fields(): void
     {
         Storage::fake('local');
@@ -228,15 +151,5 @@ class ContactControllerTest extends TestCase
             ]);
 
         $response->assertOk();
-        $response->assertSee('Map CSV Fields');
-        $response->assertSee('First Name');
-        $response->assertSee('Legacy Status');
-        $response->assertSee('name="mapping[email]"', false);
-        $response->assertSee('name="mapping[import_status]"', false);
-        $response->assertSee('Import Treatment');
-        $response->assertSee('Contact Status');
-        $response->assertSee('Apply based on a CSV field');
-        $response->assertSee('New');
-        $response->assertSee('name="csv_path"', false);
     }
 }

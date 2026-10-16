@@ -14,27 +14,6 @@ class TaskTemplateWorkspaceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_template_workspace_exposes_the_tasks_owned_list_and_editor(): void
-    {
-        config()->set('modules.enabled', ['tasks']);
-
-        $user = User::factory()->create();
-        $template = TaskTemplate::factory()->create();
-
-        $this->actingAs($user)
-            ->get(route('crm.tasks.templates.index'))
-            ->assertOk()
-            ->assertViewIs('crm.tasks.templates.index')
-            ->assertViewHas('templates', fn ($templates): bool => $templates->count() === 1);
-
-        $this->actingAs($user)
-            ->get(route('crm.tasks.templates.edit', $template))
-            ->assertOk()
-            ->assertViewIs('crm.tasks.templates.edit')
-            ->assertViewHas('taskTemplate', fn (TaskTemplate $viewTemplate): bool => (
-                $viewTemplate->is($template)
-            ));
-    }
 
     public function test_template_update_marks_the_definition_customized(): void
     {

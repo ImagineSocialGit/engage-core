@@ -361,7 +361,6 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
         $this->bindRouteToContactStatus($flowRoute, $fromStatus);
 
 
-
         $noopRoutePoint = FlowRoutePoint::query()->create([
             'flow_route_id' => $flowRoute->getKey(),
             'type' => FlowRoutePointType::Noop->value,

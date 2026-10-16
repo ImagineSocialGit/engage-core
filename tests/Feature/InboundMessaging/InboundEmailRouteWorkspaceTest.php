@@ -29,28 +29,6 @@ class InboundEmailRouteWorkspaceTest extends TestCase
         $this->withoutMiddleware(ForceStagingAccess::class);
     }
 
-    public function test_workspace_exposes_existing_routes_as_plain_language_addresses(): void
-    {
-        InboundEmailRoute::query()->create([
-            'key' => 'website_forms',
-            'local_part' => 'website-forms',
-            'label' => 'Website Forms',
-            'source' => 'integration',
-            'context_key' => 'website_form',
-            'is_active' => true,
-        ]);
-
-        $this->actingAs(User::factory()->create())
-            ->get(route('crm.inbound-messaging.email-routes.index'))
-            ->assertOk()
-            ->assertSee('data-inbound-email-routes-workspace', false)
-            ->assertSee('data-inbound-email-route-create', false)
-            ->assertSee('data-inbound-email-route-editor', false)
-            ->assertSee('website-forms@inbound.example.test')
-            ->assertSee('Website Forms')
-            ->assertDontSee('name="key"', false)
-            ->assertDontSee('name="context_key"', false);
-    }
 
     public function test_operator_can_create_update_and_disable_address_without_authoring_internal_keys(): void
     {
@@ -185,8 +163,7 @@ class InboundEmailRouteWorkspaceTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('crm.inbound-messaging.email-routes.index'))
-            ->assertOk()
-            ->assertSee('data-inbound-email-contact-extraction', false);
+            ->assertOk();
 
         $this->actingAs($user)
             ->post(

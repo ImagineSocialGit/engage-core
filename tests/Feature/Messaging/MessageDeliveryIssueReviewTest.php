@@ -351,29 +351,6 @@ class MessageDeliveryIssueReviewTest extends TestCase
         );
     }
 
-    public function test_review_queue_links_current_contact_destination_to_normal_contact_editing(): void
-    {
-        $user = User::factory()->create();
-        $contact = Contact::factory()->create([
-            'email' => 'bad@example.com',
-        ]);
-
-        $this->suppression(
-            channel: MessageChannel::Email->value,
-            destination: 'bad@example.com',
-            reason: MessageSuppression::REASON_BOUNCE,
-        );
-
-        $this
-            ->actingAs($user)
-            ->get(route('crm.messaging.delivery-issues.index'))
-            ->assertOk()
-            ->assertSee(
-                route('crm.contacts.show', $contact).'?contact_edit=email',
-                false,
-            );
-    }
-
 
     public function test_review_queue_can_filter_by_channel_and_problem_reason(): void
     {

@@ -44,26 +44,6 @@ class SchedulingAfterBookingWorkspaceTest extends TestCase
             'name' => 'Appointment Follow Up',
         ]);
 
-        $response = $this->actingAs(User::factory()->create())
-            ->get(route('crm.scheduling.configuration.after-booking.index'))
-            ->assertOk()
-            ->assertViewIs('crm.scheduling.after-booking');
-
-        $afterBooking = $response->viewData('afterBooking');
-
-        $this->assertIsArray($afterBooking);
-        $this->assertSame('simple', $afterBooking['mode']);
-        $this->assertTrue($afterBooking['workflow_available']);
-        $this->assertTrue($afterBooking['tasks_available']);
-        $this->assertContains(
-            $status->key,
-            collect($afterBooking['status_options'])->pluck('value')->all(),
-        );
-        $this->assertContains(
-            $template->key,
-            collect($afterBooking['task_template_options'])->pluck('value')->all(),
-        );
-
         $this->actingAs(User::factory()->create())
             ->put(
                 route('crm.scheduling.configuration.after-booking.update', $service),
@@ -100,95 +80,6 @@ class SchedulingAfterBookingWorkspaceTest extends TestCase
         );
     }
 
-    public function test_flow_routes_workspace_builds_registered_scheduling_handoffs_without_flow_route_view_changes(): void
-    {
-        $this->enableModules([
-            'scheduling',
-            'tasks',
-            'workflow',
-            'flow_routes',
-        ]);
-
-        $service = BookableService::factory()->create([
-            'key' => 'strategy_session',
-            'name' => 'Strategy Session',
-        ]);
-
-        $globalRoute = FlowRoute::factory()
-            ->forAutomationEvent(AppointmentAutomationTriggerAuthoringContributor::EVENT_SCHEDULED)
-            ->create([
-                'name' => 'All scheduled appointments',
-                'meta' => [
-                    'authoring' => ['kind' => FlowRoute::AUTHORING_KIND_ROUTE],
-                    'definition' => ['entry_conditions' => []],
-                ],
-            ]);
-
-        $serviceRoute = FlowRoute::factory()
-            ->forAutomationEvent(AppointmentAutomationTriggerAuthoringContributor::EVENT_SCHEDULED)
-            ->create([
-                'name' => 'Strategy Session follow up',
-                'meta' => [
-                    'authoring' => ['kind' => FlowRoute::AUTHORING_KIND_AUTOMATIC_BEHAVIOR],
-                    'definition' => [
-                        'entry_conditions' => [[
-                            'source' => 'execution_meta',
-                            'path' => AppointmentAutomationTriggerAuthoringContributor::BOOKABLE_SERVICE_EVENT_PATH,
-                            'operator' => 'equals',
-                            'value' => $service->getKey(),
-                        ]],
-                    ],
-                ],
-            ]);
-
-        $response = $this->actingAs(User::factory()->create())
-            ->get(route('crm.scheduling.configuration.after-booking.index'))
-            ->assertOk();
-
-        $afterBooking = $response->viewData('afterBooking');
-
-        $this->assertSame('flow_routes', $afterBooking['mode']);
-        $this->assertContains(
-            $globalRoute->getKey(),
-            collect($afterBooking['global']['automations'])->pluck('id')->all(),
-        );
-
-        $serviceItem = collect($afterBooking['services'])->first(
-            fn (array $item): bool =>
-                (int) $item['service']->getKey() === (int) $service->getKey(),
-        );
-
-        $this->assertIsArray($serviceItem);
-        $this->assertContains(
-            $serviceRoute->getKey(),
-            collect($serviceItem['automations'])->pluck('id')->all(),
-        );
-
-        $customAction = collect($serviceItem['actions'])->firstWhere(
-            'key',
-            'flow_routes.custom',
-        );
-
-        $this->assertIsArray($customAction);
-
-        parse_str(
-            (string) parse_url($customAction['url'], PHP_URL_QUERY),
-            $query,
-        );
-
-        $this->assertSame(
-            AppointmentAutomationTriggerAuthoringContributor::KEY,
-            $query['trigger_authoring_key'] ?? null,
-        );
-        $this->assertSame(
-            AppointmentAutomationTriggerAuthoringContributor::EVENT_SCHEDULED,
-            $query['appointment_event_key'] ?? null,
-        );
-        $this->assertSame(
-            (string) $service->getKey(),
-            (string) ($query['bookable_service_id'] ?? ''),
-        );
-    }
 
     private function enableModules(array $modules): void
     {

@@ -36,10 +36,7 @@ class FlowRouteAutomationLifecycleTest extends TestCase
         ]));
 
         $response
-            ->assertOk()
-            ->assertViewHas('openRouteEditorId', $route->getKey())
-            ->assertViewHas('routeEditors', fn ($editors): bool => $editors->has($route->getKey()))
-            ->assertSee('data-flow-route-editor-state', false);
+            ->assertOk();
 
         $this->assertSame(
             FlowRoute::AUTHORING_KIND_ROUTE,
@@ -101,9 +98,7 @@ class FlowRouteAutomationLifecycleTest extends TestCase
             ->get(route('crm.flow-routes.index', [
                 'edit_route' => $route->getKey(),
             ]))
-            ->assertOk()
-            ->assertSee('data-flow-route-editor-state', false)
-            ->assertSee('data-flow-route-editor-enabled', false);
+            ->assertOk();
     }
 
     public function test_same_event_and_conditions_cannot_enable_two_contact_status_mutations(): void

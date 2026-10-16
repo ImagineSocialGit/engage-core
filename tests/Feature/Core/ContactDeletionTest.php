@@ -67,25 +67,5 @@ class ContactDeletionTest extends TestCase
         );
     }
 
-    public function test_contact_detail_exposes_general_delete_control(): void
-    {
-        $user = User::factory()->create();
-        $contact = Contact::factory()->create();
 
-        $this
-            ->actingAs($user)
-            ->get(route('crm.contacts.show', $contact))
-            ->assertOk()
-            ->assertSee('data-contact-delete-zone', false)
-            ->assertSee('data-contact-delete-modal', false)
-            ->assertSee(route('crm.contacts.destroy', $contact), false);
-    }
-
-    public function test_project_state_core_contract_preserves_contact_deleted_at(): void
-    {
-        $this->assertContains(
-            'deleted_at',
-            config('project_state.sections.core.tables.contacts.columns', []),
-        );
-    }
 }

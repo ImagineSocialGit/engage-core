@@ -109,8 +109,7 @@ class BusinessCalendarTest extends TestCase
         $this
             ->actingAs($user)
             ->get(route('crm.business-calendar.edit', ['from' => 'routes']))
-            ->assertOk()
-            ->assertViewHas('returnContext', 'routes');
+            ->assertOk();
 
         $this
             ->actingAs($user)

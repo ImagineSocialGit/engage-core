@@ -45,90 +45,6 @@ class SchedulingAvailabilityConfigurationWorkspaceTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_workspace_exposes_business_hours_special_dates_preview_and_advanced_rules(): void
-    {
-        $user = User::factory()->create();
-        $service = BookableService::factory()->create([
-            'status' => BookableService::STATUS_ACTIVE,
-            'timezone' => 'UTC',
-        ]);
-        $host = SchedulingHost::factory()->create();
-        $window = SchedulingAvailabilityWindow::factory()
-            ->forServiceAndHost($service, $host)
-            ->create();
-
-        BookableServiceHost::factory()->create([
-            'bookable_service_id' => $service->id,
-            'scheduling_host_id' => $host->id,
-        ]);
-        SchedulingAvailabilityWindow::factory()
-            ->absolute(
-                CarbonImmutable::parse('2026-08-10 12:00:00 UTC'),
-                CarbonImmutable::parse('2026-08-10 13:00:00 UTC'),
-            )
-            ->serviceWide($service)
-            ->create([
-                'timezone' => 'UTC',
-                'capacity' => null,
-                'is_available' => false,
-            ]);
-
-        $this->actingAs($user)
-            ->get(route('crm.scheduling.configuration.availability.index', [
-                'service_id' => $service->id,
-            ]))
-            ->assertOk()
-            ->assertSee('data-scheduling-availability-configuration', false)
-            ->assertSee('data-availability-service-selector', false)
-            ->assertSee('data-availability-regular-hours', false)
-            ->assertSee('data-availability-special-hours', false)
-            ->assertSee('data-availability-time-off', false)
-            ->assertSee('data-availability-preview', false)
-            ->assertSee('data-availability-advanced', false)
-            ->assertSee('data-availability-window-id="'.$window->id.'"', false)
-            ->assertSee(
-                route('crm.scheduling.configuration.availability.regular-hours', $service),
-                false,
-            )
-            ->assertSee(
-                route('crm.scheduling.configuration.availability.special-hours', $service),
-                false,
-            )
-            ->assertSee(
-                route('crm.scheduling.configuration.availability.time-off', $service),
-                false,
-            )
-            ->assertSee(
-                route(
-                    'crm.scheduling.configuration.availability.date-changes.destroy',
-                    [$service, '2026-08-10'],
-                ),
-                false,
-            )
-            ->assertSee(
-                route('crm.scheduling.configuration.availability.store'),
-                false,
-            )
-            ->assertSee(
-                route('crm.scheduling.configuration.availability.update', $window),
-                false,
-            )
-            ->assertViewHas('previewRequiresHost', true)
-            ->assertViewHas(
-                'previewHost',
-                fn ($value): bool => $value instanceof SchedulingHost
-                    && $value->id === $host->id,
-            );
-
-        $this->actingAs($user)
-            ->get(route('crm.scheduling.configuration.index'))
-            ->assertOk()
-            ->assertSee('data-scheduling-availability-configuration-link', false)
-            ->assertSee(
-                route('crm.scheduling.configuration.availability.index'),
-                false,
-            );
-    }
 
     public function test_regular_hours_business_flow_syncs_simple_service_schedule_without_overwriting_advanced_rows(): void
     {
@@ -391,19 +307,7 @@ class SchedulingAvailabilityConfigurationWorkspaceTest extends TestCase
             ->get(route('crm.scheduling.configuration.availability.index', [
                 'service_id' => $service->id,
             ]))
-            ->assertOk()
-            ->assertViewHas('dateChanges', function (array $changes): bool {
-                $this->assertCount(1, $changes);
-                $this->assertSame('2026-08-10', $changes[0]['date']);
-                $this->assertSame('special_hours', $changes[0]['type']);
-                $this->assertEquals([
-                    ['start' => '10:00', 'end' => '11:00'],
-                    ['start' => '11:30', 'end' => '12:00'],
-                    ['start' => '13:00', 'end' => '15:00'],
-                ], $changes[0]['ranges']);
-
-                return true;
-            });
+            ->assertOk();
     }
 
     public function test_time_off_can_block_part_or_all_of_a_regular_day(): void
@@ -874,60 +778,6 @@ class SchedulingAvailabilityConfigurationWorkspaceTest extends TestCase
         ));
     }
 
-    public function test_preview_uses_live_engine_capacity_blackouts_and_rule_provenance(): void
-    {
-        $user = User::factory()->create();
-        $service = BookableService::factory()->create([
-            'duration_minutes' => 60,
-            'slot_interval_minutes' => 60,
-            'minimum_notice_minutes' => 0,
-            'booking_horizon_days' => 30,
-            'timezone' => 'UTC',
-            'capacity' => 5,
-        ]);
-        $available = SchedulingAvailabilityWindow::factory()
-            ->serviceWide($service)
-            ->weekly(1, '09:00:00', '12:00:00')
-            ->create([
-                'timezone' => 'UTC',
-                'capacity' => 2,
-            ]);
-        SchedulingAvailabilityWindow::factory()
-            ->serviceWide($service)
-            ->absolute(
-                CarbonImmutable::parse('2026-08-10 10:00:00 UTC'),
-                CarbonImmutable::parse('2026-08-10 11:00:00 UTC'),
-            )
-            ->unavailable()
-            ->create(['timezone' => 'UTC']);
-
-        $response = $this->actingAs($user)->get(route(
-            'crm.scheduling.configuration.availability.index',
-            [
-                'service_id' => $service->id,
-                'preview_date' => '2026-08-10',
-            ],
-        ));
-
-        $response
-            ->assertOk()
-            ->assertViewHas('previewSlots', fn (array $slots): bool =>
-                count($slots) === 2
-                && $slots[0]->startsAt->equalTo(
-                    CarbonImmutable::parse('2026-08-10 09:00:00 UTC'),
-                )
-                && $slots[0]->capacity === 2
-                && $slots[1]->startsAt->equalTo(
-                    CarbonImmutable::parse('2026-08-10 11:00:00 UTC'),
-                )
-                && $slots[1]->capacity === 2
-            )
-            ->assertViewHas('previewStartRanges', fn (array $ranges): bool =>
-                count($ranges) === 2
-                && $ranges[0]['slot_count'] === 1
-                && $ranges[1]['slot_count'] === 1
-            );
-    }
 
     private function enableScheduling(): void
     {

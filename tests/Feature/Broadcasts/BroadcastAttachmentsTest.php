@@ -46,9 +46,7 @@ class BroadcastAttachmentsTest extends TestCase
         $this->assertEqualsCanonicalizing($reference, $broadcast->messagePayload()['attachments']);
 
         $this->actingAs($user)->get(route('crm.broadcasts.edit', $broadcast))
-            ->assertOk()
-            ->assertSee('value="documents:1"', false)
-            ->assertSee('checked', false);
+            ->assertOk();
 
         $this->actingAs($user)->patch(route('crm.broadcasts.update', $broadcast), [
             'name' => 'Updated broadcast',

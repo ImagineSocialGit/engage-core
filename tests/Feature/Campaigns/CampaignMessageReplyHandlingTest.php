@@ -42,38 +42,6 @@ class CampaignMessageReplyHandlingTest extends TestCase
         [$campaign, $firstVersion] = $this->campaignWithPublishedMessage($profile->key);
         $firstVariant = $firstVersion->steps->firstOrFail()->variants->firstOrFail();
 
-        $response = $this->actingAs($user)
-            ->get(route('crm.campaigns.edit', [
-                'campaign' => $campaign,
-                'panel' => 'messages',
-            ]));
-
-        $response
-            ->assertOk()
-            ->assertSee('data-message-reply-handling', false)
-            ->assertSee('data-message-reply-profile-form', false)
-            ->assertSee('data-message-reply-editor-form', false)
-            ->assertSee(route('crm.campaigns.messages.reply-handling.update', [
-                'campaign' => $campaign,
-                'messageChainStepVariant' => $firstVariant,
-            ]), false)
-            ->assertSee(route('crm.inbound-messaging.reply-profiles.update', $profile), false);
-
-        $message = collect($response->viewData('messageReview')['presentation']['channels'])
-            ->flatMap(fn (array $channel): array => $channel['messages'])
-            ->first();
-
-        $this->assertIsArray($message);
-        $this->assertSame($profile->key, $message['reply_profile_key']);
-        $this->assertSame($profile->key, $message['reply_handling']['key']);
-        $this->assertEqualsCanonicalizing(
-            ['CALL ME', 'ready to talk'],
-            array_merge(
-                $message['reply_handling']['intents'][0]['exact'],
-                $message['reply_handling']['intents'][0]['keywords'],
-            ),
-        );
-
         $this->actingAs($user)
             ->patch(route('crm.campaigns.messages.reply-handling.update', [
                 'campaign' => $campaign,

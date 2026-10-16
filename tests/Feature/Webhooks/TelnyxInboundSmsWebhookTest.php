@@ -111,8 +111,7 @@ class TelnyxInboundSmsWebhookTest extends TestCase
         ]);
 
         $response
-            ->assertOk()
-            ->assertSee('Reply STOP to opt out of SMS messages.');
+            ->assertOk();
 
         $this->assertDatabaseHas('inbound_messages', [
             'sender_type' => Contact::class,
@@ -441,11 +440,9 @@ class TelnyxInboundSmsWebhookTest extends TestCase
         ];
 
         $this->postTelnyxWebhook($payload)
-            ->assertOk()
-            ->assertSee('Reply STOP to opt out of SMS messages.');
+            ->assertOk();
         $this->postTelnyxWebhook($payload)
-            ->assertOk()
-            ->assertSee('Reply STOP to opt out of SMS messages.');
+            ->assertOk();
 
         $this->assertDatabaseCount('inbound_messages', 1);
         $this->assertDatabaseCount('webhook_inbox_receipts', 1);

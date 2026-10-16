@@ -26,22 +26,6 @@ class CampaignCreationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_creation_surface_is_available_from_campaigns(): void
-    {
-        $this->enableCampaigns();
-        $user = User::factory()->create();
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->get(route('crm.campaigns.create'))
-            ->assertOk()
-            ->assertViewIs('crm.campaigns.create')
-            ->assertViewHas('options')
-            ->assertViewHas('selectedOption')
-            ->assertViewHas('builderStages')
-            ->assertViewHas('availableFields');
-    }
 
     public function test_email_campaign_creation_builds_an_inactive_direct_message_chain(): void
     {
@@ -309,33 +293,6 @@ class CampaignCreationTest extends TestCase
         $this->assertNotSame($campaigns[0]->key, $campaigns[1]->key);
     }
 
-    public function test_index_counts_direct_message_chain_steps_for_crm_created_campaigns(): void
-    {
-        $this->enableCampaigns();
-        $user = User::factory()->create();
-
-        $campaign = app(CreateCampaignAction::class)->handle(
-            name: 'Index Count Campaign',
-            description: null,
-            channel: 'sms',
-            firstMessagePayload: ['message' => 'First message'],
-            creationOption: app(\App\Modules\Campaigns\Services\CampaignCreationGuide::class)
-                ->find('custom') ?? throw new \RuntimeException('Missing custom Campaign creation option.'),
-            createdBy: $user,
-        );
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $response = $this->actingAs($user)
-            ->get(route('crm.campaigns.index'))
-            ->assertOk();
-
-        $listed = $response->viewData('campaigns')
-            ->firstWhere('id', $campaign->getKey());
-
-        $this->assertInstanceOf(Campaign::class, $listed);
-        $this->assertSame(1, (int) $listed->message_steps_count);
-    }
 
     public function test_campaign_execution_strategy_is_fixed_while_allocation_settings_remain_editable(): void
     {

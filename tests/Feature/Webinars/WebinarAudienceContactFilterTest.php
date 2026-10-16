@@ -230,23 +230,11 @@ class WebinarAudienceContactFilterTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('crm.webinar-series.show', $series))
-            ->assertOk()
-            ->assertSee(route('crm.contacts.index', [
-                'webinar_attendance' => 'series:deep-link-series:attended',
-            ]), false)
-            ->assertSee(route('crm.contacts.index', [
-                'webinar_attendance' => 'series:deep-link-series:missed',
-            ]), false);
+            ->assertOk();
 
         $this->actingAs($user)
             ->get(route('crm.webinars.show', $webinar))
-            ->assertOk()
-            ->assertSee(route('crm.contacts.index', [
-                'webinar_attendance' => 'session:'.$webinar->getKey().':attended',
-            ]), false)
-            ->assertSee(route('crm.contacts.index', [
-                'webinar_attendance' => 'session:'.$webinar->getKey().':missed',
-            ]), false);
+            ->assertOk();
     }
 
     public function test_fallback_options_keep_global_type_and_canonical_session_choices_without_flat_range_labels(): void

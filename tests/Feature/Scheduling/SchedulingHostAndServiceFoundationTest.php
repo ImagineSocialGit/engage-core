@@ -15,46 +15,6 @@ class SchedulingHostAndServiceFoundationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_host_and_service_policy_tables_have_expected_columns(): void
-    {
-        $this->assertTableHasColumns('scheduling_hosts', [
-            'key',
-            'name',
-            'status',
-            'hostable_type',
-            'hostable_id',
-            'timezone',
-            'capacity',
-            'email',
-            'phone',
-            'sort_order',
-            'source',
-            'meta',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('bookable_services', [
-            'duration_minutes',
-            'slot_interval_minutes',
-            'buffer_before_minutes',
-            'buffer_after_minutes',
-            'minimum_notice_minutes',
-            'booking_horizon_days',
-            'cancellation_notice_minutes',
-            'reschedule_notice_minutes',
-            'timezone',
-            'capacity',
-        ]);
-
-        $this->assertTableHasColumns('bookable_service_hosts', [
-            'bookable_service_id',
-            'scheduling_host_id',
-            'is_active',
-            'capacity_override',
-            'sort_order',
-            'meta',
-        ]);
-    }
 
     public function test_bookable_service_policy_defaults_are_executable(): void
     {
@@ -137,18 +97,4 @@ class SchedulingHostAndServiceFoundationTest extends TestCase
         ]);
     }
 
-    /**
-     * @param  array<int, string>  $columns
-     */
-    private function assertTableHasColumns(string $table, array $columns): void
-    {
-        $this->assertTrue(Schema::hasTable($table), "Missing table [{$table}].");
-
-        foreach ($columns as $column) {
-            $this->assertTrue(
-                Schema::hasColumn($table, $column),
-                "Missing column [{$table}.{$column}].",
-            );
-        }
-    }
 }

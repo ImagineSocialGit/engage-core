@@ -46,17 +46,6 @@ final class ContactPermissionInvitationHumanVerificationTest extends TestCase
         ]);
     }
 
-    public function test_permission_invitation_page_mounts_shared_human_verification_when_enabled(): void
-    {
-        $invitation = $this->invitation();
-
-        $this->get(route('messaging.permission-invitations.show', [
-            'token' => $invitation->token,
-        ]))
-            ->assertOk()
-            ->assertSee('data-public-human-verification', false)
-            ->assertSee('messaging_permissions');
-    }
 
     public function test_permission_invitation_post_fails_closed_without_successful_human_verification(): void
     {

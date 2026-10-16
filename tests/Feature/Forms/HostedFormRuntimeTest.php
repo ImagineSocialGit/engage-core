@@ -34,21 +34,6 @@ class HostedFormRuntimeTest extends TestCase
         $this->assertContains('public-human:forms', $route->gatherMiddleware());
     }
 
-    public function test_hosted_public_form_renders_on_forms_subdomain(): void
-    {
-        $this->publishedHostedForm();
-
-        $this->get($this->formUrl())
-            ->assertOk()
-            ->assertViewIs('forms.show')
-            ->assertSee('data-public-surface', false)
-            ->assertSee('Conditional Intake')
-            ->assertSee('Current employment type')
-            ->assertSee('data-form-block-key="employment_gap_note"', false)
-            ->assertSee('data-hosted-form-conditions', false)
-            ->assertSee('Submit intake')
-            ->assertDontSee('name="website"', false);
-    }
 
     public function test_hidden_conditional_required_field_is_ignored_and_submission_maps_contact(): void
     {

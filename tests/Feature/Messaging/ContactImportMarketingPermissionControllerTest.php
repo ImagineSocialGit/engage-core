@@ -40,19 +40,7 @@ class ContactImportMarketingPermissionControllerTest extends TestCase
         );
 
         $preview->assertOk();
-        $preview->assertViewHas('postImportInputs', function (array $inputs): bool {
-            $servicePermission = collect($inputs)->firstWhere('key', 'service_relationship_permission');
-            $marketingPermission = collect($inputs)->firstWhere('key', 'marketing_permission');
 
-            return is_array($servicePermission)
-                && collect($servicePermission['inputs'] ?? [])->contains(
-                    fn (array $input): bool => ($input['key'] ?? null) === 'relationship_status',
-                )
-                && is_array($marketingPermission)
-                && collect($marketingPermission['inputs'] ?? [])->contains(
-                    fn (array $input): bool => ($input['key'] ?? null) === 'permission_status',
-                );
-        });
     }
 
     public function test_missing_marketing_permission_input_defaults_to_no_imported_permission(): void

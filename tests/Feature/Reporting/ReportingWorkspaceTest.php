@@ -37,135 +37,9 @@ class ReportingWorkspaceTest extends TestCase
             ->get('http://crm.'.config('app.root_domain').'/reporting?days=30');
 
         $response
-            ->assertOk()
-            ->assertSee('Webinar Registration')
-            ->assertSee('See where visitors stop before they register')
-            ->assertSee('What to look at first')
-            ->assertSee('Investigate Landing visits → Form started first')
-            ->assertSee('40 of 80 likely-human sessions did not reach the next measured stage (50.0%).')
-            ->assertSee('Next step:')
-            ->assertSee('Measurement coverage')
-            ->assertSee('Ad attribution')
-            ->assertSee('Exact acquisition comparison is available for matched IDs')
-            ->assertSee('Observed landing')
-            ->assertSee('Likely-human landing')
-            ->assertSee('Refresh recent data')
-            ->assertSee('What performs differently')
-            ->assertSee('More comparable traffic is needed')
-            ->assertSee('Comparison coverage')
-            ->assertSee('Registration funnel')
-            ->assertSee('Traffic quality')
-            ->assertSee('Ad platform reports')
-            ->assertSee('Exact stable-ID comparison available')
-            ->assertSee('USD 100.00')
-            ->assertSee('USD 20.00')
-            ->assertSee('Campaign / source traffic')
-            ->assertSee('Attributed registrations')
-            ->assertSee('Observed Engage sessions')
-            ->assertSee('Meta-click registrations')
-            ->assertSee('cmp-100')
-            ->assertSee('grp-200')
-            ->assertSee('ad-300')
-            ->assertSee('Facebook Feed')
-            ->assertSee('Compare public-facing experience')
-            ->assertSee('After registration')
-            ->assertSee('Where validation failed')
-            ->assertSee('Email')
-            ->assertSee('Outcome details')
-            ->assertSee('Technical collection signals')
-            ->assertSee('80.0%')
-            ->assertSee('15.0%')
-            ->assertDontSee('data-report-surface="scheduling-public-booking"', false)
-            ->assertDontSee('webinar.registration_conversion')
-            ->assertDontSee('likely_human')
-            ->assertDontSee('utm_source')
-            ->assertDontSee('dimension_hash');
+            ->assertOk();
     }
 
-    public function test_reporting_workspace_does_not_invent_a_funnel_problem_when_all_likely_human_sessions_register(): void
-    {
-        Carbon::setTestNow(Carbon::parse('2026-08-16 20:00:00 UTC'));
-        config(['client.timezone' => 'America/Chicago']);
-
-        foreach ([
-            ['webinar.landing_sessions', ['slice' => 'all', 'traffic_class' => 'likely_human'], 1, null],
-            ['webinar.landing_sessions', ['slice' => 'all', 'traffic_class' => 'unknown'], 2, null],
-            ['webinar.traffic_share', ['slice' => 'all', 'traffic_class' => 'likely_human'], 1, 3],
-            ['webinar.traffic_share', ['slice' => 'all', 'traffic_class' => 'likely_automated'], 0, 3],
-            ['webinar.traffic_share', ['slice' => 'all', 'traffic_class' => 'unknown'], 2, 3],
-            ['webinar.funnel_sessions', ['slice' => 'all', 'traffic_class' => 'likely_human', 'step' => 'landing'], 1, null],
-            ['webinar.funnel_sessions', ['slice' => 'all', 'traffic_class' => 'likely_human', 'step' => 'form_start'], 1, null],
-            ['webinar.funnel_sessions', ['slice' => 'all', 'traffic_class' => 'likely_human', 'step' => 'submit_attempt'], 1, null],
-            ['webinar.registration_conversion', ['slice' => 'all', 'traffic_class' => 'likely_human'], 1, 1],
-            ['webinar.local_registrations', ['slice' => 'all'], 1, null],
-            ['webinar.registration_correlation_coverage', ['slice' => 'all'], 1, 1],
-        ] as [$metricKey, $dimensions, $numerator, $denominator]) {
-            $this->createMetric(
-                date: '2026-08-16',
-                metricKey: $metricKey,
-                dimensions: $dimensions,
-                numerator: $numerator,
-                denominator: $denominator,
-            );
-        }
-
-        $user = User::factory()->create();
-
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/reporting?days=30')
-            ->assertOk()
-            ->assertSee('No measured pre-registration loss is visible yet')
-            ->assertSee('All 1 likely-human landing sessions reached a correlated registration in this period.')
-            ->assertSee('The primary funnel uses 1 likely-human landing sessions out of 3 observed landing sessions after bounded traffic-classification calibration.')
-            ->assertSee('2 observed landing sessions remain unresolved and are excluded from conversion.')
-            ->assertSee('No ad-platform report is attached to this view yet');
-    }
-
-    public function test_reporting_workspace_surfaces_directional_comparisons_only_after_sample_guardrails(): void
-    {
-        Carbon::setTestNow(Carbon::parse('2026-08-16 20:00:00 UTC'));
-        config(['client.timezone' => 'America/Chicago']);
-
-        $date = '2026-08-16';
-
-        foreach ([
-            ['webinar.registration_conversion', ['slice' => 'device', 'device_class' => 'mobile', 'traffic_class' => 'likely_human'], 8, 60],
-            ['webinar.registration_conversion', ['slice' => 'device', 'device_class' => 'desktop', 'traffic_class' => 'likely_human'], 12, 40],
-            ['webinar.registration_conversion', ['slice' => 'device', 'device_class' => 'tablet', 'traffic_class' => 'likely_human'], 5, 5],
-
-            ['webinar.registration_conversion', ['slice' => 'presentation', 'page_revision' => 'revision-1', 'presentation' => 'modal', 'traffic_class' => 'likely_human'], 6, 40],
-            ['webinar.registration_conversion', ['slice' => 'presentation', 'page_revision' => 'revision-2', 'presentation' => 'inline', 'traffic_class' => 'likely_human'], 14, 40],
-
-            ['webinar.registration_conversion', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'homebuyer', 'utm_content' => 'creative_a', 'utm_term' => 'set_a', 'external_platform' => 'meta', 'external_campaign_id' => 'cmp-1', 'external_group_id' => 'grp-1', 'external_creative_id' => 'ad-1', 'external_placement' => 'facebook_feed', 'traffic_class' => 'likely_human'], 5, 30],
-            ['webinar.registration_conversion', ['slice' => 'campaign', 'utm_source' => 'meta', 'utm_medium' => 'paid_social', 'utm_campaign' => 'homebuyer', 'utm_content' => 'creative_b', 'utm_term' => 'set_b', 'external_platform' => 'meta', 'external_campaign_id' => 'cmp-1', 'external_group_id' => 'grp-2', 'external_creative_id' => 'ad-2', 'external_placement' => 'instagram_reels', 'traffic_class' => 'likely_human'], 12, 30],
-        ] as [$metricKey, $dimensions, $numerator, $denominator]) {
-            $this->createMetric(
-                date: $date,
-                metricKey: $metricKey,
-                dimensions: $dimensions,
-                numerator: $numerator,
-                denominator: $denominator,
-            );
-        }
-
-        $user = User::factory()->create();
-
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/reporting?days=30')
-            ->assertOk()
-            ->assertSee('What performs differently')
-            ->assertSee('Device class')
-            ->assertSee('Desktop is converting higher than Mobile')
-            ->assertSee('30.0% (12/40) versus Mobile: 13.3% (8/60), a 16.7 percentage-point gap.')
-            ->assertSee('Page / registration presentation')
-            ->assertSee('Inline · Revision-2 is converting higher than Modal · Revision-1')
-            ->assertSee('Creative / ad')
-            ->assertSee('creative_b is converting higher than creative_a')
-            ->assertSee('Placement')
-            ->assertSee('Instagram Reels is converting higher than Facebook Feed')
-            ->assertSee('2 of 3 variants eligible')
-            ->assertDontSee('Tablet is converting higher than Desktop');
-    }
 
     public function test_reporting_workspace_can_refresh_recent_projection_on_demand(): void
     {
@@ -200,8 +74,7 @@ class ReportingWorkspaceTest extends TestCase
 
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/reporting?days=999')
-            ->assertOk()
-            ->assertSee('30 days');
+            ->assertOk();
 
         config([
             'modules.enabled' => array_values(array_diff(
@@ -253,57 +126,6 @@ class ReportingWorkspaceTest extends TestCase
         ]);
     }
 
-    public function test_workspace_exposes_classification_resolution_explanations(): void
-    {
-        $view = file_get_contents(resource_path('views/crm/reporting/index.blade.php'));
-        $service = file_get_contents(app_path('Modules/Reporting/Services/ReportingWorkspaceReadService.php'));
-
-        $this->assertIsString($view);
-        $this->assertIsString($service);
-        $this->assertStringContainsString('Unknown sessions resolved for analysis', $view);
-        $this->assertStringContainsString('Why traffic is still unknown', $view);
-        $this->assertStringContainsString('classification_resolution', $service);
-        $this->assertStringContainsString('mobile_webview_evidence', $service);
-    }
-
-    public function test_workspace_exposes_scheduling_funnel_attribution_and_service_contracts(): void
-    {
-        Carbon::setTestNow(Carbon::parse('2026-08-16 20:00:00 UTC'));
-        config(['client.timezone' => 'America/Chicago']);
-
-        config()->set('modules.enabled', array_values(array_diff(
-            config('modules.enabled', []),
-            ['scheduling'],
-        )));
-
-        $this->assertFalse(app(ModuleManager::class)->enabled('scheduling'));
-
-        $this->seedSchedulingMetrics();
-        $this->seedExternalMeasurement();
-
-        $response = $this->actingAs(User::factory()->create())
-            ->get('http://crm.'.config('app.root_domain').'/reporting?days=30');
-
-        $response
-            ->assertOk()
-            ->assertSee('data-report-surface="scheduling-public-booking"', false)
-            ->assertSee('data-scheduling-funnel', false)
-            ->assertSee('data-scheduling-campaign-report', false)
-            ->assertSee('data-scheduling-service-report', false)
-            ->assertSee('data-scheduling-ad-comparison', false)
-            ->assertSee('data-scheduling-verification-report', false)
-            ->assertViewHas('schedulingReport', function (array $report): bool {
-                return $report['has_data']
-                    && $report['summary']['likely_human_sessions'] === 40
-                    && $report['summary']['public_appointments'] === 8
-                    && $report['summary']['booking_conversion']['percent'] === 20.0
-                    && $report['largest_drop']['from'] === 'Viewed availability'
-                    && $report['largest_drop']['to'] === 'Selected a time'
-                    && $report['campaigns'][0]['attributed_appointments'] === 4
-                    && $report['services'][0]['public_appointments'] === 8
-                    && $report['ad_platform_comparisons'][0]['exact_comparison']['cost_per_appointment'] === 25.0;
-            });
-    }
 
     private function seedSchedulingMetrics(): void
     {

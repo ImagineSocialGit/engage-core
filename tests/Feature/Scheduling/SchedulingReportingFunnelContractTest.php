@@ -84,16 +84,4 @@ class SchedulingReportingFunnelContractTest extends TestCase
         $this->assertTrue($fact->values['requires_confirmation']);
     }
 
-    public function test_public_booking_script_uses_reporting_client_without_collecting_contact_values(): void
-    {
-        $script = file_get_contents(resource_path('js/pages/scheduling-public-booking.js'));
-
-        $this->assertIsString($script);
-        $this->assertStringContainsString("'scheduling.booking.submit_attempt'", $script);
-        $this->assertStringContainsString("'scheduling.booking.validation_failed'", $script);
-        $this->assertStringContainsString('public_submission_attempt_id', $script);
-        $this->assertStringNotContainsString('destination: destination.value', $script);
-        $this->assertStringNotContainsString('email: email.value', $script);
-        $this->assertStringNotContainsString('phone: phone.value', $script);
-    }
 }

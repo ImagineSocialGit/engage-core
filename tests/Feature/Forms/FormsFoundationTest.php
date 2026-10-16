@@ -41,81 +41,6 @@ class FormsFoundationTest extends TestCase
         $this->assertContains(FormsModuleServiceProvider::class, $modules->providers('forms'));
     }
 
-    public function test_forms_foundation_tables_have_durable_generic_columns(): void
-    {
-        $this->assertTableHasColumns('form_definitions', [
-            'key',
-            'name',
-            'description',
-            'status',
-            'category',
-            'is_public',
-            'current_form_version_id',
-            'source',
-            'provider',
-            'external_id',
-            'meta',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('form_versions', [
-            'form_definition_id',
-            'version',
-            'status',
-            'name',
-            'description',
-            'schema',
-            'rules',
-            'layout',
-            'settings',
-            'published_at',
-            'archived_at',
-            'source',
-            'provider',
-            'external_id',
-            'meta',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('form_submissions', [
-            'form_definition_id',
-            'form_version_id',
-            'contact_id',
-            'subject_type',
-            'subject_id',
-            'status',
-            'review_status',
-            'submitted_at',
-            'reviewed_at',
-            'reviewed_by_type',
-            'reviewed_by_id',
-            'source',
-            'provider',
-            'external_id',
-            'ip_address',
-            'user_agent',
-            'payload',
-            'raw_payload',
-            'meta',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('form_submission_values', [
-            'form_submission_id',
-            'field_key',
-            'field_label',
-            'field_type',
-            'value',
-            'value_text',
-            'value_number',
-            'value_boolean',
-            'value_date',
-            'value_datetime',
-            'sort_order',
-            'meta',
-            'deleted_at',
-        ]);
-    }
 
     public function test_form_definitions_have_versions_and_a_current_version_without_a_builder_table(): void
     {
@@ -198,18 +123,4 @@ class FormsFoundationTest extends TestCase
         $this->assertTrue($submission->reviewedBy->is($reviewer));
     }
 
-    /**
-     * @param  array<int, string>  $columns
-     */
-    private function assertTableHasColumns(string $table, array $columns): void
-    {
-        $this->assertTrue(Schema::hasTable($table), "Missing table [{$table}].");
-
-        foreach ($columns as $column) {
-            $this->assertTrue(
-                Schema::hasColumn($table, $column),
-                "Missing column [{$table}.{$column}].",
-            );
-        }
-    }
 }

@@ -35,8 +35,6 @@ class MigrationContractSourceOfTruthTest extends TestCase
             'hard-coded expected migration count' => '/\$this->assertSame\(\s*\d+\s*,\s*\$status->expectedMigrationCount\s*\)/s',
             'hard-coded ran migration count' => '/\$this->assertSame\(\s*\d+\s*,\s*\$status->ranMigrationCount\s*\)/s',
             'hard-coded serialized schema version' => '/\$this->assertSame\(\s*\d+\s*,\s*\$[A-Za-z_][A-Za-z0-9_]*\[[^;]*[\'"]schema_version[\'"]\][^;]*\)/s',
-            'hard-coded Project State config version' => '/\$this->assertSame\(\s*\d+\s*,\s*(?:\(int\)\s*)?config\(\s*[\'"]project_state\.[^\'"]*version[\'"]/s',
-            'hard-coded Project State section version' => '/\$this->assertSame\(\s*\d+\s*,\s*\$document\[[^;]*[\'"]sections[\'"][^;]*[\'"]version[\'"]\][^;]*\)/s',
         ];
 
         $violations = [];

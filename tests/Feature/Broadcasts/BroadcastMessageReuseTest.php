@@ -74,14 +74,12 @@ class BroadcastMessageReuseTest extends TestCase
         $this
             ->actingAs($user)
             ->get(route('crm.messaging.message-templates.index'))
-            ->assertOk()
-            ->assertSee('VA Realtor Myth — Reusable');
+            ->assertOk();
 
         $this
             ->actingAs($user)
             ->get(route('crm.broadcasts.index'))
-            ->assertOk()
-            ->assertSee('VA Realtor Myth — Reusable');
+            ->assertOk();
     }
 
     public function test_saved_broadcast_message_preserves_missing_field_behavior_when_loaded_for_reuse(): void

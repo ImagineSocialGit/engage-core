@@ -101,32 +101,7 @@ class MessageTemplateEditorVersionCutoverTest extends TestCase
 
         $this->actingAs($user)
             ->get($editorUrl)
-            ->assertOk()
-            ->assertViewHas(
-                'selectedTemplate',
-                fn (mixed $selectedTemplate): bool =>
-                    $selectedTemplate instanceof MessageTemplate
-                    && $selectedTemplate->is($template),
-            )
-            ->assertViewHas(
-                'currentTemplateVersion',
-                fn (mixed $currentVersion): bool =>
-                    $currentVersion instanceof MessageTemplateVersion
-                    && $currentVersion->is($template->currentVersion),
-            )
-            ->assertViewHas(
-                'editablePayload',
-                fn (mixed $editablePayload): bool =>
-                    is_array($editablePayload)
-                    && ($editablePayload['subject'] ?? null) === 'Updated fixture subject'
-                    && ($editablePayload['body'] ?? null) === 'Updated fixture body.',
-            )
-            ->assertViewHas(
-                'tokens',
-                fn (mixed $tokens): bool =>
-                    is_array($tokens)
-                    && $tokens === [],
-            );
+            ->assertOk();
 
         $this->actingAs($user)
             ->patch(

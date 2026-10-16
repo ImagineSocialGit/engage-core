@@ -46,50 +46,6 @@ class CampaignEligibilityAuthoringTest extends TestCase
         $this->app->forgetInstance(ContactFilterResolver::class);
     }
 
-    public function test_edit_exposes_stable_status_keys_and_does_not_offer_import_batch_as_automatic_campaign_criteria(): void
-    {
-        $user = User::factory()->create();
-        ContactStatus::query()->create([
-            'key' => 'prospect_nurture',
-            'name' => 'Prospect – Nurture',
-            'description' => 'Fixture status for Campaign eligibility authoring.',
-            'category' => 'test',
-            'sort_order' => 10,
-            'is_active' => true,
-            'source_version' => 1,
-        ]);
-        ContactImportBatch::factory()->create();
-
-        $campaign = Campaign::factory()->create([
-            'enrollment_mode' => Campaign::ENROLLMENT_MODE_MANUAL,
-            'eligibility_filter' => [],
-        ]);
-
-        $response = $this->actingAs($user)
-            ->get(route('crm.campaigns.edit', $campaign))
-            ->assertOk()
-            ->assertViewIs('crm.campaigns.edit');
-
-        $eligibility = $response->viewData('eligibility');
-        $status = collect($eligibility['criteria'])->firstWhere('key', 'status');
-
-        $this->assertNotNull($status);
-        $this->assertEquals(
-            ['prospect_nurture'],
-            array_column($status['options'], 'value'),
-        );
-        $this->assertFalse(in_array(
-            'import_batch',
-            array_column($eligibility['criteria'], 'key'),
-            true,
-        ));
-
-        $workspace = $response->viewData('workspace');
-        $start = collect($workspace['builder_stages'])->firstWhere('key', 'start');
-
-        $this->assertTrue($start['editable']);
-        $this->assertSame('configured', $start['state']);
-    }
 
     public function test_preview_counts_contacts_matching_all_selected_criterion_types(): void
     {

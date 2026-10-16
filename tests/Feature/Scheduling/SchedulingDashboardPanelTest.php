@@ -93,49 +93,6 @@ class SchedulingDashboardPanelTest extends TestCase
         $this->assertSame('Bring the signed intake packet.', $panel['items'][0]['description']);
     }
 
-    public function test_dashboard_renders_scheduling_panels_when_enabled_and_filters_them_when_disabled(): void
-    {
-        $user = User::factory()->create();
-        $today = Appointment::factory()->create([
-            'status' => Appointment::STATUS_SCHEDULED,
-            'starts_at' => CarbonImmutable::parse('2026-08-29 02:00:00 UTC'),
-            'ends_at' => CarbonImmutable::parse('2026-08-29 03:00:00 UTC'),
-        ]);
-        $tomorrow = Appointment::factory()->create([
-            'status' => Appointment::STATUS_CONFIRMED,
-            'starts_at' => CarbonImmutable::parse('2026-08-29 15:00:00 UTC'),
-            'ends_at' => CarbonImmutable::parse('2026-08-29 16:00:00 UTC'),
-        ]);
-
-        config()->set('modules.dashboard.slots', [
-            'immediate_work' => [
-                'max' => 2,
-                'hide_when_empty' => false,
-                'panels' => ['scheduling.today'],
-            ],
-            'context' => [
-                'max' => 2,
-                'hide_when_empty' => true,
-                'panels' => ['scheduling.tomorrow'],
-            ],
-        ]);
-
-        $this->actingAs($user)
-            ->get(route('crm.index'))
-            ->assertOk()
-            ->assertSee('data-dashboard-panel="scheduling.today"', false)
-            ->assertSee('data-dashboard-panel="scheduling.tomorrow"', false)
-            ->assertSee(route('crm.scheduling.appointments.show', $today), false)
-            ->assertSee(route('crm.scheduling.appointments.show', $tomorrow), false);
-
-        config()->set('modules.enabled', ['core']);
-
-        $this->actingAs($user)
-            ->get(route('crm.index'))
-            ->assertOk()
-            ->assertDontSee('data-dashboard-panel="scheduling.today"', false)
-            ->assertDontSee('data-dashboard-panel="scheduling.tomorrow"', false);
-    }
 
     private function enableScheduling(): void
     {

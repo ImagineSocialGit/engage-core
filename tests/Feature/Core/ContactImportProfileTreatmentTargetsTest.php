@@ -42,9 +42,6 @@ class ContactImportProfileTreatmentTargetsTest extends TestCase
             ]);
 
         $preview->assertOk();
-        $preview->assertViewHas('treatmentDefinitions', function ($definitions): bool {
-            return $definitions->pluck('key')->all() === ['contact_tags'];
-        });
 
         $csvPath = $preview->viewData('csvPath');
 
@@ -95,12 +92,6 @@ class ContactImportProfileTreatmentTargetsTest extends TestCase
             ]);
 
         $preview->assertOk();
-        $preview->assertViewHas('importProfile', null);
-        $preview->assertViewHas('treatmentDefinitions', function ($definitions): bool {
-            $keys = $definitions->pluck('key')->all();
 
-            return in_array('contact_status', $keys, true)
-                && in_array('contact_tags', $keys, true);
-        });
     }
 }

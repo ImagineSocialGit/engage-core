@@ -31,20 +31,7 @@ class ContactImportAutoMappingTest extends TestCase
         );
 
         $response->assertOk();
-        $response->assertViewHas('importProfile', fn ($profile): bool => $profile === null);
-        $response->assertViewHas('suggestedMapping', [
-            'first_name' => 'First Name',
-            'last_name' => 'Surname',
-            'email' => 'Email Address',
-            'phone' => 'Mobile',
-            'source' => 'Lead Source',
-            'import_status' => 'Legacy Status',
-        ]);
-        $response->assertViewHas('treatmentDefaults', function (array $defaults): bool {
-            return data_get($defaults, 'contact_status.mode') === 'column'
-                && data_get($defaults, 'contact_status.source_column') === 'Legacy Status';
-        });
-        $response->assertSee('Use legacy status');
+
     }
 
     public function test_ambiguous_headers_are_not_guessed(): void

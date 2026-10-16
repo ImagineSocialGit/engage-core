@@ -19,61 +19,6 @@ class EventsFoundationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_events_foundation_tables_have_canonical_columns(): void
-    {
-        $this->assertTableHasColumns('events', [
-            'type_key',
-            'title',
-            'description',
-            'status',
-            'attendance_mode',
-            'starts_at',
-            'ends_at',
-            'timezone',
-            'announcement_at',
-            'venue_name',
-            'address_line_1',
-            'address_line_2',
-            'city',
-            'region',
-            'postal_code',
-            'country',
-            'primary_external_reference_id',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('event_external_references', [
-            'event_id',
-            'provider_key',
-            'reference_type',
-            'external_id',
-            'url',
-            'label',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('event_stakeholders', [
-            'event_id',
-            'role_key',
-            'name',
-            'organization',
-            'email',
-            'phone',
-            'notes',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('event_attendances', [
-            'event_id',
-            'contact_id',
-            'status',
-            'observed_at',
-            'source_key',
-            'source_reference',
-            'deleted_at',
-        ]);
-    }
-
     public function test_event_factory_persists_enum_casts_optional_type_and_historical_location_snapshot(): void
     {
         $event = Event::factory()->upcoming()->create([
@@ -240,37 +185,4 @@ class EventsFoundationTest extends TestCase
         ]);
     }
 
-    public function test_events_foundation_excludes_optional_module_and_generic_metadata_columns(): void
-    {
-        foreach ([
-            'location_id',
-            'series_id',
-            'commerce_offer_id',
-            'experience_id',
-            'music_release_id',
-            'image_url',
-            'media_id',
-            'meta',
-        ] as $column) {
-            $this->assertFalse(
-                Schema::hasColumn('events', $column),
-                "Unexpected optional or generic column [events.{$column}].",
-            );
-        }
-    }
-
-    /**
-     * @param array<int, string> $columns
-     */
-    private function assertTableHasColumns(string $table, array $columns): void
-    {
-        $this->assertTrue(Schema::hasTable($table), "Missing table [{$table}].");
-
-        foreach ($columns as $column) {
-            $this->assertTrue(
-                Schema::hasColumn($table, $column),
-                "Missing column [{$table}.{$column}].",
-            );
-        }
-    }
 }

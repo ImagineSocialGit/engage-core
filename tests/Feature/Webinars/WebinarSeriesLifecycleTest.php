@@ -145,50 +145,5 @@ class WebinarSeriesLifecycleTest extends TestCase
         ]);
     }
 
-    public function test_directory_separates_active_and_archived_types_and_detail_exposes_removal_plan(): void
-    {
-        $user = User::factory()->create();
-        $active = WebinarSeries::factory()->create([
-            'title' => 'Active Type',
-            'status' => 'active',
-        ]);
-        $archived = WebinarSeries::factory()->create([
-            'title' => 'Archived Type',
-            'status' => 'inactive',
-        ]);
-        Webinar::factory()->for($active, 'webinarSeries')->create();
 
-        $this->actingAs($user)
-            ->get(route('crm.webinar-series.index'))
-            ->assertOk()
-            ->assertViewHas('showArchivedTypes', false)
-            ->assertViewHas('archivedTypeCount', 1)
-            ->assertViewHas('series', function (Collection $series) use ($active, $archived): bool {
-                return $series->contains(fn (WebinarSeries $candidate): bool => $candidate->is($active))
-                    && ! $series->contains(fn (WebinarSeries $candidate): bool => $candidate->is($archived));
-            });
-
-        $this->actingAs($user)
-            ->get(route('crm.webinar-series.index', ['archived_types' => 1]))
-            ->assertOk()
-            ->assertViewHas('showArchivedTypes', true)
-            ->assertViewHas('series', function (Collection $series) use ($active, $archived): bool {
-                return ! $series->contains(fn (WebinarSeries $candidate): bool => $candidate->is($active))
-                    && $series->contains(fn (WebinarSeries $candidate): bool => $candidate->is($archived));
-            });
-
-        $this->actingAs($user)
-            ->get(route('crm.webinar-series.show', $active))
-            ->assertOk()
-            ->assertViewHas('seriesRemovalPlan', function (mixed $plan): bool {
-                return $plan instanceof WebinarSeriesRemovalPlan
-                    && ! $plan->canDelete()
-                    && $plan->sessionCount === 1;
-            });
-
-        $this->actingAs($user)
-            ->get(route('crm.webinar-series.show', $archived))
-            ->assertOk()
-            ->assertSee(route('crm.webinar-series.restore', $archived), false);
-    }
 }

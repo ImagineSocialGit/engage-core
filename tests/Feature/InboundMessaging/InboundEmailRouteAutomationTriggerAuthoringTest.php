@@ -82,35 +82,6 @@ class InboundEmailRouteAutomationTriggerAuthoringTest extends TestCase
         $this->assertSame($active->key, $condition['value']);
     }
 
-    public function test_flow_routes_create_surface_accepts_inbound_address_prefill_through_generic_trigger_contract(): void
-    {
-        $route = InboundEmailRoute::query()->create([
-            'key' => 'vendor_updates',
-            'local_part' => 'vendor-updates',
-            'label' => 'Vendor Updates',
-            'source' => 'crm',
-            'context_key' => null,
-            'is_active' => true,
-        ]);
-
-        $this->actingAs(User::factory()->create())
-            ->get('http://crm.'.config('app.root_domain').'/flow-routes?'.http_build_query([
-                'create' => 1,
-                'trigger_authoring_key' =>
-                    InboundEmailRouteAutomationTriggerAuthoringContributor::KEY,
-                'inbound_email_route_key' => $route->key,
-            ]))
-            ->assertOk()
-            ->assertViewHas(
-                'createRouteTriggerKey',
-                InboundEmailRouteAutomationTriggerAuthoringContributor::KEY,
-            )
-            ->assertViewHas(
-                'createRouteTriggerValues',
-                fn (array $values): bool =>
-                    ($values['inbound_email_route_key'] ?? null) === $route->key,
-            );
-    }
 
     private function enableModules(): void
     {

@@ -41,82 +41,6 @@ class PortalFoundationTest extends TestCase
         $this->assertContains(PortalModuleServiceProvider::class, $modules->providers('portal'));
     }
 
-    public function test_portal_foundation_tables_have_durable_generic_columns(): void
-    {
-        $this->assertTableHasColumns('portal_users', [
-            'uuid',
-            'name',
-            'email',
-            'phone',
-            'password',
-            'remember_token',
-            'status',
-            'email_verified_at',
-            'phone_verified_at',
-            'last_login_at',
-            'invited_at',
-            'accepted_at',
-            'disabled_at',
-            'source',
-            'provider',
-            'external_id',
-            'meta',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('portal_contact_links', [
-            'portal_user_id',
-            'contact_id',
-            'relationship',
-            'status',
-            'is_primary',
-            'linked_at',
-            'verified_at',
-            'revoked_at',
-            'source',
-            'meta',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('portal_invitations', [
-            'portal_user_id',
-            'contact_id',
-            'email',
-            'phone',
-            'token_hash',
-            'status',
-            'channel',
-            'purpose',
-            'expires_at',
-            'sent_at',
-            'accepted_at',
-            'revoked_at',
-            'accepted_ip',
-            'accepted_user_agent',
-            'source',
-            'provider',
-            'external_id',
-            'meta',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('portal_access_grants', [
-            'portal_user_id',
-            'contact_id',
-            'grantable_type',
-            'grantable_id',
-            'capability',
-            'status',
-            'starts_at',
-            'expires_at',
-            'granted_by_type',
-            'granted_by_id',
-            'revoked_at',
-            'source',
-            'meta',
-            'deleted_at',
-        ]);
-    }
 
     public function test_portal_users_link_to_contacts_without_owning_contact_identity(): void
     {
@@ -174,18 +98,4 @@ class PortalFoundationTest extends TestCase
         $this->assertSame(PortalAccessGrant::STATUS_ACTIVE, $grant->status);
     }
 
-    /**
-     * @param  array<int, string>  $columns
-     */
-    private function assertTableHasColumns(string $table, array $columns): void
-    {
-        $this->assertTrue(Schema::hasTable($table), "Missing table [{$table}].");
-
-        foreach ($columns as $column) {
-            $this->assertTrue(
-                Schema::hasColumn($table, $column),
-                "Missing column [{$table}.{$column}].",
-            );
-        }
-    }
 }

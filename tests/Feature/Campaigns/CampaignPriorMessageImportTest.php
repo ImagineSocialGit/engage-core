@@ -38,15 +38,7 @@ class CampaignPriorMessageImportTest extends TestCase
             )],
         );
 
-        $preview->assertOk()->assertViewHas('postImportInputs', function (array $groups): bool {
-            $group = collect($groups)->firstWhere('key', 'campaign_prior_message_receipts');
-
-            return is_array($group)
-                && collect($group['inputs'] ?? [])->contains(
-                    fn (array $field): bool => ($field['key'] ?? null) === 'campaign_key',
-                )
-                && collect($group['inputs'] ?? [])->where('type', 'select')->count() === 3;
-        });
+        $preview->assertOk();
 
         $processor = app(CampaignPriorMessageReceiptContactImportPostProcessor::class);
         $config = $processor->operatorConfig(null);

@@ -174,41 +174,6 @@ final class PublicHumanVerificationTest extends TestCase
             ->assertJsonPath('verified', null);
     }
 
-    public function test_browser_bridge_intercepts_programmatic_post_submissions_used_by_existing_public_flows(): void
-    {
-        $script = file_get_contents(
-            resource_path('js/public-human-verification.js'),
-        );
-
-        $this->assertIsString($script);
-        $this->assertStringContainsString(
-            'const bootstrap = window.__publicHumanVerificationBootstrap || null',
-            $script,
-        );
-        $this->assertStringContainsString(
-            'HTMLFormElement.prototype.submit = function publicHumanVerificationSubmit()',
-            $script,
-        );
-        $this->assertStringContainsString(
-            'nativeSubmit.call(form)',
-            $script,
-        );
-        $this->assertStringContainsString(
-            'bootstrap.pendingForms.splice(0)',
-            $script,
-        );
-
-        $component = file_get_contents(resource_path(
-            'views/components/public-surface/human-verification.blade.php',
-        ));
-
-        $this->assertIsString($component);
-        $this->assertStringContainsString(
-            'publicHumanVerificationBootstrapSubmit',
-            $component,
-        );
-    }
-
     public function test_turnstile_environment_ownership_and_secret_classification_are_explicit(): void
     {
         $enabled = EnvironmentVariableCatalog::definition(

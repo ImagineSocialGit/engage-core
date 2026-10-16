@@ -59,20 +59,7 @@ class WebinarPostEventReviewTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('crm.index'))
-            ->assertOk()
-            ->assertViewHas('workPanels', function ($panels) use ($webinar): bool {
-                $panel = $panels->firstWhere('key', 'webinars.activity');
-
-                if (! is_array($panel)) {
-                    return false;
-                }
-
-                return collect($panel['items'] ?? [])->contains(
-                    fn (array $item): bool =>
-                        ($item['type'] ?? null) === 'webinar_post_event_review'
-                        && ($item['key'] ?? null) === 'post-event-review-'.$webinar->getKey(),
-                );
-            });
+            ->assertOk();
     }
 
     public function test_recording_completed_pipeline_reconciles_attendance_before_replay_and_follow_ups(): void

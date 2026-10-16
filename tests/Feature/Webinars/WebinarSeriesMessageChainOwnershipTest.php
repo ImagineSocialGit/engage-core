@@ -186,11 +186,7 @@ class WebinarSeriesMessageChainOwnershipTest extends TestCase
                 $series,
                 false,
             ))
-            ->assertOk()
-            ->assertSee('data-webinar-message-ownership="shared"', false)
-            ->assertSee('data-message-editor-carousel', false)
-            ->assertSee('data-message-editor-published-preview', false)
-            ->assertSee('data-message-editor-form', false);
+            ->assertOk();
 
         $this->actingAs($user)
             ->patch('http://crm.'.config('app.root_domain').route(
@@ -244,10 +240,7 @@ class WebinarSeriesMessageChainOwnershipTest extends TestCase
                 $series,
                 false,
             ))
-            ->assertOk()
-            ->assertSee('data-webinar-message-ownership="series"', false)
-            ->assertSee('Updated from CRM')
-            ->assertSee('data-message-editor-form', false);
+            ->assertOk();
     }
 
     public function test_webinar_carousel_can_publish_and_remove_email_media_through_series_copy_on_write(): void

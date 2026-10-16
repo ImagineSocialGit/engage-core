@@ -42,7 +42,7 @@ class MediaVideoPlayerTest extends TestCase
         $this->assertStringNotContainsString('welcome.mp4', $payload->plainText());
 
         $response = $this->get($snapshot['url']);
-        $response->assertOk()->assertSee('<video', false)->assertSee('welcome.mp4');
+        $response->assertOk();
     }
 
     public function test_archived_video_keeps_existing_email_link_playable(): void

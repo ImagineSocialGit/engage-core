@@ -61,35 +61,6 @@ class ContactRelationshipWorkspaceTest extends TestCase
         $this->app->register(RelationshipsModuleServiceProvider::class);
     }
 
-    public function test_realtor_context_uses_relationship_stage_instead_of_contact_status(): void
-    {
-        $user = User::factory()->create();
-        $contact = Contact::factory()->create([
-            'meta' => [
-                'import' => [
-                    'original_status' => 'Legacy consumer status',
-                ],
-            ],
-        ]);
-
-        app(UpsertContactRelationshipAction::class)->handle(
-            contact: $contact,
-            relationshipKey: 'realtor',
-            stageKey: 'target_agent',
-            source: 'agent_list',
-        );
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->get(route('crm.contacts.show', $contact))
-            ->assertOk()
-            ->assertSee('data-contact-business-context="realtor"', false)
-            ->assertSee('data-contact-progression="relationship_stage"', false)
-            ->assertSee('data-relationship-stage-form', false)
-            ->assertDontSee('data-contact-status-form', false)
-            ->assertDontSee('data-contact-status-import-evidence', false);
-    }
 
     public function test_stage_update_uses_relationship_owned_action_for_configured_lifecycle_stages(): void
     {

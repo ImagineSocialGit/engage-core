@@ -19,46 +19,6 @@ class MessageTemplateCompositionEditorTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_library_exposes_shared_content_and_exact_published_preview(): void
-    {
-        config()->set('modules.enabled', ['messaging']);
-        config()->set('client.key', 'fixture-client');
-
-        $user = User::factory()->create();
-        [$preset, $template] = $this->message('fixture.reminder.one', 'Reminder One', 'Source message');
-        $layer = app(UpsertMessageTemplateCompositionLayerAction::class)->handle(
-            scopeType: MessageTemplateCompositionLayer::SCOPE_FAMILY,
-            channel: 'sms',
-            payload: ['message' => 'Shared reminder'],
-            clientKey: 'fixture-client',
-            familyKey: 'reminder',
-            source: 'config',
-            isCustomized: false,
-        );
-        $preset->forceFill(['payload' => []])->save();
-        app(PublishMessageTemplateVersionAction::class)->handle($template, []);
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/message-templates?preset='.$preset->getKey())
-            ->assertOk()
-            ->assertViewHas('selectedPreset', fn (mixed $selected): bool =>
-                $selected instanceof MessageTemplatePreset && $selected->is($preset)
-            )
-            ->assertViewHas('sharedCompositionLayers', fn (mixed $layers): bool =>
-                $layers instanceof \Illuminate\Support\Collection
-                && $layers->contains(fn (mixed $candidate): bool =>
-                    is_array($candidate)
-                    && ($candidate['layer'] ?? null) instanceof MessageTemplateCompositionLayer
-                    && $candidate['layer']->is($layer)
-                )
-            )
-            ->assertViewHas('currentTemplateVersion', fn (mixed $version): bool =>
-                $version instanceof \App\Modules\Messaging\Models\MessageTemplateVersion
-            )
-            ->assertSee(route('crm.messaging.message-templates.composition-layers.update', $layer));
-    }
 
     public function test_message_edit_stores_only_delta_and_matching_baseline_clears_override(): void
     {

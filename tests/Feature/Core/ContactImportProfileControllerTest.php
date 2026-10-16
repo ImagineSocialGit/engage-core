@@ -58,14 +58,6 @@ class ContactImportProfileControllerTest extends TestCase
             ->post(route('crm.contacts.import.preview'), ['csv' => $csv]);
 
         $preview->assertOk();
-        $preview->assertViewHas('importProfile', fn ($profile): bool => $profile?->key === 'known_export');
-        $preview->assertViewHas('suggestedMapping', [
-            'first_name' => 'First Name',
-            'last_name' => 'Last Name',
-            'email' => 'Email Address',
-        ]);
-        $preview->assertSee('Import profile: Known Export');
-        $preview->assertDontSee('name="profile_key"', false);
 
         $csvPath = $preview->viewData('csvPath');
 

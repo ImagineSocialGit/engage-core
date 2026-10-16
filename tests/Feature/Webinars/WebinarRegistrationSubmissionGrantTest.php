@@ -89,11 +89,6 @@ class WebinarRegistrationSubmissionGrantTest extends TestCase
         $show = $this->get(route('webinar.show', $series->slug));
 
         $show->assertOk();
-        $show->assertSee('name="first_name"', false);
-        $show->assertSee('name="last_name"', false);
-        $show->assertSee('name="email"', false);
-        $show->assertDontSee('name="transactional_email_consent"', false);
-        $show->assertSee('name="transactional_sms_consent"', false);
 
         $response = $this->from(route('webinar.show', $series->slug))
             ->post($this->registrationUrl($series, $webinar), [

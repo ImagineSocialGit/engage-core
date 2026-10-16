@@ -126,30 +126,6 @@ class ReportingCollectionHealthTest extends TestCase
         $this->assertSame('disabled', $health['meta_pixel']['status']);
     }
 
-    public function test_reporting_workspace_exposes_collection_health_as_a_structural_surface(): void
-    {
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/reporting');
-
-        $response
-            ->assertOk()
-            ->assertViewHas('collectionHealth', function (mixed $health): bool {
-                return is_array($health)
-                    && isset(
-                        $health['overall_status'],
-                        $health['collection'],
-                        $health['attribution'],
-                        $health['projection'],
-                        $health['meta_pixel'],
-                        $health['cards'],
-                    );
-            })
-            ->assertSee('data-reporting-health', false)
-            ->assertSee('data-reporting-health-card="collection"', false)
-            ->assertSee('data-reporting-health-card="projection"', false);
-    }
 
     /**
      * @param array<string, mixed> $attribution

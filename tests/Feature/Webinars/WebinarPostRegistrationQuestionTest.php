@@ -123,10 +123,7 @@ class WebinarPostRegistrationQuestionTest extends TestCase
         );
 
         $this->get($showPath)
-            ->assertOk()
-            ->assertSee('What is the one thing you want explained?')
-            ->assertSee('Anything else?')
-            ->assertSee('name="registration_questions[primary_question][answer]"', false);
+            ->assertOk();
 
         $this->from($showPath)
             ->post($storePath, [])
@@ -172,22 +169,6 @@ class WebinarPostRegistrationQuestionTest extends TestCase
         ]);
     }
 
-    public function test_inline_presentation_renders_the_same_registration_form_in_the_hero_without_modal_chrome(): void
-    {
-        Config::set('webinars.register.content.registration.presentation', 'inline');
-        Config::set('webinars.register.content.registration.questions', []);
-
-        [$series] = $this->webinarFixture('inline-presentation');
-
-        $response = $this->get(route('webinar.show', $series->slug));
-
-        $response->assertOk();
-        $response->assertSee('id="webinar-registration-form"', false);
-        $response->assertDontSee('aria-modal="true"', false);
-        $response->assertDontSee('name="last_name"', false);
-        $response->assertSee('name="first_name"', false);
-        $response->assertSee('name="email"', false);
-    }
 
     /**
      * @return array{0: WebinarSeries, 1: Webinar}

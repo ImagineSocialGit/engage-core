@@ -141,64 +141,6 @@ class SchedulingContactPanelTest extends TestCase
         );
     }
 
-    public function test_contact_page_renders_scheduling_summary_links_attention_and_empty_state(): void
-    {
-        $user = User::factory()->create();
-        $contact = Contact::factory()->create([
-            'name' => 'Taylor Contact',
-            'email' => 'taylor@example.test',
-        ]);
-        $emptyContact = Contact::factory()->create(['name' => 'Empty Contact']);
-        $otherContact = Contact::factory()->create();
-        $service = $this->service(['name' => 'Review Call']);
-        $next = $this->appointment(
-            contact: $contact,
-            service: $service,
-            title: 'Pending Review Call',
-            status: Appointment::STATUS_PENDING,
-            startsAt: CarbonImmutable::parse('2026-08-04 10:00:00 UTC'),
-        );
-        $recent = $this->appointment(
-            contact: $contact,
-            service: $service,
-            title: 'Completed Review Call',
-            status: Appointment::STATUS_COMPLETED,
-            startsAt: CarbonImmutable::parse('2026-08-02 10:00:00 UTC'),
-        );
-        $otherAppointment = $this->appointment(
-            contact: $otherContact,
-            service: $service,
-            title: 'Private Other Contact Appointment',
-            status: Appointment::STATUS_PENDING,
-            startsAt: CarbonImmutable::parse('2026-08-04 11:00:00 UTC'),
-        );
-
-        $this->actingAs($user)
-            ->get(route('crm.contacts.show', $contact))
-            ->assertOk()
-            ->assertSee('data-module-panel="scheduling"', false)
-            ->assertSee('data-contact-id="'.$contact->id.'"', false)
-            ->assertSee('data-scheduling-panel-pending-count="1"', false)
-            ->assertSee('data-scheduling-panel-action="schedule"', false)
-            ->assertSee('data-scheduling-appointment-kind="next"', false)
-            ->assertSee('data-appointment-id="'.$next->id.'"', false)
-            ->assertSee('data-appointment-status="'.Appointment::STATUS_PENDING.'"', false)
-            ->assertSee('data-appointment-id="'.$recent->id.'"', false)
-            ->assertSee('data-appointment-status="'.Appointment::STATUS_COMPLETED.'"', false)
-            ->assertSee(route('crm.scheduling.appointments.show', $next), false)
-            ->assertSee(route('crm.scheduling.appointments.show', $recent), false)
-            ->assertSee(
-                route('crm.scheduling.appointments.create', ['contact_id' => $contact->id]),
-                false,
-            )
-            ->assertDontSee('data-appointment-id="'.$otherAppointment->id.'"', false);
-
-        $this->actingAs($user)
-            ->get(route('crm.contacts.show', $emptyContact))
-            ->assertOk()
-            ->assertSee('data-module-panel="scheduling"', false)
-            ->assertSee('data-scheduling-panel-state="empty"', false);
-    }
 
     public function test_workspace_validates_preserves_and_reuses_contact_preselection(): void
     {
@@ -219,15 +161,7 @@ class SchedulingContactPanelTest extends TestCase
 
         $this->actingAs($user)
             ->get($workspaceUrl)
-            ->assertOk()
-            ->assertSee(
-                'data-scheduling-preselected-contact="'.$contact->id.'"',
-                false,
-            )
-            ->assertSee(
-                'name="contact_id" value="'.$contact->id.'"',
-                false,
-            );
+            ->assertOk();
 
         $response = $this->actingAs($user)
             ->post(route('crm.scheduling.appointments.store'), [

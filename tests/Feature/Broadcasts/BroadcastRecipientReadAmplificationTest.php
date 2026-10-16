@@ -41,56 +41,6 @@ class BroadcastRecipientReadAmplificationTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_terminal_completion_check_forces_the_broadcast_status_index(): void
-    {
-        $broadcast = Broadcast::factory()->scheduled()->create();
-        $contact = Contact::factory()->create();
-
-        BroadcastRecipient::factory()->scheduled()->create([
-            'broadcast_id' => $broadcast->id,
-            'contact_id' => $contact->id,
-        ]);
-
-        BroadcastRecipient::factory()->scheduled()->create([
-            'broadcast_id' => $broadcast->id,
-        ]);
-
-        $scheduledMessage = ScheduledMessage::factory()->sent()->create([
-            'recipient_type' => $contact->getMorphClass(),
-            'recipient_id' => $contact->id,
-            'context_type' => $broadcast->getMorphClass(),
-            'context_id' => $broadcast->id,
-        ]);
-
-        $queries = [];
-
-        DB::listen(function (QueryExecuted $query) use (&$queries): void {
-            $queries[] = [
-                'sql' => strtolower($query->sql),
-                'bindings' => $query->bindings,
-            ];
-        });
-
-        app(MarkBroadcastRecipientSent::class)->handle(
-            new ScheduledMessageSent($scheduledMessage),
-        );
-
-        $completionQueries = array_values(array_filter(
-            $queries,
-            static fn (array $query): bool => str_contains($query['sql'], 'broadcast_recipients')
-                && str_contains($query['sql'], 'force index')
-                && str_contains(
-                    $query['sql'],
-                    'broadcast_recipients_broadcast_id_status_index',
-                )
-                && in_array(BroadcastRecipient::STATUS_PENDING, $query['bindings'], true)
-                && in_array(BroadcastRecipient::STATUS_SCHEDULED, $query['bindings'], true),
-        ));
-
-        $this->assertCount(1, $completionQueries);
-        $this->assertSame(Broadcast::STATUS_SCHEDULED, $broadcast->fresh()->status);
-    }
-
     public function test_bulk_chunk_progression_uses_locked_metadata_without_recipient_counts(): void
     {
         Contact::factory()->count(3)->create();

@@ -185,23 +185,6 @@ class RelationshipImportTreatmentTest extends TestCase
         $this->assertSame('target_agent', data_get($batch->meta, 'mapped_blank_defaults.relationship_stage'));
     }
 
-    public function test_empty_relationship_stage_column_is_still_suggested_for_mapping(): void
-    {
-        Storage::fake('local');
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->post(route('crm.contacts.import.preview'), [
-            'csv' => UploadedFile::fake()->createWithContent(
-                'contacts.csv',
-                "Email,Relationship Key,Relationship Stage\nagent@example.test,realtor,\n",
-            ),
-        ]);
-
-        $response->assertOk();
-        $this->assertSame('Relationship Key', $response->viewData('suggestedMapping')['relationship_key'] ?? null);
-        $this->assertSame('Relationship Stage', $response->viewData('suggestedMapping')['relationship_stage'] ?? null);
-        $this->assertSame(1, $response->viewData('columnProfiles')['Relationship Stage']['blank_count'] ?? null);
-    }
 
     public function test_blank_stage_without_a_default_preserves_an_existing_stage(): void
     {

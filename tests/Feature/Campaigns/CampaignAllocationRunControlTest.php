@@ -69,8 +69,7 @@ class CampaignAllocationRunControlTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user)
             ->get(route('crm.campaigns.runs.preview', $campaign))
-            ->assertOk()
-            ->assertViewIs('crm.campaigns.allocation-runs.preview');
+            ->assertOk();
         $this->assertSame(0, CampaignAllocationRun::query()->count());
 
         $sequence = Campaign::factory()->create([

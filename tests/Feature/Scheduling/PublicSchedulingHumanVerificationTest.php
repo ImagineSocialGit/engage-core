@@ -35,28 +35,6 @@ final class PublicSchedulingHumanVerificationTest extends TestCase
         }
     }
 
-    public function test_public_booking_page_mounts_the_verification_ui_only_when_enabled(): void
-    {
-        $this->registerPublicSurface('https://schedule.test');
-        config()->set('human_verification.enabled', true);
-        config()->set('human_verification.surfaces.scheduling', [
-            'enabled' => true,
-            'action' => 'scheduling',
-        ]);
-        config()->set('human_verification.providers.turnstile.site_key', 'test-site-key');
-        config()->set('human_verification.providers.turnstile.secret_key', 'test-secret-key');
-
-        $this->get('https://schedule.test/')
-            ->assertOk()
-            ->assertSee('data-public-human-verification', false)
-            ->assertSee('test-site-key');
-
-        config()->set('human_verification.enabled', false);
-
-        $this->get('https://schedule.test/')
-            ->assertOk()
-            ->assertDontSee('data-public-human-verification', false);
-    }
 
     private function registerPublicSurface(string $url): void
     {

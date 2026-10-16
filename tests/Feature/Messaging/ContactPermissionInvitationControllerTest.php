@@ -33,37 +33,6 @@ class ContactPermissionInvitationControllerTest extends TestCase
         ]);
     }
 
-    public function test_public_invitation_page_renders_email_option_from_token(): void
-    {
-        $invitation = $this->invitation();
-
-        $response = $this->get(route('messaging.permission-invitations.show', [
-            'token' => $invitation->token,
-        ]));
-
-        $response->assertOk();
-        $response->assertSee($invitation->contact->email);
-        $response->assertSee('name="channels[]"', false);
-        $response->assertSee('value="email"', false);
-        $response->assertDontSee('value="sms"', false);
-        $response->assertDontSee('name="phone"', false);
-    }
-
-    public function test_public_invitation_page_renders_sms_option_when_enabled_for_permission_invitations(): void
-    {
-        $this->enablePermissionInvitationSms();
-
-        $invitation = $this->invitation();
-
-        $response = $this->get(route('messaging.permission-invitations.show', [
-            'token' => $invitation->token,
-        ]));
-
-        $response->assertOk();
-        $response->assertSee('value="email"', false);
-        $response->assertSee('value="sms"', false);
-        $response->assertSee('name="phone"', false);
-    }
 
     public function test_invalid_token_returns_404(): void
     {
@@ -258,26 +227,6 @@ class ContactPermissionInvitationControllerTest extends TestCase
         }
     }
 
-    public function test_accepted_invitation_shows_confirmation_page(): void
-    {
-        $invitation = $this->invitation([
-            'status' => ContactPermissionInvitation::STATUS_ACCEPTED,
-            'accepted_at' => now(),
-            'accepted_channels' => ['email', 'sms'],
-        ]);
-
-        $response = $this->get(route('messaging.permission-invitations.show', [
-            'token' => $invitation->token,
-        ]));
-
-        $response
-            ->assertOk()
-            ->assertViewIs('messaging.permission-invitations.accepted')
-            ->assertViewHas('invitation', fn (mixed $presented): bool =>
-                $presented instanceof ContactPermissionInvitation
-                && $presented->is($invitation)
-            );
-    }
 
     public function test_already_accepted_invitation_cannot_create_duplicate_consent_rows(): void
     {

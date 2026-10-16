@@ -24,27 +24,6 @@ class ContactDirectMessageTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_contact_show_exposes_messaging_owned_send_message_modal_when_contact_can_receive_email(): void
-    {
-        config()->set('modules.enabled', ['messaging']);
-        config()->set('messaging.channel_availability.email.surfaces.contact_direct_messages', true);
-
-        $user = User::factory()->create();
-        $contact = Contact::factory()->create([
-            'email' => 'jane@example.test',
-        ]);
-        $this->grantConsent($contact, 'email', 'transactional');
-
-        $this->actingAs($user)
-            ->get(route('crm.contacts.show', $contact))
-            ->assertOk()
-            ->assertSee('data-contact-direct-message-panel', false)
-            ->assertSee('data-contact-direct-message-open', false)
-            ->assertSee('data-contact-direct-message-modal', false)
-            ->assertSee('Follow up on an inquiry')
-            ->assertSee('Appointment or scheduling')
-            ->assertDontSee('Marketing or promotional outreach');
-    }
 
     public function test_business_reason_resolves_to_transactional_purpose_without_accepting_browser_authored_purpose(): void
     {

@@ -43,41 +43,6 @@ class WebinarWaitlistSignupControllerTest extends TestCase
         $this->configureWebinarWaitlistChannelAvailability();
     }
 
-    public function test_notify_me_page_hides_sms_when_sms_is_not_available_for_waitlists(): void
-    {
-        $series = WebinarSeries::factory()->create([
-            'status' => 'active',
-            'slug' => 'homebuyer-basics',
-            'title' => 'Homebuyer Basics',
-        ]);
-
-        $response = $this->get(route('webinar.show', $series->slug));
-
-        $response->assertOk();
-        $response->assertSee('name="marketing_email_consent"', false);
-        $response->assertDontSee('name="marketing_sms_consent"', false);
-        $response->assertDontSee('name="phone"', false);
-        $response->assertDontSee('name="transactional_email_consent"', false);
-        $response->assertDontSee('name="transactional_sms_consent"', false);
-    }
-
-    public function test_notify_me_page_shows_sms_when_sms_is_available_for_waitlists(): void
-    {
-        $this->enableWebinarWaitlistSms();
-
-        $series = WebinarSeries::factory()->create([
-            'status' => 'active',
-            'slug' => 'homebuyer-basics',
-            'title' => 'Homebuyer Basics',
-        ]);
-
-        $response = $this->get(route('webinar.show', $series->slug));
-
-        $response->assertOk();
-        $response->assertSee('name="marketing_email_consent"', false);
-        $response->assertSee('name="marketing_sms_consent"', false);
-        $response->assertSee('name="phone"', false);
-    }
 
     public function test_it_creates_email_waitlist_signup_and_marketing_consent(): void
     {

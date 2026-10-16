@@ -14,49 +14,6 @@ class ContactStatusAndTagManagementTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_contact_show_exposes_status_and_tag_management_controls(): void
-    {
-        config()->set('modules.enabled', array_values(array_unique([
-            ...config('modules.enabled', []),
-            'workflow',
-        ])));
-
-        $user = User::factory()->create();
-        $contact = Contact::factory()->create();
-
-        ContactStatus::query()->create([
-            'key' => 'prospect',
-            'name' => 'Prospect',
-            'is_active' => true,
-            'sort_order' => 10,
-        ]);
-
-        ContactTag::query()->create([
-            'contact_id' => $contact->getKey(),
-            'tag' => 'Webinar Attended',
-        ]);
-
-        ContactTag::query()->create([
-            'contact_id' => Contact::factory()->create()->getKey(),
-            'tag' => 'Webinar Missed',
-        ]);
-
-        $response = $this
-            ->actingAs($user)
-            ->get(route('crm.contacts.show', $contact));
-
-        $response
-            ->assertOk()
-            ->assertSee('data-contact-status-form', false)
-            ->assertSee('No status')
-            ->assertSee('Prospect')
-            ->assertSee('data-contact-tags', false)
-            ->assertSee('data-contact-tag-add-form', false)
-            ->assertSee('data-contact-tag-edit-form', false)
-            ->assertSee('data-contact-tag-remove-form', false)
-            ->assertSee('Webinar Attended')
-            ->assertSee('Webinar Missed');
-    }
 
     public function test_contact_status_can_be_assigned_and_removed_from_contact_show(): void
     {

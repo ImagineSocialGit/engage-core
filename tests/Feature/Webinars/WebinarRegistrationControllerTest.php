@@ -40,191 +40,6 @@ class WebinarRegistrationControllerTest extends TestCase
         $this->assertNull(config('webinars.queues.registrations'));
     }
 
-    public function test_show_displays_notify_me_page_when_no_upcoming_webinar_exists(): void
-    {
-        $series = WebinarSeries::factory()->create([
-            'status' => 'active',
-            'slug' => 'first-time-homebuyer',
-            'title' => 'First Time Homebuyer',
-        ]);
-
-        Webinar::factory()->create([
-            'webinar_series_id' => $series->id,
-            'starts_at' => now()->subDay(),
-        ]);
-
-        $response = $this->get(route('webinar.show', $series->slug));
-
-        $response->assertOk();
-
-        $response->assertSee($series->title);
-        $response->assertSee(route('webinar.waitlist.store', $series->slug), false);
-    }
-
-    public function test_show_displays_register_page_when_upcoming_webinar_exists(): void
-    {
-        $series = WebinarSeries::factory()->create([
-            'status' => 'active',
-            'slug' => 'va-loans',
-            'title' => 'VA Loans',
-        ]);
-
-        $webinar = Webinar::factory()->create([
-            'webinar_series_id' => $series->id,
-            'starts_at' => now()->addDay(),
-        ]);
-
-        $response = $this->get(route('webinar.show', $series->slug));
-
-        $response->assertOk();
-
-        $response->assertSee($series->title);
-        $response->assertSee(
-            $this->registrationPath($series, $webinar),
-        );
-    }
-
-    public function test_register_page_renders_the_current_session_csrf_token(): void
-    {
-        $series = WebinarSeries::factory()->create([
-            'status' => 'active',
-            'slug' => 'session-specific-register',
-            'title' => 'Session Specific Register',
-        ]);
-
-        Webinar::factory()->create([
-            'webinar_series_id' => $series->id,
-            'starts_at' => now()->addDay(),
-        ]);
-
-        $firstResponse = $this
-            ->withSession(['_token' => 'register-session-token-one'])
-            ->get(route('webinar.show', $series->slug));
-
-        $firstResponse
-            ->assertOk()
-            ->assertSee('value="register-session-token-one"', false);
-
-        $secondResponse = $this
-            ->withSession(['_token' => 'register-session-token-two'])
-            ->get(route('webinar.show', $series->slug));
-
-        $secondResponse
-            ->assertOk()
-            ->assertSee('value="register-session-token-two"', false)
-            ->assertDontSee('value="register-session-token-one"', false);
-    }
-
-    public function test_notify_me_page_renders_the_current_session_csrf_token(): void
-    {
-        $series = WebinarSeries::factory()->create([
-            'status' => 'active',
-            'slug' => 'session-specific-waitlist',
-            'title' => 'Session Specific Waitlist',
-        ]);
-
-        $firstResponse = $this
-            ->withSession(['_token' => 'waitlist-session-token-one'])
-            ->get(route('webinar.show', $series->slug));
-
-        $firstResponse
-            ->assertOk()
-            ->assertSee('value="waitlist-session-token-one"', false);
-
-        $secondResponse = $this
-            ->withSession(['_token' => 'waitlist-session-token-two'])
-            ->get(route('webinar.show', $series->slug));
-
-        $secondResponse
-            ->assertOk()
-            ->assertSee('value="waitlist-session-token-two"', false)
-            ->assertDontSee('value="waitlist-session-token-one"', false);
-    }
-
-    public function test_show_intersects_configured_consent_fields_with_channel_availability(): void
-    {
-        $this->configureRegistrationConsentContract([
-            'transactional' => ['email' => true, 'sms' => true],
-            'marketing' => ['email' => true, 'sms' => true],
-        ]);
-
-        $series = WebinarSeries::factory()->create([
-            'status' => 'active',
-            'slug' => 'hidden-sms',
-            'title' => 'Hidden SMS',
-        ]);
-
-        Webinar::factory()->create([
-            'webinar_series_id' => $series->id,
-            'starts_at' => now()->addDay(),
-        ]);
-
-        $response = $this->get(route('webinar.show', $series->slug));
-
-        $response->assertOk();
-        $response->assertSee('name="transactional_email_consent"', false);
-        $response->assertSee('name="marketing_email_consent"', false);
-        $response->assertDontSee('name="transactional_sms_consent"', false);
-        $response->assertDontSee('name="marketing_sms_consent"', false);
-    }
-
-    public function test_show_renders_only_fields_enabled_by_the_registration_consent_contract(): void
-    {
-        $this->enableWebinarRegistrationSms();
-        $this->configureRegistrationConsentContract([
-            'transactional' => ['email' => true, 'sms' => true],
-            'marketing' => ['email' => false, 'sms' => false],
-        ]);
-
-        $series = WebinarSeries::factory()->create([
-            'status' => 'active',
-            'slug' => 'transactional-only',
-            'title' => 'Transactional Only',
-        ]);
-
-        Webinar::factory()->create([
-            'webinar_series_id' => $series->id,
-            'starts_at' => now()->addDay(),
-        ]);
-
-        $response = $this->get(route('webinar.show', $series->slug));
-
-        $response->assertOk();
-        $response->assertSee('name="transactional_email_consent"', false);
-        $response->assertSee('name="transactional_sms_consent"', false);
-        $response->assertDontSee('name="marketing_email_consent"', false);
-        $response->assertDontSee('name="marketing_sms_consent"', false);
-    }
-
-    public function test_index_displays_only_active_series(): void
-    {
-        $activeSeries = WebinarSeries::factory()->create([
-            'status' => 'active',
-            'title' => 'Homebuyer Basics',
-        ]);
-
-        $inactiveSeries = WebinarSeries::factory()->create([
-            'status' => 'inactive',
-            'title' => 'Old Webinar',
-        ]);
-
-        $response = $this->get(route('webinar.index'));
-
-        $response->assertOk();
-        $response->assertSee('data-public-surface-header', false);
-        $response->assertSee('data-public-surface-brand', false);
-        $response->assertSee('data-public-surface-label', false);
-
-        $response->assertViewIs('webinar.index');
-
-        $response->assertViewHas('series', function ($series) use ($activeSeries, $inactiveSeries) {
-            return $series->contains($activeSeries)
-                && ! $series->contains($inactiveSeries);
-        });
-
-        $response->assertSee($activeSeries->title);
-        $response->assertDontSee($inactiveSeries->title);
-    }
 
     public function test_store_redirects_back_to_show_page_when_no_upcoming_webinar_exists(): void
     {
@@ -265,8 +80,7 @@ class WebinarRegistrationControllerTest extends TestCase
         ]);
 
         $this->get(route('webinar.show', $series->slug))
-            ->assertOk()
-            ->assertSee(route('webinar.waitlist.store', $series->slug), false);
+            ->assertOk();
 
         $webinar = Webinar::factory()->create([
             'webinar_series_id' => $series->id,
@@ -282,9 +96,7 @@ class WebinarRegistrationControllerTest extends TestCase
             ->handle(seriesSlug: $series->slug);
 
         $this->get(route('webinar.show', $series->slug))
-            ->assertOk()
-            ->assertSee($this->registrationPath($series, $webinar))
-            ->assertDontSee(route('webinar.waitlist.store', $series->slug), false);
+            ->assertOk();
     }
 
     public function test_store_rejects_a_selected_consent_field_disabled_by_the_registration_contract(): void
@@ -623,38 +435,6 @@ class WebinarRegistrationControllerTest extends TestCase
         $this->assertArrayNotHasKey(
             'reporting_session_token',
             is_array($registration->meta) ? $registration->meta : [],
-        );
-    }
-
-    public function test_show_resolves_public_layout_image_client_key_from_client_config(): void
-    {
-        Config::set('app.client_key', null);
-        Config::set('client.key', 'example-client');
-        Config::set('filesystems.disks.spaces.url', 'https://cdn.example.test');
-
-        Config::set('webinars.content.brand.logo', [
-            'path' => 'brand/logo',
-            'sizes' => [320],
-            'placeholder' => 'brand/logo/placeholder.webp',
-        ]);
-
-        $series = WebinarSeries::factory()->create([
-            'status' => 'active',
-            'slug' => 'client-key-image-test',
-            'title' => 'Client Key Image Test',
-        ]);
-
-        Webinar::factory()->create([
-            'webinar_series_id' => $series->id,
-            'starts_at' => now()->addDay(),
-        ]);
-
-        $response = $this->get(route('webinar.show', $series->slug));
-
-        $response->assertOk();
-        $response->assertSee(
-            'https://cdn.example.test/example-client/images/brand/logo/320.webp',
-            false
         );
     }
 

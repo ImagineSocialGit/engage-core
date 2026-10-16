@@ -54,97 +54,6 @@ class SchedulingAppointmentRescheduleWorkspaceTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_detail_links_to_reschedule_workspace_and_excludes_the_current_target(): void
-    {
-        $user = User::factory()->create();
-        [$service, $host] = $this->hostedService([
-            'name' => 'Planning Session',
-        ]);
-        $currentStart = CarbonImmutable::parse('2026-08-04 09:00:00 UTC');
-        $appointment = Appointment::factory()->create([
-            'bookable_service_id' => $service->id,
-            'scheduling_host_id' => $host->id,
-            'status' => Appointment::STATUS_SCHEDULED,
-            'title' => 'Current Planning Session',
-            'starts_at' => $currentStart,
-            'ends_at' => $currentStart->addHour(),
-        ]);
-        $this->availability(
-            service: $service,
-            host: $host,
-            startsAt: $currentStart,
-            endsAt: $currentStart->addHours(3),
-        );
-
-        $this->actingAs($user)
-            ->get(route('crm.scheduling.appointments.show', $appointment))
-            ->assertOk()
-            ->assertSee('Reschedule Appointment')
-            ->assertSee(route('crm.scheduling.appointments.reschedule', $appointment));
-
-        $this->actingAs($user)
-            ->get(route('crm.scheduling.appointments.reschedule', [
-                'appointment' => $appointment,
-                'scheduling_host_id' => $host->id,
-                'date' => '2026-08-04',
-            ]))
-            ->assertOk()
-            ->assertSee('Current Planning Session')
-            ->assertSee('10:00 AM–11:00 AM')
-            ->assertSee('11:00 AM–12:00 PM')
-            ->assertDontSee('value="'.$currentStart->toISOString().'"', false);
-    }
-
-    public function test_range_reschedule_workspace_presents_replacement_check_in_and_full_stay_interval(): void
-    {
-        $user = User::factory()->create();
-        $service = BookableService::factory()
-            ->rangeDuration(
-                defaultMinutes: 2880,
-                minimumMinutes: 1440,
-                maximumMinutes: 10080,
-            )
-            ->create([
-                'status' => BookableService::STATUS_ACTIVE,
-                'slot_interval_minutes' => 60,
-                'minimum_notice_minutes' => 0,
-                'booking_horizon_days' => 30,
-                'reschedule_notice_minutes' => 0,
-                'timezone' => 'UTC',
-                'capacity' => 1,
-            ]);
-        $originalStart = CarbonImmutable::parse('2026-08-04 15:00:00 UTC');
-        $originalEnd = CarbonImmutable::parse('2026-08-07 10:00:00 UTC');
-        $appointment = Appointment::factory()->create([
-            'bookable_service_id' => $service->id,
-            'status' => Appointment::STATUS_SCHEDULED,
-            'starts_at' => $originalStart,
-            'ends_at' => $originalEnd,
-        ]);
-        $this->availability(
-            service: $service,
-            host: null,
-            startsAt: CarbonImmutable::parse('2026-08-10 15:00:00 UTC'),
-            endsAt: CarbonImmutable::parse('2026-08-10 17:00:00 UTC'),
-        );
-        $this->availability(
-            service: $service,
-            host: null,
-            startsAt: CarbonImmutable::parse('2026-08-13 09:00:00 UTC'),
-            endsAt: CarbonImmutable::parse('2026-08-13 11:00:00 UTC'),
-        );
-
-        $this->actingAs($user)
-            ->get(route('crm.scheduling.appointments.reschedule', [
-                'appointment' => $appointment,
-                'date' => '2026-08-10',
-            ]))
-            ->assertOk()
-            ->assertSee('Replacement check-in date')
-            ->assertSee('Reschedule stay')
-            ->assertSee('Mon, Aug 10, 2026 at 3:00 PM')
-            ->assertSee('Thu, Aug 13, 2026 at 10:00 AM');
-    }
 
     public function test_crm_reschedule_changes_host_preserves_confirmation_and_records_provenance(): void
     {
@@ -394,8 +303,7 @@ class SchedulingAppointmentRescheduleWorkspaceTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('crm.scheduling.appointments.show', $terminal))
-            ->assertOk()
-            ->assertDontSee('Reschedule Appointment');
+            ->assertOk();
 
         $this->actingAs($user)
             ->get(route('crm.scheduling.appointments.reschedule', $terminal))

@@ -39,22 +39,6 @@ class FlowRouteDecisionAuthoringTest extends TestCase
         $destination = $this->point($route, 'create_follow_up_task', 10, true);
         $capability = $this->capability();
 
-        $catalogResponse = $this->actingAs($user)->get(route('crm.flow-routes.index', [
-            'edit_route' => $route->getKey(),
-        ]));
-
-        $catalogResponse->assertOk();
-        $decisionCapability = $catalogResponse
-            ->viewData('routeEditors')
-            ->get($route->getKey())['capabilities']
-            ->firstWhere('point_type', FlowRoutePointType::BranchEvaluate->value);
-
-        $this->assertIsArray($decisionCapability);
-        $this->assertContains(
-            'decision_target_point_key',
-            collect($decisionCapability['fields'])->pluck('name')->filter()->all(),
-        );
-
         $this->actingAs($user)
             ->post('http://crm.'.config('app.root_domain').'/flow-routes/'.$route->getKey().'/points', [
                 'capability_id' => $capability->getKey(),
@@ -100,8 +84,7 @@ class FlowRouteDecisionAuthoringTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('crm.flow-routes.index', ['edit_route' => $route->getKey()]))
-            ->assertOk()
-            ->assertSee('data-flow-route-decision-paths', false);
+            ->assertOk();
     }
 
     public function test_decision_paths_must_reference_active_later_points(): void

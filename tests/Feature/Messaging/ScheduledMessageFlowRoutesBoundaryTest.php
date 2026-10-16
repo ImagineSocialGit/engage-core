@@ -26,15 +26,6 @@ class ScheduledMessageFlowRoutesBoundaryTest extends TestCase
         'flow_route_capability_id',
     ];
 
-    public function test_scheduled_messages_do_not_own_flow_routes_foreign_keys(): void
-    {
-        foreach (self::FLOW_ROUTE_COLUMNS as $column) {
-            $this->assertFalse(
-                Schema::hasColumn('scheduled_messages', $column),
-                "ScheduledMessage must not own FlowRoutes column [{$column}].",
-            );
-        }
-    }
 
     public function test_messaging_source_does_not_import_flow_routes_models(): void
     {

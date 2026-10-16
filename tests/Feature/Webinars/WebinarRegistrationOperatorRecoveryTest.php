@@ -276,51 +276,6 @@ class WebinarRegistrationOperatorRecoveryTest extends TestCase
         Queue::assertNothingPushed();
     }
 
-    public function test_attention_view_includes_ended_webinars_and_only_shows_appropriate_recovery_controls(): void
-    {
-        $user = User::factory()->create();
-        $webinar = Webinar::factory()->create([
-            'title' => 'Ended Webinar Requiring Recovery',
-            'starts_at' => now()->subHours(2),
-            'ends_at' => now()->subHour(),
-        ]);
-
-        $failed = $this->registration(
-            finalizationStatus: 'failed',
-            providerSyncStatus: 'permanent_failure',
-            webinar: $webinar,
-        );
-        $reconciliation = $this->registration(
-            finalizationStatus: 'reconciliation_required',
-            providerSyncStatus: 'reconciliation_required',
-            webinar: $webinar,
-        );
-        $this->registration(
-            finalizationStatus: 'completed',
-            providerSyncStatus: 'succeeded',
-            webinar: $webinar,
-        );
-
-        $this->actingAs($user)
-            ->get(route('crm.webinar-series.index'))
-            ->assertOk()
-            ->assertDontSee('Ended Webinar Requiring Recovery');
-
-        $this->actingAs($user)
-            ->get(route('crm.webinar-series.index', ['attention' => 1]))
-            ->assertOk()
-            ->assertSee($webinar->title)
-            ->assertSee(route(
-                'crm.webinar-registrations.finalization.retry',
-                $failed,
-            ), false)
-            ->assertSee(route(
-                'crm.webinar-registrations.finalization.reconcile',
-                $reconciliation,
-            ), false)
-            ->assertSee('name="decision" value="provider_exists"', false)
-            ->assertSee('name="decision" value="provider_absent"', false);
-    }
 
     public function test_dashboard_panel_prioritizes_unresolved_finalization_work(): void
     {

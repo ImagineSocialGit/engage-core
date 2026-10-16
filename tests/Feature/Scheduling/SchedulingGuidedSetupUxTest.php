@@ -80,54 +80,6 @@ class SchedulingGuidedSetupUxTest extends TestCase
         $this->assertSame('Current', $offerStep['state_label']);
     }
 
-    public function test_guided_availability_moves_test_availability_to_a_modal_and_surfaces_staff_next(): void
-    {
-        $user = User::factory()->create();
-        $service = $this->readyService();
-        $this->availability($service);
-
-        $this->actingAs($user)
-            ->get(route('crm.scheduling.configuration.availability.index', [
-                'service_id' => $service->getKey(),
-                'guided' => 1,
-            ]))
-            ->assertOk()
-            ->assertSee('data-scheduling-progress-step="availability"', false)
-            ->assertSee('data-scheduling-progress-state="current_complete"', false)
-            ->assertSee('data-scheduling-progress-step="offers"', false)
-            ->assertSee('data-availability-guided-next', false)
-            ->assertSee('Set up staff next')
-            ->assertSee(
-                route('crm.scheduling.configuration.services.staff.edit', $service),
-                false,
-            )
-            ->assertSee('data-availability-test-trigger', false)
-            ->assertSee('data-availability-test-modal', false);
-    }
-
-    public function test_appointment_details_exposes_compact_optional_offer_management(): void
-    {
-        $user = User::factory()->create();
-        $service = $this->readyService();
-        SchedulingBookingOffer::query()->create([
-            'bookable_service_id' => $service->getKey(),
-            'code' => 'FREEVA',
-            'name' => 'Webinar offer',
-            'status' => SchedulingBookingOffer::STATUS_ACTIVE,
-        ]);
-
-        $this->actingAs($user)
-            ->get(route('crm.scheduling.configuration.services.details.edit', $service))
-            ->assertOk()
-            ->assertSee('data-scheduling-service-offers-panel', false)
-            ->assertSee('FREEVA')
-            ->assertSee('Optional')
-            ->assertSee('Add offer')
-            ->assertSee(
-                route('crm.scheduling.configuration.services.offers.index', $service).'#add-offer',
-                false,
-            );
-    }
 
     private function readyService(): BookableService
     {

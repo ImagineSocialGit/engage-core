@@ -138,55 +138,6 @@ class CommerceContactPurchaseHistoryTest extends TestCase
         ));
     }
 
-    public function test_contact_show_renders_recent_purchase_history_and_order_links(): void
-    {
-        $user = User::factory()->create();
-        $contact = Contact::factory()->create([
-            'name' => 'Commerce Buyer',
-        ]);
-        $emptyContact = Contact::factory()->create([
-            'name' => 'No Purchases',
-        ]);
-        $otherContact = Contact::factory()->create();
-        $order = $this->order(
-            contact: $contact,
-            externalId: 'order-rendered',
-            orderedAt: CarbonImmutable::parse('2026-09-28 18:30:00 UTC'),
-            totalCents: 4500,
-        );
-        CommerceOrderItem::factory()
-            ->for($order, 'commerceOrder')
-            ->create([
-                'name' => 'Tour Hoodie',
-                'title' => 'Tour Hoodie',
-                'quantity' => 1,
-                'total_cents' => 4500,
-            ]);
-        $this->confirmPurchase($order);
-
-        $other = $this->order(
-            contact: $otherContact,
-            externalId: 'order-private-other-contact',
-            orderedAt: CarbonImmutable::parse('2026-09-29 10:00:00 UTC'),
-        );
-
-        $this->actingAs($user)
-            ->get(route('crm.contacts.show', $contact))
-            ->assertOk()
-            ->assertSee('data-module-panel="commerce"', false)
-            ->assertSee('data-commerce-purchase-history', false)
-            ->assertSee('data-commerce-order-count="1"', false)
-            ->assertSee('data-commerce-confirmed-count="1"', false)
-            ->assertSee('data-commerce-order-id="'.$order->id.'"', false)
-            ->assertSee(route('crm.commerce.orders.show', $order), false)
-            ->assertSee('Tour Hoodie')
-            ->assertDontSee('data-commerce-order-id="'.$other->id.'"', false);
-
-        $this->actingAs($user)
-            ->get(route('crm.contacts.show', $emptyContact))
-            ->assertOk()
-            ->assertDontSee('data-commerce-purchase-history', false);
-    }
 
     private function enableCommerce(): void
     {

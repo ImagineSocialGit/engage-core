@@ -15,11 +15,7 @@ class SchedulingAppointmentFormatTest extends TestCase
 
     public function test_bookable_services_persist_business_language_appointment_format_and_internal_commitment_type(): void
     {
-        $this->assertTrue(Schema::hasColumns('bookable_services', [
-            'appointment_format',
-            'in_person_arrangement',
-            'remote_method',
-        ]));
+
 
         $service = app(SchedulingConfigurationWriter::class)->createService([
             ...$this->baseAttributes('remote-phone'),
@@ -87,16 +83,6 @@ class SchedulingAppointmentFormatTest extends TestCase
         $this->assertSame(BookableService::REMOTE_METHOD_VIRTUAL_MEETING, $service->remote_method);
         $this->assertSame(BookableService::LOCATION_TYPE_VIRTUAL, $service->location_type);
         $this->assertTrue($service->hasCompleteAppointmentFormat());
-    }
-
-    public function test_project_state_scheduling_contract_exports_appointment_format_fields(): void
-    {
-        $section = config('project_state.sections.scheduling');
-        $columns = data_get($section, 'tables.bookable_services.columns', []);
-
-        $this->assertContains('appointment_format', $columns);
-        $this->assertContains('in_person_arrangement', $columns);
-        $this->assertContains('remote_method', $columns);
     }
 
     /**

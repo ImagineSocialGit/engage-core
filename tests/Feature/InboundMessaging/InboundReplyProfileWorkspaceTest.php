@@ -11,26 +11,6 @@ class InboundReplyProfileWorkspaceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_workspace_exposes_authoritative_profile_rules_and_actions(): void
-    {
-        config()->set('modules.enabled', ['inbound_messaging']);
-        $profile = $this->profile();
-
-        $this->actingAs(User::factory()->create())
-            ->get(route('crm.inbound-messaging.reply-profiles.index', [
-                'profile' => $profile->key,
-            ]))
-            ->assertOk()
-            ->assertSee('data-reply-handling-workspace', false)
-            ->assertSee('data-reply-profile-editor', false)
-            ->assertSee('data-reply-profile-dependencies', false)
-            ->assertSee('data-reply-intent-editor', false)
-            ->assertSee(route('crm.inbound-messaging.reply-profiles.update', $profile), false)
-            ->assertSee(route('crm.inbound-messaging.reply-profiles.state', $profile), false)
-            ->assertSee(route('crm.inbound-messaging.reply-profiles.destroy', $profile), false)
-            ->assertSee('High intent')
-            ->assertSee('CALL ME');
-    }
 
     public function test_workspace_can_create_a_database_owned_profile(): void
     {

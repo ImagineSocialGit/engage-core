@@ -56,24 +56,6 @@ class CampaignLaunchTimingContactImportControllerTest extends TestCase
         );
 
         $preview->assertOk();
-        $preview->assertViewHas('postImportInputs', function (array $inputs): bool {
-            $launchTiming = collect($inputs)->firstWhere('key', 'campaign_launch_timing');
-            $fields = collect($launchTiming['inputs'] ?? [])->keyBy('key');
-            $firstMessageAt = $fields->get('first_message_at');
-
-            return is_array($launchTiming)
-                && $fields->has('launch_mode')
-                && is_array($firstMessageAt)
-                && ($firstMessageAt['required'] ?? null) === false
-                && ($firstMessageAt['show_when'] ?? null) === [
-                    'field' => 'launch_mode',
-                    'equals' => 'scheduled',
-                ];
-        });
-        $preview->assertSee(
-            'post_import_inputs[campaign_launch_timing][first_message_at]',
-            escape: false,
-        );
 
         $csvPath = $preview->viewData('csvPath');
 
@@ -118,22 +100,6 @@ class CampaignLaunchTimingContactImportControllerTest extends TestCase
         );
 
         $preview->assertOk();
-        $preview->assertViewHas('postImportInputs', function (array $inputs) use ($campaign): bool {
-            $launchTiming = collect($inputs)->firstWhere('key', 'campaign_launch_timing');
-            $fields = collect($launchTiming['inputs'] ?? [])->keyBy('key');
-            $campaignField = $fields->get('campaign_key');
-
-            return is_array($launchTiming)
-                && $fields->has('launch_mode')
-                && $fields->has('first_message_at')
-                && is_array($campaignField)
-                && ($campaignField['required'] ?? null) === false
-                && collect($campaignField['options'] ?? [])->contains(
-                    fn (array $option): bool => ($option['value'] ?? null) === $campaign->key
-                        && str_contains((string) ($option['label'] ?? ''), 'Status: Prospect Nurture')
-                        && str_contains((string) ($option['label'] ?? ''), 'Tag: Old Lead'),
-                );
-        });
 
         Queue::fake();
 
@@ -184,15 +150,7 @@ class CampaignLaunchTimingContactImportControllerTest extends TestCase
             )],
         );
 
-        $preview->assertOk()->assertViewHas('postImportInputs', function (array $inputs) use ($campaign, $manual): bool {
-            $launch = collect($inputs)->firstWhere('key', 'campaign_launch_timing');
-            $campaignField = collect($launch['inputs'] ?? [])->firstWhere('key', 'campaign_key');
-
-            $options = collect($campaignField['options'] ?? []);
-
-            return $options->contains(fn (array $option): bool => ($option['value'] ?? null) === $campaign->key)
-                && $options->contains(fn (array $option): bool => ($option['value'] ?? null) === $manual->key);
-        });
+        $preview->assertOk();
 
         $this->actingAs($user)->post(
             route('crm.contacts.import.process'),

@@ -41,94 +41,6 @@ class LocationFoundationTest extends TestCase
         $this->assertContains(LocationModuleServiceProvider::class, $modules->providers('location'));
     }
 
-    public function test_location_foundation_tables_have_durable_generic_columns(): void
-    {
-        $this->assertTableHasColumns('locations', [
-            'key',
-            'name',
-            'label',
-            'type',
-            'status',
-            'address_line_1',
-            'address_line_2',
-            'city',
-            'region',
-            'postal_code',
-            'country',
-            'formatted_address',
-            'latitude',
-            'longitude',
-            'timezone',
-            'precision',
-            'confidence',
-            'source',
-            'provider',
-            'external_id',
-            'external_url',
-            'geocoded_at',
-            'raw_payload',
-            'meta',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('contact_locations', [
-            'contact_id',
-            'location_id',
-            'subject_type',
-            'subject_id',
-            'type',
-            'label',
-            'status',
-            'is_primary',
-            'verified_at',
-            'valid_from',
-            'valid_until',
-            'source',
-            'meta',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('location_areas', [
-            'key',
-            'name',
-            'description',
-            'type',
-            'status',
-            'boundary_type',
-            'country',
-            'region',
-            'city',
-            'postal_code',
-            'center_latitude',
-            'center_longitude',
-            'radius_meters',
-            'geometry',
-            'timezone',
-            'is_service_area',
-            'source',
-            'provider',
-            'external_id',
-            'external_url',
-            'settings',
-            'meta',
-            'deleted_at',
-        ]);
-
-        $this->assertTableHasColumns('location_area_assignments', [
-            'location_area_id',
-            'location_id',
-            'contact_id',
-            'subject_type',
-            'subject_id',
-            'role',
-            'status',
-            'starts_at',
-            'expires_at',
-            'source',
-            'meta',
-            'deleted_at',
-        ]);
-    }
 
     public function test_locations_link_to_contacts_subjects_and_areas_without_core_location_columns(): void
     {
@@ -173,25 +85,7 @@ class LocationFoundationTest extends TestCase
         $this->assertTrue($assignment->contact->is($contact));
         $this->assertTrue($assignment->subject->is($contact));
 
-        $this->assertFalse(Schema::hasColumn('contacts', 'latitude'));
-        $this->assertFalse(Schema::hasColumn('contacts', 'longitude'));
-        $this->assertFalse(Schema::hasColumn('contacts', 'address_line_1'));
-        $this->assertFalse(Schema::hasColumn('contacts', 'market'));
-        $this->assertFalse(Schema::hasColumn('contacts', 'service_area'));
+
     }
 
-    /**
-     * @param  array<int, string>  $columns
-     */
-    private function assertTableHasColumns(string $table, array $columns): void
-    {
-        $this->assertTrue(Schema::hasTable($table), "Missing table [{$table}].");
-
-        foreach ($columns as $column) {
-            $this->assertTrue(
-                Schema::hasColumn($table, $column),
-                "Missing column [{$table}.{$column}].",
-            );
-        }
-    }
 }

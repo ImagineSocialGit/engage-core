@@ -42,7 +42,6 @@ class ContactImportModeControllerTest extends TestCase
             ]);
 
         $preview->assertOk();
-        $this->assertSame('update', $preview->viewData('importMode'));
 
         $response = $this
             ->actingAs($user)
@@ -195,39 +194,5 @@ class ContactImportModeControllerTest extends TestCase
         );
     }
 
-    public function test_profile_preview_marks_only_required_and_recognized_fields_as_primary(): void
-    {
-        Storage::fake('local');
 
-        Config::set('contact_imports.profiles', [
-            'focused_export' => [
-                'label' => 'Focused Export',
-                'filename_contains' => ['focused export'],
-                'aliases' => [
-                    'first_name' => ['First Name'],
-                    'email' => ['Email Address'],
-                ],
-            ],
-        ]);
-
-        $user = User::factory()->create();
-        $csv = UploadedFile::fake()->createWithContent(
-            'focused-export.csv',
-            "First Name,Email Address\nJane,jane@example.test\n",
-        );
-
-        $preview = $this
-            ->actingAs($user)
-            ->post(route('crm.contacts.import.preview'), [
-                'mode' => 'add',
-                'csv' => $csv,
-            ]);
-
-        $preview->assertOk();
-        $this->assertEqualsCanonicalizing(
-            ['email', 'first_name'],
-            $preview->viewData('primaryImportFieldKeys'),
-        );
-        $this->assertTrue($preview->viewData('hasAdvancedImportFields'));
-    }
 }

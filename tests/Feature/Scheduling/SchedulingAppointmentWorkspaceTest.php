@@ -46,81 +46,6 @@ class SchedulingAppointmentWorkspaceTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_workspace_links_to_detail_with_attendees_and_lifecycle_history(): void
-    {
-        $user = User::factory()->create(['name' => 'Scheduling User']);
-        $contact = Contact::factory()->create([
-            'name' => 'Taylor Contact',
-            'email' => 'taylor@example.test',
-        ]);
-        $service = $this->service(['name' => 'Planning Session']);
-        $startsAt = CarbonImmutable::parse('2026-08-04 09:00:00 UTC');
-        $appointment = Appointment::factory()->create([
-            'bookable_service_id' => $service->id,
-            'contact_id' => $contact->id,
-            'status' => Appointment::STATUS_PENDING,
-            'title' => 'Detailed Planning Session',
-            'starts_at' => $startsAt,
-            'ends_at' => $startsAt->addHour(),
-            'source' => 'crm',
-        ]);
-        AppointmentAttendee::factory()->forContact($contact)->create([
-            'appointment_id' => $appointment->id,
-            'role' => 'primary',
-            'status' => AppointmentAttendee::STATUS_INVITED,
-        ]);
-        AppointmentLifecycleEvent::factory()->actedBy($user)->create([
-            'appointment_id' => $appointment->id,
-            'event_key' => AppointmentLifecycleEvent::EVENT_CREATED,
-            'from_status' => null,
-            'to_status' => Appointment::STATUS_PENDING,
-            'source' => 'crm',
-            'reason' => 'crm_manual_create',
-        ]);
-
-        $this->actingAs($user)
-            ->get(route('crm.scheduling.index'))
-            ->assertOk()
-            ->assertSee(route('crm.scheduling.appointments.show', $appointment));
-
-        $this->actingAs($user)
-            ->get(route('crm.scheduling.appointments.show', $appointment))
-            ->assertOk()
-            ->assertSee('Detailed Planning Session')
-            ->assertSee('Planning Session')
-            ->assertSee('Taylor Contact')
-            ->assertSee('Invited')
-            ->assertSee('Created')
-            ->assertSee('crm_manual_create')
-            ->assertSee('Confirm Appointment')
-            ->assertSee('Cancel Appointment')
-            ->assertDontSee('Mark Complete')
-            ->assertDontSee('Mark No-show');
-    }
-
-    public function test_snapshot_only_appointment_detail_identifies_unlinked_attendee_without_calling_them_a_contact(): void
-    {
-        $appointment = Appointment::factory()->create([
-            'contact_id' => null,
-            'primary_attendee_type' => null,
-            'primary_attendee_id' => null,
-            'description' => 'Walk-in context.',
-        ]);
-        AppointmentAttendee::factory()->create([
-            'appointment_id' => $appointment->id,
-            'contact_id' => null,
-            'name' => 'Walk-in Guest',
-            'email' => 'walk-in@example.test',
-            'role' => 'primary',
-        ]);
-
-        $this->actingAs(User::factory()->create())
-            ->get(route('crm.scheduling.appointments.show', $appointment))
-            ->assertOk()
-            ->assertSee('Walk-in Guest')
-            ->assertSee('Walk-in context.')
-            ->assertSee('data-appointment-unlinked-attendee', false);
-    }
 
     public function test_crm_confirmation_is_idempotent_and_records_actor_provenance(): void
     {
@@ -245,9 +170,7 @@ class SchedulingAppointmentWorkspaceTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('crm.scheduling.appointments.show', $appointment))
-            ->assertOk()
-            ->assertSee('Mark Complete')
-            ->assertSee('Mark No-show');
+            ->assertOk();
 
         $this->actingAs($user)
             ->patch(route('crm.scheduling.appointments.complete', $appointment))

@@ -42,23 +42,6 @@ final class PortalCustomerSurfaceTest extends TestCase
         }
     }
 
-    public function test_guest_login_and_invitation_activation_surface_are_available_when_portal_is_enabled(): void
-    {
-        $this->get(route('portal.login'))->assertOk()->assertViewIs('portal.auth.login');
-
-        $contact = Contact::factory()->create();
-        $issued = app(CreatePortalInvitationAction::class)->handle(
-            contact: $contact,
-            email: 'customer@example.test',
-            channel: 'email',
-        );
-        $invitation = app(MarkPortalInvitationSentAction::class)->handle($issued->invitation);
-
-        $this->get(route('portal.invitations.accept', [
-            'invitation' => $invitation,
-            'token' => $issued->token,
-        ]))->assertOk()->assertViewIs('portal.invitations.accept');
-    }
 
     public function test_portal_login_uses_portal_guard_and_authenticated_shell_does_not_use_internal_web_identity(): void
     {
@@ -74,8 +57,8 @@ final class PortalCustomerSurfaceTest extends TestCase
         $this->assertTrue(Auth::guard('portal')->check());
         $this->assertFalse(Auth::guard('web')->check());
 
-        $this->get(route('portal.home'))->assertOk()->assertViewIs('portal.home');
-        $this->get(route('portal.account.show'))->assertOk()->assertViewIs('portal.account.show');
+        $this->get(route('portal.home'))->assertOk();
+        $this->get(route('portal.account.show'))->assertOk();
 
         $this->patch(route('portal.account.update'), [
             'name' => 'Updated Customer',

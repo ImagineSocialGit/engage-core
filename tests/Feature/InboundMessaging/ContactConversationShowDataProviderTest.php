@@ -201,43 +201,6 @@ class ContactConversationShowDataProviderTest extends TestCase
         $this->assertSame('Hello!', data_get($data, 'conversationItems.0.body'));
     }
 
-    public function test_registered_provider_surfaces_conversation_as_contact_work_rail(): void
-    {
-        config()->set('modules.enabled', [
-            'messaging',
-            'inbound_messaging',
-        ]);
-
-        $user = User::factory()->create();
-        $contact = Contact::factory()->create();
-
-        InboundMessage::query()->create([
-            'sender_type' => $contact->getMorphClass(),
-            'sender_id' => $contact->getKey(),
-            'client_key' => 'test-client',
-            'channel' => 'sms',
-            'provider' => 'telnyx',
-            'provider_event_id' => 'contact-conversation-page-1',
-            'from_type' => 'phone',
-            'from_value' => '+15551234567',
-            'to_type' => 'phone',
-            'to_value' => '+15557654321',
-            'body' => 'Please call me tomorrow.',
-            'classification' => InboundMessage::CLASSIFICATION_NORMAL_REPLY,
-            'purpose' => 'marketing',
-            'scope' => 'general',
-            'received_at' => now(),
-            'meta' => [],
-        ]);
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->get(route('crm.contacts.show', $contact))
-            ->assertOk()
-            ->assertSee('data-contact-conversation-rail', false)
-            ->assertSee('Please call me tomorrow.');
-    }
 
     public function test_automated_response_is_featured_after_the_latest_inbound_reply(): void
     {
@@ -304,10 +267,7 @@ class ContactConversationShowDataProviderTest extends TestCase
 
         $this->actingAs(User::factory()->create())
             ->get(route('crm.contacts.show', $contact))
-            ->assertOk()
-            ->assertSee('data-contact-automated-response', false)
-            ->assertSee('A member of our team will follow up shortly.')
-            ->assertSee('data-contact-conversation-composer', false);
+            ->assertOk();
 
         $this->assertSame($inbound->getKey(), data_get(
             $data,

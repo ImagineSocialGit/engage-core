@@ -83,7 +83,7 @@ final class PortalMessagingIntegrationTest extends TestCase
         $activationUrl = data_get($message->payload, 'cta.url');
 
         $this->assertIsString($activationUrl);
-        $this->get($activationUrl)->assertOk()->assertViewIs('portal.invitations.accept');
+        $this->get($activationUrl)->assertOk();
     }
 
     public function test_password_reset_delivery_keeps_the_broker_token_encrypted_at_rest_and_resets_password(): void

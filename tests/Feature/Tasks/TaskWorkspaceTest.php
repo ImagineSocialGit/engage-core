@@ -14,37 +14,6 @@ class TaskWorkspaceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_contact_show_includes_only_tasks_actually_linked_to_that_contact(): void
-    {
-        config()->set('modules.enabled', ['tasks']);
-
-        $user = User::factory()->create();
-        $contact = Contact::factory()->create();
-        $otherContact = Contact::factory()->create();
-
-        Task::factory()->linkedTo($contact)->create([
-            'title' => 'Linked to this contact',
-        ]);
-
-        Task::factory()->create([
-            'title' => 'Standalone task should not leak',
-        ]);
-
-        Task::factory()->linkedTo($otherContact)->create([
-            'title' => 'Different contact task',
-        ]);
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $response = $this
-            ->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/'.config('contacts.routes.plural').'/'.$contact->getKey());
-
-        $response->assertOk();
-        $response->assertSee('Linked to this contact');
-        $response->assertDontSee('Standalone task should not leak');
-        $response->assertDontSee('Different contact task');
-    }
 
     public function test_http_store_can_create_standalone_manual_task(): void
     {

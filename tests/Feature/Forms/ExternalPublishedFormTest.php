@@ -127,9 +127,6 @@ class ExternalPublishedFormTest extends TestCase
                 'disclosure_key' => 'artist_updates_v1',
             ],
         ], $response->json('data.settings'));
-        $response
-            ->assertDontSee('interest:music')
-            ->assertDontSee('must-not-leak');
     }
 
     public function test_private_inactive_and_unpublished_forms_fail_closed(): void

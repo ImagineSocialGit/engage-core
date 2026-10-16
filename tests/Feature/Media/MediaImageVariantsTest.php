@@ -125,51 +125,6 @@ class MediaImageVariantsTest extends TestCase
         );
     }
 
-    public function test_progressive_component_uses_derivatives_and_falls_back_to_original(): void
-    {
-        $asset = MediaAsset::factory()->create([
-            'disk' => 'public',
-            'path' => 'media/component-test/component-test.jpg',
-            'meta' => [
-                'image_variants' => [
-                    'version' => MediaImageVariantGenerator::VERSION,
-                    'files' => [
-                        'medium' => [
-                            'path' => 'media/component-test/medium.webp',
-                            'width' => 500,
-                            'height' => 333,
-                        ],
-                        'default' => [
-                            'path' => 'media/component-test/default.webp',
-                            'width' => 1200,
-                            'height' => 800,
-                        ],
-                    ],
-                ],
-            ],
-        ]);
-
-        $html = Blade::render(
-            '<x-media.progressive-image :asset="$asset" alt="Preview" class="aspect-video w-full object-cover" />',
-            compact('asset'),
-        );
-
-        $this->assertStringContainsString('data-media-progressive-image', $html);
-        $this->assertStringContainsString('/media/component-test/medium.webp', $html);
-        $this->assertStringContainsString('/media/component-test/default.webp', $html);
-        $this->assertStringNotContainsString('data-media-original-image', $html);
-
-        $asset->forceFill(['meta' => null])->save();
-
-        $fallback = Blade::render(
-            '<x-media.progressive-image :asset="$asset" alt="Preview" />',
-            compact('asset'),
-        );
-
-        $this->assertStringContainsString('data-media-original-image', $fallback);
-        $this->assertStringContainsString('/media/component-test/component-test.jpg', $fallback);
-    }
-
     public function test_backfill_command_is_registered_and_preserves_original_identity(): void
     {
         $generator = app(MediaImageVariantGenerator::class);

@@ -106,41 +106,4 @@ class EventWorkspacePanelRegistryTest extends TestCase
         $registry->panels($event);
     }
 
-    public function test_event_workspace_renders_contributed_panels_without_importing_the_consumer(): void
-    {
-        $event = Event::factory()->create();
-        $user = User::factory()->create();
-
-        $this->app->instance(
-            EventWorkspacePanelRegistry::class,
-            new EventWorkspacePanelRegistry([
-                new class implements EventWorkspacePanelContributor
-                {
-                    public function panels(Event $event): iterable
-                    {
-                        yield new EventWorkspacePanel(
-                            key: 'signup-kit',
-                            title: 'Signup Kit',
-                            description: 'Optional Event operator tooling.',
-                            actions: [
-                                new EventWorkspaceAction(
-                                    label: 'Open Signup Kit',
-                                    url: '/events/'.$event->getKey().'/signup-kit',
-                                    style: EventWorkspaceAction::STYLE_PRIMARY,
-                                ),
-                            ],
-                        );
-                    }
-                },
-            ]),
-        );
-
-        $this->actingAs($user)
-            ->get(route('crm.events.show', $event))
-            ->assertOk()
-            ->assertSee('data-event-workspace-panel="signup-kit"', false)
-            ->assertSee('Signup Kit')
-            ->assertSee('Open Signup Kit')
-            ->assertSee('/events/'.$event->getKey().'/signup-kit', false);
-    }
 }

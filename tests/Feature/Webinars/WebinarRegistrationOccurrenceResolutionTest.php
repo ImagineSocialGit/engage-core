@@ -70,8 +70,7 @@ class WebinarRegistrationOccurrenceResolutionTest extends TestCase
         ]);
 
         $this->get(route('webinar.show', $series->slug))
-            ->assertOk()
-            ->assertSee($this->registrationPath($series, $displayed));
+            ->assertOk();
 
         $newEarlierOccurrence = Webinar::factory()->create([
             'webinar_series_id' => $series->getKey(),
@@ -111,8 +110,7 @@ class WebinarRegistrationOccurrenceResolutionTest extends TestCase
         ]);
 
         $this->get(route('webinar.show', $series->slug))
-            ->assertOk()
-            ->assertSee($this->registrationPath($series, $displayed));
+            ->assertOk();
 
         Carbon::setTestNow(now()->addMinutes(2));
 

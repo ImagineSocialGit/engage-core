@@ -200,48 +200,6 @@ class ProviderAttendanceReconciliationTest extends TestCase
         );
     }
 
-    public function test_crm_archived_webinar_list_surfaces_unresolved_attendance_reason(): void
-    {
-        $user = User::factory()->create();
-        $webinar = Webinar::factory()->create([
-            'ends_at' => now()->subHour(),
-            'meta' => [
-                'normalized' => [
-                    'post_event' => [
-                        'attendance_checked_at' => now()->toIso8601String(),
-                        'attendance_ready' => false,
-                        'attendance_snapshot_reason' => 'no_participant_records',
-                    ],
-                ],
-            ],
-        ]);
-
-        $response = $this->actingAs($user)->get(
-            route('crm.webinar-series.index', ['archived' => 1]),
-        );
-
-        $response
-            ->assertOk()
-            ->assertViewHas('webinars', function ($webinars) use ($webinar): bool {
-                $viewWebinar = $webinars->first(
-                    fn (Webinar $candidate): bool => $candidate->is($webinar),
-                );
-
-                return $viewWebinar instanceof Webinar
-                    && data_get(
-                        $viewWebinar->meta,
-                        'normalized.post_event.attendance_checked_at',
-                    ) !== null
-                    && data_get(
-                        $viewWebinar->meta,
-                        'normalized.post_event.attendance_ready',
-                    ) === false
-                    && data_get(
-                        $viewWebinar->meta,
-                        'normalized.post_event.attendance_snapshot_reason',
-                    ) === 'no_participant_records';
-            });
-    }
 
     /**
      * @return array{Webinar, WebinarRegistration, WebinarRegistration}

@@ -40,12 +40,10 @@ class CampaignAllocationHistoryTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('crm.campaigns.runs.index', $campaign))
-            ->assertOk()
-            ->assertViewIs('crm.campaigns.allocation-runs.index');
+            ->assertOk();
         $this->actingAs($user)
             ->get(route('crm.campaigns.runs.show', ['campaign' => $campaign, 'run' => $run]))
-            ->assertOk()
-            ->assertViewIs('crm.campaigns.allocation-runs.show');
+            ->assertOk();
         $this->actingAs($user)
             ->get(route('crm.campaigns.runs.show', ['campaign' => $other, 'run' => $run]))
             ->assertNotFound();

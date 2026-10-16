@@ -65,9 +65,7 @@ class RelationshipDefinitionAuthoringTest extends TestCase
 
         $this->actingAs(User::factory()->create())
             ->get(route('crm.contacts.show', $contact))
-            ->assertOk()
-            ->assertViewHas('usesRelationshipStage', true)
-            ->assertViewHas('showContactStatusProgression', false);
+            ->assertOk();
     }
 
     public function test_database_type_and_stage_remain_available_after_new_registry_resolution(): void

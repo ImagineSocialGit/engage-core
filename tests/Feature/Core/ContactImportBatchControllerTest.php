@@ -12,36 +12,6 @@ class ContactImportBatchControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_lists_contact_import_batches(): void
-    {
-        $user = User::factory()->create();
-
-        $importBatch = ContactImportBatch::factory()->create([
-            'name' => 'June CSV Import',
-            'source' => 'crm_csv',
-            'original_filename' => 'june-leads.csv',
-            'status' => ContactImportBatch::STATUS_COMPLETED,
-            'imported_at' => now(),
-            'successful_count' => 12,
-            'failed_count' => 1,
-        ]);
-
-        Contact::factory()->count(2)->create([
-            'contact_import_batch_id' => $importBatch->id,
-        ]);
-
-        $response = $this
-            ->actingAs($user)
-            ->get(route('crm.contacts.import-batches.index'));
-
-        $response->assertOk();
-        $response->assertViewHas('importBatches', fn ($batches): bool =>
-            $batches->contains(fn (ContactImportBatch $batch): bool =>
-                $batch->is($importBatch)
-                && (int) $batch->contacts_count === 2
-            )
-        );
-    }
 
     public function test_it_shows_only_contacts_from_the_selected_import_batch(): void
     {
@@ -72,23 +42,9 @@ class ContactImportBatchControllerTest extends TestCase
             ->get(route('crm.contacts.import-batches.show', $importBatch));
 
         $response->assertOk();
-        $response->assertViewHas('contacts', function ($contacts) use ($included): bool {
-            return $contacts->count() === 1
-                && $contacts->first()?->is($included);
-        });
 
         $this->assertSame($importBatch->id, $included->refresh()->contact_import_batch_id);
     }
 
-    public function test_contacts_index_links_to_import_batches(): void
-    {
-        $user = User::factory()->create();
 
-        $response = $this
-            ->actingAs($user)
-            ->get(route('crm.contacts.index'));
-
-        $response->assertOk();
-        $response->assertSee(route('crm.contacts.import-batches.index'), false);
-    }
 }

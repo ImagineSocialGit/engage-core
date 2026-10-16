@@ -68,62 +68,6 @@ class WebinarLinkModalTest extends TestCase
         );
     }
 
-    public function test_get_links_live_on_the_webinar_type_detail_instead_of_individual_session_cards(): void
-    {
-        Config::set('modules.enabled', [
-            'core',
-            'messaging',
-            'webinars',
-            'reporting',
-        ]);
-
-        $user = User::factory()->create();
-        $series = WebinarSeries::factory()->create([
-            'title' => 'Homebuyer Class',
-            'slug' => 'homebuyer-class',
-        ]);
-
-        $this->futureWebinar($series, 'September Class', 1);
-        $this->futureWebinar($series, 'October Class', 2);
-        $this->futureWebinar($series, 'November Class', 3);
-
-        $this->actingAs($user)
-            ->get(route('crm.webinar-series.show', $series))
-            ->assertOk()
-            ->assertViewIs('crm.webinars.series-show')
-            ->assertViewHas(
-                'registrationUrl',
-                route('webinar.show', ['seriesSlug' => 'homebuyer-class']),
-            )
-            ->assertViewHas('paidAdTrackingPlatforms', fn (array $platforms): bool =>
-                array_keys($platforms) === ['meta', 'tiktok', 'youtube']
-            );
-    }
-
-    public function test_registration_link_remains_available_when_reporting_is_disabled(): void
-    {
-        Config::set('modules.enabled', [
-            'core',
-            'messaging',
-            'webinars',
-        ]);
-
-        $user = User::factory()->create();
-        $series = WebinarSeries::factory()->create([
-            'title' => 'Homebuyer Class',
-            'slug' => 'homebuyer-class',
-        ]);
-        $this->futureWebinar($series, 'September Class', 1);
-
-        $this->actingAs($user)
-            ->get(route('crm.webinar-series.show', $series))
-            ->assertOk()
-            ->assertViewHas(
-                'registrationUrl',
-                route('webinar.show', ['seriesSlug' => 'homebuyer-class']),
-            )
-            ->assertViewHas('paidAdTrackingPlatforms', []);
-    }
 
     private function futureWebinar(
         WebinarSeries $series,

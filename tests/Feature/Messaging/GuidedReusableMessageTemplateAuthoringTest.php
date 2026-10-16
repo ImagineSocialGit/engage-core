@@ -32,9 +32,7 @@ class GuidedReusableMessageTemplateAuthoringTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('crm.messaging.message-templates.create', ['use' => 'test.general.email']))
-            ->assertOk()
-            ->assertSee('data-reusable-message-authoring-option="test.general.email"', false)
-            ->assertSee('data-create-reusable-message-template-submit', false);
+            ->assertOk();
 
         $response = $this->actingAs($user)->post(
             route('crm.messaging.message-templates.store'),

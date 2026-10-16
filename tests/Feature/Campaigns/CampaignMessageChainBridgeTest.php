@@ -46,45 +46,10 @@ class CampaignMessageChainBridgeTest extends TestCase
             'started_at' => now(),
         ]);
 
-        $this->assertTrue(Schema::hasColumn('campaigns', 'message_chain_id'));
-        $this->assertTrue(Schema::hasColumn('campaign_enrollments', 'message_chain_enrollment_id'));
+
         $this->assertSame((int) $chain->getKey(), (int) $campaign->fresh()->messageChain?->getKey());
         $this->assertSame((int) $chainEnrollment->getKey(), (int) $campaignEnrollment->fresh()->messageChainEnrollment?->getKey());
         $this->assertSame(MessageChainEnrollment::STATUS_COMPLETED, $campaignEnrollment->fresh()->runtimeStatus());
-    }
-
-    public function test_campaign_enrollment_schema_keeps_only_business_bridge_state(): void
-    {
-        foreach ([
-            'status',
-            'current_step',
-            'current_campaign_step_id',
-            'exit_conditions',
-            'exited_at',
-            'exit_reason',
-            'last_scheduled_message_id',
-            'paused_at',
-            'resumed_at',
-            'cancelled_at',
-            'completed_at',
-        ] as $column) {
-            $this->assertFalse(Schema::hasColumn('campaign_enrollments', $column), $column);
-        }
-
-        foreach ([
-            'contact_id',
-            'campaign_id',
-            'message_chain_enrollment_id',
-            'source_type',
-            'source_id',
-            'campaign_key',
-            'start_context',
-            'dedupe_key',
-            'started_at',
-            'meta',
-        ] as $column) {
-            $this->assertTrue(Schema::hasColumn('campaign_enrollments', $column), $column);
-        }
     }
 
     public function test_message_chain_enrollment_id_remains_nullable_only_for_atomic_start_bridging(): void

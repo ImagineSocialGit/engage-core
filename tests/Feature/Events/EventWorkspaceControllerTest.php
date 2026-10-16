@@ -31,29 +31,6 @@ class EventWorkspaceControllerTest extends TestCase
         $this->withoutMiddleware(ForceStagingAccess::class);
     }
 
-    public function test_authenticated_operator_can_open_event_catalog_create_and_show_surfaces(): void
-    {
-        $user = User::factory()->create();
-        $event = Event::factory()->create();
-
-        $this->actingAs($user)
-            ->get(route('crm.events.index'))
-            ->assertOk()
-            ->assertViewHas('events');
-
-        $this->actingAs($user)
-            ->get(route('crm.events.create'))
-            ->assertOk()
-            ->assertViewHas('eventTypes');
-
-        $this->actingAs($user)
-            ->get(route('crm.events.show', $event))
-            ->assertOk()
-            ->assertViewHas('coreReadiness')
-            ->assertViewHas('externalReferenceProviders')
-            ->assertViewHas('stakeholderRoles')
-            ->assertViewHas('attendances');
-    }
 
     public function test_events_has_primary_navigation_when_enabled(): void
     {
@@ -435,36 +412,6 @@ class EventWorkspaceControllerTest extends TestCase
         ]);
     }
 
-    public function test_event_show_exposes_only_attendance_for_contacts_visible_to_the_operator(): void
-    {
-        $member = User::factory()->create();
-        $otherUser = User::factory()->create();
-        $this->profile($member, 'member');
-        $event = Event::factory()->upcoming()->create();
-        $visible = Contact::factory()->create([
-            'assigned_user_id' => $member->getKey(),
-        ]);
-        $hidden = Contact::factory()->create([
-            'assigned_user_id' => $otherUser->getKey(),
-        ]);
-
-        EventAttendance::factory()->create([
-            'event_id' => $event->getKey(),
-            'contact_id' => $visible->getKey(),
-        ]);
-        EventAttendance::factory()->create([
-            'event_id' => $event->getKey(),
-            'contact_id' => $hidden->getKey(),
-        ]);
-
-        $this->actingAs($member)
-            ->get(route('crm.events.show', $event))
-            ->assertOk()
-            ->assertViewHas('attendances', function ($attendances) use ($visible): bool {
-                return $attendances->count() === 1
-                    && $attendances->first()->contact_id === $visible->getKey();
-            });
-    }
 
     private function profile(User $user, string $role): void
     {

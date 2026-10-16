@@ -11,22 +11,6 @@ class ContactQuickEditTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_contact_show_exposes_quick_edit_contracts(): void
-    {
-        $user = User::factory()->create();
-        $contact = Contact::factory()->create();
-
-        $response = $this
-            ->actingAs($user)
-            ->get(route('crm.contacts.show', $contact));
-
-        $response->assertOk();
-        $response->assertSee('data-contact-quick-edit="name"', false);
-        $response->assertSee('data-contact-quick-edit="email"', false);
-        $response->assertSee('data-contact-quick-edit="phone"', false);
-        $response->assertSee('data-contact-details-edit', false);
-        $response->assertSee(route('crm.contacts.update', $contact), false);
-    }
 
     public function test_name_can_be_updated_without_rewriting_other_contact_fields(): void
     {

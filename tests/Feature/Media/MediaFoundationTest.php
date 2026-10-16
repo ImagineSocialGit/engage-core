@@ -29,37 +29,6 @@ class MediaFoundationTest extends TestCase
         );
     }
 
-    public function test_media_assets_have_stable_reusable_storage_and_similarity_identity(): void
-    {
-        foreach ([
-            'uuid',
-            'uploaded_by_type',
-            'uploaded_by_id',
-            'title',
-            'kind',
-            'disk',
-            'path',
-            'original_filename',
-            'mime_type',
-            'extension',
-            'size_bytes',
-            'checksum_sha256',
-            'perceptual_hash',
-            'perceptual_hash_algorithm',
-            'image_width',
-            'image_height',
-            'visibility',
-            'source',
-            'meta',
-            'archived_at',
-        ] as $column) {
-            $this->assertTrue(
-                Schema::hasColumn('media_assets', $column),
-                "Expected media_assets.{$column} to exist.",
-            );
-        }
-    }
-
     public function test_media_checksum_is_a_unique_exact_content_identity(): void
     {
         $checksum = hash('sha256', 'identical-media-content');

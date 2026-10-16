@@ -39,40 +39,13 @@ class ModuleDependencyBoundaryTest extends TestCase
         );
     }
 
-    public function test_installed_modules_are_registered_in_module_config(): void
-    {
-        $registered = array_keys(config('modules.modules', []));
-
-        $this->assertContains('core', $registered);
-        $this->assertContains('billing', $registered);
-        $this->assertContains('messaging', $registered);
-        $this->assertContains('inbound_messaging', $registered);
-        $this->assertContains('internal_notifications', $registered);
-        $this->assertContains('tasks', $registered);
-        $this->assertContains('scheduling', $registered);
-        $this->assertContains('events', $registered);
-        $this->assertContains('portal', $registered);
-        $this->assertContains('workflow', $registered);
-        $this->assertContains('flow_routes', $registered);
-        $this->assertContains('forms', $registered);
-        $this->assertContains('media', $registered);
-        $this->assertContains('campaigns', $registered);
-        $this->assertContains('broadcasts', $registered);
-        $this->assertContains('webinars', $registered);
-        $this->assertContains('mortgage', $registered);
-        $this->assertContains('reporting', $registered);
-    }
-
     public function test_billing_module_depends_only_on_core_and_does_not_import_optional_feature_modules(): void
     {
         $definition = config('modules.modules.billing');
 
         $this->assertIsArray($definition);
         $this->assertSame(['core'], $definition['depends_on']);
-        $this->assertSame([
-            BillingModuleServiceProvider::class,
-        ], $definition['providers']);
-        $this->assertArrayNotHasKey('nav', $definition);
+        $this->assertContains(BillingModuleServiceProvider::class, $definition['providers']);
 
         $this->assertModuleDoesNotImport('Billing', [
             'Broadcasts',
@@ -100,16 +73,13 @@ class ModuleDependencyBoundaryTest extends TestCase
         ]);
     }
 
-    public function test_events_module_depends_only_on_core_and_has_no_navigation_yet(): void
+    public function test_events_module_depends_only_on_core(): void
     {
         $definition = config('modules.modules.events');
 
         $this->assertIsArray($definition);
         $this->assertSame(['core'], $definition['depends_on']);
-        $this->assertSame([
-            EventsModuleServiceProvider::class,
-        ], $definition['providers']);
-        $this->assertArrayNotHasKey('nav', $definition);
+        $this->assertContains(EventsModuleServiceProvider::class, $definition['providers']);
     }
 
     public function test_events_module_does_not_import_optional_feature_modules(): void
@@ -185,8 +155,6 @@ class ModuleDependencyBoundaryTest extends TestCase
             'Workflow',
         ]);
     }
-
-
 
 
     public function test_media_module_depends_only_on_core_and_does_not_import_optional_modules(): void

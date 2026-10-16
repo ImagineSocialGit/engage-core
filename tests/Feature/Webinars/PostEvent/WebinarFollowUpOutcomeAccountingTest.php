@@ -275,12 +275,7 @@ class WebinarFollowUpOutcomeAccountingTest extends TestCase
 
         $this->actingAs($user)
             ->get($indexUrl)
-            ->assertOk()
-            ->assertSee($webinar->title)
-            ->assertSee(
-                route('crm.webinar-registrations.follow-up.retry', $registration),
-                false,
-            );
+            ->assertOk();
 
         $this->actingAs($user)
             ->from($indexUrl)

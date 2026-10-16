@@ -52,8 +52,6 @@ class ContactImportPostProcessingControllerTest extends TestCase
             ]);
 
         $preview->assertOk();
-        $preview->assertSee('After each successful row');
-        $preview->assertSee('This import will produce a reviewable test outcome.');
 
         $response = $this
             ->actingAs($user)

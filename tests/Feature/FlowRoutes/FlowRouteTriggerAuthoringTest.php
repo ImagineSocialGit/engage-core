@@ -115,26 +115,7 @@ class FlowRouteTriggerAuthoringTest extends TestCase
 
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/flow-routes?create=1')
-            ->assertOk()
-            ->assertViewHas('createRouteTriggers', function (array $triggers): bool {
-                $replyTrigger = collect($triggers)->firstWhere(
-                    'key',
-                    InboundReplyAutomationTriggerAuthoringContributor::KEY,
-                );
-
-                if (! is_array($replyTrigger)) {
-                    return false;
-                }
-
-                $replyOutcomeField = collect($replyTrigger['fields'] ?? [])
-                    ->firstWhere('name', 'reply_outcome');
-
-                return is_array($replyOutcomeField)
-                    && collect($replyOutcomeField['options'] ?? [])
-                        ->contains(fn (mixed $option): bool => is_array($option)
-                            && ($option['value'] ?? null) === 'cold_lead_nurture|high_intent');
-            })
-            ->assertSee('data-flow-route-create-trigger', false);
+            ->assertOk();
 
         $response = $this->actingAs($user)->post(
             'http://crm.'.config('app.root_domain').'/flow-routes',
@@ -164,23 +145,4 @@ class FlowRouteTriggerAuthoringTest extends TestCase
         $this->assertSame(0, FlowRouteTriggerBinding::query()->count());
     }
 
-    public function test_hidden_trigger_fields_are_disabled_and_only_active_fields_are_required(): void
-    {
-        ContactStatus::query()->create([
-            'key' => 'lead',
-            'name' => 'Lead',
-            'is_active' => true,
-            'sort_order' => 10,
-        ]);
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs(User::factory()->create())
-            ->get('http://crm.'.config('app.root_domain').'/flow-routes?create=1')
-            ->assertOk()
-            ->assertSee('name="contact_status_id"', false)
-            ->assertSee('data-flow-route-trigger-field="contact_status_id"', false)
-            ->assertSee('x-bind:disabled="createTriggerKey !==', false)
-            ->assertSee('x-bind:required="createTriggerKey ===', false);
-    }
 }

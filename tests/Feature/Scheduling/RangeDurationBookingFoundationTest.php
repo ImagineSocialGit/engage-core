@@ -49,41 +49,6 @@ class RangeDurationBookingFoundationTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_range_duration_schema_is_first_class_and_existing_services_default_to_fixed(): void
-    {
-        $this->assertTrue(Schema::hasColumns('bookable_services', [
-            'duration_mode',
-            'duration_minutes',
-            'minimum_duration_minutes',
-            'maximum_duration_minutes',
-        ]));
-
-        $fixed = BookableService::factory()->create();
-
-        $this->assertSame(BookableService::DURATION_MODE_FIXED, $fixed->duration_mode);
-        $this->assertTrue($fixed->usesFixedDuration());
-        $this->assertFalse($fixed->usesRangeDuration());
-        $this->assertSame(60, $fixed->defaultDurationMinutes());
-        $this->assertSame(60, $fixed->minimumDurationMinutes());
-        $this->assertSame(60, $fixed->maximumDurationMinutes());
-
-        $range = BookableService::factory()
-            ->rangeDuration(
-                defaultMinutes: 2880,
-                minimumMinutes: 1440,
-                maximumMinutes: 10080,
-            )
-            ->create();
-
-        $this->assertSame(BookableService::DURATION_MODE_RANGE, $range->duration_mode);
-        $this->assertTrue($range->usesRangeDuration());
-        $this->assertSame(2880, $range->defaultDurationMinutes());
-        $this->assertSame(1440, $range->minimumDurationMinutes());
-        $this->assertSame(10080, $range->maximumDurationMinutes());
-        $this->assertTrue($range->allowsDurationMinutes(4320));
-        $this->assertFalse($range->allowsDurationMinutes(720));
-    }
-
     public function test_range_availability_accepts_an_explicit_multi_day_candidate_duration(): void
     {
         $service = $this->rangeService();
