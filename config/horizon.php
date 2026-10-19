@@ -314,6 +314,12 @@ return [
 
         'staging' => [
             'supervisor-1' => [
+                // On shared staging hosts, avoid the per-queue idle worker floor
+                // imposed by auto balancing. One pool serves the ordered queues.
+                // Set HORIZON_STAGING_PRIMARY_BALANCE=auto to opt back into the
+                // previous per-queue balancing behavior while investigating.
+                'balance' => env('HORIZON_STAGING_PRIMARY_BALANCE', false),
+                'minProcesses' => 1,
                 'maxProcesses' => $stagingPrimaryProcesses,
                 'queue' => $primarySupervisorQueues,
             ],
