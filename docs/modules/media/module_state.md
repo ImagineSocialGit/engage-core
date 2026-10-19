@@ -33,7 +33,17 @@ The seam is intentionally image-specific in this slice. It does not imply that e
 
 ## Schema
 
-Media is still pre-rollout. Its final current schema is therefore consolidated into the single authoritative clean-install migration `2026_09_03_010000_create_media_assets_table.php`. Exact checksum uniqueness and image-similarity fingerprint columns/indexes are created directly by that migration. Media remains schema version 3; schema version is the module schema generation, not the number of migration files.
+Media owns two durable concepts:
+
+```text
+media_assets
+    stable reusable asset identity and storage metadata
+
+media_asset_assignments
+    one current Media asset selected for a persisted subject + role
+```
+
+The current migration history preserves the existing `media_assets` foundation and ingestion-state upgrade, then adds `media_asset_assignments` append-only so installed environments do not require historical migration rewrites.
 
 `media_assets` owns stable reusable asset identity and storage metadata:
 
@@ -52,6 +62,32 @@ Archiving never deletes the underlying object. This preserves old and queued ref
 Exact byte-identical uploads are idempotent regardless of filename. Media calculates SHA-256 before permanent object storage, reuses an existing asset with the same checksum, restores it when archived, and relies on a database uniqueness contract to close concurrent-upload races. A race loser removes its just-written object before returning the winning asset identity.
 
 Image perceptual fingerprints are advisory metadata only. They never replace SHA-256 identity, never make an image unique, and never prevent an operator from storing an intentional visual variant.
+
+`media_asset_assignments` is intentionally narrow:
+
+```text
+media_asset_id
+subject_type / subject_id
+role
+timestamps
+```
+
+One persisted subject may have at most one current asset for one role. Reassigning a role updates that pointer and does not delete the previously referenced Media asset. The consuming module/package owns the meaning of its role key; Media owns only the generic durable relationship.
+
+## Reusable image authoring and assignment seam
+
+Media exposes `ReusableMediaImageAuthoring` for consumers that need to create durable generated SVG images and point one persisted subject role at a reusable image.
+
+The contract allows a consumer to:
+
+- store a validated generated SVG through Media without knowing the filesystem disk/path;
+- resolve the current image assigned to one persisted subject + role;
+- assign a different active/ready/public image to that role; and
+- clear the current assignment without deleting any Media asset.
+
+Generated SVG storage reuses Media SHA-256 identity. Repeating byte-identical generated output reuses the existing Media asset rather than creating another object. Consumers still receive `ReusableMediaImage` DTOs and never receive `MediaAsset` or `MediaAssetAssignment` models.
+
+This seam is suitable for generated product artifacts such as an Event signup QR SVG. The consuming package owns the SVG's business meaning and generation rules; Media owns validation, durable object storage, identity, and the current subject-role pointer.
 
 ## Image near-duplicate suggestions
 
@@ -138,7 +174,11 @@ Media accepts SVG as a reusable image only through the ordinary Media upload act
 
 SVG is treated as active document content rather than as harmless opaque bytes. Before storage, Media parses the document without network access and rejects DTD/entity declarations, scripts/foreign content, event-handler attributes, external resource links, nonlocal resource URLs, and unsupported SVG/XML elements.
 
-Accepted SVG remains the original authoritative Media object. It does not receive GD/WebP progressive derivatives or a perceptual image fingerprint merely for symmetry. Consumers that need raster output own that presentation conversion behind their own rendering seam.
+Accepted SVG remains the original authoritative Media object. It does not receive GD/WebP progressive derivatives or a perceptual image fingerprint merely for symmetry.
+
+A self-contained SVG may embed a bounded raster image through a base64 `data:image/...` URL only for PNG, JPEG, GIF, or WebP content whose signature matches the declared raster type. External image URLs, embedded SVG data URLs, active content, and network-capable references remain rejected. This allows generated artifacts such as branded QR SVGs to remain self-contained without weakening the external-resource safety boundary.
+
+Consumers that need raster output should use Media's `ReusableMediaImageLibrary::renderedPng()` seam rather than owning a second SVG fetch/rasterization path.
 
 ## Current committed behavior
 
@@ -200,11 +240,11 @@ The module is not enabled by default merely because its schema exists.
 
 ## Project State
 
-`media_assets` is currently classified as environment-owned.
+`media_assets` and `media_asset_assignments` are currently classified as environment-owned.
 
-Project State does not transfer binary objects, so copying asset rows without their underlying object-storage contents would create broken references. A future portable-media transfer design may export metadata together with an explicit binary/object-copy workflow.
+Project State does not transfer binary objects, so copying asset rows without their underlying object-storage contents would create broken references. Assignments therefore remain environment-local with the Media objects they reference. A future portable-media transfer design may export metadata and assignments together with an explicit binary/object-copy workflow.
 
-Consuming modules should not assume Project State currently transports the Media library.
+Consuming modules should not assume Project State currently transports the Media library or its subject-role assignments.
 
 ## Messaging integration
 

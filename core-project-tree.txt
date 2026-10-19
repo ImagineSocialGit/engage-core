@@ -1071,11 +1071,15 @@
 │   │   │   └── Support
 │   │   ├── Media
 │   │   │   ├── Actions
+│   │   │   │   ├── StoreGeneratedMediaSvgAction.php
 │   │   │   │   └── StoreMediaAssetAction.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
 │   │   │   │       ├── BackfillMediaImageFingerprintsCommand.php
 │   │   │   │       └── BackfillMediaImageVariantsCommand.php
+│   │   │   ├── Contracts
+│   │   │   │   ├── ReusableMediaImageAuthoring.php
+│   │   │   │   └── ReusableMediaImageLibrary.php
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
 │   │   │   │   │   ├── MediaAssetController.php
@@ -1083,23 +1087,31 @@
 │   │   │   │   └── Public
 │   │   │   │       └── MediaVideoPlayerController.php
 │   │   │   ├── Data
-│   │   │   │   └── ImagePerceptualFingerprint.php
+│   │   │   │   ├── ImagePerceptualFingerprint.php
+│   │   │   │   ├── ReusableMediaImageContent.php
+│   │   │   │   ├── ReusableMediaImage.php
+│   │   │   │   └── ReusableMediaRenderedImage.php
 │   │   │   ├── Deployment
 │   │   │   │   └── MediaStorageDeploymentPlanContributor.php
 │   │   │   ├── Jobs
 │   │   │   │   ├── GenerateMediaImageVariantsJob.php
 │   │   │   │   └── ProcessMediaVideoIngestionJob.php
 │   │   │   ├── Models
+│   │   │   │   ├── MediaAssetAssignment.php
 │   │   │   │   └── MediaAsset.php
 │   │   │   ├── Providers
 │   │   │   │   └── MediaModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   │   └── StoreMediaAssetRequest.php
 │   │   │   ├── Services
+│   │   │   │   ├── DatabaseReusableMediaImageAuthoring.php
+│   │   │   │   ├── DatabaseReusableMediaImageLibrary.php
 │   │   │   │   ├── ImagePerceptualHasher.php
 │   │   │   │   ├── MediaFileIdentity.php
+│   │   │   │   ├── MediaImageRasterizer.php
 │   │   │   │   ├── MediaImageSimilarityInspector.php
 │   │   │   │   ├── MediaImageVariantGenerator.php
+│   │   │   │   ├── MediaSvgSafetyValidator.php
 │   │   │   │   ├── MediaUploadPolicy.php
 │   │   │   │   └── MediaVideoIngestor.php
 │   │   │   └── Validation
@@ -2778,7 +2790,8 @@
 │   │   │   │   └── 2026_04_15_195859_create_location_area_assignments_table.php
 │   │   │   ├── media
 │   │   │   │   ├── 2026_09_03_010000_create_media_assets_table.php
-│   │   │   │   └── 2026_09_21_183000_add_ingestion_state_to_media_assets_table.php
+│   │   │   │   ├── 2026_09_21_183000_add_ingestion_state_to_media_assets_table.php
+│   │   │   │   └── 2026_10_19_201500_create_media_asset_assignments_table.php
 │   │   │   ├── messaging
 │   │   │   │   ├── 2026_05_15_215534_create_message_consents_table.php
 │   │   │   │   ├── 2026_05_15_215834_create_consent_revocations_table.php
@@ -3738,6 +3751,7 @@
 │   │   │   ├── FormSubmissionVerificationTest.php
 │   │   │   ├── FormSubmissionWorkspaceTest.php
 │   │   │   ├── HostedFormContextTest.php
+│   │   │   ├── HostedFormLocalVerificationTest.php
 │   │   │   ├── HostedFormRuntimeTest.php
 │   │   │   ├── HostedFormsPublicOriginTest.php
 │   │   │   ├── IssueExternalFormIntakeSecretCommandTest.php
@@ -3797,9 +3811,13 @@
 │   │   │   ├── MediaFoundationTest.php
 │   │   │   ├── MediaImageSimilarityTest.php
 │   │   │   ├── MediaImageVariantsTest.php
+│   │   │   ├── MediaSvgUploadSafetyTest.php
 │   │   │   ├── MediaVideoIngestionTest.php
 │   │   │   ├── MediaVideoPlayerTest.php
-│   │   │   └── MediaWorkspaceTest.php
+│   │   │   ├── MediaWorkspaceTest.php
+│   │   │   ├── ReusableMediaImageAuthoringTest.php
+│   │   │   ├── ReusableMediaImageLibraryTest.php
+│   │   │   └── ReusableMediaImageRasterizationTest.php
 │   │   ├── Messaging
 │   │   │   ├── AuditEmailHygieneCommandTest.php
 │   │   │   ├── BulkMessageDeliveryPolicyTest.php
@@ -4052,6 +4070,8 @@
 │   │   │   ├── SetupValidationManagerTest.php
 │   │   │   ├── SetupValidationRegistrationTest.php
 │   │   │   └── ValidateSetupCommandTest.php
+│   │   ├── SourceIntegrity
+│   │   │   └── PhpRuntimeSourceOutputSafetyTest.php
 │   │   ├── Storage
 │   │   │   └── ClientScopedSpacesFilesystemTest.php
 │   │   ├── Support
@@ -4187,4 +4207,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-924 directories, 3264 files
+926 directories, 3282 files

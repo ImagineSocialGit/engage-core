@@ -33,12 +33,15 @@ final class StoreMediaAssetAction
         UploadedFile $file,
         ?string $title = null,
         ?Model $uploadedBy = null,
+        string $source = 'crm',
     ): MediaAsset {
         $mimeType = $this->uploadPolicy->effectiveMimeType($file);
 
         if ($mimeType === null) {
             throw new RuntimeException('The uploaded media type is not supported.');
         }
+
+        $source = $this->source($source);
 
         if ($mimeType === MediaUploadPolicy::SVG_MIME_TYPE) {
             $this->svgSafety->assertSafe($file);
@@ -94,7 +97,7 @@ final class StoreMediaAssetAction
                 'checksum_sha256' => $checksum,
                 ...$this->fingerprintAttributes($fingerprint),
                 'visibility' => MediaAsset::VISIBILITY_PUBLIC,
-                'source' => 'crm',
+                'source' => $source,
                 'meta' => $kind === MediaAsset::KIND_VIDEO
                     ? $this->videoIngestionMeta($mimeType, $extension, $file)
                     : null,
@@ -390,6 +393,17 @@ final class StoreMediaAssetAction
         return preg_match('/^[a-z0-9]{1,12}$/', $extension) === 1
             ? $extension
             : null;
+    }
+
+    private function source(string $source): string
+    {
+        $source = strtolower(trim($source));
+
+        if (preg_match('/\A[a-z][a-z0-9_.:-]{0,63}\z/', $source) !== 1) {
+            throw new RuntimeException('Media source must be a stable lowercase key.');
+        }
+
+        return $source;
     }
 
     private function title(?string $title, UploadedFile $file): string

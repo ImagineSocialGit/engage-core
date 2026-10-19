@@ -62,6 +62,22 @@ SVG;
         $this->assertSame($svg, Storage::disk('public')->get($asset->path));
     }
 
+    public function test_svg_validator_accepts_bounded_embedded_raster_images(): void
+    {
+        $validator = app(MediaSvgSafetyValidator::class);
+        $png = base64_encode(
+            "\x89PNG\r\n\x1a\n".str_repeat("\0", 24),
+        );
+
+        $validator->assertSafeBytes(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+            .'<image x="10" y="10" width="80" height="80" href="data:image/png;base64,'.$png.'"/>'
+            .'</svg>',
+        );
+
+        $this->addToAssertionCount(1);
+    }
+
     public function test_svg_validator_rejects_active_or_external_content(): void
     {
         $validator = app(MediaSvgSafetyValidator::class);
@@ -69,6 +85,7 @@ SVG;
         $unsafe = [
             '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
             '<svg xmlns="http://www.w3.org/2000/svg"><image href="https://example.test/logo.png"/></svg>',
+            '<svg xmlns="http://www.w3.org/2000/svg"><image href="data:image/svg+xml;base64,PHN2Zy8+"/></svg>',
             '<svg xmlns="http://www.w3.org/2000/svg"><rect onclick="alert(1)" width="10" height="10"/></svg>',
             '<!DOCTYPE svg [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><svg xmlns="http://www.w3.org/2000/svg"/>',
             '<svg xmlns="http://www.w3.org/2000/svg"><style>.x{fill:url(https://example.test/x)}</style></svg>',

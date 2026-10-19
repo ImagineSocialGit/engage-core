@@ -191,6 +191,10 @@ return [
         'mode' => 'environment_owned',
         'reason' => 'Media binary objects and their target storage identity remain environment-local until portable media transfer is implemented.',
     ],
+    'media_asset_assignments' => [
+        'mode' => 'environment_owned',
+        'reason' => 'Media assignments point at environment-local Media objects and remain environment-local with those assets.',
+    ],
 
     'events' => [
         'mode' => 'must_be_empty',

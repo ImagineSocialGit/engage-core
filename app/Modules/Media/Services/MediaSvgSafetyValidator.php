@@ -17,6 +17,7 @@ final class MediaSvgSafetyValidator
     private const ALLOWED_ELEMENTS = [
         'svg',
         'g',
+        'image',
         'defs',
         'symbol',
         'use',
@@ -152,11 +153,17 @@ final class MediaSvgSafetyValidator
             }
 
             if ($localName === 'href') {
-                if ($value === '' || ! str_starts_with($value, '#')) {
-                    throw new RuntimeException('SVG links must reference a local fragment.');
+                if ($value !== '' && str_starts_with($value, '#')) {
+                    continue;
                 }
 
-                continue;
+                if ($name === 'image' && $this->isSafeEmbeddedRasterImage($value)) {
+                    continue;
+                }
+
+                throw new RuntimeException(
+                    'SVG links must reference a local fragment or an embedded raster image.',
+                );
             }
 
             $this->assertSafeValue($value);
@@ -200,6 +207,40 @@ final class MediaSvgSafetyValidator
         ) {
             throw new RuntimeException('External SVG resource URLs are not allowed.');
         }
+    }
+
+    private function isSafeEmbeddedRasterImage(string $value): bool
+    {
+        if (preg_match(
+            '/\Adata:image\/(png|jpeg|gif|webp);base64,([A-Za-z0-9+\/=\r\n]+)\z/i',
+            $value,
+            $matches,
+        ) !== 1) {
+            return false;
+        }
+
+        $encoded = preg_replace('/\s+/', '', $matches[2]);
+
+        if (! is_string($encoded) || $encoded === '') {
+            return false;
+        }
+
+        $bytes = base64_decode($encoded, true);
+
+        if (! is_string($bytes) || $bytes === '') {
+            return false;
+        }
+
+        return match (strtolower($matches[1])) {
+            'png' => str_starts_with($bytes, "\x89PNG\r\n\x1a\n"),
+            'jpeg' => str_starts_with($bytes, "\xff\xd8\xff"),
+            'gif' => str_starts_with($bytes, 'GIF87a')
+                || str_starts_with($bytes, 'GIF89a'),
+            'webp' => strlen($bytes) >= 12
+                && substr($bytes, 0, 4) === 'RIFF'
+                && substr($bytes, 8, 4) === 'WEBP',
+            default => false,
+        };
     }
 
     private function allowedElementNamespace(DOMElement $element): bool

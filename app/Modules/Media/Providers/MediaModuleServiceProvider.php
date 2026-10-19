@@ -3,9 +3,11 @@
 namespace App\Modules\Media\Providers;
 
 use App\Modules\Media\Console\Commands\BackfillMediaImageFingerprintsCommand;
+use App\Modules\Media\Contracts\ReusableMediaImageAuthoring;
 use App\Modules\Media\Contracts\ReusableMediaImageLibrary;
 use App\Modules\Media\Console\Commands\BackfillMediaImageVariantsCommand;
 use App\Modules\Media\Deployment\MediaStorageDeploymentPlanContributor;
+use App\Modules\Media\Services\DatabaseReusableMediaImageAuthoring;
 use App\Modules\Media\Services\DatabaseReusableMediaImageLibrary;
 use App\Modules\Media\Validation\MediaSetupValidationContributor;
 use App\Support\ModuleIntegrations\Messaging\Contracts\MessageAttachmentSource;
@@ -19,6 +21,10 @@ final class MediaModuleServiceProvider extends ServiceProvider
         $this->app->singleton(
             ReusableMediaImageLibrary::class,
             DatabaseReusableMediaImageLibrary::class,
+        );
+        $this->app->singleton(
+            ReusableMediaImageAuthoring::class,
+            DatabaseReusableMediaImageAuthoring::class,
         );
 
         $this->app->tag(MediaMessageAttachmentSource::class, MessageAttachmentSource::TAG);
