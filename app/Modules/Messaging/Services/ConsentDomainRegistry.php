@@ -175,11 +175,27 @@ class ConsentDomainRegistry
         return $this->definitions()[$this->normalizeSegment($domain)] ?? null;
     }
 
-    public function topicForDomain(string $domain): string
-    {
+    public function topicForDomain(
+        string $domain,
+        MessagePurpose|string|null $purpose = null,
+    ): string {
         $domain = $this->normalizeSegment($domain);
+        $definition = $this->definition($domain);
 
-        return $this->definition($domain)['topic'] ?? str_replace('_', ' ', $domain);
+        if ($definition !== null && $this->filledString($definition['topic'] ?? null)) {
+            return trim((string) $definition['topic']);
+        }
+
+        if ($purpose !== null) {
+            $purpose = $this->enumValue($purpose);
+            $defaultTopic = config("messaging.consent.topic_defaults.{$purpose}");
+
+            if ($this->filledString($defaultTopic)) {
+                return trim((string) $defaultTopic);
+            }
+        }
+
+        return str_replace('_', ' ', $domain);
     }
 
     /**

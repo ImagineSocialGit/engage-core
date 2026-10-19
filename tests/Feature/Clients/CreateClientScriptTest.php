@@ -152,9 +152,6 @@ class CreateClientScriptTest extends TestCase
         $starterPackages = require base_path(
             'docs/config-templates/client-starter-packages/artist.php',
         );
-        $messaging = require base_path(
-            'docs/config-templates/client-presets/artist/config/messaging.php',
-        );
         $presets = require base_path(
             'docs/config-templates/client-presets/artist/config/presets.php',
         );
@@ -191,15 +188,6 @@ class CreateClientScriptTest extends TestCase
             $starterPackages['packages']['full']['includes'],
         );
         $this->assertSame('artist_full', $starterPackages['packages']['full']['preset']);
-
-        $this->assertSame(
-            'marketing',
-            $messaging['consent']['channel_purpose_domains']['email']['marketing'],
-        );
-        $this->assertSame(
-            'marketing',
-            $messaging['consent']['channel_purpose_domains']['sms']['marketing'],
-        );
 
         $this->assertSame(
             ['artist_updates'],

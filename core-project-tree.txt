@@ -2883,7 +2883,6 @@
 │   │   ├── client-presets
 │   │   │   ├── artist
 │   │   │   │   └── config
-│   │   │   │       ├── messaging.php
 │   │   │   │       ├── modules.php
 │   │   │   │       ├── presets
 │   │   │   │       │   └── modules
@@ -3446,6 +3445,7 @@
 │   ├── dev-reset-test-client-database.sh
 │   ├── dev-unlink-package.sh
 │   ├── dump-all-config.sh
+│   ├── dump-all-tests.sh
 │   ├── dump-client-files.sh
 │   ├── dump-integration-files.sh
 │   ├── dump-migrations.sh
@@ -3501,7 +3501,6 @@
 │   │   │   ├── BroadcastPersistenceSchemaTest.php
 │   │   │   ├── BroadcastRecipientReadAmplificationTest.php
 │   │   │   ├── BroadcastResolvedMessageDispatchOwnershipTest.php
-│   │   │   ├── BroadcastShowDiagnosticsTest.php
 │   │   │   ├── BroadcastTokenPersonalizationTest.php
 │   │   │   ├── BroadcastVersionedPersistenceTest.php
 │   │   │   ├── CancelBroadcastActionTest.php
@@ -3569,8 +3568,7 @@
 │   │   │   ├── ClientPackageRuntimeTest.php
 │   │   │   ├── ClientViewOverrideTest.php
 │   │   │   ├── CreateClientScriptTest.php
-│   │   │   ├── ExternalFormsClientEnvironmentContractTest.php
-│   │   │   └── ProjectStateClientEnvironmentContractTest.php
+│   │   │   └── ExternalFormsClientEnvironmentContractTest.php
 │   │   ├── Commerce
 │   │   │   ├── CommerceCatalogSyncTest.php
 │   │   │   ├── CommerceContactPurchaseHistoryTest.php
@@ -3630,7 +3628,6 @@
 │   │   │   ├── ContactOperationalFilterTest.php
 │   │   │   ├── ContactQuickEditTest.php
 │   │   │   ├── ContactResultActionTest.php
-│   │   │   ├── ContactShowLayoutTest.php
 │   │   │   ├── ContactStatusAndTagManagementTest.php
 │   │   │   ├── ContactStatusImportTreatmentTest.php
 │   │   │   ├── ContactTagAutomationTest.php
@@ -3640,8 +3637,6 @@
 │   │   │   ├── ProcessHighwayEntryRampInspectorTest.php
 │   │   │   ├── ProcessHighwayGraphContractTest.php
 │   │   │   ├── ProcessHighwayMapBuilderTest.php
-│   │   │   ├── ProcessHighwaySurfaceTest.php
-│   │   │   ├── ProcessHighwayUsabilitySurfaceTest.php
 │   │   │   ├── ResolveContactByEmailActionTest.php
 │   │   │   ├── SettingsHubTest.php
 │   │   │   ├── SyncContactStatusPresetsActionTest.php
@@ -3696,7 +3691,6 @@
 │   │   │   ├── CompactFlowRoutePresetAuthoringTest.php
 │   │   │   ├── ContactStatusAutomationImpactResolverTest.php
 │   │   │   ├── ContactTagAutomationCapabilityTest.php
-│   │   │   ├── FlowRouteAuthoringExtensibilityTest.php
 │   │   │   ├── FlowRouteAutomationEventExecutionContextTest.php
 │   │   │   ├── FlowRouteAutomationEventPersistenceTest.php
 │   │   │   ├── FlowRouteAutomationLifecycleTest.php
@@ -3704,13 +3698,11 @@
 │   │   │   ├── FlowRouteCapabilityMaterializationSetupValidationContributorTest.php
 │   │   │   ├── FlowRouteConditionalStatusChangeTest.php
 │   │   │   ├── FlowRouteConditionBranchPointTest.php
-│   │   │   ├── FlowRouteControllerTest.php
 │   │   │   ├── FlowRouteCreationAuthoringTest.php
 │   │   │   ├── FlowRouteDecisionAuthoringTest.php
 │   │   │   ├── FlowRouteEditorControllerTest.php
 │   │   │   ├── FlowRouteEntryCriteriaTest.php
 │   │   │   ├── FlowRouteImmediateExecutionContinuationTest.php
-│   │   │   ├── FlowRouteIndexAuthoringLinkTest.php
 │   │   │   ├── FlowRouteLeadInDelayTest.php
 │   │   │   ├── FlowRoutePointExecutionFoundationTest.php
 │   │   │   ├── FlowRoutePointPlacementPolicyTest.php
@@ -3747,6 +3739,7 @@
 │   │   │   ├── FormSubmissionWorkspaceTest.php
 │   │   │   ├── HostedFormContextTest.php
 │   │   │   ├── HostedFormRuntimeTest.php
+│   │   │   ├── HostedFormsPublicOriginTest.php
 │   │   │   ├── IssueExternalFormIntakeSecretCommandTest.php
 │   │   │   └── PublishedFormRuntimeTest.php
 │   │   ├── HumanVerification
@@ -3760,7 +3753,6 @@
 │   │   │   ├── InboundAutoResponseAutomationTest.php
 │   │   │   ├── InboundEmailContactExtractionTest.php
 │   │   │   ├── InboundEmailRouteAutomationTriggerAuthoringTest.php
-│   │   │   ├── InboundEmailRouteAutomationWorkspaceTest.php
 │   │   │   ├── InboundEmailRouteResolutionTest.php
 │   │   │   ├── InboundEmailRouteSetupValidationTest.php
 │   │   │   ├── InboundEmailRouteWorkspaceTest.php
@@ -3876,7 +3868,6 @@
 │   │   │   ├── MessageMediaPayloadValidationTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
 │   │   │   ├── MessageTemplateBehaviorOwnershipValidationTest.php
-│   │   │   ├── MessageTemplateCarouselEditorTest.php
 │   │   │   ├── MessageTemplateCompositionConfigIntegrationTest.php
 │   │   │   ├── MessageTemplateCompositionConfigSyncTest.php
 │   │   │   ├── MessageTemplateCompositionCustomizationSyncTest.php
@@ -3891,7 +3882,6 @@
 │   │   │   ├── MessageTemplatePresetControllerTest.php
 │   │   │   ├── MessageTemplatePresetSyncActionTest.php
 │   │   │   ├── MessageTemplatePresetTokenValidationSyncTest.php
-│   │   │   ├── MessageTemplateReplyHandlingAuthoringTest.php
 │   │   │   ├── MessageTemplateSyncVersionCutoverTest.php
 │   │   │   ├── MessageTemplateTokenValidationControllerTest.php
 │   │   │   ├── MessageTemplateTokenValidatorTest.php
@@ -3899,7 +3889,6 @@
 │   │   │   ├── MessageTemplateVersionPersistenceTest.php
 │   │   │   ├── MessageTokenFallbackResolverTest.php
 │   │   │   ├── MessagingDeploymentPlanContributorTest.php
-│   │   │   ├── MessagingIndexShapeTest.php
 │   │   │   ├── MessagingSetupValidationContributorTest.php
 │   │   │   ├── ModuleOwnedMessageTemplateSyncTest.php
 │   │   │   ├── OutboundContextLaunchersTest.php
@@ -3911,7 +3900,6 @@
 │   │   │   ├── ReplyProfileSetupValidationTest.php
 │   │   │   ├── ResolvedMessageDispatchBuilderTest.php
 │   │   │   ├── ResolvedMessageDispatchIntegrationTest.php
-│   │   │   ├── ResolvedMessageDispatchSchemaTest.php
 │   │   │   ├── RouteAuthoringMessageTemplateEligibilityResolverTest.php
 │   │   │   ├── ScheduledMessageBulkContentTest.php
 │   │   │   ├── ScheduledMessageContactRecipientGateTest.php
@@ -3924,7 +3912,6 @@
 │   │   │   ├── ScheduledMessagePayloadCanonicalizerTest.php
 │   │   │   ├── ScheduledMessagePayloadResolverTest.php
 │   │   │   ├── ScheduledMessageTerminalEventContractTest.php
-│   │   │   ├── ScheduledMessageTerminalPersistenceSchemaTest.php
 │   │   │   ├── ScheduleInternalNotificationActionTest.php
 │   │   │   ├── ScheduleMessageTimeNormalizationTest.php
 │   │   │   ├── SemanticCampaignVariantIdentityResolutionTest.php
@@ -3942,7 +3929,6 @@
 │   │   ├── ModuleIntegrations
 │   │   │   └── MessagingMediaLibraryTest.php
 │   │   ├── Modules
-│   │   │   ├── ContactShowModuleVisibilityTest.php
 │   │   │   ├── MigrationContractSourceOfTruthTest.php
 │   │   │   ├── ModuleDependencyBoundaryTest.php
 │   │   │   ├── ModuleManagerTest.php
@@ -3972,7 +3958,6 @@
 │   │   │   ├── ModuleFirstPresetCompositionTest.php
 │   │   │   └── PresetCompositionSyncCutoverTest.php
 │   │   ├── PublicSurfaces
-│   │   │   └── MetaPixelTrackingTest.php
 │   │   ├── Relationships
 │   │   │   ├── ContactRelationshipImportHandlerTest.php
 │   │   │   ├── ContactRelationshipWorkspaceTest.php
@@ -3986,7 +3971,6 @@
 │   │   │   └── RelationshipStageAutomationCapabilityTest.php
 │   │   ├── Reporting
 │   │   │   ├── DailyFollowUpScheduledReportTest.php
-│   │   │   ├── ReportingBrowserClientContractTest.php
 │   │   │   ├── ReportingCollectionHealthTest.php
 │   │   │   ├── ReportingDailyProjectionTest.php
 │   │   │   ├── ReportingDeploymentPlanContributorTest.php
@@ -4020,7 +4004,6 @@
 │   │   │   ├── PublicBookingDestinationVerificationServiceTest.php
 │   │   │   ├── PublicBookingHoldTest.php
 │   │   │   ├── PublicSchedulingHumanVerificationTest.php
-│   │   │   ├── PublicSchedulingOfferCodeUxTest.php
 │   │   │   ├── PublicSchedulingSurfaceTest.php
 │   │   │   ├── RangeDurationBookingFoundationTest.php
 │   │   │   ├── RescheduleAppointmentActionTest.php
@@ -4092,7 +4075,6 @@
 │   │   ├── TestingTools
 │   │   │   └── ProductionRuntimeSnapshotImporterTest.php
 │   │   ├── Ui
-│   │   │   └── MessageEditorComponentTest.php
 │   │   ├── Users
 │   │   │   └── CrmUserCommandsTest.php
 │   │   ├── Webhooks
@@ -4128,7 +4110,6 @@
 │   │   │   ├── SyncWebinarScheduleProfilesMessageAreaTest.php
 │   │   │   ├── WebinarAudienceContactFilterTest.php
 │   │   │   ├── WebinarAutomationOutboxTest.php
-│   │   │   ├── WebinarCrmWorkspaceTest.php
 │   │   │   ├── WebinarCurrentProviderOccurrenceTest.php
 │   │   │   ├── WebinarDevControllerEnvironmentGuardTest.php
 │   │   │   ├── WebinarFunnelFactContributorTest.php
@@ -4156,7 +4137,6 @@
 │   │   │   ├── WebinarRegistrationConsentPresentationTest.php
 │   │   │   ├── WebinarRegistrationControllerTest.php
 │   │   │   ├── WebinarRegistrationDisclosurePresentationTest.php
-│   │   │   ├── WebinarRegistrationFrontendContractTest.php
 │   │   │   ├── WebinarRegistrationMessageConsolidationTest.php
 │   │   │   ├── WebinarRegistrationMinimalFieldValidationTest.php
 │   │   │   ├── WebinarRegistrationOccurrenceResolutionTest.php
@@ -4207,4 +4187,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-924 directories, 3284 files
+924 directories, 3264 files

@@ -36,23 +36,6 @@ class ArtistUpdatesPresetTest extends TestCase
             'forms',
             'messaging',
         ]);
-        config()->set('messaging.consent_domains', [
-            'marketing' => [
-                'topic' => 'marketing communications',
-                'scopes' => [],
-                'scope_prefixes' => [],
-                'opt_in' => [],
-            ],
-        ]);
-        config()->set('messaging.consent.channel_purpose_domains', [
-            'email' => [
-                'marketing' => 'marketing',
-            ],
-            'sms' => [
-                'marketing' => 'marketing',
-            ],
-        ]);
-
         $this->app->forgetInstance(FormSubmissionConsentBridge::class);
     }
 

@@ -43,7 +43,7 @@ class ConsentOptInDefinitionResolver
         }
 
         $copy = array_replace_recursive($defaults, $override);
-        $payload = $this->payload($channel, $copy, $domain);
+        $payload = $this->payload($channel, $purpose, $copy, $domain);
 
         return [
             'dispatch_key' => 'consent_granted',
@@ -63,11 +63,18 @@ class ConsentOptInDefinitionResolver
      * @param array<string, mixed> $copy
      * @return array<string, mixed>
      */
-    private function payload(string $channel, array $copy, string $domain): array
-    {
+    private function payload(
+        string $channel,
+        string $purpose,
+        array $copy,
+        string $domain,
+    ): array {
         $replacements = [
             ':client_name' => $this->clientName(),
-            ':consent_topic' => $this->consentDomainRegistry->topicForDomain($domain),
+            ':consent_topic' => $this->consentDomainRegistry->topicForDomain(
+                domain: $domain,
+                purpose: $purpose,
+            ),
         ];
 
         return match ($channel) {

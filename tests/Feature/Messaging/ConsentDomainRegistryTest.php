@@ -32,6 +32,32 @@ class ConsentDomainRegistryTest extends TestCase
         );
     }
 
+    public function test_undeclared_scope_can_use_generic_purpose_topic_without_becoming_a_new_domain(): void
+    {
+        Config::set(
+            'messaging.consent.topic_defaults.marketing',
+            'generic marketing topic',
+        );
+
+        $registry = app(ConsentDomainRegistry::class);
+
+        $this->assertSame(
+            'forms',
+            $registry->domainFor(
+                channel: MessageChannel::Email,
+                purpose: MessagePurpose::Marketing,
+                scope: 'forms',
+            ),
+        );
+        $this->assertSame(
+            'generic marketing topic',
+            $registry->topicForDomain(
+                domain: 'forms',
+                purpose: MessagePurpose::Marketing,
+            ),
+        );
+    }
+
     public function test_channel_purpose_mapping_can_broaden_one_channel_without_changing_message_scope_identity(): void
     {
         $this->defineMarketingDomain();

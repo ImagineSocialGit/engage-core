@@ -81,6 +81,17 @@ return [
         'require_active_consent' => true,
 
         /*
+        | Generic acknowledgement topics are keyed only by purpose. They are
+        | copy/context fallbacks, never authorization boundaries. Module/client
+        | consent domains may still provide a more specific human-readable
+        | topic for known operational scopes.
+        */
+        'topic_defaults' => [
+            'marketing' => 'marketing communications',
+            'transactional' => 'service updates',
+        ],
+
+        /*
         | Optional channel + purpose mappings select acknowledgement/context
         | domains only. They do not participate in permission authorization.
         | Hard permission is always resolved by exact channel + purpose; message
