@@ -6,6 +6,16 @@ use Illuminate\Http\UploadedFile;
 
 final class MediaUploadPolicy
 {
+    public const SVG_MIME_TYPE = 'image/svg+xml';
+
+    private const SVG_DETECTION_FALLBACK_MIME_TYPES = [
+        'application/octet-stream',
+        'application/x-empty',
+        'application/xml',
+        'text/plain',
+        'text/xml',
+    ];
+
     /** @return array<int, string> */
     public function allowedMimeTypes(): array
     {
@@ -27,6 +37,17 @@ final class MediaUploadPolicy
         }
 
         $client = $this->normalizedMimeType($file->getClientMimeType());
+
+        if (in_array(self::SVG_MIME_TYPE, $allowed, true)
+            && $client === self::SVG_MIME_TYPE
+            && in_array(
+                $detected,
+                [null, ...self::SVG_DETECTION_FALLBACK_MIME_TYPES],
+                true,
+            )
+        ) {
+            return self::SVG_MIME_TYPE;
+        }
 
         if (in_array($detected, [null, 'application/octet-stream', 'application/x-empty'], true)
             && $client !== null

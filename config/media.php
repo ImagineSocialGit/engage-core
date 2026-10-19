@@ -23,6 +23,7 @@ return [
         'image/png',
         'image/gif',
         'image/webp',
+        'image/svg+xml',
         'video/mp4',
         'video/quicktime',
         'video/webm',
@@ -36,6 +37,9 @@ return [
         'text/plain',
     ],
 
+    'svg' => [
+        'max_kilobytes' => 2048,
+    ],
 
     /*
     |--------------------------------------------------------------------------

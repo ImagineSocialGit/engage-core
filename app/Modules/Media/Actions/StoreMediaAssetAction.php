@@ -9,6 +9,7 @@ use App\Modules\Media\Models\MediaAsset;
 use App\Modules\Media\Services\ImagePerceptualHasher;
 use App\Modules\Media\Services\MediaFileIdentity;
 use App\Modules\Media\Services\MediaUploadPolicy;
+use App\Modules\Media\Services\MediaSvgSafetyValidator;
 use App\Support\Queues\QueueContract;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
@@ -24,6 +25,7 @@ final class StoreMediaAssetAction
         private readonly MediaUploadPolicy $uploadPolicy,
         private readonly MediaFileIdentity $fileIdentity,
         private readonly ImagePerceptualHasher $perceptualHasher,
+        private readonly MediaSvgSafetyValidator $svgSafety,
         private readonly QueueContract $queueContract,
     ) {}
 
@@ -36,6 +38,10 @@ final class StoreMediaAssetAction
 
         if ($mimeType === null) {
             throw new RuntimeException('The uploaded media type is not supported.');
+        }
+
+        if ($mimeType === MediaUploadPolicy::SVG_MIME_TYPE) {
+            $this->svgSafety->assertSafe($file);
         }
 
         $checksum = $this->fileIdentity->checksum($file);
@@ -62,7 +68,7 @@ final class StoreMediaAssetAction
             : null;
         $disk = $this->disk();
         $uuid = (string) Str::uuid();
-        $extension = $this->extension($file);
+        $extension = $this->extension($file, $mimeType);
         $storedPath = $kind === MediaAsset::KIND_VIDEO
             ? $this->storeVideoSource($disk, $uuid, $file, $extension)
             : $this->storeDurableAsset($disk, $uuid, $file, $extension);
@@ -174,7 +180,7 @@ final class StoreMediaAssetAction
         string $mimeType,
     ): MediaAsset {
         $disk = $this->disk();
-        $extension = $this->extension($file);
+        $extension = $this->extension($file, $mimeType);
         $storedPath = $this->storeVideoSource(
             disk: $disk,
             uuid: (string) $asset->uuid,
@@ -226,6 +232,7 @@ final class StoreMediaAssetAction
     private function queueImageVariants(MediaAsset $asset): void
     {
         if ($asset->kind !== MediaAsset::KIND_IMAGE
+            || strtolower(trim((string) $asset->mime_type)) === MediaUploadPolicy::SVG_MIME_TYPE
             || ! (bool) config('media.image_variants.enabled', true)
             || $asset->hasProgressiveImageVariants()
         ) {
@@ -364,8 +371,14 @@ final class StoreMediaAssetAction
         return $disk;
     }
 
-    private function extension(UploadedFile $file): ?string
-    {
+    private function extension(
+        UploadedFile $file,
+        string $mimeType,
+    ): ?string {
+        if ($mimeType === MediaUploadPolicy::SVG_MIME_TYPE) {
+            return 'svg';
+        }
+
         $extension = $file->guessExtension();
 
         if (! is_string($extension) || trim($extension) === '') {

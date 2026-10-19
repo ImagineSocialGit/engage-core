@@ -14,6 +14,7 @@
         "laravel/horizon": "^5.45",
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.32",
+        "meyfa/php-svg": "^0.16.1",
         "resend/resend-laravel": "^1.3",
         "telnyx/telnyx-php": "^7.70",
         "twilio/sdk": "^8.11"

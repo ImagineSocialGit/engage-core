@@ -14,6 +14,23 @@ Media depends only on Core.
 
 Storage access goes through Laravel Filesystem. DigitalOcean Spaces is the current live writable object-storage backend, but Media code does not call DigitalOcean APIs directly.
 
+## Reusable image consumer seam
+
+Media exposes a module-owned provider-neutral read seam for product surfaces that need reusable image assets:
+
+```text
+ReusableMediaImageLibrary
+    -> selectable image summaries
+    -> one active image by UUID
+    -> exact original image bytes when rendering requires them
+```
+
+Consumers receive Media-owned DTOs rather than `MediaAsset`, filesystem disk names, object paths, or storage-provider details. The concrete Media implementation owns the active/ready/public checks, public/preview URL resolution, and storage read.
+
+A consuming module or selected-client package may depend on this public contract when Media is part of the approved workflow. It must not query `media_assets` directly or reach into DigitalOcean Spaces, S3, or another configured filesystem backend.
+
+The seam is intentionally image-specific in this slice. It does not imply that every Media kind should expose raw content to every consumer.
+
 ## Schema
 
 Media is still pre-rollout. Its final current schema is therefore consolidated into the single authoritative clean-install migration `2026_09_03_010000_create_media_assets_table.php`. Exact checksum uniqueness and image-similarity fingerprint columns/indexes are created directly by that migration. Media remains schema version 3; schema version is the module schema generation, not the number of migration files.
@@ -115,6 +132,14 @@ Use `--force` to rewrite the current derivative version when repairing missing o
 
 This browser-presentation layer is separate from the curated client/site image preprocessing pipeline under `client/{client-key}/resources/images`. The dev/site pipeline remains unchanged.
 
+## SVG safety
+
+Media accepts SVG as a reusable image only through the ordinary Media upload action.
+
+SVG is treated as active document content rather than as harmless opaque bytes. Before storage, Media parses the document without network access and rejects DTD/entity declarations, scripts/foreign content, event-handler attributes, external resource links, nonlocal resource URLs, and unsupported SVG/XML elements.
+
+Accepted SVG remains the original authoritative Media object. It does not receive GD/WebP progressive derivatives or a perceptual image fingerprint merely for symmetry. Consumers that need raster output own that presentation conversion behind their own rendering seam.
+
 ## Current committed behavior
 
 The narrow shared CRM Media workspace can:
@@ -154,6 +179,14 @@ CDN_BASE_URL
 Endpoint and CDN values must be root HTTP/HTTPS origins. The CDN origin is required because Media assets are intended for durable public consumption by outbound communications and other product surfaces.
 
 Perceptual image suggestions additionally benefit from the PHP GD extension. Progressive still-image derivatives require GD with WebP encoding support. Missing image-processing support is a setup warning rather than a deployment-blocking Media storage error because exact-content identity and original Media objects remain fully available without it.
+
+## Reusable image rendering seam
+
+Media exposes `ReusableMediaImageLibrary` as the generic read boundary for reusable public images. Consumers may resolve selectable image summaries, exact original bytes, or an ephemeral PNG rendering without importing `MediaAsset`, querying `media_assets`, or knowing the backing filesystem disk/object path.
+
+`renderedPng()` is reconstructible presentation output. It never creates another Media row, changes the original object, or becomes a second asset identity. Raster images are decoded and proportionally bounded through GD. Safe stored SVG images are revalidated and rasterized through the Media-owned SVG rendering implementation, then returned as PNG bytes through the same provider-neutral DTO.
+
+This seam exists for consumers that need one consistent raster representation across browser, PDF, QR, or other composition paths while preserving the original reusable Media asset as authority. Consumers must not implement their own storage lookup or SVG-fetch/rasterization path when this contract satisfies the workflow.
 
 ## Product surface
 
