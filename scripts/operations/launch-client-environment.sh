@@ -746,6 +746,15 @@ core_hosts() {
         hosts+=("$WEBHOOKS_HOST")
     fi
 
+    local forms_url forms_host
+    if module_enabled forms; then
+        forms_url="$(env_get "$CLIENT_ENV" FORMS_APP_URL)"
+        if [[ -n "$forms_url" ]]; then
+            forms_host="$(python3 "$HELPER" origin-host --origin "$forms_url")"
+            [[ -n "$forms_host" ]] && hosts+=("$forms_host")
+        fi
+    fi
+
     local scheduling_url scheduling_host
     scheduling_url="$(env_get "$CLIENT_ENV" SCHEDULING_APP_URL)"
     if [[ -n "$scheduling_url" ]]; then
@@ -1788,6 +1797,15 @@ audit_core_hosts() {
         || audit_plan_module_enabled forms
     then
         hosts+=("$WEBHOOKS_HOST")
+    fi
+
+    local forms_url forms_host
+    if audit_plan_module_enabled forms; then
+        forms_url="$(env_get "$CLIENT_ENV" FORMS_APP_URL)"
+        if [[ -n "$forms_url" ]]; then
+            forms_host="$(python3 "$HELPER" origin-host --origin "$forms_url" 2>/dev/null || true)"
+            [[ -n "$forms_host" ]] && hosts+=("$forms_host")
+        fi
     fi
 
     local scheduling_url scheduling_host
@@ -3758,6 +3776,9 @@ run_new_or_resume() {
     install_nginx_site
     ensure_dns_and_tls
     resolve_deployment_plan
+    prepare_host_plan
+    install_nginx_site
+    ensure_dns_and_tls
     install_new_environment
     ensure_runtime
     verify_runtime
@@ -3784,6 +3805,9 @@ run_update() {
     install_nginx_site
     ensure_dns_and_tls
     resolve_deployment_plan true
+    prepare_host_plan
+    install_nginx_site
+    ensure_dns_and_tls
     update_application
     runtime_permission_setup
     install_supervisor_program
@@ -3799,6 +3823,9 @@ run_add_modules() {
     install_nginx_site
     ensure_dns_and_tls
     resolve_deployment_plan true
+    prepare_host_plan
+    install_nginx_site
+    ensure_dns_and_tls
     install_added_modules
     runtime_permission_setup
     install_supervisor_program

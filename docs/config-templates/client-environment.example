@@ -20,6 +20,11 @@
 # Messaging public host is derived as messaging.[ROOT_DOMAIN]; do not add MESSAGING_APP_URL.
 # CRM_APP_URL=
 # WEBINAR_APP_URL=
+# FORMS_APP_URL=
+#   Hosted Forms public origin. Local/testing may omit this and use the
+#   forms.[ROOT_DOMAIN] fallback. Staging/production requires it when the
+#   selected Forms preset contains one or more hosted public Forms.
+#   Use a root-level http:// or https:// origin with no credentials/path/query/fragment.
 # SCHEDULING_APP_URL=
 #   Optional. Omit to disable the generic public Scheduling surface. When set,
 #   use a root-level http:// or https:// origin with no credentials/path/query/fragment.

@@ -38,6 +38,28 @@ final class FormsDeploymentPlanContributor implements DeploymentPlanContributor,
         }
 
         $publicForms = $this->selectedPublicFormKeys();
+        $hostedPublicForms = $this->selectedHostedPublicFormKeys();
+        $liveRuntime = in_array(app()->environment(), ['staging', 'production'], true);
+
+        if ($liveRuntime && $hostedPublicForms !== []) {
+            yield EnvironmentRequirement::required(
+                'FORMS_APP_URL',
+                sprintf(
+                    'The committed preset selects hosted public Form%s [%s]; staging/production requires an explicit Core-owned public Forms origin.',
+                    count($hostedPublicForms) === 1 ? '' : 's',
+                    implode(', ', $hostedPublicForms),
+                ),
+                valueRule: EnvironmentRequirement::VALUE_RULE_HTTP_ORIGIN,
+            );
+        } else {
+            yield EnvironmentRequirement::optional(
+                'FORMS_APP_URL',
+                $hostedPublicForms !== []
+                    ? 'Local/testing may omit the hosted Forms origin and use the forms.[ROOT_DOMAIN] fallback; configure an explicit origin only when exercising deployment-specific host behavior.'
+                    : 'Configure a public Forms origin only when this client exposes Core-hosted Forms.',
+                valueRule: EnvironmentRequirement::VALUE_RULE_HTTP_ORIGIN,
+            );
+        }
 
         if ($publicForms !== []) {
             yield EnvironmentRequirement::required(
@@ -127,6 +149,32 @@ final class FormsDeploymentPlanContributor implements DeploymentPlanContributor,
     /** @return array<int, string> */
     private function selectedPublicFormKeys(): array
     {
+        return array_keys($this->selectedPublicForms());
+    }
+
+    /** @return array<int, string> */
+    private function selectedHostedPublicFormKeys(): array
+    {
+        $keys = [];
+
+        foreach ($this->selectedPublicForms() as $key => $definition) {
+            $settings = $definition['settings'] ?? null;
+            $public = is_array($settings) ? ($settings['public'] ?? null) : null;
+            $hosted = is_array($public) ? ($public['hosted'] ?? null) : null;
+
+            if (is_array($hosted) && ($hosted['enabled'] ?? false) === true) {
+                $keys[] = $key;
+            }
+        }
+
+        sort($keys);
+
+        return array_values(array_unique($keys));
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private function selectedPublicForms(): array
+    {
         $presetKey = $this->packages->resolvePresetKey(null);
 
         if ($presetKey === null
@@ -136,7 +184,7 @@ final class FormsDeploymentPlanContributor implements DeploymentPlanContributor,
         }
 
         $resolved = $this->composition->resolve($presetKey, PresetDomain::Forms);
-        $keys = [];
+        $definitions = [];
 
         foreach ($resolved->definitions as $definitionKey => $definition) {
             if (! is_array($definition) || ($definition['is_public'] ?? false) !== true) {
@@ -148,12 +196,12 @@ final class FormsDeploymentPlanContributor implements DeploymentPlanContributor,
                 : (is_string($definitionKey) ? trim($definitionKey) : '');
 
             if ($key !== '') {
-                $keys[] = $key;
+                $definitions[$key] = $definition;
             }
         }
 
-        sort($keys);
+        ksort($definitions);
 
-        return array_values(array_unique($keys));
+        return $definitions;
     }
 }

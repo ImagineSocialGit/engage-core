@@ -47,11 +47,15 @@ $app = Application::configure(basePath: dirname(__DIR__))
                     require base_path('routes/messaging.php');
                 });
 
-            Route::middleware(['web'])
-                ->domain('forms.'.$domain)
-                ->group(function () {
-                    require base_path('routes/forms.php');
-                });
+            $formsHost = config('forms.public.host');
+
+            if (is_string($formsHost) && trim($formsHost) !== '') {
+                Route::middleware(['web'])
+                    ->domain(trim($formsHost))
+                    ->group(function () {
+                        require base_path('routes/forms.php');
+                    });
+            }
 
             $portalHost = parse_url(
                 (string) config('app.portal_url'),
