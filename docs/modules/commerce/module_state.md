@@ -171,6 +171,69 @@ point-of-sale execution
 
 The exact authority split is client configuration, not a universal vendor assumption.
 
+## Operator management surface
+
+Provider authority does not require provider-dashboard management.
+
+Commerce should make common, understandable business operations available in Engage Core when they can be represented through a clean provider-neutral contract. The configured provider still owns the authoritative fact or execution assigned to its role.
+
+Preferred write path:
+
+```text
+operator acts in Commerce
+    -> Commerce validates provider-neutral business intent
+    -> Commerce resolves the configured provider role/capability
+    -> provider package executes the authoritative provider mutation
+    -> Commerce reconciles/records the returned authoritative result
+```
+
+Candidate Core-managed operations, when an explicit capability contract exists, include:
+
+```text
+create or schedule a simple promotion/discount
+change ordinary provider-backed product availability/status
+perform a straightforward authoritative inventory adjustment
+change an ordinary provider-backed price
+initiate a simple provider-supported cancellation/refund/fulfillment action
+```
+
+These are product-direction examples, not claims that every write contract above is implemented today.
+
+A seasonal promotion is a representative case:
+
+```text
+operator supplies
+    business label
+    redemption code when applicable
+    percentage/fixed value
+    start/end window
+    eligible products/variants or another supported simple scope
+
+Commerce
+    owns the guided operator workflow and provider-neutral intent
+
+configured promotion provider
+    creates/updates the authoritative promotion
+    remains authoritative for final checkout eligibility and calculation
+```
+
+Commerce should not calculate a competing discount locally and then try to force the provider to agree.
+
+Deep provider administration remains an escape hatch rather than a Commerce-cloning target. Examples include:
+
+```text
+complex provider-specific discount combinatorics
+tax configuration
+markets/regions infrastructure
+shipping profiles and carrier configuration
+warehouse-routing/fulfillment infrastructure
+payment-account/KYC/payout setup
+advanced fraud/risk configuration
+provider account/billing administration
+```
+
+The inclusion test is business workflow, not API availability: if a client repeatedly needs an ordinary commerce action to run the business and Core can simplify it safely, prefer a Commerce-owned operator surface backed by the configured provider. If a capability exists only because the provider has an advanced administration screen, leave it provider-owned until a real Core workflow justifies otherwise.
+
 ## Provider-role model
 
 Commerce must support more than one provider in the same client ecosystem.

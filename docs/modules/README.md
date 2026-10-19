@@ -44,7 +44,7 @@ Use `../module-boundaries.md` for platform-wide ownership/dependency rules, `../
 
 Installable vertical packages such as PetServices own their module documentation in the package repository. When installed for a selected client, they may contribute real module definitions and migration scopes through `client/{CLIENT_KEY}/config/client_packages.php`; they are intentionally absent from Engage Core when the package is not installed.
 
-Integrations/adapters are not modules and do not receive independent product surfaces by default.
+Integrations/adapters are not modules and do not receive independent product surfaces by default. When Engage Core exposes a common provider-backed operation, the owning module owns the workflow/UI and invokes the adapter through a provider-neutral contract; the provider may remain authoritative for the resulting external state.
 
 ## Module reference standard
 

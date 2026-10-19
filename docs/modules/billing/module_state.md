@@ -167,6 +167,39 @@ provider-specific payment-method state
 
 `RecordBillingPaymentAction` is the public reconciliation seam for provider adapters to persist recognized payment state idempotently by provider/external identity.
 
+## Operator-management direction
+
+Billing is silent today and this foundation does not add standalone navigation. That does not mean future provider-backed money operations must be managed only in the payment provider's dashboard.
+
+For an approved workflow, the normal direction is:
+
+```text
+common business operation
+    -> consuming Engage Core workflow, or a later justified Billing operator surface
+    -> Billing/provider-neutral action contract
+    -> configured collection/payment provider
+    -> authoritative provider execution
+    -> provider result reconciled into Billing
+```
+
+Potential future Core-managed operations include straightforward actions such as collecting an amount, issuing a simple refund, or changing/canceling a subscription **only after** the corresponding Billing domain and provider-neutral contracts are explicitly approved and implemented.
+
+Provider administration should remain external for concerns such as:
+
+```text
+account identity/KYC
+banking and payout setup
+provider account billing
+legal/compliance agreements
+tax registration/provider tax administration
+advanced fraud/risk configuration
+rare provider-specific payment-routing/infrastructure settings
+```
+
+The goal is not to reproduce a payment provider dashboard. It is to keep ordinary business work inside the owning Engage Core workflow when Core can represent the intent safely, while the configured provider remains authoritative for transaction execution and provider-owned state.
+
+The deferred-capability list below remains authoritative for what Billing does **not** implement yet. This section defines the management-surface direction for capabilities if and when those workflows are approved.
+
 ## Scheduling boundary
 
 Scheduling owns:

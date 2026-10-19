@@ -195,6 +195,75 @@ Avoid introducing a separate middleware/integration SaaS account merely to synch
 
 Provider names used in implementation examples are illustrative. They must not become universal module dependencies, canonical schema vocabulary, or assumptions that every client uses the same provider combination.
 
+## Core-first operations, provider-authoritative execution
+
+Provider authority, provider execution, and the human management surface are separate decisions.
+
+An external provider being the source of truth does **not** imply that the client/operator should normally have to work in that provider's dashboard.
+
+Preferred shape:
+
+```text
+common business operation
+    -> Engage Core module-owned workflow/UI
+    -> provider-neutral capability/action contract
+    -> configured provider adapter
+    -> authoritative provider mutation/execution
+    -> authoritative result reconciled back into Core
+```
+
+Use three product-surface tiers:
+
+```text
+Core-primary
+    ordinary business operations that can be represented safely and provider-neutrally
+    should normally be completed in Engage Core
+
+Core facade + provider escape hatch
+    the common case is managed in Engage Core
+    advanced/provider-specific options remain available through a direct provider link
+
+provider-only
+    account administration, identity/KYC, banking/payout setup, legal/compliance,
+    tax registrations, deep fraud/risk rules, provider infrastructure, and rare
+    provider-specific configuration stay in the provider's own administration surface
+```
+
+A common Core-managed operation is appropriate when:
+
+```text
+the client/operator reasonably needs it during normal business work
+the business intent can be represented without pretending all providers are identical
+the provider adapter can execute it safely and idempotently
+Core can materially simplify the workflow or combine useful cross-module context
+the operation does not require Core to become the provider's specialized infrastructure
+```
+
+Core should expose business verbs and workflows, not clone provider dashboards screen-for-screen.
+
+Examples of the distinction:
+
+```text
+Create a simple promotion
+    Core may own the operator workflow
+    configured commerce provider owns authoritative discount execution
+
+Refund a straightforward payment
+    owning Core workflow may initiate it once an explicit provider-neutral contract exists
+    configured payment provider owns authoritative transaction state
+
+Reschedule a webinar
+    Webinars may own the operator workflow
+    configured webinar provider executes the remote change
+
+Configure payout banking, KYC, tax registration, or advanced provider risk rules
+    provider-only
+```
+
+Do not add a Core feature merely because a provider has a screen for it. Add a Core management surface when a real recurring business workflow benefits from a simpler module-owned operation.
+
+This principle applies across modules and integrations. Integration packages/adapters implement provider capabilities; they do not become independent product dashboards.
+
 ## Module capability standard
 
 A module capability is a good fit for Engage Core when it supports one of these outcomes:

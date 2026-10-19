@@ -216,6 +216,29 @@ CommerceProviderRegistry::PROVIDER_TAG
 
 and implement only the Commerce capability contracts it actually supports.
 
+### Operator-surface ownership
+
+An integration package may implement both read and write capabilities for the external provider, but it does not own the human product surface merely because it owns the provider API implementation.
+
+Preferred direction:
+
+```text
+owning Engage Core module
+    owns the business workflow, authorization, validation, UI, and provider-neutral action
+
+integration package
+    translates that action into provider API calls
+    preserves provider-specific identity/idempotency/webhook meaning
+    returns or reconciles authoritative provider state
+
+external provider
+    remains authoritative for the facts/operations assigned to its role
+```
+
+This allows a normal business operation to be managed in Engage Core even when the external provider remains the source of truth.
+
+An adapter may expose provider record URLs or advanced-configuration links so the owning module can offer a deliberate escape hatch. That does not justify reproducing the provider's complete account, compliance, infrastructure, or advanced administration console inside Engage Core.
+
 A vertical module package owns its own module provider. That provider may conditionally register optional integrations when another horizontal module is enabled. For example, a PetServices package may register a Scheduling booking-subject provider when Scheduling is enabled. The adapter belongs to the vertical package; Engage Core's shared `ModuleIntegrations` tree must not accumulate vertical-specific bridge classes.
 
 A package may also register:
@@ -313,8 +336,11 @@ Integration packages:
 
 - do not become Engage Core modules;
 - do not own another module's business lifecycle;
+- do not receive an independent operator/product surface merely because they integrate a provider;
 - implement provider-neutral contracts supplied by the host module;
+- may execute provider mutations requested through those contracts while the provider remains authoritative;
 - keep vendor API/webhook meaning inside the package;
+- may return provider record/admin links for advanced escape-hatch workflows;
 - may remain completely absent from clients that do not need them.
 
 Vertical module packages:
