@@ -36,6 +36,8 @@ final readonly class FormSubmissionInput
 
     public ?FormSubmissionContext $context;
 
+    public bool $enforceRequiredVerification;
+
     /**
      * @param  array<string, mixed>  $values
      * @param  array<string, mixed>|null  $rawPayload
@@ -54,6 +56,7 @@ final readonly class FormSubmissionInput
         ?FormSubmissionVerification $verification = null,
         bool $publicOnly = false,
         ?FormSubmissionContext $context = null,
+        bool $enforceRequiredVerification = true,
     ) {
         $formKey = trim($formKey);
 
@@ -101,6 +104,7 @@ final readonly class FormSubmissionInput
         $this->verification = $verification;
         $this->publicOnly = $publicOnly;
         $this->context = $context;
+        $this->enforceRequiredVerification = $enforceRequiredVerification;
     }
 
     public function hasExternalIdentity(): bool

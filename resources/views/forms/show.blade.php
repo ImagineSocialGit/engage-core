@@ -26,7 +26,7 @@
     </style>
 
     <main
-        class="mx-auto w-full max-w-[760px] px-4 py-8 sm:px-6 sm:py-12"
+        class="mx-auto w-full max-w-[720px] px-4 py-8 sm:px-6 sm:py-14"
         data-hosted-form-root
         style="--form-primary: {{ $form['branding']['primary_color'] }}; --form-accent: {{ $form['branding']['accent_color'] }};"
     >
@@ -40,14 +40,14 @@
             </div>
         @endif
 
-        <section class="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
-            <header class="border-b border-slate-200 px-5 py-6 text-center sm:px-8">
-                <h1 class="text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl">
-                    {{ $form['name'] }}
+        <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-950/5">
+            <header class="border-b border-slate-100 px-5 py-8 text-center sm:px-10 sm:py-10">
+                <h1 class="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                    {{ $form['heading'] }}
                 </h1>
 
                 @if(filled($form['description']))
-                    <p class="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+                    <p class="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600 sm:text-base">
                         {{ $form['description'] }}
                     </p>
                 @endif
@@ -69,7 +69,7 @@
                 <form
                     method="POST"
                     action="{{ route('forms.public.store', ['formSlug' => $form['slug']]) }}"
-                    class="space-y-6 px-5 py-6 sm:px-8 sm:py-8"
+                    class="space-y-6 px-5 py-7 sm:px-10 sm:py-10"
                     data-hosted-form
                     novalidate
                 >
@@ -158,7 +158,7 @@
 
                                         <div class="space-y-2.5">
                                             @foreach($block['field']['options'] as $option)
-                                                <label class="flex cursor-pointer items-start gap-2.5 text-sm leading-5 text-slate-700">
+                                                <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-3 text-sm leading-5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
                                                     @if($block['field']['type'] === 'radio')
                                                         <input
                                                             type="radio"
@@ -192,7 +192,7 @@
                                     <select
                                         id="field-{{ $block['field']['key'] }}"
                                         name="{{ $block['field']['key'] }}"
-                                        class="hosted-form-focus block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
+                                        class="hosted-form-focus block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-sm text-slate-900 shadow-sm"
                                     >
                                         <option value="">{{ $block['field']['placeholder'] ?? 'Please select' }}</option>
                                         @foreach($block['field']['options'] as $option)
@@ -205,7 +205,7 @@
                                         @endforeach
                                     </select>
                                 @elseif(in_array($block['field']['type'], ['checkbox', 'boolean'], true))
-                                    <label class="flex cursor-pointer items-start gap-2.5 text-sm leading-5 text-slate-700">
+                                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-3 text-sm leading-5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
                                         <input
                                             type="checkbox"
                                             name="{{ $block['field']['key'] }}"
@@ -232,7 +232,7 @@
                                         name="{{ $block['field']['key'] }}"
                                         rows="4"
                                         placeholder="{{ $block['field']['placeholder'] ?? '' }}"
-                                        class="hosted-form-focus block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
+                                        class="hosted-form-focus block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-sm text-slate-900 shadow-sm"
                                     >{{ old($block['field']['key']) }}</textarea>
                                 @else
                                     <label class="block text-sm font-semibold leading-6 text-slate-800" for="field-{{ $block['field']['key'] }}">
@@ -247,7 +247,7 @@
                                         name="{{ $block['field']['key'] }}"
                                         value="{{ old($block['field']['key']) }}"
                                         placeholder="{{ $block['field']['placeholder'] ?? '' }}"
-                                        class="hosted-form-focus block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
+                                        class="hosted-form-focus block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-sm text-slate-900 shadow-sm"
                                         autocomplete="{{ $block['field']['type'] === 'email' ? 'email' : ($block['field']['type'] === 'tel' ? 'tel' : 'on') }}"
                                     >
                                 @endif
@@ -262,7 +262,7 @@
                     <div class="pt-2 text-center">
                         <button
                             type="submit"
-                            class="rounded-md px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                            class="w-full rounded-xl px-5 py-3.5 text-sm font-bold text-white shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-offset-2"
                             style="background-color: var(--form-primary); --tw-ring-color: var(--form-accent);"
                         >
                             {{ $form['submit_label'] }}

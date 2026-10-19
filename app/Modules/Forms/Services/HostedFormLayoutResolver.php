@@ -40,6 +40,8 @@ final class HostedFormLayoutResolver
      * @return array{
      *     enabled: bool,
      *     slug: string,
+     *     heading: string,
+     *     description: string|null,
      *     blocks: array<int, array<string, mixed>>,
      *     conditions: array<int, array<string, mixed>>,
      *     submit_label: string,
@@ -66,6 +68,18 @@ final class HostedFormLayoutResolver
         return [
             'enabled' => $enabled,
             'slug' => Str::of($form->key)->replace('_', '-')->toString(),
+            'heading' => $this->stringSetting(
+                $form,
+                $hostedSettings['heading'] ?? $form->name,
+                'settings.public.hosted.heading',
+                255,
+            ),
+            'description' => $this->nullableStringSetting(
+                $form,
+                $hostedSettings['description'] ?? $form->description,
+                'settings.public.hosted.description',
+                2000,
+            ),
             'blocks' => $blocks,
             'conditions' => $conditions,
             'submit_label' => $this->stringSetting(
@@ -546,6 +560,36 @@ final class HostedFormLayoutResolver
         }
 
         return trim($value);
+    }
+
+    private function nullableStringSetting(
+        PublishedForm $form,
+        mixed $value,
+        string $path,
+        int $maximumLength,
+    ): ?string {
+        if ($value === null) {
+            return null;
+        }
+
+        if (! is_string($value)) {
+            throw $this->invalid($form, "{$path} must be a string or null.");
+        }
+
+        $value = trim($value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (mb_strlen($value) > $maximumLength) {
+            throw $this->invalid(
+                $form,
+                "{$path} cannot exceed {$maximumLength} characters.",
+            );
+        }
+
+        return $value;
     }
 
     private function stringSetting(

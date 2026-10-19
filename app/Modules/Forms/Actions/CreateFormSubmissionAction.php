@@ -55,7 +55,11 @@ final class CreateFormSubmissionAction
         $consentIntents = $this->consentIntents->resolve($form);
         $this->consentBridge->validateConfiguration($form, $consentIntents);
         $this->verifications->validateConfiguration($form);
-        $this->verifications->validate($form, $input->verification);
+        $this->verifications->validate(
+            $form,
+            $input->verification,
+            enforceRequired: $input->enforceRequiredVerification,
+        );
         $normalized = $this->validator->validate($form, $input->values);
 
         try {

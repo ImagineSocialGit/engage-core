@@ -45,7 +45,7 @@ final class HostedFormController
         );
 
         return view('forms.show', [
-            'title' => $form->name,
+            'title' => $presentation['heading'],
             'form' => $presentation,
             'submitted' => $request->session()->get('forms.hosted.success') === $form->key,
         ]);
@@ -84,6 +84,7 @@ final class HostedFormController
                 verification: $this->verificationFromRequest($request),
                 publicOnly: true,
                 context: $context,
+                enforceRequiredVerification: $this->enforceRequiredVerification(),
             ));
         } catch (FormSubmissionValidationException $exception) {
             return back()
@@ -178,6 +179,15 @@ final class HostedFormController
         }
 
         return $form;
+    }
+
+    private function enforceRequiredVerification(): bool
+    {
+        if ((bool) config('human_verification.enabled', false)) {
+            return true;
+        }
+
+        return ! app()->environment(['local', 'testing']);
     }
 
     private function verificationFromRequest(

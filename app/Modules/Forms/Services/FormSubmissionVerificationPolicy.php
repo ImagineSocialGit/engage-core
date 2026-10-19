@@ -31,11 +31,12 @@ final class FormSubmissionVerificationPolicy
     public function validate(
         PublishedForm $form,
         ?FormSubmissionVerification $verification,
+        bool $enforceRequired = true,
     ): void {
         $policy = $this->policy($form);
 
         if ($verification === null) {
-            if ($policy['required']) {
+            if ($policy['required'] && $enforceRequired) {
                 throw $this->submissionException(
                     'This form requires server-authored human-verification evidence.',
                 );
