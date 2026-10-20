@@ -32,8 +32,9 @@ Audit/fix identity options:
   --scheduler-user USER            Default: deploy user
   --server-ip IPV4                 Optional authoritative direct-DNS target for Core hosts.
 
-Audit is strictly non-mutating. It verifies that both Git checkouts match their
-configured remote branch before interpreting runtime state. It does not create a
+Audit is strictly non-mutating. Secret-file access is checked regardless of Git
+provenance. Clean/current Git is required for authoritative application-runtime
+interpretation. Audit does not create a
 state file, write environment files, change permissions, migrate/install schema,
 alter Nginx/Supervisor/cron, issue certificates, reload services, or modify
 provider/DNS configuration.
@@ -158,7 +159,8 @@ env_get() {
 }
 
 env_set() {
-    python3 "$HELPER" env-set --file "$1" --key "$2" --value "$3"
+    # Never expose provider credentials or passwords in a child process argv.
+    printf '%s' "$3" | python3 "$HELPER" env-set --file "$1" --key "$2" --stdin-value
 }
 
 env_remove() {
@@ -241,19 +243,45 @@ identity_preflight() {
     [[ "$(id -un)" == "$DEPLOY_USER" ]] || fail "Run the launcher as deploy user [$DEPLOY_USER], not [$(id -un)]."
 }
 
+# Creates only absent files; existing secrets are never chowned or chmodded
+# implicitly during an update, resume, or verification pass.
+provision_missing_env_files() {
+    local path
+    for path in "$ROOT_ENV" "$CLIENT_ENV"; do
+        [[ ! -L "$path" ]] || fail "Refusing a symlinked environment file: $path"
+        if [[ ! -e "$path" ]]; then
+            sudo install -o "$DEPLOY_USER" -g "$WEB_GROUP" -m 0640 /dev/null "$path" \
+                || fail "Could not provision restricted environment file: $path"
+        fi
+    done
+    ensure_env_permissions
+}
+
+# A read-only gate. This function must never repair an environment file.
+# The deploy and actual PHP identities must both read the file, while other
+# users must not gain read/write access through mode bits or an extended ACL.
 ensure_env_permissions() {
-    [[ -f "$ROOT_ENV" && -f "$CLIENT_ENV" ]] || fail "Runtime environment files are missing."
-
-    local deploy_group
-    deploy_group="$(id -gn "$DEPLOY_USER")"
-
-    sudo chown "$DEPLOY_USER:$deploy_group" "$ROOT_ENV" "$CLIENT_ENV"
-    sudo chmod 664 "$ROOT_ENV" "$CLIENT_ENV"
-
-    sudo -u "$DEPLOY_USER" test -r "$ROOT_ENV" || fail "$DEPLOY_USER cannot read $ROOT_ENV"
-    sudo -u "$WEB_USER" test -r "$ROOT_ENV" || fail "$WEB_USER cannot read $ROOT_ENV"
-    sudo -u "$DEPLOY_USER" test -r "$CLIENT_ENV" || fail "$DEPLOY_USER cannot read $CLIENT_ENV"
-    sudo -u "$WEB_USER" test -r "$CLIENT_ENV" || fail "$WEB_USER cannot read $CLIENT_ENV"
+    local path mode permission_bits
+    for path in "$ROOT_ENV" "$CLIENT_ENV"; do
+        [[ -f "$path" && ! -L "$path" ]] || fail "Missing or symlinked environment file: $path"
+        mode="$(stat -c '%a' "$path")" || fail "Cannot inspect environment permissions: $path"
+        permission_bits=$((8#$mode))
+        (( (permission_bits & 0007) == 0 && (permission_bits & 0020) == 0 )) \
+            || fail "Unsafe environment-file permissions [$mode] on [$path]. Explicitly repair ownership/mode after verifying the actual runtime readers; do not use 0664."
+        sudo -u "$DEPLOY_USER" test -r "$path" \
+            || fail "Deploy user [$DEPLOY_USER] cannot read $path"
+        sudo -u "$WEB_USER" test -r "$path" \
+            || fail "PHP runtime user [$WEB_USER] cannot read $path"
+        if id nobody >/dev/null 2>&1 && [[ "$DEPLOY_USER" != nobody && "$WEB_USER" != nobody ]]; then
+            if sudo -n -u nobody true >/dev/null 2>&1; then
+                if sudo -n -u nobody test -r "$path"; then
+                    fail "Unrelated user [nobody] can read $path; check extended ACLs and parent directories."
+                fi
+            else
+                fail "Cannot verify denial to unrelated user [nobody] for $path (sudo check unavailable)."
+            fi
+        fi
+    done
 }
 
 validate_client_env_contract() {
@@ -421,13 +449,14 @@ ensure_application_key() {
 
 ensure_environment() {
     if phase_done environment; then
+        ensure_env_permissions
         ensure_application_key
         return
     fi
 
     note "Minimal runtime environment"
     mkdir -p "$APP_PATH" "$CLIENT_PATH"
-    touch "$ROOT_ENV" "$CLIENT_ENV"
+    provision_missing_env_files
 
     env_set "$ROOT_ENV" APP_ENV "$DEPLOY_ENV"
     env_set "$ROOT_ENV" APP_DEBUG false
@@ -1349,55 +1378,62 @@ audit_env_file_metadata() {
     local path="$1"
     local key_prefix="$2"
 
-    if [[ ! -f "$path" ]]; then
-        audit_runtime_violation "$key_prefix.file" "Environment file is missing: $path"
+    if [[ ! -f "$path" || -L "$path" ]]; then
+        audit_result BREAKING "$key_prefix.file" "Environment file missing or symlinked: $path"
         return
     fi
 
-    local owner group mode deploy_group
+    local owner group mode permission_bits
     owner="$(stat -c '%U' "$path")"
     group="$(stat -c '%G' "$path")"
     mode="$(stat -c '%a' "$path")"
-    deploy_group="$(id -gn "$DEPLOY_USER" 2>/dev/null || true)"
+    permission_bits=$((8#$mode))
 
-    if [[ "$DEPLOY_ENV" == "staging" ]]; then
-        if [[ -z "$deploy_group" ]]; then
-            audit_result WARNING "$key_prefix.metadata" \
-                "Cannot resolve the primary group for deploy user [$DEPLOY_USER]; found $owner:$group $mode."
-        elif [[ "$owner" == "$DEPLOY_USER" && "$group" == "$deploy_group" && "$mode" == "664" ]]; then
-            audit_result PASS "$key_prefix.metadata" "Staging convention is $owner:$group $mode."
-        else
-            audit_result INFO "$key_prefix.metadata" \
-                "Legacy metadata drift only: new staging deployments use $DEPLOY_USER:$deploy_group 664; found $owner:$group $mode. Effective readability is authoritative."
-        fi
+    # Proven secret exposure is always reported, including for dirty Git or an
+    # inactive checkout. Never classify world-readable files as harmless drift.
+    if (( (permission_bits & 0007) != 0 || (permission_bits & 0020) != 0 )); then
+        audit_result BREAKING "$key_prefix.permissions" \
+            "Unsafe secret-file mode [$mode] ($owner:$group) at $path. Other access and group write must be disabled."
     else
-        if [[ "$owner" == "$DEPLOY_USER" ]]; then
-            audit_result PASS "$key_prefix.owner" "Production environment file owner is $owner."
-        else
-            audit_result INFO "$key_prefix.owner" "Production environment-file owner differs from new-deployment convention [$DEPLOY_USER]; found [$owner]. Effective access and deliberate production policy are authoritative."
-        fi
-        audit_result "MANUAL VERIFICATION REQUIRED" "$key_prefix.mode" \
-            "Production secret-file mode/group policy is intentionally not auto-normalized by the staging-proven 0664 convention; found $owner:$group $mode."
+        audit_result PASS "$key_prefix.permissions" \
+            "Secret-file mode [$mode] ($owner:$group) denies other access and group write."
     fi
 
     if id "$DEPLOY_USER" >/dev/null 2>&1; then
-        if sudo -u "$DEPLOY_USER" test -r "$path"; then
-            audit_result PASS "$key_prefix.deploy_read" "$DEPLOY_USER can read the environment file."
+        if sudo -n -u "$DEPLOY_USER" test -r "$path" 2>/dev/null; then
+            audit_result PASS "$key_prefix.deploy_read" "Deploy identity can read the environment file."
         else
-            audit_runtime_violation "$key_prefix.deploy_read" "$DEPLOY_USER cannot read the environment file."
+            audit_runtime_violation "$key_prefix.deploy_read" \
+                "Deploy identity cannot read the environment file (or the read probe was unavailable)."
         fi
     else
-        audit_result WARNING "$key_prefix.deploy_read" "Deploy user [$DEPLOY_USER] does not exist; verify the audit identity before remediation."
+        audit_result WARNING "$key_prefix.deploy_read" "Deploy identity is unavailable; cannot verify file access."
     fi
 
     if id "$WEB_USER" >/dev/null 2>&1; then
-        if sudo -u "$WEB_USER" test -r "$path"; then
-            audit_result PASS "$key_prefix.web_read" "$WEB_USER can read the environment file."
+        if sudo -n -u "$WEB_USER" test -r "$path" 2>/dev/null; then
+            audit_result PASS "$key_prefix.web_read" "PHP runtime identity can read the environment file."
         else
-            audit_runtime_violation "$key_prefix.web_read" "$WEB_USER cannot read the environment file."
+            audit_runtime_violation "$key_prefix.web_read" \
+                "PHP runtime identity cannot read the environment file (or the read probe was unavailable)."
         fi
     else
-        audit_result WARNING "$key_prefix.web_read" "Web user [$WEB_USER] does not exist; verify the audit identity before remediation."
+        audit_result WARNING "$key_prefix.web_read" "PHP runtime identity is unavailable; cannot verify file access."
+    fi
+
+    if id nobody >/dev/null 2>&1 && [[ "$DEPLOY_USER" != nobody && "$WEB_USER" != nobody ]]; then
+        if sudo -n -u nobody true >/dev/null 2>&1; then
+            if sudo -n -u nobody test -r "$path" 2>/dev/null; then
+                audit_result BREAKING "$key_prefix.unrelated_read" \
+                    "Unrelated identity [nobody] can read the environment file; inspect extended ACLs."
+            else
+                audit_result PASS "$key_prefix.unrelated_read" \
+                    "Unrelated identity [nobody] cannot read the environment file."
+            fi
+        else
+            audit_result WARNING "$key_prefix.unrelated_read" \
+                "Cannot execute the unrelated-identity denial probe; inspect sudo policy/ACLs manually."
+        fi
     fi
 }
 
@@ -2366,9 +2402,6 @@ audit_env_origin() {
 
 audit_environment_identity() {
     note "Environment / client identity"
-    audit_env_file_metadata "$ROOT_ENV" env.root
-    audit_env_file_metadata "$CLIENT_ENV" env.client
-
     [[ -f "$ROOT_ENV" && -f "$CLIENT_ENV" ]] || return 0
 
     audit_env_equals "$ROOT_ENV" APP_ENV "$DEPLOY_ENV" env.app_env
@@ -2437,6 +2470,10 @@ run_audit() {
     WEB_USER="$AUDIT_WEB_USER"
     WEB_GROUP="$AUDIT_WEB_GROUP"
     SCHEDULER_USER="$AUDIT_SCHEDULER_USER"
+
+    note "Environment secret access (independent of source provenance)"
+    audit_env_file_metadata "$ROOT_ENV" env.root
+    audit_env_file_metadata "$CLIENT_ENV" env.client
 
     PHP_BIN="$(command -v php || true)"
     if [[ -z "$PHP_BIN" ]]; then
@@ -2622,10 +2659,14 @@ verify_runtime() {
     cd "$APP_PATH"
     ensure_env_permissions
     validate_client_env_contract
-    write_plan_json || true
 
-    local blocking
-    blocking="$(python3 "$HELPER" plan-blocking-count --plan "$PLAN_FILE")"
+    # Resolve directly through a pipe. No deployment-plan JSON or state-file
+    # write is allowed in verify, even when required values are missing.
+    local plan_json blocking
+    plan_json="$("$PHP_BIN" artisan engage:deployment-plan --json)" || true
+    [[ -n "$plan_json" ]] || fail "Read-only deployment-plan inspection returned no JSON."
+    blocking="$(printf '%s' "$plan_json" | python3 "$HELPER" plan-blocking-count --plan -)" \
+        || fail "Read-only deployment-plan JSON is invalid."
     [[ "$blocking" == "0" ]] || fail "Deployment plan has $blocking blocking environment requirement(s)."
 
     "$PHP_BIN" artisan modules:status
@@ -2652,7 +2693,7 @@ verify_runtime() {
     echo "External/provider verification remains intentionally human-observed where the provider dashboard or a real message/event is authoritative."
     echo "Review the verification items shown during each deployment setup step."
     echo "State file: $STATE_FILE"
-    echo "Deployment plan: $PLAN_FILE"
+    echo "Deployment plan: inspected in memory (no file written)"
 }
 
 audit_has_breaking() {
@@ -3801,6 +3842,7 @@ EOF
 run_update() {
     ensure_source true
     load_state
+    ensure_env_permissions
     prepare_host_plan
     install_nginx_site
     ensure_dns_and_tls
@@ -3819,6 +3861,7 @@ run_update() {
 run_add_modules() {
     ensure_source true
     load_state
+    ensure_env_permissions
     prepare_host_plan
     install_nginx_site
     ensure_dns_and_tls
@@ -3974,7 +4017,6 @@ main() {
             [[ $# -eq 1 ]] || fail "verify requires exactly one state file."
             STATE_FILE="$1"
             load_state
-            write_plan_json || true
             verify_runtime
             ;;
         audit)

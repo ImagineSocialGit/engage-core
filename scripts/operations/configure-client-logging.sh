@@ -10,6 +10,8 @@ APP_PATH=""
 LEVEL="info"
 DAYS="14"
 APPLY=false
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+HELPER="$SCRIPT_DIR/lib/launch_client_environment.py"
 
 while (($#)); do
     case "$1" in
@@ -23,59 +25,28 @@ while (($#)); do
     esac
 done
 
-[[ -f "$ENV_FILE" ]] || { echo "Environment file not found: $ENV_FILE" >&2; exit 1; }
+[[ -f "$ENV_FILE" && ! -L "$ENV_FILE" ]] || { echo "Environment file missing or symlinked: $ENV_FILE" >&2; exit 1; }
 [[ -f "$APP_PATH/artisan" ]] || { echo "Laravel app not found: $APP_PATH" >&2; exit 1; }
 [[ "$DAYS" =~ ^[0-9]+$ ]] || { echo "--days must be numeric" >&2; exit 1; }
-
-TMP=$(mktemp)
-trap 'rm -f "$TMP"' EXIT
-
-python3 - "$ENV_FILE" "$TMP" "$LEVEL" "$DAYS" <<'PY'
-from pathlib import Path
-import sys
-
-source, output, level, days = sys.argv[1:]
-text = Path(source).read_text()
-values = {
-    'LOG_CHANNEL': 'stack',
-    'LOG_STACK': 'daily_json',
-    'LOG_LEVEL': level,
-    'LOG_DAILY_DAYS': days,
-}
-lines = text.splitlines()
-seen = set()
-out = []
-for line in lines:
-    stripped = line.strip()
-    replaced = False
-    for key, value in values.items():
-        if stripped.startswith(key + '='):
-            out.append(f'{key}={value}')
-            seen.add(key)
-            replaced = True
-            break
-    if not replaced:
-        out.append(line)
-for key, value in values.items():
-    if key not in seen:
-        out.append(f'{key}={value}')
-Path(output).write_text('\n'.join(out) + '\n')
-PY
+[[ "$LEVEL" =~ ^[a-z]+$ ]] || { echo "--level must be a lowercase logging level" >&2; exit 1; }
+[[ -f "$HELPER" ]] || { echo "Secure environment writer not found: $HELPER" >&2; exit 1; }
 
 if [[ "$APPLY" != true ]]; then
-    echo "DRY RUN — no files changed"
-    diff -u "$ENV_FILE" "$TMP" || true
+    # Never print a diff of a secret-bearing .env, including unchanged values.
+    echo "DRY RUN — would set LOG_CHANNEL, LOG_STACK, LOG_LEVEL, and LOG_DAILY_DAYS. No environment contents displayed."
     exit 0
 fi
 
-STAMP=$(date -u +%Y%m%dT%H%M%SZ)
-BACKUP="$ENV_FILE.$STAMP.bak"
-cp -a "$ENV_FILE" "$BACKUP"
-install -m "$(stat -c '%a' "$ENV_FILE")" "$TMP" "$ENV_FILE"
+# Do not leave a copied secret-bearing .env backup on disk. The central writer
+# preserves owner/group/mode/ACL before each atomic replacement, or fails closed.
+python3 "$HELPER" env-set --file "$ENV_FILE" --key LOG_CHANNEL --value stack
+python3 "$HELPER" env-set --file "$ENV_FILE" --key LOG_STACK --value daily_json
+python3 "$HELPER" env-set --file "$ENV_FILE" --key LOG_LEVEL --value "$LEVEL"
+python3 "$HELPER" env-set --file "$ENV_FILE" --key LOG_DAILY_DAYS --value "$DAYS"
 
 (
     cd "$APP_PATH"
     php artisan optimize:clear
 )
 
-echo "Client logging environment updated. Backup: $BACKUP"
+echo "Client logging environment updated without creating a secret-file backup."

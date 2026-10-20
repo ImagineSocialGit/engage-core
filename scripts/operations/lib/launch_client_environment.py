@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import getpass
 import hashlib
 import json
 import os
 import re
+import subprocess
 import stat
 import sys
 import tempfile
@@ -170,18 +172,91 @@ def env_values(path: Path) -> dict[str, str]:
     return values
 
 
+def _read_secure_env(path: Path) -> tuple[str, os.stat_result | None, bytes | None]:
+    # Never follow a symlink: caller-controlled filesystem paths cannot redirect
+    # secret writes outside the intended selected checkout.
+    if path.is_symlink():
+        fail(f'Refusing symlinked environment file [{path}].')
+
+    try:
+        info = path.stat()
+    except FileNotFoundError:
+        return '# Runtime environment\n', None, None
+
+    if not stat.S_ISREG(info.st_mode):
+        fail(f'Environment path is not a regular file [{path}].')
+
+    mode = stat.S_IMODE(info.st_mode)
+    if mode & 0o027:
+        fail(f'Unsafe existing environment-file permissions [{mode:04o}] on [{path}]; repair deliberately before updating secrets.')
+
+    acl = None
+    try:
+        acl = os.getxattr(path, 'system.posix_acl_access')
+    except OSError as exc:
+        if exc.errno not in (errno.ENODATA, getattr(errno, 'ENOATTR', errno.ENODATA), errno.ENOTSUP, errno.EOPNOTSUPP):
+            fail(f'Cannot inspect environment-file ACL for [{path}]: {exc}')
+
+    return path.read_text(), info, acl
+
+
+def _write_secure_env(path: Path, content: str, info: os.stat_result | None, acl: bytes | None) -> None:
+    # The temporary inode begins 0600. It is not broadened until its payload,
+    # ownership, group, and access ACL are prepared for atomic replacement.
+    # A failed metadata update leaves the original file untouched.
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(prefix='.engage-env-', dir=str(path.parent))
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+
+        if info is not None:
+            desired_uid, desired_gid = info.st_uid, info.st_gid
+            try:
+                os.chown(temp_name, desired_uid, desired_gid)
+            except PermissionError:
+                # Typical deployment layout: deploy owns .env, but its PHP-FPM
+                # reader group is not one of the deploy user's groups. Privileged
+                # metadata restoration is required BEFORE atomic replacement.
+                # Never replace with the temp file's default/wrong group.
+                try:
+                    subprocess.run(
+                        ['sudo', '-n', 'chown', f'{desired_uid}:{desired_gid}', temp_name],
+                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    )
+                except (OSError, subprocess.CalledProcessError):
+                    fail(f'Cannot preserve environment-file owner/group for [{path}]. Grant appropriate deploy permissions or prime approved sudo access; original file is untouched.')
+        if acl is not None:
+            try:
+                os.setxattr(temp_name, 'system.posix_acl_access', acl)
+            except OSError as exc:
+                fail(f'Cannot preserve environment-file access ACL for [{path}]: {exc}')
+
+        os.chmod(temp_name, stat.S_IMODE(info.st_mode) if info is not None else 0o600)
+        os.replace(temp_name, path)
+        # Persist the directory update when supported. This is a durability
+        # guarantee, not an attempt to modify the directory's access policy.
+        try:
+            directory_fd = os.open(path.parent, os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0))
+        except OSError:
+            directory_fd = None
+        if directory_fd is not None:
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+    finally:
+        if os.path.exists(temp_name):
+            os.unlink(temp_name)
+
+
 def env_write(path: Path, key: str, value: str) -> None:
     if not re.fullmatch(r'[A-Z][A-Z0-9_]*', key):
         fail(f'Invalid environment key [{key}].')
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        original = path.read_text()
-        mode = stat.S_IMODE(path.stat().st_mode)
-    else:
-        original = '# Runtime environment\n'
-        mode = 0o640
-
+    original, info, acl = _read_secure_env(path)
     replacement = f'{key}={dotenv_serialize(value)}'
     lines = original.splitlines()
     matched = False
@@ -201,24 +276,20 @@ def env_write(path: Path, key: str, value: str) -> None:
             output.append('')
         output.append(replacement)
 
-    content = '\n'.join(output).rstrip() + '\n'
-    fd, temp_name = tempfile.mkstemp(prefix='.engage-env-', dir=str(path.parent))
-    try:
-        os.close(fd)
-        temp = Path(temp_name)
-        temp.write_text(content)
-        os.chmod(temp, mode or 0o640)
-        os.replace(temp, path)
-    finally:
-        if os.path.exists(temp_name):
-            os.unlink(temp_name)
+    _write_secure_env(path, '\n'.join(output).rstrip() + '\n', info, acl)
 
 
 def env_remove(path: Path, key: str) -> None:
-    if not path.exists():
+    if not re.fullmatch(r'[A-Z][A-Z0-9_]*', key):
+        fail(f'Invalid environment key [{key}].')
+    if not path.exists() and not path.is_symlink():
         return
-    lines = [line for line in path.read_text().splitlines() if not line.startswith(f'{key}=')]
-    path.write_text('\n'.join(lines).rstrip() + '\n')
+
+    original, info, acl = _read_secure_env(path)
+    lines = [line for line in original.splitlines() if not line.startswith(f'{key}=')]
+    content = '\n'.join(lines).rstrip() + '\n'
+    if content != original:
+        _write_secure_env(path, content, info, acl)
 
 
 def load_state(path: Path) -> dict[str, Any]:
@@ -827,7 +898,14 @@ def command_derive(args: argparse.Namespace) -> None:
 
 
 def command_env_set(args: argparse.Namespace) -> None:
-    env_write(Path(args.file), args.key, args.value)
+    # Read secret-bearing values over stdin so they do not enter process argv.
+    if args.stdin_value:
+        value = sys.stdin.read()
+    elif args.value is not None:
+        value = args.value
+    else:
+        fail('env-set requires --value or --stdin-value.')
+    env_write(Path(args.file), args.key, value)
 
 
 def command_env_get(args: argparse.Namespace) -> None:
@@ -945,7 +1023,8 @@ def command_plan_modules(args: argparse.Namespace) -> None:
 
 
 def command_plan_blocking_count(args: argparse.Namespace) -> None:
-    plan = json.loads(Path(args.plan).read_text())
+    source = sys.stdin.read() if args.plan == '-' else Path(args.plan).read_text()
+    plan = json.loads(source)
     print(sum(1 for item in plan_requirements(plan) if blocks(item)))
 
 
@@ -1105,7 +1184,9 @@ def build_parser() -> argparse.ArgumentParser:
     env_set = sub.add_parser('env-set')
     env_set.add_argument('--file', required=True)
     env_set.add_argument('--key', required=True)
-    env_set.add_argument('--value', required=True)
+    value_source = env_set.add_mutually_exclusive_group(required=True)
+    value_source.add_argument('--value')
+    value_source.add_argument('--stdin-value', action='store_true')
     env_set.set_defaults(func=command_env_set)
 
     env_get = sub.add_parser('env-get')
