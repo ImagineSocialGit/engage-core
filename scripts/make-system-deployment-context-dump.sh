@@ -88,7 +88,7 @@ for relative in \
     docs/modular-migrations.md \
     docs/client-staging-production-setup-checklist.md \
     docs/deployment-safety-and-troubleshooting.md \
-    docs/operations/project-state-transfer-runbook.md
+    docs/architecture/cross-platform-deployment-topology.md
  do
     add_file "$relative"
  done

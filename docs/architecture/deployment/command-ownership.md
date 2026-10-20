@@ -47,7 +47,14 @@ adds missing required variable names only
 does not invent values
 does not overwrite existing values
 does not delete values
+preserves the approved root/client secret-file access policy
 ```
+
+Variable necessity, ownership and filesystem access are specified only in `client-environment-reference.md`.
+
+### `engage:refresh`
+
+Development/disposable-environment rebuild only. It must run the **read-only** deployment preflight before the destructive `db:wipe` step and refuse a wipe if the selected client's enabled runtime requirements are not satisfied. It is not a production deployment procedure.
 
 ### `engage:install`
 
@@ -243,25 +250,3 @@ current schema with no ledger row
 Never mark ledger rows manually merely to clear an error.
 
 Never run optional module migration directories with broad ad-hoc `migrate --path` commands.
-
-## Launcher integration contract
-
-The host-side launcher orchestrates these commands. It does not replace their ownership.
-
-The launcher must:
-
-```text
-derive runtime identity and requirements
-use deployment-plan output rather than duplicate application logic
-call the existing schema/preset/validation commands
-pause for external/operator-owned work
-audit after mutation
-```
-
-See:
-
-```text
-docs/architecture/deployment/deployment-orchestrator-contract.md
-docs/architecture/deployment/deployment-plan-and-environment.md
-docs/operations/deployment-runbook.md
-```

@@ -138,21 +138,57 @@ A shared Cloudflare widget may authorize both staging and production hostnames, 
 
 ---
 
-# 4. DigitalOcean Spaces
+# 4. First-party external Forms intake (Artist Sites → Core)
+
+The external calling service must match the signed Core intake contract and the published FormVersion. The configuration keys, allowed domains, and endpoint ownership are defined in `client-environment-reference.md`.
+
+For the reusable Artist Sites intake, environment allowlisting is only one part of readiness. The selected Core client must also:
+
+```text
+- enable Forms in client config/modules.php;
+- explicitly select the Forms preset group `artist_updates` in the selected package;
+- when Messaging-backed marketing consent is used, confirm the intended channel +
+  purpose permissions are represented by the form's accepted consent fields; optional
+  consent-domain mappings may be configured only when custom acknowledgement/topic
+  grouping is desired;
+- sync the selected preset so a public current `artist_updates` FormVersion exists.
+```
+
+The reusable Core preset begins with `settings.submission.verification.required=false` while still validating any supplied Turnstile evidence against provider `turnstile`, action `artist_updates`, hostname presence, and a 300-second age limit. This is a rollout state, not the desired permanent public posture.
+
+After the matching Artist Sites sender is proven end to end, use a selected-client config override at:
+
+```text
+client/{client-key}/config/presets/modules/forms/forms.php
+```
+
+to set only:
+
+```php
+'definitions' => [
+    'artist_updates' => [
+        'settings' => [
+            'submission' => [
+                'verification' => [
+                    'required' => true,
+                ],
+            ],
+        ],
+    ],
+],
+```
+
+Then run `php artisan presets:sync` and `php artisan setup:validate`. The sync publishes a new immutable FormVersion; it does not mutate the previously published version.
+
+The Artist Sites read-only probe may be run before destination cutover. Do not treat a successful GET probe as permission to switch live POST traffic until the Sites sender also matches the published field contract. For the reusable artist-newsletter flow, `email_marketing_consent` is an optional boolean field: the matching disclosed Subscribe action must submit it as `true` when email marketing permission is being granted. Any enabled SMS-consent field remains independently explicit.
+
+---
+
+# 5. DigitalOcean Spaces
 
 Current Core storage path supports DigitalOcean Spaces through the Laravel S3 driver.
 
 Spaces is not a universal requirement merely because static client assets may already be hosted there. When the Media module is enabled in staging/production, its deployment contributor activates writable-storage coverage: `FILESYSTEM_DISK` remains root/process-owned and the remaining Spaces/CDN values are selected-client deployment values. Clients without an enabled runtime upload capability are not forced to satisfy this block by Media.
-
-```env
-FILESYSTEM_DISK=spaces
-DO_SPACES_KEY=
-DO_SPACES_SECRET=
-DO_SPACES_ENDPOINT=
-DO_SPACES_REGION=
-DO_SPACES_BUCKET=
-CDN_BASE_URL=
-```
 
 Checklist:
 
@@ -170,41 +206,13 @@ Do not reuse a production write credential in staging without a deliberate reaso
 
 ---
 
-# 5. Resend
+# 6. Resend
 
 Current canonical email path is Laravel's `resend` transport plus Messaging's Resend provider integration.
 
 Use this section as the operator-facing Resend account/DNS/webhook setup authority. The technical route/event ownership contract is `docs/modules/messaging/provider-webhook-routing.md`.
 
-Core deployment variables:
-
-```env
-MAIL_MAILER=resend
-EMAIL_PROVIDER=resend
-MAIL_FROM_ADDRESS=
-MAIL_FROM_NAME=
-FROM_EMAIL_TRANSACTIONAL=
-FROM_NAME_TRANSACTIONAL=
-FROM_EMAIL_MARKETING=
-FROM_NAME_MARKETING=
-RESEND_API_KEY=
-RESEND_WEBHOOK_SECRET=
-INBOUND_EMAIL_DOMAIN=
-RESEND_WEBHOOK_TIMESTAMP_DRIFT_SECONDS=300
-```
-
-`RESEND_WEBHOOK_TIMESTAMP_DRIFT_SECONDS` is root/process-owned. The remaining client-varying Resend/sender values are selected-client deployment values.
-
-Provider-specific sender overrides exist but are optional:
-
-```text
-RESEND_FROM_EMAIL_TRANSACTIONAL
-RESEND_FROM_NAME_TRANSACTIONAL
-RESEND_FROM_EMAIL_MARKETING
-RESEND_FROM_NAME_MARKETING
-```
-
-Do not set optional override variables to blank values merely for symmetry. A blank override can defeat the intended fallback sender identity.
+Environment keys, sender fallbacks, and root/client ownership are defined only in `client-environment-reference.md`. Provider-specific dashboard instructions follow.
 
 ## Recommended domain topology
 
@@ -435,32 +443,9 @@ Production must not point to the staging webhook endpoint, and staging must not 
 
 ---
 
-# 6. Telnyx
+# 7. Telnyx
 
 Current primary SMS provider is Telnyx.
-
-Core variables:
-
-```env
-SMS_ENABLED=true
-SMS_PROVIDER=telnyx
-TELNYX_API_KEY=
-TELNYX_FROM_TRANSACTIONAL=
-TELNYX_FROM_MARKETING=
-TELNYX_FROM_NOTIFICATIONS=
-TELNYX_WEBHOOK_PUBLIC_KEY=
-MESSAGING_SMS_MARKETING_PROFILE_ID=
-MESSAGING_SMS_TRANSACTIONAL_PROFILE_ID=
-```
-
-Optional generic fallback:
-
-```text
-TELNYX_FROM
-SMS_FROM
-SMS_FROM_TRANSACTIONAL
-SMS_FROM_MARKETING
-```
 
 Prefer purpose-specific sender numbers when the client has distinct transactional and marketing sender requirements.
 
@@ -512,48 +497,12 @@ A valid Telnyx API key is not sufficient proof that a client-facing SMS option s
 
 ---
 
-# 7. Twilio, only when intentionally used
-
-Current Core still contains Twilio configuration support, but Telnyx is the canonical primary SMS path.
-
-Optional variables:
-
-```env
-TWILIO_SID=
-TWILIO_AUTH_TOKEN=
-TWILIO_FROM=
-TWILIO_FROM_TRANSACTIONAL=
-TWILIO_FROM_MARKETING=
-TWILIO_VIRTUAL_PHONE=
-```
-
-Do not populate these for a Telnyx-only client merely because the variables exist.
-
----
-
 # 8. Zoom Server-to-Server OAuth
 
 Webinars uses Zoom Meeting and Webinar API operations through one Server-to-Server OAuth app.
 The same provider family supports both Zoom Webinars and Zoom Meetings; each Webinar
 series selects its event type, while every synchronized occurrence preserves the remote
 type that created it.
-
-Core variables:
-
-```env
-WEBINAR_PROVIDER=zoom
-ZOOM_ACCOUNT_ID=
-ZOOM_CLIENT_ID=
-ZOOM_CLIENT_SECRET=
-ZOOM_WEBHOOK_SECRET=
-ZOOM_BASE_URL=https://api.zoom.us/v2
-ZOOM_OAUTH_URL=https://zoom.us/oauth/token
-ZOOM_OAUTH_TOKEN_TTL_SECONDS=3500
-ZOOM_WEBHOOK_MAX_TIMESTAMP_DRIFT_SECONDS=300
-```
-
-`WEBINARS_ENABLED` is not a canonical environment variable. Enable the module through
-the selected client module configuration.
 
 ## App type and activation
 
@@ -735,34 +684,3 @@ Do not wait for the first live event to discover a missing scope, role permissio
 webhook subscription, or replacement-recovery problem.
 
 ---
-
-# 9. Final external-services handoff gate
-
-```text
-[ ] GitHub Core access works from server
-[ ] GitHub client-repo access works from server
-[ ] All DNS records resolve to intended environment
-[ ] SSL plan/certificates cover required hostnames, including the configured CRM_APP_URL host and webhooks host
-[ ] Turnstile widget/credentials/hostname policy verified when public forms require human verification
-[ ] Spaces credentials work
-[ ] Spaces/CDN isolation deliberate
-[ ] Resend sending domain/capability verified when email is enabled
-[ ] Resend Open Tracking matches the client's email-open evidence policy; Click Tracking remains off
-[ ] Resend API key works and has Full Access when inbound email is enabled
-[ ] Resend delivery/lifecycle webhook points to the correct environment
-[ ] Resend receiving domain/capability, INBOUND_EMAIL_DOMAIN, and email.received webhook are verified when inbound email is enabled
-[ ] All active Resend endpoint signing secrets are stored in RESEND_WEBHOOK_SECRET
-[ ] Transactional and marketing email sender addresses/display names resolve
-[ ] Real inbound reply retrieval/correlation succeeds when inbound email is enabled
-[ ] Telnyx API key works when SMS enabled
-[ ] Transactional/marketing/notification numbers resolve as needed
-[ ] Telnyx profile IDs correct when used
-[ ] Telnyx inbound webhook points to correct environment when used
-[ ] Zoom Server-to-Server app active when Webinars enabled
-[ ] Zoom Meeting and Webinar registration/lookup scopes sufficient
-[ ] Zoom recording scopes sufficient when replay used
-[ ] Zoom Meeting and Webinar attendance-report scopes sufficient
-[ ] Zoom webhook subscriptions correct
-[ ] No production provider points to staging by accident
-[ ] Secrets stored only in approved locations
-```

@@ -146,39 +146,7 @@ sudo supervisorctl start <SUPERVISOR_PROGRAM>
 
 Do not run `FLUSHDB` until you know whether sessions, cache, queues, locks, Horizon metadata, or other applications share that Redis DB.
 
-Production rule:
-
-```text
-Once real data matters, do not use destructive database resets as a routine deployment technique.
-```
-
-## Controlled Project State rebuild exception
-
-Project State supports a deliberately approved clean rebuild only when the current transfer contract covers every durable row that must survive.
-
-This is not permission to run `migrate:fresh` during a normal deploy. The controlled path requires:
-
-```text
-independent database backup
-maintenance/write freeze
-Horizon and Scheduler stopped
-current-format Project State export
-exact Redis namespace cleanup
-target platform-only migrate:fresh
-engage:install for configured module schema, presets, and setup validation
-validation-only upload
-transactional apply
-explicit dependency-ordered resume
-provider and queue reconciliation
-```
-
-Project State does not export Redis jobs. Old delayed jobs must be removed from the exact source/target Redis namespace before primary keys are reused. Supported runnable database work is imported inert and recreated only through explicit resume.
-
-Export is blocked when pending resume items remain, unsupported durable tables contain rows, database-backed jobs exist, operational receipts are nonterminal, schema changes are unclassified, or references cannot be restored safely.
-
-Use [`operations/project-state-transfer-runbook.md`](project-state-transfer-runbook.md) for the complete procedure.
-
----
+Production rule: when real data matters, do not reset the database as a routine deployment technique. The historical Project State clean-rebuild procedure is retired from active deployment operations.
 
 # 3. Queue-prefix confusion
 
@@ -251,51 +219,9 @@ Diagnostic rule:
 
 # 5. Horizon queue list does not cover actual dispatch queues
 
-## Current known risk
+**Failure mode:** Horizon appears healthy but messages, reminders or webhooks stall because an executable queue is absent from its effective worker configuration. The canonical current queue inventory, compatibility override, and staging balancing behavior are maintained only in `client-environment-reference.md`.
 
-Horizon must consume every queue that current runtime/config can actually dispatch to.
-
-Current executable/configured queues include:
-
-```text
-default
-notifications
-confirmation_messages
-opt_in_messages
-reminders
-post_event
-marketing
-emails
-sms
-webinars
-webhooks
-```
-
-Current runtime notes:
-
-```text
-emails is an active queue path.
-Webinar waitlist delivery uses notifications; there is no canonical separate waitlist queue requirement.
-Do not preserve an old campaigns queue requirement from stale Webinar nurture config.
-```
-
-## Deployment protection
-
-Set and verify an explicit queue list when the built-in Horizon defaults are not confirmed to cover the current runtime:
-
-```env
-HORIZON_SUPERVISOR_1_QUEUES=default,notifications,confirmation_messages,opt_in_messages,reminders,post_event,marketing,emails,sms,webinars,webhooks
-```
-
-Then verify effective Horizon environment config:
-
-```bash
-php artisan tinker --execute="dump(config('horizon.environments.'.app()->environment()));"
-```
-
-Do not leave queue behavior dependent on one hand-maintained historical `.env` forever. Reconcile queue registry/config, Horizon defaults, and deployed environment values whenever executable queue paths change.
-
----
+Compare `php artisan tinker --execute="dump(config('horizon.environments.'.app()->environment()));"` with the application-owned queue inventory, then inspect the live supervised worker process and queue waits. Do not add stale historical `campaigns`/`waitlist` queues to fix a mismatch without executable evidence.
 
 # 5A. CLI works but PHP-FPM cannot read `.env`
 
@@ -315,29 +241,9 @@ CRM host returns 404 even though the CLI route matcher succeeds
 
 A common cause is setting root/client `.env` files to `0600` owned by the deploy user while PHP-FPM runs as `www-data` or another separate identity.
 
-## Required protection
+## Diagnosis
 
-For the common deployment shape:
-
-```bash
-sudo chown <DEPLOY_USER>:<WEB_GROUP> .env client/<CLIENT_KEY>/.env
-sudo chmod 640 .env client/<CLIENT_KEY>/.env
-
-test -r .env
-sudo -u <WEB_USER> test -r .env
-sudo -u <WEB_USER> test -r client/<CLIENT_KEY>/.env
-```
-
-Do not print environment contents merely to prove readability. After correcting permissions:
-
-```bash
-php artisan optimize:clear
-sudo systemctl reload php8.3-fpm
-```
-
-Then repeat the HTTP smoke.
-
----
+Verify which identities actually read root and selected-client `.env`; do not infer PHP-FPM visibility from a successful CLI Artisan command. The **only** ownership/mode and authorized/unauthorized access specification is in `client-environment-reference.md`. A runtime-access repair must not alter permissions during audit/verification. After an approved environment repair, clear Laravel configuration cache and verify HTTP behavior.
 
 # 5B. Client `.env` contains root-owned or unsupported keys
 
@@ -791,105 +697,3 @@ deploy the fix
 ```
 
 The production correction should be narrower than the incident whenever possible.
-
-# 16. Diagnostic command set
-
-## Environment/client
-
-```bash
-php artisan tinker --execute="dump([
-    'env' => app()->environment(),
-    'app_url' => config('app.url'),
-    'root_domain' => config('app.root_domain'),
-    'crm_url' => config('app.crm_url'),
-    'webinar_url' => config('app.webinar_url'),
-    'client_key' => config('client.key'),
-    'client_preset' => config('client.preset'),
-    'client_timezone' => config('client.timezone'),
-    'enabled_modules' => config('modules.enabled'),
-]);"
-```
-
-## Redis/Horizon
-
-```bash
-php artisan tinker --execute="dump([
-    'queue_default' => config('queue.default'),
-    'redis_default' => config('database.redis.default'),
-    'redis_cache' => config('database.redis.cache'),
-    'queue_redis' => config('queue.connections.redis'),
-    'cache_prefix' => config('cache.prefix'),
-    'horizon_prefix' => config('horizon.prefix'),
-    'horizon_use' => config('horizon.use'),
-    'horizon_environment' => config('horizon.environments.'.app()->environment()),
-]);"
-```
-
-## Routes
-
-```bash
-php artisan route:list
-php artisan route:list | grep -i webhook
-php artisan route:list | grep -i zoom
-```
-
-## Running worker
-
-```bash
-ps aux | grep "[a]rtisan horizon"
-```
-
-## Deployment and validation
-
-For an existing database with real data, module schema changes use the checksum/history gate:
-
-```bash
-php artisan migrate --force
-php artisan modules:preflight
-php artisan modules:migrate --force
-php artisan presets:sync
-php artisan modules:status
-php artisan setup:validate
-```
-
-Migration ownership config declares directories only. Direct-child migration files inside an owned directory are authoritative, the compatibility schema version is derived from their count, and `module_installations.migration_checksums` records accepted file contents. Do not edit or delete an already-applied migration; add a new migration. Do not alter the module installation ledger to suppress checksum drift. `modules:reconcile` may adopt already-current untracked schema, but it is not a way to conceal migration-history drift.
-
-On the first checksum-ledger rollout, ship this infrastructure without unrelated module migrations. The platform migration adds the nullable checksum column; the first preflight may warn that schema-current installed scopes have no baseline; `modules:migrate --force` establishes those baselines without replaying current files. Run preflight again and require it to be clean before continuing.
-
-For operator-facing new-client, existing-client, audit/fix, module-addition, and controlled-rebuild entry points, use `docs/operations/deployment-runbook.md`. For command ownership semantics, use `docs/architecture/deployment/command-ownership.md`.
-
----
-
-# 17. Incident-prevention gate
-
-Before launch or a live Webinar event:
-
-```text
-[ ] Correct checkout served by Nginx
-[ ] Correct checkout consumed by Horizon
-[ ] Actual Horizon process path verified
-[ ] Explicit queue list covers executable queues
-[ ] Laravel Scheduler cron exists exactly once for this client and `schedule:list` is understood
-[ ] Root/client `.env` files are readable by deploy + PHP-FPM identities and not world-readable
-[ ] Selected-client `.env` passes the strict ClientEnvironmentLoader ownership contract
-[ ] Runtime writable directories pass cross-user create/update checks for the actual process identities
-[ ] Build host has adequate memory/disk/swap posture for the chosen deployment strategy
-[ ] Redis prefixes understood
-[ ] No stale jobs after disposable-data resets or a controlled Project State rebuild
-[ ] Root production logging resolves to the intended logging stack
-[ ] Production observability verifier passes when the Engage Core observability path is installed
-[ ] Project State export/import/resume record preserved when a controlled rebuild was performed
-[ ] No pending Project State resume items remain unless deliberately reconciled
-[ ] No placeholder domains
-[ ] Config cache cleared after env changes
-[ ] setup:validate passes
-[ ] Resend sender/API/webhook verified when enabled
-[ ] Telnyx number/profile/webhook verified when enabled
-[ ] Zoom registration scopes verified when enabled
-[ ] Zoom recording scopes verified when replay used
-[ ] Zoom attendance-report scope verified
-[ ] Zoom webhook subscriptions verified
-[ ] Duplicate registration conflicts checked
-[ ] Post-event recording/playback dependency understood
-[ ] Already scheduled messages reviewed before copy/CTA changes
-```

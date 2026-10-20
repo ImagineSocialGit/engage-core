@@ -371,7 +371,6 @@ DOC_PATHS=(
     "docs/project-organization.md"
     "docs/operations/crm-user-administration.md"
     "docs/project-state-extension-guide.md"
-    "docs/operations/project-state-transfer-runbook.md"
 )
 
 for relative_path in "${DOC_PATHS[@]}"; do

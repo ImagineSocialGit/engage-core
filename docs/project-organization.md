@@ -90,7 +90,6 @@ Project State does not make a module own another module's data. Each section dec
 
 Developer guidance: [`project-state-extension-guide.md`](project-state-extension-guide.md)
 
-Operator guidance: [`operations/project-state-transfer-runbook.md`](operations/project-state-transfer-runbook.md)
 
 ## Layers
 

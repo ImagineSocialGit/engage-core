@@ -12,41 +12,7 @@ php artisan engage:deployment-plan --json
 
 The launcher must not carry a second list of module requirements, provider requirements, or Horizon queues.
 
-## Environment and database topology
-
-Use this standard topology unless a client has an explicitly documented exception.
-
-| Platform | Development | Staging | Production |
-| --- | --- | --- | --- |
-| Core | Local database | Local isolated database | Remote client database |
-| SEO Sites | Local database | Shared production database in preview mode | Remote client database |
-| Artist Sites | Local database | Shared production database in preview mode | Remote client database |
-
-SEO/Artist staging is a preview surface over production content, not a disposable staging database.
-
-For shared-data preview staging:
-
-- use a distinct database credential from the production application;
-- prefer read-only database privileges;
-- do not run schema migrations, destructive refreshes, seeders, or production-side-effect workers from preview staging;
-- treat schema changes as production-database changes and deploy them through a backward-compatible production migration sequence;
-- keep preview-only access controls in place while allowing draft/unpublished content to be rendered for review.
-
-Core staging remains isolated and disposable. Core production uses the remote authoritative client database.
-
-## Database identities
-
-Keep the operator/admin database account separate from application credentials.
-
-Recommended model:
-
-- one operator account may retain administrative access across client databases;
-- each production application uses its own client-scoped database user;
-- that application user is granted only the privileges it needs on the client's database (`client_database.*`), not unrelated client databases;
-- shared-preview SEO/Artist staging should use a separate read-only credential when practical;
-- remote database provisioning remains an operator gate unless a future database-management integration is explicitly approved.
-
-Core staging is the exception: the launcher may provision the local staging database and local client-scoped application user through `sudo mysql` because that database is deliberately local/disposable.
+The cross-platform staging/production data model and database credential boundaries are owned by `docs/architecture/cross-platform-deployment-topology.md`. This Core orchestrator must not duplicate that model.
 
 ## Deployment topology
 
@@ -90,29 +56,7 @@ When a platform length limit applies, identifiers are truncated only through det
 
 The executable queue list remains application-owned through `QueueContract`/Horizon configuration. The launcher never accepts an operator-maintained queue list.
 
-## Runtime environment files
-
-The launcher creates minimal runtime files. It does not copy `.env.example` wholesale.
-
-Root `.env` owns process/server values such as:
-
-- `APP_ENV`;
-- `APP_KEY`;
-- `CLIENT_KEY`;
-- DB host/transport;
-- Redis transport;
-- queue/cache/session process defaults;
-- root logging/Horizon process overrides.
-
-The selected-client `.env` owns client-varying values such as:
-
-- URLs/root domain;
-- database name/user/password;
-- Redis/cache/Horizon prefixes;
-- provider credentials;
-- selected sender identities and client-owned public keys/secrets.
-
-`engage:environment:sync --write-missing` remains the application authority for missing required variable names.
+Runtime `.env` key ownership, creation and effective-access policy are defined only in `docs/operations/client-environment-reference.md`. The launcher must consume those contracts without maintaining a parallel environment-variable list.
 
 ## Core deployment-plan machine contract
 
@@ -130,6 +74,18 @@ The selected-client `.env` owns client-varying values such as:
 Non-secret requirements may expose their `expected_value` to the launcher. Secret expected values are never serialized.
 
 The launcher iterates the plan because provider/capability selectors may reveal additional requirements on a later pass.
+
+## Planner and synchronization invariants
+
+`engage:deployment-plan` is observational. Its default operator output focuses on required keys and active persisted overrides, while `--verbose` expands the matrix and `--json` supplies exhaustive machine fields. Missing, blank, invalid, or persisted-client-mismatched **required** values produce a blocking exit status. Module and provider contributors may declare constrained allowed values; unsupported selections fail before infrastructure or schema mutation.
+
+`EnvironmentVariableCatalog` determines legal names, root/client ownership and sensitivity during bootstrap; contributors determine whether the selected committed client actually needs them. Provider selectors may reveal more requirements, so the launcher reruns the plan after each secure value collection step. A secret expected value must never be serialized in machine results or recorded in the launch state.
+
+`engage:environment:sync --write-missing` may only add absent required names to their catalog-owned environment file. It cannot invent values, replace existing settings, or delete unused keys. Provider requirements and current variable inventories live exclusively in `client-environment-reference.md`; the launcher must not duplicate them.
+
+Package-contributed deployment/setup contributors participate through the documented registries. A module/environment owner with no requirements still needs an explicit zero-requirement contributor so missing planner coverage is detected. Contributors currently cover Core, Forms, Messaging, Inbound Messaging, Internal Notifications, Flow Routes, Webinars, Scheduling, Reporting, and Media; this list is **descriptive of the supplied snapshot**, not a second executable registry.
+
+Deployment planning and application installation always evaluate the complete configured enabled runtime module set; an explicit `engage:install --modules=` schema selection cannot narrow provider/runtime readiness for other enabled capabilities. Unused known environment keys are informational and must not be removed automatically.
 
 ## Operator/external setup steps
 
@@ -158,17 +114,7 @@ The operator may stop with Ctrl+C at any pause and resume later from the state f
 
 ## Core public hosts
 
-The launcher provisions only Core-owned hosts.
-
-Typical roles:
-
-- CRM/admin host from `CRM_APP_URL` (default derived as `crm.<ROOT_DOMAIN>`);
-- `messaging.<ROOT_DOMAIN>` when Messaging is enabled;
-- `webinar.<ROOT_DOMAIN>` when Webinars is enabled;
-- `webhooks.<ROOT_DOMAIN>` when enabled modules expose provider/server-to-server callbacks;
-- the host from `SCHEDULING_APP_URL` when generic public Scheduling is deliberately enabled.
-
-The root domain is never pointed at Core merely because Core is installed.
+The launcher provisions **only** hosts resolved for enabled Core capabilities through the application-owned deployment plan. It never assumes ownership of the root website. Exact host derivation and environment URL keys belong to `client-environment-reference.md`; DNS, certificate, and external callback readiness are verified through the operator runbook and provider checklist.
 
 ## Implemented Core launcher lifecycle
 
@@ -185,25 +131,17 @@ fix
 derive
 ```
 
-A new environment follows this sequence:
+The launcher follows dependency ordering rather than a second operator checklist:
 
-1. collect/derive identity and topology;
-2. clone/pull clean Core and client repositories;
-3. install production dependencies and build assets;
-4. create minimal root/client environment files;
-5. provision the local database for Core staging, or collect remote DB credentials for Core production;
-6. generate/preserve `APP_KEY`;
-7. resolve the enabled-module host set from the current plan even while provider requirements are still incomplete;
-8. generate the Nginx site for Core-owned hosts only and install/refresh the existing Core observability integration when available;
-9. display exact DNS A records, wait for resolution, and acquire the exact Core TLS certificate through a deterministic Certbot webroot flow;
-10. iterate `engage:deployment-plan --json` and `engage:environment:sync --write-missing`;
-11. complete provider/external setup steps against already-live HTTPS callback hosts and securely collect values;
-12. run `engage:install --force --no-create-user`, `modules:status`, and `setup:validate`;
-13. optionally create the initial CRM owner through `engage:user:add`;
-14. set runtime permissions;
-15. install/update the derived Supervisor/Horizon program;
-16. install the exact marked Laravel Scheduler cron entry;
-17. run final deployment-plan, module, setup, Horizon, Scheduler, and HTTP checks.
+1. Resolve and validate client/source identity and intended root-host ownership; pull only approved clean commits.
+2. Establish restrictive secret-file and writable-runtime-directory prerequisites **before any Composer hook, package-provider bootstrap, or Artisan invocation**. Install the applicable selected-client locked Composer dependencies before any root Composer hook that bootstraps the Laravel application, then install the locked Core dependencies.
+3. Derive the enabled-module Core-owned hosts from the application plan. Establish routing, DNS, and HTTPS callback reachability before asking an operator to complete provider webhook registration.
+4. Iterate planner requirements and explicit operator/provider gates; collect values through hidden prompts and secure atomic environment updates.
+5. Run the application-owned installation/schema/preset/readiness lifecycle only after its deployment preflight passes.
+6. Reconcile only the necessary Nginx, Horizon, and Scheduler state once application readiness is proven, preserving healthy legacy identities.
+7. Finish with **read-only** verification of source, security access, services, and enabled capabilities.
+
+Do not build assets or restart shared services gratuitously when the approved deployed inputs and effective configuration have not changed. No launcher flow may widen `.env` permissions simply to make bootstrap succeed.
 
 ## Launch state
 
@@ -220,34 +158,7 @@ It contains only non-secret identity/checkpoint information such as:
 
 Secrets never belong in the state file.
 
-## Normal updates
-
-`update <state-file>`:
-
-- pulls approved Core/client commits;
-- installs dependencies/builds assets;
-- reruns the deployment-plan/setup-step loop for any newly required environment/provider values;
-- runs platform migrations, read-only module migration preflight, installed-module migrations, preset sync, status, and setup validation;
-- refreshes runtime processes/host configuration;
-- runs safe verification.
-
-Production tests are not part of this procedure.
-
-## Later module additions
-
-Module enablement is authored/tested in development and committed in the client repository.
-
-After the approved commit is pulled:
-
-```bash
-bash scripts/operations/launch-client-environment.sh add-modules /path/to/state.json \
-  --module scheduling
-```
-
-The launcher refuses a requested module that is not enabled by the pulled client configuration. For each requested module it runs `modules:preflight <module>` immediately before the application-owned `modules:install <module> --force` dependency closure, then preset sync/status/setup validation and runtime/host verification.
-
-This flow may activate new deployment-plan requirements or provider setup steps before schema installation.
-
+Routine update and module-addition command sequences belong exclusively in `docs/operations/deployment-runbook.md`. The orchestrator applies the same environment-plan, schema preflight, and postflight invariants when updating existing deployments.
 
 ## Existing-deployment audit contract
 
@@ -263,7 +174,7 @@ root domain
 
 The checkout path is discovered from the canonical location and readable `/var/www` client checkouts, with `--app-path` available when a legacy layout is ambiguous.
 
-Before any runtime interpretation, the auditor proves that both Core and client checkouts are clean and that local `HEAD` matches the configured remote branch through read-only `git ls-remote`. It never fetches or pulls. A branch/origin/cleanliness/current-revision mismatch stops the authoritative runtime audit so stale source cannot be mistaken for a deployment defect.
+The auditor checks Core/client Git cleanliness and read-only remote-current identity through `git ls-remote` without fetching or pulling. A source mismatch blocks **authoritative application-runtime interpretation and automatic fixes**, but it must **not suppress independent host-security inspection**: root/client secret-file ownership, other-access bits, and effective authorized/unauthorized readability must still be evaluated and reported. Do not misattribute source-dependent application failures when provenance is untrusted.
 
 The auditor may inspect:
 
@@ -306,9 +217,9 @@ Migration inventory comes from direct-child PHP files inside the paths declared 
 
 Automatic schema repair may run platform migrations and then preflight, but it must not auto-normalize checksum drift. Changed, removed, or unmanaged applied migration history remains a manual investigation blocker.
 
-For staging `.env` files, the currently proven convention is deploy-user ownership, deploy-user primary group, and mode `0664`. Runtime-directory correctness is tested through effective deploy/web write access; metadata divergence from the launcher convention is `INFO` when access is still effective.
+Environment secrets in staging and production may **never** be other-readable, group-writable, or other-writable. Access is validated for the actual deploy, PHP-FPM, and Horizon users, and denied for unrelated identities. A file with `0664` is a proven security defect, not a healthy staging convention. The canonical access model and permitted `0640`/`0600`-style arrangements are owned by `client-environment-reference.md`; the auditor tests their effects without repairing the files.
 
-The staging-proven `.env` mode is not automatically declared the production secret-file mode. Production mode/group remains an explicit review item until that contract is separately proven.
+Shared `www-data` read access does not establish tenant separation; report this as an architectural isolation risk rather than silently changing running PHP-FPM or Horizon identities in an audit/fix pass. Runtime-directory write suitability is likewise judged by effective writer access, not only metadata.
 
 ## Audit-driven fix contract
 
@@ -377,12 +288,6 @@ A finding is not automatically fixable merely because the auditor can detect it.
 
 Every mutating fix attempt ends with a fresh audit. If environment values change, fix re-audits before proceeding to runtime services. If a deterministic repair step fails, the launcher re-audits the resulting state before stopping so the next decision is based on what actually changed.
 
-
-## Remaining higher-level work
-
-The Core launcher deliberately does not yet deploy an SEO Site or Artist Site. A later host/client orchestrator can call compatible sub-deployment entry points for those platforms while retaining the topology/data-mode rules defined here.
-
-Shared-production-data SEO/Artist preview staging must remain protected from migrations, destructive resets, and production-side-effect workers even when that higher-level orchestrator is added.
 
 ## Legacy deployment audit classification
 

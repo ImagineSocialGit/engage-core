@@ -39,28 +39,40 @@ until an override is intentionally needed.
 
 The updated `.env.example` follows this rule for fallback-based variables.
 
+`.env.example` and `docs/config-templates/client-environment.example` are **catalogs, not runtime install templates**: do not copy every example key into a live `.env`. `engage:environment:sync --write-missing` adds only missing required names to their catalog-owned root or client file; it must not overwrite supplied values, invent credentials, or remove unused keys. The deployment plan determines which keys are required for the selected environment and enabled capabilities.
+
+`EnvironmentVariableCatalog` owns legal key scope and secret classification. `ClientEnvironmentLoader` rejects unsupported or root-owned keys in the selected-client file and clears legal client-owned values before loading the current selected client's values so a previously selected client cannot leak into a subsequent selection.
+
 ## Environment-file filesystem permissions
 
-The supported server deployment path expects both the deployment/Artisan user and PHP-FPM to read the root and selected-client environment files. Protect secrets without making them unreadable to the web runtime.
+The root and selected-client `.env` files are secrets. A supported deployment must prove effective read access for its actual deploy/Artisan, PHP-FPM, and Horizon identities, and deny read access to unrelated identities. Never grant group- or world-write access, and never grant world-read access. Audit and verification inspect these properties without modifying them.
 
-For the common deployment shape where the checkout is owned by `<DEPLOY_USER>` and PHP-FPM runs in `<WEB_GROUP>` (commonly `www-data`), use:
+For the specific arrangement where the deploy user owns the checkout and the authorized runtime processes belong to the same dedicated `<RUNTIME_GROUP>`, a valid baseline is:
 
 ```bash
-sudo chown <DEPLOY_USER>:<WEB_GROUP> .env client/<CLIENT_KEY>/.env
+sudo chown <DEPLOY_USER>:<RUNTIME_GROUP> .env client/<CLIENT_KEY>/.env
 sudo chmod 640 .env client/<CLIENT_KEY>/.env
 ```
 
-Verify both identities can read the files without printing their contents:
+Test outcomes as the actual identities without exposing values:
 
 ```bash
 test -r .env && test -r client/<CLIENT_KEY>/.env
 sudo -u <WEB_USER> test -r .env
 sudo -u <WEB_USER> test -r client/<CLIENT_KEY>/.env
+sudo -u <HORIZON_USER> test -r .env
+sudo -u <HORIZON_USER> test -r client/<CLIENT_KEY>/.env
+! sudo -u <UNRELATED_USER> test -r .env
+! sudo -u <UNRELATED_USER> test -r client/<CLIENT_KEY>/.env
 ```
 
-Do not default these files to `0600` when PHP-FPM runs as another user and reads the files directly. That produces a split-brain failure where CLI/Artisan sees the intended environment while web requests fall back to missing/default environment values; symptoms can include `MissingAppKeyException`, unexpected `production` logging context, or host-specific routes returning 404 even though `route:list` is correct from the CLI.
+Choose `<UNRELATED_USER>` as an existing, genuinely unprivileged identity that is not a member of an authorized group. The selected paths and directory traversal must also permit authorized access.
 
-`0600` is valid only when the web runtime does not need filesystem read access to these files or runs as the same owning identity.
+`0600` is appropriate only when every required reader uses the owning identity or does not need direct access. Conversely, `0640` with a **shared `www-data` group** does not isolate one client's secrets from another client's PHP process using that same group. Per-client PHP-FPM/Horizon Unix identities or equivalently verified isolation require a separate, deliberate shared-host migration; do not imply that changing file mode alone establishes tenant separation.
+
+Atomic updates and missing-key synchronization must establish restrictive permissions before secret material is written, preserve the validated owner/group/ACL policy, and recheck effective access afterward. They must never normalize existing secure files to `0664`.
+
+A CLI/web mismatch can otherwise present as `MissingAppKeyException` or host-specific 404s when Artisan sees an environment the web process cannot read.
 
 ---
 
@@ -175,6 +187,8 @@ WEBINAR_APP_URL=
 CRM_APP_URL=
 ```
 
+`SCHEDULING_APP_URL` is an additional optional selected-client origin when a public Scheduling booking host is deliberately enabled; omit it otherwise. The Messaging public host is derived, not configured through a `MESSAGING_APP_URL` key.
+
 `bootstrap/app.php` derives the webhooks route host from `ROOT_DOMAIN`:
 
 ```text
@@ -192,11 +206,17 @@ Typical deployment roles:
 <CORE_ADMIN_SUBDOMAIN>.[ROOT_DOMAIN]
     human-facing Engage Core administration; commonly crm or app
 
+messaging.[ROOT_DOMAIN]
+    Messaging public preference host when Messaging exposes that public surface
+
 webinar.[ROOT_DOMAIN]
     public Engage Core Webinar host when Webinars is enabled
 
 webhooks.[ROOT_DOMAIN]
     public Engage Core webhook and signed server-to-server integration host
+
+<host from SCHEDULING_APP_URL>
+    optional generic Scheduling public booking host, only when configured
 ```
 
 The Engage Core admin subdomain is deployment-owned. `CRM_APP_URL` remains the canonical environment key even when the selected hostname uses `app` rather than `crm`. Only Core-owned hostnames should route to the Engage Core `public/` directory; the standard site domain must route to its owning application.
@@ -236,45 +256,7 @@ FORMS_EXTERNAL_INTAKE_CLIENT_RATE_LIMIT_PER_MINUTE
 
 Do not put those process-wide controls into every selected-client `.env` merely for symmetry.
 
-For the reusable Artist Sites intake, environment allowlisting is only one part of readiness. The selected Core client must also:
-
-```text
-- enable Forms in client config/modules.php;
-- explicitly select the Forms preset group `artist_updates` in the selected package;
-- when Messaging-backed marketing consent is used, confirm the intended channel +
-  purpose permissions are represented by the form's accepted consent fields; optional
-  consent-domain mappings may be configured only when custom acknowledgement/topic
-  grouping is desired;
-- sync the selected preset so a public current `artist_updates` FormVersion exists.
-```
-
-The reusable Core preset begins with `settings.submission.verification.required=false` while still validating any supplied Turnstile evidence against provider `turnstile`, action `artist_updates`, hostname presence, and a 300-second age limit. This is a rollout state, not the desired permanent public posture.
-
-After the matching Artist Sites sender is proven end to end, use a selected-client config override at:
-
-```text
-client/{client-key}/config/presets/modules/forms/forms.php
-```
-
-to set only:
-
-```php
-'definitions' => [
-    'artist_updates' => [
-        'settings' => [
-            'submission' => [
-                'verification' => [
-                    'required' => true,
-                ],
-            ],
-        ],
-    ],
-],
-```
-
-Then run `php artisan presets:sync` and `php artisan setup:validate`. The sync publishes a new immutable FormVersion; it does not mutate the previously published version.
-
-The Artist Sites read-only probe may be run before destination cutover. Do not treat a successful GET probe as permission to switch live POST traffic until the Sites sender also matches the published field contract. For the reusable artist-newsletter flow, `email_marketing_consent` is an optional boolean field: the matching disclosed Subscribe action must submit it as `true` when email marketing permission is being granted. Any enabled SMS-consent field remains independently explicit.
+For the application-to-application Forms setup, published form-version and consent tests, use `client-third-party-services-checklist.md`.
 
 ---
 
@@ -329,45 +311,8 @@ STAGING_USER=
 STAGING_PASSWORD=
 ```
 
-CRM application users are not environment configuration.
+CRM application users are not environment configuration. User creation, roles, and password recovery belong exclusively to `crm-user-administration.md`; no CRM login password belongs in an environment file.
 
-Create the first CRM user, and later users, with:
-
-```bash
-php artisan engage:user:add
-```
-
-Reset a forgotten CRM password with:
-
-```bash
-php artisan engage:user:password user@example.com
-```
-
-Passwords are entered through hidden terminal prompts and must not be retained in `.env`.
-
-Keep the existing STAGING_USER / STAGING_PASSWORD and PROJECT_STATE_ADMIN_EMAIL documentation. Those values serve separate access/authorization purposes.
-
-See `operations/crm-user-administration.md` for the complete user-administration contract.
-
-Project State owner authorization:
-
-```env
-PROJECT_STATE_ADMIN_EMAIL=
-```
-
-These are separate concepts.
-
-```text
-STAGING_USER / STAGING_PASSWORD
-    environment access gate
-
-PROJECT_STATE_ADMIN_EMAIL
-    exact CRM user email allowed to open and operate the owner-only Project State surface
-```
-
-`PROJECT_STATE_ADMIN_EMAIL` is a selected-client environment value. A blank value intentionally disables Project State access because no authenticated user can match it. The configured user must still provide the current password for export, apply, and resume operations.
-
-Remove or rotate bootstrap secrets after use according to operational policy. Keep the Project State owner email deliberately configured only for operators who should retain that maintenance authority.
 
 ---
 
@@ -525,7 +470,11 @@ WEBINAR_WEBHOOK_QUEUE=webhooks
 WEBINAR_REMINDER_QUEUE=notifications
 WEBINAR_CONFIRMATION_MESSAGE_QUEUE=notifications
 WEBINAR_FOLLOWUP_QUEUE=notifications
+FLOW_ROUTE_CONTINUATION_QUEUE=default
+FLOW_ROUTE_IMMEDIATE_EXECUTION_BUDGET=25
 ```
+
+Flow Routes' continuation queue and execution budget are **root/process-owned defaulted controls**; neither is required as an explicit `.env` entry. When persisted, the budget must be a canonical positive integer (the committed default is 25).
 
 ## Current executable queue inventory
 
@@ -566,7 +515,7 @@ marketing
 default,notifications,confirmation_messages,reminders,opt_in_messages,post_event,marketing
 ```
 
-That built-in default does not cover every executable queue path above. Until the Core Horizon defaults are reconciled, set `HORIZON_SUPERVISOR_1_QUEUES` explicitly for deployments:
+That built-in default does not cover every executable queue path above. Until the Core Horizon defaults are reconciled, a deployment can use the following **temporary compatibility override**; the canonical executable inventory belongs to the application `QueueContract`, not to the launcher or a separately maintained list:
 
 ```env
 HORIZON_SUPERVISOR_1_QUEUES=default,notifications,confirmation_messages,opt_in_messages,reminders,post_event,marketing,emails,sms,webinars,webhooks
@@ -639,11 +588,10 @@ DO_SPACES_BUCKET=
 CDN_BASE_URL=
 ```
 
-`config/filesystems.php` still has a legacy fallback from `CDN_BASE_URL` to the Spaces endpoint for generic filesystem URL generation. When Media is enabled in staging/production, `CDN_BASE_URL` is explicitly required so reusable outbound assets have a stable public delivery origin rather than relying on that fallback.
+`config/filesystems.php` still has a legacy fallback from `CDN_BASE_URL` to the Spaces endpoint for generic filesystem URL generation. When Media is enabled in staging/production, `FILESYSTEM_DISK=spaces` and the client Spaces identity, credentials, bucket, and `CDN_BASE_URL` are required. `DO_SPACES_ENDPOINT` and `CDN_BASE_URL` must be valid HTTP(S) origins. Media upload policy itself remains committed application config, not deployment environment.
 
 ---
 
-# 14. Email and Resend
 # 14. Email and Resend
 
 Provider selection, credentials, webhook secrets, sender identities, and inbound receiving-domain identity are selected-client deployment values.
@@ -666,7 +614,7 @@ FROM_EMAIL_MARKETING=
 FROM_NAME_MARKETING=
 ```
 
-Selected-client Resend credentials, webhook secrets, and optional inbound receiving domain:
+Selected-client Resend credentials, webhook secrets, and inbound receiving domain (required according to enabled live capabilities):
 
 ```env
 RESEND_API_KEY=
@@ -704,7 +652,7 @@ Inbound `email.received` webhooks contain receiving metadata rather than the com
 
 Each Resend webhook registration may have its own Svix signing secret. `RESEND_WEBHOOK_SECRET` accepts one or more active trusted secrets separated by commas, semicolons, or whitespace. This supports the canonical split between the Messaging delivery/lifecycle endpoint and the Inbound Messaging `email.received` endpoint without adding another environment variable.
 
-`INBOUND_EMAIL_DOMAIN` is required only when the selected deployment uses Resend Receiving / Inbound Messaging email. It should contain a bare domain such as:
+Under the documented current deployment-plan contract, **enabling `inbound_messaging` in staging or production requires `INBOUND_EMAIL_DOMAIN`**, even if no authored semantic email routes are present. Signed per-message Reply-To correlation still depends on it. An SMS-only Inbound Messaging deployment is therefore not exempt from the current readiness gate. Local/testing keeps this override optional. It must contain a bare domain such as:
 
 ```env
 INBOUND_EMAIL_DOMAIN=replies.example.com
@@ -860,6 +808,10 @@ TELNYX_FROM
 
 Do not populate all fallback layers by default. Prefer one clear canonical sender strategy.
 
+When live SMS is enabled in staging or production, the supported provider is currently Telnyx and Inbound Messaging must be enabled for STOP/HELP/START and replies. `SMS_ENABLED=false` requires no SMS provider credentials. The current Twilio outbound adapter is not sufficient to declare a live Twilio deployment ready; the public inbound SMS route currently supports Telnyx only. An effective sender may be resolved through the documented generic fallbacks rather than requiring every Telnyx-specific sender override.
+
+The `MESSAGING_SMS_MARKETING_PROFILE_ID` and `MESSAGING_SMS_TRANSACTIONAL_PROFILE_ID` values are optional where purpose mapping is needed; they are not universally required.
+
 ---
 
 # 18. Twilio
@@ -927,22 +879,10 @@ credentials. The OAuth cache TTL must remain between 60 and 3600 seconds; the we
 timestamp drift must remain between 1 and 3600 seconds. Current defaults are 3500 and
 300 seconds respectively.
 
-The Zoom Marketplace app must subscribe the environment-specific webhook endpoint to:
+The Zoom Marketplace scopes, webhook subscription event inventory, and end-to-end verification procedure are owned by `client-third-party-services-checklist.md`. Scope grants and account Reports permissions require a real provider check and cannot be proven by static environment validation.
 
-```text
-webinar.ended
-meeting.ended
-recording.completed
-```
+`WEBHOOK_INBOX_CLAIM_LEASE_SECONDS` is provider-neutral and controls reclamation of interrupted durable Zoom/Resend webhook work; it is not a cache replay TTL.
 
-The exact granular admin scopes required by current provider calls are documented in
-`client-third-party-services-checklist.md`. Scope grants and account Reports-role
-permissions cannot be proven by static environment validation; exercise the actual API
-calls in staging.
-
-`WEBHOOK_INBOX_CLAIM_LEASE_SECONDS` is provider-neutral and controls when interrupted
-durable webhook work may be reclaimed for processing. It applies to Zoom and Resend
-receipts; it is not a cache replay TTL.
 
 ---
 
@@ -968,9 +908,11 @@ HORIZON_BALANCE_COOLDOWN=3
 HORIZON_SUPERVISOR_1_QUEUES=
 ```
 
-Optional Horizon surface values also supported:
+Optional Horizon overrides and surface values (omit until deliberately used; do not add blank assignments):
 
 ```text
+HORIZON_STAGING_BULK_MAX_PROCESSES
+HORIZON_STAGING_PRIMARY_BALANCE
 HORIZON_NAME
 HORIZON_DOMAIN
 HORIZON_PATH
@@ -978,9 +920,19 @@ HORIZON_PATH
 
 Use a unique `HORIZON_PREFIX` for every app/environment sharing Redis.
 
+For low-volume shared-host **staging only**, the current primary supervisor profile defaults to `balance=false`, `minProcesses=1`, and a bounded worker budget. Bulk and media remain separate supervisors. This reduces idle workers but consumes the configured primary queues **in order**; sustained earlier-queue load can delay later reminders, callbacks, or messages. Verify actual queue latency during rollout. `HORIZON_STAGING_PRIMARY_BALANCE=auto` re-enables the previous balancing behavior for one installation if needed. `HORIZON_STAGING_MAX_PROCESSES` and `HORIZON_STAGING_BULK_MAX_PROCESSES` control the respective worker budgets. Do not apply this staging policy to production or modify another client's process settings as part of a single-client rollout. Restart only the applicable supervised Horizon process after deployment of the setting.
+
 ---
 
-# 21. Keys intentionally omitted from the new canonical example
+# 21. Scheduling public origin
+
+The client-owned `SCHEDULING_APP_URL` is optional. When absent, public Scheduling routes remain disabled while the internal Scheduling functionality can still be used. When present it must be an HTTP(S) **origin** (scheme, host, optional port; no credentials, path, query, or fragment). Booking and rate-limit business settings stay in committed application configuration.
+
+# 22. Reporting environment requirements
+
+Reporting intentionally contributes **no additional environment keys**. Its browser-collection, retention, classification, ingestion, and projection policy is committed configuration; its approved external-click-ID HMAC key derives from Core's `APP_KEY` and the selected client identity.
+
+# 23. Keys intentionally omitted from the new canonical example
 
 The following keys appeared in older env material but were not evidenced by the supplied current Core config files:
 
@@ -1012,7 +964,7 @@ Before deleting an existing live environment variable, search the full repositor
 
 ---
 
-# 22. Recommended environment-specific isolation
+# 24. Recommended environment-specific isolation
 
 Local/testing development may intentionally share cache/Redis/Horizon namespaces across client selections. Per-client `CACHE_PREFIX`, `REDIS_PREFIX`, and `HORIZON_PREFIX` values are optional there. Staging and production still require explicit unique client namespaces.
 
@@ -1033,41 +985,3 @@ Local/testing development may intentionally share cache/Redis/Horizon namespaces
 | Destructive DB resets | normal | disposable-data only | never after real data matters |
 
 ---
-
-# 23. Pre-handoff environment verification
-
-```text
-[ ] No placeholder required values remain
-[ ] Root CLIENT_KEY correct
-[ ] Selected client directory exists
-[ ] Selected client .env populated with deployment/runtime values
-[ ] Selected client config/client.php has correct preset and timezone
-[ ] Selected client config/modules.php has correct runtime modules
-[ ] APP_ENV correct
-[ ] APP_DEBUG false outside local
-[ ] APP_KEY set and preserved
-[ ] root and client `.env` files are owned/readable by the deploy and PHP-FPM identities without being world-readable
-[ ] client `.env` contains only ClientEnvironmentLoader-owned keys; root/process keys were not copied there for symmetry
-[ ] URLs correct
-[ ] `CRM_APP_URL` resolves to the actual registered CRM route host (including `app.` deployments)
-[ ] DB correct
-[ ] Redis DB/prefix isolation correct for staging/production or any intentionally isolated local runtime
-[ ] Cache prefix unique where client isolation is required
-[ ] Horizon prefix unique where client isolation is required
-[ ] Horizon queue list covers executable queues
-[ ] Root logging resolves to the intended production channel/stack/level/retention
-[ ] Production observability is installed/verified when this deployment uses the Engage Core observability path
-[ ] Mail sender fallbacks resolve to non-empty addresses
-[ ] Resend API key and active webhook signing secrets set when email is enabled
-[ ] Resend API key has Full Access when Inbound Messaging email receiving is enabled
-[ ] INBOUND_EMAIL_DOMAIN matches the verified Resend receiving domain when inbound email is enabled
-[ ] SMS_ENABLED deliberate
-[ ] Telnyx sender numbers/profile IDs correct when enabled
-[ ] Webinars/Zoom provider and credentials correct when enabled
-[ ] setup user values handled securely
-[ ] PROJECT_STATE_ADMIN_EMAIL is blank or matches the deliberately authorized CRM owner
-[ ] External Forms client identity/secret/allowlist are populated only when external Forms access is enabled
-[ ] staging credentials only used where intended
-[ ] php artisan optimize:clear run after client/env changes
-[ ] php artisan setup:validate passes
-```

@@ -265,30 +265,9 @@ Do not add new vendor-specific credential keys to the permanent Engage Core envi
 
 Client configuration may select provider roles or other provider-neutral module behavior, but the package remains responsible for translating that configuration into its implementation.
 
-## Installation and deployment
+## Deployment prerequisite
 
-For a selected client with a nested Composer project:
-
-```bash
-cd client/{CLIENT_KEY}
-composer install
-```
-
-Normal staging/production deployment should install the exact committed client lock file, for example:
-
-```bash
-composer install --no-dev --prefer-dist --optimize-autoloader
-```
-
-Core runtime bootstrap intentionally does not run Composer or mutate the selected client repository. Package installation remains an explicit deployment step.
-
-After Composer installation, package-contributed schema is still installed through the normal Engage module command, for example:
-
-```bash
-php artisan modules:install pet_services --force
-```
-
-Before the first package-backed production rollout, the deployment launcher should be verified or extended so the selected client's locked Composer install is performed as part of the normal deployment workflow rather than depending on an undocumented manual step.
+The selected client's committed `composer.lock` pins any nested package dependencies, and `client/{CLIENT_KEY}/vendor/` must be present before runtime bootstrap loads those providers. The **sole** server installation order and commands are maintained by `docs/operations/deployment-runbook.md`; the owning module schema lifecycle is documented in `docs/architecture/deployment/command-ownership.md`. No Composer installation or source/config edits occur automatically during application bootstrap.
 
 ## Local package development
 

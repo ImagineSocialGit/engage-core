@@ -12,11 +12,11 @@ Start here for:
 - repairing audit findings;
 - adding a module later;
 - verifying a deployment before handoff;
-- identifying when a special Project State or troubleshooting runbook is required.
+- identifying when a specialized troubleshooting runbook is required.
 
 This document intentionally does not duplicate the complete environment-variable catalog, provider-dashboard instructions, incident-recovery detail, or internal deployment-orchestrator architecture.
 
-Use these companion authorities:
+Use these companion authorities (each owns its subject; this runbook does not duplicate their catalogs or internal command contracts):
 
 ```text
 Need an environment variable or ownership rule?
@@ -27,9 +27,6 @@ Need Resend, Telnyx, Zoom, Spaces, DNS, or Turnstile account/dashboard work?
 
 Something failed or runtime behavior is suspicious?
     docs/operations/deployment-safety-and-troubleshooting.md
-
-Doing an approved destructive Project State clean rebuild?
-    docs/operations/project-state-transfer-runbook.md
 
 Need command ownership or launcher internals?
     docs/architecture/deployment/
@@ -74,9 +71,6 @@ Existing/pre-orchestrator deployment
 Add a module
     -> launch-client-environment.sh add-modules <state-file> --module <module>
 
-Approved clean rebuild preserving supported Project State
-    -> project-state-transfer-runbook.md
-
 Incident / bootstrap / worker / queue / provider failure
     -> deployment-safety-and-troubleshooting.md
 ```
@@ -108,7 +102,8 @@ It may handle or coordinate:
 ```text
 application/runtime path
 Core + client repository identity
-dependency installation
+root and selected-client locked dependency installation, where applicable
+early runtime-directory and secret-file prerequisites
 asset build
 environment-plan requirements
 database setup pauses
@@ -140,16 +135,7 @@ Completed phases and completed provider steps are not repeated unnecessarily.
 
 ## New-environment application ownership
 
-`engage:install` is the application-level installation authority.
-
-Its four installation stages are:
-
-```text
-1. platform migrations
-2. configured schema-owning module installation
-3. preset synchronization
-4. setup validation
-```
+`engage:install` owns new-environment application installation, as defined exclusively in `docs/architecture/deployment/command-ownership.md`.
 
 Interactive installation may create the first CRM user. Automated deployment should use the launcher's chosen non-interactive path and create users explicitly when required.
 
@@ -195,14 +181,21 @@ confirm the correct target environment
 confirm provider/environment additions required by the new code are already available
 ```
 
-Install dependencies and build assets:
+Prepare the authorized runtime directory tree and secret-file access **before** Composer scripts or Artisan run. On fresh clones, `storage/` and required `bootstrap/cache/` directories may not exist in Git; create them with the verified deploy/runtime write-inheritance policy described by the environment contract.
+
+Install the applicable selected-client lock file **before any root Composer hook that bootstraps Laravel**, then install the exact committed root lock. The selected-client Composer project is optional and must have both `composer.json` and a committed `composer.lock` when used:
 
 ```bash
+# Only when client/<CLIENT_KEY>/composer.json and composer.lock exist:
+(cd client/<CLIENT_KEY> && composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction)
+
 composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 npm ci
 npm run build
 php artisan optimize:clear
 ```
+
+Do not manufacture a nested Composer project for clients that have none. Do not update committed lock files on a deployment target. Run build/install stages only when the approved deployment actually requires them; the manual fallback above gives the full sequence.
 
 For an already-installed database with real data:
 
@@ -215,53 +208,13 @@ php artisan modules:status
 php artisan setup:validate
 ```
 
-Important ownership:
-
-```text
-migrate
-    platform migrations only
-
-modules:preflight
-    read-only checksum/history integrity gate for enabled schema scopes
-
-modules:migrate
-    ledger-installed module scopes only
-
-presets:sync
-    configured DB-owned definitions; not schema migration
-
-modules:status
-    read-only schema/ledger/manifest inspection
-
-setup:validate
-    read-only application readiness gate
-```
+Command and migration ownership, including the one-time checksum-baseline procedure, is maintained solely in `docs/architecture/deployment/command-ownership.md`.
 
 If queued-job runtime code changed, restart the actual Supervisor-managed Horizon program after code/schema/config changes and verify the live process path.
 
 Also verify the Scheduler entry and effective schedule.
 
 Do not run `migrate:fresh` on a normal production update.
-
-## Migration ownership and first checksum-baseline rollout
-
-`config/module_migrations.php` declares only the platform/module migration directories. Migration files inside each owned directory are discovered from the filesystem; adding a normal migration does not require a config manifest or manual schema-version increment. The reported schema version is derived from the discovered file count.
-
-`module_installations.migration_checksums` stores the accepted SHA-256 map for installed module migration history. Never edit or delete an already-applied migration to change production schema; add a new migration. Never bypass an integrity blocker by editing `module_installations` directly.
-
-For the first rollout of checksum tracking, deploy this infrastructure batch without unrelated module migrations, then run:
-
-```bash
-php artisan optimize:clear
-php artisan migrate --force
-php artisan modules:preflight
-php artisan modules:migrate --force
-php artisan modules:preflight
-php artisan modules:status
-php artisan setup:validate
-```
-
-The first preflight may report baseline warnings on schema-current installed scopes. `modules:migrate` records the baseline without replaying current migrations. The second preflight must be clean; any integrity blocker requires investigation before further module schema work.
 
 # 4. Audit an existing deployment
 
@@ -319,28 +272,7 @@ modify CRM/business data
 
 It may inspect runtime/environment metadata, Git remote revisions, Nginx/TLS, Supervisor, cron, DNS, module state, setup validation, Horizon status, and the effective Laravel schedule.
 
-## Audit classifications
-
-```text
-PASS
-    verified healthy
-
-INFO
-    harmless or historical/canonical drift
-
-WARNING
-    unusual or incomplete, but not proven to break the platform
-
-MANUAL VERIFICATION REQUIRED
-    provider/external/operator fact the host cannot safely prove
-
-BREAKING
-    current runtime/security/isolation contract is proven broken
-```
-
-Only `BREAKING` fails the normal audit result and only `BREAKING` findings may enter the automatic deterministic repair registry.
-
-Do not normalize healthy legacy names, paths, prefixes, process labels, or metadata merely to make them look like a fresh launcher-created deployment.
+Audit reports `PASS`, `INFO`, `WARNING`, `BREAKING`, or `MANUAL VERIFICATION REQUIRED`. Treat proven `BREAKING` conditions as blockers; external/manual facts remain operator-owned. Classification and repair eligibility are defined only in the orchestrator contract. Audit must still inspect file-secret security when source identity is not current, although Git provenance may block authoritative runtime attribution.
 
 # 5. Fix audit findings
 
@@ -441,34 +373,9 @@ php artisan setup:validate
 
 `modules:install` resolves schema-owning dependencies. It must not install unrelated optional modules merely because their migration directories exist.
 
-# 7. Module-specific post-install commands
+Module-specific post-install commands are registered only in `docs/architecture/deployment/command-ownership.md`; run them when their recorded conditions apply, never as a blanket step.
 
-Run only module-owned setup commands not already covered by `engage:install` or `presets:sync`.
-
-Current registry:
-
-## Forms external-intake credentials
-
-Condition: Forms is enabled for a server-to-server external intake client and the environment does not already have a valid client ID/signing-secret pair.
-
-```bash
-php artisan forms:external-intake:issue-secret [client]
-```
-
-The command prints matching Core and external-caller environment blocks without mutating either environment.
-
-After installing new values:
-
-```bash
-php artisan optimize:clear
-php artisan setup:validate
-```
-
-Use distinct staging and production credentials.
-
-No other current module requires a mandatory module-specific post-install Artisan command beyond the normal install/preset lifecycle.
-
-# 8. Provider and external-system work
+# 7. Provider and external-system work
 
 The deployment plan can identify required provider setup, but static server checks cannot prove every provider-dashboard permission or real external event.
 
@@ -478,21 +385,9 @@ Use:
 docs/operations/client-third-party-services-checklist.md
 ```
 
-for:
-
-```text
-GitHub deploy access
-DNS
-Turnstile
-DigitalOcean Spaces
-Resend
-Telnyx
-Zoom
-```
-
 Provider setup may remain `MANUAL VERIFICATION REQUIRED` after an otherwise healthy audit. Resolve or deliberately verify each applicable item before launch.
 
-# 9. Horizon and Scheduler
+# 8. Horizon and Scheduler
 
 Supervisor is the lifecycle owner for Horizon on the supported deployment path.
 
@@ -521,118 +416,29 @@ php artisan schedule:list
 
 Do not assume healthy Horizon proves Scheduler is configured.
 
-# 10. Production-safe smoke checks
+# 9. Final deployment gate
 
-Run only the checks applicable to the enabled client capabilities.
-
-Infrastructure:
+The **single** deployment completion gate is below. Run only feature-specific checks that apply to the selected client; detailed provider acceptance belongs in `client-third-party-services-checklist.md`, and failure diagnosis belongs in the troubleshooting guide.
 
 ```text
-CRM/login responds over HTTPS
-required Core hosts resolve correctly
-SSL is valid
-DB is reachable
-Redis is reachable
-expected prefixes are isolated
-Horizon is running the intended checkout
-all required queues are consumed
-Scheduler exists and schedule:list is correct
-setup:validate passes
+[ ] Core and selected client are on the approved, clean commits
+[ ] correct CLIENT_KEY, module configuration, preset, timezone, APP_ENV, APP_DEBUG and preserved APP_KEY
+[ ] secure root/client .env permissions: each authorized runtime can read; unrelated users cannot
+[ ] selected-client .env passes key-ownership validation
+[ ] correct database identity and isolated Redis/cache/Horizon namespaces
+[ ] modules:preflight (where required), modules:status and setup:validate are satisfactory
+[ ] Horizon Supervisor runs the approved checkout and consumes every executable queue
+[ ] Scheduler entry is present exactly once and schedule:list is understood
+[ ] Core-owned CRM/public/webhooks hosts resolve to the intended Nginx document root with valid TLS
+[ ] login/CRM HTTPS smoke passes
+[ ] enabled Messaging: representative email/SMS delivery and consent/STOP/HELP safeguards pass
+[ ] enabled Inbound Messaging: inbound email/SMS correlation and provider webhook signatures pass
+[ ] enabled Webinars: registration, provider join links, attendance, ended/recording events, and conditional follow-up pass
+[ ] provider-dashboard, credential, and externally verified items are resolved or deliberately accepted
+[ ] final read-only audit reports no BREAKING finding, including secret-access violations
 ```
 
-Messaging, when enabled:
-
-```text
-transactional email reaches sent/delivered
-marketing sender resolves
-Resend lifecycle webhook works
-inbound reply works when Inbound Messaging email is enabled
-transactional SMS sends
-marketing SMS sender resolves
-Telnyx inbound/signature behavior works when used
-STOP/HELP protections remain active
-```
-
-Webinars, when enabled:
-
-```text
-public registration creates/reuses Contact
-registration is stored
-correct Zoom event adapter is used
-provider registrant is created
-personalized join URL is stored
-confirmation/reminders are planned
-consent behavior is correct
-ended webhook is accepted for the event type in use
-attendance resolves
-attended/missed automation runs
-recording.completed resolves playback when required
-post-event follow-up waits for required conditions
-```
-
-Use the specialized provider and troubleshooting docs for deeper verification.
-
-# 11. Controlled Project State clean rebuild
-
-Project State is not a normal deployment/update mechanism.
-
-For an approved destructive clean rebuild that must preserve supported CRM state, use only:
-
-```text
-docs/operations/project-state-transfer-runbook.md
-```
-
-At a high level, that flow owns:
-
-```text
-freeze writes
-stop Horizon/Scheduler
-take independent DB backup
-export immutable Project State
-clear only the exact stale Redis runtime namespace
-deploy intended code/client config
-migrate:fresh --force
-engage:install --force --no-create-user
-recreate environment-owned CRM user
-Validate Only
-Apply Import
-verify inert imported state
-restore runtime services
-resume imported work deliberately
-audit
-reopen traffic
-```
-
-Do not substitute this sequence for a routine production deployment.
-
-# 12. Final deployment gate
-
-Before calling a deployment complete:
-
-```text
-[ ] intended Core commit deployed
-[ ] intended client commit deployed
-[ ] CLIENT_KEY / preset / modules / timezone correct
-[ ] APP_ENV and APP_DEBUG correct
-[ ] APP_KEY preserved
-[ ] environment files readable by required process identities
-[ ] selected-client .env contains only client-owned keys
-[ ] database identity correct
-[ ] Redis/cache/Horizon isolation correct
-[ ] modules:status reviewed
-[ ] setup:validate passes
-[ ] Horizon process/path healthy
-[ ] every runtime queue is consumed
-[ ] Scheduler cron and schedule:list verified
-[ ] DNS/Nginx/TLS healthy
-[ ] enabled providers verified
-[ ] applicable safe smoke checks pass
-[ ] Project State work completed/resumed when applicable
-[ ] final audit contains no BREAKING finding
-[ ] MANUAL VERIFICATION REQUIRED items are deliberately resolved or accepted
-```
-
-# 13. What not to do
+# 10. What not to do
 
 Do not:
 
@@ -641,6 +447,7 @@ run php artisan test as the production deployment gate
 regenerate APP_KEY casually
 flush Redis indiscriminately
 run migrate:fresh on a normal production update
+use Project State export/import as a normal deployment or recovery shortcut
 edit application/client source directly on staging/production
 assume preset sync rewrites already-scheduled message payloads
 assume Horizon health proves Scheduler health

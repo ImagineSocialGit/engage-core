@@ -1,3 +1,9 @@
+# Archived — Project State Transfer Runbook
+
+> **Retired from active operations on 2026-10-20.** This document is retained only as historical implementation/recovery knowledge. It is **not** an approved deployment, update, production reset, or restoration procedure. Its described transfer contract and supported table/module coverage may be outdated. Do not execute these instructions on staging or production without separately validating the current code, durable state, backup/recovery guarantees, and obtaining explicit operational approval.
+
+---
+
 # Engage Core — Project State Transfer Runbook
 
 ## Purpose
@@ -12,7 +18,7 @@ Project State is not a normal deployment mechanism and is not a substitute for:
 - Redis/queue isolation;
 - change approval and a maintenance window.
 
-Developer contract changes belong in [`../project-state-extension-guide.md`](../project-state-extension-guide.md).
+Developer contract changes belong in [the Project State extension guide](../../project-state-extension-guide.md).
 
 ## Current transfer contract
 

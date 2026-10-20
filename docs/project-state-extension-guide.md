@@ -6,7 +6,7 @@ Project State is Engage Core's current-format database state transfer system for
 
 It exports the supported client-owned database state into one versioned JSON document, validates that document against the target application's current schema and transfer contract, imports it in dependency-safe order, and leaves runnable work inert until an owner explicitly resumes it.
 
-This guide is for developers extending the Project State contract. Operators should use [`operations/project-state-transfer-runbook.md`](operations/project-state-transfer-runbook.md).
+This guide is for developers extending the Project State contract.
 
 ## Current contract
 

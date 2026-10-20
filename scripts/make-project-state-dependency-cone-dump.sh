@@ -138,7 +138,7 @@ SEED_PATHS=(
     "config/project_state.php"
     "tests/Feature/Clients/ProjectStateClientEnvironmentContractTest.php"
     "docs/project-state-extension-guide.md"
-    "docs/operations/project-state-transfer-runbook.md"
+    "docs/archive/deployment/project-state-transfer-runbook.md"
 )
 
 SEED_DIRECTORIES=(
