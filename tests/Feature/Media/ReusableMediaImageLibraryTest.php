@@ -49,12 +49,18 @@ class ReusableMediaImageLibraryTest extends TestCase
             'ingestion_status' => MediaAsset::INGESTION_READY,
             'visibility' => 'private',
         ]);
+        $generated = MediaAsset::factory()->create([
+            'disk' => 'public',
+            'ingestion_status' => MediaAsset::INGESTION_READY,
+            'meta' => ['authoring_selectable' => false],
+        ]);
 
         Storage::disk('public')->put($eligible->path, 'eligible-image-bytes');
         Storage::disk('public')->put($archived->path, 'archived-image-bytes');
         Storage::disk('public')->put($processing->path, 'processing-image-bytes');
         Storage::disk('public')->put($video->path, 'video-bytes');
         Storage::disk('public')->put($private->path, 'private-image-bytes');
+        Storage::disk('public')->put($generated->path, 'generated-image-bytes');
 
         $library = app(ReusableMediaImageLibrary::class);
         $selectable = $library->selectable(['image/jpeg']);
@@ -73,6 +79,15 @@ class ReusableMediaImageLibraryTest extends TestCase
         $this->assertSame((string) $eligible->uuid, $content->image->uuid);
         $this->assertSame('image/jpeg', $content->image->mimeType);
         $this->assertSame('eligible-image-bytes', $content->bytes);
+
+        $generatedContent = $library->content((string) $generated->uuid);
+        $this->assertInstanceOf(ReusableMediaImageContent::class, $generatedContent);
+        $this->assertSame('generated-image-bytes', $generatedContent->bytes);
+        $this->assertSame(
+            (string) $generated->uuid,
+            $library->find((string) $generated->uuid)?->uuid,
+        );
+
         $this->assertNull($library->find((string) $archived->uuid));
         $this->assertNull($library->find((string) $processing->uuid));
         $this->assertNull($library->find((string) $video->uuid));

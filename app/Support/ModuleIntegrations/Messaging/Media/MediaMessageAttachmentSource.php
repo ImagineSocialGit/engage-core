@@ -38,6 +38,7 @@ final class MediaMessageAttachmentSource implements MessageAttachmentSource, Sel
     {
         return MediaAsset::query()
             ->active()
+            ->authoringSelectable()
             ->where('visibility', MediaAsset::VISIBILITY_PUBLIC)
             ->whereNotNull('size_bytes')
             ->where('size_bytes', '<=', max(1, (int) config('messaging.email.attachments.max_file_bytes', 10485760)))

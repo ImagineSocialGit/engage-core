@@ -41,12 +41,21 @@ final class StoreGeneratedMediaSvgAction
                 test: true,
             );
 
-            return $this->storeMediaAsset->handle(
+            $asset = $this->storeMediaAsset->handle(
                 file: $file,
                 title: $title,
                 uploadedBy: $createdBy,
                 source: $source,
             );
+
+            if ($asset->isAuthoringSelectable()) {
+                $meta = is_array($asset->meta) ? $asset->meta : [];
+                $meta['authoring_selectable'] = false;
+
+                $asset->forceFill(['meta' => $meta])->save();
+            }
+
+            return $asset;
         } finally {
             @unlink($temporaryPath);
         }

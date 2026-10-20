@@ -28,6 +28,7 @@ final class MediaMessageMediaLibrary implements MessageMediaLibrary
         return MediaAsset::query()
             ->active()
             ->ready()
+            ->authoringSelectable()
             ->latest('id')
             ->limit(200)
             ->get()

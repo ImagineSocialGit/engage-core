@@ -7,6 +7,7 @@ use App\Modules\Media\Models\MediaAsset;
 use App\Modules\Messaging\Support\MessageMediaPayload;
 use App\Support\ModuleIntegrations\Messaging\Contracts\MessageMediaLibrary;
 use App\Support\ModuleIntegrations\Messaging\Media\MediaMessageMediaLibrary;
+use App\Support\ModuleIntegrations\Messaging\Media\MediaMessageAttachmentSource;
 use App\Support\ModuleIntegrations\Messaging\UnavailableMessageMediaLibrary;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -141,6 +142,80 @@ class MessagingMediaLibraryTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $library->snapshot($snapshot['asset_uuid']);
+    }
+
+    public function test_generated_system_artifacts_are_hidden_from_message_media_selection_but_remain_resolvable(): void
+    {
+        $this->configureMedia();
+        Storage::disk('spaces')->put('media/selectable.jpg', 'selectable');
+        Storage::disk('spaces')->put('media/generated.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>');
+
+        $selectable = MediaAsset::factory()->create([
+            'disk' => 'spaces',
+            'path' => 'media/selectable.jpg',
+            'mime_type' => 'image/jpeg',
+            'extension' => 'jpg',
+            'ingestion_status' => MediaAsset::INGESTION_READY,
+        ]);
+        $generated = MediaAsset::factory()->create([
+            'disk' => 'spaces',
+            'path' => 'media/generated.svg',
+            'mime_type' => 'image/svg+xml',
+            'extension' => 'svg',
+            'ingestion_status' => MediaAsset::INGESTION_READY,
+            'meta' => ['authoring_selectable' => false],
+        ]);
+
+        $library = app(MediaMessageMediaLibrary::class);
+
+        $this->assertSame(
+            [(string) $selectable->uuid],
+            array_column($library->selectableAssets(), 'uuid'),
+        );
+        $this->assertSame(
+            (string) $generated->uuid,
+            $library->snapshot((string) $generated->uuid)['asset_uuid'],
+        );
+    }
+
+    public function test_generated_system_artifacts_are_hidden_from_message_attachment_selection_but_remain_resolvable(): void
+    {
+        $this->configureMedia();
+        Storage::disk('spaces')->put('media/selectable.pdf', 'selectable');
+        Storage::disk('spaces')->put('media/generated.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>');
+
+        $selectable = MediaAsset::factory()->create([
+            'kind' => MediaAsset::KIND_DOCUMENT,
+            'disk' => 'spaces',
+            'path' => 'media/selectable.pdf',
+            'mime_type' => 'application/pdf',
+            'extension' => 'pdf',
+            'size_bytes' => 10,
+            'ingestion_status' => MediaAsset::INGESTION_READY,
+        ]);
+        $generated = MediaAsset::factory()->create([
+            'disk' => 'spaces',
+            'path' => 'media/generated.svg',
+            'mime_type' => 'image/svg+xml',
+            'extension' => 'svg',
+            'size_bytes' => 10,
+            'ingestion_status' => MediaAsset::INGESTION_READY,
+            'meta' => ['authoring_selectable' => false],
+        ]);
+
+        $source = app(MediaMessageAttachmentSource::class);
+
+        $this->assertSame(
+            [(string) $selectable->uuid],
+            array_map(
+                static fn ($attachment): string => $attachment->id,
+                $source->selectable(),
+            ),
+        );
+        $this->assertSame(
+            (string) $generated->uuid,
+            $source->find((string) $generated->uuid)?->id,
+        );
     }
 
     public function test_generated_video_poster_is_available_to_later_message_snapshots(): void

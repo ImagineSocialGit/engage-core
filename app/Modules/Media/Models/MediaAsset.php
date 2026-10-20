@@ -96,6 +96,19 @@ class MediaAsset extends Model
         return $query->where('ingestion_status', self::INGESTION_READY);
     }
 
+    public function scopeAuthoringSelectable(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            $query->whereNull('meta->authoring_selectable')
+                ->orWhere('meta->authoring_selectable', true);
+        });
+    }
+
+    public function isAuthoringSelectable(): bool
+    {
+        return data_get($this->meta, 'authoring_selectable', true) !== false;
+    }
+
     public function ingestionStatus(): string
     {
         $status = is_string($this->ingestion_status)

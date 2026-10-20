@@ -89,6 +89,14 @@ Generated SVG storage reuses Media SHA-256 identity. Repeating byte-identical ge
 
 This seam is suitable for generated product artifacts such as an Event signup QR SVG. The consuming package owns the SVG's business meaning and generation rules; Media owns validation, durable object storage, identity, and the current subject-role pointer.
 
+## Authoring selection policy
+
+Media distinguishes durable assets from assets that should be offered in reusable authoring pickers. Normal operator-uploaded Media remains authoring-selectable by default. System-generated artifacts may remain public, assigned, directly resolvable, rasterizable, and historically durable while opting out of reusable authoring catalogs with `meta.authoring_selectable = false`.
+
+`StoreGeneratedMediaSvgAction` applies that non-selectable marker to generated SVG assets, including exact-content assets reused through Media deduplication. `ReusableMediaImageLibrary::selectable()`, Messaging body-media selection, and Messaging Media attachment selection all honor the marker. Direct UUID resolution intentionally does not: existing assignments and previously persisted references must keep working even when an asset is not appropriate to offer as a new authoring choice.
+
+The Media library workspace may still expose these assets for storage/audit visibility. "Not authoring-selectable" is a picker policy, not deletion, archival, privacy, or loss of Media identity. Consumers must not special-case their own generated source names; they should rely on Media's shared authoring-selection policy.
+
 ## Image near-duplicate suggestions
 
 When `media.near_duplicate_images.enabled` is true, Media can inspect an image before permanent storage and suggest existing active images that look substantially similar.

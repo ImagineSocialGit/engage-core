@@ -71,6 +71,8 @@ SVG;
         $this->assertSame($actor->getMorphClass(), $asset->uploaded_by_type);
         $this->assertSame($actor->getKey(), $asset->uploaded_by_id);
         $this->assertSame(MediaAsset::INGESTION_READY, $asset->ingestionStatus());
+        $this->assertFalse($asset->isAuthoringSelectable());
+        $this->assertFalse(data_get($asset->meta, 'authoring_selectable'));
         $this->assertSame(hash('sha256', $svg), $asset->checksum_sha256);
         Storage::disk('public')->assertExists((string) $asset->path);
         $this->assertSame($svg, Storage::disk('public')->get((string) $asset->path));

@@ -24,6 +24,7 @@ final class DatabaseReusableMediaImageLibrary implements ReusableMediaImageLibra
         $mimeTypes = $this->normalizeMimeTypes($mimeTypes);
 
         return $this->imageQuery()
+            ->authoringSelectable()
             ->when(
                 $mimeTypes !== [],
                 fn (Builder $query) => $query->whereIn('mime_type', $mimeTypes),
