@@ -2,7 +2,9 @@
 
 namespace App\Modules\Forms\Services;
 
+use App\Modules\Forms\Data\HostedFormContextReference;
 use App\Modules\Forms\Data\PublishedForm;
+use App\Modules\Forms\Models\FormContextVersion;
 use App\Modules\Forms\Models\FormDefinition;
 use App\Modules\Forms\Models\FormVersion;
 use DomainException;
@@ -14,9 +16,50 @@ final class PublishedFormResolver
         private readonly FormSchemaNormalizer $schemas,
     ) {}
 
-    public function find(
+    public function find(string $key, bool $publicOnly = false): ?PublishedForm
+    {
+        return $this->resolve($key, null, $publicOnly);
+    }
+
+    public function findForContext(
         string $key,
+        HostedFormContextReference $context,
         bool $publicOnly = false,
+    ): ?PublishedForm {
+        return $this->resolve($key, $context, $publicOnly);
+    }
+
+    public function require(string $key, bool $publicOnly = false): PublishedForm
+    {
+        return $this->requireResolved($key, null, $publicOnly);
+    }
+
+    public function requireForContext(
+        string $key,
+        HostedFormContextReference $context,
+        bool $publicOnly = false,
+    ): PublishedForm {
+        return $this->requireResolved($key, $context, $publicOnly);
+    }
+
+    private function requireResolved(
+        string $key,
+        ?HostedFormContextReference $context,
+        bool $publicOnly,
+    ): PublishedForm {
+        $published = $this->resolve($key, $context, $publicOnly);
+
+        if ($published instanceof PublishedForm) {
+            return $published;
+        }
+
+        throw new DomainException("Published form [{$key}] is unavailable.");
+    }
+
+    private function resolve(
+        string $key,
+        ?HostedFormContextReference $context,
+        bool $publicOnly,
     ): ?PublishedForm {
         $key = trim($key);
 
@@ -39,34 +82,36 @@ final class PublishedFormResolver
             return null;
         }
 
-        return $this->published($definition);
-    }
-
-    public function require(
-        string $key,
-        bool $publicOnly = false,
-    ): PublishedForm {
-        $published = $this->find(
-            key: $key,
-            publicOnly: $publicOnly,
-        );
-
-        if ($published instanceof PublishedForm) {
-            return $published;
-        }
-
-        throw new DomainException(
-            "Published form [{$key}] is unavailable.",
-        );
-    }
-
-    private function published(FormDefinition $definition): PublishedForm
-    {
         $version = $definition->currentVersion;
 
+        // The global/current version must remain valid even when a context override exists.
+        $this->assertPublished($definition, $version, current: true);
+
+        if ($context !== null) {
+            $binding = FormContextVersion::query()
+                ->with('formVersion')
+                ->where('form_definition_id', $definition->getKey())
+                ->where('context_key', $context->key)
+                ->where('context_reference', $context->reference)
+                ->first();
+
+            if ($binding instanceof FormContextVersion) {
+                $version = $binding->formVersion;
+                $this->assertPublished($definition, $version, current: false);
+            }
+        }
+
+        return $this->published($definition, $version);
+    }
+
+    private function assertPublished(
+        FormDefinition $definition,
+        ?FormVersion $version,
+        bool $current,
+    ): void {
         if (! $version instanceof FormVersion) {
             throw new DomainException(
-                "Active form [{$definition->key}] has no current FormVersion.",
+                "Active form [{$definition->key}] has no ".($current ? 'current' : 'context').' FormVersion.',
             );
         }
 
@@ -81,10 +126,14 @@ final class PublishedFormResolver
             || $version->archived_at !== null
         ) {
             throw new DomainException(
-                "Active form [{$definition->key}] does not point at a current published FormVersion.",
+                "Active form [{$definition->key}] does not point at a ".
+                ($current ? 'current' : 'context').' published FormVersion.',
             );
         }
+    }
 
+    private function published(FormDefinition $definition, FormVersion $version): PublishedForm
+    {
         try {
             $schema = $this->schemas->normalize(
                 $version->schema ?? [],

@@ -6,6 +6,7 @@ use App\Modules\Forms\Actions\CreateFormSubmissionAction;
 use App\Modules\Forms\Data\FormSubmissionContext;
 use App\Modules\Forms\Data\FormSubmissionInput;
 use App\Modules\Forms\Data\FormSubmissionVerification;
+use App\Modules\Forms\Data\HostedFormContextReference;
 use App\Modules\Forms\Data\PublishedForm;
 use App\Modules\Forms\Exceptions\FormSubmissionValidationException;
 use App\Modules\Forms\Services\HostedFormContextService;
@@ -35,8 +36,8 @@ final class HostedFormController
 
     public function show(Request $request, string $formSlug): View
     {
-        $form = $this->resolveHostedForm($formSlug);
         $context = $this->resolveSignedContext($request);
+        $form = $this->resolveHostedForm($formSlug, $context?->reference);
         $presentation = $this->presenter->present($form);
         $presentation = $this->withContextToken(
             presentation: $presentation,
@@ -53,8 +54,9 @@ final class HostedFormController
 
     public function store(Request $request, string $formSlug): RedirectResponse
     {
-        $form = $this->resolveHostedForm($formSlug);
-        $context = $this->resolvePostedContext($request, $form);
+        $formKey = $this->keyFromSlug($formSlug);
+        $context = $this->resolvePostedContext($request, $formKey);
+        $form = $this->resolveHostedForm($formSlug, $context?->reference);
         $presentation = $this->presenter->present($form);
         $redirect = route('forms.public.show', [
             'formSlug' => $presentation['slug'],
@@ -114,12 +116,12 @@ final class HostedFormController
 
     private function resolvePostedContext(
         Request $request,
-        PublishedForm $form,
+        string $formKey,
     ): ?FormSubmissionContext {
         try {
             return $this->contexts->resolvePostedRequest(
                 request: $request,
-                formKey: $form->key,
+                formKey: $formKey,
             );
         } catch (DomainException) {
             abort(404);
@@ -151,21 +153,17 @@ final class HostedFormController
         return $presentation;
     }
 
-    private function resolveHostedForm(string $formSlug): PublishedForm
-    {
+    private function resolveHostedForm(
+        string $formSlug,
+        ?HostedFormContextReference $context = null,
+    ): PublishedForm {
         $formSlug = strtolower(trim($formSlug));
-
-        if (preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $formSlug) !== 1) {
-            abort(404);
-        }
-
-        $formKey = str_replace('-', '_', $formSlug);
+        $formKey = $this->keyFromSlug($formSlug);
 
         try {
-            $form = $this->forms->require(
-                key: $formKey,
-                publicOnly: true,
-            );
+            $form = $context !== null
+                ? $this->forms->requireForContext($formKey, $context, publicOnly: true)
+                : $this->forms->require($formKey, publicOnly: true);
             $this->runtime->validate($form);
             $presentation = $this->presenter->present($form);
         } catch (DomainException) {
@@ -179,6 +177,17 @@ final class HostedFormController
         }
 
         return $form;
+    }
+
+    private function keyFromSlug(string $formSlug): string
+    {
+        $formSlug = strtolower(trim($formSlug));
+
+        if (preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $formSlug) !== 1) {
+            abort(404);
+        }
+
+        return str_replace('-', '_', $formSlug);
     }
 
     private function enforceRequiredVerification(): bool

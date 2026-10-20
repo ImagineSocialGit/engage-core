@@ -32,7 +32,8 @@ final class FormVisibilityEvaluator
         $visible = [];
 
         foreach ($fieldKeys as $fieldKey) {
-            $visible[$fieldKey] = ! isset($conditionByTarget[$fieldKey]);
+            $visible[$fieldKey] = ($form->field($fieldKey)['managed_visible'] ?? true) !== false
+                && ! isset($conditionByTarget[$fieldKey]);
         }
 
         $maximumIterations = max(1, count($fieldKeys) + 1);
@@ -42,6 +43,10 @@ final class FormVisibilityEvaluator
             $next = $visible;
 
             foreach ($conditionByTarget as $target => $condition) {
+                if (($form->field($target)['managed_visible'] ?? true) === false) {
+                    continue;
+                }
+
                 $matches = $this->matches(
                     form: $form,
                     condition: $condition,

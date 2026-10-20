@@ -46,10 +46,16 @@ final class CreateFormSubmissionAction
             }
         }
 
-        $form = $this->forms->require(
-            key: $input->formKey,
-            publicOnly: $input->publicOnly,
-        );
+        $form = $input->context !== null
+            ? $this->forms->requireForContext(
+                key: $input->formKey,
+                context: $input->context->reference,
+                publicOnly: $input->publicOnly,
+            )
+            : $this->forms->require(
+                key: $input->formKey,
+                publicOnly: $input->publicOnly,
+            );
         $this->validator->validateConfiguration($form);
         $this->contacts->validateConfiguration($form);
         $consentIntents = $this->consentIntents->resolve($form);

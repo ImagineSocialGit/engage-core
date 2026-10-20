@@ -22,7 +22,7 @@ final class HostedFormPresenter
             if ($block['type'] === 'field') {
                 $field = $form->field((string) $block['field']);
 
-                if ($field === null) {
+                if ($field === null || ($field['managed_visible'] ?? true) === false) {
                     continue;
                 }
 
@@ -39,7 +39,8 @@ final class HostedFormPresenter
 
         $hiddenFields = array_values(array_filter(
             $form->fields,
-            static fn (array $field): bool => ($field['type'] ?? null) === 'hidden',
+            static fn (array $field): bool => ($field['type'] ?? null) === 'hidden'
+                && ($field['managed_visible'] ?? true) !== false,
         ));
 
         return [
