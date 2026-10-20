@@ -3030,7 +3030,8 @@
 │   │   ├── module-uninstall.md
 │   │   ├── observability
 │   │   │   └── README.md
-│   │   └── project-state-transfer-runbook.md
+│   │   ├── project-state-transfer-runbook.md
+│   │   └── shared-host-staging-horizon.md
 │   ├── possible-scenarios.md
 │   ├── process-highway.md
 │   ├── product-principles.md
@@ -4207,4 +4208,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-926 directories, 3282 files
+926 directories, 3283 files
