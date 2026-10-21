@@ -19,6 +19,7 @@ final class FlowRoutesFormSubmissionAutomationWorkspace implements FormSubmissio
         private readonly AutomationCapabilityRegistry $capabilities,
         private readonly ModuleManager $modules,
         private readonly FlowRouteAuthoringLinkBuilder $authoringLinks,
+        private readonly QuickFormSubmissionAutomationService $quickActions,
     ) {}
 
     public function readForForm(
@@ -52,6 +53,26 @@ final class FlowRoutesFormSubmissionAutomationWorkspace implements FormSubmissio
         ];
     }
 
+    public function createQuickActionForForm(
+        string $formKey,
+        string $formName,
+        bool $contactAvailable,
+        string $capabilityKey,
+        array $input,
+        ?HostedFormContextReference $context = null,
+        ?string $contextLabel = null,
+    ): int {
+        return $this->quickActions->create(
+            formKey: $formKey,
+            formName: $formName,
+            contactAvailable: $contactAvailable,
+            capabilityKey: $capabilityKey,
+            input: $input,
+            context: $context,
+            contextLabel: $contextLabel,
+        );
+    }
+
     private function actions(
         string $formKey,
         string $formName,
@@ -76,10 +97,12 @@ final class FlowRoutesFormSubmissionAutomationWorkspace implements FormSubmissio
             }
 
             $nameTarget = $contextLabel ?? $formName;
+            $inlineFields = $this->quickActions->inlineFields($capability);
 
             $actions[] = [
                 'key' => $capability->key,
                 'module_key' => $capability->moduleKey,
+                'inline_fields' => $inlineFields,
                 'label' => $this->presentationString(
                     $presentation,
                     'label',

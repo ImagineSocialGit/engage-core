@@ -27,6 +27,7 @@ class CoreAutomationCapabilityContributor implements AutomationCapabilityContrib
                         'detail' => 'Add a reusable Contact tag after this form is submitted.',
                         'name_prefix' => 'Tag after',
                         'sort_order' => 10,
+                        'inline_authoring' => true,
                     ],
                 ],
             ],
